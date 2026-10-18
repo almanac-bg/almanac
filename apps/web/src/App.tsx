@@ -11,6 +11,7 @@ import { api } from './lib/api';
 import { actions, socket } from './lib/socket';
 import { setState, toast, useStore } from './lib/store';
 import { ResetPasswordPage, SettingsPage, VerifyEmailPage } from './pages/AccountPages';
+import { LegalLinks, PrivacyPage, TermsPage } from './pages/LegalPages';
 import { AchievementsPage } from './pages/AchievementsPage';
 import { AdminPage } from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
@@ -23,8 +24,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { RoomPage } from './pages/RoomPage';
 import { SubmitPage } from './pages/SubmitPage';
 
-/** Email links work whether or not you're signed in. */
-const PUBLIC_PATHS = ['/reset-password', '/verify-email'];
+/** Email links and legal pages work whether or not you're signed in. */
+const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/privacy', '/terms'];
 
 export function App() {
   const me = useStore((s) => s.me);
@@ -66,6 +67,8 @@ export function App() {
         <Routes>
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
         </Routes>
       ) : me ? (
         <SignedIn />
@@ -109,6 +112,7 @@ function SignedIn() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        {!inGame && <LegalLinks className="mt-16 justify-center" />}
       </main>
       {!inGame && <QueueOverlay />}
       <Invites />

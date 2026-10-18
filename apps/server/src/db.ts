@@ -220,6 +220,26 @@ const MIGRATIONS: (string | (() => void))[] = [
   );
   CREATE INDEX email_tokens_user ON email_tokens(user_id, purpose);
   `,
+
+  // v4: moderation — bans and player reports.
+  `
+  ALTER TABLE users ADD COLUMN banned_until INTEGER;
+  ALTER TABLE users ADD COLUMN ban_reason TEXT;
+
+  CREATE TABLE reports (
+    id INTEGER PRIMARY KEY,
+    reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    target_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    details TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER,
+    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT
+  );
+  CREATE INDEX reports_open ON reports(status, target_id);
+  `,
 ];
 
 function migrate() {

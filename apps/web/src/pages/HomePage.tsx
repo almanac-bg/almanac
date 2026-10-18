@@ -484,12 +484,13 @@ function DailyCard() {
 function CommunityCard() {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
-  const [pending, setPending] = useState<number | null>(null);
+  const [todo, setTodo] = useState<{ pendingQuestions: number; openReports: number } | null>(null);
   const level = levelProgress(me.xp).level;
   const locked = level < SUBMISSION_RULES.minLevel;
+  const pending = todo ? todo.pendingQuestions + todo.openReports : 0;
 
   useEffect(() => {
-    if (me.isAdmin) api.adminSubmissions('pending').then((r) => setPending(r.pending)).catch(() => {});
+    if (me.isAdmin) api.adminSummary().then(setTodo).catch(() => {});
   }, [me.isAdmin]);
 
   return (
@@ -516,7 +517,7 @@ function CommunityCard() {
           )}
         </Button>
         {me.isAdmin && (
-          <Button variant="ghost" onClick={() => navigate('/admin')}>
+          <Button variant="ghost" onClick={() => navigate(todo?.openReports && !todo.pendingQuestions ? '/admin?tab=reports' : '/admin')}>
             <ShieldCheck className="size-4" /> Модерация
             {pending ? <span className="rounded-full bg-amber-400 px-1.5 text-xs font-bold text-amber-950">{pending}</span> : null}
           </Button>

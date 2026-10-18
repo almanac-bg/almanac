@@ -14,7 +14,7 @@ import { type MatchContext, settleAchievements } from '../achievements';
 import { recordDailyResult } from '../daily';
 import { run, tx } from '../db';
 import { getRating, recordRating } from '../seasons';
-import { getUser } from '../users';
+import { DELETED_NAME, getUser } from '../users';
 import type { Game, Participant } from './Game';
 
 const XP = {
@@ -47,6 +47,14 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
   const { setup } = game;
   const playerCount = game.participants.size;
   const rewards = new Map<number, MatchRewards>();
+
+  // Someone may have deleted their account mid-match: keep their row, but anonymous.
+  for (const p of game.participants.values()) {
+    if (p.player.userId !== null && !getUser(p.player.userId)) {
+      p.player.userId = null;
+      p.player.name = DELETED_NAME;
+    }
+  }
 
   tx(() => {
     run(

@@ -33,7 +33,12 @@ export interface UserRow {
   email: string | null;
   email_key: string | null;
   pending_email: string | null;
+  banned_until: number | null;
+  ban_reason: string | null;
 }
+
+/** Shown in other players' match history once an account is deleted. */
+export const DELETED_NAME = 'Изтрит играч';
 
 export const getUser = (id: number) => one<UserRow>('SELECT * FROM users WHERE id = ?', id);
 export const usernameKey = (username: string) => username.normalize('NFC').toLowerCase();

@@ -475,3 +475,61 @@ test('email verification, password reset and change', T, async () => {
 
   assert.equal((await api.send('DELETE', '/api/account/email', newCookie)).body.user.email, null, 'email can be removed');
 });
+
+test('moderation: name filter, reports, rename, ban', T, async () => {
+  assert.equal((await api.send('POST', '/api/auth/register', '', { username: 'pu7ka', password: 'secret123' })).status, 400, 'offensive names are refused');
+  assert.equal((await api.send('POST', '/api/auth/register', '', { username: 'Admin_1', password: 'secret123' })).status, 400, 'reserved names are refused');
+
+  const D = await register(srv.url, 'troll_test');
+  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'nope' })).status, 400, 'reason is required');
+  assert.equal((await api.send('POST', '/api/reports', D.cookie, { username: 'troll_test', reason: 'name' })).status, 400, 'no self-reports');
+  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'behavior', details: 'спами емоции' })).status, 200);
+  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'name' })).status, 200, 'a repeat report updates the open one');
+  assert.equal((await api.get('/api/admin/reports', B.cookie)).status, 403, 'only admins see reports');
+  const queue = (await api.get('/api/admin/reports', A.cookie)).body.groups;
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].target.username, 'troll_test');
+  assert.equal(queue[0].reports.length, 1);
+  assert.equal(queue[0].reports[0].reason, 'name');
+  assert.deepEqual((await api.get('/api/admin/summary', A.cookie)).body.openReports, 1);
+
+  const resolve = (body: object) => api.send('POST', `/api/admin/reports/${D.user.id}/resolve`, A.cookie, body);
+  assert.equal((await resolve({ action: 'rename', username: 'kurva_1' })).status, 400, "moderators can't pick offensive names either");
+  assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч' })).status, 200);
+  assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
+  assert.equal((await api.get('/api/admin/reports', A.cookie)).body.groups.length, 0, 'reports close when resolved');
+
+  await api.send('POST', '/api/reports', B.cookie, { username: 'Мирен_играч', reason: 'cheating' });
+  assert.equal((await resolve({ action: 'ban', days: 7, reason: 'Нечестна игра' })).status, 200);
+  assert.equal((await api.get('/api/me', D.cookie)).body.user, null, 'a ban logs the player out');
+  const login = await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' });
+  assert.equal(login.status, 403);
+  assert.match(login.body.error, /спрян до .*Нечестна игра/);
+  assert.equal((await resolve({ action: 'ban', days: null, reason: '' })).status, 200, 'permanent bans');
+  assert.match((await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' })).body.error, /за постоянно/);
+});
+
+test('data export and account deletion', T, async () => {
+  const exp = await fetch(`${srv.url}/api/account/export`, { headers: { cookie: B.cookie } });
+  assert.match(exp.headers.get('content-disposition') ?? '', /attachment/);
+  const data = (await exp.json()) as { account: { username: string }; matches: unknown[]; achievements: unknown[]; friends: unknown[] };
+  assert.equal(data.account.username, B.user.username);
+  assert.ok(data.matches.length > 0 && data.achievements.length > 0 && data.friends.length > 0);
+
+  const E = await register(srv.url, 'to_be_deleted');
+  const se = connect(srv.url, E.cookie);
+  await connected(se);
+  const play = autoPlay(se, 'right');
+  await emitAck(se, 'solo:start', { category: 'mixed' });
+  await play;
+  assert.equal((await api.send('POST', '/api/account/delete', E.cookie, { password: 'wrong' })).status, 400);
+  assert.equal((await api.send('POST', '/api/account/delete', E.cookie, { password: 'secret123' })).status, 200);
+  se.close();
+  assert.equal((await api.get('/api/me', E.cookie)).body.user, null);
+  assert.equal((await api.send('POST', '/api/auth/login', '', { username: 'to_be_deleted', password: 'secret123' })).status, 401);
+  const rows = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'to_be_deleted'").get() as { n: number };
+  assert.equal(rows.n, 0, 'match history no longer names the player');
+  const anon = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'Изтрит играч'").get() as { n: number };
+  assert.ok(anon.n >= 1);
+  assert.equal((srv.db.prepare('SELECT COUNT(*) AS n FROM category_stats WHERE user_id = ?').get(E.user.id) as { n: number }).n, 0, 'stats are erased');
+});

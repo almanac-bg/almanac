@@ -14,7 +14,7 @@ import {
 } from '@quiz/shared';
 import { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
-import { getMe, settleAccount, updateLoadout } from '../account';
+import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
 import {
   createSession,
@@ -39,6 +39,7 @@ import {
 } from '../emailAuth';
 import { all, one, run } from '../db';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
+import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { notifyUser } from '../notify';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import {
@@ -108,12 +109,18 @@ const idParam = (req: Request) => Number(req.params.id);
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 api.post('/auth/register', async (req, res) => {
-  if (throttled(`register:${req.ip}`, 5, 60 * 60_000)) {
+  // Generous per-IP limit: a whole school class may sign up from one network.
+  if (throttled(`register:${req.ip}`, 30, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много регистрации. Опитай по-късно.' });
     return;
   }
   const creds = parse(Registration, req, res);
   if (!creds) return;
+  const problem = nameProblem(creds.username);
+  if (problem) {
+    res.status(400).json({ error: problem });
+    return;
+  }
   if (getUserByName(creds.username)) {
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
@@ -145,6 +152,11 @@ api.post('/auth/login', async (req, res) => {
   const user = getUserByLogin(creds.username);
   if (!user || !(await verifyPassword(creds.password, user.password_hash))) {
     res.status(401).json({ error: 'Грешно име или парола.' });
+    return;
+  }
+  const ban = activeBan(user);
+  if (ban) {
+    res.status(403).json({ error: ban });
     return;
   }
   setSessionCookie(res, createSession(user.id));
@@ -256,6 +268,42 @@ api.post('/account/password', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+api.get('/account/export', requireAuth, (_req, res) => {
+  res.setHeader('content-disposition', 'attachment; filename="almanac-data.json"');
+  res.type('application/json').send(JSON.stringify(exportAccount(res.locals.userId), null, 2));
+});
+
+api.post('/account/delete', requireAuth, async (req, res) => {
+  const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
+  if (!body) return;
+  if (throttled(`delete:${res.locals.userId}`, 5, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const result = await deleteAccount(res.locals.userId, body.password);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  setSessionCookie(res, null);
+  res.json({ ok: true });
+});
+
+api.post('/reports', requireAuth, (req, res) => {
+  const body = parse(
+    z.object({ username: z.string().trim().min(1).max(40), reason: z.string(), details: z.string().max(500).default('') }),
+    req,
+    res,
+  );
+  if (!body) return;
+  const result = fileReport(res.locals.userId, body.username, body.reason, body.details);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
+});
+
 api.get('/achievements', requireAuth, (_req, res) => {
   res.json({ achievements: achievementProgress(res.locals.userId) });
 });
@@ -335,6 +383,31 @@ api.post('/submissions', requireAuth, (req, res) => {
 api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
   const status = z.enum(['pending', 'approved', 'rejected']).catch('pending').parse(req.query.status) as SubmissionStatus;
   res.json({ submissions: listSubmissions(status), pending: pendingCount() });
+});
+
+api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {
+  res.json({ pendingQuestions: pendingCount(), openReports: openReportCount() });
+});
+
+api.get('/admin/reports', requireAuth, requireAdmin, (_req, res) => {
+  res.json({ groups: openReports() });
+});
+
+const Decision = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('dismiss') }),
+  z.object({ action: z.literal('rename'), username: z.string().max(40) }),
+  z.object({ action: z.literal('ban'), days: z.number().int().min(1).max(3650).nullable(), reason: z.string().max(200).default('') }),
+]);
+
+api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, (req, res) => {
+  const decision = parse(Decision, req, res);
+  if (!decision) return;
+  const result = resolveReports(res.locals.userId, idParam(req), decision);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true, groups: openReports() });
 });
 
 api.post('/admin/submissions/:id/approve', requireAuth, requireAdmin, (req, res) => {

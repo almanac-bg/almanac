@@ -8,15 +8,17 @@ import {
   type ProfileStats,
   RANK_TIERS,
   RARITIES,
+  REPORT_REASONS,
+  type ReportReason,
   seasonName,
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Swords, UserPlus } from 'lucide-react';
+import { Check, Flag, Swords, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
-import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { api } from '../lib/api';
 import { actions } from '../lib/socket';
 import { toast, useStore } from '../lib/store';
@@ -84,7 +86,10 @@ export function ProfilePage() {
               </Link>
             </div>
           ) : (
-            <FriendActions profile={data} onChange={setData} />
+            <div className="flex flex-wrap items-center gap-2">
+              <FriendActions profile={data} onChange={setData} />
+              <ReportButton username={user.username} />
+            </div>
           )}
         </div>
       </Card>
@@ -328,6 +333,74 @@ function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange:
     <Button onClick={() => run(() => api.addFriend(user.username), 'Поканата е изпратена')} loading={busy}>
       <UserPlus className="size-4" /> Добави приятел
     </Button>
+  );
+}
+
+function ReportButton({ username }: { username: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [details, setDetails] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!reason) return;
+    setBusy(true);
+    try {
+      await api.report(username, reason, details);
+      toast({ kind: 'success', title: 'Благодарим! Модераторите ще прегледат доклада.' });
+      setOpen(false);
+      setReason(null);
+      setDetails('');
+    } catch (e) {
+      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title="Докладвай"
+        aria-label="Докладвай играча"
+        className="focus-ring grid size-11 place-items-center rounded-2xl text-fg-3 hover:bg-rose-500/10 hover:text-rose-300"
+      >
+        <Flag className="size-4.5" />
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Докладвай ${username}`}>
+        <div className="space-y-2">
+          {REPORT_REASONS.map((r) => (
+            <label
+              key={r.id}
+              className={clsx(
+                'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
+                reason === r.id ? 'border-rose-400/50 bg-rose-500/10' : 'border-line hover:bg-white/5',
+              )}
+            >
+              <input type="radio" name="reason" checked={reason === r.id} onChange={() => setReason(r.id)} className="accent-rose-400" />
+              {r.label}
+            </label>
+          ))}
+        </div>
+        <textarea
+          value={details}
+          onChange={(e) => setDetails(e.target.value.slice(0, 500))}
+          placeholder="Подробности (по желание)"
+          rows={3}
+          className="mt-4 w-full rounded-2xl border border-line bg-black/30 p-3 text-sm outline-none focus:border-violet-400/60"
+        />
+        <p className="mt-2 text-xs text-fg-3">Докладите са анонимни за докладвания играч.</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Отказ
+          </Button>
+          <Button variant="danger" onClick={submit} disabled={!reason} loading={busy}>
+            Изпрати доклад
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 

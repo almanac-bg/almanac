@@ -195,6 +195,8 @@ socket.on('achievements', (ids) => {
   void refreshMe();
 });
 
+socket.on('account:update', () => void refreshMe());
+
 socket.on('notice', ({ kind, message }) => toast({ kind, title: message }));
 
 export function dropInvite(id: string) {

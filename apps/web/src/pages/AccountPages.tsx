@@ -1,10 +1,10 @@
-import { CheckCircle2, Eye, EyeOff, KeyRound, Mail, MailCheck, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Mail, MailCheck, ShieldAlert, Trash2, XCircle } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Logo } from '../components/NavBar';
-import { Button, Card, Spinner } from '../components/ui';
+import { Button, Card, Modal, Spinner } from '../components/ui';
 import { api } from '../lib/api';
-import { refreshMe } from '../lib/socket';
+import { refreshMe, socket } from '../lib/socket';
 import { setState, toast, useStore } from '../lib/store';
 
 const INPUT =
@@ -183,7 +183,80 @@ export function SettingsPage() {
       </div>
       <EmailSettings />
       <PasswordSettings />
+      <DataSettings />
     </div>
+  );
+}
+
+function DataSettings() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remove(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteAccount(password);
+      socket.disconnect();
+      setState({ me: null, room: null, game: null, queue: null });
+      navigate('/', { replace: true });
+      toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="size-5 text-violet-300" />
+        <h2 className="font-display text-lg font-bold">Твоите данни</h2>
+      </div>
+      <p className="mt-1 text-sm text-fg-3">
+        Виж как ги пазим в{' '}
+        <Link to="/privacy" className="text-violet-300 hover:underline">
+          Политиката за поверителност
+        </Link>
+        .
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a href="/api/account/export" download="almanac-data.json">
+          <Button variant="secondary" tabIndex={-1}>
+            <Download className="size-4" /> Изтегли данните си
+          </Button>
+        </a>
+        <Button variant="ghost" className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={() => setOpen(true)}>
+          <Trash2 className="size-4" /> Изтрий профила
+        </Button>
+      </div>
+
+      <Modal open={open} onClose={() => setOpen(false)} title="Изтриване на профила">
+        <form onSubmit={remove} className="space-y-4">
+          <p className="text-sm text-fg-2">
+            Профилът, нивото, статистиката, постиженията и приятелите ти ще бъдат изтрити завинаги. Това не може да се отмени.
+          </p>
+          <label className="block">
+            <Label>Потвърди с паролата си</Label>
+            <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
+          </label>
+          {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Отказ
+            </Button>
+            <Button type="submit" variant="danger" loading={busy} disabled={!password}>
+              Изтрий завинаги
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </Card>
   );
 }
 

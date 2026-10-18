@@ -47,7 +47,11 @@ export function createRealtime(httpServer: HttpServer): IO {
     if (matchmaker.modeOf(userId)) return 'queue';
     return 'online';
   };
-  setRealtime(io, presenceOf, friendIds);
+  setRealtime(io, presenceOf, friendIds, (userId) => {
+    matchmaker.leave(userId, false);
+    rooms.leave(userId);
+    games.leave(userId);
+  });
 
   const stats = (): LobbyStats => ({
     online: openSockets.size,

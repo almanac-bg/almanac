@@ -28,6 +28,7 @@ process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
 const { ordinal } = await import('../src/game/rewards');
+const { nameProblem } = await import('../src/moderation');
 
 test('elimination schedule leaves a two-player final', () => {
   assert.deepEqual(eliminationSchedule(8, 15), [3, 5, 7, 9, 11, 13]);
@@ -97,4 +98,13 @@ test('question picking: ramp, category cap and seeded determinism', () => {
 
 test('Bulgarian ordinals', () => {
   assert.deepEqual([1, 2, 3, 4, 7, 8, 11, 12, 21].map(ordinal), ['1-во', '2-ро', '3-то', '4-то', '7-мо', '8-мо', '11-то', '12-то', '21-во']);
+});
+
+test('username filter: catches disguised words, spares ordinary names', () => {
+  for (const bad of ['Fuck', 'f.u.c.k', 'ПУТКА', 'pu7ka', 'КуРвА', 'хуй123', 'Хуйло', 'sh1t_head', 'Пичкаджия', 'admin', 'Админ', 'Модератор_1', 'almanac', 'АЛМАНАХ']) {
+    assert.ok(nameProblem(bad), `should block "${bad}"`);
+  }
+  for (const ok of ['Себастиан', 'Badminton', 'Маркетинг', 'Иван', 'Курт', 'Торпедо', 'Лебед', 'Мария_92', 'Kurtis', 'Huxley', 'Ребека', 'Supper']) {
+    assert.equal(nameProblem(ok), null, `should allow "${ok}"`);
+  }
 });

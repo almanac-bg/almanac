@@ -8,12 +8,22 @@ import type { IO } from './game/io';
 let io: IO | null = null;
 let presenceOf: (userId: number) => Presence = () => 'offline';
 let friendsOf: (userId: number) => number[] = () => [];
+let removeFromPlayHook: (userId: number) => void = () => {};
 
-export function setRealtime(server: IO, presence: (userId: number) => Presence, friends: (userId: number) => number[]) {
+export function setRealtime(
+  server: IO,
+  presence: (userId: number) => Presence,
+  friends: (userId: number) => number[],
+  removeFromPlay: (userId: number) => void,
+) {
   io = server;
   presenceOf = presence;
   friendsOf = friends;
+  removeFromPlayHook = removeFromPlay;
 }
+
+/** Takes a user out of queues, rooms and live matches (bans, account deletion). */
+export const removeFromPlay = (userId: number) => removeFromPlayHook(userId);
 
 export const presence = (userId: number) => presenceOf(userId);
 

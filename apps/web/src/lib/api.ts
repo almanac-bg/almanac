@@ -6,6 +6,9 @@ import type {
   LeaderboardResponse,
   Loadout,
   MeUser,
+  ModerationAction,
+  ReportGroup,
+  ReportReason,
   ProfileStats,
   QuestionDraft,
   SeasonInfo,
@@ -46,6 +49,13 @@ export const api = {
   setEmail: (email: string) => request<{ user: MeUser }>('POST', '/account/email', { email }),
   removeEmail: () => request<{ user: MeUser }>('DELETE', '/account/email'),
   changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/account/password', { current, next }),
+  deleteAccount: (password: string) => request<{ ok: true }>('POST', '/account/delete', { password }),
+  report: (username: string, reason: ReportReason, details: string) =>
+    request<{ ok: true }>('POST', '/reports', { username, reason, details }),
+  adminSummary: () => request<{ pendingQuestions: number; openReports: number }>('GET', '/admin/summary'),
+  adminReports: () => request<{ groups: ReportGroup[] }>('GET', '/admin/reports'),
+  resolveReports: (userId: number, decision: ModerationAction) =>
+    request<{ ok: true; groups: ReportGroup[] }>('POST', `/admin/reports/${userId}/resolve`, decision),
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
   profile: (username: string) => request<ProfileStats>('GET', `/profile/${encodeURIComponent(username)}`),

@@ -229,6 +229,8 @@ export interface ServerToClientEvents {
   invite: (i: Invite) => void;
   /** Achievements earned outside a match (friends, authoring, seasons). */
   achievements: (ids: string[]) => void;
+  /** Your account changed server-side (e.g. renamed by a moderator); refetch /me. */
+  'account:update': () => void;
   notice: (p: { kind: 'info' | 'error'; message: string }) => void;
 }
 
@@ -377,3 +379,23 @@ export const SUBMISSION_RULES = {
   /** XP the author gets when a question is approved. */
   approvedXp: 100,
 } as const;
+
+export const REPORT_REASONS = [
+  { id: 'name', label: 'Обидно потребителско име' },
+  { id: 'behavior', label: 'Обидно поведение' },
+  { id: 'cheating', label: 'Измама или нечестна игра' },
+  { id: 'other', label: 'Друго' },
+] as const;
+
+export type ReportReason = (typeof REPORT_REASONS)[number]['id'];
+
+/** Open reports about one player, for the moderation queue. */
+export interface ReportGroup {
+  target: PublicUser & { bannedUntil: number | null };
+  reports: { id: number; reason: ReportReason; details: string | null; createdAt: number; reporter: string | null }[];
+}
+
+export type ModerationAction =
+  | { action: 'dismiss' }
+  | { action: 'rename'; username: string }
+  | { action: 'ban'; days: number | null; reason: string };

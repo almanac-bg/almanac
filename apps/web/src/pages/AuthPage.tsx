@@ -3,9 +3,11 @@ import clsx from 'clsx';
 import { ArrowLeft, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented } from '../components/ui';
 import { api } from '../lib/api';
+import { LegalLinks } from './LegalPages';
 import { setState } from '../lib/store';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
@@ -209,10 +211,24 @@ export function AuthPage() {
             <Button type="submit" size="lg" className="w-full" loading={busy}>
               {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
             </Button>
+            {mode === 'register' && (
+              <p className="text-center text-xs text-fg-3">
+                Със създаването на профил приемаш{' '}
+                <Link to="/terms" className="text-violet-300 hover:underline">
+                  Условията за ползване
+                </Link>{' '}
+                и{' '}
+                <Link to="/privacy" className="text-violet-300 hover:underline">
+                  Политиката за поверителност
+                </Link>
+                .
+              </p>
+            )}
           </form>
           </>
           )}
         </Card>
+        <LegalLinks className="mt-4 justify-center" />
       </motion.div>
     </div>
   );

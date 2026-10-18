@@ -2,7 +2,8 @@ import type { QuestionDraft, Submission, SubmissionStatus } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
+import { ReportsQueue } from '../components/admin/ReportsQueue';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { DraftEditor } from '../components/questions/DraftEditor';
@@ -22,29 +23,17 @@ const toDraft = (s: Submission): QuestionDraft => ({
 
 export function AdminPage() {
   const me = useStore((s) => s.me)!;
-  const [status, setStatus] = useState<SubmissionStatus>('pending');
-  const [items, setItems] = useState<Submission[] | null>(null);
-  const [pending, setPending] = useState<number | null>(null);
+  const [params, setParams] = useSearchParams();
+  const section = params.get('tab') === 'reports' ? 'reports' : 'questions';
+  const [counts, setCounts] = useState<{ pendingQuestions: number; openReports: number } | null>(null);
 
   useEffect(() => {
-    if (!me.isAdmin) return;
-    setItems(null);
-    api
-      .adminSubmissions(status)
-      .then((r) => {
-        setItems(r.submissions);
-        setPending(r.pending);
-      })
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, [status, me.isAdmin]);
+    if (me.isAdmin) api.adminSummary().then(setCounts).catch(() => {});
+  }, [me.isAdmin]);
 
   if (!me.isAdmin) return <Navigate to="/" replace />;
 
-  function reviewed(id: number, pendingNow: number) {
-    setItems((list) => list?.filter((s) => s.id !== id) ?? null);
-    setPending(pendingNow);
-  }
-
+  const badge = (n: number | undefined) => (n ? <span className="ml-1.5 text-amber-300">{n}</span> : null);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -53,8 +42,53 @@ export function AdminPage() {
             <ShieldCheck className="size-4" /> Модератор
           </p>
           <h1 className="mt-1 font-display text-3xl font-bold">Модерация</h1>
-          <p className="mt-1 text-fg-2">Въпроси, предложени от играчите. Одобрените влизат веднага в играта.</p>
         </div>
+        <Segmented
+          value={section}
+          onChange={(v) => setParams(v === 'reports' ? { tab: 'reports' } : {}, { replace: true })}
+          options={[
+            { value: 'questions', label: <>Въпроси{badge(counts?.pendingQuestions)}</> },
+            { value: 'reports', label: <>Доклади{badge(counts?.openReports)}</> },
+          ]}
+        />
+      </div>
+      {section === 'questions' ? (
+        <QuestionsQueue onPending={(n) => setCounts((c) => c && { ...c, pendingQuestions: n })} />
+      ) : (
+        <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />
+      )}
+    </div>
+  );
+}
+
+function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
+  const [status, setStatus] = useState<SubmissionStatus>('pending');
+  const [items, setItems] = useState<Submission[] | null>(null);
+  const [pending, setPending] = useState<number | null>(null);
+
+  useEffect(() => {
+    setItems(null);
+    api
+      .adminSubmissions(status)
+      .then((r) => {
+        setItems(r.submissions);
+        setPending(r.pending);
+        onPending(r.pending);
+      })
+      .catch((e) => toast({ kind: 'error', title: e.message }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  function reviewed(id: number, pendingNow: number) {
+    setItems((list) => list?.filter((s) => s.id !== id) ?? null);
+    setPending(pendingNow);
+    onPending(pendingNow);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-fg-2">Въпроси, предложени от играчите. Одобрените влизат веднага в играта.</p>
         <Segmented
           value={status}
           onChange={setStatus}

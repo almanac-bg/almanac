@@ -111,6 +111,15 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
 - **Accounts:** players log in with their username or a verified email. An optional email (verified by link) enables
   "Забравена парола?": a single-use reset link that expires in 1 hour and logs the account out everywhere.
   Passwords can be changed in Настройки.
+- **Moderation:**
+  - An offensive-name filter covers Cyrillic, Latin and leetspeak, and reserves names like admin and АЛМАНАХ.
+  - Players can report others from their profile.
+  - Moderators handle reports in `/admin` → Доклади: dismiss, rename, or ban for 1/7/30 days or permanently.
+  - The word lists are in `apps/server/src/moderation.ts`.
+- **Privacy (GDPR):**
+  - The privacy policy and terms of use are at `/privacy` and `/terms`.
+  - Players can download all their data as JSON and delete their account from Настройки.
+  - Fonts are self-hosted, and there are no third-party trackers.
 - **Friends:** players send requests by username and see live presence. They can invite friends into a room or
   challenge them to a 1v1 with one click.
 - **Community questions:** players at level 3+ submit questions. Moderators (`/admin`) approve them, editing if
@@ -154,6 +163,9 @@ and renews Let's Encrypt certificates automatically. A **CX22** (2 vCPU, 4 GB) i
 3. Put the SMTP details in `.env` as `SMTP_URL` and run `docker compose up -d`.
 
 Use port **587**: Hetzner blocks outgoing ports 25 and 465 on new cloud servers.
+
+**Before launch:** fill in the operator details (`LEGAL` in `packages/shared/src/brand.ts`). The privacy policy and
+terms show them. Both documents are drafts: have them reviewed for your situation.
 
 **Updating:** `git pull && docker compose up -d --build`. Live matches end on restart; accounts and stats are kept.
 

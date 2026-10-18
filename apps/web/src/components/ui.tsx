@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ButtonHTMLAttributes, type ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
 type Size = 'sm' | 'md' | 'lg';
@@ -105,7 +106,8 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  return (
+  // Portal to <body>: a glass ancestor's backdrop-filter would otherwise trap `position: fixed` inside it.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -136,7 +138,8 @@ export function Modal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
