@@ -1,0 +1,229 @@
+import type { QuestionDraft, Submission, SubmissionStatus } from '@quiz/shared';
+import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router';
+import { Avatar, LevelBadge } from '../components/Avatar';
+import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
+import { DraftEditor } from '../components/questions/DraftEditor';
+import { QuestionPreview } from '../components/questions/QuestionPreview';
+import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
+import { api } from '../lib/api';
+import { longDate, timeAgo } from '../lib/format';
+import { toast, useStore } from '../lib/store';
+
+const toDraft = (s: Submission): QuestionDraft => ({
+  category: s.category,
+  difficulty: s.difficulty,
+  q: s.q,
+  options: [...s.options],
+  answer: s.answer,
+});
+
+export function AdminPage() {
+  const me = useStore((s) => s.me)!;
+  const [status, setStatus] = useState<SubmissionStatus>('pending');
+  const [items, setItems] = useState<Submission[] | null>(null);
+  const [pending, setPending] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!me.isAdmin) return;
+    setItems(null);
+    api
+      .adminSubmissions(status)
+      .then((r) => {
+        setItems(r.submissions);
+        setPending(r.pending);
+      })
+      .catch((e) => toast({ kind: 'error', title: e.message }));
+  }, [status, me.isAdmin]);
+
+  if (!me.isAdmin) return <Navigate to="/" replace />;
+
+  function reviewed(id: number, pendingNow: number) {
+    setItems((list) => list?.filter((s) => s.id !== id) ?? null);
+    setPending(pendingNow);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-emerald-300 uppercase">
+            <ShieldCheck className="size-4" /> Модератор
+          </p>
+          <h1 className="mt-1 font-display text-3xl font-bold">Модерация</h1>
+          <p className="mt-1 text-fg-2">Въпроси, предложени от играчите. Одобрените влизат веднага в играта.</p>
+        </div>
+        <Segmented
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: 'pending', label: <>Чакащи{pending ? <span className="ml-1.5 text-amber-300">{pending}</span> : null}</> },
+            { value: 'approved', label: 'Одобрени' },
+            { value: 'rejected', label: 'Отхвърлени' },
+          ]}
+        />
+      </div>
+
+      {!items ? (
+        <div className="grid place-items-center py-24">
+          <Spinner className="size-8 text-violet-400" />
+        </div>
+      ) : items.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={status === 'pending' ? '🎉' : '🗂️'}
+            title={status === 'pending' ? 'Няма чакащи въпроси' : 'Тук още няма нищо'}
+            body={status === 'pending' ? 'Всичко е прегледано. Браво!' : undefined}
+          />
+        </Card>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <AnimatePresence initial={false}>
+            {items.map((s) =>
+              status === 'pending' ? (
+                <PendingCard key={s.id} submission={s} onReviewed={reviewed} />
+              ) : (
+                <ReviewedCard key={s.id} submission={s} />
+              ),
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuthorLine({ submission: s }: { submission: Submission }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Avatar avatar={s.author.avatar} frame={s.author.frame} size={36} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-sm">
+          <span className="truncate font-semibold">{s.author.username}</span>
+          <LevelBadge level={s.author.level} />
+        </div>
+        <div className="text-xs text-fg-3" title={longDate(s.createdAt)}>
+          {timeAgo(s.createdAt)}
+        </div>
+      </div>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${SUBMISSION_STATUS[s.status].className}`}>
+        {SUBMISSION_STATUS[s.status].label}
+      </span>
+    </div>
+  );
+}
+
+function PendingCard({ submission, onReviewed }: { submission: Submission; onReviewed: (id: number, pending: number) => void }) {
+  const original = useMemo(() => toDraft(submission), [submission]);
+  const [draft, setDraft] = useState<QuestionDraft>(original);
+  const [editing, setEditing] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const errors = useMemo(() => validateDraft(draft), [draft]);
+  const edited = !draftsEqual(draft, original);
+
+  async function approve() {
+    if (edited && hasErrors(errors)) {
+      setEditing(true);
+      return;
+    }
+    setBusy('approve');
+    try {
+      const res = await api.approveSubmission(submission.id, edited ? cleanDraft(draft) : null);
+      toast({ kind: 'success', title: `Одобрен${edited ? ' (с редакция)' : ''} — ${submission.author.username} получава XP` });
+      onReviewed(submission.id, res.pending);
+    } catch (e) {
+      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно одобрение.' });
+      setBusy(null);
+    }
+  }
+
+  async function reject() {
+    setBusy('reject');
+    try {
+      const res = await api.rejectSubmission(submission.id, reason);
+      toast({ kind: 'info', title: 'Въпросът е отхвърлен' });
+      onReviewed(submission.id, res.pending);
+    } catch (e) {
+      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно отхвърляне.' });
+      setBusy(null);
+    }
+  }
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.25 } }}
+    >
+      <Card className="space-y-4 p-5">
+        <AuthorLine submission={submission} />
+
+        {editing ? (
+          <DraftEditor draft={draft} onChange={setDraft} errors={errors} compact />
+        ) : (
+          <QuestionPreview draft={draft} compact />
+        )}
+
+        {rejecting ? (
+          <div className="space-y-3 rounded-2xl border border-rose-400/30 bg-rose-500/[0.06] p-3">
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={300}
+              autoFocus
+              placeholder="Причина (по желание) — авторът ще я види"
+              className="h-10 w-full rounded-xl border border-line bg-black/30 px-3 text-sm outline-none placeholder:text-fg-3 focus:border-rose-400/60"
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
+                Назад
+              </Button>
+              <Button size="sm" variant="danger" onClick={reject} loading={busy === 'reject'}>
+                <X className="size-4" /> Отхвърли
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {editing && edited && (
+              <Button size="sm" variant="ghost" onClick={() => setDraft(original)}>
+                <Undo2 className="size-4" /> Върни оригинала
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => setEditing(!editing)}>
+              <Pencil className="size-4" /> {editing ? 'Преглед' : 'Редактирай'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRejecting(true)} disabled={busy !== null}>
+              <X className="size-4" /> Откажи
+            </Button>
+            <Button size="sm" onClick={approve} loading={busy === 'approve'} disabled={edited && hasErrors(errors)}>
+              <Check className="size-4" /> Одобри{edited ? ' с промените' : ''}
+            </Button>
+          </div>
+        )}
+      </Card>
+    </motion.div>
+  );
+}
+
+function ReviewedCard({ submission: s }: { submission: Submission }) {
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <Card className="space-y-4 p-5">
+        <AuthorLine submission={s} />
+        <QuestionPreview draft={toDraft(s)} compact />
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
+          {s.reviewedAt && <span>Прегледан {timeAgo(s.reviewedAt)}</span>}
+          {s.status === 'rejected' && (
+            <span className="text-rose-300">{s.reason ? `Причина: ${s.reason}` : 'Без посочена причина'}</span>
+          )}
+        </div>
+      </Card>
+    </motion.div>
+  );
+}

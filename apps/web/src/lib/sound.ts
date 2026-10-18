@@ -1,0 +1,85 @@
+/** Tiny synthesized sound effects — no audio files needed. */
+
+let ctx: AudioContext | null = null;
+let muted = readMuted();
+
+function readMuted() {
+  try {
+    return localStorage.getItem('quiz:muted') === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function isMuted() {
+  return muted;
+}
+
+export function setMuted(value: boolean) {
+  muted = value;
+  try {
+    localStorage.setItem('quiz:muted', value ? '1' : '0');
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function audio(): AudioContext | null {
+  if (muted) return null;
+  try {
+    ctx ??= new AudioContext();
+    if (ctx.state === 'suspended') void ctx.resume();
+    return ctx;
+  } catch {
+    return null;
+  }
+}
+
+function tone(freq: number, start: number, duration: number, type: OscillatorType = 'sine', gain = 0.12, slideTo?: number) {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime + start;
+  const osc = ac.createOscillator();
+  const amp = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + duration);
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(amp).connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+
+export const sfx = {
+  tick: () => tone(1250, 0, 0.05, 'square', 0.03),
+  lock: () => tone(520, 0, 0.09, 'triangle', 0.08, 780),
+  countdown: () => tone(660, 0, 0.14, 'sine', 0.1),
+  go: () => {
+    tone(880, 0, 0.12, 'sine', 0.1);
+    tone(1320, 0.08, 0.22, 'sine', 0.1);
+  },
+  correct: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.06, 0.22, 'triangle', 0.09)),
+  wrong: () => {
+    tone(220, 0, 0.28, 'sawtooth', 0.05, 140);
+    tone(185, 0.05, 0.3, 'square', 0.03, 110);
+  },
+  pop: () => tone(900, 0, 0.07, 'sine', 0.06, 1400),
+  powerup: () => [700, 1050, 1400].forEach((f, i) => tone(f, i * 0.04, 0.12, 'sine', 0.07)),
+  eliminated: () => {
+    tone(160, 0, 0.5, 'sawtooth', 0.06, 60);
+    tone(90, 0.02, 0.6, 'sine', 0.12, 45);
+  },
+  win: () =>
+    [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.11, i === 6 ? 0.6 : 0.16, 'triangle', 0.09)),
+  levelUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, 'sine', 0.08)),
+  freeze: () => {
+    [2093, 1760, 1568, 1319].forEach((f, i) => tone(f, i * 0.05, 0.35, 'sine', 0.05));
+    tone(110, 0, 0.5, 'triangle', 0.06, 80);
+  },
+  achievement: () => {
+    tone(1047, 0, 0.18, 'sine', 0.08);
+    tone(1568, 0.1, 0.4, 'sine', 0.08);
+  },
+};

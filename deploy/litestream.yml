@@ -1,0 +1,10 @@
+# Streams every SQLite change to object storage within seconds.
+# Restore on a fresh server: docker compose run --rm litestream restore -o /data/quiz.db /data/quiz.db
+dbs:
+  - path: /data/quiz.db
+    replicas:
+      - type: s3
+        bucket: ${BACKUP_BUCKET}
+        path: almanac
+        endpoint: ${BACKUP_ENDPOINT}
+        force-path-style: true

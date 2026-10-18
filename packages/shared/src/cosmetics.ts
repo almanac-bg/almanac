@@ -1,0 +1,274 @@
+import { RANK_TIERS, type RankTierId } from './progression';
+
+/** Unlocked by reaching a level, earning an achievement, or finishing a season at a rank tier (or higher). */
+export type Requirement = { level: number } | { achievement: string } | { season: RankTierId };
+
+/** What a player has, for checking requirements. `seasonTier` is the best finished-season tier index (-1 = none). */
+export interface UnlockContext {
+  level: number;
+  achievements: ReadonlySet<string>;
+  seasonTier: number;
+}
+
+export interface AvatarDef {
+  id: string;
+  name: string;
+  emoji: string;
+  req: Requirement;
+}
+
+export interface FrameDef {
+  id: string;
+  name: string;
+  /** CSS background for the ring around the avatar. */
+  background: string;
+  animated?: boolean;
+  req: Requirement;
+}
+
+export interface TitleDef {
+  id: string;
+  name: string;
+  req: Requirement;
+}
+
+export interface EmoteDef {
+  id: string;
+  emoji: string;
+  req: Requirement;
+}
+
+export type PowerupId = 'fifty' | 'double' | 'freeze' | 'retry' | 'time';
+
+export interface PowerupDef {
+  id: PowerupId;
+  name: string;
+  icon: string;
+  description: string;
+  req: Requirement;
+  /** Needs an opponent to target. */
+  multiplayerOnly?: boolean;
+}
+
+export const AVATARS: AvatarDef[] = [
+  { id: 'fox', name: 'Лисица', emoji: '🦊', req: { level: 1 } },
+  { id: 'panda', name: 'Панда', emoji: '🐼', req: { level: 1 } },
+  { id: 'frog', name: 'Жабок', emoji: '🐸', req: { level: 1 } },
+  { id: 'octopus', name: 'Октопод', emoji: '🐙', req: { level: 1 } },
+  { id: 'cat', name: 'Коте', emoji: '🐱', req: { level: 1 } },
+  { id: 'penguin', name: 'Пингвин', emoji: '🐧', req: { level: 1 } },
+  { id: 'owl', name: 'Бухал', emoji: '🦉', req: { level: 2 } },
+  { id: 'tiger', name: 'Тигър', emoji: '🐯', req: { level: 3 } },
+  { id: 'koala', name: 'Коала', emoji: '🐨', req: { level: 4 } },
+  { id: 'unicorn', name: 'Еднорог', emoji: '🦄', req: { level: 5 } },
+  { id: 'shark', name: 'Акула', emoji: '🦈', req: { level: 7 } },
+  { id: 'dragon', name: 'Дракон', emoji: '🐲', req: { level: 9 } },
+  { id: 'alien', name: 'Извънземно', emoji: '👽', req: { level: 11 } },
+  { id: 'robot', name: 'Робот', emoji: '🤖', req: { level: 13 } },
+  { id: 'lion', name: 'Лъв', emoji: '🦁', req: { level: 16 } },
+  { id: 'wizard', name: 'Магьосник', emoji: '🧙', req: { level: 20 } },
+  { id: 'ghost', name: 'Призрак', emoji: '👻', req: { level: 25 } },
+  { id: 'planet', name: 'Планета', emoji: '🪐', req: { level: 30 } },
+  { id: 'trex', name: 'Ти-рекс', emoji: '🦖', req: { level: 40 } },
+  { id: 'star', name: 'Суперзвезда', emoji: '🌟', req: { level: 50 } },
+  { id: 'bolt', name: 'Мълния', emoji: '⚡', req: { achievement: 'speed_demon' } },
+  { id: 'flame', name: 'Пламък', emoji: '🔥', req: { achievement: 'streak_10' } },
+  { id: 'target', name: 'В десетката', emoji: '🎯', req: { achievement: 'perfect' } },
+  { id: 'crown', name: 'Корона', emoji: '👑', req: { achievement: 'royale_win' } },
+  { id: 'brain', name: 'Голям мозък', emoji: '🧠', req: { achievement: 'correct_1000' } },
+  { id: 'goat', name: 'Най-великият', emoji: '🐐', req: { achievement: 'level_50' } },
+];
+
+export const FRAMES: FrameDef[] = [
+  { id: 'classic', name: 'Класика', background: 'linear-gradient(135deg,#ffffff40,#ffffff12)', req: { level: 1 } },
+  { id: 'mint', name: 'Мента', background: 'linear-gradient(135deg,#6ee7b7,#14b8a6)', req: { level: 2 } },
+  { id: 'sunset', name: 'Залез', background: 'linear-gradient(135deg,#fb923c,#ec4899)', req: { level: 4 } },
+  { id: 'ocean', name: 'Океан', background: 'linear-gradient(135deg,#38bdf8,#6366f1)', req: { level: 6 } },
+  { id: 'neon', name: 'Неон', background: 'linear-gradient(135deg,#f0abfc,#22d3ee)', req: { level: 9 } },
+  { id: 'toxic', name: 'Токсик', background: 'linear-gradient(135deg,#d9f99d,#22c55e,#065f46)', req: { level: 12 } },
+  { id: 'gold', name: 'Злато', background: 'linear-gradient(135deg,#fef3c7,#f59e0b,#fde68a,#b45309)', req: { level: 15 } },
+  {
+    id: 'holo',
+    name: 'Холограма',
+    background: 'conic-gradient(#f472b6,#a78bfa,#22d3ee,#34d399,#facc15,#f472b6)',
+    animated: true,
+    req: { level: 22 },
+  },
+  {
+    id: 'void',
+    name: 'Бездна',
+    background: 'conic-gradient(#0f0a1f,#7c3aed,#0f0a1f,#22d3ee,#0f0a1f)',
+    animated: true,
+    req: { level: 35 },
+  },
+  {
+    id: 'inferno',
+    name: 'Инферно',
+    background: 'conic-gradient(#f97316,#ef4444,#facc15,#f97316)',
+    animated: true,
+    req: { achievement: 'streak_10' },
+  },
+  {
+    id: 'royal',
+    name: 'Кралска',
+    background: 'linear-gradient(135deg,#fde047,#a855f7,#fde047)',
+    req: { achievement: 'royale_win' },
+  },
+  {
+    id: 'prism',
+    name: 'Призма',
+    background: 'conic-gradient(#ef4444,#f59e0b,#84cc16,#06b6d4,#8b5cf6,#ef4444)',
+    animated: true,
+    req: { achievement: 'polymath' },
+  },
+  { id: 'season_silver', name: 'Сезон: Сребро', background: 'linear-gradient(135deg,#f8fafc,#94a3b8,#e2e8f0)', req: { season: 'silver' } },
+  { id: 'season_gold', name: 'Сезон: Злато', background: 'linear-gradient(135deg,#fef9c3,#eab308,#fef08a,#a16207)', req: { season: 'gold' } },
+  {
+    id: 'season_platinum',
+    name: 'Сезон: Платина',
+    background: 'conic-gradient(#ccfbf1,#5eead4,#f0fdfa,#2dd4bf,#ccfbf1)',
+    animated: true,
+    req: { season: 'platinum' },
+  },
+  {
+    id: 'season_diamond',
+    name: 'Сезон: Диамант',
+    background: 'conic-gradient(#dbeafe,#60a5fa,#e0f2fe,#818cf8,#dbeafe)',
+    animated: true,
+    req: { season: 'diamond' },
+  },
+  {
+    id: 'season_master',
+    name: 'Сезон: Майстор',
+    background: 'conic-gradient(#f0abfc,#e879f9,#fde047,#c026d3,#f0abfc)',
+    animated: true,
+    req: { season: 'master' },
+  },
+];
+
+export const TITLES: TitleDef[] = [
+  { id: 'rookie', name: 'Новобранец', req: { level: 1 } },
+  { id: 'curious', name: 'Любопитен ум', req: { level: 3 } },
+  { id: 'enthusiast', name: 'Куиз ентусиаст', req: { level: 5 } },
+  { id: 'buff', name: 'Ерудит', req: { level: 8 } },
+  { id: 'knowitall', name: 'Всезнайко', req: { level: 12 } },
+  { id: 'mastermind', name: 'Гений', req: { level: 18 } },
+  { id: 'encyclopedia', name: 'Ходеща енциклопедия', req: { level: 25 } },
+  { id: 'oracle', name: 'Оракул', req: { level: 35 } },
+  { id: 'legend', name: 'Жива легенда', req: { level: 50 } },
+  { id: 'speedster', name: 'Демон на скоростта', req: { achievement: 'speed_demon' } },
+  { id: 'unstoppable', name: 'Неудържим', req: { achievement: 'streak_10' } },
+  { id: 'perfectionist', name: 'Перфекционист', req: { achievement: 'perfect' } },
+  { id: 'duelist', name: 'Дуелист', req: { achievement: 'duelist' } },
+  { id: 'survivor', name: 'Последен оцелял', req: { achievement: 'royale_win' } },
+  { id: 'polymath', name: 'Всестранен ум', req: { achievement: 'polymath' } },
+  { id: 'comeback', name: 'Майстор на обрата', req: { achievement: 'comeback' } },
+  { id: 'slayer', name: 'Победител на гиганти', req: { achievement: 'giant_slayer' } },
+  { id: 'carry', name: 'Носещ отбора', req: { achievement: 'team_carry' } },
+  { id: 'author', name: 'Автор на въпроси', req: { achievement: 'author_10' } },
+  { id: 'daily', name: 'Всеки ден по малко', req: { achievement: 'daily_streak_7' } },
+  { id: 'season_gold', name: 'Златен сезон', req: { season: 'gold' } },
+  { id: 'season_diamond', name: 'Диамантен ум', req: { season: 'diamond' } },
+  { id: 'season_master', name: 'Сезонен майстор', req: { season: 'master' } },
+];
+
+export const EMOTES: EmoteDef[] = [
+  { id: 'thumbs', emoji: '👍', req: { level: 1 } },
+  { id: 'lol', emoji: '😂', req: { level: 1 } },
+  { id: 'wow', emoji: '😮', req: { level: 1 } },
+  { id: 'fire', emoji: '🔥', req: { level: 1 } },
+  { id: 'cool', emoji: '😎', req: { level: 4 } },
+  { id: 'mindblown', emoji: '🤯', req: { level: 6 } },
+  { id: 'clap', emoji: '👏', req: { level: 8 } },
+  { id: 'dead', emoji: '💀', req: { level: 10 } },
+  { id: 'salute', emoji: '🫡', req: { level: 14 } },
+  { id: 'clown', emoji: '🤡', req: { level: 18 } },
+  { id: 'goat', emoji: '🐐', req: { level: 24 } },
+  { id: 'trophy', emoji: '🏆', req: { achievement: 'first_win' } },
+  { id: 'huff', emoji: '😤', req: { achievement: 'photo_finish' } },
+  { id: 'ice', emoji: '🥶', req: { achievement: 'freezer' } },
+  { id: 'handshake', emoji: '🤝', req: { achievement: 'team_win' } },
+];
+
+export const POWERUPS: PowerupDef[] = [
+  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.', req: { level: 3 } },
+  { id: 'double', name: 'Двойно или нищо', icon: '💰', description: 'Удвоява точките за въпроса — ако отговориш вярно.', req: { level: 6 } },
+  {
+    id: 'freeze',
+    name: 'Леден удар',
+    icon: '❄️',
+    description: 'Замразява водещия съперник за 3 секунди — не може да отговаря.',
+    req: { level: 9 },
+    multiplayerOnly: true,
+  },
+  { id: 'retry', name: 'Втори шанс', icon: '🔁', description: 'Ако сгрешиш, имаш още един опит (за половин точки).', req: { level: 12 } },
+  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 15 } },
+];
+
+export const powerupById = (id: string) => POWERUPS.find((p) => p.id === id);
+
+/** Milliseconds a "Леден удар" locks its target out. */
+export const FREEZE_MS = 3000;
+/** Extra milliseconds from "Още време". */
+export const TIME_BONUS_MS = 5000;
+
+export const DEFAULT_LOADOUT = { avatar: 'fox', frame: 'classic', title: 'rookie' } as const;
+
+export type UnlockKind = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
+
+export interface UnlockRef {
+  kind: UnlockKind;
+  id: string;
+}
+
+const CATALOG: Record<UnlockKind, { id: string; req: Requirement }[]> = {
+  avatar: AVATARS,
+  frame: FRAMES,
+  title: TITLES,
+  emote: EMOTES,
+  powerup: POWERUPS,
+};
+
+export const tierIndex = (tier: RankTierId) => RANK_TIERS.findIndex((t) => t.id === tier);
+
+export function meetsRequirement(req: Requirement, ctx: UnlockContext): boolean {
+  if ('level' in req) return ctx.level >= req.level;
+  if ('achievement' in req) return ctx.achievements.has(req.achievement);
+  return ctx.seasonTier >= tierIndex(req.season);
+}
+
+export function isUnlocked(kind: UnlockKind, id: string, ctx: UnlockContext): boolean {
+  const item = CATALOG[kind].find((i) => i.id === id);
+  return !!item && meetsRequirement(item.req, ctx);
+}
+
+export function unlockedIds(kind: UnlockKind, ctx: UnlockContext): string[] {
+  return CATALOG[kind].filter((i) => meetsRequirement(i.req, ctx)).map((i) => i.id);
+}
+
+/** Everything that became available between two progression states. */
+export function newlyUnlocked(before: UnlockContext, after: UnlockContext): UnlockRef[] {
+  const out: UnlockRef[] = [];
+  for (const kind of Object.keys(CATALOG) as UnlockKind[]) {
+    for (const item of CATALOG[kind]) {
+      if (!meetsRequirement(item.req, before) && meetsRequirement(item.req, after)) out.push({ kind, id: item.id });
+    }
+  }
+  return out;
+}
+
+/** Next few level-gated rewards, for "coming up" teasers. */
+export function upcomingUnlocks(level: number, limit = 3): (UnlockRef & { level: number })[] {
+  const out: (UnlockRef & { level: number })[] = [];
+  for (const kind of Object.keys(CATALOG) as UnlockKind[]) {
+    for (const item of CATALOG[kind]) {
+      if ('level' in item.req && item.req.level > level) out.push({ kind, id: item.id, level: item.req.level });
+    }
+  }
+  return out.sort((a, b) => a.level - b.level).slice(0, limit);
+}
+
+export const avatarEmoji = (id: string) => AVATARS.find((a) => a.id === id)?.emoji ?? '🦊';
+export const frameById = (id: string) => FRAMES.find((f) => f.id === id) ?? FRAMES[0];
+export const titleName = (id: string) => TITLES.find((t) => t.id === id)?.name ?? 'Новобранец';
+export const emoteById = (id: string) => EMOTES.find((e) => e.id === id);

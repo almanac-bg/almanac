@@ -1,0 +1,54 @@
+# Production: `docker compose up -d --build` on the server. See README → Deploying.
+services:
+  app:
+    build: .
+    image: almanac:latest
+    restart: unless-stopped
+    environment:
+      COOKIE_SECURE: 'true'
+      # Caddy reaches the app over the private Docker network.
+      TRUST_PROXY: loopback, uniquelocal
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
+    volumes:
+      - data:/data
+    expose:
+      - '3001'
+
+  # HTTPS with automatic Let's Encrypt certificates, HTTP/3 and WebSocket proxying.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:-almanac.bg}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Optional continuous SQLite backups to S3-compatible storage (e.g. Hetzner Object Storage).
+  # Enable with: docker compose --profile backup up -d
+  litestream:
+    image: litestream/litestream:0.3.13
+    profiles: ['backup']
+    restart: unless-stopped
+    command: replicate
+    environment:
+      LITESTREAM_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${BACKUP_SECRET_ACCESS_KEY:-}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}
+      BACKUP_ENDPOINT: ${BACKUP_ENDPOINT:-}
+    volumes:
+      - data:/data
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:
