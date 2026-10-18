@@ -29,12 +29,22 @@ export interface UserRow {
   best_daily_streak: number;
   last_daily_day: string | null;
   freezes: number;
+  /** Verified address only; an unverified one waits in `pending_email`. */
+  email: string | null;
+  email_key: string | null;
+  pending_email: string | null;
 }
 
 export const getUser = (id: number) => one<UserRow>('SELECT * FROM users WHERE id = ?', id);
 export const usernameKey = (username: string) => username.normalize('NFC').toLowerCase();
 export const getUserByName = (username: string) =>
   one<UserRow>('SELECT * FROM users WHERE username_key = ?', usernameKey(username));
+
+export const emailKey = (email: string) => email.trim().normalize('NFC').toLowerCase();
+export const getUserByEmail = (email: string) => one<UserRow>('SELECT * FROM users WHERE email_key = ?', emailKey(email));
+
+/** Login accepts a username or a verified email. */
+export const getUserByLogin = (login: string) => (login.includes('@') ? getUserByEmail(login) : getUserByName(login));
 
 export function toPublicUser(row: Pick<UserRow, 'id' | 'username' | 'xp' | 'avatar' | 'frame' | 'title'>): PublicUser {
   return {

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { BRAND } from '@quiz/shared';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
 
@@ -20,6 +21,13 @@ export const config = {
   /** Express "trust proxy" setting: which proxies may set X-Forwarded-For. */
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',
   sessionDays: 30,
+  /** Public origin used in email links. */
+  appUrl: (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, ''),
+  /** e.g. smtp://user:pass@smtp-relay.brevo.com:587 — without it, emails are printed to the console. */
+  smtpUrl: process.env.SMTP_URL || null,
+  mailFrom: process.env.MAIL_FROM || `${BRAND.name} <no-reply@${BRAND.domain}>`,
+  /** Tests: write every outgoing email as a JSON file into this directory. */
+  mailOutbox: process.env.MAIL_OUTBOX || null,
   /** Extra moderators (comma-separated usernames). The first account ever registered is always an admin. */
   adminUsernames: (process.env.ADMIN_USERNAMES ?? '')
     .split(',')

@@ -1,6 +1,6 @@
 import { BRAND } from '@quiz/shared';
 import clsx from 'clsx';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Logo } from '../components/NavBar';
@@ -16,10 +16,17 @@ const FEATURES = [
   { icon: '🏆', title: 'Нива и постижения', body: 'Отключвай аватари, рамки и титли' },
 ];
 
+/** On phones autofocus would pop the keyboard and scroll past the logo. */
+const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
+const INPUT =
+  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
+
 export function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +36,8 @@ export function AuthPage() {
     setError(null);
     setBusy(true);
     try {
-      const { user } = mode === 'login' ? await api.login(username, password) : await api.register(username, password);
+      const { user } =
+        mode === 'login' ? await api.login(username, password) : await api.register(username, password, email.trim() || undefined);
       setState({ me: user });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Нещо се обърка.');
@@ -39,7 +47,7 @@ export function AuthPage() {
   }
 
   return (
-    <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
+    <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-16">
       {/* floating avatars */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {FLOATERS.map((e, i) => (
@@ -62,12 +70,12 @@ export function AuthPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
-        className="relative"
+        className="relative @container min-w-0"
       >
         <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2">
           <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Онлайн куиз битки
         </span>
-        <h1 className="text-[clamp(2.75rem,9vw,6.25rem)] leading-[0.9]">
+        <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
           <Logo />
         </h1>
         <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
@@ -99,6 +107,16 @@ export function AuthPage() {
       >
         <div className="absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm" />
         <Card className="relative bg-ink-2/70 p-6 sm:p-8">
+          {mode === 'forgot' ? (
+            <ForgotPassword
+              initial={username}
+              onBack={() => {
+                setMode('login');
+                setError(null);
+              }}
+            />
+          ) : (
+          <>
           <Segmented
             value={mode}
             onChange={(m) => {
@@ -118,19 +136,31 @@ export function AuthPage() {
           </p>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <Field label="Потребителско име">
+            <Field label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
-                autoFocus
+                autoFocus={DESKTOP}
                 required
-                minLength={3}
-                maxLength={20}
+                minLength={mode === 'register' ? 3 : 1}
+                maxLength={mode === 'register' ? 20 : 254}
                 placeholder="напр. Мозъчко"
-                className="h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40"
+                className={INPUT}
               />
             </Field>
+            {mode === 'register' && (
+              <Field label="Имейл (по желание)">
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="за възстановяване на паролата"
+                  className={INPUT}
+                />
+              </Field>
+            )}
             <Field label="Парола">
               <div className="relative">
                 <input
@@ -153,6 +183,18 @@ export function AuthPage() {
                 </button>
               </div>
             </Field>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('forgot');
+                  setError(null);
+                }}
+                className="focus-ring -mt-1 rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
+              >
+                Забравена парола?
+              </button>
+            )}
 
             <div
               role="alert"
@@ -168,8 +210,60 @@ export function AuthPage() {
               {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
             </Button>
           </form>
+          </>
+          )}
         </Card>
       </motion.div>
+    </div>
+  );
+}
+
+function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => void }) {
+  const [login, setLogin] = useState(initial);
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.forgotPassword(login.trim());
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={onBack} className="focus-ring inline-flex items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg">
+        <ArrowLeft className="size-4" /> Обратно към вход
+      </button>
+      <h2 className="mt-5 font-display text-2xl font-bold">Забравена парола</h2>
+      {sent ? (
+        <div className="mt-4 space-y-3 text-sm text-fg-2">
+          <p className="rounded-2xl bg-emerald-500/10 p-4 text-emerald-200">
+            <MailCheck className="mb-2 size-6" />
+            Ако профилът има потвърден имейл, изпратихме линк за нова парола. Провери пощата си (и папката за спам). Линкът е валиден 1 час.
+          </p>
+          <p className="text-fg-3">Без потвърден имейл паролата не може да се възстанови — тогава създай нов профил.</p>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="mt-4 space-y-4">
+          <p className="text-sm text-fg-3">Въведи потребителското си име или имейла, който си потвърдил. Ще ти изпратим линк за нова парола.</p>
+          <Field label="Потребителско име или имейл">
+            <input value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus={DESKTOP} autoComplete="username" className={INPUT} />
+          </Field>
+          {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+          <Button type="submit" size="lg" className="w-full" loading={busy}>
+            Изпрати линк
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

@@ -18,7 +18,21 @@ import {
   upcomingUnlocks,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, CalendarDays, DoorOpen, Flame, Gift, Lock, PenLine, Plus, ShieldCheck, Trophy, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarDays,
+  DoorOpen,
+  Flame,
+  Gift,
+  Lock,
+  MailWarning,
+  PenLine,
+  Plus,
+  ShieldCheck,
+  Trophy,
+  Users,
+  X,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -62,6 +76,8 @@ export function HomePage() {
           </span>
         </motion.button>
       )}
+
+      <EmailNudge />
 
       {/* Hero */}
       <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -291,6 +307,45 @@ function UpNext({ level }: { level: number }) {
     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2">
       Ниво {next.level}: <span className="text-base leading-none">{icon}</span> {name}
     </span>
+  );
+}
+
+/** Without a verified email a forgotten password means a lost account — nudge until one is added. */
+function EmailNudge() {
+  const me = useStore((s) => s.me)!;
+  const navigate = useNavigate();
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('quiz:email-nudge') === '1';
+    } catch {
+      return false;
+    }
+  });
+  if (me.email || me.pendingEmail || dismissed) return null;
+  return (
+    <div className="glass flex flex-wrap items-center gap-3 rounded-2xl border-violet-400/30 px-5 py-3">
+      <MailWarning className="size-5 text-violet-300" />
+      <span className="min-w-0 flex-1 text-sm">
+        Добави имейл, за да можеш да възстановиш паролата си, ако я забравиш.
+      </span>
+      <Button size="sm" variant="secondary" onClick={() => navigate('/settings')}>
+        Добави имейл
+      </Button>
+      <button
+        onClick={() => {
+          setDismissed(true);
+          try {
+            localStorage.setItem('quiz:email-nudge', '1');
+          } catch {
+            /* storage unavailable */
+          }
+        }}
+        aria-label="Скрий"
+        className="focus-ring grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-white/5 hover:text-fg"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
   );
 }
 

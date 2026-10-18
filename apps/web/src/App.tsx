@@ -10,6 +10,7 @@ import { Spinner } from './components/ui';
 import { api } from './lib/api';
 import { actions, socket } from './lib/socket';
 import { setState, toast, useStore } from './lib/store';
+import { ResetPasswordPage, SettingsPage, VerifyEmailPage } from './pages/AccountPages';
 import { AchievementsPage } from './pages/AchievementsPage';
 import { AdminPage } from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
@@ -22,9 +23,13 @@ import { ProfilePage } from './pages/ProfilePage';
 import { RoomPage } from './pages/RoomPage';
 import { SubmitPage } from './pages/SubmitPage';
 
+/** Email links work whether or not you're signed in. */
+const PUBLIC_PATHS = ['/reset-password', '/verify-email'];
+
 export function App() {
   const me = useStore((s) => s.me);
   const authChecked = useStore((s) => s.authChecked);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     api
@@ -57,7 +62,16 @@ export function App() {
     <>
       <Background />
       <Toasts />
-      {me ? <SignedIn /> : <AuthPage />}
+      {PUBLIC_PATHS.includes(pathname) ? (
+        <Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
+      ) : me ? (
+        <SignedIn />
+      ) : (
+        <AuthPage />
+      )}
     </>
   );
 }
@@ -92,6 +106,7 @@ function SignedIn() {
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/submit" element={<SubmitPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

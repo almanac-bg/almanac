@@ -1,6 +1,6 @@
 import { BRAND, levelProgress } from '@quiz/shared';
 import clsx from 'clsx';
-import { ChartColumn, Gamepad2, LogOut, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
+import { ChartColumn, Gamepad2, LogOut, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
 import { api } from '../lib/api';
@@ -113,6 +113,14 @@ export function NavBar() {
                   />
                 </div>
               </div>
+            </Link>
+            <Link
+              to="/settings"
+              aria-label="Настройки"
+              title="Настройки"
+              className="focus-ring grid size-9 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+            >
+              <Settings className="size-4.5" />
             </Link>
             <button
               onClick={logout}

@@ -25,6 +25,11 @@ export function notifyUser<E extends keyof ServerToClientEvents>(
   (io?.to(`user:${userId}`).emit as ((...a: unknown[]) => void) | undefined)?.(event, ...args);
 }
 
+/** Drops every live connection of a user (e.g. after a password reset logs them out everywhere). */
+export function disconnectUser(userId: number) {
+  io?.in(`user:${userId}`).disconnectSockets(true);
+}
+
 /** Coalesced "your friends list changed" pings, so a flurry of presence changes sends one update. */
 const pending = new Set<number>();
 let flushTimer: NodeJS.Timeout | null = null;

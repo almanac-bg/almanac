@@ -39,6 +39,10 @@ export interface MeUser extends PublicUser {
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
+  /** Verified address (used for password resets). */
+  email: string | null;
+  /** Address waiting for its verification link to be clicked. */
+  pendingEmail: string | null;
 }
 
 // ─── Realtime ────────────────────────────────────────────────────────────────

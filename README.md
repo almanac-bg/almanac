@@ -29,6 +29,22 @@ test real multiplayer locally, open a second browser (or a private window) with 
 | `npm run build`     | Builds the web app and bundles the server into `apps/server/dist`    |
 | `npm start`         | Production server on :3001 (plain Node) that also serves the web app |
 | `npm run typecheck` | Type-checks all three packages                                       |
+| `npm test`          | Full test suite (~45 s), see below                                   |
+
+### Tests
+
+`npm test` runs three suites with Node's built-in test runner:
+- **`e2e.test.ts`** boots a real server with a throwaway database and plays through everything with real sockets.
+  Two players and bots cover: solo, a ranked duel with a reconnect, Royale eliminations, private rooms and teams,
+  the daily challenge, friends, invites and challenges, every joker, community questions with moderation, and season
+  rewards.
+- **`questions.test.ts`** validates the question bank. New questions must pass it.
+- **`rules.test.ts`** checks the scoring and progression rules, including Sofia-time day and season boundaries across
+  DST changes.
+
+`npm run test:dist -w @quiz/server` runs the same suites against the production bundle. GitHub Actions
+(`.github/workflows/ci.yml`) runs typecheck, build and both test targets on every push, then builds the Docker image
+and checks that it boots.
 
 ### Configuration (environment variables)
 
@@ -40,6 +56,9 @@ test real multiplayer locally, open a second browser (or a private window) with 
 | `COOKIE_SECURE`    | `false`                               | Set `true` when served over HTTPS                            |
 | `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`; which reverse proxies to trust        |
 | `ADMIN_USERNAMES`  |                                       | Extra moderators (comma-separated usernames)                 |
+| `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
+| `SMTP_URL`         |                                       | e.g. `smtp://user:pass@host:587`. Unset → emails are printed to the console |
+| `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Sender address                                               |
 | `QUESTIONS_PATH`   | `apps/server/src/data/questions.json` | Built-in question bank                                       |
 | `GAME_TIME_SCALE`  | `1`                                   | Multiplies all in-game timers. For automated tests only      |
 
@@ -59,7 +78,7 @@ apps/server       Express + Socket.IO + SQLite
   src/daily.ts            Daily challenge: one seeded question set per day, one attempt
   src/friends.ts          Friend requests and presence
   src/submissions.ts      Community questions and moderation
-  src/data/questions.json Built-in question bank (300 questions, 10 categories)
+  src/data/questions.json Built-in question bank (800 questions, 10 categories)
 apps/web          React 19 + Vite + Tailwind 4 + Motion
 ```
 
@@ -89,6 +108,9 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
 - **Progression:** every match grants XP: participation, correct answers (by difficulty), placement, a perfect-game
   bonus, the first match of the day, the daily streak and achievements. Reaching level L takes `50·L·(L−1)` total
   XP.
+- **Accounts:** players log in with their username or a verified email. An optional email (verified by link) enables
+  "Забравена парола?": a single-use reset link that expires in 1 hour and logs the account out everywhere.
+  Passwords can be changed in Настройки.
 - **Friends:** players send requests by username and see live presence. They can invite friends into a room or
   challenge them to a 1v1 with one click.
 - **Community questions:** players at level 3+ submit questions. Moderators (`/admin`) approve them, editing if
@@ -124,6 +146,14 @@ and renews Let's Encrypt certificates automatically. A **CX22** (2 vCPU, 4 GB) i
    docker compose up -d --build
    ```
 4. Open https://almanac.bg and register. The first account becomes the admin.
+
+**Email (password resets):**
+1. Create an account with a transactional email provider. Brevo (EU, free up to 300 emails a day), Mailgun EU and
+   Postmark all work.
+2. Verify the `almanac.bg` domain there by adding the SPF and DKIM DNS records the provider gives you.
+3. Put the SMTP details in `.env` as `SMTP_URL` and run `docker compose up -d`.
+
+Use port **587**: Hetzner blocks outgoing ports 25 and 465 on new cloud servers.
 
 **Updating:** `git pull && docker compose up -d --build`. Live matches end on restart; accounts and stats are kept.
 

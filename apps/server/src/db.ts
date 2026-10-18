@@ -201,6 +201,25 @@ const MIGRATIONS: (string | (() => void))[] = [
     ).run(seasonKey());
     db.exec('DROP TABLE ratings;');
   },
+
+  // v3: email (verified only) for password resets, and single-use email tokens.
+  `
+  ALTER TABLE users ADD COLUMN email TEXT;
+  ALTER TABLE users ADD COLUMN email_key TEXT;
+  ALTER TABLE users ADD COLUMN pending_email TEXT;
+  CREATE UNIQUE INDEX users_email ON users(email_key) WHERE email_key IS NOT NULL;
+
+  CREATE TABLE email_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL,
+    email TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER
+  );
+  CREATE INDEX email_tokens_user ON email_tokens(user_id, purpose);
+  `,
 ];
 
 function migrate() {

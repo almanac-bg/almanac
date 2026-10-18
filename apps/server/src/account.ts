@@ -60,6 +60,8 @@ export function getMe(userId: number): MeUser | null {
     },
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
+    email: row.email,
+    pendingEmail: row.pending_email,
   };
 }
 

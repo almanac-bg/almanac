@@ -27,6 +27,16 @@ import {
   verifyPassword,
 } from '../auth';
 import { dailyInfo, liveDailyStreak } from '../daily';
+import {
+  changePassword,
+  EmailSchema,
+  PasswordSchema,
+  removeEmail,
+  requestEmailChange,
+  requestPasswordReset,
+  resetPassword,
+  verifyEmailToken,
+} from '../emailAuth';
 import { all, one, run } from '../db';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { notifyUser } from '../notify';
@@ -40,7 +50,7 @@ import {
   rejectSubmission,
   submitQuestion,
 } from '../submissions';
-import { getUser, getUserByName, isAdmin, toPublicUser, type UserRow, usernameKey } from '../users';
+import { getUser, getUserByLogin, getUserByName, isAdmin, toPublicUser, type UserRow, usernameKey } from '../users';
 
 export const api = Router();
 
@@ -51,7 +61,15 @@ const Credentials = z.object({
     .min(3, 'Името трябва да е поне 3 символа.')
     .max(20, 'Името може да е най-много 20 символа.')
     .regex(/^[\p{L}\p{N}_.-]+$/u, 'Само букви, цифри, точка, тире и долна черта.'),
-  password: z.string().min(6, 'Паролата трябва да е поне 6 символа.').max(200),
+  password: PasswordSchema,
+});
+
+const Registration = Credentials.extend({ email: z.union([z.literal(''), EmailSchema]).optional() });
+
+/** Login takes a username or a verified email. */
+const Login = z.object({
+  username: z.string().trim().min(1, 'Въведи име или имейл.').max(254),
+  password: z.string().min(1, 'Въведи парола.').max(200),
 });
 
 /** Tiny in-memory throttle for auth endpoints: N attempts per key per window. */
@@ -94,7 +112,7 @@ api.post('/auth/register', async (req, res) => {
     res.status(429).json({ error: 'Твърде много регистрации. Опитай по-късно.' });
     return;
   }
-  const creds = parse(Credentials, req, res);
+  const creds = parse(Registration, req, res);
   if (!creds) return;
   if (getUserByName(creds.username)) {
     res.status(409).json({ error: 'Това име вече е заето.' });
@@ -112,24 +130,65 @@ api.post('/auth/register', async (req, res) => {
     firstUser ? 1 : 0,
   );
   const userId = Number(lastInsertRowid);
+  if (creds.email) requestEmailChange(userId, creds.email);
   setSessionCookie(res, createSession(userId));
   res.status(201).json({ user: getMe(userId) });
 });
 
 api.post('/auth/login', async (req, res) => {
-  const creds = parse(Credentials, req, res);
+  const creds = parse(Login, req, res);
   if (!creds) return;
   if (throttled(`login:${req.ip}:${usernameKey(creds.username)}`)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
-  const user = getUserByName(creds.username);
+  const user = getUserByLogin(creds.username);
   if (!user || !(await verifyPassword(creds.password, user.password_hash))) {
     res.status(401).json({ error: 'Грешно име или парола.' });
     return;
   }
   setSessionCookie(res, createSession(user.id));
   res.json({ user: getMe(user.id) });
+});
+
+/** Always answers the same way, so it can't be used to discover accounts or emails. */
+api.post('/auth/forgot', (req, res) => {
+  const body = parse(z.object({ login: z.string().trim().min(1, 'Въведи име или имейл.').max(254) }), req, res);
+  if (!body) return;
+  if (throttled(`forgot-ip:${req.ip}`, 5, 15 * 60_000) || throttled(`forgot:${usernameKey(body.login)}`, 3, 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много заявки. Опитай по-късно.' });
+    return;
+  }
+  requestPasswordReset(body.login);
+  res.json({ ok: true });
+});
+
+api.post('/auth/reset', async (req, res) => {
+  const body = parse(z.object({ token: z.string().min(10).max(200), password: PasswordSchema }), req, res);
+  if (!body) return;
+  if (throttled(`reset:${req.ip}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
+    return;
+  }
+  const result = await resetPassword(body.token, body.password);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  setSessionCookie(res, createSession(result.userId));
+  res.json({ user: getMe(result.userId) });
+});
+
+/** The token alone proves mailbox ownership, so this works signed out too. */
+api.post('/auth/verify-email', (req, res) => {
+  const body = parse(z.object({ token: z.string().min(10).max(200) }), req, res);
+  if (!body) return;
+  const result = verifyEmailToken(body.token);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 api.post('/auth/logout', (req, res) => {
@@ -160,6 +219,41 @@ api.patch('/me/loadout', requireAuth, (req, res) => {
     return;
   }
   res.json({ user: getMe(res.locals.userId) });
+});
+
+api.post('/account/email', requireAuth, (req, res) => {
+  const body = parse(z.object({ email: z.string().max(254) }), req, res);
+  if (!body) return;
+  if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
+    return;
+  }
+  const result = requestEmailChange(res.locals.userId, body.email);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+api.delete('/account/email', requireAuth, (_req, res) => {
+  removeEmail(res.locals.userId);
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+api.post('/account/password', requireAuth, async (req, res) => {
+  const body = parse(z.object({ current: z.string().min(1, 'Въведи текущата парола.').max(200), next: PasswordSchema }), req, res);
+  if (!body) return;
+  if (throttled(`password:${res.locals.userId}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const result = await changePassword(res.locals.userId, body.current, body.next, sessionTokenFromCookieHeader(req.headers.cookie));
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 api.get('/achievements', requireAuth, (_req, res) => {

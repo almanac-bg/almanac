@@ -6,19 +6,24 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "build": "node build.mjs",
-    "start": "NODE_ENV=production node dist/index.mjs"
+    "start": "NODE_ENV=production node dist/index.mjs",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:dist": "TEST_TARGET=dist node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@quiz/shared": "*",
     "cookie": "^2.0.1",
     "express": "^5.3.0",
+    "nodemailer": "^10.1.7",
     "socket.io": "^4.8.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "@types/nodemailer": "^8.0.2",
     "esbuild": "^0.28.2",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.23.15"
   }
 }

@@ -75,9 +75,14 @@ export function ProfilePage() {
             </div>
           </div>
           {isMe ? (
-            <Link to="/locker" className="glass focus-ring rounded-2xl px-4 py-2 text-sm font-semibold hover:bg-white/10">
-              Промени визията
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/locker" className="glass focus-ring rounded-2xl px-4 py-2 text-sm font-semibold hover:bg-white/10">
+                Промени визията
+              </Link>
+              <Link to="/settings" className="glass focus-ring rounded-2xl px-4 py-2 text-sm font-semibold hover:bg-white/10">
+                Настройки
+              </Link>
+            </div>
           ) : (
             <FriendActions profile={data} onChange={setData} />
           )}

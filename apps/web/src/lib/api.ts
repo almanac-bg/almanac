@@ -37,9 +37,15 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   me: () => request<{ user: MeUser | null }>('GET', '/me'),
   login: (username: string, password: string) => request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
-  register: (username: string, password: string) =>
-    request<{ user: MeUser }>('POST', '/auth/register', { username, password }),
+  register: (username: string, password: string, email?: string) =>
+    request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
+  forgotPassword: (login: string) => request<{ ok: true }>('POST', '/auth/forgot', { login }),
+  resetPassword: (token: string, password: string) => request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
+  verifyEmail: (token: string) => request<{ ok: true }>('POST', '/auth/verify-email', { token }),
+  setEmail: (email: string) => request<{ user: MeUser }>('POST', '/account/email', { email }),
+  removeEmail: () => request<{ user: MeUser }>('DELETE', '/account/email'),
+  changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/account/password', { current, next }),
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
   profile: (username: string) => request<ProfileStats>('GET', `/profile/${encodeURIComponent(username)}`),

@@ -10,6 +10,9 @@ services:
       TRUST_PROXY: loopback, uniquelocal
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
+      APP_URL: https://${DOMAIN:-almanac.bg}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     volumes:
       - data:/data
     expose:
