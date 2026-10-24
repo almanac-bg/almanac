@@ -29,6 +29,9 @@ export function dayKey(ts = Date.now()) {
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
 
+/** Hour of the day (0–23) in Sofia time. */
+export const sofiaHour = (ts = Date.now()) => sofiaParts(ts).hour;
+
 /** Seasons are calendar months: "2026-10". */
 export const seasonKey = (ts = Date.now()) => dayKey(ts).slice(0, 7);
 

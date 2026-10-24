@@ -17,8 +17,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, register an account, and play. **The first account you register becomes the admin**, so
-it can approve community questions.
+Open http://localhost:5173, register an account, and play. In development **the first account you register becomes
+the admin**, so it can approve community questions. In production admins come only from `ADMIN_USERNAMES`.
 
 When no other humans are queuing, bots fill the empty seats after a few seconds, so every mode is playable alone. To
 test real multiplayer locally, open a second browser (or a private window) with another account.
@@ -33,11 +33,14 @@ test real multiplayer locally, open a second browser (or a private window) with 
 
 ### Tests
 
-`npm test` runs three suites with Node's built-in test runner:
+`npm test` runs five suites with Node's built-in test runner:
 - **`e2e.test.ts`** boots a real server with a throwaway database and plays through everything with real sockets.
   Two players and bots cover: solo, a ranked duel with a reconnect, Royale eliminations, private rooms and teams,
-  the daily challenge, friends, invites and challenges, every joker, community questions with moderation, and season
-  rewards.
+  the daily challenge, friends, invites and challenges, every joker, community questions with moderation, season
+  rewards, flagging and hiding wrong questions, and how the website's files are cached.
+- **`production.test.ts`** runs the server as in production: admins only from `ADMIN_USERNAMES`, browser security
+  headers, the health check, crash reports.
+- **`maintenance.test.ts`** covers the cleanup of expired logins and the daily database snapshots.
 - **`questions.test.ts`** validates the question bank. New questions must pass it.
 - **`rules.test.ts`** checks the scoring and progression rules, including Sofia-time day and season boundaries across
   DST changes.
@@ -55,12 +58,14 @@ and checks that it boots.
 | `BOT_FILL_SECONDS` | `8`                                   | Queue wait before bots fill empty seats; `off` disables bots |
 | `COOKIE_SECURE`    | `false`                               | Set `true` when served over HTTPS                            |
 | `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`; which reverse proxies to trust        |
-| `ADMIN_USERNAMES`  |                                       | Extra moderators (comma-separated usernames)                 |
+| `ADMIN_USERNAMES`  |                                       | Moderators (comma-separated usernames); the only admins in production |
 | `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
 | `SMTP_URL`         |                                       | e.g. `smtp://user:pass@host:587`. Unset → emails are printed to the console |
 | `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Sender address                                               |
 | `QUESTIONS_PATH`   | `apps/server/src/data/questions.json` | Built-in question bank                                       |
 | `GAME_TIME_SCALE`  | `1`                                   | Multiplies all in-game timers. For automated tests only      |
+| `BACKUP_DIR`       | `backups` next to the database        | Daily database snapshots; `off` disables them                |
+| `BACKUP_KEEP_DAYS` | `14`                                  | How many daily snapshots to keep                             |
 
 The brand name lives in `packages/shared/src/brand.ts`.
 
@@ -117,6 +122,8 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
   - An offensive-name filter covers Cyrillic, Latin and leetspeak, and reserves names like admin and АЛМАНАХ.
   - Players can report others from their profile.
   - Moderators handle reports in `/admin` → Доклади: dismiss, rename, or ban for 1/7/30 days or permanently.
+  - After a match players can review every question and flag a mistake. Moderators see the flags in `/admin` →
+    Сигнали, most reported first, and can hide a question from new matches at once (and undo that).
   - The word lists are in `apps/server/src/moderation.ts`.
 - **Privacy (GDPR):**
   - The privacy policy and terms of use are at `/privacy` and `/terms`.
@@ -153,10 +160,10 @@ and renews Let's Encrypt certificates automatically. A **CX22** (2 vCPU, 4 GB) i
    ```bash
    curl -fsSL https://get.docker.com | sh
    git clone <your repo> almanac && cd almanac
-   cp .env.example .env        # set DOMAIN, optionally ADMIN_USERNAMES and backups
+   cp .env.example .env        # set DOMAIN and ADMIN_USERNAMES (your username), optionally backups
    docker compose up -d --build
    ```
-4. Open https://almanac.bg and register. The first account becomes the admin.
+4. Open https://almanac.bg and register with the username you put in `ADMIN_USERNAMES` — that account is the admin.
 
 **Email (password resets):**
 1. Create an account with a transactional email provider. Brevo (EU, free up to 300 emails a day), Mailgun EU and
@@ -166,16 +173,35 @@ and renews Let's Encrypt certificates automatically. A **CX22** (2 vCPU, 4 GB) i
 
 Use port **587**: Hetzner blocks outgoing ports 25 and 465 on new cloud servers.
 
-**Before launch:** fill in the operator details (`LEGAL` in `packages/shared/src/brand.ts`). The privacy policy and
-terms show them. Both documents are drafts: have them reviewed for your situation.
+**Before launch:** fill in your name and a correspondence address (`LEGAL` in `packages/shared/src/brand.ts`); the
+service is run by a private individual, and the privacy policy and terms show these details. Both documents are
+drafts: have them reviewed for your situation.
 
 **Updating:** `git pull && docker compose up -d --build`. Live matches end on restart; accounts and stats are kept.
 
-**Backups:** pick either option.
-- **Hetzner's server backups:** a checkbox on the server.
-- **Litestream:** streams every database change to Hetzner Object Storage within seconds. Fill in the `BACKUP_*`
-  values in `.env` and run `docker compose --profile backup up -d`. See `deploy/litestream.yml` for how to restore.
+**Backups:** three layers, from automatic to off-site.
+1. **Daily snapshots (automatic):** after 04:00 Sofia time the app writes a consistent copy of the database to
+   `/data/backups/quiz-YYYY-MM-DD.db` and keeps the last 14 (`BACKUP_KEEP_DAYS`). These protect against mistakes and
+   bad deploys, but live on the same disk.
+2. **Hetzner's server backups (turn this on):** a checkbox on the server (+20% of its price). Daily images of the
+   whole server, kept off the machine, so losing the server isn't losing the game.
+3. **Litestream (optional):** streams every change to Hetzner Object Storage within seconds, for minute-level
+   recovery. Fill in the `BACKUP_*` values in `.env` and run `docker compose --profile backup up -d`. See
+   `deploy/litestream.yml` for how to restore.
 
-**Logs:** `docker compose logs -f app`.
+To restore a daily snapshot:
+```bash
+docker compose stop app
+docker compose run --rm --no-deps --entrypoint sh app -c 'ls /data/backups'   # pick a day
+docker compose run --rm --no-deps --entrypoint sh app -c \
+  'cp /data/quiz.db /data/quiz-before-restore.db && cp /data/backups/quiz-2026-10-25.db /data/quiz.db && rm -f /data/quiz.db-wal /data/quiz.db-shm'
+docker compose start app
+```
+
+**Monitoring:** add a free uptime check (e.g. UptimeRobot or Better Stack) on `https://almanac.bg/api/health`. It
+answers 200 only while the app and its database work. Crashes in players' browsers are reported to the server log
+as lines starting with 🧯.
+
+**Logs:** `docker compose logs -f app` (rotated: 5 × 10 MB per container).
 
 Live matches, queues and rooms are held in memory, so run a single app instance.

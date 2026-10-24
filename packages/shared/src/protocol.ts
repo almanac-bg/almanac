@@ -71,6 +71,8 @@ export interface Standing {
 }
 
 export interface QuestionPayload {
+  /** Stable question id (for reporting a mistake in it). */
+  id: string;
   index: number;
   total: number;
   category: CategoryId;
@@ -399,3 +401,35 @@ export type ModerationAction =
   | { action: 'dismiss' }
   | { action: 'rename'; username: string }
   | { action: 'ban'; days: number | null; reason: string };
+
+/** What a player can flag about a question. */
+export const QUESTION_REPORT_REASONS = [
+  { id: 'wrong', label: 'Отговорът, отбелязан като верен, е грешен' },
+  { id: 'ambiguous', label: 'Повече от един отговор е верен' },
+  { id: 'outdated', label: 'Информацията е остаряла' },
+  { id: 'typo', label: 'Правописна или езикова грешка' },
+  { id: 'other', label: 'Друго' },
+] as const;
+
+export type QuestionReportReason = (typeof QUESTION_REPORT_REASONS)[number]['id'];
+
+export interface QuestionInfo {
+  id: string;
+  category: CategoryId;
+  difficulty: Difficulty;
+  q: string;
+  options: string[];
+  answer: number;
+  /** Username of a community question's author. */
+  author: string | null;
+  /** Hidden from new matches by a moderator. */
+  hidden: boolean;
+}
+
+/** Open reports about one question, for the moderation queue. */
+export interface QuestionReportGroup {
+  question: QuestionInfo;
+  reports: { reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
+}
+
+export type QuestionReportAction = 'dismiss' | 'hide';

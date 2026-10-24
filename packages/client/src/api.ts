@@ -9,6 +9,10 @@ import type {
   ModerationAction,
   ProfileStats,
   QuestionDraft,
+  QuestionInfo,
+  QuestionReportAction,
+  QuestionReportGroup,
+  QuestionReportReason,
   ReportGroup,
   ReportReason,
   SeasonInfo,
@@ -16,6 +20,11 @@ import type {
   SubmissionStatus,
 } from '@quiz/shared';
 import { clientConfig } from './config';
+
+export interface QuestionReports {
+  groups: QuestionReportGroup[];
+  hidden: QuestionInfo[];
+}
 
 export class ApiError extends Error {
   constructor(
@@ -61,7 +70,15 @@ export const api = {
 
   report: (username: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', '/reports', { username, reason, details }),
-  adminSummary: () => request<{ pendingQuestions: number; openReports: number }>('GET', '/admin/summary'),
+  adminSummary: () =>
+    request<{ pendingQuestions: number; openReports: number; questionReports: number }>('GET', '/admin/summary'),
+  reportQuestion: (questionId: string, reason: QuestionReportReason, details: string) =>
+    request<{ ok: true }>('POST', `/questions/${encodeURIComponent(questionId)}/report`, { reason, details }),
+  adminQuestionReports: () => request<QuestionReports>('GET', '/admin/question-reports'),
+  resolveQuestionReports: (questionId: string, action: QuestionReportAction) =>
+    request<QuestionReports>('POST', `/admin/question-reports/${encodeURIComponent(questionId)}/resolve`, { action }),
+  unhideQuestion: (questionId: string) =>
+    request<QuestionReports>('POST', `/admin/hidden-questions/${encodeURIComponent(questionId)}/unhide`),
   adminReports: () => request<{ groups: ReportGroup[] }>('GET', '/admin/reports'),
   resolveReports: (userId: number, decision: ModerationAction) =>
     request<{ ok: true; groups: ReportGroup[] }>('POST', `/admin/reports/${userId}/resolve`, decision),

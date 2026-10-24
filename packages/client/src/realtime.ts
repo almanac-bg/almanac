@@ -93,6 +93,7 @@ function bind(s: GameSocket) {
         eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
         reactions: [],
         feed: [],
+        history: [],
         end: null,
       },
     });
@@ -125,13 +126,34 @@ function bind(s: GameSocket) {
   });
 
   s.on('game:reveal', (reveal) => {
-    patchGame((g) => ({
-      phase: 'reveal',
-      reveal,
-      retryPrompt: false,
-      standings: reveal.standings,
-      eliminated: [...g.eliminated, ...reveal.eliminated],
-    }));
+    patchGame((g) => {
+      const q = g.question;
+      const mine = reveal.results[g.start.youId];
+      const recorded = !q || q.index !== reveal.index || g.history.some((h) => h.index === reveal.index);
+      return {
+        phase: 'reveal',
+        reveal,
+        retryPrompt: false,
+        standings: reveal.standings,
+        eliminated: [...g.eliminated, ...reveal.eliminated],
+        history: recorded
+          ? g.history
+          : [
+              ...g.history,
+              {
+                id: q.id,
+                index: q.index,
+                q: q.q,
+                options: q.options,
+                category: q.category,
+                difficulty: q.difficulty,
+                correct: reveal.correct,
+                choice: mine?.choice ?? null,
+                right: !!mine?.correct,
+              },
+            ],
+      };
+    });
     const g = getState().game;
     if (!g) return;
     const mine = reveal.results[g.start.youId];

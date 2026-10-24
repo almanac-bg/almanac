@@ -23,9 +23,16 @@ export type PreparedQuestion = Question;
 
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH ?? path.join(import.meta.dirname, 'data', 'questions.json');
 
+let everything: Map<string, Question> | null = null;
 let bank: Question[] | null = null;
 
-/** Built-in questions from the JSON file plus approved community questions from the database. */
+/** Every question by id, hidden ones included (for moderation and reports). */
+export function questionById(id: string): Question | undefined {
+  questionBank();
+  return everything!.get(id);
+}
+
+/** Questions matches draw from: built-in ones from the JSON file plus approved community questions, minus hidden ones. */
 export function questionBank(): Question[] {
   if (!bank) {
     const builtIn = z.array(QuestionSchema).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
@@ -41,13 +48,15 @@ export function questionBank(): Question[] {
       `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
        FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
     ).map((r) => ({ ...r, options: JSON.parse(r.options) as string[] }));
-    bank = [...builtIn, ...community];
-    console.log(`📚 ${builtIn.length} built-in + ${community.length} community questions`);
+    const hidden = new Set(all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id));
+    everything = new Map([...builtIn, ...community].map((q) => [q.id, q]));
+    bank = [...everything.values()].filter((q) => !hidden.has(q.id));
+    console.log(`📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`);
   }
   return bank;
 }
 
-/** Call after approving a question so new matches can draw it. */
+/** Call after approving or hiding a question so new matches see the change. */
 export function reloadQuestionBank() {
   bank = null;
   questionBank();

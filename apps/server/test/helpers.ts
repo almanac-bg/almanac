@@ -77,7 +77,7 @@ export interface TestServer {
  * Boots a real server on a free port with a throwaway database, fixture questions, fast timers
  * (GAME_TIME_SCALE) and quick bot fill. TEST_TARGET=dist runs the production bundle instead of the sources.
  */
-export async function startServer(): Promise<TestServer> {
+export async function startServer(env: Record<string, string> = {}): Promise<TestServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-test-'));
   const questions = path.join(dir, 'questions.json');
   const dbPath = path.join(dir, 'test.db');
@@ -99,6 +99,7 @@ export async function startServer(): Promise<TestServer> {
       MAIL_OUTBOX: outbox,
       APP_URL: 'https://almanac.test',
       SMTP_URL: '',
+      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

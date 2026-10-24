@@ -1,4 +1,6 @@
 import type {
+  CategoryId,
+  Difficulty,
   GameEndPayload,
   GamePlayer,
   GameStartPayload,
@@ -23,6 +25,20 @@ export interface Toast {
 }
 
 export type GamePhase = 'countdown' | 'question' | 'reveal' | 'ended';
+
+/** One finished question of the match, for the review afterwards. */
+export interface ReviewItem {
+  id: string;
+  index: number;
+  q: string;
+  options: string[];
+  category: CategoryId;
+  difficulty: Difficulty;
+  correct: number;
+  /** Your pick; null if you didn't answer (or were already out). */
+  choice: number | null;
+  right: boolean;
+}
 
 export interface LiveGame {
   start: GameStartPayload;
@@ -55,6 +71,8 @@ export interface LiveGame {
   eliminated: string[];
   reactions: { key: number; playerId: string; emote: string }[];
   feed: { key: number; text: string; icon: string }[];
+  /** Questions revealed so far (since you joined or reconnected). */
+  history: ReviewItem[];
   end: GameEndPayload | null;
 }
 

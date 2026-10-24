@@ -5,10 +5,11 @@ import { BRAND } from '@quiz/shared';
 import express from 'express';
 import { config } from './config';
 import { db } from './db';
-import { questionBank } from './questions';
 import { startMaintenance } from './maintenance';
+import { questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
+import { securityHeaders } from './security';
 
 questionBank(); // fail fast on a broken question file
 
@@ -16,9 +17,16 @@ const app = express();
 app.disable('x-powered-by');
 // Behind a reverse proxy (Caddy in Docker) this must trust it, or every visitor shares the proxy's IP.
 app.set('trust proxy', config.trustProxy);
+app.use(securityHeaders);
 app.use(express.json({ limit: '20kb' }));
+// For uptime monitors: answers only if the database does too.
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true });
+  } catch {
+    res.status(503).json({ ok: false });
+  }
 });
 app.use('/api', api);
 
@@ -33,7 +41,8 @@ if (fs.existsSync(config.webDist)) {
   );
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
+    // HEAD too: uptime monitors often check with it.
+    if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
     res.setHeader('cache-control', 'no-cache');
     res.sendFile(indexHtml);

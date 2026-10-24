@@ -25,6 +25,8 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
+      # The production compose file must parse (anchors, profiles, env interpolation).
+      - run: DOMAIN=example.test docker compose config --quiet
       - run: docker build -t almanac .
       # Boot the image and wait for the health check to pass.
       - run: |

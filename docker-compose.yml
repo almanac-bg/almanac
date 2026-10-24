@@ -1,9 +1,18 @@
 # Production: `docker compose up -d --build` on the server. See README → Deploying.
+
+# Rotate container logs (Docker keeps them forever by default and the disk slowly fills up).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '5'
+
 services:
   app:
     build: .
     image: almanac:latest
     restart: unless-stopped
+    logging: *logging
     environment:
       COOKIE_SECURE: 'true'
       # Caddy reaches the app over the private Docker network.
@@ -22,6 +31,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - app
     ports:
@@ -41,6 +51,7 @@ services:
     image: litestream/litestream:0.3.13
     profiles: ['backup']
     restart: unless-stopped
+    logging: *logging
     command: replicate
     environment:
       LITESTREAM_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}

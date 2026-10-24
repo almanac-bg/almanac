@@ -240,6 +240,30 @@ const MIGRATIONS: (string | (() => void))[] = [
   );
   CREATE INDEX reports_open ON reports(status, target_id);
   `,
+
+  // v5: players flag mistakes in questions; moderators can hide a question from new matches.
+  `
+  CREATE TABLE question_reports (
+    id INTEGER PRIMARY KEY,
+    question_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER,
+    resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+  );
+  -- One open report per player per question.
+  CREATE UNIQUE INDEX question_reports_once ON question_reports(question_id, user_id) WHERE status = 'open';
+  CREATE INDEX question_reports_open ON question_reports(status, question_id);
+
+  CREATE TABLE hidden_questions (
+    question_id TEXT PRIMARY KEY,
+    hidden_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    hidden_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 function migrate() {

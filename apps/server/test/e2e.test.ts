@@ -543,11 +543,60 @@ test('data export and account deletion', T, async () => {
   assert.equal((srv.db.prepare('SELECT COUNT(*) AS n FROM category_stats WHERE user_id = ?').get(E.user.id) as { n: number }).n, 0, 'stats are erased');
 });
 
+test('players flag wrong questions; moderators hide them from new matches', T, async () => {
+  const log = newLog();
+  const play = autoPlay(sb, 'wrong', log);
+  await emitAck(sb, 'solo:start', { category: 'science' });
+  await play;
+  const id = log.questions[0].id;
+  assert.match(id, /^science-\d+$/, 'questions carry their id');
+
+  const report = (questionId: string, body: object) => api.send('POST', `/api/questions/${questionId}/report`, B.cookie, body);
+  assert.equal((await report(id, { reason: 'nonsense' })).status, 400, 'a reason from the list');
+  assert.equal((await report('no-such-question', { reason: 'wrong' })).status, 400);
+  assert.equal((await report(id, { reason: 'wrong', details: 'Верният е Б' })).status, 200);
+  assert.equal((await report(id, { reason: 'ambiguous' })).status, 200, 'reporting again updates the open report');
+
+  assert.equal((await api.get('/api/admin/question-reports', B.cookie)).status, 403, 'moderators only');
+  const open = await api.get('/api/admin/question-reports', A.cookie);
+  assert.equal(open.body.groups.length, 1);
+  assert.equal(open.body.groups[0].question.id, id);
+  assert.deepEqual(
+    open.body.groups[0].reports.map((r: { reason: string; reporter: string }) => [r.reason, r.reporter]),
+    [['ambiguous', B.user.username]],
+  );
+  assert.equal((await api.get('/api/admin/summary', A.cookie)).body.questionReports, 1);
+
+  const hidden = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'hide' });
+  assert.equal(hidden.body.groups.length, 0, 'reports closed');
+  assert.deepEqual(
+    hidden.body.hidden.map((q: { id: string }) => q.id),
+    [id],
+  );
+
+  // The other 29 science questions keep coming; the hidden one never does.
+  const seen = new Set<string>();
+  for (let i = 0; i < 2; i++) {
+    const l = newLog();
+    const p = autoPlay(sb, 'right', l);
+    await emitAck(sb, 'solo:start', { category: 'science' });
+    await p;
+    for (const q of l.questions) seen.add(q.id);
+  }
+  assert.ok(seen.size >= 15 && !seen.has(id), 'hidden questions stay out of new matches');
+
+  const restored = await api.send('POST', `/api/admin/hidden-questions/${id}/unhide`, A.cookie);
+  assert.equal(restored.body.hidden.length, 0, 'a hide can be undone');
+  const exported = (await api.get('/api/account/export', B.cookie)).body as { questionReportsFiled: unknown[] };
+  assert.equal(exported.questionReportsFiled.length, 1, 'reports are part of the data export');
+});
+
 const webDist = path.resolve(import.meta.dirname, '../../web/dist');
 
 test('website files are served with the right caching', { ...T, skip: !fs.existsSync(webDist) && 'web app not built' }, async () => {
   const page = await fetch(`${srv.url}/friends`);
   assert.equal(page.status, 200);
+  assert.equal((await fetch(`${srv.url}/`, { method: 'HEAD' })).status, 200, 'HEAD works for uptime monitors');
   assert.match(page.headers.get('content-type') ?? '', /text\/html/, 'app routes get the page');
   assert.equal(page.headers.get('cache-control'), 'no-cache', 'the page always revalidates');
 

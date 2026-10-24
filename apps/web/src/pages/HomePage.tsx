@@ -28,6 +28,7 @@ import {
   MailWarning,
   PenLine,
   Plus,
+  Share2,
   ShieldCheck,
   Trophy,
   Users,
@@ -39,6 +40,7 @@ import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Button, Card, Modal, ProgressBar } from '../components/ui';
 import { actions, api, fmt, toast, unlockPreview, useNow, useStore } from '@quiz/client';
+import { savedDailyShare, shareText } from '../lib/share';
 
 export function HomePage() {
   const me = useStore((s) => s.me)!;
@@ -374,6 +376,8 @@ function DailyCard() {
   const [info, setInfo] = useState<DailyInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [a, b] = MODES.daily.accent;
+  // Saved by the results screen on this device when today's challenge was played.
+  const savedShare = info?.played ? savedDailyShare(me.daily.day) : null;
 
   useEffect(() => {
     api.daily().then(setInfo).catch(() => {});
@@ -433,9 +437,16 @@ function DailyCard() {
                     </span>
                   </div>
                 </div>
-                <Button variant="secondary" className="ml-auto" onClick={() => navigate('/leaderboard?board=daily')}>
-                  Класиране <ArrowRight className="size-4" />
-                </Button>
+                <div className="ml-auto flex gap-2">
+                  {savedShare && (
+                    <Button variant="secondary" onClick={() => shareText(savedShare)} aria-label="Сподели резултата">
+                      <Share2 className="size-4" />
+                    </Button>
+                  )}
+                  <Button variant="secondary" onClick={() => navigate('/leaderboard?board=daily')}>
+                    Класиране <ArrowRight className="size-4" />
+                  </Button>
+                </div>
               </div>
             ) : info?.attempted ? (
               <p className="text-sm text-fg-3">Днешният опит е използван. Ново предизвикателство след {countdown(info.endsAt - now)}.</p>
@@ -479,10 +490,12 @@ function DailyCard() {
 function CommunityCard() {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
-  const [todo, setTodo] = useState<{ pendingQuestions: number; openReports: number } | null>(null);
+  const [todo, setTodo] = useState<{ pendingQuestions: number; openReports: number; questionReports: number } | null>(null);
   const level = levelProgress(me.xp).level;
   const locked = level < SUBMISSION_RULES.minLevel;
-  const pending = todo ? todo.pendingQuestions + todo.openReports : 0;
+  const pending = todo ? todo.pendingQuestions + todo.openReports + todo.questionReports : 0;
+  // Open the moderation tab that has work waiting.
+  const adminTab = !todo || todo.pendingQuestions ? '/admin' : todo.questionReports ? '/admin?tab=flags' : todo.openReports ? '/admin?tab=reports' : '/admin';
 
   useEffect(() => {
     if (me.isAdmin) api.adminSummary().then(setTodo).catch(() => {});
@@ -512,7 +525,7 @@ function CommunityCard() {
           )}
         </Button>
         {me.isAdmin && (
-          <Button variant="ghost" onClick={() => navigate(todo?.openReports && !todo.pendingQuestions ? '/admin?tab=reports' : '/admin')}>
+          <Button variant="ghost" onClick={() => navigate(adminTab)}>
             <ShieldCheck className="size-4" /> Модерация
             {pending ? <span className="rounded-full bg-amber-400 px-1.5 text-xs font-bold text-amber-950">{pending}</span> : null}
           </Button>

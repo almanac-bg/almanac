@@ -15,14 +15,16 @@ import {
 } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Skull } from 'lucide-react';
+import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull } from 'lucide-react';
 import { animate, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
+import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { Button, Card } from '../components/ui';
-import { actions, fmt, type LiveGame, ordinal, plural, toast, unlockPreview, useStore } from '@quiz/client';
+import { actions, fmt, type LiveGame, ordinal, plural, type ReviewItem, toast, unlockPreview, useStore } from '@quiz/client';
+import { dailyShareText, rememberDailyShare, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
 const CONFETTI_COLORS = ['#a78bfa', '#e879f9', '#22d3ee', '#fbbf24', '#34d399'];
@@ -163,12 +165,16 @@ export function Results({ game }: { game: LiveGame }) {
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}
         <div className="space-y-4">
-          {rewards?.daily && <DailyCard daily={rewards.daily} onBoard={dailyBoard} />}
+          {rewards?.daily && (
+            <DailyCard daily={rewards.daily} onBoard={dailyBoard} history={game.history} total={game.start.totalQuestions} />
+          )}
           {rewards && rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
           {rewards && rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
           {rewards?.rating && <RatingCard rating={rewards.rating} />}
         </div>
       </div>
+
+      {game.history.length > 0 && <QuestionReview items={game.history} />}
 
       <div className="mt-10 flex flex-wrap justify-center gap-3">
         {daily ? (
@@ -334,7 +340,19 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
   );
 }
 
-function DailyCard({ daily, onBoard }: { daily: NonNullable<MatchRewards['daily']>; onBoard: () => void }) {
+function DailyCard({
+  daily,
+  onBoard,
+  history,
+  total,
+}: {
+  daily: NonNullable<MatchRewards['daily']>;
+  onBoard: () => void;
+  history: ReviewItem[];
+  total: number;
+}) {
+  const text = dailyShareText(history, total, daily.streak);
+  useEffect(() => rememberDailyShare(text), [text]);
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
@@ -349,9 +367,14 @@ function DailyCard({ daily, onBoard }: { daily: NonNullable<MatchRewards['daily'
         </p>
       )}
       <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
-      <button onClick={onBoard} className="relative mt-3 text-sm font-semibold text-amber-300 hover:text-amber-200">
-        Виж класирането →
-      </button>
+      <div className="relative mt-4 flex flex-wrap items-center gap-3">
+        <Button size="sm" onClick={() => shareText(text)}>
+          <Share2 className="size-4" /> Сподели резултата
+        </Button>
+        <button onClick={onBoard} className="text-sm font-semibold text-amber-300 hover:text-amber-200">
+          Виж класирането →
+        </button>
+      </div>
     </Card>
   );
 }

@@ -7,16 +7,16 @@ export const BRAND = {
 } as const;
 
 /**
- * Who runs the service — shown in the privacy policy and terms.
- * TODO before launch: replace the bracketed placeholders with the real operator details.
+ * Who runs the service (a private individual, not a company) — shown in the privacy policy and terms.
+ * TODO before launch: replace the bracketed placeholders with the real details.
  */
 export const LEGAL = {
-  operator: '[Име на физическото лице или фирмата]',
-  /** Company registration number (ЕИК), if the operator is a company. */
-  companyId: '[ЕИК]',
+  /** Full name of the person running the service. */
+  operator: '[Име и фамилия]',
+  /** Where letters reach you. It needn't be your home: a P.O. box or another address you can receive mail at works. */
   address: '[Адрес за кореспонденция]',
   email: 'privacy@almanac.bg',
   /** Email / SMTP provider that delivers password-reset emails. */
   emailProvider: '[Доставчик на имейли, напр. Brevo (Франция)]',
-  updated: '18 октомври 2026 г.',
+  updated: '25 октомври 2026 г.',
 } as const;

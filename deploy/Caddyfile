@@ -4,5 +4,10 @@ www.{$DOMAIN} {
 
 {$DOMAIN} {
 	encode zstd gzip
+	header {
+		# Browsers remember to use HTTPS only (one year).
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
 	reverse_proxy app:3001
 }

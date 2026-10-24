@@ -530,6 +530,7 @@ export class Game {
   private questionPayload(): QuestionPayload {
     const q = this.questions[this.index];
     return {
+      id: q.id,
       index: this.index,
       total: this.questions.length,
       category: q.category,

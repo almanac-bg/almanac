@@ -26,6 +26,7 @@ import {
   userIdFromCookieHeader,
   verifyPassword,
 } from '../auth';
+import { config } from '../config';
 import { dailyInfo, liveDailyStreak } from '../daily';
 import {
   changePassword,
@@ -41,6 +42,14 @@ import { all, one, run } from '../db';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { notifyUser } from '../notify';
+import {
+  hiddenQuestions,
+  openQuestionReportCount,
+  openQuestionReports,
+  reportQuestion,
+  resolveQuestionReports,
+  unhideQuestion,
+} from '../questionReports';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import {
   approveSubmission,
@@ -75,6 +84,12 @@ const Login = z.object({
 
 /** Tiny in-memory throttle for auth endpoints: N attempts per key per window. */
 const attempts = new Map<string, { count: number; resetAt: number }>();
+// Forget expired windows now and then, or every IP and username ever seen would stay in memory.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of attempts) if (entry.resetAt < now) attempts.delete(key);
+}, 10 * 60_000).unref();
+
 function throttled(key: string, limit = 10, windowMs = 5 * 60_000): boolean {
   const now = Date.now();
   const entry = attempts.get(key);
@@ -126,8 +141,9 @@ api.post('/auth/register', async (req, res) => {
     return;
   }
   const hash = await hashPassword(creds.password);
-  // The very first account runs the place.
-  const firstUser = one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n === 0;
+  // In development the very first account runs the place. In production nobody gets admin by signing up first:
+  // moderators come only from ADMIN_USERNAMES (otherwise a stranger could beat the owner to it).
+  const firstUser = !config.production && one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n === 0;
   const { lastInsertRowid } = run(
     'INSERT INTO users (username, username_key, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?)',
     creds.username,
@@ -289,6 +305,23 @@ api.post('/account/delete', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+/** Crashes in players' browsers land in the server log (there's no other way to hear about them). */
+api.post('/client-errors', (req, res) => {
+  const body = z
+    .object({
+      message: z.string().max(500),
+      stack: z.string().max(4000).optional(),
+      url: z.string().max(300).optional(),
+      kind: z.enum(['render', 'error', 'rejection']),
+    })
+    .safeParse(req.body);
+  if (body.success && !throttled(`client-error:${req.ip}`, 20, 10 * 60_000)) {
+    const { kind, message, url, stack } = body.data;
+    console.error(`🧯 Browser ${kind} at ${url ?? '?'}: ${message}${stack ? `\n${stack}` : ''}`);
+  }
+  res.status(204).end();
+});
+
 api.post('/reports', requireAuth, (req, res) => {
   const body = parse(
     z.object({ username: z.string().trim().min(1).max(40), reason: z.string(), details: z.string().max(500).default('') }),
@@ -386,7 +419,46 @@ api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
 });
 
 api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {
-  res.json({ pendingQuestions: pendingCount(), openReports: openReportCount() });
+  res.json({ pendingQuestions: pendingCount(), openReports: openReportCount(), questionReports: openQuestionReportCount() });
+});
+
+api.post('/questions/:id/report', requireAuth, (req, res) => {
+  const body = parse(z.object({ reason: z.string(), details: z.string().max(500).default('') }), req, res);
+  if (!body) return;
+  if (throttled(`question-report:${res.locals.userId}`, 30, 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много сигнали. Опитай по-късно.' });
+    return;
+  }
+  const result = reportQuestion(res.locals.userId, String(req.params.id), body.reason, body.details);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+api.get('/admin/question-reports', requireAuth, requireAdmin, (_req, res) => {
+  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
+});
+
+api.post('/admin/question-reports/:id/resolve', requireAuth, requireAdmin, (req, res) => {
+  const body = parse(z.object({ action: z.enum(['dismiss', 'hide']) }), req, res);
+  if (!body) return;
+  const result = resolveQuestionReports(res.locals.userId, String(req.params.id), body.action);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
+});
+
+api.post('/admin/hidden-questions/:id/unhide', requireAuth, requireAdmin, (req, res) => {
+  const result = unhideQuestion(String(req.params.id));
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
 });
 
 api.get('/admin/reports', requireAuth, requireAdmin, (_req, res) => {

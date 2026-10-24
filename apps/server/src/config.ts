@@ -10,14 +10,19 @@ function botFillMs(): number | null {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 8000;
 }
 
+const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
+
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   production: process.env.NODE_ENV === 'production',
-  dbPath: process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db'),
+  dbPath,
   webDist: path.resolve(serverRoot, '../web/dist'),
   /** How long a quick-match queue waits for humans before bots fill the empty seats. */
   botFillMs: botFillMs(),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
+  /** Daily database snapshots ("off" disables). Defaults to a backups folder next to the database. */
+  backupDir: process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),
+  backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS ?? 14),
   /** Express "trust proxy" setting: which proxies may set X-Forwarded-For. */
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',
   sessionDays: 30,
@@ -28,7 +33,7 @@ export const config = {
   mailFrom: process.env.MAIL_FROM || `${BRAND.name} <no-reply@${BRAND.domain}>`,
   /** Tests: write every outgoing email as a JSON file into this directory. */
   mailOutbox: process.env.MAIL_OUTBOX || null,
-  /** Extra moderators (comma-separated usernames). The first account ever registered is always an admin. */
+  /** Moderators (comma-separated usernames). In development the first account ever registered is one too. */
   adminUsernames: (process.env.ADMIN_USERNAMES ?? '')
     .split(',')
     .map((s) => s.trim().normalize('NFC').toLowerCase())

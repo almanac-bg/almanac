@@ -10,7 +10,10 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    { name: 'brand', transformIndexHtml: (html) => html.replaceAll('%BRAND_NAME%', BRAND.name) },
+    {
+      name: 'brand',
+      transformIndexHtml: (html) => html.replaceAll('%BRAND_NAME%', BRAND.name).replaceAll('%BRAND_DOMAIN%', BRAND.domain),
+    },
   ],
   build: {
     rolldownOptions: {
