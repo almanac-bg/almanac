@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented } from '../components/ui';
 import { api, setState } from '@quiz/client';
-import { LegalLinks } from './LegalPages';
+import { LegalLinks } from '../components/LegalLinks';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 

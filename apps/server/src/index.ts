@@ -25,9 +25,17 @@ app.use('/api', api);
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {
   const indexHtml = path.join(config.webDist, 'index.html');
+  // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
+  // never the page (a tab from an older deploy then reloads instead of running HTML as JavaScript).
+  app.use(
+    '/assets',
+    express.static(path.join(config.webDist, 'assets'), { index: false, maxAge: '1y', immutable: true, fallthrough: false }),
+  );
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
+    // The page itself always revalidates, so a new deploy is picked up on the next visit.
+    res.setHeader('cache-control', 'no-cache');
     res.sendFile(indexHtml);
   });
 }

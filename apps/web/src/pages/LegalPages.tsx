@@ -1,6 +1,7 @@
 import { BRAND, LEGAL } from '@quiz/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
+import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Card } from '../components/ui';
 
@@ -28,22 +29,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="mb-3 font-display text-lg font-bold text-fg">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
-  );
-}
-
-export function LegalLinks({ className = '' }: { className?: string }) {
-  return (
-    <nav className={`flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-3 ${className}`}>
-      <Link to="/terms" className="hover:text-fg-2">
-        Условия за ползване
-      </Link>
-      <Link to="/privacy" className="hover:text-fg-2">
-        Политика за поверителност
-      </Link>
-      <span>
-        © {new Date().getFullYear()} {BRAND.name}
-      </span>
-    </nav>
   );
 }
 

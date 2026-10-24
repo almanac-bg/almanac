@@ -23,6 +23,18 @@ const SOUNDS: Partial<Record<Effect, () => void>> = {
 // Same-origin API, httpOnly session cookie.
 configureClient({ baseUrl: '', effect: (name) => SOUNDS[name]?.() });
 
+// A tab opened before a deploy may ask for page code that no longer exists: reload once to get the new version.
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
+    sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
+  } catch {
+    /* storage unavailable: reload anyway */
+  }
+  event.preventDefault();
+  window.location.reload();
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

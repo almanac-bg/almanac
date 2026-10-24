@@ -1,6 +1,8 @@
 // End-to-end: a real server, real sockets, two players (A is the first account, so admin) and bots.
 // Sections run in order and share state, like a play session.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import type { GameStartPayload, PowerupEvent, QuestionPayload, RevealPayload, RoomState } from '@quiz/shared';
 import {
@@ -539,4 +541,21 @@ test('data export and account deletion', T, async () => {
   const anon = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'Изтрит играч'").get() as { n: number };
   assert.ok(anon.n >= 1);
   assert.equal((srv.db.prepare('SELECT COUNT(*) AS n FROM category_stats WHERE user_id = ?').get(E.user.id) as { n: number }).n, 0, 'stats are erased');
+});
+
+const webDist = path.resolve(import.meta.dirname, '../../web/dist');
+
+test('website files are served with the right caching', { ...T, skip: !fs.existsSync(webDist) && 'web app not built' }, async () => {
+  const page = await fetch(`${srv.url}/friends`);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type') ?? '', /text\/html/, 'app routes get the page');
+  assert.equal(page.headers.get('cache-control'), 'no-cache', 'the page always revalidates');
+
+  const asset = fs.readdirSync(path.join(webDist, 'assets')).find((f) => f.endsWith('.js'))!;
+  const js = await fetch(`${srv.url}/assets/${asset}`);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('cache-control') ?? '', /max-age=31536000.*immutable/, 'hashed files are cached for good');
+
+  const gone = await fetch(`${srv.url}/assets/index-from-an-old-deploy.js`);
+  assert.equal(gone.status, 404, 'a missing build file is a 404, not the page');
 });
