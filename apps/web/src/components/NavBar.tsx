@@ -3,10 +3,8 @@ import clsx from 'clsx';
 import { ChartColumn, Gamepad2, LogOut, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
-import { api } from '../lib/api';
-import { socket } from '../lib/socket';
+import { api, disconnectRealtime, setState, useStore } from '@quiz/client';
 import { isMuted, setMuted } from '../lib/sound';
-import { setState, useStore } from '../lib/store';
 import { Avatar, LevelBadge } from './Avatar';
 
 const LINKS = [
@@ -45,7 +43,7 @@ export function NavBar() {
 
   async function logout() {
     await api.logout().catch(() => {});
-    socket.disconnect();
+    disconnectRealtime();
     setState({ me: null, room: null, game: null, queue: null });
     navigate('/');
   }

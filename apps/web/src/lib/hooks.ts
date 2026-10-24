@@ -1,17 +1,6 @@
 import { animate } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
-/** Re-renders every `intervalMs` and returns the current time. */
-export function useNow(intervalMs = 250, active = true) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs, active]);
-  return now;
-}
-
 /** Smoothly animates a displayed number towards `value`. */
 export function useCountUp(value: number, duration = 0.8) {
   const [display, setDisplay] = useState(value);

@@ -2,12 +2,8 @@ import { RANK_TIERS, seasonName } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import { fmt } from '../lib/format';
-import { refreshMe } from '../lib/socket';
+import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { sfx } from '../lib/sound';
-import { useStore } from '../lib/store';
-import { unlockPreview } from '../lib/unlocks';
 import { Button, Modal } from './ui';
 
 /** Shown once after a season ends: the best rank reached, its XP and the cosmetics it unlocked. */

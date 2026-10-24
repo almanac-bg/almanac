@@ -3,9 +3,7 @@ import { Ban, Check, Flag, PenLine } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { api } from '../../lib/api';
-import { timeAgo } from '../../lib/format';
-import { toast } from '../../lib/store';
+import { api, timeAgo, toast } from '@quiz/client';
 import { Avatar, LevelBadge } from '../Avatar';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
 

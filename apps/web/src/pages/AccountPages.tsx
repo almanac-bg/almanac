@@ -3,9 +3,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Modal, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { refreshMe, socket } from '../lib/socket';
-import { setState, toast, useStore } from '../lib/store';
+import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
 
 const INPUT =
   'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
@@ -201,7 +199,7 @@ function DataSettings() {
     setError(null);
     try {
       await api.deleteAccount(password);
-      socket.disconnect();
+      disconnectRealtime();
       setState({ me: null, room: null, game: null, queue: null });
       navigate('/', { replace: true });
       toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });

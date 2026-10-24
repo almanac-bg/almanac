@@ -7,14 +7,15 @@ import type {
   Loadout,
   MeUser,
   ModerationAction,
-  ReportGroup,
-  ReportReason,
   ProfileStats,
   QuestionDraft,
+  ReportGroup,
+  ReportReason,
   SeasonInfo,
   Submission,
   SubmissionStatus,
 } from '@quiz/shared';
+import { clientConfig } from './config';
 
 export class ApiError extends Error {
   constructor(
@@ -26,12 +27,17 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'same-origin',
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
+      method,
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: 'same-origin',
+    });
+  } catch {
+    throw new ApiError('Няма връзка със сървъра. Провери интернета си.', 0);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(data.error ?? 'Нещо се обърка. Опитай пак.', res.status);
   return data as T;
@@ -50,12 +56,16 @@ export const api = {
   removeEmail: () => request<{ user: MeUser }>('DELETE', '/account/email'),
   changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/account/password', { current, next }),
   deleteAccount: (password: string) => request<{ ok: true }>('POST', '/account/delete', { password }),
+  /** Where the browser downloads the data export (the session cookie authenticates it). */
+  exportUrl: () => `${clientConfig().baseUrl}/api/account/export`,
+
   report: (username: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', '/reports', { username, reason, details }),
   adminSummary: () => request<{ pendingQuestions: number; openReports: number }>('GET', '/admin/summary'),
   adminReports: () => request<{ groups: ReportGroup[] }>('GET', '/admin/reports'),
   resolveReports: (userId: number, decision: ModerationAction) =>
     request<{ ok: true; groups: ReportGroup[] }>('POST', `/admin/reports/${userId}/resolve`, decision),
+
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
   profile: (username: string) => request<ProfileStats>('GET', `/profile/${encodeURIComponent(username)}`),

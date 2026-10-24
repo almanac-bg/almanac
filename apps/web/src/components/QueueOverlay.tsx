@@ -1,9 +1,7 @@
 import { avatarEmoji, MODES } from '@quiz/shared';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useNow } from '../lib/hooks';
-import { actions } from '../lib/socket';
-import { useStore } from '../lib/store';
+import { actions, useNow, useStore } from '@quiz/client';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 

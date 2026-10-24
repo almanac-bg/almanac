@@ -11,6 +11,7 @@
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource-variable/unbounded": "^5.3.0",
+    "@quiz/client": "*",
     "@quiz/shared": "*",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",

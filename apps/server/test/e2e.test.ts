@@ -54,6 +54,13 @@ test('auth', T, async () => {
   const bad = await api.send('POST', '/api/auth/login', '', { username: A.user.username, password: 'wrongpass' });
   assert.equal(bad.status, 401, 'wrong password is rejected');
   assert.equal((await api.get('/api/me', A.cookie)).body.user?.username, A.user.username, '/me works with the session cookie');
+
+  // Sessions slide: one used in the second half of its life is renewed to a full 30 days.
+  const token = decodeURIComponent(A.cookie.split('=')[1]);
+  srv.db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(Date.now() + 3 * 24 * 60 * 60_000, token);
+  await api.get('/api/me', A.cookie);
+  const { expires_at } = srv.db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(token) as { expires_at: number };
+  assert.ok(expires_at > Date.now() + 29 * 24 * 60 * 60_000, 'an active session is renewed');
   const anon = await api.get('/api/me');
   assert.equal(anon.status, 200);
   assert.equal(anon.body.user, null, 'signed-out /me is { user: null }');

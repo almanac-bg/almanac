@@ -22,11 +22,8 @@ import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
 import { teamColor } from '../components/game/teams';
 import { Button, Card } from '../components/ui';
-import { fmt, ordinal, plural } from '../lib/format';
-import { actions } from '../lib/socket';
+import { actions, fmt, type LiveGame, ordinal, plural, toast, unlockPreview, useStore } from '@quiz/client';
 import { sfx } from '../lib/sound';
-import { type LiveGame, toast, useStore } from '../lib/store';
-import { unlockPreview } from '../lib/unlocks';
 
 const CONFETTI_COLORS = ['#a78bfa', '#e879f9', '#22d3ee', '#fbbf24', '#34d399'];
 

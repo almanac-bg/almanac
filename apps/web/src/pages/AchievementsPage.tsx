@@ -5,9 +5,7 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { fmt, longDate } from '../lib/format';
-import { toast } from '../lib/store';
+import { api, fmt, longDate, toast } from '@quiz/client';
 
 type Filter = 'all' | 'unlocked' | 'locked';
 

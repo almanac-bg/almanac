@@ -19,10 +19,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { actions } from '../lib/socket';
-import { toast, useStore } from '../lib/store';
-import { fmt, longDate, ordinal, pct, plural, seconds, timeAgo } from '../lib/format';
+import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
 

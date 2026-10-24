@@ -1,7 +1,7 @@
 import { categoryById, type QuestionDraft } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { DIFFICULTY_LABEL } from '../../lib/format';
+import { DIFFICULTY_LABEL } from '@quiz/client';
 import { LETTERS, OPTION_COLORS } from './draft';
 
 /** Read-only question card styled like the in-game one, with the correct answer highlighted. */

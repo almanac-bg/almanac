@@ -15,9 +15,7 @@ import { motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Card, Segmented } from '../components/ui';
-import { api } from '../lib/api';
-import { setState, toast, useStore } from '../lib/store';
-import { requirementLabel, unlockContextOf } from '../lib/unlocks';
+import { api, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
 

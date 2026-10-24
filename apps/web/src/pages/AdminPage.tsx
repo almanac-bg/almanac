@@ -9,9 +9,7 @@ import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } 
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { longDate, timeAgo } from '../lib/format';
-import { toast, useStore } from '../lib/store';
+import { api, longDate, timeAgo, toast, useStore } from '@quiz/client';
 
 const toDraft = (s: Submission): QuestionDraft => ({
   category: s.category,

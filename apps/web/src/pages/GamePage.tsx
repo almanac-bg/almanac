@@ -18,11 +18,9 @@ import { Navigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
 import { TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
 import { Button, Modal } from '../components/ui';
-import { DIFFICULTY_LABEL, fmt } from '../lib/format';
-import { useCountUp, useNow } from '../lib/hooks';
-import { actions } from '../lib/socket';
+import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
+import { useCountUp } from '../lib/hooks';
 import { sfx } from '../lib/sound';
-import { type LiveGame, useStore } from '../lib/store';
 import { Results } from './Results';
 
 const LETTERS = ['А', 'Б', 'В', 'Г'];

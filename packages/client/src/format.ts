@@ -1,5 +1,15 @@
 const numberFormat = new Intl.NumberFormat('bg-BG');
-const relative = new Intl.RelativeTimeFormat('bg', { numeric: 'auto' });
+// Not every JS engine (e.g. some Hermes builds) ships RelativeTimeFormat — fall back to plain Bulgarian.
+const relative =
+  typeof Intl.RelativeTimeFormat === 'function' ? new Intl.RelativeTimeFormat('bg', { numeric: 'auto' }) : null;
+const UNIT_BG: Record<string, [string, string]> = {
+  year: ['година', 'години'],
+  month: ['месец', 'месеца'],
+  week: ['седмица', 'седмици'],
+  day: ['ден', 'дни'],
+  hour: ['час', 'часа'],
+  minute: ['минута', 'минути'],
+};
 
 export const fmt = (n: number) => numberFormat.format(Math.round(n));
 
@@ -21,7 +31,14 @@ export function timeAgo(ts: number): string {
     ['hour', 3_600],
     ['minute', 60],
   ];
-  for (const [unit, size] of steps) if (Math.abs(diff) >= size) return relative.format(Math.round(diff / size), unit);
+  for (const [unit, size] of steps) {
+    if (Math.abs(diff) < size) continue;
+    const n = Math.round(diff / size);
+    if (relative) return relative.format(n, unit);
+    const [one, many] = UNIT_BG[unit];
+    const amount = `${Math.abs(n)} ${Math.abs(n) === 1 ? one : many}`;
+    return n < 0 ? `преди ${amount}` : `след ${amount}`;
+  }
   return 'току-що';
 }
 

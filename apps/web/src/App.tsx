@@ -7,9 +7,7 @@ import { QueueOverlay } from './components/QueueOverlay';
 import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
 import { Spinner } from './components/ui';
-import { api } from './lib/api';
-import { actions, socket } from './lib/socket';
-import { setState, toast, useStore } from './lib/store';
+import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
 import { ResetPasswordPage, SettingsPage, VerifyEmailPage } from './pages/AccountPages';
 import { LegalLinks, PrivacyPage, TermsPage } from './pages/LegalPages';
 import { AchievementsPage } from './pages/AchievementsPage';
@@ -44,9 +42,9 @@ export function App() {
   const userId = me?.id;
   useEffect(() => {
     if (!userId) return;
-    socket.connect();
+    connectRealtime();
     return () => {
-      socket.disconnect();
+      disconnectRealtime();
     };
   }, [userId]);
 

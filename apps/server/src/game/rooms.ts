@@ -143,6 +143,7 @@ export class RoomManager {
     const created = this.create(fromId, { maxPlayers: 2 });
     if (!created.ok) return created;
     const sent = this.invite(fromId, toId, 'challenge');
+    if (!sent.ok) this.leave(fromId);
     return sent.ok ? created : sent;
   }
 

@@ -19,9 +19,7 @@ import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { teamColor } from '../components/game/teams';
 import { Button, Card, Segmented, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { actions } from '../lib/socket';
-import { toast, useStore } from '../lib/store';
+import { actions, api, toast, useStore } from '@quiz/client';
 
 export function RoomPage() {
   const room = useStore((s) => s.room);

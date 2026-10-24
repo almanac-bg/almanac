@@ -6,9 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { fmt, pct } from '../lib/format';
-import { toast, useStore } from '../lib/store';
+import { api, fmt, pct, toast, useStore } from '@quiz/client';
 
 const BOARDS: { value: LeaderboardBoard; label: string }[] = [
   { value: 'level', label: 'Ниво' },
@@ -73,7 +71,7 @@ export function LeaderboardPage() {
           <EmptyState
             icon={board === 'daily' ? '📅' : '🏁'}
             title={board === 'daily' ? 'Още никой не е играл днес' : 'Още никой не е класиран'}
-            body={board === 'daily' ? 'Изиграй дневното предизвикателство от началната страница.' : 'Изиграй класиран мач и бъди първият в тази класация.'}
+            body={board === 'daily' ? 'Изиграй дневното предизвикателство от началната страница.' : 'Изиграй класиран мач и оглави тази класация.'}
           />
         </Card>
       ) : (

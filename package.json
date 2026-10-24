@@ -10,7 +10,7 @@
     "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @quiz/server\" \"npm run dev -w @quiz/web\"",
     "build": "npm run build -w @quiz/web && npm run build -w @quiz/server",
     "start": "npm run start -w @quiz/server",
-    "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web",
+    "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/client && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web",
     "test": "npm test -w @quiz/server"
   },
   "engines": {

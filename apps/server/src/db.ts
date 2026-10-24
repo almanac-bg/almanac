@@ -244,6 +244,10 @@ const MIGRATIONS: (string | (() => void))[] = [
 
 function migrate() {
   const { user_version: current } = db.prepare('PRAGMA user_version').get() as { user_version: number };
+  // A database from newer code would silently skip this code's future migrations — refuse it instead.
+  if (current > MIGRATIONS.length) {
+    throw new Error(`Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`);
+  }
   for (let v = current; v < MIGRATIONS.length; v++) {
     tx(() => {
       const step = MIGRATIONS[v];

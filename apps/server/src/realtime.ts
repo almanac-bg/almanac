@@ -32,7 +32,7 @@ export function createRealtime(httpServer: HttpServer): IO {
     // Only same-origin pages may open a socket (blocks cross-site socket hijacking with the session cookie).
     allowRequest: (req, cb) => {
       const origin = req.headers.origin;
-      cb(null, !origin || new URL(origin).host === req.headers.host);
+      cb(null, !origin || URL.parse(origin)?.host === req.headers.host);
     },
   });
   const openSockets = new Map<number, number>();

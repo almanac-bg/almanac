@@ -2,13 +2,6 @@
 
 export const TIME_ZONE = 'Europe/Sofia';
 
-const dayFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 const partsFormat = new Intl.DateTimeFormat('en-US', {
   timeZone: TIME_ZONE,
   hourCycle: 'h23',
@@ -20,14 +13,27 @@ const partsFormat = new Intl.DateTimeFormat('en-US', {
   second: 'numeric',
 });
 
+/** Sofia wall-clock fields, from parts rather than a locale's date format (which differs between JS engines). */
+function sofiaParts(ts: number) {
+  return Object.fromEntries(partsFormat.formatToParts(ts).map((x) => [x.type, Number(x.value)])) as Record<
+    'year' | 'month' | 'day' | 'hour' | 'minute' | 'second',
+    number
+  >;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
 /** "2026-10-18" in Sofia time. */
-export const dayKey = (ts = Date.now()) => dayFormat.format(ts);
+export function dayKey(ts = Date.now()) {
+  const p = sofiaParts(ts);
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
 
 /** Seasons are calendar months: "2026-10". */
 export const seasonKey = (ts = Date.now()) => dayKey(ts).slice(0, 7);
 
 function offsetAt(ts: number): number {
-  const p = Object.fromEntries(partsFormat.formatToParts(ts).map((x) => [x.type, Number(x.value)]));
+  const p = sofiaParts(ts);
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ts / 1000) * 1000;
 }
 

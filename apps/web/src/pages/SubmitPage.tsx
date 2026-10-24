@@ -7,9 +7,7 @@ import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } f
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { timeAgo } from '../lib/format';
-import { toast, useStore } from '../lib/store';
+import { api, timeAgo, toast, useStore } from '@quiz/client';
 
 export function SubmitPage() {
   const me = useStore((s) => s.me)!;

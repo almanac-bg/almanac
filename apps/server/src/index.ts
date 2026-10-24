@@ -6,6 +6,7 @@ import express from 'express';
 import { config } from './config';
 import { db } from './db';
 import { questionBank } from './questions';
+import { startMaintenance } from './maintenance';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
 
@@ -33,6 +34,7 @@ if (fs.existsSync(config.webDist)) {
 
 const server = http.createServer(app);
 const io = createRealtime(server);
+startMaintenance();
 
 server.listen(config.port, () => {
   console.log(`⚡ ${BRAND.name} server on http://localhost:${config.port}`);

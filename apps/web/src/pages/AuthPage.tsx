@@ -6,9 +6,8 @@ import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented } from '../components/ui';
-import { api } from '../lib/api';
+import { api, setState } from '@quiz/client';
 import { LegalLinks } from './LegalPages';
-import { setState } from '../lib/store';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 

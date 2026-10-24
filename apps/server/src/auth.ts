@@ -48,10 +48,13 @@ export function userIdFromCookieHeader(header: string | undefined): number | nul
     token,
   );
   if (!session) return null;
-  if (session.expires_at < Date.now()) {
+  const now = Date.now();
+  if (session.expires_at < now) {
     destroySession(token);
     return null;
   }
+  // Sessions slide: one used in the second half of its life is extended, so active players never get logged out.
+  if (session.expires_at - now < SESSION_MS / 2) run('UPDATE sessions SET expires_at = ? WHERE token = ?', now + SESSION_MS, token);
   return session.user_id;
 }
 

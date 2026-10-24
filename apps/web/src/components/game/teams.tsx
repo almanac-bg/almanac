@@ -1,6 +1,6 @@
 import { type GamePlayer, type Standing, type TeamId, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { fmt } from '../../lib/format';
+import { fmt } from '@quiz/client';
 import { useCountUp } from '../../lib/hooks';
 
 export const teamColor = (team: TeamId) => TEAMS[team].color;

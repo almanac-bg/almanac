@@ -33,6 +33,8 @@ export interface LiveGame {
   question: QuestionPayload | null;
   /** Local timestamp when the current question closes for you (includes "Още време"). */
   deadline: number;
+  /** Extra time "Още време" added to the current question. */
+  extraMs: number;
   answered: string[];
   /** -1 = locked in before a reconnect, choice unknown. */
   myChoice: number | null;

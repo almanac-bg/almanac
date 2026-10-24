@@ -6,10 +6,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
-import { api } from '../lib/api';
-import { timeAgo } from '../lib/format';
-import { actions } from '../lib/socket';
-import { toast, useStore } from '../lib/store';
+import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
 
 const PRESENCE: Record<Presence, { label: string; color: string }> = {
   online: { label: 'Онлайн', color: '#34d399' },

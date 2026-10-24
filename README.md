@@ -28,7 +28,7 @@ test real multiplayer locally, open a second browser (or a private window) with 
 | `npm run dev`       | API + realtime server on :3001 and Vite on :5173 (proxied)           |
 | `npm run build`     | Builds the web app and bundles the server into `apps/server/dist`    |
 | `npm start`         | Production server on :3001 (plain Node) that also serves the web app |
-| `npm run typecheck` | Type-checks all three packages                                       |
+| `npm run typecheck` | Type-checks every package                                            |
 | `npm test`          | Full test suite (~45 s), see below                                   |
 
 ### Tests
@@ -79,6 +79,8 @@ apps/server       Express + Socket.IO + SQLite
   src/friends.ts          Friend requests and presence
   src/submissions.ts      Community questions and moderation
   src/data/questions.json Built-in question bank (800 questions, 10 categories)
+packages/client   Client core: API calls, realtime game state (zustand), formatting. The website
+                  plugs in its sounds; kept separate so other clients can reuse it
 apps/web          React 19 + Vite + Tailwind 4 + Motion
 ```
 

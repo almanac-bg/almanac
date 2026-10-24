@@ -38,12 +38,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Button, Card, Modal, ProgressBar } from '../components/ui';
-import { api } from '../lib/api';
-import { fmt } from '../lib/format';
-import { useNow } from '../lib/hooks';
-import { actions } from '../lib/socket';
-import { toast, useStore } from '../lib/store';
-import { unlockPreview } from '../lib/unlocks';
+import { actions, api, fmt, toast, unlockPreview, useNow, useStore } from '@quiz/client';
 
 export function HomePage() {
   const me = useStore((s) => s.me)!;
@@ -472,7 +467,7 @@ function DailyCard() {
               ))}
             </ol>
           ) : (
-            <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Бъди първият!</p>
+            <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
           )}
           {info && info.total > 3 && <p className="mt-3 text-xs text-fg-3">+ още {info.total - 3} играчи днес</p>}
         </div>

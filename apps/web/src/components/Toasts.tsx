@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'motion/react';
-import { dismissToast, useStore } from '../lib/store';
+import { dismissToast, useStore } from '@quiz/client';
 
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
