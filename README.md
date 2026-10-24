@@ -83,7 +83,7 @@ apps/server       Express + Socket.IO + SQLite
   src/daily.ts            Daily challenge: one seeded question set per day, one attempt
   src/friends.ts          Friend requests and presence
   src/submissions.ts      Community questions and moderation
-  src/data/questions.json Built-in question bank (800 questions, 10 categories)
+  src/data/questions.json Built-in question bank (~2,000 questions, 10 categories)
 packages/client   Client core: API calls, realtime game state (zustand), formatting. The website
                   plugs in its sounds; kept separate so other clients can reuse it
 apps/web          React 19 + Vite + Tailwind 4 + Motion
