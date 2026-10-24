@@ -13,6 +13,8 @@ services:
     image: almanac:latest
     restart: unless-stopped
     logging: *logging
+    # On a deploy, running matches play out before the old container stops (see DRAIN_SECONDS).
+    stop_grace_period: 6m
     environment:
       COOKIE_SECURE: 'true'
       # Caddy reaches the app over the private Docker network.
@@ -45,8 +47,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
-  # Optional continuous SQLite backups to S3-compatible storage (e.g. Hetzner Object Storage).
-  # Enable with: docker compose --profile backup up -d
+  # Continuous SQLite backups to S3-compatible storage (Hetzner Object Storage). On by default through
+  # COMPOSE_PROFILES=backup in .env; see deploy/litestream.yml for restoring.
   litestream:
     image: litestream/litestream:0.3.13
     profiles: ['backup']

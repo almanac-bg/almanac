@@ -1,5 +1,11 @@
-# Streams every SQLite change to object storage within seconds.
-# Restore on a fresh server: docker compose run --rm litestream restore -o /data/quiz.db /data/quiz.db
+# Streams every SQLite change to object storage within seconds (part of the standard deploy: COMPOSE_PROFILES=backup).
+# Any moment of the last 7 days can be restored.
+#
+# Restore after losing the server (fresh machine, same .env):
+#   docker compose run --rm litestream restore -o /data/quiz.db /data/quiz.db
+# Test that backups work, without touching the live database:
+#   docker compose run --rm litestream restore -o /data/restore-test.db /data/quiz.db && \
+#   docker compose run --rm --no-deps --entrypoint sh app -c 'ls -la /data/restore-test.db && rm /data/restore-test.db'
 dbs:
   - path: /data/quiz.db
     replicas:
@@ -8,3 +14,6 @@ dbs:
         path: almanac
         endpoint: ${BACKUP_ENDPOINT}
         force-path-style: true
+        # A fresh snapshot every day; changes in between are replayed on restore.
+        snapshot-interval: 24h
+        retention: 168h

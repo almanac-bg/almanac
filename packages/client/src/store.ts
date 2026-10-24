@@ -90,6 +90,8 @@ interface State {
   invites: Invite[];
   /** Bumped whenever the server says the friends list changed; pages refetch on change. */
   friendsVersion: number;
+  /** The server is restarting for an update (cleared when it's back). */
+  maintenance: string | null;
 }
 
 export const useStore = create<State>(() => ({
@@ -104,6 +106,7 @@ export const useStore = create<State>(() => ({
   toasts: [],
   invites: [],
   friendsVersion: 0,
+  maintenance: null,
 }));
 
 export const setState = useStore.setState;

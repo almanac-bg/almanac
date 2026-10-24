@@ -70,6 +70,8 @@ export interface TestServer {
   db: DatabaseSync;
   /** Emails the server "sent", oldest first. */
   mails(): SentMail[];
+  /** Sends a signal to the server process and resolves with its exit code once it exits. */
+  kill(signal: NodeJS.Signals): Promise<number | null>;
   stop(): Promise<void>;
 }
 
@@ -131,6 +133,12 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
             .sort()
             .map((f) => JSON.parse(fs.readFileSync(path.join(outbox, f), 'utf8')) as SentMail)
         : [],
+    async kill(signal) {
+      const exited = onceEvent(child, 'exit');
+      child.kill(signal);
+      const [code] = await exited;
+      return code as number | null;
+    },
     async stop() {
       db.close();
       if (child.exitCode === null) {

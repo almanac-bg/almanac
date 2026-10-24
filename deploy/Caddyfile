@@ -10,4 +10,34 @@ www.{$DOMAIN} {
 		-Server
 	}
 	reverse_proxy app:3001
+
+	# The few seconds the app restarts during a deploy: a friendly page that retries by itself, not a bare 502.
+	handle_errors 502 503 504 {
+		header Cache-Control "no-store"
+		header Retry-After "10"
+		@api path /api/* /socket.io/*
+		handle @api {
+			header Content-Type "application/json; charset=utf-8"
+			respond `{"error":"Обновяваме играта — опитай след няколко секунди."}` 503
+		}
+		handle {
+			header Content-Type "text/html; charset=utf-8"
+			respond <<HTML
+				<!doctype html>
+				<html lang="bg">
+				<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1">
+				<meta http-equiv="refresh" content="5">
+				<title>Обновяваме АЛМАНАХ</title>
+				<style>
+				body{margin:0;min-height:100vh;display:grid;place-items:center;background:#07060d;color:#f5f3ff;font-family:system-ui,sans-serif;text-align:center;padding:24px}
+				h1{font-size:28px;margin:16px 0 8px}p{color:#b3aed0;margin:0}
+				</style>
+				</head>
+				<body><div><div style="font-size:48px">⚡</div><h1>Обновяваме играта</h1><p>Връщаме се след няколко секунди — страницата ще се презареди сама.</p></div></body>
+				</html>
+				HTML 503
+		}
+	}
 }

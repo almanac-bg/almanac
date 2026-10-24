@@ -41,7 +41,7 @@ import {
 import { all, one, run } from '../db';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
-import { notifyUser } from '../notify';
+import { notifyUser, sendFriendsUpdate } from '../notify';
 import {
   hiddenQuestions,
   openQuestionReportCount,
@@ -364,8 +364,8 @@ function friendReply(res: Response, me: number, result: FriendResult) {
     return;
   }
   // Both sides refresh (the actor's other tabs and nav badge too).
-  notifyUser(result.otherId, 'friends:update');
-  notifyUser(me, 'friends:update');
+  sendFriendsUpdate(result.otherId);
+  sendFriendsUpdate(me);
   if (result.accepted) {
     settleAccount(me);
     settleAccount(result.otherId);
@@ -390,8 +390,8 @@ api.post('/friends/:id/accept', requireAuth, (req, res) => {
 api.delete('/friends/:id', requireAuth, (req, res) => {
   const other = idParam(req);
   if (removeFriend(res.locals.userId, other)) {
-    notifyUser(other, 'friends:update');
-    notifyUser(res.locals.userId, 'friends:update');
+    sendFriendsUpdate(other);
+    sendFriendsUpdate(res.locals.userId);
   }
   res.json(listFriends(res.locals.userId));
 });

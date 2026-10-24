@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { Background } from './components/Background';
 import { Invites } from './components/Invites';
+import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { NavBar } from './components/NavBar';
 import { QueueOverlay } from './components/QueueOverlay';
 import { SeasonRecap } from './components/SeasonRecap';
@@ -109,6 +110,7 @@ function SignedIn() {
   return (
     <>
       {!inGame && <NavBar />}
+      {!inGame && <MaintenanceBanner />}
       <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 sm:px-6 md:pb-16'}>
         <Suspense fallback={<PageLoading />}>
           <Routes>

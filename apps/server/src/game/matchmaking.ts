@@ -40,6 +40,14 @@ export class Matchmaker {
     if (notify) this.io.to(`user:${userId}`).emit('queue:status', null);
   }
 
+  /** Empties every queue (the server is about to restart). Returns who was waiting. */
+  clear(): number[] {
+    const waiting = QUEUE_MODES.flatMap((mode) => this.queues[mode].splice(0).map((e) => e.userId));
+    for (const userId of waiting) this.io.to(`user:${userId}`).emit('queue:status', null);
+    friendsChanged(...waiting);
+    return waiting;
+  }
+
   modeOf(userId: number): QueueModeId | null {
     return QUEUE_MODES.find((m) => this.queues[m].some((e) => e.userId === userId)) ?? null;
   }

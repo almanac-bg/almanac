@@ -226,14 +226,16 @@ export interface ServerToClientEvents {
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
   'game:end': (p: GameEndPayload) => void;
-  /** Something about your friends changed; refetch the list. */
-  'friends:update': () => void;
+  /** Something about your friends changed (refetch the list); `requests` is your pending friend-request count. */
+  'friends:update': (p: { requests: number }) => void;
   invite: (i: Invite) => void;
   /** Achievements earned outside a match (friends, authoring, seasons). */
   achievements: (ids: string[]) => void;
   /** Your account changed server-side (e.g. renamed by a moderator); refetch /me. */
   'account:update': () => void;
   notice: (p: { kind: 'info' | 'error'; message: string }) => void;
+  /** The server is restarting for an update: running matches finish, no new ones start until it's back. */
+  'server:draining': (p: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {

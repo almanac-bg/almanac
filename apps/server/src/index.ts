@@ -50,20 +50,30 @@ if (fs.existsSync(config.webDist)) {
 }
 
 const server = http.createServer(app);
-const io = createRealtime(server);
+const realtime = createRealtime(server);
 startMaintenance();
 
 server.listen(config.port, () => {
   console.log(`⚡ ${BRAND.name} server on http://localhost:${config.port}`);
 });
 
-function shutdown() {
-  io.close();
+/**
+ * Graceful restart (e.g. a deploy): no new matches start, queued players are told why, running matches play out
+ * (up to DRAIN_SECONDS), then the process exits. A second signal stops at once.
+ */
+let stopping = false;
+async function shutdown(signal: string) {
+  if (stopping) process.exit(0);
+  stopping = true;
+  const live = realtime.activeGames();
+  if (live && config.drainMs) console.log(`⏳ ${signal}: letting ${live} live match(es) finish before stopping…`);
+  await realtime.drain(config.drainMs);
+  realtime.io.close();
   server.close(() => {
     db.close();
     process.exit(0);
   });
   setTimeout(() => process.exit(0), 2000).unref();
 }
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));

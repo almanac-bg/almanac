@@ -83,6 +83,7 @@ export class GameRegistry {
   private games = new Map<string, Game>();
   private byUser = new Map<number, Game>();
   private closedListeners: ((game: Game) => void)[] = [];
+  private idleWaiters: (() => void)[] = [];
 
   constructor(private io: IO) {}
 
@@ -97,6 +98,22 @@ export class GameRegistry {
 
   get playersInGame() {
     return this.byUser.size;
+  }
+
+  get activeGames() {
+    return this.games.size;
+  }
+
+  /** Resolves once no match is running (or after `maxMs`). */
+  idle(maxMs: number): Promise<void> {
+    if (this.games.size === 0 || maxMs <= 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, maxMs);
+      this.idleWaiters.push(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 
   start(opts: NewGame): Game {
@@ -165,5 +182,6 @@ export class GameRegistry {
     this.io.in(`game:${game.id}`).socketsLeave(`game:${game.id}`);
     friendsChanged(...userIds);
     for (const listener of this.closedListeners) listener(game);
+    if (this.games.size === 0) for (const done of this.idleWaiters.splice(0)) done();
   }
 }

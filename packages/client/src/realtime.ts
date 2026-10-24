@@ -40,7 +40,7 @@ let resyncTimer: ReturnType<typeof setTimeout> | undefined;
 function bind(s: GameSocket) {
   s.on('connect', () => {
     const { game } = getState();
-    setState({ connected: true, queue: null, room: null });
+    setState({ connected: true, queue: null, room: null, maintenance: null });
     if (game && game.phase !== 'ended') {
       clearTimeout(resyncTimer);
       resyncTimer = setTimeout(() => {
@@ -210,10 +210,13 @@ function bind(s: GameSocket) {
     void refreshMe();
   });
 
-  s.on('friends:update', () => {
-    setState((st) => ({ friendsVersion: st.friendsVersion + 1 }));
-    void refreshMe();
-  });
+  // Presence changes arrive often; they carry the request count, so no profile reload is needed.
+  s.on('friends:update', ({ requests }) =>
+    setState((st) => ({
+      friendsVersion: st.friendsVersion + 1,
+      me: st.me && st.me.friendRequests !== requests ? { ...st.me, friendRequests: requests } : st.me,
+    })),
+  );
 
   s.on('invite', (invite) => {
     effect('invite');
@@ -233,6 +236,8 @@ function bind(s: GameSocket) {
   s.on('account:update', () => void refreshMe());
 
   s.on('notice', ({ kind, message }) => toast({ kind, title: message }));
+
+  s.on('server:draining', ({ message }) => setState({ maintenance: message }));
 }
 
 function pushFeed(text: string, icon: string) {

@@ -7,7 +7,9 @@ import { config } from './config';
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
 export const db = new DatabaseSync(config.dbPath);
-db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+// WAL + a busy timeout is also what Litestream (continuous backups) needs. synchronous = NORMAL is safe in WAL mode
+// (a power cut can lose the last commits, never corrupt the file) and saves an fsync per write.
+db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
 /** Append-only. Each entry runs once, tracked via PRAGMA user_version. */
 const MIGRATIONS: (string | (() => void))[] = [
@@ -263,6 +265,22 @@ const MIGRATIONS: (string | (() => void))[] = [
     hidden_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     hidden_at INTEGER NOT NULL
   );
+  `,
+
+  // v6: which questions each player saw recently survives restarts (it lived in memory, unbounded); indexes for
+  // queries that scanned whole tables: the level leaderboard, expired-session cleanup, approved questions per author.
+  `
+  CREATE TABLE seen_questions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question_id TEXT NOT NULL,
+    seen_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, question_id)
+  ) WITHOUT ROWID;
+  CREATE INDEX seen_questions_recent ON seen_questions(user_id, seen_at);
+
+  CREATE INDEX users_xp ON users(xp DESC, id);
+  CREATE INDEX sessions_expiry ON sessions(expires_at);
+  CREATE INDEX questions_author ON questions(author_id);
   `,
 ];
 

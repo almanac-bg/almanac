@@ -12,7 +12,7 @@ import {
 import { Server } from 'socket.io';
 import { userIdFromCookieHeader } from './auth';
 import { claimDailyAttempt, dailyQuestions } from './daily';
-import { friendIds } from './friends';
+import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry } from './game/registry';
@@ -26,7 +26,17 @@ function reply<T extends object>(ack: unknown, result: AckResult<T>) {
   if (typeof ack === 'function') ack(result);
 }
 
-export function createRealtime(httpServer: HttpServer): IO {
+/** Shown while the server restarts for an update. */
+const DRAINING = 'Обновяваме играта — нови мачове може да започнат след минута-две.';
+
+export interface Realtime {
+  io: IO;
+  activeGames: () => number;
+  /** Stops new matches and empties the queues, then resolves once running matches have finished (or after `maxMs`). */
+  drain: (maxMs: number) => Promise<void>;
+}
+
+export function createRealtime(httpServer: HttpServer): Realtime {
   const io: IO = new Server(httpServer, {
     serveClient: false,
     // Only same-origin pages may open a socket (blocks cross-site socket hijacking with the session cookie).
@@ -39,6 +49,8 @@ export function createRealtime(httpServer: HttpServer): IO {
   const games = new GameRegistry(io);
   const matchmaker = new Matchmaker(io, games);
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
+  /** Set when the server is shutting down for an update. */
+  let draining = false;
 
   const presenceOf = (userId: number): Presence => {
     if (!openSockets.has(userId)) return 'offline';
@@ -47,7 +59,7 @@ export function createRealtime(httpServer: HttpServer): IO {
     if (matchmaker.modeOf(userId)) return 'queue';
     return 'online';
   };
-  setRealtime(io, presenceOf, friendIds, (userId) => {
+  setRealtime(io, presenceOf, friendIds, incomingRequests, (userId) => {
     matchmaker.leave(userId, false);
     rooms.leave(userId);
     games.leave(userId);
@@ -87,8 +99,10 @@ export function createRealtime(httpServer: HttpServer): IO {
     rooms.connected(userId, socket);
     matchmaker.sendStatus(userId);
     socket.emit('lobby:stats', stats());
+    if (draining) socket.emit('server:draining', { message: DRAINING });
 
-    const busyError = () => (games.forUser(userId) ? 'Вече си в игра.' : null);
+    // Starting anything new is refused while the server drains for a restart.
+    const busyError = () => (games.forUser(userId) ? 'Вече си в игра.' : draining ? DRAINING : null);
 
     socket.on('queue:join', (mode, ack) => {
       if (!isQueueMode(mode)) return reply(ack, { ok: false, error: 'Непознат режим.' });
@@ -176,7 +190,7 @@ export function createRealtime(httpServer: HttpServer): IO {
     });
     socket.on('room:kick', (playerId) => rooms.kick(userId, String(playerId)));
     socket.on('room:team', (playerId) => rooms.switchTeam(userId, String(playerId)));
-    socket.on('room:start', (ack) => reply(ack, rooms.start(userId)));
+    socket.on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
 
     socket.on('invite:send', (p, ack) => reply(ack, rooms.invite(userId, Number(p?.userId))));
 
@@ -229,5 +243,14 @@ export function createRealtime(httpServer: HttpServer): IO {
     });
   });
 
-  return io;
+  return {
+    io,
+    activeGames: () => games.activeGames,
+    async drain(maxMs) {
+      draining = true;
+      for (const userId of matchmaker.clear()) notifyUser(userId, 'notice', { kind: 'info', message: DRAINING });
+      io.emit('server:draining', { message: DRAINING });
+      await games.idle(maxMs);
+    },
+  };
 }

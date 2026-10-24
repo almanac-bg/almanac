@@ -8,17 +8,20 @@ import type { IO } from './game/io';
 let io: IO | null = null;
 let presenceOf: (userId: number) => Presence = () => 'offline';
 let friendsOf: (userId: number) => number[] = () => [];
+let requestsOf: (userId: number) => number = () => 0;
 let removeFromPlayHook: (userId: number) => void = () => {};
 
 export function setRealtime(
   server: IO,
   presence: (userId: number) => Presence,
   friends: (userId: number) => number[],
+  requests: (userId: number) => number,
   removeFromPlay: (userId: number) => void,
 ) {
   io = server;
   presenceOf = presence;
   friendsOf = friends;
+  requestsOf = requests;
   removeFromPlayHook = removeFromPlay;
 }
 
@@ -40,6 +43,11 @@ export function disconnectUser(userId: number) {
   io?.in(`user:${userId}`).disconnectSockets(true);
 }
 
+/** Tells a player their friends list changed, with their pending-request count (so the badge needs no refetch). */
+export function sendFriendsUpdate(userId: number) {
+  notifyUser(userId, 'friends:update', { requests: requestsOf(userId) });
+}
+
 /** Coalesced "your friends list changed" pings, so a flurry of presence changes sends one update. */
 const pending = new Set<number>();
 let flushTimer: NodeJS.Timeout | null = null;
@@ -51,6 +59,6 @@ export function friendsChanged(...userIds: number[]) {
     const targets = new Set<number>();
     for (const id of pending) for (const friend of friendsOf(id)) targets.add(friend);
     pending.clear();
-    for (const id of targets) notifyUser(id, 'friends:update');
+    for (const id of targets) sendFriendsUpdate(id);
   }, 300);
 }

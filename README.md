@@ -66,6 +66,7 @@ and checks that it boots.
 | `GAME_TIME_SCALE`  | `1`                                   | Multiplies all in-game timers. For automated tests only      |
 | `BACKUP_DIR`       | `backups` next to the database        | Daily database snapshots; `off` disables them                |
 | `BACKUP_KEEP_DAYS` | `14`                                  | How many daily snapshots to keep                             |
+| `DRAIN_SECONDS`    | `330` in production, `0` otherwise    | On shutdown, how long running matches may finish first       |
 
 The brand name lives in `packages/shared/src/brand.ts`.
 
@@ -150,20 +151,25 @@ Players can submit questions in the app. To add built-in ones, append to `apps/s
 
 ## Deploying (Hetzner + Docker)
 
-The stack is two containers: the app (plain Node, with SQLite on a volume) and Caddy, which handles HTTPS and gets
-and renews Let's Encrypt certificates automatically. A **CX22** (2 vCPU, 4 GB) is plenty to start.
+The stack is three containers: the app (plain Node, with SQLite on a volume), Caddy, which handles HTTPS and gets
+and renews Let's Encrypt certificates automatically, and Litestream, which streams every database change to object
+storage. A **CX22** (2 vCPU, 4 GB) is plenty to start: in a load test, 1,500 simultaneous players used about 5% CPU.
 
 1. **Create the server:** a Hetzner Cloud server with Ubuntu 24.04. In the firewall, allow ports 22, 80 and 443.
 2. **Point DNS at it:** add `A` records for `almanac.bg` and `www.almanac.bg` with the server's IPv4 (and `AAAA`
    for IPv6).
-3. **Install Docker and deploy:**
+3. **Create the backup bucket:** in the Hetzner Cloud Console → Object Storage, create a bucket (e.g. `almanac-backups`)
+   and S3 credentials for it. Also tick **Backups** on the server itself.
+4. **Install Docker and deploy:**
    ```bash
    curl -fsSL https://get.docker.com | sh
    git clone <your repo> almanac && cd almanac
-   cp .env.example .env        # set DOMAIN and ADMIN_USERNAMES (your username), optionally backups
+   cp .env.example .env        # set DOMAIN, ADMIN_USERNAMES (your username) and the BACKUP_* values
    docker compose up -d --build
    ```
-4. Open https://almanac.bg and register with the username you put in `ADMIN_USERNAMES` — that account is the admin.
+5. Open https://almanac.bg and register with the username you put in `ADMIN_USERNAMES` — that account is the admin.
+6. **Test the backup once** (the commands are in `deploy/litestream.yml`): restore into a scratch file and check it
+   exists. A backup that has never been restored isn't a backup yet.
 
 **Email (password resets):**
 1. Create an account with a transactional email provider. Brevo (EU, free up to 300 emails a day), Mailgun EU and
@@ -177,17 +183,18 @@ Use port **587**: Hetzner blocks outgoing ports 25 and 465 on new cloud servers.
 service is run by a private individual, and the privacy policy and terms show these details. Both documents are
 drafts: have them reviewed for your situation.
 
-**Updating:** `git pull && docker compose up -d --build`. Live matches end on restart; accounts and stats are kept.
+**Updating:** `git pull && docker compose up -d --build`. The new version builds while the old one keeps running.
+Then the old one stops gracefully: queued players are told an update is coming, no new matches start, and running
+matches play to the end (up to ~5½ minutes, `DRAIN_SECONDS`) before it restarts. While it's down for those few
+seconds, Caddy shows a page that reloads by itself, and players' browsers reconnect automatically.
 
-**Backups:** three layers, from automatic to off-site.
-1. **Daily snapshots (automatic):** after 04:00 Sofia time the app writes a consistent copy of the database to
-   `/data/backups/quiz-YYYY-MM-DD.db` and keeps the last 14 (`BACKUP_KEEP_DAYS`). These protect against mistakes and
-   bad deploys, but live on the same disk.
-2. **Hetzner's server backups (turn this on):** a checkbox on the server (+20% of its price). Daily images of the
-   whole server, kept off the machine, so losing the server isn't losing the game.
-3. **Litestream (optional):** streams every change to Hetzner Object Storage within seconds, for minute-level
-   recovery. Fill in the `BACKUP_*` values in `.env` and run `docker compose --profile backup up -d`. See
-   `deploy/litestream.yml` for how to restore.
+**Backups:** three layers.
+1. **Litestream (continuous, off-site):** every change reaches Hetzner Object Storage within seconds; any moment of
+   the last 7 days can be restored. Restore commands are in `deploy/litestream.yml`.
+2. **Daily snapshots (automatic, on the server):** after 04:00 Sofia time the app writes a consistent copy of the
+   database to `/data/backups/quiz-YYYY-MM-DD.db` and keeps the last 14 (`BACKUP_KEEP_DAYS`). Handy for undoing a
+   mistake quickly; they live on the same disk.
+3. **Hetzner's server backups:** daily images of the whole server, kept off the machine (+20% of its price).
 
 To restore a daily snapshot:
 ```bash

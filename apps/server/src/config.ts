@@ -38,6 +38,11 @@ export const config = {
     .split(',')
     .map((s) => s.trim().normalize('NFC').toLowerCase())
     .filter(Boolean),
+  /**
+   * On shutdown, how long running matches may play out before the process exits. A 15-question Royale takes about
+   * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
+   */
+  drainMs: Number(process.env.DRAIN_SECONDS ?? (process.env.NODE_ENV === 'production' ? 330 : 0)) * 1000,
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */
   gameTimeScale: Number(process.env.GAME_TIME_SCALE ?? 1),
 };

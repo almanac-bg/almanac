@@ -216,11 +216,11 @@ test('daily challenge', T, async () => {
 });
 
 test('friends, invites and challenges', T, async () => {
-  const update = next(sb, 'friends:update');
+  const update = next<{ requests: number }>(sb, 'friends:update');
   const req = await api.send('POST', '/api/friends', A.cookie, { username: B.user.username.toUpperCase() });
   assert.equal(req.status, 200);
   assert.equal(req.body.outgoing.length, 1);
-  await update;
+  assert.equal((await update).requests, 1, 'the update carries the badge count');
   assert.equal((await api.get('/api/me', B.cookie)).body.user.friendRequests, 1);
   assert.equal((await api.send('POST', '/api/friends', A.cookie, { username: B.user.username })).status, 400, 'no duplicate requests');
   const accepted = await api.send('POST', `/api/friends/${A.user.id}/accept`, B.cookie);

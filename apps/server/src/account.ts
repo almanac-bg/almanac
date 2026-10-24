@@ -131,6 +131,7 @@ export function exportAccount(userId: number) {
     questionSubmissions: rows('SELECT category, difficulty, q, options, answer, status, reason, created_at FROM question_submissions WHERE user_id = ?'),
     reportsFiled: rows('SELECT reason, details, status, created_at FROM reports WHERE reporter_id = ?'),
     questionReportsFiled: rows('SELECT question_id, reason, details, status, created_at FROM question_reports WHERE user_id = ?'),
+    recentlySeenQuestions: rows('SELECT question_id, seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC'),
   };
 }
 

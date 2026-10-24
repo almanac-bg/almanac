@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CATEGORY_IDS, type CategoryChoice, type CategoryId, type Difficulty } from '@quiz/shared';
 import { z } from 'zod';
-import { all } from './db';
+import { all, run, tx } from './db';
 
 const QuestionSchema = z.object({
   id: z.string().min(1),
@@ -143,14 +143,39 @@ export function pickQuestions(
     });
 }
 
-const RECENT_LIMIT = 150;
-const recentlySeen = new Map<number, string[]>();
+/** How many of a player's most recent questions new matches try to avoid (a quarter of the bank). */
+export const RECENT_LIMIT = 500;
 
+/** Remembers a match's questions for each player, keeping only the newest RECENT_LIMIT. */
 export function markSeen(userId: number, questionIds: string[]) {
-  const list = [...(recentlySeen.get(userId) ?? []), ...questionIds];
-  recentlySeen.set(userId, list.slice(-RECENT_LIMIT));
+  const now = Date.now();
+  tx(() => {
+    for (const id of questionIds) {
+      run(
+        `INSERT INTO seen_questions (user_id, question_id, seen_at) VALUES (?, ?, ?)
+         ON CONFLICT (user_id, question_id) DO UPDATE SET seen_at = excluded.seen_at`,
+        userId,
+        id,
+        now,
+      );
+    }
+    run(
+      `DELETE FROM seen_questions WHERE user_id = ? AND seen_at < (
+         SELECT seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC LIMIT 1 OFFSET ?)`,
+      userId,
+      userId,
+      RECENT_LIMIT - 1,
+    );
+  });
 }
 
+/** Questions any of these players saw recently. */
 export function recentFor(userIds: number[]): Set<string> {
-  return new Set(userIds.flatMap((id) => recentlySeen.get(id) ?? []));
+  if (!userIds.length) return new Set();
+  return new Set(
+    all<{ question_id: string }>(
+      `SELECT question_id FROM seen_questions WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
+      ...userIds,
+    ).map((r) => r.question_id),
+  );
 }
