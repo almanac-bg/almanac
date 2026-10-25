@@ -1,5 +1,5 @@
 # ── Build: install everything, build the web app and bundle the server ──
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/
@@ -11,7 +11,7 @@ COPY . .
 RUN npm run build
 
 # ── Runtime: plain Node, no node_modules (the server bundle is self-contained) ──
-FROM node:24-alpine
+FROM node:26-alpine
 ENV NODE_ENV=production \
     PORT=3001 \
     DB_PATH=/data/quiz.db
