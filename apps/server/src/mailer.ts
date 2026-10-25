@@ -4,6 +4,7 @@ import path from 'node:path';
 import { BRAND, TIME_ZONE } from '@quiz/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
+import { reportError } from './monitoring';
 
 export interface Mail {
   to: string;
@@ -19,8 +20,9 @@ if (!transport && config.production) {
 }
 
 /**
- * Sends in the background; failures are logged, never surfaced to the requester. Logs never contain addresses or
- * links (they hold live tokens) — except in development without SMTP, where the console stands in for the inbox.
+ * Sends in the background; failures are logged and reported (an expired SMTP key would otherwise stop every email
+ * quietly), never surfaced to the requester. Logs and reports never contain addresses or links (they hold live
+ * tokens) — except in development without SMTP, where the console stands in for the inbox.
  */
 export function sendMail(mail: Mail) {
   if (config.mailOutbox) {
@@ -29,9 +31,11 @@ export function sendMail(mail: Mail) {
     fs.writeFileSync(path.join(config.mailOutbox, name), JSON.stringify(mail));
   }
   if (transport) {
-    transport
-      .sendMail({ from: config.mailFrom, ...mail })
-      .catch((err) => console.error(`✉️  Failed to send "${mail.subject}":`, err instanceof Error ? err.message : err));
+    transport.sendMail({ from: config.mailFrom, ...mail }).catch((err) => {
+      // A mail server's error can quote the recipient ("550 <x@y>: no such user"): never into a report.
+      const message = String(err instanceof Error ? err.message : err).replace(/[^\s<>"@]+@[^\s<>"@]+/g, '<address>');
+      void reportError(new Error(message), 'email', { extra: { subject: mail.subject } });
+    });
   } else if (config.production) {
     console.warn(`✉️  Not sent (SMTP_URL not set): "${mail.subject}"`);
   } else if (!config.mailOutbox) {

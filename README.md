@@ -372,8 +372,10 @@ S3-съвместимо object storage. Нищо не го обвързва с �
 трябва да стигат до теб.
 1. **Изпращане — Scaleway Transactional Email** (фирма от ЕС, без чужди лога в писмата и без дневен таван; 300
    писма на месец са безплатни, после 0,25 € на 1000): Transactional Email → добави домейна `almanac.bg` и сложи в
-   Cloudflare записите, които дава (DKIM, DMARC; SPF — виж т. 3). После IAM → API ключ за проекта. В `.env`:
-   `SMTP_URL=smtp://<Project ID>:<Secret key>@smtp.tem.scaleway.com:587`.
+   Cloudflare записите, които дава (DKIM, DMARC; SPF — виж т. 3). После IAM → приложение (напр. `almanac-smtp`) с
+   политика **TransactionalEmailEmailFullAccess** за проекта и API ключ за него. В `.env`:
+   `SMTP_URL=smtp://<Project ID>:<Secret key>@smtp.tem.scaleway.com:587`. Ключът важи най-много година: сложи си
+   напомняне да го подновиш (неизпратен имейл стига и до Sentry).
 2. **Получаване — Cloudflare Email Routing** (безплатно): включи го и пренасочи `privacy@almanac.bg` към пощата си;
    Cloudflare сам добавя MX записите си.
 3. **SPF е един запис за целия домейн**, затова обедини двата: `v=spf1 include:_spf.mx.cloudflare.net
