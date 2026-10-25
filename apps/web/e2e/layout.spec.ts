@@ -79,3 +79,21 @@ test('a friend request waiting fits the friends page on a 320 px phone', async (
   await page.getByRole('button', { name: 'Приеми', exact: true }).click();
   await expect(page.getByText('Вече сте приятели!')).toBeVisible();
 });
+
+// Playwright clicks only what a person could click: a link under an invisible layer fails here.
+test('the legal links on the landing page open the legal pages', async ({ page }) => {
+  for (const size of [
+    { width: 375, height: 812 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(size);
+    for (const [name, heading] of [
+      ['Условия за ползване', 'Условия за ползване'],
+      ['Политика за поверителност', 'Политика за поверителност'],
+    ]) {
+      await page.goto('/');
+      await page.getByRole('link', { name, exact: true }).click();
+      await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    }
+  }
+});

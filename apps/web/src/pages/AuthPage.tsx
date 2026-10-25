@@ -183,180 +183,186 @@ export function AuthPage() {
         transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
         className="relative min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
       >
-        <div className="absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm" />
-        {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
-        <Card className="relative bg-ink-2/95 p-5 sm:p-8">
-          {challengeId && !formOpen ? (
-            <ChallengeLanding
-              preview={preview.data}
-              error={preview.error}
-              onRetry={preview.retry}
-              busy={guestBusy}
-              guestError={guestError}
-              onPlay={() => playAsGuest(guestLanding)}
-              onSignIn={() => {
-                setFormOpen(true);
-                setMode('login');
-                setError(null);
-              }}
-            />
-          ) : mode === 'forgot' ? (
-            <ForgotPassword
-              initial={username}
-              onBack={() => {
-                setMode('login');
-                setError(null);
-              }}
-            />
-          ) : (
-            <>
-              {challengeId && (
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
-                >
-                  <ArrowLeft className="size-4" /> Към предизвикателството
-                </button>
-              )}
-              {inviteCode && (
-                <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
-                  <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
-                  <span>
-                    Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез като
-                    гост или с профила си, за да се присъединиш.
-                  </span>
-                </p>
-              )}
-              {/* One main action per screen: playing as a guest for a new device, signing in for a known one. */}
-              {!returning && (
-                <>
-                  {guest}
-                  <Or>или с профил</Or>
-                </>
-              )}
-              <Segmented
-                value={mode}
-                onChange={(m) => {
-                  setMode(m);
+        {/* The glow hugs the card only (not the links under it) and never takes a click. */}
+        <div className="relative">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm"
+          />
+          {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
+          <Card className="relative bg-ink-2/95 p-5 sm:p-8">
+            {challengeId && !formOpen ? (
+              <ChallengeLanding
+                preview={preview.data}
+                error={preview.error}
+                onRetry={preview.retry}
+                busy={guestBusy}
+                guestError={guestError}
+                onPlay={() => playAsGuest(guestLanding)}
+                onSignIn={() => {
+                  setFormOpen(true);
+                  setMode('login');
                   setError(null);
                 }}
-                options={[
-                  { value: 'login', label: 'Вход' },
-                  { value: 'register', label: 'Регистрация' },
-                ]}
               />
-              <h2 className="mt-6 font-display text-2xl font-bold">
-                {mode === 'login' ? 'Здравей отново!' : 'Създай профил'}
-              </h2>
-              <p className="mt-1 text-sm text-fg-3">
-                {mode === 'login'
-                  ? 'Влез и продължи там, където спря.'
-                  : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
-              </p>
-              <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-                <Field
-                  label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
-                  htmlFor={`${id}-username`}
-                >
-                  <input
-                    id={`${id}-username`}
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoComplete="username"
-                    aria-invalid={!!error && invalid === 'username'}
-                    aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
-                    // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
-                    autoFocus={DESKTOP && returning}
-                    required
-                    minLength={mode === 'register' ? 3 : 1}
-                    maxLength={mode === 'register' ? 20 : 254}
-                    placeholder="напр. Мозъчко"
-                    className={INPUT}
-                  />
-                </Field>
-                {mode === 'register' && (
-                  <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
+            ) : mode === 'forgot' ? (
+              <ForgotPassword
+                initial={username}
+                onBack={() => {
+                  setMode('login');
+                  setError(null);
+                }}
+              />
+            ) : (
+              <>
+                {challengeId && (
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen(false)}
+                    className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
+                  >
+                    <ArrowLeft className="size-4" /> Към предизвикателството
+                  </button>
+                )}
+                {inviteCode && (
+                  <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
+                    <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
+                    <span>
+                      Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез като
+                      гост или с профила си, за да се присъединиш.
+                    </span>
+                  </p>
+                )}
+                {/* One main action per screen: playing as a guest for a new device, signing in for a known one. */}
+                {!returning && (
+                  <>
+                    {guest}
+                    <Or>или с профил</Or>
+                  </>
+                )}
+                <Segmented
+                  value={mode}
+                  onChange={(m) => {
+                    setMode(m);
+                    setError(null);
+                  }}
+                  options={[
+                    { value: 'login', label: 'Вход' },
+                    { value: 'register', label: 'Регистрация' },
+                  ]}
+                />
+                <h2 className="mt-6 font-display text-2xl font-bold">
+                  {mode === 'login' ? 'Здравей отново!' : 'Създай профил'}
+                </h2>
+                <p className="mt-1 text-sm text-fg-3">
+                  {mode === 'login'
+                    ? 'Влез и продължи там, където спря.'
+                    : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
+                </p>
+                <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+                  <Field
+                    label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
+                    htmlFor={`${id}-username`}
+                  >
                     <input
-                      id={`${id}-email`}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      type="email"
-                      autoComplete="email"
-                      placeholder="за възстановяване на паролата"
+                      id={`${id}-username`}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      autoComplete="username"
+                      aria-invalid={!!error && invalid === 'username'}
+                      aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
+                      // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
+                      autoFocus={DESKTOP && returning}
+                      required
+                      minLength={mode === 'register' ? 3 : 1}
+                      maxLength={mode === 'register' ? 20 : 254}
+                      placeholder="напр. Мозъчко"
                       className={INPUT}
                     />
                   </Field>
-                )}
-                <Field label="Парола" htmlFor={`${id}-password`}>
-                  <div className="relative">
-                    <input
-                      id={`${id}-password`}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      type={show ? 'text' : 'password'}
-                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                      aria-invalid={!!error && invalid === 'password'}
-                      aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
-                      required
-                      minLength={6}
-                      placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
-                      className={`${INPUT} pr-12`}
-                    />
+                  {mode === 'register' && (
+                    <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
+                      <input
+                        id={`${id}-email`}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        autoComplete="email"
+                        placeholder="за възстановяване на паролата"
+                        className={INPUT}
+                      />
+                    </Field>
+                  )}
+                  <Field label="Парола" htmlFor={`${id}-password`}>
+                    <div className="relative">
+                      <input
+                        id={`${id}-password`}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        type={show ? 'text' : 'password'}
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        aria-invalid={!!error && invalid === 'password'}
+                        aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
+                        required
+                        minLength={6}
+                        placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
+                        className={`${INPUT} pr-12`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShow(!show)}
+                        aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
+                        className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+                      >
+                        {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+                      </button>
+                    </div>
+                  </Field>
+                  {mode === 'login' && (
                     <button
                       type="button"
-                      onClick={() => setShow(!show)}
-                      aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-                      className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+                      onClick={() => {
+                        setMode('forgot');
+                        setError(null);
+                      }}
+                      className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
                     >
-                      {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+                      Забравена парола?
                     </button>
-                  </div>
-                </Field>
-                {mode === 'login' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('forgot');
-                      setError(null);
-                    }}
-                    className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
-                  >
-                    Забравена парола?
-                  </button>
-                )}
-
-                <div
-                  id={`${id}-error`}
-                  role="alert"
-                  className={clsx(
-                    'overflow-hidden rounded-xl bg-rose-500/10 text-sm text-rose-300 transition-all',
-                    error ? 'max-h-20 px-3 py-2.5' : 'max-h-0',
                   )}
-                >
-                  {error}
-                </div>
 
-                <Button
-                  type="submit"
-                  size="lg"
-                  variant={returning ? 'primary' : 'secondary'}
-                  className="w-full"
-                  loading={busy}
-                >
-                  {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
-                </Button>
-              </form>
-              {returning && (
-                <>
-                  <Or>или</Or>
-                  {guest}
-                </>
-              )}
-              <Consent minors={mode === 'register'} />
-            </>
-          )}
-        </Card>
+                  <div
+                    id={`${id}-error`}
+                    role="alert"
+                    className={clsx(
+                      'overflow-hidden rounded-xl bg-rose-500/10 text-sm text-rose-300 transition-all',
+                      error ? 'max-h-20 px-3 py-2.5' : 'max-h-0',
+                    )}
+                  >
+                    {error}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    variant={returning ? 'primary' : 'secondary'}
+                    className="w-full"
+                    loading={busy}
+                  >
+                    {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
+                  </Button>
+                </form>
+                {returning && (
+                  <>
+                    <Or>или</Or>
+                    {guest}
+                  </>
+                )}
+                <Consent minors={mode === 'register'} />
+              </>
+            )}
+          </Card>
+        </div>
         <LegalLinks className="mt-4 justify-center" />
       </motion.div>
 
