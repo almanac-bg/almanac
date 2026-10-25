@@ -9,7 +9,8 @@ www.{$DOMAIN} {
 		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
-	reverse_proxy app:3001
+	# The app's port is published on the server's loopback only (Caddy runs on the host network).
+	reverse_proxy 127.0.0.1:3001
 
 	# The few seconds the app restarts during a deploy: a friendly page that retries by itself, not a bare 502.
 	handle_errors 502 503 504 {

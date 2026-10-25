@@ -52,7 +52,7 @@ export interface LiveGame {
   /** Extra time "Още време" added to the current question. */
   extraMs: number;
   answered: string[];
-  /** -1 = locked in before a reconnect, choice unknown. */
+  /** Your pick (-1 = locked in before a reconnect, choice unknown). It's in once `answered` includes you. */
   myChoice: number | null;
   removed: number[];
   doubled: boolean;
@@ -68,6 +68,8 @@ export interface LiveGame {
   /** Who froze you, for the overlay. */
   frozenBy: string | null;
   reveal: RevealPayload | null;
+  /** Just reconnected: until the server re-sends the question on screen, it may already be closed. */
+  resyncing: boolean;
   eliminated: string[];
   reactions: { key: number; playerId: string; emote: string }[];
   feed: { key: number; text: string; icon: string }[];

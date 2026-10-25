@@ -82,10 +82,12 @@ export function settleSeasons(
   unlocksFor: (seasonTier: number) => UnlockRef[],
   addXp: (xp: number) => void,
 ): SeasonReward[] {
-  const finished = all<{ season: string; peak: number; games: number }>(
-    `SELECT season, MAX(peak) AS peak, SUM(games) AS games FROM season_ratings
+  // The best peak among the modes played enough: a lucky streak of three games doesn't make a season.
+  const finished = all<{ season: string; peak: number | null }>(
+    `SELECT season, MAX(CASE WHEN games >= ? THEN peak END) AS peak FROM season_ratings
      WHERE user_id = ? AND season < ? AND season NOT IN (SELECT season FROM season_rewards WHERE user_id = ?)
      GROUP BY season ORDER BY season`,
+    SEASON_MIN_GAMES,
     userId,
     seasonKey(),
     userId,
@@ -93,7 +95,7 @@ export function settleSeasons(
   if (!finished.length) return [];
   return tx(() =>
     finished.map((s) => {
-      const tier = s.games >= SEASON_MIN_GAMES ? rankFor(s.peak).id : null;
+      const tier = s.peak !== null ? rankFor(s.peak).id : null;
       const xp = tier ? SEASON_REWARD_XP[tier] : 0;
       const unlocks = tier ? unlocksFor(tierIndex(tier)) : [];
       run(

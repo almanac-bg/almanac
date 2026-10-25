@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
@@ -282,6 +283,13 @@ const MIGRATIONS: (string | (() => void))[] = [
   CREATE INDEX sessions_expiry ON sessions(expires_at);
   CREATE INDEX questions_author ON questions(author_id);
   `,
+
+  // v7: session tokens are stored as SHA-256 hashes (a leaked database or backup holds no usable logins).
+  () => {
+    const rows = db.prepare('SELECT token FROM sessions').all() as { token: string }[];
+    const update = db.prepare('UPDATE sessions SET token = ? WHERE token = ?');
+    for (const { token } of rows) update.run(createHash('sha256').update(token).digest('base64url'), token);
+  },
 ];
 
 function migrate() {

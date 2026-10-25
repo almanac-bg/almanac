@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { BRAND } from '@quiz/shared';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import { ServerBusyError } from './auth';
 import { config } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
@@ -29,6 +30,21 @@ app.get('/api/health', (_req, res) => {
   }
 });
 app.use('/api', api);
+// Anything a route throws: a short JSON answer, never Express's HTML page or a stack trace.
+app.use('/api', (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof ServerBusyError) {
+    res.status(503).json({ error: err.message });
+    return;
+  }
+  // Malformed JSON bodies and the like.
+  const status = (err as { status?: number }).status;
+  if (status && status >= 400 && status < 500) {
+    res.status(status).json({ error: 'Невалидна заявка.' });
+    return;
+  }
+  console.error('💥', err);
+  res.status(500).json({ error: 'Нещо се обърка. Опитай пак.' });
+});
 
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {

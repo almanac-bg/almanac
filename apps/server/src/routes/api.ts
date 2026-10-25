@@ -19,11 +19,13 @@ import { achievementProgress } from '../achievements';
 import {
   createSession,
   destroySession,
+  DUMMY_PASSWORD_HASH,
   hashPassword,
+  hashToken,
   requireAuth,
   sessionTokenFromCookieHeader,
   setSessionCookie,
-  userIdFromCookieHeader,
+  userIdFromRequest,
   verifyPassword,
 } from '../auth';
 import { config } from '../config';
@@ -41,7 +43,7 @@ import {
 import { all, one, run } from '../db';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
-import { notifyUser, sendFriendsUpdate } from '../notify';
+import { disconnectSession, notifyUser, sendFriendsUpdate } from '../notify';
 import {
   hiddenQuestions,
   openQuestionReportCount,
@@ -50,6 +52,7 @@ import {
   resolveQuestionReports,
   unhideQuestion,
 } from '../questionReports';
+import { throttled } from '../throttle';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import {
   approveSubmission,
@@ -60,7 +63,7 @@ import {
   rejectSubmission,
   submitQuestion,
 } from '../submissions';
-import { getUser, getUserByLogin, getUserByName, isAdmin, toPublicUser, type UserRow, usernameKey } from '../users';
+import { emailKey, getUser, getUserByLogin, getUserByName, isAdmin, toPublicUser, type UserRow, usernameKey } from '../users';
 
 export const api = Router();
 
@@ -81,25 +84,6 @@ const Login = z.object({
   username: z.string().trim().min(1, 'Въведи име или имейл.').max(254),
   password: z.string().min(1, 'Въведи парола.').max(200),
 });
-
-/** Tiny in-memory throttle for auth endpoints: N attempts per key per window. */
-const attempts = new Map<string, { count: number; resetAt: number }>();
-// Forget expired windows now and then, or every IP and username ever seen would stay in memory.
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of attempts) if (entry.resetAt < now) attempts.delete(key);
-}, 10 * 60_000).unref();
-
-function throttled(key: string, limit = 10, windowMs = 5 * 60_000): boolean {
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  entry.count++;
-  return entry.count > limit;
-}
 
 function parse<T>(schema: z.ZodType<T>, req: Request, res: Response): T | null {
   const parsed = schema.safeParse(req.body);
@@ -141,8 +125,8 @@ api.post('/auth/register', async (req, res) => {
     return;
   }
   const hash = await hashPassword(creds.password);
-  // In development the very first account runs the place. In production nobody gets admin by signing up first:
-  // moderators come only from ADMIN_USERNAMES (otherwise a stranger could beat the owner to it).
+  // In development the very first account runs the place. In production nobody gets admin by signing up: moderators
+  // are made with the admin command line (src/cli.ts), so no name can be claimed by someone faster.
   const firstUser = !config.production && one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n === 0;
   const { lastInsertRowid } = run(
     'INSERT INTO users (username, username_key, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?)',
@@ -161,12 +145,20 @@ api.post('/auth/register', async (req, res) => {
 api.post('/auth/login', async (req, res) => {
   const creds = parse(Login, req, res);
   if (!creds) return;
-  if (throttled(`login:${req.ip}:${usernameKey(creds.username)}`)) {
+  // Per IP and account, per IP across accounts (password spraying), and per account across IPs (distributed guessing).
+  const account = usernameKey(creds.username);
+  if (
+    throttled(`login:${req.ip}:${account}`) ||
+    throttled(`login-ip:${req.ip}`, 40, 15 * 60_000) ||
+    throttled(`login-account:${account}`, 30, 15 * 60_000)
+  ) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
   const user = getUserByLogin(creds.username);
-  if (!user || !(await verifyPassword(creds.password, user.password_hash))) {
+  // An unknown login still costs a password check, so timing doesn't reveal which usernames and emails exist.
+  const valid = await verifyPassword(creds.password, user?.password_hash ?? DUMMY_PASSWORD_HASH);
+  if (!user || !valid) {
     res.status(401).json({ error: 'Грешно име или парола.' });
     return;
   }
@@ -203,6 +195,12 @@ api.post('/auth/reset', async (req, res) => {
     res.status(400).json({ error: result.error });
     return;
   }
+  // A new password doesn't lift a ban.
+  const ban = activeBan(getUser(result.userId)!);
+  if (ban) {
+    res.status(403).json({ error: ban });
+    return;
+  }
   setSessionCookie(res, createSession(result.userId));
   res.json({ user: getMe(result.userId) });
 });
@@ -221,7 +219,10 @@ api.post('/auth/verify-email', (req, res) => {
 
 api.post('/auth/logout', (req, res) => {
   const token = sessionTokenFromCookieHeader(req.headers.cookie);
-  if (token) destroySession(token);
+  if (token) {
+    destroySession(token);
+    disconnectSession(hashToken(token)); // the socket of every tab on this session too
+  }
   setSessionCookie(res, null);
   res.json({ ok: true });
 });
@@ -230,7 +231,7 @@ api.post('/auth/logout', (req, res) => {
 
 /** Signed-out visitors get `{ user: null }` rather than a 401, so the first page load stays quiet. */
 api.get('/me', (req, res) => {
-  const userId = userIdFromCookieHeader(req.headers.cookie);
+  const userId = userIdFromRequest(req, res);
   res.json({ user: userId ? getMe(userId) : null });
 });
 
@@ -249,12 +250,34 @@ api.patch('/me/loadout', requireAuth, (req, res) => {
   res.json({ user: getMe(res.locals.userId) });
 });
 
-api.post('/account/email', requireAuth, (req, res) => {
-  const body = parse(z.object({ email: z.string().max(254) }), req, res);
+/** Changing or removing the email needs the password: whoever controls the email can reset the password. */
+async function confirmPassword(res: Response, password: string): Promise<boolean> {
+  if (throttled(`confirm-password:${res.locals.userId}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return false;
+  }
+  if (!(await verifyPassword(password, getUser(res.locals.userId)!.password_hash))) {
+    res.status(400).json({ error: 'Грешна парола.' });
+    return false;
+  }
+  return true;
+}
+
+api.post('/account/email', requireAuth, async (req, res) => {
+  const body = parse(z.object({ email: z.string().max(254), password: z.string().max(200).optional() }), req, res);
   if (!body) return;
-  if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000)) {
+  if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000) || throttled(`email-to:${emailKey(body.email)}`, 3, 24 * 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
+  }
+  // Re-sending the link to the address already waiting is harmless; a new address needs the password.
+  const resend = getUser(res.locals.userId)!.pending_email;
+  if (!(resend && emailKey(resend) === emailKey(body.email))) {
+    if (!body.password) {
+      res.status(400).json({ error: 'Въведи паролата си, за да смениш имейла.' });
+      return;
+    }
+    if (!(await confirmPassword(res, body.password))) return;
   }
   const result = requestEmailChange(res.locals.userId, body.email);
   if (!result.ok) {
@@ -264,7 +287,9 @@ api.post('/account/email', requireAuth, (req, res) => {
   res.json({ user: getMe(res.locals.userId) });
 });
 
-api.delete('/account/email', requireAuth, (_req, res) => {
+api.delete('/account/email', requireAuth, async (req, res) => {
+  const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
+  if (!body || !(await confirmPassword(res, body.password))) return;
   removeEmail(res.locals.userId);
   res.json({ user: getMe(res.locals.userId) });
 });
@@ -316,8 +341,11 @@ api.post('/client-errors', (req, res) => {
     })
     .safeParse(req.body);
   if (body.success && !throttled(`client-error:${req.ip}`, 20, 10 * 60_000)) {
+    // Untrusted text: one line for the message, an indented block for the stack, so it can't forge log entries.
+    const line = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
     const { kind, message, url, stack } = body.data;
-    console.error(`🧯 Browser ${kind} at ${url ?? '?'}: ${message}${stack ? `\n${stack}` : ''}`);
+    const trace = stack ? `\n${stack.split('\n').map((l) => `    | ${line(l)}`).join('\n')}` : '';
+    console.error(`🧯 Browser ${kind} at ${line(url ?? '?')}: ${line(message)}${trace}`);
   }
   res.status(204).end();
 });
@@ -378,8 +406,14 @@ api.get('/friends', requireAuth, (_req, res) => {
 });
 
 api.post('/friends', requireAuth, (req, res) => {
-  const body = parse(z.object({ username: z.string().trim().min(1, 'Въведи име.') }), req, res);
+  const body = parse(z.object({ username: z.string().trim().min(1, 'Въведи име.').max(40) }), req, res);
   if (!body) return;
+  // Per sender, and per pair (removing and re-requesting the same player can't become a notification loop).
+  const pair = `${res.locals.userId}:${usernameKey(body.username)}`;
+  if (throttled(`friend-request:${res.locals.userId}`, 30, 60 * 60_000) || throttled(`friend-pair:${pair}`, 3, 24 * 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много покани. Опитай по-късно.' });
+    return;
+  }
   friendReply(res, res.locals.userId, requestFriend(res.locals.userId, body.username));
 });
 

@@ -76,12 +76,12 @@ test('unlock requirements', () => {
   assert.ok(meetsRequirement({ season: 'gold' }, ctx));
   assert.ok(!meetsRequirement({ season: 'platinum' }, ctx));
   const gained = newlyUnlocked({ level: 2, achievements: new Set(), seasonTier: -1 }, { level: 3, achievements: new Set(), seasonTier: 1 });
-  assert.ok(gained.some((u) => u.kind === 'powerup' && u.id === 'fifty'), '50/50 at level 3');
+  assert.ok(gained.some((u) => u.kind === 'powerup' && u.id === 'freeze'), 'Леден удар at level 3');
   assert.ok(gained.some((u) => u.kind === 'frame' && u.id === 'season_silver'), 'silver season frame');
 });
 
 test('question picking: ramp, category cap and seeded determinism', () => {
-  const picked = pickQuestions(10, 'mixed', new Set());
+  const picked = pickQuestions(10, 'mixed', new Map());
   assert.equal(picked.length, 10);
   assert.match(picked.map((q) => q.difficulty[0]).join(''), /^e*m*h*$/);
   const perCategory = new Map<string, number>();
@@ -89,11 +89,22 @@ test('question picking: ramp, category cap and seeded determinism', () => {
   assert.ok(Math.max(...perCategory.values()) <= 3, 'no category dominates a mixed match');
   for (const q of picked) assert.ok(q.options[q.answer].includes('✓'), 'answer index follows the shuffle');
 
-  const a = pickQuestions(10, 'mixed', new Set(), seededRng('daily:2026-10-18'));
-  const b = pickQuestions(10, 'mixed', new Set(), seededRng('daily:2026-10-18'));
-  const c = pickQuestions(10, 'mixed', new Set(), seededRng('daily:2026-10-19'));
+  const a = pickQuestions(10, 'mixed', new Map(), seededRng('daily:2026-10-18'));
+  const b = pickQuestions(10, 'mixed', new Map(), seededRng('daily:2026-10-18'));
+  const c = pickQuestions(10, 'mixed', new Map(), seededRng('daily:2026-10-19'));
   assert.deepEqual(a, b, 'same seed → same questions and option order');
   assert.notDeepEqual(a, c, 'another day → another set');
+});
+
+test('question picking: unseen first, then what the players saw longest ago', () => {
+  const every = pickQuestions(30, 'history', new Map());
+  assert.equal(every.length, 30);
+  const stale = new Set(pickQuestions(10, 'history', new Map()).map((q) => q.id));
+  const seen = new Map(every.map((q) => [q.id, stale.has(q.id) ? 1 : 2]));
+  assert.deepEqual(new Set(pickQuestions(10, 'history', seen).map((q) => q.id)), stale, 'the longest-ago ones come back first');
+  const fresh = every.find((q) => q.difficulty === 'easy' && !stale.has(q.id))!;
+  seen.delete(fresh.id);
+  assert.ok(pickQuestions(10, 'history', seen).some((q) => q.id === fresh.id), 'a question nobody saw beats them all');
 });
 
 test('Bulgarian ordinals', () => {

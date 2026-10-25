@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import {
   type AckResult,
+  type ClientToServerEvents,
   isCategoryChoice,
   isQueueMode,
   type LobbyStats,
@@ -10,14 +11,16 @@ import {
   type Presence,
 } from '@quiz/shared';
 import { Server } from 'socket.io';
-import { userIdFromCookieHeader } from './auth';
+import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import { claimDailyAttempt, dailyQuestions } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry } from './game/registry';
 import { RoomManager } from './game/rooms';
+import { guarded } from './guard';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
+import { eventBucket, throttled } from './throttle';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
@@ -25,6 +28,15 @@ const POWERUP_IDS = POWERUPS.map((p) => p.id);
 function reply<T extends object>(ack: unknown, result: AckResult<T>) {
   if (typeof ack === 'function') ack(result);
 }
+
+// Client payloads are untrusted JSON and are checked by type, never coerced: `String(x)` / `Number(x)` run code chosen
+// by the sender's payload shape (`{"toString": 1}` throws).
+const str = (x: unknown, max: number) => (typeof x === 'string' ? x.slice(0, max) : '');
+/** -1 for anything but a whole number: no player, question or option has that id. */
+const int = (x: unknown) => (Number.isSafeInteger(x) ? (x as number) : -1);
+const obj = (x: unknown): Record<string, unknown> => (x !== null && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
+
+const MAX_SOCKETS_PER_USER = 10;
 
 /** Shown while the server restarts for an update. */
 const DRAINING = 'Обновяваме играта — нови мачове може да започнат след минута-две.';
@@ -39,6 +51,8 @@ export interface Realtime {
 export function createRealtime(httpServer: HttpServer): Realtime {
   const io: IO = new Server(httpServer, {
     serveClient: false,
+    // Every client message is tiny; the 1 MB default only invites abuse.
+    maxHttpBufferSize: 16 * 1024,
     // Only same-origin pages may open a socket (blocks cross-site socket hijacking with the session cookie).
     allowRequest: (req, cb) => {
       const origin = req.headers.origin;
@@ -70,18 +84,43 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     inGame: games.playersInGame,
     queues: matchmaker.counts(),
   });
-  setInterval(() => io.emit('lobby:stats', stats()), 3000).unref();
+  setInterval(guarded('lobby stats', () => io.emit('lobby:stats', stats())), 3000).unref();
 
   io.use((socket, next) => {
-    const userId = userIdFromCookieHeader(socket.request.headers.cookie);
-    if (!userId || !getUser(userId)) return next(new Error('unauthorized'));
+    const token = sessionTokenFromCookieHeader(socket.request.headers.cookie);
+    const userId = resolveSession(token)?.userId;
+    if (!token || !userId || !getUser(userId)) return next(new Error('unauthorized'));
+    // A handful of tabs is normal; dozens of sockets for one account is not.
+    if ((openSockets.get(userId) ?? 0) >= MAX_SOCKETS_PER_USER) return next(new Error('too-many-connections'));
     socket.data.userId = userId;
+    socket.data.session = hashToken(token);
     next();
   });
 
   io.on('connection', (socket) => {
-    const { userId } = socket.data;
-    socket.join(`user:${userId}`);
+    const { userId, session } = socket.data;
+    socket.join([`user:${userId}`, `session:${session}`]);
+    // Bursts are fine (answer + joker + emote); a stream of events is dropped.
+    const allowed = eventBucket();
+    socket.use((_packet, next) => {
+      if (allowed()) next();
+    });
+
+    /**
+     * Every client event goes through here: a handler that throws (a bug, or a payload nobody anticipated) answers
+     * that one request with an error instead of taking the whole server — and every live match — down with it.
+     */
+    const on = <E extends keyof ClientToServerEvents>(event: E, listener: ClientToServerEvents[E]) => {
+      socket.on(event, ((...args: unknown[]) => {
+        try {
+          (listener as (...a: unknown[]) => void)(...args);
+        } catch (err) {
+          console.error(`💥 socket "${event}" from user ${userId}:`, err);
+          const ack = args.at(-1);
+          if (typeof ack === 'function') ack({ ok: false, error: 'Нещо се обърка. Опитай пак.' });
+        }
+      }) as never);
+    };
     const firstSocket = !openSockets.has(userId);
     openSockets.set(userId, (openSockets.get(userId) ?? 0) + 1);
     if (firstSocket) friendsChanged(userId);
@@ -95,6 +134,13 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       const sync = current.syncFor(playerId);
       socket.emit('game:start', sync.start);
       if (sync.question) socket.emit('game:question', sync.question);
+    } else {
+      // The match ended while they were away: show how it went (it's already saved).
+      const missed = games.takeMissed(userId);
+      if (missed) {
+        socket.emit('game:start', missed.start);
+        socket.emit('game:end', missed.end);
+      }
     }
     rooms.connected(userId, socket);
     matchmaker.sendStatus(userId);
@@ -104,7 +150,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     // Starting anything new is refused while the server drains for a restart.
     const busyError = () => (games.forUser(userId) ? 'Вече си в игра.' : draining ? DRAINING : null);
 
-    socket.on('queue:join', (mode, ack) => {
+    on('queue:join', (mode, ack) => {
       if (!isQueueMode(mode)) return reply(ack, { ok: false, error: 'Непознат режим.' });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
@@ -113,10 +159,10 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       reply(ack, { ok: true });
     });
 
-    socket.on('queue:leave', () => matchmaker.leave(userId));
+    on('queue:leave', () => matchmaker.leave(userId));
 
-    socket.on('solo:start', (opts, ack) => {
-      const category = opts?.category;
+    on('solo:start', (opts, ack) => {
+      const { category } = obj(opts);
       if (!isCategoryChoice(category)) return reply(ack, { ok: false, error: 'Непозната категория.' });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
@@ -141,7 +187,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       }
     });
 
-    socket.on('daily:start', (ack) => {
+    on('daily:start', (ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       const claim = claimDailyAttempt(userId);
@@ -159,7 +205,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
           category: 'mixed',
           elimination: false,
           dailyDay: claim.day,
-          questions: dailyQuestions(claim.day),
+          questions: dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
         });
@@ -169,60 +215,66 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       }
     });
 
-    socket.on('room:create', (settings, ack) => {
+    on('room:create', (settings, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       matchmaker.leave(userId);
-      reply(ack, rooms.create(userId, settings ?? {}));
+      reply(ack, rooms.create(userId, obj(settings)));
     });
 
-    socket.on('room:join', (code, ack) => {
+    on('room:join', (code, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
+      // Codes are short enough to type; this keeps them too slow to guess.
+      if (throttled(`room-join:${userId}`, 20, 10 * 60_000)) {
+        return reply(ack, { ok: false, error: 'Твърде много опити да влезеш в стая. Изчакай няколко минути.' });
+      }
       matchmaker.leave(userId);
-      reply(ack, rooms.join(userId, String(code ?? '')));
+      reply(ack, rooms.join(userId, str(code, 10)));
     });
 
-    socket.on('room:leave', () => rooms.leave(userId));
-    socket.on('room:settings', (settings) => rooms.updateSettings(userId, settings ?? {}));
-    socket.on('room:bot', (action) => {
+    on('room:leave', () => rooms.leave(userId));
+    on('room:settings', (settings) => rooms.updateSettings(userId, obj(settings)));
+    on('room:bot', (action) => {
       if (action === 'add' || action === 'remove') rooms.bot(userId, action);
     });
-    socket.on('room:kick', (playerId) => rooms.kick(userId, String(playerId)));
-    socket.on('room:team', (playerId) => rooms.switchTeam(userId, String(playerId)));
-    socket.on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
+    on('room:kick', (playerId) => rooms.kick(userId, str(playerId, 32)));
+    on('room:team', (playerId) => rooms.switchTeam(userId, str(playerId, 32)));
+    on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
 
-    socket.on('invite:send', (p, ack) => reply(ack, rooms.invite(userId, Number(p?.userId))));
+    on('invite:send', (p, ack) => reply(ack, rooms.invite(userId, int(obj(p).userId))));
 
-    socket.on('invite:decline', (p) => {
-      const from = Number(p?.fromUserId);
+    on('invite:decline', (p) => {
+      const from = rooms.declineInvite(userId, str(obj(p).inviteId, 64));
       const me = publicUser(userId);
       if (from && me) notifyUser(from, 'notice', { kind: 'info', message: `${me.username} отказа поканата.` });
     });
 
-    socket.on('friends:challenge', (p, ack) => {
+    on('friends:challenge', (p, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       matchmaker.leave(userId);
-      reply(ack, rooms.challenge(userId, Number(p?.userId)));
+      reply(ack, rooms.challenge(userId, int(obj(p).userId)));
     });
 
-    socket.on('game:answer', (p) => {
+    on('game:answer', (p) => {
       const game = games.forUser(userId);
-      if (game && p) game.answer(game.playerIdFor(userId), Number(p.index), Number(p.choice));
+      const { index, choice } = obj(p);
+      if (game) game.answer(game.playerIdFor(userId), int(index), int(choice));
     });
 
-    socket.on('game:powerup', (p) => {
+    on('game:powerup', (p) => {
       const game = games.forUser(userId);
-      if (game && p && POWERUP_IDS.includes(p.powerup)) game.usePowerup(game.playerIdFor(userId), Number(p.index), p.powerup as PowerupId);
+      const { index, powerup } = obj(p);
+      if (game && POWERUP_IDS.includes(powerup as PowerupId)) game.usePowerup(game.playerIdFor(userId), int(index), powerup as PowerupId);
     });
 
-    socket.on('game:react', (emote) => {
+    on('game:react', (emote) => {
       const game = games.forUser(userId);
-      if (game) game.react(game.playerIdFor(userId), String(emote));
+      if (game) game.react(game.playerIdFor(userId), str(emote, 16));
     });
 
-    socket.on('game:leave', () => {
+    on('game:leave', () => {
       const game = games.forUser(userId);
       if (game?.setup.roomCode) rooms.leave(userId);
       games.leave(userId);

@@ -18,7 +18,8 @@ npm run dev
 ```
 
 Open http://localhost:5173, register an account, and play. In development **the first account you register becomes
-the admin**, so it can approve community questions. In production admins come only from `ADMIN_USERNAMES`.
+the admin**, so it can approve community questions. In production nobody becomes an admin by signing up; see
+step 5 of [Deploying](#deploying-hetzner--docker).
 
 When no other humans are queuing, bots fill the empty seats after a few seconds, so every mode is playable alone. To
 test real multiplayer locally, open a second browser (or a private window) with another account.
@@ -33,12 +34,17 @@ test real multiplayer locally, open a second browser (or a private window) with 
 
 ### Tests
 
-`npm test` runs five suites with Node's built-in test runner:
+`npm test` runs these suites with Node's built-in test runner:
 - **`e2e.test.ts`** boots a real server with a throwaway database and plays through everything with real sockets.
   Two players and bots cover: solo, a ranked duel with a reconnect, Royale eliminations, private rooms and teams,
   the daily challenge, friends, invites and challenges, every joker, community questions with moderation, season
-  rewards, flagging and hiding wrong questions, and how the website's files are cached.
-- **`production.test.ts`** runs the server as in production: admins only from `ADMIN_USERNAMES`, browser security
+  rewards, flagging and hiding wrong questions, results replayed after a dropped connection, malformed socket
+  messages (which must never crash the server), and how the website's files are cached.
+- **`game.test.ts`** drives the match engine on a mocked clock: leaving and forfeits, dropped connections, abandoned
+  matches, "Двойно или нищо", tie-breaks and bot strength.
+- **`restart.test.ts`** covers graceful restarts (running matches finish first) and a daily attempt cut short by a crash.
+- **`database.test.ts`** checks the per-player question history and that hot queries use indexes.
+- **`production.test.ts`** runs the server as in production: admins only through the admin command line, browser security
   headers, the health check, crash reports.
 - **`maintenance.test.ts`** covers the cleanup of expired logins and the daily database snapshots.
 - **`questions.test.ts`** validates the question bank. New questions must pass it.
@@ -58,7 +64,6 @@ and checks that it boots.
 | `BOT_FILL_SECONDS` | `8`                                   | Queue wait before bots fill empty seats; `off` disables bots |
 | `COOKIE_SECURE`    | `false`                               | Set `true` when served over HTTPS                            |
 | `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`; which reverse proxies to trust        |
-| `ADMIN_USERNAMES`  |                                       | Moderators (comma-separated usernames); the only admins in production |
 | `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
 | `SMTP_URL`         |                                       | e.g. `smtp://user:pass@host:587`. Unset → emails are printed to the console |
 | `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Sender address                                               |
@@ -94,27 +99,43 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
 
 - **Modes:**
   - Соло: 10 questions, pick a category.
-  - Дневно предизвикателство: the same 10 questions for everyone, one attempt a day, no jokers, its own leaderboard.
+  - Дневно предизвикателство: the same 10 questions for everyone (each player gets their own option order), one
+    attempt a day, no jokers, its own leaderboard. An attempt cut short by a server restart can be replayed.
   - Дуел: 1v1.
   - Отбори: 2v2, with teams balanced by rating.
   - Трио: 3 players.
   - Арена: 5 players.
   - Роял: 8 players. The lowest scorer is knocked out after questions 3, 5, 7, 9, 11 and 13.
   - Частна стая: 2–8 players, with configurable questions, timer, category, eliminations and teams.
-- **Scoring:** 500 for a correct answer, up to +500 for speed, and +50 per streak step (capped at +250).
-- **Jokers:** one of each per match, and at most one per question.
-  - 50/50 (level 3): removes two wrong answers.
-  - Двойно или нищо (level 6): doubles the points for one question.
-  - Леден удар (level 9): freezes the leading opponent for 3 seconds.
-  - Втори шанс (level 12): allows a second attempt, for half points.
-  - Още време (level 15): gives you 5 extra seconds.
+- **Scoring:** 500 for a correct answer, up to +500 for speed (measured against the regular timer), and +50 per streak
+  step (capped at +250). Ties go to more correct answers, then less total time; an unanswered question counts the
+  whole timer.
+- **Jokers:** one of each per match, and at most one per question. All five unlock by level 6, so ranked play isn't
+  decided by time played.
+  - 50/50 (level 2): removes two wrong answers.
+  - Леден удар (level 3): freezes the leading opponent for 3 seconds.
+  - Втори шанс (level 4): allows a second attempt, for half points.
+  - Още време (level 5): gives you 5 extra seconds.
+  - Двойно или нищо (level 6): doubles the points for one question; a miss costs 500 (never below zero).
+- **Leaving and connection drops:** a player who walks out ranks last (the first to leave lowest), unless already
+  knocked out, in which case that place stands. A match ends at once when only one side is left. A dropped connection
+  is waited for 5 seconds before a question can close without the player; if every human is gone for 30 seconds,
+  the rest of the match plays out at once as if they hadn't answered. A result that came in while offline is shown
+  on return.
+- **Bots** fill ranked seats after a few seconds. A bot plays as strong as the rating it shows (capped at 1600), and
+  ratings move less against bots than against people (K 24 vs 40), so Elo settles where a player's skill really is.
+  A player's first three multiplayer matches get slightly kinder bots. The same two people only move each other's
+  rating three times a day. In private rooms beating bots earns no placement XP.
+- **Question variety:** each player's last 1,500 questions are remembered; matches pick questions none of the players
+  has seen, then the ones seen longest ago.
 - **Anti-cheat:** the server owns the clock, the answers and every player's deadline. Clients never see the correct
   option before the reveal.
 - **Seasons:** calendar months in Sofia time. Ratings are per season, and a new season starts players halfway back
-  to 1000. At season end, players with 3+ ranked games get XP and exclusive frames and titles for their best rank
-  (Бронз → Майстор).
+  to 1000. At season end, players get XP and exclusive frames and titles for the best peak rank (Бронз → Майстор) they reached
+  in a mode where they played at least 10 ranked games.
 - **Progression:** every match grants XP: participation, correct answers (by difficulty), placement, a perfect-game
-  bonus, the first match of the day, the daily streak and achievements. Reaching level L takes `50·L·(L−1)` total
+  bonus, the first match of the day, the daily streak (growing for 30 days, with milestones at 7, 30 and 100) and
+  achievements. Reaching level L takes `50·L·(L−1)` total
   XP.
 - **Accounts:** players log in with their username or a verified email. An optional email (verified by link) enables
   "Забравена парола?": a single-use reset link that expires in 1 hour and logs the account out everywhere.
@@ -155,7 +176,7 @@ The stack is three containers: the app (plain Node, with SQLite on a volume), Ca
 and renews Let's Encrypt certificates automatically, and Litestream, which streams every database change to object
 storage. A **CX22** (2 vCPU, 4 GB) is plenty to start: in a load test, 1,500 simultaneous players used about 5% CPU.
 
-1. **Create the server:** a Hetzner Cloud server with Ubuntu 24.04. In the firewall, allow ports 22, 80 and 443.
+1. **Create the server:** a Hetzner Cloud server with Ubuntu 24.04. In the firewall, allow TCP 22, 80 and 443, and UDP 443 (HTTP/3).
 2. **Point DNS at it:** add `A` records for `almanac.bg` and `www.almanac.bg` with the server's IPv4 (and `AAAA`
    for IPv6).
 3. **Create the backup bucket:** in the Hetzner Cloud Console → Object Storage, create a bucket (e.g. `almanac-backups`)
@@ -164,10 +185,14 @@ storage. A **CX22** (2 vCPU, 4 GB) is plenty to start: in a load test, 1,500 sim
    ```bash
    curl -fsSL https://get.docker.com | sh
    git clone <your repo> almanac && cd almanac
-   cp .env.example .env        # set DOMAIN, ADMIN_USERNAMES (your username) and the BACKUP_* values
+   cp .env.example .env        # set DOMAIN and the BACKUP_* values
    docker compose up -d --build
    ```
-5. Open https://almanac.bg and register with the username you put in `ADMIN_USERNAMES` — that account is the admin.
+5. Open https://almanac.bg and register your account, then make it the admin:
+   ```bash
+   docker compose exec app node apps/server/dist/cli.mjs admin add <your-username>
+   ```
+   (`admin list` and `admin remove <username>` work the same way.)
 6. **Test the backup once** (the commands are in `deploy/litestream.yml`): restore into a scratch file and check it
    exists. A backup that has never been restored isn't a backup yet.
 

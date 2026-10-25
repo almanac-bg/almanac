@@ -92,26 +92,18 @@ export function seededRng(seed: string): Rng {
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
 
 /**
- * Picks `count` questions, preferring ones none of the players saw recently,
- * with a 40/40/20 easy/medium/hard mix ordered so the match ramps up.
+ * Picks `count` questions: ones none of the players has seen first, then the ones seen longest ago, with a 40/40/20
+ * easy/medium/hard mix ordered so the match ramps up. `seen` maps question ids to when any of the players last saw them.
  */
 export function pickQuestions(
   count: number,
   category: CategoryChoice,
-  avoid: ReadonlySet<string>,
+  seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
 ): PreparedQuestion[] {
   const pool = questionBank().filter((q) => category === 'mixed' || q.category === category);
-  const ordered = [
-    ...shuffle(
-      pool.filter((q) => !avoid.has(q.id)),
-      rng,
-    ),
-    ...shuffle(
-      pool.filter((q) => avoid.has(q.id)),
-      rng,
-    ),
-  ];
+  // Shuffled first, so unseen questions (and ones seen in the same match) come in random order; the sort is stable.
+  const ordered = shuffle(pool, rng).sort((a, b) => (seen.get(a.id) ?? 0) - (seen.get(b.id) ?? 0));
 
   const hard = Math.round(count * 0.2);
   const easy = Math.round(count * 0.4);
@@ -143,8 +135,8 @@ export function pickQuestions(
     });
 }
 
-/** How many of a player's most recent questions new matches try to avoid (a quarter of the bank). */
-export const RECENT_LIMIT = 500;
+/** How many of a player's most recent questions are remembered (most of the bank); older ones count as new again. */
+export const RECENT_LIMIT = 1500;
 
 /** Remembers a match's questions for each player, keeping only the newest RECENT_LIMIT. */
 export function markSeen(userId: number, questionIds: string[]) {
@@ -169,13 +161,14 @@ export function markSeen(userId: number, questionIds: string[]) {
   });
 }
 
-/** Questions any of these players saw recently. */
-export function recentFor(userIds: number[]): Set<string> {
-  if (!userIds.length) return new Set();
-  return new Set(
-    all<{ question_id: string }>(
-      `SELECT question_id FROM seen_questions WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
+/** When any of these players last saw each question they saw recently. */
+export function recentFor(userIds: number[]): Map<string, number> {
+  if (!userIds.length) return new Map();
+  return new Map(
+    all<{ question_id: string; seen_at: number }>(
+      `SELECT question_id, MAX(seen_at) AS seen_at FROM seen_questions
+       WHERE user_id IN (${userIds.map(() => '?').join(',')}) GROUP BY question_id`,
       ...userIds,
-    ).map((r) => r.question_id),
+    ).map((r) => [r.question_id, r.seen_at]),
   );
 }

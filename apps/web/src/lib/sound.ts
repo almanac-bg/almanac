@@ -1,7 +1,9 @@
 /** Tiny synthesized sound effects — no audio files needed. */
+import { useSyncExternalStore } from 'react';
 
 let ctx: AudioContext | null = null;
 let muted = readMuted();
+const listeners = new Set<() => void>();
 
 function readMuted() {
   try {
@@ -22,6 +24,19 @@ export function setMuted(value: boolean) {
   } catch {
     /* storage unavailable */
   }
+  for (const listener of listeners) listener();
+}
+
+/** The mute setting as React state: every toggle (header, in-game, settings) stays in sync. */
+export function useMuted(): [boolean, (value: boolean) => void] {
+  const value = useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    isMuted,
+  );
+  return [value, setMuted];
 }
 
 function audio(): AudioContext | null {

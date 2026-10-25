@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { once as onceEvent } from 'node:events';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -68,6 +68,7 @@ export interface SentMail {
 export interface TestServer {
   url: string;
   db: DatabaseSync;
+  dbPath: string;
   /** Emails the server "sent", oldest first. */
   mails(): SentMail[];
   /** Sends a signal to the server process and resolves with its exit code once it exits. */
@@ -104,6 +105,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Its own process group, so a simulated crash (SIGKILL) reaches the server under the tsx wrapper too.
+    detached: true,
   });
   let output = '';
   child.stdout!.on('data', (d) => (output += d));
@@ -126,6 +129,7 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
   return {
     url,
     db,
+    dbPath,
     mails: () =>
       fs.existsSync(outbox)
         ? fs
@@ -135,13 +139,15 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
         : [],
     async kill(signal) {
       const exited = onceEvent(child, 'exit');
-      child.kill(signal);
+      // Other signals go to the wrapper, which forwards them once (a second SIGTERM means "stop now").
+      if (signal === 'SIGKILL') process.kill(-child.pid!, signal);
+      else child.kill(signal);
       const [code] = await exited;
       return code as number | null;
     },
     async stop() {
       db.close();
-      if (child.exitCode === null) {
+      if (child.exitCode === null && child.signalCode === null) {
         child.kill('SIGTERM');
         await onceEvent(child, 'exit');
       }
@@ -164,6 +170,16 @@ export async function register(url: string, username: string, email?: string): P
   const body = (await r.json()) as { user: MeUser };
   if (!r.ok) throw new Error(`register ${username}: ${JSON.stringify(body)}`);
   return { cookie: r.headers.get('set-cookie')!.split(';')[0], user: body.user };
+}
+
+/** Runs the admin command line (src/cli.ts, or the bundle with TEST_TARGET=dist) against a test server's database. */
+export function cli(dbPath: string, ...args: string[]): { status: number | null; output: string } {
+  const entry =
+    process.env.TEST_TARGET === 'dist'
+      ? [path.join(serverDir, 'dist/cli.mjs')]
+      : [require.resolve('tsx/cli'), path.join(serverDir, 'src/cli.ts')];
+  const r = spawnSync(process.execPath, [...entry, ...args], { env: { ...process.env, DB_PATH: dbPath }, encoding: 'utf8' });
+  return { status: r.status, output: `${r.stdout}${r.stderr}` };
 }
 
 export function http(url: string) {

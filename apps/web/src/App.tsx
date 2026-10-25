@@ -1,5 +1,7 @@
+import { MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
+import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
 import { Invites } from './components/Invites';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
@@ -10,6 +12,7 @@ import { Toasts } from './components/Toasts';
 import { Spinner } from './components/ui';
 import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
 import { LegalLinks } from './components/LegalLinks';
+import { markReturning } from './lib/returning';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
 import {
@@ -37,6 +40,14 @@ export function App() {
   const me = useStore((s) => s.me);
   const authChecked = useStore((s) => s.authChecked);
   const { pathname } = useLocation();
+
+  // A new page — or the lobby right after signing in — starts at the top, not at the old scroll offset.
+  const signedIn = !!me;
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    // This device has an account now: next time the sign-in page opens on "Вход".
+    if (signedIn) markReturning();
+  }, [pathname, signedIn]);
 
   useEffect(() => {
     api
@@ -73,7 +84,8 @@ export function App() {
   }
 
   return (
-    <>
+    // Players who ask their system for less motion get it in every animation, not just the CSS ones.
+    <MotionConfig reducedMotion="user">
       <Background />
       <Toasts />
       {PUBLIC_PATHS.includes(pathname) ? (
@@ -90,7 +102,7 @@ export function App() {
       ) : (
         <AuthPage />
       )}
-    </>
+    </MotionConfig>
   );
 }
 
@@ -111,6 +123,7 @@ function SignedIn() {
     <>
       {!inGame && <NavBar />}
       {!inGame && <MaintenanceBanner />}
+      {!inGame && <ActiveMatchBar />}
       <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 sm:px-6 md:pb-16'}>
         <Suspense fallback={<PageLoading />}>
           <Routes>

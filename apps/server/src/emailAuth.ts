@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { hashPassword, verifyPassword } from './auth';
+import { hashPassword, hashToken as hashSessionToken, verifyPassword } from './auth';
 import { config } from './config';
 import { one, run, tx } from './db';
-import { resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
-import { disconnectUser } from './notify';
+import { emailChangedMail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
+import { disconnectOtherSessions, disconnectUser } from './notify';
 import { emailKey, getUser, getUserByEmail, getUserByLogin } from './users';
 
 type Purpose = 'verify' | 'reset';
@@ -64,8 +64,10 @@ export function requestEmailChange(userId: number, email: string): Result {
 }
 
 export function removeEmail(userId: number) {
+  const user = getUser(userId)!;
   run('UPDATE users SET email = NULL, email_key = NULL, pending_email = NULL WHERE id = ?', userId);
   run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'", userId);
+  if (user.email) sendMail(emailChangedMail(user.email, user.username, true));
 }
 
 export function verifyEmailToken(token: string): Result<{ userId: number }> {
@@ -74,6 +76,9 @@ export function verifyEmailToken(token: string): Result<{ userId: number }> {
     if (!t?.email) return { ok: false, error: 'Линкът е невалиден или е изтекъл.' };
     const owner = getUserByEmail(t.email);
     if (owner && owner.id !== t.userId) return { ok: false, error: 'Този имейл вече е свързан с друг профил.' };
+    // The old address hears about the switch (someone with a moment at an unlocked device can't quietly take over).
+    const before = getUser(t.userId)!;
+    if (before.email && before.email_key !== emailKey(t.email)) sendMail(emailChangedMail(before.email, before.username, false));
     run(
       'UPDATE users SET email = ?, email_key = ?, pending_email = NULL WHERE id = ?',
       t.email,
@@ -112,6 +117,8 @@ export async function changePassword(userId: number, current: string, next: stri
   if (!(await verifyPassword(current, user.password_hash))) return { ok: false, error: 'Текущата парола е грешна.' };
   const hash = await hashPassword(next);
   run('UPDATE users SET password_hash = ? WHERE id = ?', hash, userId);
-  run('DELETE FROM sessions WHERE user_id = ? AND token != ?', userId, keepToken ?? '');
+  const keep = keepToken ? hashSessionToken(keepToken) : '';
+  run('DELETE FROM sessions WHERE user_id = ? AND token != ?', userId, keep);
+  disconnectOtherSessions(userId, keep || null);
   return { ok: true };
 }

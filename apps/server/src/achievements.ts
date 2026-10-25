@@ -88,6 +88,8 @@ const RULES: Record<string, Rule> = {
   team_carry: { earned: (_, m) => !!m && m.won && m.teams && m.topScorer },
   daily_first: { progress: (a) => a.dailyCompleted },
   daily_streak_7: { progress: (a) => a.bestDailyStreak },
+  daily_streak_30: { progress: (a) => a.bestDailyStreak },
+  daily_streak_100: { progress: (a) => a.bestDailyStreak },
   daily_perfect: { earned: (_, m) => !!m && !m.left && m.mode === 'daily' && m.correct === m.questions },
   friends_5: { progress: (a) => a.friends },
   freezer: { progress: (a) => a.freezes },

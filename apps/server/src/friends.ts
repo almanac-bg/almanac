@@ -4,6 +4,8 @@ import { presence } from './notify';
 import { getUserByName, toPublicUser, type UserRow } from './users';
 
 const MAX_FRIENDS = 200;
+/** Requests waiting for an answer; enough for any real use, too few for spamming strangers. */
+const MAX_PENDING_OUTGOING = 20;
 
 const pair = (a: number, b: number): [number, number] => (a < b ? [a, b] : [b, a]);
 
@@ -90,6 +92,15 @@ export function requestFriend(userId: number, username: string): FriendResult {
   if (state === 'outgoing') return { ok: false, error: 'Поканата вече е изпратена.' };
   if (state === 'incoming') return acceptFriend(userId, other.id);
   if (friendIds(userId).length >= MAX_FRIENDS) return { ok: false, error: `Можеш да имаш до ${MAX_FRIENDS} приятели.` };
+  const pending = one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM friendships WHERE (user_a = ? OR user_b = ?) AND status = 'pending' AND requested_by = ?",
+    userId,
+    userId,
+    userId,
+  )!.n;
+  if (pending >= MAX_PENDING_OUTGOING) {
+    return { ok: false, error: `Имаш ${pending} неотговорени покани. Изчакай някои от тях да бъдат приети.` };
+  }
   const [a, b] = pair(userId, other.id);
   run(
     "INSERT INTO friendships (user_a, user_b, requested_by, status, created_at) VALUES (?, ?, ?, 'pending', ?)",

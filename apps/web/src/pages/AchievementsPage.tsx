@@ -2,10 +2,12 @@ import { ACHIEVEMENTS, type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITI
 import clsx from 'clsx';
 import { Lock } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
+import { LoadError } from '../components/LoadError';
 import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
-import { api, fmt, longDate, toast } from '@quiz/client';
+import { api, fmt, longDate } from '@quiz/client';
+import { useLoad } from '../lib/load';
 
 type Filter = 'all' | 'unlocked' | 'locked';
 
@@ -20,16 +22,11 @@ function rewardsFor(id: string): string[] {
 }
 
 export function AchievementsPage() {
-  const [items, setItems] = useState<AchievementProgress[] | null>(null);
+  const { data, error, retry } = useLoad(() => api.achievements());
+  const items: AchievementProgress[] | null = data?.achievements ?? null;
   const [filter, setFilter] = useState<Filter>('all');
 
-  useEffect(() => {
-    api
-      .achievements()
-      .then((r) => setItems(r.achievements))
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, []);
-
+  if (!items && error) return <LoadError title="Постиженията не се заредиха" error={error} onRetry={retry} />;
   if (!items) {
     return (
       <div className="grid place-items-center py-24">

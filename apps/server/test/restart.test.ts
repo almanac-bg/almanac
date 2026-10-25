@@ -1,7 +1,7 @@
 // Deploys restart the server: running matches must play out first, and nobody may start a new one meanwhile.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { autoPlay, connect, connected, emitAck, next, register, startServer } from './helpers';
+import { autoPlay, connect, connected, emitAck, next, register, sleep, startServer, type TestServer } from './helpers';
 
 const T = { timeout: 60_000 };
 
@@ -44,5 +44,32 @@ test('an idle server stops right away', T, async () => {
     assert.ok(Date.now() - started < 3000, `took ${Date.now() - started} ms`);
   } finally {
     await srv.stop();
+  }
+});
+
+test('a daily attempt cut short by a crash can be played again', T, async () => {
+  const first = await startServer();
+  let second: TestServer | undefined;
+  try {
+    const A = await register(first.url, 'prekasnat_dneven');
+    const sa = connect(first.url, A.cookie);
+    await connected(sa);
+    const question = next(sa, 'game:question');
+    assert.ok((await emitAck(sa, 'daily:start')).ok);
+    await question;
+    await first.kill('SIGKILL');
+    sa.close();
+
+    second = await startServer({ DB_PATH: first.dbPath });
+    const again = connect(second.url, A.cookie);
+    await connected(again);
+    assert.ok((await emitAck(again, 'daily:start')).ok, 'the attempt died with the old process, so it is not lost');
+    again.emit('game:leave');
+    await sleep(200);
+    assert.equal((await emitAck(again, 'daily:start')).ok, false, 'walking out of the retry still uses it up');
+    again.close();
+  } finally {
+    await second?.stop();
+    await first.stop();
   }
 });

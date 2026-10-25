@@ -1,7 +1,7 @@
 import {
+  BRAND,
   CATEGORIES,
   type CategoryChoice,
-  type FriendEntry,
   MIXED_CATEGORY,
   type Presence,
   ROOM_LIMITS,
@@ -12,14 +12,18 @@ import {
   TEAMS,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeftRight, Bot, Check, Copy, Crown, LogOut, Minus, Play, Plus, Send, Skull, UserMinus, Users } from 'lucide-react';
+import { ArrowLeftRight, Bot, Check, Copy, Crown, LogOut, Minus, Play, Plus, Send, Share2, Skull, UserMinus, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { teamColor } from '../components/game/teams';
-import { Button, Card, Segmented, Spinner } from '../components/ui';
-import { actions, api, toast, useStore } from '@quiz/client';
+import { LoadError } from '../components/LoadError';
+import { ABOVE_TAB_BAR } from '../components/NavBar';
+import { Button, Card, Modal, Segmented, Spinner } from '../components/ui';
+import { actions, api, plural, toast, useStore } from '@quiz/client';
+import { useLoad } from '../lib/load';
+
 
 export function RoomPage() {
   const room = useStore((s) => s.room);
@@ -27,6 +31,7 @@ export function RoomPage() {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [kicking, setKicking] = useState<string | null>(null);
 
   if (!room) return <Navigate to="/" replace />;
 
@@ -35,6 +40,15 @@ export function RoomPage() {
   const inviteUrl = `${window.location.origin}/join/${room.code}`;
   const hasBots = room.players.some((p) => p.isBot);
   const teamsReady = !s.teams || new Set(room.players.map((p) => p.team)).size === 2;
+  const canStart = room.players.length >= 2 && teamsReady;
+  const startHint =
+    room.players.length < 2
+      ? 'Покани приятел или добави бот, за да започнеш.'
+      : !teamsReady
+        ? 'И двата отбора трябва да имат поне по един играч.'
+        : null;
+  // Still in the room (they may have left while the dialog was open).
+  const kickTarget = room.players.find((p) => p.id === kicking) ?? null;
 
   async function copy() {
     try {
@@ -46,6 +60,19 @@ export function RoomPage() {
     }
   }
 
+  /** Phones get the system share sheet (straight into a chat); elsewhere the link goes to the clipboard. */
+  async function share() {
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+      try {
+        await navigator.share({ title: BRAND.name, text: `Ела да играем в ${BRAND.name}! Стая ${room!.code}`, url: inviteUrl });
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return; // the sheet was closed
+      }
+    }
+    await copy();
+  }
+
   async function start() {
     setStarting(true);
     const res = await actions.startRoom();
@@ -53,63 +80,83 @@ export function RoomPage() {
     if (!res.ok) toast({ kind: 'error', title: res.error });
   }
 
+  // A bot comes back with one tap; a person can only return with a new invite, so ask first.
+  function kick(p: RoomPlayer) {
+    if (p.isBot) actions.roomKick(p.id);
+    else setKicking(p.id);
+  }
+
   const update = (patch: Partial<RoomSettings>) => actions.roomSettings(patch);
+
+  const startButton = (
+    <Button size="lg" className="w-full" onClick={start} loading={starting} disabled={!canStart}>
+      <Play className="size-5" /> Започни играта
+    </Button>
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <div>
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <p className="text-xs font-bold tracking-widest text-fuchsia-300 uppercase">Частна стая</p>
-          <button onClick={copy} className="focus-ring group mt-1 flex items-center gap-3 rounded-xl" title="Копирай линк за покана">
+          <button onClick={copy} className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl" title="Копирай линк за покана">
             <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
             <span className="grid size-9 place-items-center rounded-xl bg-white/5 text-fg-2 group-hover:bg-white/10">
               {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
             </span>
           </button>
-          <p className="mt-1 text-sm text-fg-3">
+          <p className="mt-1 text-sm text-fg-3" aria-live="polite">
             {copied ? 'Линкът е копиран — прати го на приятели!' : 'Натисни кода, за да копираш линк за покана.'}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          className="ml-auto"
-          onClick={() => {
-            actions.leaveRoom();
-            navigate('/');
-          }}
-        >
-          <LogOut className="size-4" /> Напусни стаята
-        </Button>
+        <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+          <Button variant="secondary" className="flex-1 sm:flex-none" onClick={share}>
+            {copied ? <Check className="size-4 text-emerald-400" /> : <Share2 className="size-4" />} Покани
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              actions.leaveRoom();
+              navigate('/');
+            }}
+          >
+            <LogOut className="size-4" /> Напусни стаята
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
-          <Card className="p-5 sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
+          <Card className="p-4 sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-display text-lg font-bold">
                 Играчи <span className="text-fg-3">{room.players.length}/{s.maxPlayers}</span>
               </h2>
               {isHost && (
                 <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => actions.roomBot('add')} disabled={room.players.length >= s.maxPlayers}>
+                  <Button variant="secondary" onClick={() => actions.roomBot('add')} disabled={room.players.length >= s.maxPlayers}>
                     <Bot className="size-4" /> Добави бот
                   </Button>
                   {hasBots && (
-                    <Button size="sm" variant="ghost" onClick={() => actions.roomBot('remove')} aria-label="Махни бот">
+                    <Button variant="ghost" onClick={() => actions.roomBot('remove')} aria-label="Махни бот" title="Махни бот">
                       <Minus className="size-4" />
                     </Button>
                   )}
                 </div>
               )}
             </div>
-            {s.teams ? <TeamColumns room={room} meId={me.id} isHost={isHost} /> : <Seats room={room} meId={me.id} isHost={isHost} />}
+            {s.teams ? (
+              <TeamColumns room={room} meId={me.id} isHost={isHost} onKick={kick} />
+            ) : (
+              <Seats room={room} meId={me.id} isHost={isHost} onKick={kick} />
+            )}
           </Card>
 
           <InviteFriends room={room} />
         </div>
 
         <Card className="space-y-5 self-start p-5 sm:p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <h2 className="font-display text-lg font-bold">Настройки</h2>
             {!isHost && <span className="text-xs text-fg-3">Само домакинът ги променя</span>}
           </div>
@@ -117,7 +164,6 @@ export function RoomPage() {
           <Setting label="Максимум играчи">
             <div className="flex items-center gap-3">
               <Button
-                size="sm"
                 variant="secondary"
                 aria-label="По-малко"
                 disabled={!isHost || s.maxPlayers <= Math.max(ROOM_LIMITS.maxPlayers[0], room.players.length)}
@@ -127,7 +173,6 @@ export function RoomPage() {
               </Button>
               <span className="w-6 text-center font-display text-xl font-bold">{s.maxPlayers}</span>
               <Button
-                size="sm"
                 variant="secondary"
                 aria-label="Повече"
                 disabled={!isHost || s.maxPlayers >= ROOM_LIMITS.maxPlayers[1]}
@@ -191,21 +236,56 @@ export function RoomPage() {
             accent="accent-rose-400"
           />
 
-          {isHost ? (
-            <Button size="lg" className="w-full" onClick={start} loading={starting} disabled={room.players.length < 2 || !teamsReady}>
-              <Play className="size-5" /> Започни играта
-            </Button>
-          ) : (
-            <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>
-          )}
-          {isHost && room.players.length < 2 && (
-            <p className="text-center text-xs text-fg-3">Покани приятел или добави бот, за да започнеш.</p>
-          )}
-          {isHost && room.players.length >= 2 && !teamsReady && (
-            <p className="text-center text-xs text-fg-3">И двата отбора трябва да имат поне по един играч.</p>
-          )}
+          {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
+          <div className="hidden space-y-3 lg:block">
+            {isHost ? startButton : <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>}
+            {isHost && startHint && <p className="text-center text-xs text-fg-3">{startHint}</p>}
+          </div>
         </Card>
       </div>
+
+      {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
+      <div
+        className={clsx(
+          'sticky z-30 -mx-4 flex items-center gap-3 border-t border-line bg-ink/85 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden',
+          ABOVE_TAB_BAR,
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">
+            Играчи {room.players.length}/{s.maxPlayers}
+          </p>
+          <p className="text-xs text-fg-3">
+            {isHost ? (startHint ?? 'Всичко е готово за старт.') : 'Чакаме домакина да започне…'}
+          </p>
+        </div>
+        {isHost && (
+          <Button size="lg" className="shrink-0" onClick={start} loading={starting} disabled={!canStart}>
+            <Play className="size-5" /> Започни
+          </Button>
+        )}
+      </div>
+
+      <Modal open={!!kickTarget} onClose={() => setKicking(null)} title="Премахване от стаята">
+        <p className="text-fg-2">
+          Да премахна ли <b className="text-fg [overflow-wrap:anywhere]">{kickTarget?.name}</b> от стаята? Ще може да се върне само с
+          нова покана от теб.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setKicking(null)}>
+            Отказ
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (kickTarget) actions.roomKick(kickTarget.id);
+              setKicking(null);
+            }}
+          >
+            <UserMinus className="size-4" /> Премахни
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -262,17 +342,23 @@ function Toggle({
 
 // ─── Players ───────────────────────────────────────────────────────────────
 
+// A 44px target that takes only 32px of the row (the rest overlaps the card's padding), so names keep their room.
+const SEAT_BUTTON = 'focus-ring -m-1.5 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3';
+
 function PlayerCard({
   p,
   meId,
   isHost,
   teamButton,
+  onKick,
 }: {
   p: RoomPlayer;
   meId: number;
   isHost: boolean;
   teamButton?: React.ReactNode;
+  onKick: (p: RoomPlayer) => void;
 }) {
+  const kickable = isHost && !p.isHost;
   return (
     <motion.div
       layout
@@ -280,63 +366,81 @@ function PlayerCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       className={clsx(
-        'flex items-center gap-3 rounded-2xl border border-line bg-white/[0.04] p-3',
+        'flex items-center gap-2.5 rounded-2xl border border-line bg-white/[0.04] p-2.5 sm:gap-3 sm:p-3',
         p.id === `u${meId}` && 'border-violet-400/40 bg-violet-500/10',
       )}
     >
-      <Avatar avatar={p.avatar} frame={p.frame} size={44} />
+      {/* Bots are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would squeeze it out. */}
+      <Avatar avatar={p.avatar} frame={p.frame} size={44}>
+        {p.isBot && (
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[9px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
+            БОТ
+          </span>
+        )}
+      </Avatar>
       <div className="min-w-0 flex-1 text-sm">
-        <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
+        <PlayerTag name={p.name} title={p.title} level={p.level} />
+        {p.isBot && <span className="sr-only">бот</span>}
       </div>
       {p.isHost && <Crown className="size-4 shrink-0 text-amber-300" aria-label="Домакин" />}
-      {teamButton}
-      {isHost && !p.isHost && (
-        <button
-          onClick={() => actions.roomKick(p.id)}
-          aria-label={`Премахни ${p.name}`}
-          className="focus-ring grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-rose-500/15 hover:text-rose-300"
-        >
-          <UserMinus className="size-4" />
-        </button>
+      {(teamButton || kickable) && (
+        <div className="flex shrink-0 items-center gap-2.5">
+          {teamButton}
+          {/* Keep "move" and the destructive "remove" apart. */}
+          {teamButton && kickable && <span aria-hidden className="h-6 w-px bg-line" />}
+          {kickable && (
+            <button
+              onClick={() => onKick(p)}
+              aria-label={`Премахни ${p.name}`}
+              title="Премахни от стаята"
+              className={clsx(SEAT_BUTTON, 'hover:bg-rose-500/15 hover:text-rose-300')}
+            >
+              <UserMinus className="size-4" />
+            </button>
+          )}
+        </div>
       )}
     </motion.div>
   );
 }
 
-function Seats({ room, meId, isHost }: { room: RoomState; meId: number; isHost: boolean }) {
-  const seats = Array.from({ length: room.settings.maxPlayers }, (_, i) => room.players[i] ?? null);
+/** All the empty seats as one tile, instead of a column of "free" placeholders. */
+function FreeSeats({ count, className }: { count: number; className?: string }) {
   return (
-    <div className="grid gap-2.5 sm:grid-cols-2">
+    <motion.div
+      layout
+      className={clsx('grid place-items-center rounded-2xl border border-dashed border-line px-3 text-center text-sm text-fg-3', className)}
+    >
+      Още {plural(count, 'свободно място', 'свободни места')}
+    </motion.div>
+  );
+}
+
+function Seats({ room, meId, isHost, onKick }: { room: RoomState; meId: number; isHost: boolean; onKick: (p: RoomPlayer) => void }) {
+  const free = room.settings.maxPlayers - room.players.length;
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
       <AnimatePresence initial={false}>
-        {seats.map((p, i) =>
-          p ? (
-            <PlayerCard key={p.id} p={p} meId={meId} isHost={isHost} />
-          ) : (
-            <motion.div
-              key={`empty-${i}`}
-              layout
-              className="grid h-[70px] place-items-center rounded-2xl border border-dashed border-line text-sm text-fg-3"
-            >
-              Свободно място
-            </motion.div>
-          ),
-        )}
+        {room.players.map((p) => (
+          <PlayerCard key={p.id} p={p} meId={meId} isHost={isHost} onKick={onKick} />
+        ))}
       </AnimatePresence>
+      {free > 0 && <FreeSeats count={free} className="min-h-[70px]" />}
     </div>
   );
 }
 
-function TeamColumns({ room, meId, isHost }: { room: RoomState; meId: number; isHost: boolean }) {
+function TeamColumns({ room, meId, isHost, onKick }: { room: RoomState; meId: number; isHost: boolean; onKick: (p: RoomPlayer) => void }) {
   const free = room.settings.maxPlayers - room.players.length;
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 2xl:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 2xl:grid-cols-2">
         {([0, 1] as TeamId[]).map((team) => {
           const color = teamColor(team);
           const members = room.players.filter((p) => p.team === team);
           const other = TEAMS[team === 0 ? 1 : 0].name;
           return (
-            <div key={team} className="rounded-2xl border p-2.5" style={{ borderColor: `${color}44`, background: `${color}0d` }}>
+            <div key={team} className="rounded-2xl border p-2 sm:p-2.5" style={{ borderColor: `${color}44`, background: `${color}0d` }}>
               <div className="mb-2 flex items-center gap-2 px-1">
                 <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
                 <span className="font-display text-sm font-bold" style={{ color }}>
@@ -352,13 +456,14 @@ function TeamColumns({ room, meId, isHost }: { room: RoomState; meId: number; is
                       p={p}
                       meId={meId}
                       isHost={isHost}
+                      onKick={onKick}
                       teamButton={
                         isHost && (
                           <button
                             onClick={() => actions.roomTeam(p.id)}
                             title={`Премести при ${other}`}
                             aria-label={`Премести ${p.name} при ${other}`}
-                            className="focus-ring grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-white/10 hover:text-fg"
+                            className={clsx(SEAT_BUTTON, 'hover:bg-white/10 hover:text-fg')}
                           >
                             <ArrowLeftRight className="size-4" />
                           </button>
@@ -377,11 +482,7 @@ function TeamColumns({ room, meId, isHost }: { room: RoomState; meId: number; is
           );
         })}
       </div>
-      {free > 0 && (
-        <div className="grid h-12 place-items-center rounded-2xl border border-dashed border-line text-sm text-fg-3">
-          Свободни места: {free}
-        </div>
-      )}
+      {free > 0 && <FreeSeats count={free} className="h-12" />}
     </div>
   );
 }
@@ -406,20 +507,10 @@ const PRESENCE_DOT: Record<Presence, string> = {
 
 function InviteFriends({ room }: { room: RoomState }) {
   const version = useStore((s) => s.friendsVersion);
-  const [friends, setFriends] = useState<FriendEntry[] | null>(null);
+  const { data, error, retry } = useLoad(() => api.friends(), '', version);
+  const friends = data?.friends ?? null;
   const [sent, setSent] = useState<Set<number>>(new Set());
   const [sending, setSending] = useState<number | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .friends()
-      .then((r) => alive && setFriends(r.friends))
-      .catch(() => alive && setFriends([]));
-    return () => {
-      alive = false;
-    };
-  }, [version]);
 
   async function invite(userId: number) {
     setSending(userId);
@@ -448,24 +539,31 @@ function InviteFriends({ room }: { room: RoomState }) {
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-bold">Покани приятели</h2>
-        <Link to="/friends" className="text-sm font-semibold text-violet-300 hover:text-violet-200">
+        <Link
+          to="/friends"
+          className="focus-ring -my-2.5 inline-flex min-h-11 shrink-0 items-center rounded-lg text-sm font-semibold whitespace-nowrap text-violet-300 hover:text-violet-200"
+        >
           Приятели →
         </Link>
       </div>
       {friends === null ? (
-        <div className="grid place-items-center py-6">
-          <Spinner className="size-6 text-violet-400" />
-        </div>
+        error ? (
+          <LoadError compact title="Приятелите не се заредиха" error={error} onRetry={retry} />
+        ) : (
+          <div className="grid place-items-center py-6">
+            <Spinner className="size-6 text-violet-400" />
+          </div>
+        )
       ) : friends.length === 0 ? (
         <p className="text-sm text-fg-3">
-          Още нямаш приятели в играта.{' '}
+          Още нямаш приятели в играта — прати им линка с „Покани“ горе.{' '}
           <Link to="/friends" className="font-semibold text-violet-300 hover:text-violet-200">
-            Добави някого
-          </Link>{' '}
-          и го покани с един клик.
+            Добави приятели
+          </Link>
+          , за да ги каниш направо оттук.
         </p>
       ) : online.length === 0 ? (
-        <p className="text-sm text-fg-3">Никой от приятелите ти не е онлайн в момента. Можеш да им пратиш кода на стаята.</p>
+        <p className="text-sm text-fg-3">Никой от приятелите ти не е онлайн в момента. Прати им линка с „Покани“ горе.</p>
       ) : (
         <ul className="space-y-2">
           {online.map((f) => {

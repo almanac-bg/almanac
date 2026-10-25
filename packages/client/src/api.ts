@@ -61,8 +61,9 @@ export const api = {
   forgotPassword: (login: string) => request<{ ok: true }>('POST', '/auth/forgot', { login }),
   resetPassword: (token: string, password: string) => request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
   verifyEmail: (token: string) => request<{ ok: true }>('POST', '/auth/verify-email', { token }),
-  setEmail: (email: string) => request<{ user: MeUser }>('POST', '/account/email', { email }),
-  removeEmail: () => request<{ user: MeUser }>('DELETE', '/account/email'),
+  /** A new address needs the password; re-sending the link to the pending one doesn't. */
+  setEmail: (email: string, password?: string) => request<{ user: MeUser }>('POST', '/account/email', { email, password }),
+  removeEmail: (password: string) => request<{ user: MeUser }>('DELETE', '/account/email', { password }),
   changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/account/password', { current, next }),
   deleteAccount: (password: string) => request<{ ok: true }>('POST', '/account/delete', { password }),
   /** Where the browser downloads the data export (the session cookie authenticates it). */

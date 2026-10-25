@@ -1,4 +1,4 @@
-import { AVATARS, FRAMES, type GamePlayer, TITLES } from '@quiz/shared';
+import { AVATARS, FRAMES, type GamePlayer, START_RATING, TITLES } from '@quiz/shared';
 import { shuffle } from '../questions';
 
 export interface BotBrain {
@@ -28,27 +28,42 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 let botSeq = 0;
 
-/** Bots sized to roughly match the humans they play against. */
-export function makeBots(count: number, around: { level: number; rating: number }, takenNames: string[] = []): Bot[] {
+/** Bots never rate higher than this: beyond it, climbing has to come from beating people. */
+export const BOT_MAX_RATING = 1600;
+const BOT_MIN_RATING = 700;
+const jitter = (spread: number) => (Math.random() * 2 - 1) * spread;
+
+/**
+ * Bots sized to the humans they play against. A bot plays as strong as the rating it shows, so Elo against bots
+ * settles where the player's skill really is instead of climbing forever. Players new to multiplayer get slightly
+ * kinder bots for their first few matches.
+ */
+export function makeBots(
+  count: number,
+  around: { level: number; rating: number },
+  takenNames: string[] = [],
+  opts: { gentle?: boolean } = {},
+): Bot[] {
   const names = shuffle(NAMES.filter((n) => !takenNames.includes(n)));
   return Array.from({ length: count }, (_, i) => {
-    const level = clamp(Math.round(around.level + (Math.random() * 6 - 3)), 1, 60);
+    const rating = Math.round(clamp(around.rating + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
+    const skill = rating - START_RATING;
     return {
       player: {
         id: `b${++botSeq}`,
         userId: null,
         name: names[i % names.length],
-        level,
+        level: clamp(Math.round(around.level + jitter(3)), 1, 60),
         isBot: true,
-        rating: Math.round(around.rating + (Math.random() * 120 - 60)),
+        rating,
         avatar: pick(STARTER_AVATARS).id,
         frame: pick(STARTER_FRAMES).id,
         title: pick(STARTER_TITLES).id,
         team: null,
       },
       brain: {
-        accuracy: clamp(0.5 + level * 0.008 + (Math.random() * 0.2 - 0.1), 0.4, 0.85),
-        pace: 0.25 + Math.random() * 0.35,
+        accuracy: clamp(0.5 + skill * 0.0006 + jitter(0.05) - (opts.gentle ? 0.1 : 0), 0.3, 0.92),
+        pace: clamp(0.5 - skill * 0.0003 + jitter(0.1), 0.18, 0.75),
       },
     };
   });

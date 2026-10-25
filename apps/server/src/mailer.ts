@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND } from '@quiz/shared';
+import { BRAND, LEGAL } from '@quiz/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
 
@@ -13,8 +13,14 @@ export interface Mail {
 }
 
 const transport = config.smtpUrl ? nodemailer.createTransport(config.smtpUrl) : null;
+if (!transport && config.production) {
+  console.warn('✉️  SMTP_URL is not set: password-reset and verification emails are not being sent.');
+}
 
-/** Sends in the background; failures are logged, never surfaced to the requester. */
+/**
+ * Sends in the background; failures are logged, never surfaced to the requester. Logs never contain addresses or
+ * links (they hold live tokens) — except in development without SMTP, where the console stands in for the inbox.
+ */
 export function sendMail(mail: Mail) {
   if (config.mailOutbox) {
     fs.mkdirSync(config.mailOutbox, { recursive: true });
@@ -22,7 +28,11 @@ export function sendMail(mail: Mail) {
     fs.writeFileSync(path.join(config.mailOutbox, name), JSON.stringify(mail));
   }
   if (transport) {
-    transport.sendMail({ from: config.mailFrom, ...mail }).catch((err) => console.error(`✉️  Failed to send to ${mail.to}:`, err));
+    transport
+      .sendMail({ from: config.mailFrom, ...mail })
+      .catch((err) => console.error(`✉️  Failed to send "${mail.subject}":`, err instanceof Error ? err.message : err));
+  } else if (config.production) {
+    console.warn(`✉️  Not sent (SMTP_URL not set): "${mail.subject}"`);
   } else if (!config.mailOutbox) {
     console.log(`✉️  (SMTP_URL not set) To: ${mail.to} — ${mail.subject}\n${mail.text}\n`);
   }
@@ -53,6 +63,24 @@ export function verifyEmailMail(to: string, username: string, link: string): Mai
       'Потвърди имейла',
       link,
       'Линкът е валиден 24 часа. Ако не си ти, просто игнорирай това писмо.',
+    ),
+  };
+}
+
+/** To the previous address when a profile's email is changed or removed: the owner hears about it. */
+export function emailChangedMail(to: string, username: string, removed: boolean): Mail {
+  const what = removed ? 'Имейлът беше премахнат от профила ти' : 'Профилът ти вече използва друг имейл';
+  const advice = `Ако промяната не е от теб, смени паролата си веднага и ни пиши на ${LEGAL.email}.`;
+  return {
+    to,
+    subject: `${what} в ${BRAND.name}`,
+    text: `Здравей, ${username}!\n\n${what} (${BRAND.domain}). Затова това е последното писмо, което получаваш на този адрес.\n\n${advice}`,
+    html: layout(
+      `Здравей, ${username}!`,
+      `${what}. Затова това е последното писмо, което получаваш на този адрес.`,
+      'Към настройките',
+      `${config.appUrl}/settings`,
+      escape(advice),
     ),
   };
 }

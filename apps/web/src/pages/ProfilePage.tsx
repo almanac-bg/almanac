@@ -15,30 +15,25 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Flag, Swords, UserPlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
+import { useLoad } from '../lib/load';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
 
 export function ProfilePage() {
   const me = useStore((s) => s.me)!;
   const { username = me.username } = useParams();
-  const [data, setData] = useState<ProfileStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const friendsVersion = useStore((s) => s.friendsVersion);
+  // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
+  const { data, error, retry, setData } = useLoad(() => api.profile(username), username, `${me.xp}:${friendsVersion}`);
 
-  useEffect(() => {
-    setError(null);
-    api
-      .profile(username)
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, [username, me.xp, friendsVersion]);
-
-  if (error) return <EmptyState icon="🕵️" title={error} />;
+  if (!data && error?.status === 404) return <EmptyState icon="🕵️" title={error.message} />;
+  if (!data && error) return <LoadError title="Профилът не се зареди" error={error} onRetry={retry} />;
   if (!data) {
     return (
       <div className="grid place-items-center py-24">
@@ -59,7 +54,7 @@ export function ProfilePage() {
           <Avatar avatar={user.avatar} frame={user.frame} size={112} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-violet-300">{titleName(user.title)}</p>
-            <h1 className="truncate font-display text-3xl font-bold sm:text-4xl">{user.username}</h1>
+            <h1 className="line-clamp-2 font-display text-3xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">{user.username}</h1>
             <p className="mt-1 text-sm text-fg-3">
               Играе от {longDate(user.createdAt)} · {data.achievements.length}/{ACHIEVEMENTS.length} постижения
             </p>
@@ -75,10 +70,10 @@ export function ProfilePage() {
           </div>
           {isMe ? (
             <div className="flex flex-wrap gap-2">
-              <Link to="/locker" className="glass focus-ring rounded-2xl px-4 py-2 text-sm font-semibold hover:bg-white/10">
+              <Link to="/locker" className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10">
                 Промени визията
               </Link>
-              <Link to="/settings" className="glass focus-ring rounded-2xl px-4 py-2 text-sm font-semibold hover:bg-white/10">
+              <Link to="/settings" className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10">
                 Настройки
               </Link>
             </div>

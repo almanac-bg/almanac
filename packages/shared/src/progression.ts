@@ -24,6 +24,8 @@ export const SCORING = {
   /** Bonus per consecutive correct answer beyond the first. */
   streakStep: 50,
   streakMax: 250,
+  /** What a miss costs with "Двойно или нищо" active. */
+  doubleStake: 500,
 } as const;
 
 export const START_RATING = 1000;
@@ -49,13 +51,14 @@ export const SEASON_REWARD_XP: Record<RankTierId, number> = {
   diamond: 1200,
   master: 2000,
 };
-/** Ranked games needed in a season to qualify for its rewards. */
-export const SEASON_MIN_GAMES = 3;
+/** Ranked games needed in one mode for its peak to count toward the season's rewards. */
+export const SEASON_MIN_GAMES = 10;
 /** A new season starts you this fraction of the way from the baseline back to your old rating. */
 export const SEASON_CARRYOVER = 0.5;
 
 /** XP for finishing the daily challenge, plus a bonus per streak day (capped). */
-export const DAILY_XP = { complete: 50, perStreakDay: 10, streakCap: 7 } as const;
+/** The streak bonus keeps growing for a month: a long streak is worth protecting. */
+export const DAILY_XP = { complete: 50, perStreakDay: 10, streakCap: 30 } as const;
 
 export function rankFor(rating: number): RankTier {
   let tier: RankTier = RANK_TIERS[0];

@@ -12,7 +12,7 @@ import {
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
 import { recordDailyResult } from '../daily';
-import { run, tx } from '../db';
+import { all, run, tx } from '../db';
 import { getRating, recordRating } from '../seasons';
 import { DELETED_NAME, getUser } from '../users';
 import type { Game, Participant } from './Game';
@@ -20,16 +20,20 @@ import type { Game, Participant } from './Game';
 const XP = {
   played: 20,
   perCorrect: { easy: 8, medium: 12, hard: 18 },
-  winBase: 30,
+  winBase: 50,
   winPerOpponent: 15,
   perOpponentBeaten: 10,
   teamWin: 60,
-  soloScoreDivisor: 150,
+  soloScoreDivisor: 250,
   perfect: 50,
   daily: 100,
 };
 
+/** Elo step against people; bots move ratings less (their strength is an estimate). */
 const RATING_K = 40;
+const RATING_K_BOTS = 24;
+/** Win-trading guard: the same two people only move each other's rating this many times a day. */
+const RATED_GAMES_PER_PAIR = 3;
 
 /** "1-во", "2-ро", "3-то", "7-мо"… */
 export function ordinal(n: number): string {
@@ -96,7 +100,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
         p.faced,
         p.bestStreak,
         s.eliminatedAt,
-        p.left ? 1 : 0,
+        game.forfeited(p) ? 1 : 0,
         deltas.get(s.id) ?? null,
         p.player.team,
       );
@@ -127,40 +131,49 @@ function rewardHuman(
   const ctxBefore = unlockContext(userId);
   const playerCount = game.participants.size;
   const multiplayer = playerCount > 1;
-  const won = multiplayer && s.placement === 1 && !p.left;
+  // Walking out after being knocked out isn't a forfeit: that player keeps their place and its rewards.
+  const left = game.forfeited(p);
+  const won = multiplayer && s.placement === 1 && !left;
   const solo = setup.mode === 'solo';
   const daily = setup.dailyDay !== null;
+  // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
+  // there earns nothing extra (else a room full of bots is an XP farm).
+  const rivals = standings.filter((o) => {
+    const them = game.participants.get(o.id)!.player;
+    return o.id !== s.id && (!setup.roomCode || !them.isBot) && (!setup.teams || them.team !== p.player.team);
+  });
+  const beaten = rivals.filter((o) => o.placement > s.placement).length;
 
   // ── XP ──
   const lines: XpLine[] = [];
-  if (!p.left) lines.push({ label: 'Изигран мач', amount: XP.played });
+  if (!left) lines.push({ label: 'Изигран мач', amount: XP.played });
   const correctXp =
     p.correctByDifficulty.easy * XP.perCorrect.easy +
     p.correctByDifficulty.medium * XP.perCorrect.medium +
     p.correctByDifficulty.hard * XP.perCorrect.hard;
   if (correctXp > 0) lines.push({ label: `Верни отговори (${p.correct})`, amount: correctXp });
-  if (!p.left && setup.teams) {
-    if (won) lines.push({ label: 'Отборна победа', amount: XP.teamWin });
-  } else if (!p.left && multiplayer) {
-    const amount = won ? XP.winBase + XP.winPerOpponent * (playerCount - 1) : XP.perOpponentBeaten * (playerCount - s.placement);
+  if (!left && setup.teams) {
+    if (won && rivals.length > 0) lines.push({ label: 'Отборна победа', amount: XP.teamWin });
+  } else if (!left && multiplayer) {
+    const amount = won ? (rivals.length ? XP.winBase + XP.winPerOpponent * rivals.length : 0) : XP.perOpponentBeaten * beaten;
     if (amount > 0) lines.push({ label: won ? 'Победа' : `${ordinal(s.placement)} място`, amount });
   }
-  if (!p.left && (solo || daily)) {
+  if (!left && (solo || daily)) {
     const amount = Math.floor(s.score / XP.soloScoreDivisor);
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
-  if (!p.left && p.faced === game.questions.length && p.correct === game.questions.length) {
+  if (!left && p.faced === game.questions.length && p.correct === game.questions.length) {
     lines.push({ label: 'Перфектна игра', amount: XP.perfect });
   }
   const today = dayKey();
-  const claimDaily = !p.left && before.last_daily_bonus !== today;
+  const claimDaily = !left && before.last_daily_bonus !== today;
   if (claimDaily) lines.push({ label: 'Първи мач за деня', amount: XP.daily });
 
   // ── Daily challenge (recorded even after leaving: one attempt per day) ──
   let dailyResult: MatchRewards['daily'] = null;
   if (daily) {
     dailyResult = recordDailyResult(userId, setup.dailyDay!, s.score, p.correct, p.answerMs);
-    if (!p.left) {
+    if (!left) {
       lines.push({ label: 'Дневно предизвикателство', amount: DAILY_XP.complete });
       const streakBonus = Math.min(dailyResult.streak, DAILY_XP.streakCap) * DAILY_XP.perStreakDay;
       if (dailyResult.streak > 1) lines.push({ label: `Дневна серия ×${dailyResult.streak}`, amount: streakBonus });
@@ -168,7 +181,7 @@ function rewardHuman(
   }
 
   // ── Lifetime stats ──
-  const counted = p.left ? 0 : 1;
+  const counted = left ? 0 : 1;
   const fastest =
     p.fastestCorrectMs === null
       ? before.fastest_correct_ms
@@ -187,8 +200,8 @@ function rewardHuman(
     fastest,
     before.total_correct_ms + p.correctMs,
     before.powerups_used + p.usedPowerups.size,
-    solo && !p.left ? Math.max(before.best_solo_score, s.score) : before.best_solo_score,
-    before.hosted_games + (setup.roomCode && setup.hostUserId === userId && !p.left ? 1 : 0),
+    solo && !left ? Math.max(before.best_solo_score, s.score) : before.best_solo_score,
+    before.hosted_games + (setup.roomCode && setup.hostUserId === userId && !left ? 1 : 0),
     claimDaily ? today : before.last_daily_bonus,
     before.freezes + p.freezesUsed,
     lines.reduce((sum, l) => sum + l.amount, 0),
@@ -221,7 +234,7 @@ function rewardHuman(
   const match: MatchContext = {
     mode: setup.mode,
     won,
-    left: p.left,
+    left,
     teams: setup.teams,
     questions: game.questions.length,
     faced: p.faced,
@@ -258,19 +271,46 @@ function rewardHuman(
 
 const ratingOf = (game: Game, id: string) => game.participants.get(id)!.player.rating ?? START_RATING;
 
+/** Pairs of people who already played each other RATED_GAMES_PER_PAIR rated matches in the last 24 hours. */
+function overplayedPairs(game: Game): Set<string> {
+  const ids = game.humans.map((h) => h.player.userId).filter((id): id is number => id !== null);
+  const pairs = new Set<string>();
+  if (ids.length < 2) return pairs;
+  const rows = all<{ a: number; b: number; n: number }>(
+    `SELECT a.user_id AS a, b.user_id AS b, COUNT(*) AS n
+     FROM match_players a
+     JOIN match_players b ON b.match_id = a.match_id AND b.user_id > a.user_id
+     JOIN matches m ON m.id = a.match_id
+     WHERE a.user_id IN (${ids.map(() => '?').join(',')}) AND b.user_id IN (${ids.map(() => '?').join(',')})
+       AND m.ranked = 1 AND m.ended_at > ? AND m.id != ? AND a.rating_delta IS NOT NULL
+     GROUP BY a.user_id, b.user_id`,
+    ...ids,
+    ...ids,
+    Date.now() - 24 * 60 * 60 * 1000,
+    game.id,
+  );
+  for (const r of rows) if (r.n >= RATED_GAMES_PER_PAIR) pairs.add(`${r.a}:${r.b}`);
+  return pairs;
+}
+
 /** Multiplayer Elo: every pair of players is treated as a head-to-head result. */
 function ratingDeltas(game: Game, standings: FinalStanding[]): Map<string, number> {
+  const overplayed = overplayedPairs(game);
+  const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
   const deltas = new Map<string, number>();
   for (const me of standings) {
-    if (game.participants.get(me.id)!.player.userId === null) continue;
+    const myUserId = game.participants.get(me.id)!.player.userId;
+    if (myUserId === null) continue;
     let sum = 0;
     for (const other of standings) {
       if (other.id === me.id) continue;
+      const them = game.participants.get(other.id)!.player;
+      if (them.userId !== null && overplayed.has(pairKey(myUserId, them.userId))) continue;
       const expected = 1 / (1 + 10 ** ((ratingOf(game, other.id) - ratingOf(game, me.id)) / 400));
       const actual = me.placement < other.placement ? 1 : me.placement > other.placement ? 0 : 0.5;
-      sum += actual - expected;
+      sum += (them.isBot ? RATING_K_BOTS : RATING_K) * (actual - expected);
     }
-    deltas.set(me.id, (RATING_K * sum) / (standings.length - 1));
+    deltas.set(me.id, sum / (standings.length - 1));
   }
   return deltas;
 }
@@ -286,7 +326,8 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Map<string, n
     const p = game.participants.get(s.id)!;
     if (p.player.userId === null || p.player.team === null) continue;
     const expected = 1 / (1 + 10 ** ((avg(1 - p.player.team) - avg(p.player.team)) / 400));
-    deltas.set(s.id, RATING_K * ((s.placement === 1 ? 1 : 0) - expected));
+    const k = standings.some((o) => game.participants.get(o.id)!.player.isBot) ? RATING_K_BOTS : RATING_K;
+    deltas.set(s.id, k * ((s.placement === 1 ? 1 : 0) - expected));
   }
   return deltas;
 }

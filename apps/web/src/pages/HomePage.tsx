@@ -1,13 +1,16 @@
 import {
   CATEGORIES,
   type CategoryChoice,
-  type DailyInfo,
   levelProgress,
   MIXED_CATEGORY,
   type ModeDef,
   MODES,
   QUEUE_MODES,
   type QueueModeId,
+  RANK_TIERS,
+  rankFor,
+  SEASON_MIN_GAMES,
+  SEASON_REWARD_XP,
   seasonEndsAt,
   seasonKey,
   seasonName,
@@ -21,10 +24,10 @@ import clsx from 'clsx';
 import {
   ArrowRight,
   CalendarDays,
+  CircleHelp,
   DoorOpen,
   Flame,
   Gift,
-  Lock,
   MailWarning,
   PenLine,
   Plus,
@@ -38,9 +41,15 @@ import { motion } from 'motion/react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
-import { Button, Card, Modal, ProgressBar } from '../components/ui';
+import { LoadError } from '../components/LoadError';
+import { Button, Card, Modal, ProgressBar, Spinner } from '../components/ui';
 import { actions, api, fmt, toast, unlockPreview, useNow, useStore } from '@quiz/client';
+import { useLoad } from '../lib/load';
+import { useMediaQuery } from '../lib/media';
 import { savedDailyShare, shareText } from '../lib/share';
+
+/** Below this the "N играят в момента" count reads as an empty room rather than a busy one, so it stays hidden. */
+const LIVE_COUNT_MIN = 5;
 
 export function HomePage() {
   const me = useStore((s) => s.me)!;
@@ -48,7 +57,12 @@ export function HomePage() {
   const room = useStore((s) => s.room);
   const navigate = useNavigate();
   const [soloOpen, setSoloOpen] = useState(false);
-  const progress = levelProgress(me.xp);
+  const [rankInfo, setRankInfo] = useState<{ mode: QueueModeId; open: boolean } | null>(null);
+  const level = levelProgress(me.xp).level;
+  // Brand-new players get pointed at the gentlest ways in.
+  const newcomer = level === 1;
+  // Writing questions opens at level 3; until then the card would only hold a disabled button.
+  const community = level >= SUBMISSION_RULES.minLevel || me.isAdmin;
 
   async function queue(mode: QueueModeId) {
     const res = await actions.joinQueue(mode);
@@ -56,17 +70,17 @@ export function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {room && (
         <motion.button
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => navigate('/room')}
-          className="glass focus-ring flex w-full items-center gap-3 rounded-2xl border-fuchsia-400/30 px-5 py-3 text-left"
+          className="glass focus-ring flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-fuchsia-400/30 px-5 py-3 text-left"
         >
           <DoorOpen className="size-5 text-fuchsia-300" />
           <span className="text-sm">
-            В стая <b className="font-mono tracking-widest">{room.code}</b> си
+            Ти си в стая <b className="font-mono tracking-widest">{room.code}</b>
           </span>
           <span className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-fuchsia-300">
             Към стаята <ArrowRight className="size-4" />
@@ -76,80 +90,100 @@ export function HomePage() {
 
       <EmailNudge />
 
-      {/* Hero */}
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Card className="relative overflow-hidden p-6 sm:p-7">
-          <div className="absolute -top-24 -right-16 size-64 rounded-full bg-violet-600/30 blur-3xl" />
-          <div className="relative flex items-center gap-5">
-            <Avatar avatar={me.avatar} frame={me.frame} size={84} />
-            <div className="min-w-0">
-              <p className="text-sm text-fg-3">Здравей,</p>
-              <h1 className="truncate font-display text-2xl font-bold sm:text-3xl">{me.username}</h1>
-              <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
-            </div>
-          </div>
-          <div className="relative mt-6">
-            <div className="mb-2 flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2 font-semibold">
-                <LevelBadge level={progress.level} /> Ниво {progress.level}
-              </span>
-              <span className="text-fg-3 tabular-nums">
-                {fmt(progress.into)} / {fmt(progress.needed)} XP
-              </span>
-            </div>
-            <ProgressBar value={progress.pct} className="h-2.5" />
-          </div>
-          <div className="relative mt-5 flex flex-wrap items-center gap-2">
-            {me.dailyBonusAvailable && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
-                <Gift className="size-3.5" /> Днешният бонус +100 XP те чака
+      {/* Phones read top to bottom: who you are, what to play, the daily, then friends and the rest.
+          From lg up the same pieces form a grid with the modes across the middle. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-x-4 lg:gap-y-8">
+        <ProfileCard className="lg:col-start-1 lg:row-start-1" />
+
+        <section aria-labelledby="modes-title" className="lg:col-span-2 lg:row-start-2">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+            <h2 id="modes-title" className="font-display text-xl font-bold sm:text-2xl">
+              Избери битка
+            </h2>
+            {lobby && lobby.inGame >= LIVE_COUNT_MIN && (
+              <span className="text-sm text-fg-3">
+                <span className="text-fg-2">{fmt(lobby.inGame)}</span> играят в момента
               </span>
             )}
-            <UpNext level={progress.level} />
-            <SeasonChip ratings={me.ratings} />
           </div>
-        </Card>
-
-        <FriendsCard />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <DailyCard />
-        <CommunityCard />
-      </section>
-
-      {/* Modes */}
-      <section>
-        <div className="mb-4 flex items-end justify-between">
-          <h2 className="font-display text-xl font-bold sm:text-2xl">Избери битка</h2>
-          {lobby && (
-            <span className="text-sm text-fg-3">
-              <span className="text-fg-2">{fmt(lobby.inGame)}</span> играят в момента
-            </span>
-          )}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <ModeCard mode={MODES.solo} className="sm:col-span-2 lg:col-span-1 lg:row-span-2" big onPlay={() => setSoloOpen(true)} />
-          {QUEUE_MODES.map((id) => (
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <ModeCard
-              key={id}
-              mode={MODES[id]}
-              className={clsx(id === 'royale' && 'sm:col-span-2 lg:col-span-3')}
-              wide={id === 'royale'}
-              searching={lobby?.queues[id] ?? 0}
-              rating={me.ratings[id] ?? START_RATING}
-              onPlay={() => queue(id)}
+              mode={MODES.solo}
+              className="sm:col-span-2 lg:col-span-1 lg:row-span-2"
+              big
+              starter={newcomer}
+              onPlay={() => setSoloOpen(true)}
             />
-          ))}
-        </div>
-      </section>
+            {QUEUE_MODES.map((id) => (
+              <ModeCard
+                key={id}
+                mode={MODES[id]}
+                className={clsx(id === 'royale' && 'sm:col-span-2 lg:col-span-3')}
+                wide={id === 'royale'}
+                searching={lobby?.queues[id] ?? 0}
+                rating={me.ratings[id] ?? START_RATING}
+                onRankInfo={() => setRankInfo({ mode: id, open: true })}
+                onPlay={() => queue(id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <DailyCard starter={newcomer} className={clsx('lg:col-start-1 lg:row-start-3', !community && 'lg:col-span-2')} />
+        <FriendsCard className="lg:col-start-2 lg:row-start-1" />
+        {community && <CommunityCard className="lg:col-start-2 lg:row-start-3" />}
+      </div>
 
       <SoloPicker open={soloOpen} onClose={() => setSoloOpen(false)} />
+      {rankInfo && (
+        <RankInfo mode={rankInfo.mode} open={rankInfo.open} onClose={() => setRankInfo({ ...rankInfo, open: false })} />
+      )}
     </div>
   );
 }
 
-const BIG_LABEL: Record<string, string> = { solo: '1', duel: '1v1', teams: '2v2', trio: '3', squad: '5', royale: '8' };
+function ProfileCard({ className }: { className?: string }) {
+  const me = useStore((s) => s.me)!;
+  const progress = levelProgress(me.xp);
+  const roomy = useMediaQuery('(min-width: 640px)');
+  return (
+    <Card className={clsx('relative overflow-hidden p-4 sm:p-7', className)}>
+      <div className="absolute -top-24 -right-16 size-64 rounded-full bg-violet-600/30 blur-3xl" />
+      <div className="relative flex items-center gap-4 sm:gap-5">
+        <Avatar avatar={me.avatar} frame={me.frame} size={roomy ? 84 : 56} />
+        <div className="min-w-0">
+          <p className="text-sm text-fg-3">Здравей,</p>
+          {/* Names run to 20 characters: wrap them (even mid-word) onto a second line rather than cut them off. */}
+          <h1 className="line-clamp-2 font-display text-xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl">
+            {me.username}
+          </h1>
+          <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
+        </div>
+      </div>
+      <div className="relative mt-4 sm:mt-6">
+        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+          <span className="flex items-center gap-2 font-semibold">
+            <LevelBadge level={progress.level} /> Ниво {progress.level}
+          </span>
+          <span className="text-fg-3 tabular-nums">
+            {fmt(progress.into)} / {fmt(progress.needed)} XP
+          </span>
+        </div>
+        <ProgressBar value={progress.pct} className="h-2.5" />
+      </div>
+      {/* Phones keep just the daily bonus here; the next unlock and the season wait for wider screens. */}
+      <div className={clsx('relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5', !me.dailyBonusAvailable && 'max-sm:hidden')}>
+        {me.dailyBonusAvailable && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
+            <Gift className="size-3.5" /> Днешният бонус +100 XP те чака
+          </span>
+        )}
+        <UpNext level={progress.level} className="max-sm:hidden" />
+        <SeasonChip ratings={me.ratings} className="max-sm:hidden" />
+      </div>
+    </Card>
+  );
+}
 
 function ModeCard({
   mode,
@@ -158,91 +192,164 @@ function ModeCard({
   wide,
   searching,
   rating,
+  starter,
   onPlay,
+  onRankInfo,
 }: {
   mode: ModeDef;
   className?: string;
   big?: boolean;
   wide?: boolean;
   searching?: number;
+  /** Ranked modes: the player's rating, shown as a rank chip that explains itself. */
   rating?: number;
+  starter?: boolean;
   onPlay: () => void;
+  onRankInfo?: () => void;
 }) {
   const [a, b] = mode.accent;
   return (
-    <motion.button
+    // The whole card plays: the "Играй" button stretches over it (its ::after). The rank chip sits above as its own button.
+    <motion.article
       whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      onClick={onPlay}
       className={clsx(
-        'glass group focus-ring relative flex min-h-48 flex-col overflow-hidden rounded-3xl p-5 text-left sm:p-6',
+        'glass group relative isolate flex min-h-44 flex-col overflow-hidden rounded-3xl p-5 transition-[scale,box-shadow] duration-150 sm:min-h-48 sm:p-6',
+        'has-[[data-play]:active]:scale-[0.98] has-[[data-play]:focus-visible]:shadow-[0_0_0_2px_var(--color-ink),0_0_0_4px_var(--color-cyan)]',
         big && 'lg:min-h-full',
         className,
       )}
     >
       <div
-        className="absolute inset-0 opacity-20 transition-opacity duration-300 group-hover:opacity-40"
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-20 transition-opacity duration-300 group-hover:opacity-40"
         style={{ background: `radial-gradient(120% 90% at 100% 0%, ${a}, transparent 60%), radial-gradient(90% 80% at 0% 100%, ${b}55, transparent 70%)` }}
       />
+      {/* How many play: the chip says "1 на 1", "8 играчи"… in words, this says it big. */}
       <span
         aria-hidden
         className={clsx(
-          'absolute right-4 font-display leading-none font-black text-transparent opacity-60 transition-[transform,opacity] duration-500 group-hover:-rotate-3 group-hover:opacity-100',
+          'absolute right-4 -z-10 font-display leading-none font-black text-transparent opacity-60 transition-[rotate,opacity] duration-500 group-hover:-rotate-3 group-hover:opacity-100',
           big ? 'top-4 text-[8rem]' : wide ? 'top-1 text-[7rem]' : 'top-3 text-[4.5rem]',
         )}
         style={{ WebkitTextStroke: `1.5px ${a}88`, backgroundImage: `linear-gradient(160deg, ${a}40, transparent 75%)`, WebkitBackgroundClip: 'text' }}
       >
-        {BIG_LABEL[mode.id]}
+        {mode.players}
       </span>
 
-      <div className="relative flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span
           className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-white uppercase"
           style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
         >
           {mode.short}
         </span>
-        {rating !== undefined && <RankBadge rating={rating} compact />}
+        {starter && (
+          <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">Започни оттук</span>
+        )}
+        {rating !== undefined && onRankInfo && (
+          <button
+            type="button"
+            onClick={onRankInfo}
+            className="focus-ring relative z-10 -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
+          >
+            <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
+            <RankBadge rating={rating} compact />
+            <CircleHelp aria-hidden className="size-3.5 text-fg-3" />
+            <span className="sr-only">— какво е рангът?</span>
+          </button>
+        )}
       </div>
-      <h3 className={clsx('relative mt-3 font-display font-bold', big || wide ? 'text-3xl sm:text-4xl' : 'text-2xl')}>{mode.name}</h3>
-      <p className={clsx('relative mt-1 text-sm text-fg-2', wide ? 'max-w-md' : 'max-w-[17rem]')}>{mode.tagline}</p>
-      {wide && <p className="relative mt-2 hidden max-w-md text-sm text-fg-3 sm:block">{mode.description}</p>}
+      <h3 className={clsx('mt-3 font-display font-bold', big || wide ? 'text-3xl sm:text-4xl' : 'text-2xl')}>{mode.name}</h3>
+      <p className={clsx('mt-1 text-sm text-fg-2', wide ? 'max-w-md' : 'max-w-[17rem]')}>{mode.tagline}</p>
+      <p className={clsx('mt-2 text-sm text-fg-3', wide ? 'max-w-md' : 'max-w-xs')}>{mode.description}</p>
       {big && (
-        <>
-          <p className="relative mt-3 max-w-xs text-sm text-fg-3">{mode.description}</p>
-          <div className="relative mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
-            {CATEGORIES.map((c, i) => (
-              <span
-                key={c.id}
-                title={c.name}
-                className="grid size-10 place-items-center rounded-xl border border-line bg-white/5 text-lg transition-transform duration-300 group-hover:-translate-y-1"
-                style={{ transitionDelay: `${i * 25}ms` }}
-              >
-                {c.icon}
-              </span>
-            ))}
-          </div>
-        </>
+        <div className="mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
+          {CATEGORIES.map((c, i) => (
+            <span
+              key={c.id}
+              title={c.name}
+              className="grid size-10 place-items-center rounded-xl border border-line bg-white/5 text-lg transition-transform duration-300 group-hover:-translate-y-1"
+              style={{ transitionDelay: `${i * 25}ms` }}
+            >
+              {c.icon}
+            </span>
+          ))}
+        </div>
       )}
 
-      <div className="relative mt-auto flex items-center justify-between pt-6">
+      <div className="mt-auto flex items-center justify-between gap-3 pt-5 sm:pt-6">
         <span className="text-xs text-fg-3">
           {mode.questions} въпроса · {mode.timeMs / 1000} с
           {searching ? <span className="ml-2 text-emerald-300">● {searching} търсят</span> : null}
         </span>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-white shadow-lg transition-transform group-hover:translate-x-0.5"
-          style={{ background: `linear-gradient(90deg, ${a}, ${b})`, boxShadow: `0 8px 24px -8px ${a}` }}
-        >
-          Играй <ArrowRight className="size-4" />
-        </span>
+        {/* Not positioned, so its ::after covers the card rather than the button. */}
+        <button data-play onClick={onPlay} className="shrink-0 outline-none after:absolute after:inset-0 after:content-['']">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-white shadow-lg transition-transform group-hover:translate-x-0.5"
+            style={{ background: `linear-gradient(90deg, ${a}, ${b})`, boxShadow: `0 8px 24px -8px ${a}` }}
+          >
+            Играй <span className="sr-only">{mode.name}</span>
+            <ArrowRight aria-hidden className="size-4" />
+          </span>
+        </button>
       </div>
-    </motion.button>
+    </motion.article>
   );
 }
 
-function FriendsCard() {
+/** What the "Бронз"/"Сребро"… chip on a ranked mode means. */
+function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boolean; onClose: () => void }) {
+  const me = useStore((s) => s.me)!;
+  const navigate = useNavigate();
+  const rating = me.ratings[mode] ?? START_RATING;
+  const tier = rankFor(rating);
+  return (
+    <Modal open={open} onClose={onClose} title="Рейтинг и рангове">
+      <div className="space-y-4 text-sm text-fg-2">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-white/5 p-3.5">
+          Твоят рейтинг в {MODES[mode].name}: <RankBadge rating={rating} />
+        </p>
+        <p>
+          Всеки класиран режим има свой рейтинг, който започва от {START_RATING}. След мач той расте за всеки съперник, когото
+          изпревариш, и пада за всеки, който те изпревари. Срещу по-силни съперници се печели повече.
+        </p>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {RANK_TIERS.map((t, i) => (
+            <li
+              key={t.id}
+              className={clsx('rounded-xl border px-3 py-2', t.id === tier.id && 'ring-1 ring-white/40')}
+              style={{ borderColor: `${t.color}44`, background: `${t.color}10` }}
+            >
+              <div className="flex items-center gap-1.5 font-bold" style={{ color: t.color }}>
+                <span className="size-1.5 rounded-full" style={{ background: t.color }} />
+                {t.name}
+                {t.id === tier.id && <span className="ml-auto text-[10px] font-semibold tracking-wide text-fg-2 uppercase">ти</span>}
+              </div>
+              <div className="mt-0.5 text-xs text-fg-3 tabular-nums">
+                {i === 0 ? `под ${RANK_TIERS[1].min}` : `от ${t.min}`} · +{fmt(SEASON_REWARD_XP[t.id])} XP
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p className="text-fg-3">
+          Сезонът трае месец. В края му получаваш XP за най-високия ранг, достигнат в режим с поне {SEASON_MIN_GAMES} мача
+          (наградата е до всеки ранг горе). В новия сезон рейтингът започва по-близо до {START_RATING}.
+        </p>
+      </div>
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Ясно
+        </Button>
+        <Button variant="secondary" onClick={() => navigate(`/leaderboard?board=${mode}`)}>
+          <Trophy className="size-4" /> Класация
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function FriendsCard({ className }: { className?: string }) {
   const navigate = useNavigate();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
@@ -266,7 +373,7 @@ function FriendsCard() {
   }
 
   return (
-    <Card className="relative overflow-hidden p-6 sm:p-7">
+    <Card className={clsx('relative overflow-hidden p-5 sm:p-7', className)}>
       <div className="absolute -bottom-20 -left-10 size-56 rounded-full bg-fuchsia-600/20 blur-3xl" />
       <div className="relative">
         <div className="flex items-center gap-2 text-fuchsia-300">
@@ -296,12 +403,12 @@ function FriendsCard() {
   );
 }
 
-function UpNext({ level }: { level: number }) {
+function UpNext({ level, className }: { level: number; className?: string }) {
   const next = upcomingUnlocks(level, 1)[0];
   if (!next) return null;
   const { icon, name } = unlockPreview(next);
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2">
+    <span className={clsx('inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2', className)}>
       Ниво {next.level}: <span className="text-base leading-none">{icon}</span> {name}
     </span>
   );
@@ -320,12 +427,11 @@ function EmailNudge() {
   });
   if (me.email || me.pendingEmail || dismissed) return null;
   return (
-    <div className="glass flex flex-wrap items-center gap-3 rounded-2xl border-violet-400/30 px-5 py-3">
-      <MailWarning className="size-5 text-violet-300" />
-      <span className="min-w-0 flex-1 text-sm">
-        Добави имейл, за да можеш да възстановиш паролата си, ако я забравиш.
-      </span>
-      <Button size="sm" variant="secondary" onClick={() => navigate('/settings')}>
+    // Phones: icon, text and close on the first row, the button under the text. Wider: all in one row.
+    <div className="glass grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border-violet-400/30 py-2 pr-1.5 pl-4 sm:flex sm:pl-5">
+      <MailWarning aria-hidden className="size-5 shrink-0 text-violet-300" />
+      <span className="min-w-0 py-1 text-sm sm:flex-1">Добави имейл, за да можеш да възстановиш паролата си, ако я забравиш.</span>
+      <Button variant="secondary" className="col-start-2 row-start-2 mb-1.5 justify-self-start sm:mb-0" onClick={() => navigate('/settings')}>
         Добави имейл
       </Button>
       <button
@@ -338,7 +444,8 @@ function EmailNudge() {
           }
         }}
         aria-label="Скрий"
-        className="focus-ring grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-white/5 hover:text-fg"
+        title="Скрий"
+        className="focus-ring col-start-3 row-start-1 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
       >
         <X className="size-4" />
       </button>
@@ -346,7 +453,7 @@ function EmailNudge() {
   );
 }
 
-function SeasonChip({ ratings }: { ratings: Partial<Record<QueueModeId, number>> }) {
+function SeasonChip({ ratings, className }: { ratings: Partial<Record<QueueModeId, number>>; className?: string }) {
   const now = useNow(60_000);
   const id = seasonKey(now);
   const days = Math.max(1, Math.ceil((seasonEndsAt(id) - now) / 86_400_000));
@@ -354,7 +461,7 @@ function SeasonChip({ ratings }: { ratings: Partial<Record<QueueModeId, number>>
   return (
     <Link
       to="/leaderboard"
-      className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2 hover:bg-white/10"
+      className={clsx('inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2 hover:bg-white/10', className)}
     >
       <Trophy className="size-3.5 text-amber-300" />
       Сезон {seasonName(id)} · още {days} {days === 1 ? 'ден' : 'дни'}
@@ -369,25 +476,24 @@ const countdown = (ms: number) => {
   return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
 };
 
-function DailyCard() {
+function DailyCard({ className, starter }: { className?: string; starter?: boolean }) {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
   const now = useNow(1000);
-  const [info, setInfo] = useState<DailyInfo | null>(null);
+  // Reloaded when today's result changes; kept on screen meanwhile.
+  const { data: info, error, retry } = useLoad(() => api.daily(), '', `${me.daily.day}:${me.daily.played}`);
   const [busy, setBusy] = useState(false);
   const [a, b] = MODES.daily.accent;
   // Saved by the results screen on this device when today's challenge was played.
   const savedShare = info?.played ? savedDailyShare(me.daily.day) : null;
 
-  useEffect(() => {
-    api.daily().then(setInfo).catch(() => {});
-  }, [me.daily.day, me.daily.played]);
-
   // Midnight in Sofia: a new challenge is up.
   const expired = !!info && now >= info.endsAt;
   useEffect(() => {
-    if (expired) api.daily().then(setInfo).catch(() => {});
-  }, [expired]);
+    if (expired) retry();
+  }, [expired, retry]);
+  // Without today's info there's nothing true to show: not "play", not "nobody played yet".
+  const failed = !!error && (!info || expired);
 
   async function play() {
     setBusy(true);
@@ -396,19 +502,21 @@ function DailyCard() {
     if (!res.ok) toast({ kind: 'error', title: res.error });
   }
 
-  const dayLabel = info
-    ? new Date(`${info.day}T12:00:00Z`).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', timeZone: TIME_ZONE })
-    : '';
+  const dayLabel = new Date(`${info?.day ?? me.daily.day}T12:00:00Z`).toLocaleDateString('bg-BG', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: TIME_ZONE,
+  });
   const streak = info?.streak ?? me.daily.streak;
 
   return (
-    <Card className="relative overflow-hidden p-6 sm:p-7">
+    <Card className={clsx('relative overflow-hidden p-5 sm:p-7', className)}>
       <div
         className="absolute inset-0 opacity-25"
         style={{ background: `radial-gradient(100% 120% at 100% 0%, ${a}, transparent 55%), radial-gradient(80% 90% at 0% 100%, ${b}55, transparent 70%)` }}
       />
-      <div className="relative grid gap-6 sm:grid-cols-[1.2fr_1fr]">
-        <div className="flex flex-col">
+      <div className={clsx('relative grid gap-5 sm:gap-6', !failed && 'sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]')}>
+        <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-amber-950 uppercase"
@@ -421,12 +529,19 @@ function DailyCard() {
                 <Flame className="size-3.5" /> {streak} {streak === 1 ? 'ден' : 'дни'} поред
               </span>
             )}
+            {starter && info && !info.attempted && (
+              <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">Започни оттук</span>
+            )}
           </div>
           <h2 className="mt-3 font-display text-xl font-bold sm:text-2xl">{MODES.daily.name}</h2>
           <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
 
           <div className="mt-auto pt-5">
-            {info?.played ? (
+            {failed ? (
+              <LoadError compact title="Днешното предизвикателство не се зареди" error={error} onRetry={retry} />
+            ) : !info ? (
+              <div aria-hidden className="h-14 w-56 max-w-full animate-pulse rounded-2xl bg-white/8" />
+            ) : info.played ? (
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <div className="text-xs text-fg-3">Твоят резултат</div>
@@ -448,51 +563,59 @@ function DailyCard() {
                   </Button>
                 </div>
               </div>
-            ) : info?.attempted ? (
+            ) : info.attempted ? (
               <p className="text-sm text-fg-3">Днешният опит е използван. Ново предизвикателство след {countdown(info.endsAt - now)}.</p>
             ) : (
               <Button variant="gold" size="lg" onClick={play} loading={busy}>
                 Играй днешното <ArrowRight className="size-5" />
               </Button>
             )}
-            {info && !info.attempted && (
+            {info && !failed && !info.attempted && (
               <p className="mt-3 text-xs text-fg-3 tabular-nums">Изтича след {countdown(info.endsAt - now)}</p>
             )}
-            {info?.played && <p className="mt-3 text-xs text-fg-3 tabular-nums">Ново след {countdown(info.endsAt - now)}</p>}
+            {info && !failed && info.played && (
+              <p className="mt-3 text-xs text-fg-3 tabular-nums">Ново след {countdown(info.endsAt - now)}</p>
+            )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-black/20 p-4">
-          <p className="mb-3 text-xs font-bold tracking-widest text-fg-3 uppercase">Топ на деня</p>
-          {info && info.entries.length > 0 ? (
-            <ol className="space-y-2">
-              {info.entries.slice(0, 3).map((e) => (
-                <li key={e.user.id} className="flex items-center gap-2.5 text-sm">
-                  <span className="w-5 text-center">{['🥇', '🥈', '🥉'][e.rank - 1]}</span>
-                  <Avatar avatar={e.user.avatar} frame={e.user.frame} size={30} />
-                  <span className={clsx('min-w-0 flex-1 truncate font-semibold', e.user.id === me.id && 'text-violet-300')}>
-                    {e.user.username}
-                  </span>
-                  <span className="text-fg-2 tabular-nums">{fmt(e.value)}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
-          )}
-          {info && info.total > 3 && <p className="mt-3 text-xs text-fg-3">+ още {info.total - 3} играчи днес</p>}
-        </div>
+        {!failed && (
+          <div className="rounded-2xl border border-line bg-black/20 p-4">
+            <p className="mb-3 text-xs font-bold tracking-widest text-fg-3 uppercase">Топ на деня</p>
+            {!info ? (
+              <div className="grid place-items-center py-4">
+                <Spinner className="size-5 text-amber-300" />
+                <span className="sr-only">Зареждане…</span>
+              </div>
+            ) : info.entries.length > 0 ? (
+              <ol className="space-y-2">
+                {info.entries.slice(0, 3).map((e) => (
+                  <li key={e.user.id} className="flex items-center gap-2.5 text-sm">
+                    <span className="w-5 text-center">{['🥇', '🥈', '🥉'][e.rank - 1]}</span>
+                    <Avatar avatar={e.user.avatar} frame={e.user.frame} size={30} />
+                    <span className={clsx('min-w-0 flex-1 truncate font-semibold', e.user.id === me.id && 'text-violet-300')}>
+                      {e.user.username}
+                    </span>
+                    <span className="text-fg-2 tabular-nums">{fmt(e.value)}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
+            )}
+            {info && info.total > 3 && <p className="mt-3 text-xs text-fg-3">+ още {info.total - 3} играчи днес</p>}
+          </div>
+        )}
       </div>
     </Card>
   );
 }
 
-function CommunityCard() {
+function CommunityCard({ className }: { className?: string }) {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
   const [todo, setTodo] = useState<{ pendingQuestions: number; openReports: number; questionReports: number } | null>(null);
-  const level = levelProgress(me.xp).level;
-  const locked = level < SUBMISSION_RULES.minLevel;
+  const locked = levelProgress(me.xp).level < SUBMISSION_RULES.minLevel;
   const pending = todo ? todo.pendingQuestions + todo.openReports + todo.questionReports : 0;
   // Open the moderation tab that has work waiting.
   const adminTab = !todo || todo.pendingQuestions ? '/admin' : todo.questionReports ? '/admin?tab=flags' : todo.openReports ? '/admin?tab=reports' : '/admin';
@@ -502,7 +625,7 @@ function CommunityCard() {
   }, [me.isAdmin]);
 
   return (
-    <Card className="relative flex flex-col overflow-hidden p-6 sm:p-7">
+    <Card className={clsx('relative flex flex-col overflow-hidden p-5 sm:p-7', className)}>
       <div className="absolute -right-10 -bottom-16 size-48 rounded-full bg-emerald-500/15 blur-3xl" />
       <div className="relative flex items-center gap-2 text-emerald-300">
         <PenLine className="size-5" />
@@ -513,17 +636,12 @@ function CommunityCard() {
         Знаеш нещо интересно? Изпрати въпрос — одобрените влизат в играта с твоето име и +{SUBMISSION_RULES.approvedXp} XP.
       </p>
       <div className="relative mt-auto flex flex-wrap gap-2 pt-5">
-        <Button variant="secondary" onClick={() => navigate('/submit')} disabled={locked}>
-          {locked ? (
-            <>
-              <Lock className="size-4" /> От ниво {SUBMISSION_RULES.minLevel}
-            </>
-          ) : (
-            <>
-              <PenLine className="size-4" /> Напиши въпрос
-            </>
-          )}
-        </Button>
+        {/* Only admins see the card before level 3 (for moderation); writing still waits for the level. */}
+        {!locked && (
+          <Button variant="secondary" onClick={() => navigate('/submit')}>
+            <PenLine className="size-4" /> Напиши въпрос
+          </Button>
+        )}
         {me.isAdmin && (
           <Button variant="ghost" onClick={() => navigate(adminTab)}>
             <ShieldCheck className="size-4" /> Модерация

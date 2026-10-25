@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type ButtonHTMLAttributes, type ReactNode, useEffect } from 'react';
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
@@ -17,7 +17,8 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: 'h-9 px-3.5 text-sm rounded-xl gap-1.5',
+  // Compact for a mouse, a full 44px tap target on touch screens.
+  sm: 'h-9 pointer-coarse:h-11 px-3.5 text-sm rounded-xl gap-1.5',
   md: 'h-11 px-5 text-[15px] rounded-2xl gap-2',
   lg: 'h-14 px-7 text-base rounded-2xl gap-2.5',
 };
@@ -86,25 +87,73 @@ export function Pill({ children, className, style }: { children: ReactNode; clas
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * A dialog that behaves like one: focus moves into it and stays there (Tab cycles inside), goes back where it was on
+ * close, the page behind doesn't scroll, and it's named by its title (or `label` when it has none).
+ */
 export function Modal({
   open,
   onClose,
   children,
   className,
   title,
+  label,
+  labelledBy,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   className?: string;
   title?: ReactNode;
+  /** Accessible name when there's no `title`. */
+  label?: string;
+  /** Id of a heading inside `children` that names the dialog, when there's no `title`. */
+  labelledBy?: string;
 }) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  // Kept in a ref: callers pass inline functions, and re-running the effect would yank focus while someone types.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog.current?.focus({ preventScroll: true });
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return close.current();
+      const box = dialog.current;
+      if (e.key !== 'Tab' || !box) return;
+      const items = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      if (!items.length) return e.preventDefault();
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!box.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && (active === first || active === box)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   // Portal to <body>: a glass ancestor's backdrop-filter would otherwise trap `position: fixed` inside it.
   return createPortal(
@@ -118,9 +167,13 @@ export function Modal({
           onMouseDown={(e) => e.target === e.currentTarget && onClose()}
         >
           <motion.div
+            ref={dialog}
             role="dialog"
             aria-modal
-            className={clsx('glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 sm:p-8', className)}
+            aria-labelledby={title ? titleId : labelledBy}
+            aria-label={title || labelledBy ? undefined : label}
+            tabIndex={-1}
+            className={clsx('glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none sm:p-8', className)}
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
@@ -129,11 +182,15 @@ export function Modal({
             <button
               onClick={onClose}
               aria-label="Затвори"
-              className="focus-ring absolute top-4 right-4 grid size-9 place-items-center rounded-full text-fg-3 hover:bg-white/10 hover:text-fg"
+              className="focus-ring absolute top-3 right-3 grid size-11 place-items-center rounded-full text-fg-3 hover:bg-white/10 hover:text-fg"
             >
               <X className="size-5" />
             </button>
-            {title && <h2 className="mb-5 pr-10 font-display text-xl font-bold">{title}</h2>}
+            {title && (
+              <h2 id={titleId} className="mb-5 pr-10 font-display text-xl font-bold">
+                {title}
+              </h2>
+            )}
             {children}
           </motion.div>
         </motion.div>
@@ -162,7 +219,7 @@ export function Segmented<T extends string | number>({
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={clsx(
-            'focus-ring relative h-9 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default',
+            'focus-ring relative h-9 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default pointer-coarse:min-h-11 pointer-coarse:min-w-11',
             o.value === value ? 'text-white' : 'text-fg-3 hover:text-fg-2',
           )}
         >

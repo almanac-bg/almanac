@@ -6,6 +6,7 @@ import {
 } from '@quiz/shared';
 import { all, one, run, tx } from './db';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
+import { reloadQuestionBank } from './questions';
 import { getUser, getUserByName, toPublicUser, type UserRow, usernameKey } from './users';
 
 // ─── Username filter ─────────────────────────────────────────────────────────
@@ -163,6 +164,7 @@ export function resolveReports(adminId: number, targetId: number, decision: Mode
   });
 
   if (decision.action === 'rename') {
+    reloadQuestionBank(); // their approved questions show the new name
     notifyUser(targetId, 'notice', { kind: 'info', message: `Модератор смени името ти на „${decision.username.trim()}“.` });
     notifyUser(targetId, 'account:update');
   } else if (decision.action === 'ban') {

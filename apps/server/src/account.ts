@@ -6,6 +6,7 @@ import { all, one, run, tx } from './db';
 import { incomingRequests } from './friends';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
+import { reloadQuestionBank } from './questions';
 import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
@@ -83,55 +84,41 @@ export function updateLoadout(userId: number, patch: Partial<Loadout>): { ok: tr
 
 // ─── GDPR: export and erasure ────────────────────────────────────────────────
 
-/** Everything stored about the player, as a downloadable JSON document. */
+/**
+ * Everything stored about the player, as a downloadable JSON document: whole rows, so it stays complete as the schema
+ * grows. Left out are only secrets (password and token hashes) and other players' identities (who reported you).
+ */
 export function exportAccount(userId: number) {
-  const u = getUser(userId)!;
-  const rows = <T>(sql: string) => all<T>(sql, userId);
+  const { password_hash: _secret, username_key: _derived, email_key: _alsoDerived, ...account } = getUser(userId)!;
+  const rows = (sql: string) => all<Record<string, unknown>>(sql, userId);
   return {
     exportedAt: new Date().toISOString(),
-    account: {
-      username: u.username,
-      createdAt: new Date(u.created_at).toISOString(),
-      email: u.email,
-      pendingEmail: u.pending_email,
-      xp: u.xp,
-      level: levelFromXp(u.xp),
-      loadout: { avatar: u.avatar, frame: u.frame, title: u.title },
-      stats: {
-        gamesPlayed: u.games_played,
-        multiplayerGames: u.mp_games,
-        wins: u.wins,
-        questionsAnswered: u.questions_answered,
-        correctAnswers: u.correct_answers,
-        bestStreak: u.best_streak,
-        fastestCorrectMs: u.fastest_correct_ms,
-        bestSoloScore: u.best_solo_score,
-        powerupsUsed: u.powerups_used,
-        dailyStreak: u.daily_streak,
-        bestDailyStreak: u.best_daily_streak,
-      },
-    },
-    achievements: rows('SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ?'),
-    categoryStats: rows('SELECT category, answered, correct FROM category_stats WHERE user_id = ?'),
-    seasonRatings: rows('SELECT season, mode, rating, peak, games, wins FROM season_ratings WHERE user_id = ?'),
-    seasonRewards: rows('SELECT season, tier, xp, granted_at FROM season_rewards WHERE user_id = ?'),
-    dailyResults: rows('SELECT day, score, correct, finished_at FROM daily_results WHERE user_id = ?'),
+    account: { ...account, level: levelFromXp(account.xp), createdAt: new Date(account.created_at).toISOString() },
+    achievements: rows('SELECT * FROM user_achievements WHERE user_id = ?'),
+    categoryStats: rows('SELECT * FROM category_stats WHERE user_id = ?'),
+    seasonRatings: rows('SELECT * FROM season_ratings WHERE user_id = ?'),
+    seasonRewards: rows('SELECT * FROM season_rewards WHERE user_id = ?'),
+    dailyResults: rows('SELECT * FROM daily_results WHERE user_id = ?'),
     matches: rows(
-      `SELECT m.mode, m.ranked, m.ended_at, mp.placement, mp.score, mp.correct, mp.xp_gained, mp.rating_delta
+      `SELECT m.mode, m.ranked, m.room_code, m.player_count, m.question_count, m.started_at, m.ended_at, mp.*
        FROM match_players mp JOIN matches m ON m.id = mp.match_id WHERE mp.user_id = ? ORDER BY m.ended_at`,
     ),
     friends: all(
-      `SELECT u.username, f.status, f.created_at FROM friendships f
+      `SELECT u.username, f.status, f.requested_by = ? AS you_asked, f.created_at, f.accepted_at FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END
        WHERE f.user_a = ? OR f.user_b = ?`,
       userId,
       userId,
       userId,
+      userId,
     ),
-    questionSubmissions: rows('SELECT category, difficulty, q, options, answer, status, reason, created_at FROM question_submissions WHERE user_id = ?'),
-    reportsFiled: rows('SELECT reason, details, status, created_at FROM reports WHERE reporter_id = ?'),
-    questionReportsFiled: rows('SELECT question_id, reason, details, status, created_at FROM question_reports WHERE user_id = ?'),
+    questionSubmissions: rows('SELECT * FROM question_submissions WHERE user_id = ?'),
+    reportsFiled: rows('SELECT * FROM reports WHERE reporter_id = ?'),
+    reportsAboutYou: rows('SELECT reason, status, action, created_at, resolved_at FROM reports WHERE target_id = ?'),
+    questionReportsFiled: rows('SELECT * FROM question_reports WHERE user_id = ?'),
     recentlySeenQuestions: rows('SELECT question_id, seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC'),
+    loginSessions: rows('SELECT created_at, expires_at FROM sessions WHERE user_id = ?'),
+    emailLinks: rows('SELECT purpose, email, created_at, expires_at, used_at FROM email_tokens WHERE user_id = ?'),
   };
 }
 
@@ -146,8 +133,11 @@ export async function deleteAccount(userId: number, password: string): Promise<{
   removeFromPlay(userId);
   tx(() => {
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
+    // Reports they filed stay for the record, but their words go with them.
+    run('UPDATE reports SET details = NULL WHERE reporter_id = ?', userId);
     run('DELETE FROM users WHERE id = ?', userId);
   });
   disconnectUser(userId);
+  reloadQuestionBank(); // approved questions stop showing their name
   return { ok: true };
 }

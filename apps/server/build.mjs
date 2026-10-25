@@ -8,8 +8,10 @@ const out = path.join(root, 'dist');
 fs.rmSync(out, { recursive: true, force: true });
 
 await build({
-  entryPoints: [path.join(root, 'src/index.ts')],
-  outfile: path.join(out, 'index.mjs'),
+  // The server, and the admin command line (see src/cli.ts).
+  entryPoints: { index: path.join(root, 'src/index.ts'), cli: path.join(root, 'src/cli.ts') },
+  outdir: out,
+  outExtension: { '.js': '.mjs' },
   bundle: true,
   platform: 'node',
   format: 'esm',

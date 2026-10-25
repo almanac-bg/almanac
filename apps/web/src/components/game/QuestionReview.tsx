@@ -5,8 +5,7 @@ import { Check, ChevronDown, Flag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { Button, Card, Modal } from '../ui';
-
-const LETTERS = ['А', 'Б', 'В', 'Г'];
+import { LETTERS } from './answers';
 
 /** The match's questions with the right answers, and a way to flag a mistake in any of them. */
 export function QuestionReview({ items }: { items: ReviewItem[] }) {
@@ -93,7 +92,7 @@ function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: b
         title={reported ? 'Сигнализирано — благодарим!' : 'Сигнализирай за грешка'}
         aria-label={reported ? 'Сигнализирано' : `Сигнализирай за грешка във въпрос ${item.index + 1}`}
         className={clsx(
-          'focus-ring grid size-9 shrink-0 place-items-center rounded-xl transition-colors',
+          'focus-ring -mt-1.5 -mr-2 grid size-11 shrink-0 place-items-center rounded-xl transition-colors',
           reported ? 'text-amber-300' : 'text-fg-3 hover:bg-white/10 hover:text-amber-300',
         )}
       >

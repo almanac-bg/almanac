@@ -1,18 +1,19 @@
-import { type LeaderboardBoard, type LeaderboardEntry, type LeaderboardResponse, MODES, titleName } from '@quiz/shared';
+import { type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
 import { CalendarDays, Trophy } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
-import { api, fmt, pct, toast, useStore } from '@quiz/client';
+import { api, fmt, pct, useStore } from '@quiz/client';
+import { useLoad } from '../lib/load';
 
 const BOARDS: { value: LeaderboardBoard; label: string }[] = [
   { value: 'level', label: 'Ниво' },
   { value: 'daily', label: 'Днес' },
   { value: 'duel', label: MODES.duel.name },
-  { value: 'teams', label: MODES.teams.short },
+  { value: 'teams', label: MODES.teams.name },
   { value: 'trio', label: MODES.trio.name },
   { value: 'squad', label: MODES.squad.name },
   { value: 'royale', label: MODES.royale.name },
@@ -24,15 +25,7 @@ export function LeaderboardPage() {
   const requested = params.get('board') as LeaderboardBoard | null;
   const board: LeaderboardBoard = BOARDS.some((b) => b.value === requested) ? requested! : 'level';
   const setBoard = (b: LeaderboardBoard) => setParams(b === 'level' ? {} : { board: b }, { replace: true });
-  const [data, setData] = useState<LeaderboardResponse | null>(null);
-
-  useEffect(() => {
-    setData(null);
-    api
-      .leaderboard(board)
-      .then(setData)
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, [board]);
+  const { data, error, retry } = useLoad(() => api.leaderboard(board), board);
 
   const meInList = data?.entries.some((e) => e.user.id === me.id);
 
@@ -62,7 +55,11 @@ export function LeaderboardPage() {
         <Segmented value={board} onChange={setBoard} options={BOARDS} />
       </div>
 
-      {!data ? (
+      {error && !data ? (
+        <Card>
+          <LoadError title="Класацията не се зареди" error={error} onRetry={retry} />
+        </Card>
+      ) : !data ? (
         <div className="grid place-items-center py-24">
           <Spinner className="size-8 text-violet-400" />
         </div>

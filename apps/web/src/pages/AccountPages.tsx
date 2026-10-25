@@ -1,9 +1,27 @@
-import { CheckCircle2, Download, Eye, EyeOff, KeyRound, Mail, MailCheck, ShieldAlert, Trash2, XCircle } from 'lucide-react';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
+import {
+  CheckCircle2,
+  Download,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LogOut,
+  Mail,
+  MailCheck,
+  MailWarning,
+  ShieldAlert,
+  Trash2,
+  Volume2,
+  VolumeX,
+  XCircle,
+} from 'lucide-react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Modal, Spinner } from '../components/ui';
 import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
+import { markReturning } from '../lib/returning';
+import { sfx, useMuted } from '../lib/sound';
 
 const INPUT =
   'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
@@ -35,7 +53,7 @@ function PasswordInput({
         type="button"
         onClick={() => setShow(!show)}
         aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-        className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+        className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
       >
         {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
       </button>
@@ -173,16 +191,145 @@ export function SettingsPage() {
   const me = useStore((s) => s.me)!;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-bold">Настройки</h1>
-        <p className="mt-1 text-fg-2">
-          Профил <b className="text-fg">{me.username}</b>
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl font-bold">Настройки</h1>
+          <p className="mt-1 text-fg-2 [overflow-wrap:anywhere]">
+            Профил <b className="text-fg">{me.username}</b>
+          </p>
+        </div>
+        <LogoutButton />
       </div>
       <EmailSettings />
+      <SoundSettings />
       <PasswordSettings />
       <DataSettings />
     </div>
+  );
+}
+
+/** Forget the session on this device: back to the sign-in page with nothing of the old account left in memory. */
+function clearSession() {
+  disconnectRealtime();
+  setState({ me: null, room: null, game: null, queue: null, invites: [] });
+}
+
+const EMAIL_INPUT_ID = 'settings-email';
+
+function LogoutButton() {
+  const me = useStore((s) => s.me)!;
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function logout() {
+    setBusy(true);
+    await api.logout().catch(() => {});
+    markReturning(); // next time the sign-in page opens on "Вход"
+    clearSession();
+    navigate('/', { replace: true });
+  }
+
+  function addEmail() {
+    setOpen(false);
+    // After the dialog has closed and handed focus back.
+    setTimeout(() => {
+      const input = document.getElementById(EMAIL_INPUT_ID);
+      input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      input?.focus({ preventScroll: true });
+    }, 350);
+  }
+
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        <LogOut className="size-4" /> Изход
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Изход от профила">
+        {me.email ? (
+          <p className="text-sm text-fg-2">Ще можеш да влезеш отново с потребителското име или имейла и паролата си.</p>
+        ) : (
+          // Without a verified email a forgotten password means the account is gone for good: say so before they leave.
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm">
+            <p className="flex items-center gap-2 font-semibold text-amber-200">
+              <MailWarning className="size-5 shrink-0" /> Профилът няма потвърден имейл
+            </p>
+            <p className="mt-2 text-fg-2">
+              {me.pendingEmail ? (
+                <>
+                  Линкът за потвърждение до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b> още не е отворен.{' '}
+                </>
+              ) : null}
+              Ако забравиш паролата, профилът не може да бъде възстановен. Запомни името{' '}
+              <b className="text-fg [overflow-wrap:anywhere]">{me.username}</b> и паролата си — или първо добави имейл.
+            </p>
+          </div>
+        )}
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          {!me.email && !me.pendingEmail && (
+            <Button variant="secondary" onClick={addEmail} className="mr-auto">
+              <Mail className="size-4" /> Добави имейл
+            </Button>
+          )}
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Отказ
+          </Button>
+          <Button variant="danger" onClick={logout} loading={busy}>
+            <LogOut className="size-4" /> Излез
+          </Button>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function SoundSettings() {
+  const [muted, setMuted] = useMuted();
+  const id = useId();
+  const on = !muted;
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {on ? <Volume2 className="size-5 text-violet-300" /> : <VolumeX className="size-5 text-fg-3" />}
+            <h2 id={`${id}-label`} className="font-display text-lg font-bold">
+              Звук
+            </h2>
+          </div>
+          <p id={`${id}-hint`} className="mt-1 text-sm text-fg-3">
+            Ефекти в играта: часовникът, верните и грешните отговори, наградите.
+          </p>
+        </div>
+        <button
+          role="switch"
+          aria-checked={on}
+          aria-labelledby={`${id}-label`}
+          aria-describedby={`${id}-hint`}
+          onClick={() => {
+            setMuted(on);
+            if (!on) sfx.pop(); // a taste of what was just switched on
+          }}
+          className="focus-ring grid h-11 w-16 shrink-0 place-items-center rounded-2xl"
+        >
+          <span
+            aria-hidden
+            className={clsx(
+              'relative h-7 w-12 rounded-full border transition-colors',
+              on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-white/10',
+            )}
+          >
+            <span
+              className={clsx(
+                'absolute top-0.5 left-0.5 size-5.5 rounded-full bg-white shadow transition-transform',
+                on && 'translate-x-5',
+              )}
+            />
+          </span>
+        </button>
+      </div>
+    </Card>
   );
 }
 
@@ -199,8 +346,7 @@ function DataSettings() {
     setError(null);
     try {
       await api.deleteAccount(password);
-      disconnectRealtime();
-      setState({ me: null, room: null, game: null, queue: null });
+      clearSession();
       navigate('/', { replace: true });
       toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });
     } catch (err) {
@@ -261,14 +407,18 @@ function DataSettings() {
 function EmailSettings() {
   const me = useStore((s) => s.me)!;
   const [email, setEmail] = useState('');
+  // Whoever controls the email can reset the password, so changing it asks for the password.
+  const [password, setPassword] = useState('');
+  const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState<'save' | 'remove' | 'resend' | null>(null);
 
   async function save(address: string, kind: 'save' | 'resend') {
     setBusy(kind);
     try {
-      const { user } = await api.setEmail(address);
+      const { user } = await api.setEmail(address, kind === 'save' ? password : undefined);
       setState({ me: user });
       setEmail('');
+      setPassword('');
       toast({ kind: 'success', icon: '✉️', title: 'Изпратихме линк за потвърждение', body: address });
     } catch (err) {
       toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
@@ -277,11 +427,17 @@ function EmailSettings() {
     }
   }
 
-  async function remove() {
+  async function remove(e: FormEvent) {
+    e.preventDefault();
     setBusy('remove');
     try {
-      const { user } = await api.removeEmail();
+      const { user } = await api.removeEmail(password);
       setState({ me: user });
+      setPassword('');
+      setRemoving(false);
+      toast({ kind: 'info', title: 'Имейлът е премахнат' });
+    } catch (err) {
+      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
     } finally {
       setBusy(null);
     }
@@ -300,10 +456,32 @@ function EmailSettings() {
           <MailCheck className="size-5 text-emerald-300" />
           <span className="min-w-0 flex-1 truncate font-semibold">{me.email}</span>
           <span className="text-xs font-semibold text-emerald-300">Потвърден</span>
-          <Button size="sm" variant="ghost" onClick={remove} loading={busy === 'remove'}>
-            Премахни
-          </Button>
+          {!removing && (
+            <Button size="sm" variant="ghost" onClick={() => setRemoving(true)}>
+              Премахни
+            </Button>
+          )}
         </div>
+      )}
+      {me.email && removing && (
+        <form onSubmit={remove} className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Парола за потвърждение"
+            aria-label="Парола за потвърждение"
+            className={`${INPUT} min-w-0 sm:flex-1`}
+          />
+          <Button type="submit" variant="danger" loading={busy === 'remove'}>
+            Премахни имейла
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setRemoving(false)}>
+            Отказ
+          </Button>
+        </form>
       )}
       {me.pendingEmail && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm">
@@ -311,7 +489,12 @@ function EmailSettings() {
             Чака потвърждение: <b>{me.pendingEmail}</b>
             <span className="block text-xs text-fg-3">Отвори линка от писмото (провери и папката за спам).</span>
           </span>
-          <Button size="sm" variant="secondary" onClick={() => save(me.pendingEmail!, 'resend')} loading={busy === 'resend'}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => save(me.pendingEmail!, 'resend')}
+            loading={busy === 'resend'}
+          >
             Изпрати отново
           </Button>
         </div>
@@ -324,7 +507,9 @@ function EmailSettings() {
         }}
         className="mt-4 flex flex-wrap gap-2"
       >
+        {/* Phones: one field per row; wider screens: side by side. */}
         <input
+          id={EMAIL_INPUT_ID}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           type="email"
@@ -332,9 +517,19 @@ function EmailSettings() {
           autoComplete="email"
           placeholder={me.email ? 'Нов имейл' : 'твоят@имейл.bg'}
           aria-label="Имейл"
-          className={`${INPUT} min-w-0 flex-1`}
+          className={`${INPUT} min-w-0 sm:flex-1`}
         />
-        <Button type="submit" size="lg" loading={busy === 'save'}>
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          type="password"
+          required
+          autoComplete="current-password"
+          placeholder="Парола за потвърждение"
+          aria-label="Парола за потвърждение"
+          className={`${INPUT} min-w-0 sm:flex-1`}
+        />
+        <Button type="submit" size="lg" className="w-full sm:w-auto" loading={busy === 'save'}>
           {me.email ? 'Смени' : 'Добави'}
         </Button>
       </form>

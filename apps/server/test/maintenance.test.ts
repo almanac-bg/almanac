@@ -33,20 +33,20 @@ test('expired sessions and old email links are purged', () => {
   purgeExpired(now);
 
   assert.equal(count('sessions'), 1, 'only the live session stays');
-  assert.equal(count('email_tokens'), 2, 'links expired over a week ago are gone');
+  assert.equal(count('email_tokens'), 1, 'expired links are gone right away');
 });
 
-test('daily snapshots: one per day, a working copy, only the newest kept', () => {
+test('daily snapshots: one per day, a working copy, only the newest kept', async () => {
   const dir = path.join(tmp, 'backups');
   const day = (d: number) => Date.UTC(2026, 9, d, 12);
-  const first = snapshot(day(1), dir);
+  const first = await snapshot(day(1), dir);
   assert.ok(first?.endsWith('quiz-2026-10-01.db'));
-  assert.equal(snapshot(day(1), dir), null, 'one snapshot per day');
+  assert.equal(await snapshot(day(1), dir), null, 'one snapshot per day');
 
   const copy = new DatabaseSync(first!, { readOnly: true });
   assert.equal((copy.prepare("SELECT username FROM users WHERE id = 1").get() as { username: string }).username, 'a');
   copy.close();
 
-  for (const d of [2, 3, 4, 5]) snapshot(day(d), dir);
+  for (const d of [2, 3, 4, 5]) await snapshot(day(d), dir);
   assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-03.db', 'quiz-2026-10-04.db', 'quiz-2026-10-05.db']);
 });

@@ -1,7 +1,7 @@
 import { RANK_TIERS, seasonName } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { sfx } from '../lib/sound';
 import { Button, Modal } from './ui';
@@ -11,6 +11,7 @@ export function SeasonRecap() {
   const rewards = useStore((s) => s.me?.seasonRewards ?? []);
   const inGame = useStore((s) => !!s.game);
   const [closing, setClosing] = useState(false);
+  const headingId = useId();
   const reward = rewards.at(-1);
   const open = !!reward && !inGame && !closing;
   const tier = reward?.tier ? RANK_TIERS.find((t) => t.id === reward.tier)! : null;
@@ -18,7 +19,13 @@ export function SeasonRecap() {
   useEffect(() => {
     if (!open || !tier) return;
     sfx.levelUp();
-    void confetti({ particleCount: 120, spread: 80, origin: { y: 0.4 }, colors: [tier.color, '#ffffff', '#a78bfa'] });
+    void confetti({
+      particleCount: 120,
+      spread: 80,
+      origin: { y: 0.4 },
+      colors: [tier.color, '#ffffff', '#a78bfa'],
+      disableForReducedMotion: true,
+    });
   }, [open, tier]);
 
   async function close() {
@@ -30,9 +37,11 @@ export function SeasonRecap() {
 
   if (!reward) return null;
   return (
-    <Modal open={open} onClose={close} className="max-w-md text-center">
+    <Modal open={open} onClose={close} labelledBy={headingId} className="max-w-md text-center">
       <p className="text-xs font-bold tracking-[0.3em] text-fg-3 uppercase">Сезонът приключи</p>
-      <h2 className="mt-2 font-display text-2xl font-bold">{seasonName(reward.season)}</h2>
+      <h2 id={headingId} className="mt-2 font-display text-2xl font-bold">
+        {seasonName(reward.season)}
+      </h2>
       {tier ? (
         <>
           <motion.div

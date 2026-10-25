@@ -252,7 +252,7 @@ export interface ClientToServerEvents {
   'room:team': (playerId: string) => void;
   'room:start': (ack: Ack) => void;
   'invite:send': (p: { userId: number }, ack: Ack) => void;
-  'invite:decline': (p: { fromUserId: number }) => void;
+  'invite:decline': (p: { inviteId: string }) => void;
   'friends:challenge': (p: { userId: number }, ack: Ack<{ code: string }>) => void;
   'game:answer': (p: { index: number; choice: number }) => void;
   'game:powerup': (p: { index: number; powerup: PowerupId }) => void;

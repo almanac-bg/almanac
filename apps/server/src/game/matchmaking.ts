@@ -1,9 +1,14 @@
 import { MODES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 import type { IO } from './io';
 import { config } from '../config';
+import { guarded } from '../guard';
 import { friendsChanged } from '../notify';
+import { getUser } from '../users';
 import { makeBots } from './bots';
 import { averageOf, balanceTeams, buildHuman, type GameRegistry } from './registry';
+
+/** A player's first few multiplayer matches get kinder bots: the first win comes sooner. */
+const NEWCOMER_GAMES = 3;
 
 interface Entry {
   userId: number;
@@ -18,7 +23,7 @@ export class Matchmaker {
     private io: IO,
     private games: GameRegistry,
   ) {
-    setInterval(() => this.tick(), 1000).unref();
+    setInterval(guarded('matchmaking', () => this.tick()), 1000).unref();
   }
 
   join(userId: number, mode: QueueModeId) {
@@ -76,11 +81,12 @@ export class Matchmaker {
 
   private launch(mode: QueueModeId, entries: Entry[]) {
     const def = MODES[mode];
-    const humans = entries.map((e) => buildHuman(e.userId, mode));
     for (const e of entries) this.io.to(`user:${e.userId}`).emit('queue:status', null);
-    const bots = makeBots(def.players - humans.length, averageOf(humans), humans.map((h) => h.player.name));
-    if (def.teams) balanceTeams([...humans, ...bots]);
     try {
+      const humans = entries.map((e) => buildHuman(e.userId, mode));
+      const gentle = entries.some((e) => (getUser(e.userId)?.mp_games ?? 0) < NEWCOMER_GAMES);
+      const bots = makeBots(def.players - humans.length, averageOf(humans), humans.map((h) => h.player.name), { gentle });
+      if (def.teams) balanceTeams([...humans, ...bots]);
       this.games.start({
         mode,
         ranked: true,

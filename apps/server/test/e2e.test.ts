@@ -1,6 +1,7 @@
 // End-to-end: a real server, real sockets, two players (A is the first account, so admin) and bots.
 // Sections run in order and share state, like a play session.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
@@ -57,11 +58,15 @@ test('auth', T, async () => {
   assert.equal(bad.status, 401, 'wrong password is rejected');
   assert.equal((await api.get('/api/me', A.cookie)).body.user?.username, A.user.username, '/me works with the session cookie');
 
-  // Sessions slide: one used in the second half of its life is renewed to a full 30 days.
+  // Sessions are stored hashed (a leaked backup holds no usable logins)…
   const token = decodeURIComponent(A.cookie.split('=')[1]);
-  srv.db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(Date.now() + 3 * 24 * 60 * 60_000, token);
-  await api.get('/api/me', A.cookie);
-  const { expires_at } = srv.db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(token) as { expires_at: number };
+  const hash = createHash('sha256').update(token).digest('base64url');
+  assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE token = ?').get(token)!.n, 0, 'no raw token stored');
+  // …and slide: one used in the second half of its life is renewed to a full 30 days, cookie included.
+  srv.db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(Date.now() + 3 * 24 * 60 * 60_000, hash);
+  const renewed = await fetch(`${srv.url}/api/me`, { headers: { cookie: A.cookie } });
+  assert.match(renewed.headers.get('set-cookie') ?? '', /Max-Age=2592000/, 'the browser cookie is renewed too');
+  const { expires_at } = srv.db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(hash) as { expires_at: number };
   assert.ok(expires_at > Date.now() + 29 * 24 * 60 * 60_000, 'an active session is renewed');
   const anon = await api.get('/api/me');
   assert.equal(anon.status, 200);
@@ -173,6 +178,58 @@ test('forfeit frees the player', T, async () => {
   sb.emit('queue:leave');
 });
 
+test('a match that ends while the player is offline shows its result on return', T, async () => {
+  const matches = () => (srv.db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number }).n;
+  const before = matches();
+  const question = next(sb, 'game:question');
+  assert.ok((await emitAck(sb, 'solo:start', { category: 'mixed' })).ok);
+  await question;
+  sb.disconnect();
+  for (let i = 0; i < 200 && matches() === before; i++) await sleep(100); // the match runs out without them
+
+  sb = connect(srv.url, B.cookie);
+  const start = next<GameStartPayload>(sb, 'game:start');
+  const end = next(sb, 'game:end');
+  await connected(sb);
+  assert.equal((await end).gameId, (await start).gameId, 'the finished match comes back with its result');
+  const again = connect(srv.url, B.cookie);
+  await assert.rejects(next(again, 'game:end', 1000), 'and only once');
+  again.close();
+});
+
+test('malformed socket messages are refused and never crash the server', T, async () => {
+  const H = await register(srv.url, 'hostile_test');
+  const sh = connect(srv.url, H.cookie);
+  await connected(sh);
+  // `String()` / `Number()` on this throw: it once took the whole server down.
+  const evil = { toString: 1, valueOf: 1 };
+  const fields = { userId: evil, inviteId: evil, index: evil, choice: evil, powerup: evil, category: evil, mode: evil };
+  for (const event of ['queue:join', 'solo:start', 'room:join', 'invite:send', 'friends:challenge'] as const) {
+    for (const payload of [evil, fields, [evil], null]) {
+      const ack = await emitAck(sh, event, payload);
+      assert.equal(ack.ok, false, `${event} refuses ${JSON.stringify(payload)}`);
+    }
+  }
+  assert.ok((await emitAck(sh, 'room:create', fields)).ok, 'unknown room settings are ignored');
+  for (const event of ['room:settings', 'room:bot', 'room:kick', 'room:team', 'invite:decline'] as const) sh.emit(event, evil as never);
+  sh.emit('room:leave');
+  await sleep(1500); // the burst above used up the socket's event budget
+
+  const question = next<QuestionPayload>(sh, 'game:question');
+  assert.deepEqual(await emitAck(sh, 'solo:start', { category: 'mixed' }), { ok: true });
+  await question;
+  for (const event of ['game:answer', 'game:powerup', 'game:react'] as const) {
+    sh.emit(event, evil as never);
+    sh.emit(event, fields as never);
+  }
+  sh.emit('game:leave');
+
+  assert.ok((await emitAck(sh, 'queue:join', 'duel')).ok, 'the same socket still works');
+  sh.emit('queue:leave');
+  assert.equal((await api.get('/api/health')).status, 200, 'the server is still up');
+  sh.close();
+});
+
 test('profiles, achievements, leaderboards, loadout', T, async () => {
   const prof = await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, B.cookie);
   assert.equal(prof.status, 200);
@@ -204,7 +261,9 @@ test('daily challenge', T, async () => {
   assert.ok((await emitAck(sb, 'daily:start')).ok);
   const { end: eb } = await pb;
   assert.deepEqual(logB.questions.map((q) => q.q), log.questions.map((q) => q.q), 'same questions for everyone');
-  assert.deepEqual(logB.questions.map((q) => q.options), log.questions.map((q) => q.options), 'same option order');
+  const sorted = (l: typeof log) => l.questions.map((q) => [...q.options].sort());
+  assert.deepEqual(sorted(logB), sorted(log), 'same options');
+  assert.notDeepEqual(logB.questions.map((q) => q.options), log.questions.map((q) => q.options), 'but in each player’s own order');
   assert.deepEqual(eb.rewards!.daily, { rank: 2, total: 2, streak: 1 });
   const info = await api.get('/api/daily', A.cookie);
   assert.equal(info.body.played.rank, 1);
@@ -234,8 +293,11 @@ test('friends, invites and challenges', T, async () => {
   const invite = await invited;
   assert.equal(invite.roomCode, room.code);
   assert.equal(invite.kind, 'room');
+  // Only a real invite can be declined (no toast spam at arbitrary players).
+  sb.emit('invite:decline', { inviteId: 'made-up' });
+  await assert.rejects(next(sa, 'notice', 300), 'a made-up invite id is ignored');
   const declined = next(sa, 'notice');
-  sb.emit('invite:decline', { fromUserId: A.user.id });
+  sb.emit('invite:decline', { inviteId: invite.id });
   assert.match((await declined).message, /отказа/);
   sa.emit('room:leave');
 
@@ -392,7 +454,11 @@ test('community questions', T, async () => {
 
 test('season settlement', T, async () => {
   srv.db
-    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 1300, 1310, 5, 4)")
+    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 1300, 1310, 12, 8)")
+    .run(A.user.id);
+  // A higher peak from only a handful of games in another mode doesn't count.
+  srv.db
+    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'royale', 1750, 1800, 4, 4)")
     .run(A.user.id);
   srv.db
     .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 900, 950, 1, 0)")
@@ -434,11 +500,14 @@ test('email verification, password reset and change', T, async () => {
   assert.equal(me.email, 'Pesho@Example.com');
   assert.equal(me.pendingEmail, null);
 
+  // Changing the email needs the password (whoever controls the email can reset the password).
+  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com' })).status, 400);
+  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'wrong-pass' })).status, 400);
   // Someone else can't claim a verified address, but isn't told why until verification.
-  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com' })).status, 200);
+  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'secret123' })).status, 200);
   const stolen = (await api.send('POST', '/api/auth/verify-email', '', { token: tokenFrom(srv.mails().at(-1)!) })).body;
   assert.match(stolen.error, /друг профил/);
-  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'not-an-email' })).status, 400);
+  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'not-an-email', password: 'secret123' })).status, 400);
 
   // Unknown logins get the same answer and no email.
   const count = srv.mails().length;
@@ -482,7 +551,11 @@ test('email verification, password reset and change', T, async () => {
   assert.ok((await api.get('/api/me', newCookie)).body.user, 'the current session stays');
   assert.equal((await api.get('/api/me', secondCookie)).body.user, null, 'other sessions are logged out');
 
-  assert.equal((await api.send('DELETE', '/api/account/email', newCookie)).body.user.email, null, 'email can be removed');
+  assert.equal((await api.send('DELETE', '/api/account/email', newCookie, {})).status, 400, 'removing it needs the password too');
+  const sentBefore = srv.mails().length;
+  assert.equal((await api.send('DELETE', '/api/account/email', newCookie, { password: 'third-pass' })).body.user.email, null, 'email can be removed');
+  const notice = srv.mails().slice(sentBefore).find((m) => m.to === 'Pesho@Example.com');
+  assert.match(notice?.subject ?? '', /премахнат/, 'the old address is told');
 });
 
 test('moderation: name filter, reports, rename, ban', T, async () => {

@@ -1,30 +1,21 @@
-import {
-  categoryById,
-  emoteById,
-  type GamePlayer,
-  MODES,
-  POWERUPS,
-  type PowerupId,
-  type Standing,
-  type TeamId,
-  TEAMS,
-  TIME_BONUS_MS,
-} from '@quiz/shared';
+import { categoryById, emoteById, type GamePlayer, MODES, type Standing, type TeamId, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Flame, Skull, Users, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { Check, Flame, Skull, Users, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
-import { TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
-import { Button, Modal } from '../components/ui';
+import { MatchAnnouncer } from '../components/game/Announcer';
+import { LETTERS, OPTION_COLORS } from '../components/game/answers';
+import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
+import { ConnectionBanner } from '../components/game/ConnectionBanner';
+import { ActiveJokers, type JokerGuide, PowerupBar, useJokerGuide } from '../components/game/Jokers';
+import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
+import { Button, Modal, Spinner } from '../components/ui';
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
 import { useCountUp } from '../lib/hooks';
-import { sfx } from '../lib/sound';
+import { sfx, useMuted } from '../lib/sound';
 import { Results } from './Results';
-
-const LETTERS = ['А', 'Б', 'В', 'Г'];
-const OPTION_COLORS = ['#a78bfa', '#22d3ee', '#fbbf24', '#f472b6'];
 
 export function GamePage() {
   const game = useStore((s) => s.game);
@@ -33,26 +24,42 @@ export function GamePage() {
   return <Arena game={game} />;
 }
 
-const myTeamOf = (game: LiveGame): TeamId | null => game.players[game.start.youId]?.team ?? null;
+const ANSWER_KEYS = ['1', '2', '3', '4'];
 
-function Arena({ game }: { game: LiveGame }) {
-  const [leaving, setLeaving] = useState(false);
-  const single = game.start.players.length === 1;
-  const meEliminated = game.eliminated.includes(game.start.youId);
-
-  // Keyboard: 1-4 answer.
+/** 1–4 answer — but not behind a dialog, and not while typing somewhere. */
+function useAnswerKeys(paused: boolean) {
+  const pausedNow = useRef(paused);
+  useEffect(() => {
+    pausedNow.current = paused;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const n = Number(e.key);
-      if (n >= 1 && n <= 4) actions.answer(n - 1);
+      const choice = ANSWER_KEYS.indexOf(e.key);
+      if (choice < 0 || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (pausedNow.current || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
+      actions.answer(choice);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+function Arena({ game }: { game: LiveGame }) {
+  const [leaving, setLeaving] = useState(false);
+  const offline = !useStore((s) => s.connected);
+  const jokers = useJokerGuide(game.start.powerups);
+  const single = game.start.players.length === 1;
+  const meEliminated = game.eliminated.includes(game.start.youId);
+
+  // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
+  useBackGuard(() => setLeaving((open) => !open));
+  useAnswerKeys(leaving);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar game={game} onLeave={() => setLeaving(true)} />
+      <ConnectionBanner />
       {!single && <MobileStrip game={game} />}
 
       <div
@@ -66,7 +73,7 @@ function Arena({ game }: { game: LiveGame }) {
             {game.phase === 'countdown' ? (
               <Intro key="intro" game={game} />
             ) : game.question ? (
-              <QuestionView key={`q${game.question.index}`} game={game} />
+              <QuestionView key={`q${game.question.index}`} game={game} jokers={jokers} offline={offline} />
             ) : (
               <motion.div key="wait" className="grid place-items-center py-32 text-fg-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 Следващият въпрос идва…
@@ -82,8 +89,9 @@ function Arena({ game }: { game: LiveGame }) {
         )}
       </div>
 
-      {!single && <EmoteBar emotes={game.start.emotes} />}
+      {!single && <EmoteBar emotes={game.start.emotes} offline={offline} />}
       <EliminationBanner game={game} />
+      <MatchAnnouncer game={game} />
       {meEliminated && game.phase !== 'countdown' && (
         <div className="fixed inset-x-0 bottom-20 z-30 mx-auto w-fit rounded-full border border-rose-400/30 bg-rose-500/15 px-4 py-2 text-sm text-rose-200 backdrop-blur">
           💀 Отпадна — гледаш като зрител
@@ -102,7 +110,7 @@ function Arena({ game }: { game: LiveGame }) {
           <Button variant="ghost" onClick={() => setLeaving(false)}>
             Остани
           </Button>
-          <Button variant="danger" onClick={actions.leaveGame}>
+          <Button variant="danger" onClick={() => leaveMatchScreen(actions.leaveGame)}>
             Напусни
           </Button>
         </div>
@@ -120,11 +128,11 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
   const q = game.question;
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
         <button
           onClick={onLeave}
           aria-label="Напусни мача"
-          className="focus-ring grid size-9 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+          className="focus-ring -ml-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
         >
           <X className="size-5" />
         </button>
@@ -140,7 +148,7 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
           </div>
         ) : (
           q && (
-            <div className="hidden items-center gap-1 sm:flex" aria-label={`Въпрос ${q.index + 1} от ${q.total}`}>
+            <div className="hidden items-center gap-1 sm:flex" role="img" aria-label={`Въпрос ${q.index + 1} от ${q.total}`}>
               {Array.from({ length: q.total }, (_, i) => (
                 <span
                   key={i}
@@ -154,8 +162,17 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
             </div>
           )
         )}
-        {q && <span className="text-sm font-semibold text-fg-2 tabular-nums sm:hidden">{q.index + 1}/{q.total}</span>}
-        <div className="ml-auto flex items-center gap-3">
+        {q && (
+          <span className="text-sm font-semibold text-fg-2 tabular-nums sm:hidden">
+            <span aria-hidden>
+              {q.index + 1}/{q.total}
+            </span>
+            <span className="sr-only">
+              Въпрос {q.index + 1} от {q.total}
+            </span>
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {me && me.streak >= 2 && (
             <motion.span
               key={me.streak}
@@ -166,10 +183,29 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
               <Flame className="size-4" /> {me.streak}
             </motion.span>
           )}
-          <span className="font-display text-xl font-bold tabular-nums">{fmt(score)}</span>
+          <span className="font-display text-xl font-bold tabular-nums">
+            <span aria-hidden>{fmt(score)}</span>
+            <span className="sr-only">{fmt(me?.score ?? 0)} точки</span>
+          </span>
+          <MuteButton />
         </div>
       </div>
     </header>
+  );
+}
+
+function MuteButton() {
+  const [muted, setMuted] = useMuted();
+  const label = muted ? 'Включи звука' : 'Изключи звука';
+  return (
+    <button
+      onClick={() => setMuted(!muted)}
+      aria-label={label}
+      title={label}
+      className="focus-ring -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+    >
+      {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
+    </button>
   );
 }
 
@@ -225,7 +261,10 @@ function Intro({ game }: { game: LiveGame }) {
               transition={{ delay: 0.1 + i * 0.12, type: 'spring', stiffness: 300, damping: 18 }}
               className="flex flex-col items-center gap-2"
             >
-              <Avatar avatar={p.avatar} frame={p.frame} size={64} />
+              <div className="relative">
+                <Avatar avatar={p.avatar} frame={p.frame} size={64} />
+                <PlayerMark me={p.id === me.id} bot={p.isBot} />
+              </div>
               <span className={clsx('max-w-20 truncate text-xs font-semibold', p.id === me.id && 'text-violet-300')}>
                 {p.name}
               </span>
@@ -346,18 +385,14 @@ function TeamsVersus({ game }: { game: LiveGame }) {
 
 // ─── Question ──────────────────────────────────────────────────────────────
 
-function QuestionView({ game }: { game: LiveGame }) {
+function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: JokerGuide; offline: boolean }) {
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
-  const active = !game.eliminated.includes(youId) && !reveal;
+  const active = !game.eliminated.includes(youId) && !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
-  const others = game.start.players.length - 1;
-
-  // "Още време" pushes the deadline out; compare against where it started for this question.
-  const initialDeadline = useRef(game.deadline);
-  const extraMs = Math.max(0, game.deadline - initialDeadline.current);
+  const reduceMotion = useReducedMotion();
 
   // Re-render while frozen so the overlay counts down and lifts on time.
   const now = useNow(200, game.frozenUntil > Date.now());
@@ -393,8 +428,9 @@ function QuestionView({ game }: { game: LiveGame }) {
           {DIFFICULTY_LABEL[q.difficulty]}
         </span>
         {q.elimination && (
+          // MotionConfig only stills movement; this loop is opacity, so it stops here.
           <motion.span
-            animate={{ opacity: [1, 0.55, 1] }}
+            animate={reduceMotion ? undefined : { opacity: [1, 0.55, 1] }}
             transition={{ repeat: Infinity, duration: 1.4 }}
             className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-bold text-rose-300"
           >
@@ -416,7 +452,7 @@ function QuestionView({ game }: { game: LiveGame }) {
             <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-balance">{q.q}</h2>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
           </div>
-          <TimerRing deadline={game.deadline} duration={q.durationMs + extraMs} stopped={!!reveal} />
+          <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
         </div>
       </div>
 
@@ -448,7 +484,8 @@ function QuestionView({ game }: { game: LiveGame }) {
               selected={game.myChoice === i}
               locked={game.myChoice !== null}
               removed={game.removed.includes(i)}
-              disabled={!active || frozen}
+              disabled={!active || frozen || offline}
+              offline={(offline || game.resyncing) && !reveal}
               correct={reveal ? reveal.correct === i : null}
               pickers={pickers[i] ?? []}
             />
@@ -465,18 +502,11 @@ function QuestionView({ game }: { game: LiveGame }) {
             <RevealSummary key="sum" result={mine} />
           ) : reveal ? null : game.myChoice !== null ? (
             <motion.div key="wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap items-center gap-2">
-              <p className="inline-flex items-center gap-2 text-sm text-fg-2">
-                <Check className="size-4 text-emerald-400" /> Отговорът е заключен
-                {others > 0 && (
-                  <span className="text-fg-3">
-                    · <Users className="mb-0.5 inline size-3.5" /> {game.answered.length}/{game.start.players.length - game.eliminated.length}
-                  </span>
-                )}
-              </p>
-              <ActiveJokers game={game} extraMs={extraMs} />
+              <LockStatus game={game} offline={offline} />
+              <ActiveJokers game={game} />
             </motion.div>
           ) : (
-            active && <PowerupBar key="pw" game={game} extraMs={extraMs} />
+            active && <PowerupBar key="pw" game={game} guide={jokers} offline={offline} />
           )}
         </AnimatePresence>
       </div>
@@ -484,10 +514,44 @@ function QuestionView({ game }: { game: LiveGame }) {
   );
 }
 
+/** A pick counts once the server has it (it echoes `answered`); until then this says so instead of claiming a lock. */
+function LockStatus({ game, offline }: { game: LiveGame; offline: boolean }) {
+  if (!game.answered.includes(game.start.youId)) {
+    return offline ? (
+      <p className="inline-flex items-center gap-2 text-sm text-rose-200">
+        <WifiOff className="size-4" aria-hidden /> Отговорът не е потвърден — няма връзка
+      </p>
+    ) : (
+      // Normally confirmed within a blink: only a slow link ever gets to see this.
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="inline-flex items-center gap-2 text-sm text-fg-2"
+      >
+        <Spinner className="size-3.5" /> Изпращаме отговора…
+      </motion.p>
+    );
+  }
+  const playing = game.start.players.length - game.eliminated.length;
+  return (
+    <p className="inline-flex items-center gap-2 text-sm text-fg-2">
+      <Check className="size-4 text-emerald-400" aria-hidden /> Отговорът е заключен
+      {game.start.players.length > 1 && (
+        <span className="text-fg-3">
+          · <Users className="mb-0.5 inline size-3.5" aria-hidden /> {game.answered.length}/{playing}
+          <span className="sr-only"> са отговорили</span>
+        </span>
+      )}
+    </p>
+  );
+}
+
 /** Frosted panel over the answers while "Леден удар" holds you. */
 function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
   const by = game.frozenBy ? game.players[game.frozenBy]?.name : null;
   const left = Math.max(0, Math.ceil((game.frozenUntil - now) / 1000));
+  const reduceMotion = useReducedMotion();
   return (
     <motion.div
       initial={{ opacity: 0, scale: 1.04 }}
@@ -500,11 +564,10 @@ function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
           'radial-gradient(circle at 20% 20%, rgb(207 250 254 / 0.25), transparent 40%), radial-gradient(circle at 80% 70%, rgb(165 243 252 / 0.2), transparent 45%), linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 60%)',
         boxShadow: 'inset 0 0 60px rgb(165 243 252 / 0.25)',
       }}
-      role="status"
     >
       <div className="flex flex-col items-center text-center">
         <motion.span
-          animate={{ rotate: [0, 12, -12, 0] }}
+          animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
           className="text-5xl drop-shadow-[0_0_18px_rgb(165_243_252/0.9)]"
         >
@@ -537,8 +600,13 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
   const R = 26;
   const C = 2 * Math.PI * R;
   return (
-    <div className={clsx('relative grid size-16 shrink-0 place-items-center sm:size-20', secs <= 3 && !stopped && 'animate-pulse')}>
-      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90">
+    // role="timer" is never read out on its own: the time is there when the reader looks, not on every tick.
+    <div
+      role="timer"
+      aria-label={`Оставащо време: ${secs} ${secs === 1 ? 'секунда' : 'секунди'}`}
+      className={clsx('relative grid size-16 shrink-0 place-items-center sm:size-20', secs <= 3 && !stopped && 'motion-safe:animate-pulse')}
+    >
+      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90" aria-hidden>
         <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="5" />
         <circle
           cx="32"
@@ -553,7 +621,7 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
           style={{ transition: 'stroke-dashoffset 0.1s linear, stroke 0.3s', filter: `drop-shadow(0 0 6px ${color})` }}
         />
       </svg>
-      <span className="font-display text-xl font-bold tabular-nums sm:text-2xl" style={{ color }}>
+      <span className="font-display text-xl font-bold tabular-nums sm:text-2xl" style={{ color }} aria-hidden>
         {secs}
       </span>
     </div>
@@ -567,6 +635,7 @@ function AnswerButton({
   locked,
   removed,
   disabled,
+  offline,
   correct,
   pickers,
 }: {
@@ -576,18 +645,29 @@ function AnswerButton({
   locked: boolean;
   removed: boolean;
   disabled: boolean;
+  /** No connection (or not yet re-synced): shown as out of reach, not just unresponsive. */
+  offline: boolean;
   correct: boolean | null;
   pickers: GamePlayer[];
 }) {
   const color = OPTION_COLORS[index];
   const revealed = correct !== null;
   const wrongPick = revealed && selected && !correct;
-  const state = revealed ? (correct ? 'correct' : wrongPick ? 'wrong' : 'dim') : selected ? 'selected' : locked ? 'dim' : 'idle';
+  const state = revealed ? (correct ? 'correct' : wrongPick ? 'wrong' : 'dim') : selected ? 'selected' : locked || offline ? 'dim' : 'idle';
+
+  // What the colors and icons say, for screen readers.
+  const name = [`${LETTERS[index]}) ${text}`];
+  if (removed) name.push('премахнат');
+  if (state === 'correct') name.push(selected ? 'верен отговор, твоят избор' : 'верен отговор');
+  else if (wrongPick) name.push('твоят избор, грешен');
+  else if (selected) name.push('твоят избор');
+  if (pickers.length) name.push(`избран от ${pickers.map((p) => p.name).join(', ')}`);
 
   return (
     <motion.button
       layout
       data-answer={index}
+      aria-label={name.join(' — ')}
       disabled={disabled || locked || removed}
       onClick={() => actions.answer(index)}
       initial={{ opacity: 0, y: 14 }}
@@ -666,98 +746,15 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
           {result.timeMs !== null && <span className="text-sm text-fg-3">за {(result.timeMs / 1000).toFixed(1).replace('.', ',')} с</span>}
         </>
       ) : (
-        <span className="font-display text-2xl font-bold text-rose-300">
-          {result.choice === null ? 'Времето изтече ⏱️' : 'Грешно 😬'}
-        </span>
+        <>
+          <span className="font-display text-2xl font-bold text-rose-300">
+            {result.choice === null ? 'Времето изтече ⏱️' : 'Грешно 😬'}
+          </span>
+          {result.points < 0 && (
+            <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-sm font-bold text-rose-300">💰 −{fmt(-result.points)}</span>
+          )}
+        </>
       )}
-    </motion.div>
-  );
-}
-
-/** Is there an opponent still answering (so "Леден удар" has someone to hit)? Client-side approximation. */
-function hasFreezeTarget(game: LiveGame): boolean {
-  const youId = game.start.youId;
-  const myTeam = myTeamOf(game);
-  return game.start.players.some((p) => {
-    if (p.id === youId || game.eliminated.includes(p.id) || game.answered.includes(p.id)) return false;
-    if (game.standings.find((s) => s.id === p.id)?.left) return false;
-    return !game.start.teams || p.team !== myTeam;
-  });
-}
-
-/** Chips for jokers already working on this question. */
-function ActiveJokers({ game, extraMs }: { game: LiveGame; extraMs: number }) {
-  const chips: string[] = [];
-  if (game.doubled) chips.push('💰 ×2 точки');
-  if (game.retryArmed && !game.retryPrompt) chips.push('🔁 Втори шанс е активен');
-  if (extraMs > 0) chips.push(`⏳ +${Math.round(extraMs / 1000)} с`);
-  if (!chips.length) return null;
-  return (
-    <>
-      {chips.map((c) => (
-        <motion.span
-          key={c}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-xs font-bold text-amber-200"
-        >
-          {c}
-        </motion.span>
-      ))}
-    </>
-  );
-}
-
-function PowerupBar({ game, extraMs }: { game: LiveGame; extraMs: number }) {
-  if (game.start.powerups.length === 0) return null;
-  const canFreeze = hasFreezeTarget(game);
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <ActiveJokers game={game} extraMs={extraMs} />
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {POWERUPS.filter((p) => game.start.powerups.includes(p.id)).map((p) => {
-          const used = game.usedPowerups.includes(p.id);
-          const noTarget = p.id === 'freeze' && !canFreeze;
-          const blocked = !used && (game.powerupThisQuestion || noTarget);
-          const title = used
-            ? `${p.name} — вече е използван`
-            : game.powerupThisQuestion
-              ? 'Само един жокер на въпрос'
-              : noTarget
-                ? 'Няма кого да замразиш — всички съперници отговориха'
-                : p.description;
-          return (
-            <button
-              key={p.id}
-              disabled={used || blocked}
-              onClick={() => actions.powerup(p.id as PowerupId)}
-              title={title}
-              aria-label={`${p.name}: ${p.description}`}
-              className={clsx(
-                'focus-ring inline-flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all',
-                used
-                  ? 'border-line text-fg-3 line-through opacity-50'
-                  : blocked
-                    ? 'border-line text-fg-3 opacity-60'
-                    : p.id === 'freeze'
-                      ? 'border-cyan-300/40 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20 hover:shadow-[0_0_20px_-6px_rgb(34_211_238/0.9)]'
-                      : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
-              )}
-            >
-              <span className="text-base leading-none">{p.icon}</span> {p.name}
-            </button>
-          );
-        })}
-      </div>
-      <span className="text-xs text-fg-3">
-        {game.powerupThisQuestion
-          ? 'Вече игра жокер на този въпрос — следващият на следващия.'
-          : `Всеки жокер е по веднъж на мач и по един на въпрос.${
-              game.start.powerups.includes('time') ? ` „Още време“ дава +${TIME_BONUS_MS / 1000} с.` : ''
-            }`}
-      </span>
     </motion.div>
   );
 }
@@ -844,6 +841,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
         )}
       </Avatar>
       <div className={clsx('min-w-0 flex-1 text-sm', out && 'opacity-50')}>
+        {me && <span className="sr-only">Ти: </span>}
         <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
       </div>
       <div className="text-right">
@@ -858,7 +856,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
               exit={{ opacity: 0 }}
               className={clsx('text-xs font-bold tabular-nums', result.correct ? 'text-emerald-300' : 'text-rose-300')}
             >
-              {result.correct ? `+${fmt(result.points)}` : '✗'}
+              {result.correct ? `+${fmt(result.points)}` : result.points < 0 ? `−${fmt(-result.points)}` : '✗'}
             </motion.div>
           )}
         </AnimatePresence>
@@ -901,46 +899,64 @@ function MobileStrip({ game }: { game: LiveGame }) {
           <TeamScoreBar totals={teamTotals(game.standings, game.players)} myTeam={myTeamOf(game)} compact />
         </div>
       )}
-      <div className="flex gap-3 overflow-x-auto px-4 py-3">
+      <ul className="flex gap-3 overflow-x-auto px-4 py-3" aria-label="Класиране">
         {order.map((s) => {
           const p = game.players[s.id];
+          const me = s.id === game.start.youId;
           const out = s.eliminatedAt !== null || s.left;
           const answered = game.phase === 'question' && game.answered.includes(s.id);
           const reactions = game.reactions.filter((r) => r.playerId === s.id);
           const color = teams && p.team !== null ? teamColor(p.team) : null;
+          const status = s.left ? 'напусна' : s.eliminatedAt !== null ? 'отпадна' : `${s.score} точки${answered ? ', отговори' : ''}`;
           return (
-            <motion.div layout key={s.id} className="relative flex shrink-0 flex-col items-center gap-1">
-              <div className="rounded-full" style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined}>
+            <motion.li layout key={s.id} className="relative flex shrink-0 flex-col items-center gap-1">
+              <span className="sr-only">
+                {me ? 'Ти' : p.name}
+                {p.isBot && ' (бот)'}: {status}
+              </span>
+              <div className="relative rounded-full" style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-hidden>
                 <Avatar avatar={p.avatar} frame={p.frame} size={40} dim={out}>
                   {answered && <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />}
                 </Avatar>
+                <PlayerMark me={me} bot={p.isBot} />
               </div>
-              <span
-                className={clsx(
-                  'text-[11px] font-bold tabular-nums',
-                  s.id === game.start.youId ? 'text-violet-300' : 'text-fg-2',
-                )}
-              >
+              <span className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')} aria-hidden>
                 {out ? '💀' : fmt(s.score)}
               </span>
-              {color && <span className="h-0.5 w-6 rounded-full" style={{ background: color }} />}
+              {color && <span className="h-0.5 w-6 rounded-full" style={{ background: color }} aria-hidden />}
               <Reactions reactions={reactions} />
-            </motion.div>
+            </motion.li>
           );
         })}
-      </div>
+      </ul>
     </div>
+  );
+}
+
+/** "ТИ" / "БОТ" on an avatar's top edge: who's who without relying on color. */
+function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
+  if (!me && !bot) return null;
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[9px] leading-none font-extrabold tracking-wide',
+        me ? 'bg-violet-500 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
+      )}
+    >
+      {me ? 'ТИ' : 'БОТ'}
+    </span>
   );
 }
 
 // ─── Emotes, feed, eliminations ────────────────────────────────────────────
 
 /** Full bar on desktop; on phones a single button that expands, so it never covers the answers. */
-function EmoteBar({ emotes }: { emotes: string[] }) {
+function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
   const [cooldown, setCooldown] = useState(false);
   const [open, setOpen] = useState(false);
   function send(id: string) {
-    if (cooldown) return;
+    if (cooldown || offline) return;
     actions.react(id);
     sfx.pop();
     setCooldown(true);
@@ -972,7 +988,8 @@ function EmoteBar({ emotes }: { emotes: string[] }) {
             whileTap={{ scale: 0.8 }}
             whileHover={{ scale: 1.2, y: -3 }}
             onClick={() => send(id)}
-            className={clsx('focus-ring grid size-10 shrink-0 place-items-center rounded-xl text-2xl', cooldown && 'opacity-50')}
+            disabled={offline}
+            className={clsx('focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl', (cooldown || offline) && 'opacity-50')}
             aria-label={`Реакция ${emoteById(id)?.emoji}`}
           >
             {emoteById(id)?.emoji}

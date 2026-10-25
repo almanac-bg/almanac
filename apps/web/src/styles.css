@@ -9,7 +9,8 @@
   --color-line: rgb(255 255 255 / 0.08);
   --color-fg: #f5f3ff;
   --color-fg-2: #b3aed0;
-  --color-fg-3: #756f96;
+  /* Muted text that stays above 4.5:1 on the page (5.7), on glass cards (5.2) and on lighter nested panels (4.6). */
+  --color-fg-3: #8a84ab;
 
   --color-violet: #8b5cf6;
   --color-fuchsia: #e879f9;

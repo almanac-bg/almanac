@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
   type AckResult,
   DEFAULT_ROOM_SETTINGS,
@@ -9,7 +9,9 @@ import {
   type TeamId,
 } from '@quiz/shared';
 import { areFriends } from '../friends';
+import { guarded } from '../guard';
 import { friendsChanged, notifyUser, presence } from '../notify';
+import { getRating } from '../seasons';
 import { publicUser } from '../users';
 import { type Bot, makeBots } from './bots';
 import type { Game } from './Game';
@@ -29,6 +31,14 @@ interface Room {
   /** Team per player id, when the room plays in teams. */
   teams: Map<string, TeamId>;
   game: Game | null;
+  /** Players the host removed; they can't rejoin unless invited again. */
+  kicked: Set<number>;
+}
+
+interface PendingInvite {
+  from: number;
+  to: number;
+  expiresAt: number;
 }
 
 const memberId = (userId: number) => `u${userId}`;
@@ -37,6 +47,8 @@ export class RoomManager {
   private rooms = new Map<string, Room>();
   private byUser = new Map<number, Room>();
   private graceTimers = new Map<number, NodeJS.Timeout>();
+  /** Invites sent and not yet expired, so a "decline" can only answer a real one. */
+  private invites = new Map<string, PendingInvite>();
 
   constructor(
     private io: IO,
@@ -59,7 +71,7 @@ export class RoomManager {
   create(userId: number, patch: Partial<RoomSettings>): AckResult<{ code: string }> {
     this.leave(userId);
     let code: string;
-    do code = String(Math.floor(10000 + Math.random() * 90000));
+    do code = String(randomInt(10000, 100000));
     while (this.rooms.has(code));
     const room: Room = {
       code,
@@ -69,6 +81,7 @@ export class RoomManager {
       bots: [],
       teams: new Map(),
       game: null,
+      kicked: new Set(),
     };
     this.rooms.set(code, room);
     this.add(room, userId);
@@ -82,6 +95,7 @@ export class RoomManager {
       this.broadcast(room);
       return { ok: true, code: room.code };
     }
+    if (room.kicked.has(userId)) return { ok: false, error: 'Домакинът те премахна от тази стая.' };
     if (room.game) return { ok: false, error: 'Играта в тази стая вече е започнала.' };
     if (room.members.length + room.bots.length >= room.settings.maxPlayers) return { ok: false, error: 'Стаята е пълна.' };
     this.leave(userId);
@@ -132,8 +146,21 @@ export class RoomManager {
     if (presence(toId) === 'offline') return { ok: false, error: 'Приятелят ти не е онлайн.' };
     if (room.members.includes(toId)) return { ok: false, error: 'Вече е в стаята.' };
     const from = publicUser(fromId)!;
-    notifyUser(toId, 'invite', { id: randomUUID(), from, roomCode: room.code, kind, expiresAt: Date.now() + INVITE_TTL_MS });
+    const now = Date.now();
+    for (const [id, invite] of this.invites) if (invite.expiresAt < now) this.invites.delete(id);
+    const id = randomUUID();
+    this.invites.set(id, { from: fromId, to: toId, expiresAt: now + INVITE_TTL_MS });
+    room.kicked.delete(toId); // inviting someone back lifts a kick
+    notifyUser(toId, 'invite', { id, from, roomCode: room.code, kind, expiresAt: now + INVITE_TTL_MS });
     return { ok: true };
+  }
+
+  /** The invited player says no: returns who invited them, or null if there's no such invite for them. */
+  declineInvite(userId: number, inviteId: string): number | null {
+    const invite = this.invites.get(inviteId);
+    if (!invite || invite.to !== userId || invite.expiresAt < Date.now()) return null;
+    this.invites.delete(inviteId);
+    return invite.from;
   }
 
   /** A 1v1 private room with the friend invited straight away. */
@@ -153,7 +180,9 @@ export class RoomManager {
     if (action === 'add' && room.members.length + room.bots.length < room.settings.maxPlayers) {
       const humans = room.members.map((id) => buildHuman(id, 'custom'));
       const taken = [...humans.map((h) => h.player.name), ...room.bots.map((b) => b.player.name)];
-      const [bot] = makeBots(1, averageOf(humans), taken);
+      // Room games are unrated; bots play at about the level of the room's players in duels.
+      const rating = room.members.reduce((sum, id) => sum + getRating(id, 'duel'), 0) / room.members.length;
+      const [bot] = makeBots(1, { ...averageOf(humans), rating }, taken);
       room.bots.push(bot);
       if (room.settings.teams) room.teams.set(bot.player.id, this.smallerTeam(room));
     } else if (action === 'remove') {
@@ -175,6 +204,7 @@ export class RoomManager {
     }
     const target = Number(playerId.replace(/^u/, ''));
     if (target === userId || !room.members.includes(target)) return;
+    room.kicked.add(target);
     this.leave(target);
     this.io.to(`user:${target}`).emit('notice', { kind: 'info', message: 'Домакинът те премахна от стаята.' });
   }
@@ -184,11 +214,14 @@ export class RoomManager {
     if (!room) return { ok: false, error: 'Не си в стая.' };
     if (room.hostUserId !== userId) return { ok: false, error: 'Само домакинът може да започне играта.' };
     if (room.game) return { ok: false, error: 'Играта вече тече.' };
-    if (room.members.length + room.bots.length < 2) return { ok: false, error: 'Трябват поне двама играчи — покани приятел или добави бот.' };
-    if (room.members.some((id) => this.games.forUser(id))) return { ok: false, error: 'Някой от играчите още е в друга игра.' };
+    // Someone whose connection just dropped is still listed for a few seconds, but only players who are here play.
+    const players = room.members.filter((id) => this.isOnline(id));
+    if (players.length + room.bots.length < 2) return { ok: false, error: 'Трябват поне двама играчи — покани приятел или добави бот.' };
+    if (players.some((id) => this.games.forUser(id))) return { ok: false, error: 'Някой от играчите още е в друга игра.' };
     const teams = room.settings.teams;
-    if (teams && new Set(room.teams.values()).size < 2) return { ok: false, error: 'И двата отбора трябва да имат поне по един играч.' };
     const teamOf = (playerId: string) => (teams ? (room.teams.get(playerId) ?? 0) : null);
+    const seated = [...players.map((id) => `u${id}`), ...room.bots.map((b) => b.player.id)];
+    if (teams && new Set(seated.map(teamOf)).size < 2) return { ok: false, error: 'И двата отбора трябва да имат поне по един играч.' };
     try {
       room.game = this.games.start({
         mode: 'custom',
@@ -200,7 +233,7 @@ export class RoomManager {
         category: room.settings.category,
         elimination: room.settings.elimination && !teams,
         teams,
-        humans: room.members.map((id) => {
+        humans: players.map((id) => {
           const h = buildHuman(id, 'custom');
           h.player.team = teamOf(h.player.id);
           return h;
@@ -228,7 +261,7 @@ export class RoomManager {
     this.clearGrace(userId);
     this.graceTimers.set(
       userId,
-      setTimeout(() => this.leave(userId), RECONNECT_GRACE_MS),
+      setTimeout(guarded('room grace', () => this.leave(userId)), RECONNECT_GRACE_MS),
     );
   }
 

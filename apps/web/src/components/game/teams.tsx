@@ -1,9 +1,11 @@
 import { type GamePlayer, type Standing, type TeamId, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { fmt } from '@quiz/client';
+import { fmt, type LiveGame } from '@quiz/client';
 import { useCountUp } from '../../lib/hooks';
 
 export const teamColor = (team: TeamId) => TEAMS[team].color;
+
+export const myTeamOf = (game: LiveGame): TeamId | null => game.players[game.start.youId]?.team ?? null;
 
 /** Live team totals (sum of member scores), indexed by team. */
 export function teamTotals(standings: Standing[], players: Record<string, GamePlayer>): [number, number] {

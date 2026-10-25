@@ -1,5 +1,7 @@
 import {
+  type GameEndPayload,
   type GamePlayer,
+  type GameStartPayload,
   isQueueMode,
   type ModeId,
   type PowerupId,
@@ -79,9 +81,13 @@ export interface NewGame {
   bots: Bot[];
 }
 
+/** How long a result waits for a player who was offline when their match ended. */
+const MISSED_RESULT_MS = 15 * 60_000;
+
 export class GameRegistry {
   private games = new Map<string, Game>();
   private byUser = new Map<number, Game>();
+  private missed = new Map<number, { start: GameStartPayload; end: GameEndPayload; until: number }>();
   private closedListeners: ((game: Game) => void)[] = [];
   private idleWaiters: (() => void)[] = [];
 
@@ -145,22 +151,54 @@ export class GameRegistry {
         bots: opts.bots,
       },
       emitter,
-      { finalize: finalizeMatch, onClosed: (g) => this.close(g) },
+      {
+        finalize: finalizeMatch,
+        undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
+        onClosed: (g) => this.close(g),
+      },
     );
 
+    // Bookkeeping first: once the match is registered nothing may fail before it starts, or its players would be
+    // stuck "in a game" that never runs.
+    for (const userId of userIds) {
+      try {
+        markSeen(userId, questions.map((q) => q.id));
+      } catch (err) {
+        console.error(`Could not record the questions user ${userId} saw`, err);
+      }
+    }
     this.games.set(game.id, game);
     for (const userId of userIds) {
+      this.missed.delete(userId);
       this.byUser.set(userId, game);
       this.io.in(`user:${userId}`).socketsJoin(room(game.id));
-      markSeen(userId, questions.map((q) => q.id));
+    }
+    try {
+      game.start();
+    } catch (err) {
+      this.close(game);
+      throw err;
     }
     friendsChanged(...userIds);
-    game.start();
     return game;
+  }
+
+  /** The result of a match that ended while this player was offline (once). */
+  takeMissed(userId: number) {
+    const missed = this.missed.get(userId);
+    this.missed.delete(userId);
+    return missed && missed.until > Date.now() ? missed : null;
+  }
+
+  private keepMissed(userId: number, start: GameStartPayload, end: GameEndPayload) {
+    const now = Date.now();
+    for (const [id, m] of this.missed) if (m.until < now) this.missed.delete(id);
+    this.missed.set(userId, { start, end, until: now + MISSED_RESULT_MS });
   }
 
   /** Forfeit: the player is out of the match and free to do other things. */
   leave(userId: number) {
+    this.missed.delete(userId);
     const game = this.byUser.get(userId);
     if (!game) return;
     this.byUser.delete(userId);

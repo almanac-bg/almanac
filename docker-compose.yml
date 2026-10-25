@@ -15,31 +15,36 @@ services:
     logging: *logging
     # On a deploy, running matches play out before the old container stops (see DRAIN_SECONDS).
     stop_grace_period: 6m
+    # Least privilege: nothing to escalate to, and only /data (and a scratch /tmp) is writable.
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
     environment:
       COOKIE_SECURE: 'true'
-      # Caddy reaches the app over the private Docker network.
+      # Caddy reaches the app through the Docker bridge (a private address); only it may set X-Forwarded-For.
       TRUST_PROXY: loopback, uniquelocal
-      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
       APP_URL: https://${DOMAIN:-almanac.bg}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}
     volumes:
       - data:/data
-    expose:
-      - '3001'
+    # Only reachable from the server itself (Caddy); never from the internet.
+    ports:
+      - '127.0.0.1:3001:3001'
 
-  # HTTPS with automatic Let's Encrypt certificates, HTTP/3 and WebSocket proxying.
+  # HTTPS with automatic Let's Encrypt certificates, HTTP/3 and WebSocket proxying. It uses the host's network so it
+  # sees every visitor's real address, IPv6 included (through Docker's port mapping, IPv6 visitors can all appear as
+  # one internal address — and then share one rate limit).
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     logging: *logging
+    network_mode: host
+    security_opt: ['no-new-privileges:true']
     depends_on:
       - app
-    ports:
-      - '80:80'
-      - '443:443'
-      - '443:443/udp'
     environment:
       DOMAIN: ${DOMAIN:-almanac.bg}
     volumes:
@@ -54,6 +59,7 @@ services:
     profiles: ['backup']
     restart: unless-stopped
     logging: *logging
+    security_opt: ['no-new-privileges:true']
     command: replicate
     environment:
       LITESTREAM_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}

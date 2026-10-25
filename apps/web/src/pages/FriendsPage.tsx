@@ -2,11 +2,13 @@ import { type FriendEntry, type FriendsResponse, type Presence, titleName } from
 import clsx from 'clsx';
 import { Check, DoorOpen, Swords, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
+import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
 import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
+import { useLoad } from '../lib/load';
 
 const PRESENCE: Record<Presence, { label: string; color: string }> = {
   online: { label: 'Онлайн', color: '#34d399' },
@@ -19,20 +21,10 @@ const PRESENCE: Record<Presence, { label: string; color: string }> = {
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Нещо се обърка.');
 
 export function FriendsPage() {
+  // The server bumps the version whenever the list changes (a request, a friend online…): reload, keeping the list on screen.
   const version = useStore((s) => s.friendsVersion);
-  const [data, setData] = useState<FriendsResponse | null>(null);
+  const { data, error, retry, setData } = useLoad(() => api.friends(), '', version);
   const [removing, setRemoving] = useState<FriendEntry | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .friends()
-      .then((d) => alive && setData(d))
-      .catch((e) => toast({ kind: 'error', title: errorMessage(e) }));
-    return () => {
-      alive = false;
-    };
-  }, [version]);
 
   async function mutate(fn: () => Promise<FriendsResponse>, success?: string) {
     try {
@@ -43,6 +35,7 @@ export function FriendsPage() {
     }
   }
 
+  if (!data && error) return <LoadError title="Приятелите не се заредиха" error={error} onRetry={retry} />;
   if (!data) {
     return (
       <div className="grid place-items-center py-24">
@@ -83,10 +76,19 @@ export function FriendsPage() {
                   <Card className="flex items-center gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
                     <PersonLink entry={f} />
                     <div className="flex shrink-0 gap-2">
-                      <Button size="sm" onClick={() => mutate(() => api.acceptFriend(f.user.id), `${f.user.username} вече е твой приятел!`)}>
+                      <Button
+                        size="sm"
+                        onClick={() => mutate(() => api.acceptFriend(f.user.id), `${f.user.username} вече е твой приятел!`)}
+                      >
                         <Check className="size-4" /> Приеми
                       </Button>
-                      <Button size="sm" variant="ghost" aria-label="Откажи" onClick={() => mutate(() => api.removeFriend(f.user.id))}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Откажи"
+                        title="Откажи"
+                        onClick={() => mutate(() => api.removeFriend(f.user.id))}
+                      >
                         <X className="size-4" />
                       </Button>
                     </div>
@@ -293,7 +295,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
           onClick={onRemove}
           aria-label={`Премахни ${user.username}`}
           title="Премахни от приятели"
-          className="focus-ring grid size-9 place-items-center rounded-xl text-fg-3 hover:bg-rose-500/15 hover:text-rose-300"
+          className="focus-ring grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-rose-500/15 hover:text-rose-300"
         >
           <UserMinus className="size-4" />
         </button>

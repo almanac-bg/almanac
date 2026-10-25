@@ -1,5 +1,6 @@
 import type { Presence, ServerToClientEvents } from '@quiz/shared';
 import type { IO } from './game/io';
+import { guarded } from './guard';
 
 /**
  * Lets REST routes and background logic reach connected clients without importing the realtime layer
@@ -43,6 +44,17 @@ export function disconnectUser(userId: number) {
   io?.in(`user:${userId}`).disconnectSockets(true);
 }
 
+/** Drops the live connections of one login session (its tabs), after logout. `session` is the token's hash. */
+export function disconnectSession(session: string) {
+  io?.in(`session:${session}`).disconnectSockets(true);
+}
+
+/** Drops a user's connections except one session's (after a password change, other devices are logged out). */
+export function disconnectOtherSessions(userId: number, keepSession: string | null) {
+  const sockets = io?.in(`user:${userId}`);
+  (keepSession ? sockets?.except(`session:${keepSession}`) : sockets)?.disconnectSockets(true);
+}
+
 /** Tells a player their friends list changed, with their pending-request count (so the badge needs no refetch). */
 export function sendFriendsUpdate(userId: number) {
   notifyUser(userId, 'friends:update', { requests: requestsOf(userId) });
@@ -54,11 +66,14 @@ let flushTimer: NodeJS.Timeout | null = null;
 
 export function friendsChanged(...userIds: number[]) {
   for (const id of userIds) pending.add(id);
-  flushTimer ??= setTimeout(() => {
-    flushTimer = null;
-    const targets = new Set<number>();
-    for (const id of pending) for (const friend of friendsOf(id)) targets.add(friend);
-    pending.clear();
-    for (const id of targets) sendFriendsUpdate(id);
-  }, 300);
+  flushTimer ??= setTimeout(
+    guarded('friends update', () => {
+      flushTimer = null;
+      const targets = new Set<number>();
+      for (const id of pending) for (const friend of friendsOf(id)) targets.add(friend);
+      pending.clear();
+      for (const id of targets) sendFriendsUpdate(id);
+    }),
+    300,
+  );
 }

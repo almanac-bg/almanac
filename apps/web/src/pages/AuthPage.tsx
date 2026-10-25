@@ -1,13 +1,14 @@
 import { BRAND } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeft, Eye, EyeOff, MailCheck } from 'lucide-react';
+import { ArrowLeft, DoorOpen, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented } from '../components/ui';
 import { api, setState } from '@quiz/client';
 import { LegalLinks } from '../components/LegalLinks';
+import { isReturning, markReturning } from '../lib/returning';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 
@@ -24,7 +25,11 @@ const INPUT =
   'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
 
 export function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  // Signed out, every address shows this page — an invite link (/join/12345) included. Once signed in, the app opens the room.
+  const { pathname } = useLocation();
+  const inviteCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
+  // Newcomers mostly arrive to sign up; a device that has signed in before most likely wants to sign in again.
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => (isReturning() ? 'login' : 'register'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -39,6 +44,7 @@ export function AuthPage() {
     try {
       const { user } =
         mode === 'login' ? await api.login(username, password) : await api.register(username, password, email.trim() || undefined);
+      markReturning();
       setState({ me: user });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Нещо се обърка.');
@@ -48,7 +54,8 @@ export function AuthPage() {
   }
 
   return (
-    <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-16">
+    // Phones: brand, then the form (in reach without scrolling), then the pitch. Desktop: brand and pitch left, form right.
+    <div className="relative mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-5 py-6 sm:gap-10 sm:py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-center lg:gap-x-16">
       {/* floating avatars */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {FLOATERS.map((e, i) => (
@@ -67,44 +74,35 @@ export function AuthPage() {
         ))}
       </div>
 
-      <motion.section
+      <motion.header
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
-        className="relative @container min-w-0"
+        className="relative @container min-w-0 lg:self-end"
       >
-        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2">
+        {/* With an invite, phones skip the pitch: the hint says it all and the form stays on the first screen. */}
+        <span
+          className={clsx(
+            'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
+            inviteCode && 'max-sm:hidden',
+          )}
+        >
           <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Онлайн куиз битки
         </span>
         <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
           <Logo />
         </h1>
         <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
-        <p className="mt-6 max-w-md text-lg text-fg-2 sm:text-xl">
+        <p className={clsx('mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl', inviteCode && 'max-sm:hidden')}>
           Бързи въпроси. Истински съперници. <span className="text-fg">Кой е най-умният в стаята?</span>
         </p>
-        <ul className="mt-10 grid gap-3 sm:grid-cols-3 lg:max-w-xl">
-          {FEATURES.map((f, i) => (
-            <motion.li
-              key={f.title}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 + i * 0.1 }}
-              className="glass rounded-2xl p-4"
-            >
-              <div className="text-2xl">{f.icon}</div>
-              <div className="mt-2 text-sm font-bold">{f.title}</div>
-              <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
-            </motion.li>
-          ))}
-        </ul>
-      </motion.section>
+      </motion.header>
 
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
-        className="relative"
+        className="relative min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
       >
         <div className="absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm" />
         <Card className="relative bg-ink-2/70 p-6 sm:p-8">
@@ -118,6 +116,15 @@ export function AuthPage() {
             />
           ) : (
           <>
+          {inviteCode && (
+            <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
+              <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
+              <span>
+                Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> —{' '}
+                {mode === 'login' ? 'влез в профила си, за да се присъединиш.' : 'създай профил, за да влезеш.'}
+              </span>
+            </p>
+          )}
           <Segmented
             value={mode}
             onChange={(m) => {
@@ -135,7 +142,6 @@ export function AuthPage() {
           <p className="mt-1 text-sm text-fg-3">
             {mode === 'login' ? 'Влез и продължи там, където спря.' : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
           </p>
-
           <form onSubmit={submit} className="mt-6 space-y-4">
             <Field label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}>
               <input
@@ -178,7 +184,7 @@ export function AuthPage() {
                   type="button"
                   onClick={() => setShow(!show)}
                   aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-                  className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+                  className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
                 >
                   {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
                 </button>
@@ -191,7 +197,7 @@ export function AuthPage() {
                   setMode('forgot');
                   setError(null);
                 }}
-                className="focus-ring -mt-1 rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
+                className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
               >
                 Забравена парола?
               </button>
@@ -229,6 +235,26 @@ export function AuthPage() {
         </Card>
         <LegalLinks className="mt-4 justify-center" />
       </motion.div>
+
+      <ul className="relative grid gap-3 sm:grid-cols-3 lg:col-start-1 lg:row-start-2 lg:max-w-xl lg:self-start">
+        {FEATURES.map((f, i) => (
+          <motion.li
+            key={f.title}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 + i * 0.1 }}
+            className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4"
+          >
+            <div aria-hidden className="text-2xl">
+              {f.icon}
+            </div>
+            <div>
+              <div className="text-sm font-bold sm:mt-2">{f.title}</div>
+              <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
+            </div>
+          </motion.li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -255,7 +281,10 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
 
   return (
     <div>
-      <button onClick={onBack} className="focus-ring inline-flex items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg">
+      <button
+        onClick={onBack}
+        className="focus-ring -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
+      >
         <ArrowLeft className="size-4" /> Обратно към вход
       </button>
       <h2 className="mt-5 font-display text-2xl font-bold">Забравена парола</h2>

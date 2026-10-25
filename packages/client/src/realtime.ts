@@ -4,6 +4,7 @@ import {
   type CategoryChoice,
   type ClientToServerEvents,
   FREEZE_MS,
+  type GameStartPayload,
   type Invite,
   powerupById,
   type PowerupId,
@@ -36,6 +37,10 @@ export const disconnectRealtime = () => socket?.disconnect();
 
 /** After a reconnect the server re-sends live state right away; anything it doesn't re-send is gone. */
 let resyncTimer: ReturnType<typeof setTimeout> | undefined;
+/** After a mid-match resync: if no question follows, the one on screen closed while we were away. */
+let staleQuestionTimer: ReturnType<typeof setTimeout> | undefined;
+/** The match you walked out of: if the server still sends it (the leave crossed a reconnect), leave it again. */
+let leftGameId: string | null = null;
 
 function bind(s: GameSocket) {
   s.on('connect', () => {
@@ -52,7 +57,20 @@ function bind(s: GameSocket) {
       }, 2500);
     }
   });
-  s.on('disconnect', () => setState({ connected: false }));
+  s.on('disconnect', (reason) => {
+    setState({ connected: false });
+    // The server closed this connection on purpose (logged out here or elsewhere): Socket.IO won't come back on its own.
+    // Signed out → the sign-in page; still signed in → connect again.
+    if (reason === 'io server disconnect') {
+      api
+        .me()
+        .then(({ user }) => {
+          setState({ me: user });
+          if (user) s.connect();
+        })
+        .catch(() => setTimeout(() => s.connect(), 2000));
+    }
+  });
   s.on('connect_error', (err) => {
     if (err.message === 'unauthorized') setState({ me: null });
   });
@@ -67,6 +85,12 @@ function bind(s: GameSocket) {
 
   s.on('game:start', (start) => {
     clearTimeout(resyncTimer);
+    if (start.gameId === leftGameId) {
+      s.emit('game:leave');
+      return;
+    }
+    const prev = getState().game;
+    if (prev?.start.gameId === start.gameId && start.startsInMs === 0) return resync(prev, start);
     const now = Date.now();
     setState({
       queue: null,
@@ -90,6 +114,7 @@ function bind(s: GameSocket) {
         frozenUntil: 0,
         frozenBy: null,
         reveal: null,
+        resyncing: false,
         eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
         reactions: [],
         feed: [],
@@ -99,24 +124,36 @@ function bind(s: GameSocket) {
     });
   });
 
-  s.on('game:question', (question) =>
-    patchGame((g) => ({
+  s.on('game:question', (question) => {
+    clearTimeout(staleQuestionTimer);
+    const g = getState().game;
+    if (!g) return;
+    // The question on screen again: a resync after a reconnect. The server still holds your jokers and pick for it
+    // but doesn't re-send them, so keep ours.
+    const same = g.question?.index === question.index && g.phase === 'question' ? g : null;
+    const lockedIn = question.answered.includes(g.start.youId);
+    const extraMs = same?.extraMs ?? 0;
+    if (same && same.myChoice !== null && !lockedIn && question.remainingMs + extraMs > 0) {
+      toast({ kind: 'error', title: 'Отговорът ти не стигна до сървъра.', body: 'Избери отново — времето още тече.' });
+    }
+    patchGame(() => ({
       phase: 'question',
       question,
-      deadline: Date.now() + question.remainingMs,
-      extraMs: 0,
+      deadline: Date.now() + question.remainingMs + extraMs,
+      extraMs,
       answered: question.answered,
-      myChoice: question.answered.includes(g.start.youId) ? -1 : null,
-      removed: [],
-      doubled: false,
-      powerupThisQuestion: false,
-      retryArmed: false,
-      retryPrompt: false,
-      frozenUntil: 0,
-      frozenBy: null,
+      myChoice: lockedIn ? (same?.myChoice ?? -1) : null,
+      removed: same?.removed ?? [],
+      doubled: same?.doubled ?? false,
+      powerupThisQuestion: same?.powerupThisQuestion ?? false,
+      retryArmed: same?.retryArmed ?? false,
+      retryPrompt: !lockedIn && !!same?.retryPrompt,
+      frozenUntil: same?.frozenUntil ?? 0,
+      frozenBy: same?.frozenBy ?? null,
       reveal: null,
-    })),
-  );
+      resyncing: false,
+    }));
+  });
 
   s.on('game:answered', ({ playerId }) => patchGame((g) => ({ answered: [...g.answered, playerId] })));
 
@@ -133,6 +170,7 @@ function bind(s: GameSocket) {
       return {
         phase: 'reveal',
         reveal,
+        resyncing: false,
         retryPrompt: false,
         standings: reveal.standings,
         eliminated: [...g.eliminated, ...reveal.eliminated],
@@ -240,6 +278,36 @@ function bind(s: GameSocket) {
   s.on('server:draining', ({ message }) => setState({ maintenance: message }));
 }
 
+/**
+ * The server re-sent the match on screen: we reconnected mid-match. Keep what's on screen (the question, your pick,
+ * the review so far) and take the server's word for the rest. The question stays locked until the server confirms
+ * it's still open: it may have closed while we were away.
+ */
+function resync(prev: LiveGame, start: GameStartPayload) {
+  setState({
+    game: {
+      ...prev,
+      start,
+      players: Object.fromEntries(start.players.map((p) => [p.id, p])),
+      standings: start.standings,
+      usedPowerups: start.usedPowerups,
+      eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
+      resyncing: true,
+    },
+  });
+  // An open question arrives right behind this. If none does, the round ended while we were away.
+  clearTimeout(staleQuestionTimer);
+  staleQuestionTimer = setTimeout(
+    () =>
+      patchGame((g) =>
+        g.phase === 'question' || g.phase === 'countdown'
+          ? { phase: 'reveal', question: null, resyncing: false }
+          : { resyncing: false },
+      ),
+    1000,
+  );
+}
+
 function pushFeed(text: string, icon: string) {
   const key = ++seq;
   patchGame((x) => ({ feed: [...x.feed, { key, text, icon }] }));
@@ -269,6 +337,31 @@ async function ask<T extends object = object>(fn: () => Promise<AckResult<T>>): 
 
 const withTimeout = () => getSocket().timeout(8000);
 
+type MoveEvent = 'game:answer' | 'game:powerup' | 'game:react';
+
+/**
+ * Sends a game move only over a live connection. Socket.IO would buffer a move made offline and replay it after the
+ * reconnect, when its question is over (or worse, still open after the player has seen the state change).
+ * Returns whether it went out.
+ */
+function sendMove<E extends MoveEvent>(event: E, ...args: Parameters<ClientToServerEvents[E]>): boolean {
+  const s = getSocket();
+  if (!s.connected) return false;
+  // A link that died silently (ping overdue) still reads as connected; Socket.IO then buffers instead of sending.
+  const buffered = s.sendBuffer.length;
+  s.emit(event, ...args);
+  if (s.sendBuffer.length === buffered) return true;
+  s.sendBuffer.length = buffered;
+  return false;
+}
+
+let offlineToastAt = 0;
+function offlineToast(title: string) {
+  if (Date.now() - offlineToastAt < 3000) return; // mashing a key shouldn't stack them
+  offlineToastAt = Date.now();
+  toast({ kind: 'error', title, body: 'Няма връзка със сървъра — опитваме отново.' });
+}
+
 export const actions = {
   joinQueue: (mode: QueueModeId) => ask(() => withTimeout().emitWithAck('queue:join', mode)),
   leaveQueue: () => {
@@ -291,26 +384,29 @@ export const actions = {
   startRoom: () => ask(() => withTimeout().emitWithAck('room:start')),
   invite: (userId: number) => ask(() => withTimeout().emitWithAck('invite:send', { userId })),
   declineInvite: (invite: Invite) => {
-    getSocket().emit('invite:decline', { fromUserId: invite.from.id });
+    getSocket().emit('invite:decline', { inviteId: invite.id });
     dropInvite(invite.id);
   },
   challenge: (userId: number) => ask<{ code: string }>(() => withTimeout().emitWithAck('friends:challenge', { userId })),
   answer: (choice: number) => {
     const g = getState().game;
-    if (!g?.question || g.phase !== 'question' || g.myChoice !== null || g.removed.includes(choice)) return;
+    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice)) return;
     if (g.frozenUntil > Date.now()) return;
+    if (!sendMove('game:answer', { index: g.question.index, choice })) return offlineToast('Отговорът не е изпратен.');
     effect('lock');
     patchGame(() => ({ myChoice: choice, retryPrompt: false }));
-    getSocket().emit('game:answer', { index: g.question.index, choice });
   },
   powerup: (powerup: PowerupId) => {
     const g = getState().game;
-    if (!g?.question || g.phase !== 'question' || g.myChoice !== null) return;
+    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null) return;
     if (g.usedPowerups.includes(powerup) || g.powerupThisQuestion) return;
-    getSocket().emit('game:powerup', { index: g.question.index, powerup });
+    if (!sendMove('game:powerup', { index: g.question.index, powerup })) offlineToast('Жокерът не е изигран.');
   },
-  react: (emote: string) => getSocket().emit('game:react', emote),
+  /** Emotes are for the moment: one that can't go out now is dropped. */
+  react: (emote: string) => void sendMove('game:react', emote),
+  /** Unlike a move, a leave made offline should still land after the reconnect, so this one may queue. */
   leaveGame: () => {
+    leftGameId = getState().game?.start.gameId ?? null;
     getSocket().emit('game:leave');
     setState({ game: null });
   },

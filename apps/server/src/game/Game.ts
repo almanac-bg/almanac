@@ -24,6 +24,7 @@ import {
 import { config } from '../config';
 import { type PreparedQuestion, shuffle } from '../questions';
 import type { BotBrain } from './bots';
+import { ordinal } from './rewards';
 
 const COUNTDOWN_MS = 3_500;
 /** Accept answers that were in flight when the clock hit zero. */
@@ -32,8 +33,10 @@ const GRACE_MS = 400;
 const EARLY_REVEAL_MS = 600;
 const REVEAL_MS = 4_000;
 const ELIMINATION_EXTRA_MS = 2_000;
-/** End the match if every human has been disconnected this long. */
+/** If every human has been disconnected this long, the rest of the match plays out without them. */
 const ABANDON_MS = 30_000;
+/** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
+const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
 
 type Events = ServerToClientEvents;
@@ -48,6 +51,8 @@ export interface GameEmitter {
 export interface GameHooks {
   /** Persist results; returns per-user rewards. */
   finalize(game: Game, standings: FinalStanding[]): Map<number, MatchRewards>;
+  /** The match ended while this player was offline: they get the result when they're back. */
+  undelivered(userId: number, start: GameStartPayload, end: GameEndPayload): void;
   onClosed(game: Game): void;
 }
 
@@ -85,8 +90,12 @@ export interface Participant {
   correctByDifficulty: Record<Difficulty, number>;
   categories: Map<CategoryId, { answered: number; correct: number; correctMs: number }>;
   eliminatedAt: number | null;
+  /** Walked out. Once knocked out that's no forfeit: the place they were knocked out at stands. */
   left: boolean;
+  /** Order of leaving (1 = first): whoever walked out first ranks last. */
+  leftOrder: number | null;
   connected: boolean;
+  disconnectedAt: number | null;
   /** Was strictly last at the halfway point (for the comeback achievement). */
   lastAtHalfway: boolean;
   freezesUsed: number;
@@ -118,6 +127,7 @@ export class Game {
   private timers = new Set<NodeJS.Timeout>();
   private questionTimer: NodeJS.Timeout | null = null;
   private abandonTimer: NodeJS.Timeout | null = null;
+  private leaves = 0;
 
   constructor(
     readonly setup: GameSetup,
@@ -237,9 +247,10 @@ export class Game {
     const p = this.participants.get(playerId);
     if (!p || p.left || this.phase === 'ended') return;
     p.left = true;
+    p.leftOrder = ++this.leaves;
     p.connected = false;
     this.emit.toGame('game:presence', { playerId, connected: false, left: true });
-    if (this.humans.every((h) => h.left)) return this.end();
+    if (this.humans.every((h) => h.left) || this.decided()) return this.end();
     this.maybeRevealEarly();
     this.checkAbandoned();
   }
@@ -248,13 +259,14 @@ export class Game {
     const p = this.participants.get(playerId);
     if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
     p.connected = connected;
+    p.disconnectedAt = connected ? null : Date.now();
     this.emit.toGame('game:presence', { playerId, connected, left: false });
     if (connected && this.abandonTimer) {
       clearTimeout(this.abandonTimer);
       this.abandonTimer = null;
     }
     if (!connected) {
-      this.maybeRevealEarly();
+      this.later(DISCONNECT_GRACE_MS + 50, () => this.maybeRevealEarly());
       this.checkAbandoned();
     }
   }
@@ -299,7 +311,10 @@ export class Game {
 
   private maybeRevealEarly() {
     if (this.phase !== 'question') return;
-    const waitingOn = [...this.participants.values()].filter((p) => this.isActive(p) && (p.connected || p.brain));
+    const now = Date.now();
+    const reconnecting = (p: Participant) =>
+      p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
+    const waitingOn = [...this.participants.values()].filter((p) => this.isActive(p) && (p.connected || p.brain || reconnecting(p)));
     if (waitingOn.some((p) => !p.answer)) return;
     if (this.questionTimer) clearTimeout(this.questionTimer);
     this.questionTimer = this.later(EARLY_REVEAL_MS, () => this.reveal());
@@ -323,7 +338,8 @@ export class Game {
 
       const correct = p.answer?.choice === q.answer;
       let points = 0;
-      if (p.answer) p.answerMs += p.answer.timeMs;
+      // Tie-breaks compare total time, so a question left unanswered costs the whole clock.
+      p.answerMs += p.answer?.timeMs ?? this.setup.timeMs + p.extraMs;
       if (correct && p.answer) {
         const { timeMs, retried } = p.answer;
         p.streak++;
@@ -334,11 +350,14 @@ export class Game {
         cat.correctMs += timeMs;
         p.bestStreak = Math.max(p.bestStreak, p.streak);
         p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
-        const speed = Math.round(SCORING.speed * Math.max(0, 1 - timeMs / (this.setup.timeMs + p.extraMs)));
+        // Speed is measured against the regular clock: "Още време" buys time, not speed points.
+        const speed = Math.round(SCORING.speed * Math.max(0, 1 - timeMs / this.setup.timeMs));
         const streakBonus = Math.min((p.streak - 1) * SCORING.streakStep, SCORING.streakMax);
         points = Math.round((SCORING.base + speed + streakBonus) * (p.doubled ? 2 : 1) * (retried ? 0.5 : 1));
       } else {
         p.streak = 0;
+        // "Двойно или нищо" is a bet: a miss costs points (never below zero).
+        if (p.doubled && p.score > 0) points = -Math.min(SCORING.doubleStake, p.score);
       }
       p.score += points;
       results[p.player.id] = {
@@ -391,8 +410,18 @@ export class Game {
       console.error(`Failed to persist match ${this.id}`, err);
     }
     for (const p of this.humans) {
-      if (p.left) continue;
-      const userId = p.player.userId!;
+      const userId = p.player.userId;
+      if (userId === null) continue; // deleted their account mid-match
+      const mine = rewards.get(userId) ?? null;
+      if (p.left) {
+        // Knocked out, then off to something else: just say how it ended.
+        const placement = standings.find((s) => s.id === p.player.id)?.placement;
+        if (!this.forfeited(p) && mine && placement) {
+          const message = `Мачът, от който излезе, приключи: ${ordinal(placement)} място, +${mine.xpGained} XP.`;
+          this.emit.toUser(userId, 'notice', { kind: 'info', message });
+        }
+        continue;
+      }
       const payload: GameEndPayload = {
         gameId: this.id,
         mode: this.setup.mode,
@@ -400,27 +429,29 @@ export class Game {
         roomCode: this.setup.roomCode,
         standings,
         teamScores,
-        rewards: rewards.get(userId) ?? null,
+        rewards: mine,
       };
       this.emit.toUser(userId, 'game:end', payload);
+      if (!p.connected) this.hooks.undelivered(userId, this.startPayload(p.player.id, 0), payload);
     }
     this.hooks.onClosed(this);
   }
 
   // ─── Teams ───────────────────────────────────────────────────────────────
 
-  /** Team totals, winner first. Ties go to more correct answers, then faster total time. */
+  /** Team totals, winner first. A team that walked out loses; ties go to more correct answers, then faster total time. */
   teamScores(): { team: TeamId; score: number }[] {
     const totals = ([0, 1] as TeamId[]).map((team) => {
       const members = [...this.participants.values()].filter((p) => p.player.team === team);
       return {
         team,
+        gone: members.every((p) => p.left),
         score: members.reduce((s, p) => s + p.score, 0),
         correct: members.reduce((s, p) => s + p.correct, 0),
         time: members.reduce((s, p) => s + p.answerMs, 0),
       };
     });
-    totals.sort((a, b) => b.score - a.score || b.correct - a.correct || a.time - b.time);
+    totals.sort((a, b) => Number(a.gone) - Number(b.gone) || b.score - a.score || b.correct - a.correct || a.time - b.time);
     return totals.map(({ team, score }) => ({ team, score }));
   }
 
@@ -432,25 +463,51 @@ export class Game {
     return standings
       .map((s) => {
         const p = this.participants.get(s.id)!;
-        return { ...s, placement: p.player.team === winner && !p.left ? 1 : 2 };
+        return { ...s, placement: p.player.team === winner && !this.forfeited(p) ? 1 : 2 };
       })
       .sort((a, b) => a.placement - b.placement || a.rank - b.rank);
   }
 
   // ─── Bots ────────────────────────────────────────────────────────────────
 
-  private scheduleBots() {
+  /** A bot's answer to the current question and how long it takes (game ms), or null when it zones out. */
+  private botMove(brain: BotBrain): { choice: number; afterMs: number } | null {
     const q = this.questions[this.index];
-    const index = this.index;
+    if (Math.random() < 0.04) return null; // zoned out — lets the clock run down
     const difficultyShift = { easy: 0.15, medium: 0, hard: -0.2 }[q.difficulty];
+    const correct = Math.random() < clamp(brain.accuracy + difficultyShift, 0.1, 0.97);
+    const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer);
+    const choice = correct ? q.answer : wrong[Math.floor(Math.random() * wrong.length)];
+    const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (correct ? -0.05 : 0.1), 0.08, 0.92);
+    return { choice, afterMs: Math.max(900, fraction * this.setup.timeMs) };
+  }
+
+  private scheduleBots() {
+    const index = this.index;
     for (const p of this.participants.values()) {
       if (!p.brain || !this.isActive(p)) continue;
-      if (Math.random() < 0.04) continue; // zoned out — lets the clock run down
-      const correct = Math.random() < clamp(p.brain.accuracy + difficultyShift, 0.1, 0.97);
-      const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer);
-      const choice = correct ? q.answer : wrong[Math.floor(Math.random() * wrong.length)];
-      const fraction = clamp(p.brain.pace + (Math.random() - 0.5) * 0.35 + (correct ? -0.05 : 0.1), 0.08, 0.92);
-      this.later(Math.max(900, fraction * this.setup.timeMs), () => this.answer(p.player.id, index, choice));
+      const move = this.botMove(p.brain);
+      if (move) this.later(move.afterMs, () => this.answer(p.player.id, index, move.choice));
+    }
+  }
+
+  /**
+   * Every human has been gone a while: the rest of the match plays out at once, exactly as if they had stayed and not
+   * answered — so dropping the connection can't lock in a lead.
+   */
+  private finishUnattended() {
+    this.abandonTimer = null;
+    while (this.phase !== 'ended') {
+      if (this.phase !== 'question') {
+        this.nextQuestion();
+        continue;
+      }
+      for (const p of this.participants.values()) {
+        if (!p.brain || !this.isActive(p) || p.answer) continue;
+        const move = this.botMove(p.brain);
+        if (move) p.answer = { choice: move.choice, timeMs: move.afterMs, retried: false };
+      }
+      this.reveal();
     }
   }
 
@@ -468,6 +525,18 @@ export class Game {
 
   isActive(p: Participant) {
     return p.eliminatedAt === null && !p.left;
+  }
+
+  /** Walked out while still in the game (leaving after being knocked out isn't a forfeit). */
+  forfeited(p: Participant) {
+    return p.left && p.eliminatedAt === null;
+  }
+
+  /** A multiplayer match is over once only one side is still in it. */
+  private decided() {
+    if (this.participants.size < 2) return false;
+    const sides = new Set([...this.participants.values()].filter((p) => this.isActive(p)).map((p) => (this.setup.teams ? p.player.team : p.player.id)));
+    return sides.size < 2;
   }
 
   /** Milliseconds since the question opened, in game time. */
@@ -495,12 +564,17 @@ export class Game {
     );
   }
 
-  /** Best first: still in > knocked out later > knocked out earlier > left; then score, accuracy, speed. */
+  /**
+   * Best first: still in > knocked out later > knocked out earlier > walked out later > walked out earlier; then score,
+   * accuracy, speed.
+   */
   private ranked(): Participant[] {
+    const group = (p: Participant) => (this.forfeited(p) ? 2 : p.eliminatedAt !== null ? 1 : 0);
     return [...this.participants.values()].sort(
       (a, b) =>
-        Number(a.left) - Number(b.left) ||
-        (b.eliminatedAt ?? Infinity) - (a.eliminatedAt ?? Infinity) ||
+        group(a) - group(b) ||
+        (b.eliminatedAt ?? 0) - (a.eliminatedAt ?? 0) ||
+        (b.leftOrder ?? 0) - (a.leftOrder ?? 0) ||
         b.score - a.score ||
         b.correct - a.correct ||
         a.answerMs - b.answerMs,
@@ -515,7 +589,7 @@ export class Game {
       streak: p.streak,
       rank: i + 1,
       eliminatedAt: p.eliminatedAt,
-      left: p.left,
+      left: this.forfeited(p),
       connected: p.connected,
     }));
   }
@@ -570,19 +644,46 @@ export class Game {
   private checkAbandoned() {
     const anyoneHere = this.humans.some((h) => !h.left && h.connected);
     if (anyoneHere || this.abandonTimer) return;
-    this.abandonTimer = setTimeout(() => this.end(), ABANDON_MS);
+    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), ABANDON_MS);
   }
 
   private later(ms: number, fn: () => void): NodeJS.Timeout {
     const t = setTimeout(
       () => {
         this.timers.delete(t);
-        fn();
+        this.guard(fn);
       },
       Math.max(0, ms) * config.gameTimeScale,
     );
     this.timers.add(t);
     return t;
+  }
+
+  /**
+   * Runs a timer callback. A bug while running this match ends the match (the scores so far count) instead of crashing
+   * the server and every other match with it.
+   */
+  private guard(fn: () => void) {
+    try {
+      fn();
+    } catch (err) {
+      console.error(`💥 Match ${this.id} failed:`, err);
+      try {
+        if (this.phase !== 'ended') return this.end();
+      } catch (endErr) {
+        console.error(`💥 Match ${this.id} could not end cleanly:`, endErr);
+      }
+      // Ending it failed too: drop the match so its players are free to play again.
+      try {
+        this.clearTimers();
+        for (const p of this.humans) {
+          if (!p.left) this.emit.toUser(p.player.userId!, 'notice', { kind: 'error', message: 'Мачът прекъсна заради грешка при нас. Съжаляваме!' });
+        }
+        this.hooks.onClosed(this);
+      } catch (closeErr) {
+        console.error(`💥 Match ${this.id} could not be closed:`, closeErr);
+      }
+    }
   }
 
   private clearTimers() {
@@ -610,7 +711,9 @@ export class Game {
       categories: new Map(),
       eliminatedAt: null,
       left: false,
+      leftOrder: null,
       connected: true,
+      disconnectedAt: null,
       lastAtHalfway: false,
       freezesUsed: 0,
       lastReactionAt: 0,

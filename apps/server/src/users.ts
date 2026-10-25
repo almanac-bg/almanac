@@ -1,5 +1,4 @@
 import { levelFromXp, type PublicUser } from '@quiz/shared';
-import { config } from './config';
 import { all, one } from './db';
 
 export interface UserRow {
@@ -73,6 +72,7 @@ export function achievementSet(userId: number): Set<string> {
   return new Set(rows.map((r) => r.achievement_id));
 }
 
-export function isAdmin(row: Pick<UserRow, 'is_admin' | 'username_key'>): boolean {
-  return row.is_admin === 1 || config.adminUsernames.includes(row.username_key);
+/** Moderators: the account flag, set with the admin command line (src/cli.ts) or for the first account in development. */
+export function isAdmin(row: Pick<UserRow, 'is_admin'>): boolean {
+  return row.is_admin === 1;
 }

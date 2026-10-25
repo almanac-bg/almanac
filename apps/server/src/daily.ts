@@ -1,25 +1,46 @@
 import { type DailyInfo, dayEndsAt, dayKey, MODES, shiftDay } from '@quiz/shared';
 import { all, one, run } from './db';
-import { pickQuestions, type PreparedQuestion, seededRng } from './questions';
+import { pickQuestions, type PreparedQuestion, seededRng, shuffle } from './questions';
 import { getUser, toPublicUser, type UserRow } from './users';
 
+/** When this server process started: a daily attempt begun before that died with the previous process. */
+const BOOTED_AT = Date.now();
+
 /** Today's question set — generated once per day from a date seed, then frozen in the database. */
-export function dailyQuestions(day = dayKey()): PreparedQuestion[] {
+function dailySet(day: string): PreparedQuestion[] {
   const existing = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (existing) return JSON.parse(existing.questions);
-  const questions = pickQuestions(MODES.daily.questions, 'mixed', new Set(), seededRng(`daily:${day}`));
+  const questions = pickQuestions(MODES.daily.questions, 'mixed', new Map(), seededRng(`daily:${day}`));
   run('INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)', day, JSON.stringify(questions));
   return JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day)!.questions);
 }
 
-/** Claims today's single attempt. Starting counts — leaving or disconnecting doesn't give a retry. */
+/**
+ * The day's questions as this player sees them: the same questions in the same order for everyone, but each player
+ * gets their own option order — so "Б, А, Г…" from a friend (or a second account) gives nothing away.
+ */
+export function dailyQuestions(day: string, userId: number): PreparedQuestion[] {
+  return dailySet(day).map((q) => {
+    const order = shuffle([0, 1, 2, 3], seededRng(`daily:${day}:${userId}:${q.id}`));
+    return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
+  });
+}
+
+/**
+ * Claims today's single attempt. Starting counts — leaving or disconnecting doesn't give a retry; only a server restart
+ * that cut the attempt short does.
+ */
 export function claimDailyAttempt(userId: number): { ok: true; day: string } | { ok: false; error: string } {
   const day = dayKey();
-  const existing = one<{ finished_at: number | null }>(
-    'SELECT finished_at FROM daily_results WHERE user_id = ? AND day = ?',
+  const existing = one<{ started_at: number; finished_at: number | null }>(
+    'SELECT started_at, finished_at FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
+  if (existing && !existing.finished_at && existing.started_at < BOOTED_AT) {
+    run('UPDATE daily_results SET started_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
+    return { ok: true, day };
+  }
   if (existing) {
     return {
       ok: false,

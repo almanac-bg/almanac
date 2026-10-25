@@ -68,8 +68,13 @@ export const AVATARS: AvatarDef[] = [
   { id: 'lion', name: 'Лъв', emoji: '🦁', req: { level: 16 } },
   { id: 'wizard', name: 'Магьосник', emoji: '🧙', req: { level: 20 } },
   { id: 'ghost', name: 'Призрак', emoji: '👻', req: { level: 25 } },
+  { id: 'eagle', name: 'Орел', emoji: '🦅', req: { level: 27 } },
   { id: 'planet', name: 'Планета', emoji: '🪐', req: { level: 30 } },
+  { id: 'wolf', name: 'Вълк', emoji: '🐺', req: { level: 33 } },
+  { id: 'whale', name: 'Кит', emoji: '🐳', req: { level: 37 } },
   { id: 'trex', name: 'Ти-рекс', emoji: '🦖', req: { level: 40 } },
+  { id: 'peacock', name: 'Паун', emoji: '🦚', req: { level: 43 } },
+  { id: 'genie', name: 'Джин', emoji: '🧞', req: { level: 46 } },
   { id: 'star', name: 'Суперзвезда', emoji: '🌟', req: { level: 50 } },
   { id: 'bolt', name: 'Мълния', emoji: '⚡', req: { achievement: 'speed_demon' } },
   { id: 'flame', name: 'Пламък', emoji: '🔥', req: { achievement: 'streak_10' } },
@@ -94,6 +99,7 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { level: 22 },
   },
+  { id: 'aurora', name: 'Аврора', background: 'linear-gradient(135deg,#a7f3d0,#22d3ee,#818cf8,#c084fc)', req: { level: 28 } },
   {
     id: 'void',
     name: 'Бездна',
@@ -101,12 +107,27 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { level: 35 },
   },
+  { id: 'magma', name: 'Магма', background: 'linear-gradient(135deg,#1c1917,#dc2626,#f97316,#fde047)', req: { level: 42 } },
+  {
+    id: 'galaxy',
+    name: 'Галактика',
+    background: 'conic-gradient(#1e1b4b,#c026d3,#1e1b4b,#38bdf8,#f0abfc,#1e1b4b)',
+    animated: true,
+    req: { level: 45 },
+  },
   {
     id: 'inferno',
     name: 'Инферно',
     background: 'conic-gradient(#f97316,#ef4444,#facc15,#f97316)',
     animated: true,
     req: { achievement: 'streak_10' },
+  },
+  {
+    id: 'dawn',
+    name: 'Зора',
+    background: 'conic-gradient(#fde68a,#fb923c,#f472b6,#a78bfa,#fde68a)',
+    animated: true,
+    req: { achievement: 'daily_streak_30' },
   },
   {
     id: 'royal',
@@ -147,29 +168,33 @@ export const FRAMES: FrameDef[] = [
 ];
 
 export const TITLES: TitleDef[] = [
-  { id: 'rookie', name: 'Новобранец', req: { level: 1 } },
+  { id: 'rookie', name: 'Нова искра', req: { level: 1 } },
   { id: 'curious', name: 'Любопитен ум', req: { level: 3 } },
-  { id: 'enthusiast', name: 'Куиз ентусиаст', req: { level: 5 } },
-  { id: 'buff', name: 'Ерудит', req: { level: 8 } },
-  { id: 'knowitall', name: 'Всезнайко', req: { level: 12 } },
-  { id: 'mastermind', name: 'Гений', req: { level: 18 } },
+  { id: 'enthusiast', name: 'Куиз страст', req: { level: 5 } },
+  { id: 'buff', name: 'Ерудиция', req: { level: 8 } },
+  { id: 'knowitall', name: 'Всезнание', req: { level: 12 } },
+  { id: 'mastermind', name: 'Гениален ум', req: { level: 18 } },
   { id: 'encyclopedia', name: 'Ходеща енциклопедия', req: { level: 25 } },
+  { id: 'well', name: 'Кладенец от знания', req: { level: 30 } },
   { id: 'oracle', name: 'Оракул', req: { level: 35 } },
+  { id: 'library', name: 'Жива библиотека', req: { level: 40 } },
+  { id: 'wisdom', name: 'Вековна мъдрост', req: { level: 45 } },
   { id: 'legend', name: 'Жива легенда', req: { level: 50 } },
   { id: 'speedster', name: 'Демон на скоростта', req: { achievement: 'speed_demon' } },
-  { id: 'unstoppable', name: 'Неудържим', req: { achievement: 'streak_10' } },
-  { id: 'perfectionist', name: 'Перфекционист', req: { achievement: 'perfect' } },
-  { id: 'duelist', name: 'Дуелист', req: { achievement: 'duelist' } },
-  { id: 'survivor', name: 'Последен оцелял', req: { achievement: 'royale_win' } },
+  { id: 'unstoppable', name: 'Неудържима серия', req: { achievement: 'streak_10' } },
+  { id: 'perfectionist', name: 'Безупречност', req: { achievement: 'perfect' } },
+  { id: 'duelist', name: 'Дуелен инстинкт', req: { achievement: 'duelist' } },
+  { id: 'survivor', name: 'Короната на Роял', req: { achievement: 'royale_win' } },
   { id: 'polymath', name: 'Всестранен ум', req: { achievement: 'polymath' } },
-  { id: 'comeback', name: 'Майстор на обрата', req: { achievement: 'comeback' } },
-  { id: 'slayer', name: 'Победител на гиганти', req: { achievement: 'giant_slayer' } },
-  { id: 'carry', name: 'Носещ отбора', req: { achievement: 'team_carry' } },
-  { id: 'author', name: 'Автор на въпроси', req: { achievement: 'author_10' } },
+  { id: 'comeback', name: 'Магията на обрата', req: { achievement: 'comeback' } },
+  { id: 'slayer', name: 'Гроза за гигантите', req: { achievement: 'giant_slayer' } },
+  { id: 'carry', name: 'Гръбнакът на отбора', req: { achievement: 'team_carry' } },
+  { id: 'author', name: 'Златно перо', req: { achievement: 'author_10' } },
   { id: 'daily', name: 'Всеки ден по малко', req: { achievement: 'daily_streak_7' } },
+  { id: 'sunrises', name: 'Сто изгрева', req: { achievement: 'daily_streak_100' } },
   { id: 'season_gold', name: 'Златен сезон', req: { season: 'gold' } },
   { id: 'season_diamond', name: 'Диамантен ум', req: { season: 'diamond' } },
-  { id: 'season_master', name: 'Сезонен майстор', req: { season: 'master' } },
+  { id: 'season_master', name: 'Сезонно майсторство', req: { season: 'master' } },
 ];
 
 export const EMOTES: EmoteDef[] = [
@@ -184,6 +209,9 @@ export const EMOTES: EmoteDef[] = [
   { id: 'salute', emoji: '🫡', req: { level: 14 } },
   { id: 'clown', emoji: '🤡', req: { level: 18 } },
   { id: 'goat', emoji: '🐐', req: { level: 24 } },
+  { id: 'monocle', emoji: '🧐', req: { level: 32 } },
+  { id: 'party', emoji: '🥳', req: { level: 36 } },
+  { id: 'praise', emoji: '🙌', req: { level: 44 } },
   { id: 'trophy', emoji: '🏆', req: { achievement: 'first_win' } },
   { id: 'huff', emoji: '😤', req: { achievement: 'photo_finish' } },
   { id: 'ice', emoji: '🥶', req: { achievement: 'freezer' } },
@@ -191,18 +219,24 @@ export const EMOTES: EmoteDef[] = [
 ];
 
 export const POWERUPS: PowerupDef[] = [
-  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.', req: { level: 3 } },
-  { id: 'double', name: 'Двойно или нищо', icon: '💰', description: 'Удвоява точките за въпроса — ако отговориш вярно.', req: { level: 6 } },
+  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.', req: { level: 2 } },
+  {
+    id: 'double',
+    name: 'Двойно или нищо',
+    icon: '💰',
+    description: 'Удвоява точките за въпроса, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
+    req: { level: 6 },
+  },
   {
     id: 'freeze',
     name: 'Леден удар',
     icon: '❄️',
     description: 'Замразява водещия съперник за 3 секунди — не може да отговаря.',
-    req: { level: 9 },
+    req: { level: 3 },
     multiplayerOnly: true,
   },
-  { id: 'retry', name: 'Втори шанс', icon: '🔁', description: 'Ако сгрешиш, имаш още един опит (за половин точки).', req: { level: 12 } },
-  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 15 } },
+  { id: 'retry', name: 'Втори шанс', icon: '🔁', description: 'Ако сгрешиш, имаш още един опит (за половин точки).', req: { level: 4 } },
+  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 5 } },
 ];
 
 export const powerupById = (id: string) => POWERUPS.find((p) => p.id === id);
@@ -270,5 +304,5 @@ export function upcomingUnlocks(level: number, limit = 3): (UnlockRef & { level:
 
 export const avatarEmoji = (id: string) => AVATARS.find((a) => a.id === id)?.emoji ?? '🦊';
 export const frameById = (id: string) => FRAMES.find((f) => f.id === id) ?? FRAMES[0];
-export const titleName = (id: string) => TITLES.find((t) => t.id === id)?.name ?? 'Новобранец';
+export const titleName = (id: string) => TITLES.find((t) => t.id === id)?.name ?? 'Нова искра';
 export const emoteById = (id: string) => EMOTES.find((e) => e.id === id);

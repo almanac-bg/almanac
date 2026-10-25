@@ -33,11 +33,6 @@ export const config = {
   mailFrom: process.env.MAIL_FROM || `${BRAND.name} <no-reply@${BRAND.domain}>`,
   /** Tests: write every outgoing email as a JSON file into this directory. */
   mailOutbox: process.env.MAIL_OUTBOX || null,
-  /** Moderators (comma-separated usernames). In development the first account ever registered is one too. */
-  adminUsernames: (process.env.ADMIN_USERNAMES ?? '')
-    .split(',')
-    .map((s) => s.trim().normalize('NFC').toLowerCase())
-    .filter(Boolean),
   /**
    * On shutdown, how long running matches may play out before the process exits. A 15-question Royale takes about
    * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
