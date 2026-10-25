@@ -1,5 +1,9 @@
 # АЛМАНАХ ⚡ — almanac.bg
 
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Play](https://img.shields.io/badge/play-almanac.bg-8b5cf6.svg)](https://almanac.bg)
+
 Real-time multiplayer quiz battles, in Bulgarian: play at **[almanac.bg](https://almanac.bg)**. This is its complete
 source code, free software under the [AGPL-3.0](LICENSE).
 
@@ -338,5 +342,8 @@ Not covered by the license:
 
 Development happens in a private repository that also holds the question bank. The public one is a copy without it,
 with its own history: `scripts/publish-public.sh <empty folder>` makes that copy (everything tracked, minus
-`private/`) as a fresh git repository, and checks that no question-bank file slipped in.
+`private/`) as a fresh git repository, and checks that no question-bank file slipped in. After pushing it,
+`scripts/github-setup.sh <owner/repo>` sets up the GitHub side: description, website and topics, issues and
+discussions, squash merges, Dependabot alerts, private vulnerability reporting, secret scanning, labels and a
+protected `main` (upload `.github/social-preview.png` as the social preview by hand). Then set `SOURCE_URL`.
 
