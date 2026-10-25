@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card } from '../components/ui';
+import { usePageTitle } from '../lib/title';
 
 /** Standalone screen for the email link (works signed in or out), like the other email-link pages. */
 function Centered({ children }: { children: ReactNode }) {
@@ -24,6 +25,7 @@ function Centered({ children }: { children: ReactNode }) {
  * that mustn't switch anyone's reminders off. The button does it (mail apps' one-click unsubscribe calls the API directly).
  */
 export function UnsubscribePage() {
+  usePageTitle('Напомняния за серията');
   const [params] = useSearchParams();
   const u = params.get('u') ?? '';
   const k = params.get('k') ?? '';

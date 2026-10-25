@@ -23,6 +23,7 @@ import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
+import { usePageTitle } from '../lib/title';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
 
@@ -32,6 +33,7 @@ const HEADER_ACTIONS = 'col-span-2 sm:col-span-1 sm:col-start-2 lg:col-start-3 l
 export function ProfilePage() {
   const me = useStore((s) => s.me)!;
   const { username = me.username } = useParams();
+  usePageTitle(username === me.username ? 'Профил' : username);
   const roomy = useMediaQuery('(min-width: 640px)');
   const friendsVersion = useStore((s) => s.friendsVersion);
   // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
@@ -113,7 +115,7 @@ export function ProfilePage() {
             value={fmt(o.wins)}
             hint={
               o.multiplayerGames
-                ? `${pct(o.wins, o.multiplayerGames)}% от ${fmt(o.multiplayerGames)} мултиплейър`
+                ? `${pct(o.wins, o.multiplayerGames)}% от ${plural(o.multiplayerGames, 'мултиплейър мач', 'мултиплейър мача')}`
                 : undefined
             }
           />

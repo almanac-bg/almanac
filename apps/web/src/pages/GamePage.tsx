@@ -17,10 +17,12 @@ import { accentFill } from '../lib/accent';
 import { useCountUp } from '../lib/hooks';
 import { useMediaQuery } from '../lib/media';
 import { sfx, useMuted } from '../lib/sound';
+import { usePageTitle } from '../lib/title';
 import { Results } from './Results';
 
 export function GamePage() {
   const game = useStore((s) => s.game);
+  usePageTitle(game ? MODES[game.start.mode].name : null);
   if (!game) return <Navigate to="/" replace />;
   if (game.phase === 'ended' && game.end) return <Results game={game} />;
   return <Arena game={game} />;
@@ -179,11 +181,8 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
           </div>
         ) : (
           q && (
-            <div
-              className="hidden items-center gap-1 sm:flex"
-              role="img"
-              aria-label={`Въпрос ${q.index + 1} от ${q.total}`}
-            >
+            // Decorative: the counter next to it says the same in words.
+            <div className="hidden items-center gap-1 sm:flex" aria-hidden>
               {Array.from({ length: q.total }, (_, i) => (
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: one dot per question number
@@ -199,7 +198,7 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
           )
         )}
         {q && (
-          <span className="text-sm font-semibold text-fg-2 tabular-nums sm:hidden">
+          <span className="text-sm font-semibold text-fg-2 tabular-nums">
             <span aria-hidden>
               {q.index + 1}/{q.total}
             </span>
@@ -485,9 +484,6 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
             <Skull className="size-3.5" /> Елиминация след този въпрос
           </motion.span>
         )}
-        <span className="ml-auto text-sm font-semibold text-fg-3 tabular-nums">
-          Въпрос {q.index + 1} / {q.total}
-        </span>
       </div>
 
       <div className="glass relative mt-4 overflow-hidden rounded-3xl p-6 sm:p-8">
@@ -495,12 +491,18 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
           className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 blur-3xl"
           style={{ background: cat.color }}
         />
-        <div className="relative flex items-start gap-5">
-          <div className="flex-1">
-            <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-balance">{q.q}</h2>
+        {/* Phones: the timer floats at the top right and the question wraps around it, instead of a narrow column of
+            two-word lines beside it. Wider screens: side by side. */}
+        <div className="relative sm:flex sm:items-start sm:gap-5">
+          <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
+            <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
+          </div>
+          <div className="sm:flex-1">
+            <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto sm:text-balance">
+              {q.q}
+            </h2>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
           </div>
-          <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
         </div>
       </div>
 
@@ -659,7 +661,7 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
       role="timer"
       aria-label={`Оставащо време: ${secs} ${secs === 1 ? 'секунда' : 'секунди'}`}
       className={clsx(
-        'relative grid size-16 shrink-0 place-items-center sm:size-20',
+        'relative grid size-14 shrink-0 place-items-center sm:size-20',
         secs <= 3 && !stopped && 'motion-safe:animate-pulse',
       )}
     >

@@ -5,5 +5,6 @@ export * from './cosmetics';
 export * from './modes';
 export * from './progression';
 export * from './protocol';
+export * from './routes';
 export * from './time';
 export * from './words';

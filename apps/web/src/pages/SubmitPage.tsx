@@ -1,4 +1,4 @@
-import { api, timeAgo, toast, useStore } from '@quiz/client';
+import { api, plural, timeAgo, toast, useStore } from '@quiz/client';
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
 import { Lock, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -9,8 +9,10 @@ import { DraftEditor } from '../components/questions/DraftEditor';
 import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { usePageTitle } from '../lib/title';
 
 export function SubmitPage() {
+  usePageTitle('Предложи въпрос');
   const me = useStore((s) => s.me)!;
   const unlocked = me.level >= SUBMISSION_RULES.minLevel;
 
@@ -20,7 +22,8 @@ export function SubmitPage() {
         <h1 className="font-display text-3xl font-bold">Предложи въпрос</h1>
         <p className="mt-1 max-w-2xl text-fg-2">
           Измисли въпрос за играта. Модератор го преглежда и ако бъде одобрен, влиза в мачовете с твоето име — плюс{' '}
-          <b className="text-violet-300">+{SUBMISSION_RULES.approvedXp} XP</b> и прогрес към постиженията „Автор“.
+          <b className="text-violet-300">{SUBMISSION_RULES.approvedXp} XP</b> и прогрес към постиженията „Първо перо“ и
+          „Златно перо“.
         </p>
       </div>
       {me.isGuest ? (
@@ -45,11 +48,12 @@ function LockedCard({ level }: { level: number }) {
       </span>
       <h2 className="font-display text-xl font-bold">Отключва се на ниво {SUBMISSION_RULES.minLevel}</h2>
       <p className="max-w-sm text-sm text-fg-2">
-        Изиграй още няколко мача — нужни са ти още {SUBMISSION_RULES.minLevel - level} нива, за да предлагаш въпроси.
+        Изиграй още няколко мача — нужни са ти още {plural(SUBMISSION_RULES.minLevel - level, 'ниво', 'нива')}, за да
+        предлагаш въпроси.
       </p>
       <ProgressBar value={level / SUBMISSION_RULES.minLevel} className="mt-2 w-56" />
       <Link to="/" className="mt-3 text-sm font-semibold text-violet-300 hover:text-violet-200">
-        Към игрите →
+        Към играта →
       </Link>
     </Card>
   );
@@ -134,7 +138,7 @@ function MySubmissions() {
           <EmptyState
             icon="✍️"
             title="Още нямаш предложения"
-            body="Първият ти одобрен въпрос отключва постижението „Автор“."
+            body="Първият ти одобрен въпрос отключва постижението „Първо перо“."
           />
         </Card>
       ) : (

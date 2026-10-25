@@ -23,6 +23,7 @@ import { Button, Card, Segmented, Spinner } from '../components/ui';
 import { credentialsProblem } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isReturning, markReturning } from '../lib/returning';
+import { usePageTitle } from '../lib/title';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 
@@ -50,6 +51,7 @@ export function AuthPage() {
   const navigate = useNavigate();
   const inviteCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
   const challengeId = /^\/c\/([\w-]{1,16})\/?$/.exec(pathname)?.[1] ?? null;
+  usePageTitle(challengeId ? 'Предизвикателство' : null);
   // Newcomers mostly arrive to play (or sign up); a device that has signed in before most likely wants to sign in again.
   const [returning] = useState(isReturning);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => (returning ? 'login' : 'register'));

@@ -56,6 +56,7 @@ import { accentFill } from '../lib/accent';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { savedDailyShare, shareText } from '../lib/share';
+import { usePageTitle } from '../lib/title';
 
 /** Below this the "N играят в момента" count reads as an empty room rather than a busy one, so it stays hidden. */
 const LIVE_COUNT_MIN = 5;
@@ -67,6 +68,7 @@ const LIVE_COUNT_MIN = 5;
 const DAILY_TITLE = MODES.daily.name.replace('предизвикателство', 'предизвика\u00ADтелство');
 
 export function HomePage() {
+  usePageTitle(null);
   const me = useStore((s) => s.me)!;
   const lobby = useStore((s) => s.lobby);
   const room = useStore((s) => s.room);
@@ -761,7 +763,9 @@ function DailyCard({ className }: { className?: string }) {
             ) : (
               <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
             )}
-            {info && info.total > 3 && <p className="mt-3 text-xs text-fg-3">+ още {info.total - 3} играчи днес</p>}
+            {info && info.total > 3 && (
+              <p className="mt-3 text-xs text-fg-3">+ още {plural(info.total - 3, 'играч', 'играчи')} днес</p>
+            )}
           </div>
         )}
       </div>
@@ -841,7 +845,9 @@ function SoloPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
   const options = [MIXED_CATEGORY, ...CATEGORIES];
   return (
     <Modal open={open} onClose={onClose} title="Избери категория" className="max-w-2xl">
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      {/* As many columns as fit tiles wide enough for „Изкуство и литература“: one on a 320 px phone, two at 375,
+          three in a wider dialog. */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
         {options.map((c, i) => (
           <motion.button
             key={c.id}
@@ -852,16 +858,16 @@ function SoloPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
             disabled={busy !== null}
             onClick={() => start(c.id as CategoryChoice)}
             className={clsx(
-              'focus-ring group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-line bg-white/[0.03] p-3.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-60',
-              c.id === 'mixed' && 'col-span-2 sm:col-span-3',
+              'focus-ring group relative flex items-center gap-2.5 overflow-hidden rounded-2xl border border-line bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-60 sm:gap-3 sm:p-3.5',
+              c.id === 'mixed' && 'col-span-full',
             )}
           >
             <span
               className="absolute inset-y-0 left-0 w-1 opacity-70 transition-all group-hover:w-1.5"
               style={{ background: c.color }}
             />
-            <span className="text-2xl">{c.icon}</span>
-            <span className="text-sm font-semibold">{c.name}</span>
+            <span className="text-xl sm:text-2xl">{c.icon}</span>
+            <span className="min-w-0 text-sm font-semibold break-words">{c.name}</span>
             {c.id === 'mixed' && <span className="ml-auto text-xs text-fg-3">по малко от всичко</span>}
           </motion.button>
         ))}

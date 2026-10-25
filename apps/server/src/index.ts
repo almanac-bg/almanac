@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { BRAND } from '@quiz/shared';
+import { BRAND, PUBLIC_PAGES, routeKind } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError } from './auth';
 import { challengePreview } from './challenges';
@@ -96,16 +96,83 @@ if (fs.existsSync(config.webDist)) {
       fallthrough: false,
     }),
   );
-  app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
+  // HEAD too: uptime monitors often check with it.
+  const forPage = (req: Request) =>
+    ['GET', 'HEAD'].includes(req.method) && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io');
+  // One address per page: search engines would count "/index.html" and "/privacy/" as pages of their own.
   app.use((req, res, next) => {
-    // HEAD too: uptime monitors often check with it.
-    if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api') || req.path.startsWith('/socket.io'))
-      return next();
+    if (!forPage(req)) return next();
+    if (req.path === '/index.html') return res.redirect(301, '/');
+    if (req.path.length > 1 && req.path.endsWith('/'))
+      return res.redirect(301, req.path.replace(/\/+$/, '') + req.url.slice(req.path.length));
+    next();
+  });
+  app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
+  // Each public page with its own title, description and address in the page itself (link previews and search
+  // engines read the page, not the app); the rest of the game says "don't index".
+  const publicPages = new Map(
+    Object.entries(PUBLIC_PAGES).map(([route, meta]) => [
+      route,
+      withHead(page, { ...meta, url: `${config.appUrl}${route === '/' ? '/' : route}`, index: true }),
+    ]),
+  );
+  const appPage = withHead(page, { index: false });
+  app.use((req, res, next) => {
+    if (!forPage(req)) return next();
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
     res.setHeader('cache-control', 'no-cache');
-    const challenge = /^\/c\/([\w-]{4,16})\/?$/.exec(req.path)?.[1];
-    res.type('html').send((challenge && challengePage(page, challenge)) || page);
+    const kind = routeKind(req.path);
+    if (kind !== 'public') res.setHeader('x-robots-tag', 'noindex');
+    const challenge = /^\/c\/([^/]+)$/.exec(req.path)?.[1];
+    if (challenge) {
+      // A link that never existed is a 404 (its page says so); an expired one still has a page to show.
+      const html = challengePage(appPage, challenge);
+      res
+        .status(html ? 200 : 404)
+        .type('html')
+        .send(html ?? appPage);
+      return;
+    }
+    const pub = publicPages.get(req.path);
+    if (pub) {
+      res.type('html').send(pub);
+      return;
+    }
+    // A screen of the game (its own title comes with it), or an address that isn't one: the app shows "not found".
+    res
+      .status(kind === 'app' ? 200 : 404)
+      .type('html')
+      .send(appPage);
   });
+}
+
+/** The page with this title, description and address in its head; `index` says whether search engines may list it. */
+function withHead(html: string, head: { title?: string; description?: string; url?: string; index: boolean }): string {
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  let out = html;
+  if (head.title) {
+    const title = esc(head.title);
+    out = out
+      .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+      .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`);
+  }
+  if (head.description) {
+    const description = esc(head.description);
+    out = out
+      .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
+      .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`);
+  }
+  const extra = [
+    head.index
+      ? '<meta name="robots" content="index, follow, max-image-preview:large" />'
+      : '<meta name="robots" content="noindex" />',
+  ];
+  if (head.url) {
+    out = out.replace(/(<meta property="og:url" content=")[^"]*/, `$1${esc(head.url)}`);
+    // Only on pages to be listed: a canonical address on a "noindex" page is a mixed signal.
+    if (head.index) extra.push(`<link rel="canonical" href="${esc(head.url)}" />`);
+  }
+  return out.replace('</head>', `${extra.join('')}</head>`);
 }
 
 /**
@@ -115,21 +182,19 @@ if (fs.existsSync(config.webDist)) {
 function challengePage(html: string, id: string): string | null {
   const preview = challengePreview(id);
   if (!preview) return null;
-  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const title = esc(`${preview.creator?.username ?? 'Някой'} те предизвиква в ${BRAND.name}`);
-  const description = esc(
-    preview.expired
-      ? 'Това предизвикателство изтече — но можеш да създадеш свое.'
-      : preview.topScore !== null
-        ? `Резултатът за биене: ${preview.topScore} точки. 10 въпроса, един опит — можеш ли повече?`
-        : '10 въпроса, един опит. Приемаш ли?',
-  );
-  return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
-    .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
-    .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
-    .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
-    .replace(/(<meta property="og:url" content=")[^"]*/, `$1${config.appUrl}/c/${encodeURIComponent(preview.id)}`);
+  const title = `${preview.creator?.username ?? 'Някой'} те предизвиква в ${BRAND.name}`;
+  const description = preview.expired
+    ? 'Това предизвикателство изтече — но можеш да създадеш свое.'
+    : preview.topScore !== null
+      ? `Резултатът за биене: ${preview.topScore} точки. 10 въпроса, един опит — можеш ли повече?`
+      : '10 въпроса, един опит. Приемаш ли?';
+  // `html` already says noindex: a challenge is for the people it's sent to, not for search results.
+  return withHead(html.replace(/<meta name="robots"[^>]*>/, ''), {
+    title,
+    description,
+    url: `${config.appUrl}/c/${encodeURIComponent(preview.id)}`,
+    index: false,
+  });
 }
 
 // Last resort: a bug no guard caught. Report it, then exit (state may be broken); Docker restarts the server.

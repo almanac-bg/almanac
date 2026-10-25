@@ -5,6 +5,7 @@ import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Card } from '../components/ui';
 import { useOperator } from '../lib/operator';
+import { usePageTitle } from '../lib/title';
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -62,6 +63,7 @@ function Provider({ kind }: { kind: 'hosting' | 'emailProvider' }) {
 }
 
 export function PrivacyPage() {
+  usePageTitle('Политика за поверителност');
   const op = useOperator();
   return (
     <LegalLayout title="Политика за поверителност">
@@ -270,6 +272,7 @@ export function PrivacyPage() {
 }
 
 export function TermsPage() {
+  usePageTitle('Условия за ползване');
   return (
     <LegalLayout title="Условия за ползване">
       <p>

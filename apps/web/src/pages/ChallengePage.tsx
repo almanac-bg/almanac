@@ -11,6 +11,7 @@ import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { shareText } from '../lib/share';
+import { usePageTitle } from '../lib/title';
 
 const MODE = MODES.challenge;
 const [ACCENT_FROM, ACCENT_TO] = MODE.accent;
@@ -26,6 +27,7 @@ interface AcceptState {
 // ─── /c/:id ──────────────────────────────────────────────────────────────────
 
 export function ChallengePage() {
+  usePageTitle('Предизвикателство');
   const { id = '' } = useParams();
   const { data, error, retry } = useLoad(() => api.challenge(id), id);
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import type { OperatorInfo } from '@quiz/shared';
+import { type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -90,6 +90,59 @@ test('responses carry the browser hardening headers', async () => {
   assert.equal(res.headers.get('x-frame-options'), 'DENY');
   assert.ok(res.headers.get('referrer-policy'));
   assert.equal(res.headers.get('x-powered-by'), null);
+});
+
+const built = fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'));
+
+test('each public page has its own title and address; the game says noindex; a wrong address is a 404', {
+  skip: !built,
+}, async () => {
+  const get = (route: string) => fetch(`${srv.url}${route}`, { redirect: 'manual' });
+  const head = async (route: string) => {
+    const res = await get(route);
+    const html = await res.text();
+    return {
+      status: res.status,
+      robotsHeader: res.headers.get('x-robots-tag'),
+      title: /<title>([^<]*)<\/title>/.exec(html)?.[1],
+      canonical: /<link rel="canonical" href="([^"]*)"/.exec(html)?.[1] ?? null,
+      robots: /<meta name="robots" content="([^"]*)"/.exec(html)?.[1],
+    };
+  };
+  for (const [route, meta] of Object.entries(PUBLIC_PAGES)) {
+    const page = await head(route);
+    assert.equal(page.status, 200, route);
+    assert.equal(page.title, meta.title, route);
+    assert.equal(page.canonical, `https://almanac.test${route}`, route);
+    assert.match(page.robots ?? '', /^index/, route);
+    assert.equal(page.robotsHeader, null, route);
+  }
+  const settings = await head('/settings');
+  assert.deepEqual(
+    [settings.status, settings.robots, settings.robotsHeader, settings.canonical],
+    [200, 'noindex', 'noindex', null],
+  );
+  for (const route of ['/no-such-page', '/c/no-such-challenge']) {
+    const page = await head(route);
+    assert.deepEqual([page.status, page.robots], [404, 'noindex'], route);
+  }
+  for (const [from, to] of [
+    ['/privacy/', '/privacy'],
+    ['/index.html', '/'],
+  ]) {
+    const res = await get(from);
+    assert.deepEqual([res.status, res.headers.get('location')], [301, to], from);
+  }
+  const icon = await get('/favicon.ico');
+  assert.equal(icon.status, 200);
+  assert.match(icon.headers.get('content-type') ?? '', /icon/);
+});
+
+test('the server knows every screen of the app (else it would answer it with a 404)', () => {
+  const app = fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src/App.tsx'), 'utf8');
+  const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) => m[1].replace(/:[a-z]+/g, 'x1'));
+  assert.ok(routes.length > 15, `found ${routes.length} routes`);
+  for (const route of routes) assert.notEqual(routeKind(route), 'unknown', route);
 });
 
 test('health answers from the database', async () => {

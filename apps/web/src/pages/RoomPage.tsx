@@ -38,8 +38,10 @@ import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { Button, Card, Modal, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { usePageTitle } from '../lib/title';
 
 export function RoomPage() {
+  usePageTitle('Частна стая');
   const room = useStore((s) => s.room);
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();

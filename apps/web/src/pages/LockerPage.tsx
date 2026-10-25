@@ -16,10 +16,12 @@ import { motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Card, Segmented } from '../components/ui';
+import { usePageTitle } from '../lib/title';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
 
 export function LockerPage() {
+  usePageTitle('Колекция');
   const me = useStore((s) => s.me)!;
   const [tab, setTab] = useState<Tab>('avatar');
   const [saving, setSaving] = useState<string | null>(null);

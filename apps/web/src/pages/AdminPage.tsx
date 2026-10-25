@@ -12,6 +12,7 @@ import { DraftEditor } from '../components/questions/DraftEditor';
 import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
+import { usePageTitle } from '../lib/title';
 
 const toDraft = (s: Submission): QuestionDraft => ({
   category: s.category,
@@ -24,6 +25,7 @@ const toDraft = (s: Submission): QuestionDraft => ({
 type Section = 'questions' | 'flags' | 'reports' | 'stats';
 
 export function AdminPage() {
+  usePageTitle('Модерация');
   const me = useStore((s) => s.me)!;
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');

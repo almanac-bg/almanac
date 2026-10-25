@@ -10,6 +10,7 @@ import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { usePageTitle } from '../lib/title';
 
 const PRESENCE: Record<Presence, { label: string; color: string }> = {
   online: { label: 'Онлайн', color: '#34d399' },
@@ -22,6 +23,7 @@ const PRESENCE: Record<Presence, { label: string; color: string }> = {
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Нещо се обърка.');
 
 export function FriendsPage() {
+  usePageTitle('Приятели');
   const guest = useStore((s) => !!s.me?.isGuest);
   return guest ? <GuestFriends /> : <Friends />;
 }

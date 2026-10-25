@@ -27,6 +27,7 @@ import { Logo } from '../components/NavBar';
 import { Button, buttonClass, Card, Modal, Spinner } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
+import { usePageTitle } from '../lib/title';
 
 const INPUT =
   'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
@@ -93,6 +94,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 // and the server's answers are shown in the form, in Bulgarian.
 
 export function ResetPasswordPage() {
+  usePageTitle('Нова парола');
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const navigate = useNavigate();
@@ -153,6 +155,7 @@ export function ResetPasswordPage() {
 // ─── /verify-email?token=… ───────────────────────────────────────────────────
 
 export function VerifyEmailPage() {
+  usePageTitle('Потвърждение на имейла');
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const signedIn = useStore((s) => !!s.me);
@@ -205,6 +208,7 @@ export function VerifyEmailPage() {
 // ─── /settings ───────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
+  usePageTitle('Настройки');
   const me = useStore((s) => s.me)!;
   return (
     <div className="mx-auto max-w-2xl space-y-6">

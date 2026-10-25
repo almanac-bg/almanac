@@ -1,7 +1,8 @@
 import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
+import { routeKind } from '@quiz/shared';
 import { MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
+import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
 import { Invites } from './components/Invites';
@@ -35,6 +36,7 @@ import {
   UnsubscribePage,
   VerifyEmailPage,
 } from './pages/lazy';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 /** Email links and legal pages work whether or not you're signed in. */
 const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/unsubscribe', '/privacy', '/terms'];
@@ -109,6 +111,9 @@ export function App() {
         </Suspense>
       ) : me ? (
         <SignedIn />
+      ) : routeKind(pathname) === 'unknown' ? (
+        // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
+        <NotFoundPage standalone />
       ) : (
         <AuthPage />
       )}
@@ -151,7 +156,7 @@ function SignedIn() {
             <Route path="/submit" element={<SubmitPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
         {!inGame && <LegalLinks className="mt-16 justify-center" />}

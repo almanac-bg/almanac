@@ -68,7 +68,7 @@ function InviteCard({ invite }: { invite: Invite }) {
           Откажи
         </Button>
         <Button size="sm" onClick={accept} loading={busy}>
-          {challenge ? 'Приемам!' : 'Влез'} · {left}с
+          {challenge ? 'Приеми' : 'Влез'} · {left} с
         </Button>
       </div>
     </motion.div>

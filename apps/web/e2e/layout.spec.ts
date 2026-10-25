@@ -97,3 +97,18 @@ test('the legal links on the landing page open the legal pages', async ({ page }
     }
   }
 });
+
+// A mistyped link says so — signed out it isn't the sign-up form, signed in it isn't a silent jump home.
+test('a wrong address shows "page not found", signed out and signed in', async ({ page, pageProblems }) => {
+  await page.goto('/no-such-page');
+  await expect(page.getByRole('heading', { name: 'Тази страница не съществува', exact: true })).toBeVisible();
+  await expect(page).toHaveTitle('Страницата не съществува — АЛМАНАХ');
+  await signUp(page, uniqueName('Изгубен'), 'parola-123');
+  await page.goto('/no-such-page');
+  await expect(page.getByRole('heading', { name: 'Тази страница не съществува', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Към началото', exact: true }).click();
+  await expectLobby(page);
+  // The browser logs the 404 itself: that's the point of this test, not a problem.
+  const expected = (p: string) => p.includes('status of 404') && p.includes('/no-such-page');
+  pageProblems.splice(0, pageProblems.length, ...pageProblems.filter((p) => !expected(p)));
+});

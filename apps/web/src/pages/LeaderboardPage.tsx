@@ -10,8 +10,10 @@ import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
+import { usePageTitle } from '../lib/title';
 
 export function LeaderboardPage() {
+  usePageTitle('Класации');
   const me = useStore((s) => s.me)!;
   // Boards for the ranked queues that are open; a closed queue's board would only show last season's leftovers.
   const open = useOpenQueues();

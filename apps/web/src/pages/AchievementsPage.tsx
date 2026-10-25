@@ -9,6 +9,7 @@ import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { usePageTitle } from '../lib/title';
 
 type Filter = 'all' | 'unlocked' | 'locked';
 
@@ -23,6 +24,7 @@ function rewardsFor(id: string): string[] {
 }
 
 export function AchievementsPage() {
+  usePageTitle('Постижения');
   const { data, error, retry } = useLoad(() => api.achievements());
   const items: AchievementProgress[] | null = data?.achievements ?? null;
   const [filter, setFilter] = useState<Filter>('all');

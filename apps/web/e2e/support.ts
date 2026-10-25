@@ -128,7 +128,7 @@ export interface MatchSummary {
 export async function playMatch(page: Page): Promise<MatchSummary> {
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
   const results = page.getByRole('heading', { name: 'Награди', exact: true });
-  const counter = page.getByText(/^Въпрос \d+ \/ \d+$/);
+  const counter = page.getByText(/^Въпрос \d+ от \d+$/);
   const answered = new Set<number>();
   let total = 0;
   // The pointer stays clear of the answers: one resting on an answer's bottom edge makes it bob up and down without
