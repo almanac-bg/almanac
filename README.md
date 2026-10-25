@@ -1,357 +1,366 @@
 # АЛМАНАХ ⚡ — almanac.bg
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
-[![Play](https://img.shields.io/badge/play-almanac.bg-8b5cf6.svg)](https://almanac.bg)
+[![Лиценз: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Играй](https://img.shields.io/badge/play-almanac.bg-8b5cf6.svg)](https://almanac.bg)
 
-Real-time multiplayer quiz battles, in Bulgarian: play at **[almanac.bg](https://almanac.bg)**. This is its complete
-source code, free software under the [AGPL-3.0](LICENSE).
+Куиз битки в реално време за много играчи: играй на **[almanac.bg](https://almanac.bg)**. Тук е пълният изходен код
+на играта, свободен софтуер под [AGPL-3.0](LICENSE).
 
 ![АЛМАНАХ](apps/web/public/og.jpg)
 
-It has:
+Какво има:
 
-- **Modes:** solo practice, a daily challenge, ranked 1v1 duels and 2v2 teams, 3- and 5-player free-for-alls, an
-  8-player Royale with eliminations, private rooms for friends, and challenge links anyone can play.
-- **Progression:** accounts level up, unlock cosmetics and jokers, earn achievements, finish daily quests, keep a
-  daily streak (with shields), climb monthly seasons and keep detailed statistics.
-- **Social:** players can add friends, invite and challenge each other, ask for a rematch, and submit their own
-  questions for review. Visitors can play straight away as guests and save their progress later.
+- **Режими:** соло тренировка, дневно предизвикателство, класирани дуели 1 на 1 и отбори 2 на 2, мачове всеки срещу
+  всеки за 3 и 5 играчи, Роял за 8 играчи с отпадане, частни стаи за приятели и линкове с предизвикателство, които
+  всеки може да изиграе.
+- **Прогрес:** профилите качват нива, отключват аватари, рамки, титли и жокери, печелят постижения, изпълняват дневни
+  задачи, трупат дневна серия (с щитове), изкачват се в месечни сезони и пазят подробна статистика.
+- **Приятели и общност:** играчите могат да се добавят за приятели, да се канят и предизвикват, да искат реванш и да
+  предлагат свои въпроси за одобрение. Посетителите могат да играят веднага като гости и да запазят прогреса си
+  по-късно.
 
-## Quick start
+## Бърз старт
 
-Requires Node 24+. It uses the built-in `node:sqlite`, so there's no database to install.
+Нужен е Node 24+. Играта ползва вградения `node:sqlite`, така че няма база данни за инсталиране.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173, register an account, and play. In development **the first account you register becomes
-the admin**, so it can approve community questions. In production nobody becomes an admin by signing up; see
-step 5 of [Deploying](#deploying-any-vps--docker).
+Отвори http://localhost:5173, регистрирай профил и играй. При разработка **първият профил, който регистрираш, става
+администратор**, за да може да одобрява въпроси от общността. В продукция никой не става администратор с
+регистрация; виж стъпка 5 от [Внедряване](#внедряване-произволен-vps--docker).
 
-The game's real question bank (about 2,000 questions) isn't part of the public code, so answers can't be looked up
-during a match. A checkout without it plays the 120-question sample in `apps/server/src/data/questions.sample.json`,
-which is enough to develop with and to run every test. See [Questions](#adding-questions).
+Истинската банка с въпроси на играта (около 2000 въпроса) не е част от публичния код, за да не могат отговорите да се
+търсят по време на мач. Без нея се играе с примерните 120 въпроса от `apps/server/src/data/questions.sample.json`,
+което стига за разработка и за всички тестове. Виж [Въпроси](#добавяне-на-въпроси).
 
-When no other humans are queuing, bots fill the empty seats after a few seconds, so every mode is playable alone. To
-test real multiplayer locally, open a second browser (or a private window) with another account.
+Когато никой друг не чака за мач, след няколко секунди ботове заемат празните места, така че всеки режим може да се
+играе и без други хора. За да тестваш истински мултиплейър локално, отвори втори браузър (или частен прозорец) с друг
+профил.
 
-| Script              | What it does                                                         |
-| ------------------- | -------------------------------------------------------------------- |
-| `npm run dev`       | API + realtime server on :3001 and Vite on :5173 (proxied)           |
-| `npm run build`     | Builds the web app and bundles the server into `apps/server/dist`    |
-| `npm start`         | Production server on :3001 (plain Node) that also serves the web app |
-| `npm run typecheck` | Type-checks every package                                            |
-| `npm test`          | Full test suite (~45 s), see below                                   |
+| Скрипт              | Какво прави                                                            |
+| ------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`       | API + realtime сървър на :3001 и Vite на :5173 (през proxy)            |
+| `npm run build`     | Билдва уеб приложението и пакетира сървъра в `apps/server/dist`        |
+| `npm start`         | Продукционен сървър на :3001 (чист Node), който сервира и уеб приложението |
+| `npm run typecheck` | Проверява типовете във всички пакети                                   |
+| `npm test`          | Всички тестове (~45 s), виж по-долу                                    |
 
-### Tests
+### Тестове
 
-`npm test` runs these suites with Node's built-in test runner:
-- **`e2e.test.ts`** boots a real server with a throwaway database and plays through everything with real sockets.
-  Two players and bots cover: solo, a ranked duel with a reconnect, Royale eliminations, private rooms and teams,
-  the daily challenge, friends, invites and challenges, every joker, community questions with moderation, season
-  rewards, flagging and hiding wrong questions, guests, challenge links, rematches, streak-reminder opt-out, results
-  replayed after a dropped connection, malformed socket
-  messages (which must never crash the server), and how the website's files are cached.
-- **`game.test.ts`** drives the match engine on a mocked clock: leaving and forfeits, dropped connections, abandoned
-  matches, "Двойно или нищо", tie-breaks and bot strength.
-- **`restart.test.ts`** covers graceful restarts (running matches finish first) and a daily attempt cut short by a crash.
-- **`database.test.ts`** checks the per-player question history and that hot queries use indexes.
-- **`production.test.ts`** runs the server as in production: admins only through the admin command line, browser security
-  headers, the health check, crash reports.
-- **`maintenance.test.ts`** covers the cleanup of expired logins and the daily database snapshots.
-- **`progress.test.ts`** covers daily quests, streak shields, the evening streak reminder, guest cleanup and the launch
-  statistics.
-- **`monitoring.test.ts`** checks the error reports sent to Sentry, their rate limit, and that the browser tunnel
-  only forwards to the site's own project.
-- **`questions.test.ts`** validates the question bank. New questions must pass it.
-- **`rules.test.ts`** checks the scoring and progression rules, including Sofia-time day and season boundaries across
-  DST changes.
+`npm test` пуска тези тестове с вградения test runner на Node:
+- **`e2e.test.ts`** стартира истински сървър с временна база данни и минава през всичко с истински сокети. Двама
+  играчи и ботове покриват: соло, класиран дуел с повторно свързване, отпадания в Роял, частни стаи и отбори,
+  дневното предизвикателство, приятели, покани и предизвикателства, всеки жокер, въпроси от общността с модерация,
+  сезонни награди, сигнали и скриване на грешни въпроси, гости, линкове с предизвикателство, реванши, отказ от
+  напомнянията за серията, резултати, показани отново след прекъсната връзка, невалидни съобщения по сокета (които
+  никога не бива да сриват сървъра) и кеширането на файловете на сайта.
+- **`game.test.ts`** управлява енджина на мача с подменен часовник: напускане и служебни загуби, прекъснати връзки,
+  изоставени мачове, „Двойно или нищо“, равенства и силата на ботовете.
+- **`restart.test.ts`** покрива плавните рестарти (текущите мачове първо завършват) и опит в дневното
+  предизвикателство, прекъснат от срив.
+- **`database.test.ts`** проверява историята на въпросите за всеки играч и че честите заявки използват индекси.
+- **`production.test.ts`** пуска сървъра като в продукция: администратори се добавят само от командния ред,
+  security хедъри за браузъра, health check, отчети за сривове.
+- **`maintenance.test.ts`** покрива почистването на изтекли сесии и дневните копия на базата данни.
+- **`progress.test.ts`** покрива дневните задачи, щитовете за серията, вечерното напомняне за серията, почистването
+  на гост-профили и статистиката за старта.
+- **`monitoring.test.ts`** проверява отчетите за грешки към Sentry, ограничението на броя им и че тунелът от браузъра
+  препраща само към собствения проект на сайта.
+- **`questions.test.ts`** валидира банката с въпроси. Новите въпроси трябва да минават проверката.
+- **`rules.test.ts`** проверява правилата за точките и прогреса, включително границите на дните и сезоните по
+  софийско време при смяна на лятното часово време.
 
-`npm run test:dist -w @quiz/server` runs the same suites against the production bundle. GitHub Actions
-(`.github/workflows/ci.yml`) runs typecheck, build and both test targets on every push, then builds the Docker image
-and checks that it boots.
+`npm run test:dist -w @quiz/server` пуска същите тестове срещу продукционния bundle. GitHub Actions
+(`.github/workflows/ci.yml`) пуска typecheck, build и двата варианта на тестовете при всеки push, после билдва Docker
+образа и проверява, че стартира.
 
-### Configuration (environment variables)
+### Конфигурация (променливи на средата)
 
-| Variable           | Default                               | Meaning                                                      |
+| Променлива         | По подразбиране                       | Значение                                                     |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------ |
-| `PORT`             | `3001`                                | Server port                                                  |
-| `DB_PATH`          | `apps/server/data/quiz.db`            | SQLite file (created and migrated automatically)             |
-| `BOT_FILL_SECONDS` | `8`                                   | Queue wait before bots fill empty seats; `off` disables bots |
-| `PUBLIC_QUEUES`    | `duel,royale`                         | Ranked queues players can join (`all`, or a list of `duel`, `teams`, `trio`, `squad`, `royale`) |
-| `COOKIE_SECURE`    | `false`                               | Set `true` when served over HTTPS                            |
-| `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`; which reverse proxies to trust        |
-| `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
-| `SMTP_URL`         |                                       | e.g. `smtp://user:pass@host:587`. Unset → emails are printed to the console |
-| `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Sender address                                               |
-| `GAME_TIME_SCALE`  | `1`                                   | Multiplies all in-game timers. For automated tests only      |
-| `BACKUP_DIR`       | `backups` next to the database        | Daily database snapshots; `off` disables them                |
-| `BACKUP_KEEP_DAYS` | `14`                                  | How many daily snapshots to keep                             |
-| `DRAIN_SECONDS`    | `330` in production, `0` otherwise    | On shutdown, how long running matches may finish first       |
-| `SENTRY_DSN`       |                                       | Sentry project for error reports; unset → errors only go to the log |
-| `APP_RELEASE`      |                                       | Version tag on error reports (the deploy command sets the git commit) |
+| `PORT`             | `3001`                                | Порт на сървъра                                              |
+| `DB_PATH`          | `apps/server/data/quiz.db`            | SQLite файл (създава се и се мигрира автоматично)            |
+| `BOT_FILL_SECONDS` | `8`                                   | Изчакване в опашката, преди ботове да заемат празните места; `off` изключва ботовете |
+| `PUBLIC_QUEUES`    | `duel,royale`                         | Класирани опашки, в които играчите могат да влизат (`all` или списък от `duel`, `teams`, `trio`, `squad`, `royale`) |
+| `COOKIE_SECURE`    | `false`                               | Задай `true`, когато сайтът се сервира през HTTPS            |
+| `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`: на кои reverse proxy сървъри да се вярва |
+| `APP_URL`          | `http://localhost:5173`               | Публичният адрес (origin) в линковете в имейлите             |
+| `SMTP_URL`         |                                       | Напр. `smtp://user:pass@host:587`. Без него → имейлите се печатат в конзолата |
+| `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Адрес на подателя                                            |
+| `GAME_TIME_SCALE`  | `1`                                   | Умножава всички таймери в играта. Само за автоматични тестове |
+| `BACKUP_DIR`       | `backups` до базата данни             | Дневни копия на базата; `off` ги изключва                    |
+| `BACKUP_KEEP_DAYS` | `14`                                  | Колко дневни копия да се пазят                               |
+| `DRAIN_SECONDS`    | `330` в продукция, иначе `0`          | При спиране: колко време имат текущите мачове да завършат    |
+| `SENTRY_DSN`       |                                       | Sentry проект за отчети за грешки; без него → грешките отиват само в лога |
+| `APP_RELEASE`      |                                       | Версия в отчетите за грешки (командата за деплой задава git commit-а) |
+| `OPERATOR_NAME`, `OPERATOR_ADDRESS` |                      | Кой поддържа сайта; показва се в политиката за поверителност и условията за ползване (задължително) |
+| `CONTACT_EMAIL`    | `privacy@<domain>`                    | Адрес за контакт в правните страници и имейлите              |
+| `EMAIL_PROVIDER`, `HOSTING_PROVIDER` |                    | Посочени в политиката за поверителност като обработващи данни |
+| `SOURCE_URL`       |                                       | Публичното хранилище, към което води линкът във футъра („Изходен код“) |
+| `QUESTIONS_PATH`   | `private/questions.json`, иначе примерната | Вградената банка с въпроси (виж [Добавяне на въпроси](#добавяне-на-въпроси)) |
 
-| `OPERATOR_NAME`, `OPERATOR_ADDRESS` |                      | Who runs the site, shown in the privacy policy and terms (required) |
-| `CONTACT_EMAIL`    | `privacy@<domain>`                    | Contact address in the legal pages and emails                |
-| `EMAIL_PROVIDER`, `HOSTING_PROVIDER` |                    | Named in the privacy policy as processors                    |
-| `SOURCE_URL`       |                                       | Public repository, linked in the footer ("Изходен код")      |
-| `QUESTIONS_PATH`   | `private/questions.json`, else the sample | The built-in question bank (see [Adding questions](#adding-questions)) |
+Името на марката е в `packages/shared/src/brand.ts`.
 
-The brand name lives in `packages/shared/src/brand.ts`.
-
-## Layout
+## Структура на кода
 
 ```
-packages/shared   Rules & catalog shared by client and server: modes, level curve, seasons,
-                  cosmetics, jokers, achievements, socket and REST types
+packages/shared   Правила и каталог, общи за клиента и сървъра: режими, крива на нивата, сезони,
+                  козметика, жокери, постижения, типове за сокетите и REST
 apps/server       Express + Socket.IO + SQLite
-  src/game/Game.ts        Server-authoritative match engine (timers, scoring, teams, jokers, eliminations, bots)
-  src/game/matchmaking.ts Quick-match queues with bot fill and team balancing
-  src/game/rooms.ts       Private rooms (5-digit codes, /join/12345 links, teams, friend invites)
-  src/game/rewards.ts     Persists matches: XP, stats, seasonal Elo, daily results, achievements
-  src/seasons.ts          Monthly seasons: soft reset, season-end rewards (settled lazily)
-  src/daily.ts            Daily challenge: one seeded question set per day, one attempt
-  src/friends.ts          Friend requests and presence
-  src/submissions.ts      Community questions and moderation
-  src/data/questions.sample.json  Public sample of the question bank (the real one is private, in private/)
-packages/client   Client core: API calls, realtime game state (zustand), formatting. The website
-                  plugs in its sounds; kept separate so other clients can reuse it
+  src/game/Game.ts        Енджинът на мача, изцяло на сървъра (таймери, точки, отбори, жокери, отпадане, ботове)
+  src/game/matchmaking.ts Опашки за бърз мач, попълване с ботове и балансиране на отборите
+  src/game/rooms.ts       Частни стаи (5-цифрени кодове, линкове /join/12345, отбори, покани към приятели)
+  src/game/rewards.ts     Записва мачовете: XP, статистика, сезонно Elo, дневни резултати, постижения
+  src/seasons.ts          Месечни сезони: частично нулиране, награди в края на сезона (изчисляват се при нужда)
+  src/daily.ts            Дневно предизвикателство: един набор въпроси на ден (от seed), един опит
+  src/friends.ts          Покани за приятелство и кой е онлайн
+  src/submissions.ts      Въпроси от общността и модерация
+  src/data/questions.sample.json  Публична извадка от банката с въпроси (истинската е частна, в private/)
+packages/client   Ядрото на клиента: API заявки, състояние на играта в реално време (zustand), форматиране.
+                  Сайтът добавя звуците си; отделено е, за да могат и други клиенти да го ползват
 apps/web          React 19 + Vite + Tailwind 4 + Motion
 ```
 
-## How it plays
+## Как се играе
 
-- **Modes:**
-  - Соло: 10 questions, pick a category.
-  - Дневно предизвикателство: the same 10 questions for everyone (each player gets their own option order), one
-    attempt a day, no jokers, its own leaderboard. An attempt cut short by a server restart can be replayed.
-  - Дуел: 1v1.
-  - Отбори: 2v2, with teams balanced by rating.
-  - Трио: 3 players.
-  - Арена: 5 players.
-  - Роял: 8 players. The lowest scorer is knocked out after questions 3, 5, 7, 9, 11 and 13.
-  - Предизвикателство (challenge link, `/c/<id>`): a player makes a link with 10 fixed questions and plays it first;
-    anyone with the link (guests too) plays the same questions once, in their own option order, with no jokers, and
-    lands on the link's own board. The creator hears about every result. Links last 7 days.
-  - At launch only Дуел and Роял are open as ranked queues (`PUBLIC_QUEUES`), so the first players meet each other
-    instead of bots; Отбори, Трио and Арена open as the game grows (and stay playable in private rooms).
-- **Rematch:** after a ranked match with other people, anyone can ask for a rematch for a minute; once everyone asks,
-  the same people play again (one "no", or walking away, ends the offer).
-  - Частна стая: 2–8 players, with configurable questions, timer, category, eliminations and teams.
-- **Scoring:** 500 for a correct answer, up to +500 for speed (measured against the regular timer), and +50 per streak
-  step (capped at +250). Ties go to more correct answers, then less total time; an unanswered question counts the
-  whole timer.
-- **Jokers:** one of each per match, and at most one per question. All five unlock by level 6, so ranked play isn't
-  decided by time played.
-  - 50/50 (level 2): removes two wrong answers.
-  - Леден удар (level 3): freezes the leading opponent for 3 seconds.
-  - Втори шанс (level 4): allows a second attempt, for half points.
-  - Още време (level 5): gives you 5 extra seconds.
-  - Двойно или нищо (level 6): doubles the points for one question; a miss costs 500 (never below zero).
-- **Leaving and connection drops:** a player who walks out ranks last (the first to leave lowest), unless already
-  knocked out, in which case that place stands. A match ends at once when only one side is left. A dropped connection
-  is waited for 5 seconds before a question can close without the player; if every human is gone for 30 seconds,
-  the rest of the match plays out at once as if they hadn't answered. A result that came in while offline is shown
-  on return.
-- **Bots** fill ranked seats after a few seconds. A bot plays as strong as the rating it shows (capped at 1600), and
-  ratings move less against bots than against people (K 24 vs 40), so Elo settles where a player's skill really is.
-  A player's first three multiplayer matches get slightly kinder bots. The same two people only move each other's
-  rating three times a day. In private rooms beating bots earns no placement XP.
-- **Question variety:** each player's last 1,500 questions are remembered; matches pick questions none of the players
-  has seen, then the ones seen longest ago.
-- **Anti-cheat:** the server owns the clock, the answers and every player's deadline. Clients never see the correct
-  option before the reveal.
-- **Seasons:** calendar months in Sofia time. Ratings are per season, and a new season starts players halfway back
-  to 1000. At season end, players get XP and exclusive frames and titles for the best peak rank (Бронз → Майстор) they reached
-  in a mode where they played at least 10 ranked games.
-- **Progression:** every match grants XP: participation, correct answers (by difficulty), placement, a perfect-game
-  bonus, the first match of the day, the daily streak (growing for 30 days, with milestones at 7, 30 and 100), daily
-  quests and achievements. Reaching level L takes `50·L·(L−1)` total XP.
-- **Daily quests:** three a day (Sofia time), one each for showing up, playing well and trying something different,
-  chosen per player and fixed for the day; XP is paid as they're completed, plus a bonus for all three.
-- **Streak shields:** every 7 days of daily streak earns a shield (at most 2); a missed day uses one up instead of
-  breaking the streak. Players with a verified email can opt in to one evening email when their streak is about to
-  break (with a one-click unsubscribe). With Brevo's free plan (300 emails a day) that covers a few hundred players.
-- **Accounts:** players log in with their username or a verified email. An optional email (verified by link) enables
-  "Забравена парола?": a single-use reset link that expires in 1 hour and logs the account out everywhere.
-  Passwords can be changed in Настройки.
-- **Guests:** "Играй като гост" makes an account without a name or password, so the first game is one tap away.
-  Guests play everything except what needs a lasting identity (friends, rooms of their own, challenge links of their
-  own, questions, reports), aren't listed on leaderboards, and can save their progress with a name and password at
-  any time. A guest account nobody can sign in to any more (no session left) is erased after a day.
-- **Moderation:**
-  - An offensive-name filter covers Cyrillic, Latin and leetspeak, and reserves names like admin and АЛМАНАХ.
-  - Players can report others from their profile.
-  - Moderators handle reports in `/admin` → Доклади: dismiss, rename, or ban for 1/7/30 days or permanently.
-  - After a match players can review every question and flag a mistake. Moderators see the flags in `/admin` →
-    Сигнали, most reported first, and can hide a question from new matches at once (and undo that).
-  - The word lists are in `apps/server/src/moderation.ts`.
-- **Phones:** the site installs to the home screen (a web app manifest with icons): it then opens full-screen like an
-  app, without an app store.
-- **Privacy (GDPR):**
-  - The privacy policy and terms of use are at `/privacy` and `/terms`.
-  - Players can download all their data as JSON and delete their account from Настройки.
-  - Fonts are self-hosted, and there are no third-party trackers.
-- **Friends:** players send requests by username and see live presence. They can invite friends into a room or
-  challenge them to a 1v1 with one click.
-- **Community questions:** players at level 3+ submit questions. Moderators (`/admin`) approve them, editing if
-  needed, or reject them. Approved questions join the game immediately with author credit, and the author gets XP.
-- **Achievements:** 41 in total. Definitions are in `packages/shared/src/achievements.ts` and the rules in
+- **Режими:**
+  - Соло: 10 въпроса от избрана категория.
+  - Дневно предизвикателство: едни и същи 10 въпроса за всички (всеки играч получава свой ред на отговорите), един
+    опит на ден, без жокери, собствена класация. Опит, прекъснат от рестарт на сървъра, може да се изиграе отново.
+  - Дуел: 1 на 1.
+  - Отбори: 2 на 2, с отбори, балансирани по рейтинг.
+  - Трио: 3 играчи.
+  - Арена: 5 играчи.
+  - Роял: 8 играчи. Играчът с най-малко точки отпада след въпроси 3, 5, 7, 9, 11 и 13.
+  - Предизвикателство (линк с предизвикателство, `/c/<id>`): играч създава линк с 10 фиксирани въпроса и го изиграва,
+    преди да го сподели; всеки с линка (и гостите) играе същите въпроси веднъж, със свой ред на отговорите и без жокери, и влиза в
+    класацията на самия линк. Създателят получава известие за всеки резултат. Линковете важат 7 дни.
+  - Частна стая: 2–8 играчи, с настройки за въпросите, таймера, категорията, отпадането и отборите.
+  - При старта само Дуел и Роял са отворени като класирани опашки (`PUBLIC_QUEUES`), за да се срещат първите играчи
+    помежду си, а не с ботове; Отбори, Трио и Арена се отварят, когато играта порасне (и остават достъпни в частните
+    стаи).
+- **Реванш:** след класиран мач с други хора всеки може да поиска реванш в рамките на минута; щом всички поискат,
+  същите хора играят отново (едно „не“ или излизане прекратява предложението).
+- **Точки:** 500 за верен отговор, до +500 за бързина (спрямо обичайния таймер) и +50 за всяка стъпка в серията
+  от верни отговори (до +250). При равен резултат решава броят верни отговори, после по-краткото общо време;
+  въпрос без отговор се брои с цялото време на таймера.
+- **Жокери:** по един от всеки вид на мач и най-много един на въпрос. И петте се отключват до ниво 6, така че
+  класираната игра не се решава от изиграното време.
+  - 50/50 (ниво 2): премахва два грешни отговора.
+  - Леден удар (ниво 3): замразява съперника, който води, за 3 секунди.
+  - Втори шанс (ниво 4): дава втори опит, за половин точки.
+  - Още време (ниво 5): дава ти 5 секунди повече.
+  - Двойно или нищо (ниво 6): удвоява точките за един въпрос; грешка струва 500 (никога под нулата).
+- **Напускане и прекъсната връзка:** който напусне мача, се класира на последно място (по-ранното напускане е
+  по-назад), освен при вече отпадналите — те запазват мястото, на което са отпаднали. Мачът свършва веднага, щом
+  остане само една страна. При прекъсната връзка играта чака 5 секунди, преди въпрос да може да приключи без играча;
+  ако 30 секунди всички хора в мача са без връзка, остатъкът от мача се изиграва веднага, все едно не са отговорили.
+  Резултат, излязъл, докато играчът е офлайн, се показва при връщането.
+- **Ботовете** заемат свободните места в класираните мачове след няколко секунди. Ботът играе толкова силно,
+  колкото показва рейтингът му (до 1600), а рейтингът се променя по-малко срещу ботове, отколкото срещу хора (K 24
+  срещу 40), така че Elo се установява там, където е реалното ниво на играча. Първите три мултиплейър мача на играча
+  са срещу малко по-меки ботове. Едни и същи двама души могат да си влияят на рейтинга само три пъти на ден. В
+  частните стаи победата над ботове не носи XP за класиране.
+- **Разнообразие на въпросите:** помнят се последните 1500 въпроса на всеки играч; мачовете избират въпроси, нови за
+  всички играчи в мача, а след тях — видените най-отдавна.
+- **Защита от измами:** сървърът държи часовника, отговорите и крайния срок на всеки играч. Клиентите никога не виждат
+  верния отговор преди разкриването му.
+- **Сезони:** календарни месеци по софийско време. Рейтингът е отделен за всеки сезон, а в началото на новия сезон
+  всеки рейтинг се връща наполовина към 1000. В края на сезона играчите получават XP и ексклузивни рамки и титли за
+  най-високия ранг (Бронз → Майстор), достигнат в режим, в който имат поне 10 класирани мача.
+- **Прогрес:** всеки мач носи XP: за участие, верни отговори (според трудността), класиране, бонус за перфектна игра,
+  първия мач за деня, дневната серия (расте 30 дни, с етапи на 7, 30 и 100), дневните задачи и постиженията. Ниво L
+  изисква общо `50·L·(L−1)` XP.
+- **Дневни задачи:** три на ден (софийско време): една за участие, една за добра игра и една за нещо различно,
+  избрани за всеки играч и фиксирани за деня; XP се дава при изпълнение на всяка, плюс бонус за трите.
+- **Щитове за серията:** всеки 7 дни от дневната серия носят щит (най-много 2); пропуснат ден изразходва щит, вместо
+  да прекъсне серията. Играчите с потвърден имейл могат да включат вечерно писмо, когато серията им е на път да
+  прекъсне (с отписване с един клик). С безплатния план на Brevo (300 имейла на ден) това стига за няколкостотин
+  играчи.
+- **Профили:** играчите влизат с потребителско име или потвърден имейл. Незадължителният имейл (потвърждава се с
+  линк) включва „Забравена парола?“: еднократен линк за нова парола, който изтича след 1 час и прекратява всички
+  сесии на профила. Паролата се сменя от Настройки.
+- **Гости:** „Играй като гост“ създава профил без име и парола, така че до първата игра има само едно докосване.
+  Гостите играят всичко освен онова, което изисква постоянна самоличност (приятели, собствени стаи, собствени линкове
+  с предизвикателство, въпроси, доклади), не се показват в класациите и могат по всяко време да запазят прогреса си
+  с име и парола. Гост-профил, в който никой вече не може да влезе (не е останала сесия), се изтрива след ден.
+- **Модерация:**
+  - Филтърът за обидни имена покрива кирилица, латиница и leetspeak и резервира имена като admin и АЛМАНАХ.
+  - Играчите могат да докладват други играчи от профила им.
+  - Модераторите обработват докладите в `/admin` → Доклади: отхвърляне, смяна на името или бан за 1/7/30 дни или
+    завинаги.
+  - След мач играчите могат да прегледат всеки въпрос и да сигнализират за грешка. Модераторите виждат сигналите в
+    `/admin` → Сигнали, подредени по брой, и могат веднага да скрият въпрос от новите мачове (и да отменят това).
+  - Списъците с думи са в `apps/server/src/moderation.ts`.
+- **Телефони:** сайтът се инсталира на началния екран (web app manifest с икони) и после се отваря на цял екран като
+  приложение, без магазин за приложения.
+- **Поверителност (GDPR):**
+  - Политиката за поверителност и условията за ползване са на `/privacy` и `/terms`.
+  - Играчите могат да изтеглят всичките си данни като JSON и да изтрият профила си от Настройки.
+  - Шрифтовете се хостват на самия сайт и няма проследяване от трети страни.
+- **Приятели:** играчите изпращат покани по потребителско име и виждат на живо кой е онлайн. Могат да поканят
+  приятели в стая или да ги предизвикат на дуел 1 на 1 с един клик.
+- **Въпроси от общността:** играчите от ниво 3 нагоре предлагат въпроси. Модераторите (`/admin`) ги одобряват, като
+  при нужда ги редактират, или ги отхвърлят. Одобрените въпроси влизат в играта веднага, с името на автора, а авторът
+  получава XP.
+- **Постижения:** общо 41. Дефинициите са в `packages/shared/src/achievements.ts`, а правилата — в
   `apps/server/src/achievements.ts`.
 
-## Adding questions
+## Добавяне на въпроси
 
-Players can submit questions in the app, and moderators approve them in `/admin` — that's the way to contribute
-questions to the live game.
+Играчите могат да предлагат въпроси в самата игра, а модераторите ги одобряват в `/admin` — така се добавят въпроси
+в играта на almanac.bg.
 
-The live game's bank is kept in a separate private repository (`almanac-questions`), cloned into `private/`
-here, a folder this repository ignores:
+Банката на almanac.bg се пази в отделно частно хранилище (`almanac-questions`), клонирано тук в `private/` — папка,
+която това хранилище игнорира:
 
 ```bash
 git clone git@github.com:almanac-bg/almanac-questions.git private
 ```
 
-With it present, the server uses `private/questions.json`, and `npm run build` puts it next to the server bundle,
-so a Docker image built on a machine that has it includes it. Without it, the server plays the public sample,
-`apps/server/src/data/questions.sample.json`. Both files have the same format, and `npm test` validates whichever
-are present. To add built-in questions, append to the bank (then commit and push in `private/`):
+Когато я има, сървърът използва `private/questions.json`, а `npm run build` я слага до сървърния bundle, така че
+Docker образ, билднат на машина с нея, я съдържа. Без нея сървърът играе с публичната извадка,
+`apps/server/src/data/questions.sample.json`. Двата файла са в един и същ формат и `npm test` проверява наличните. За
+да добавиш вградени въпроси, добави ги в края на банката (после commit и push в `private/`):
 
 ```json
 { "id": "gen-031", "category": "general", "difficulty": "easy",
   "q": "Колко цвята има българското знаме?", "options": ["3", "2", "4", "5"], "answer": 0 }
 ```
 
-`answer` is the index of the correct option. Options are shuffled for every match. Categories are `general`,
-`science`, `history`, `geography`, `movies`, `music`, `sports`, `technology`, `literature` and `nature`.
+`answer` е индексът на верния отговор в `options`. Отговорите се разбъркват за всеки мач. Категориите са `general`,
+`science`, `history`, `geography`, `movies`, `music`, `sports`, `technology`, `literature` и `nature`.
 
-## Deploying (any VPS + Docker)
+## Внедряване (произволен VPS + Docker)
 
-The stack is three containers: the app (plain Node, with SQLite on a volume), Caddy, which handles HTTPS and gets
-and renews Let's Encrypt certificates automatically, and Litestream, which streams every database change to
-S3-compatible object storage. Nothing ties it to one provider. **2 vCPU and 4 GB** is plenty to start: in a load
-test, 1,500 simultaneous players used about 5% of one core. All images run on x86 and ARM.
+Стекът е от три контейнера: приложението (чист Node, със SQLite на volume), Caddy, който се грижи за HTTPS и сам
+взема и подновява сертификатите от Let's Encrypt, и Litestream, който стриймва всяка промяна в базата към
+S3-съвместимо object storage. Нищо не го обвързва с конкретен доставчик. **2 vCPU и 4 GB** са предостатъчни за начало:
+при тест с натоварване 1500 едновременни играчи използваха около 5% от едно ядро. Всички образи работят на x86 и ARM.
 
-Choosing the server (prices as of October 2026; check before ordering), in the EU for GDPR and low latency to
-Bulgaria:
-- **Hetzner** CX23 (€5.99) or CAX11 (ARM, €6.49), in Falkenstein, Nuremberg or Helsinki: the best value when in stock
-  (they've often been sold out since September 2026). The always-orderable CPX22 costs about three times more.
-- **netcup** VPS 500 (about €8, month to month; Germany or Vienna) or **OVHcloud** VPS-1 (€4.49): good alternatives.
+Избор на сървър (цените са към октомври 2026; провери ги преди поръчка) — в ЕС заради GDPR и ниската латентност до
+България:
+- **Hetzner** CX23 (5,99 €) или CAX11 (ARM, 6,49 €) във Фалкенщайн, Нюрнберг или Хелзинки: най-изгодни, когато ги
+  има (от септември 2026 често са изчерпани). CPX22, който винаги може да се поръча, струва около три пъти повече.
+- **netcup** VPS 500 (около 8 €, помесечно; Германия или Виена) или **OVHcloud** VPS-1 (4,49 €): добри алтернативи.
 
-1. **Create the server:** Ubuntu 24.04, logged in with an SSH key (no password logins). In the provider's firewall
-   allow TCP 22 (ideally only from your own IP), 80 and 443, and UDP 443 (HTTP/3). Turn on automatic security
-   updates: `sudo apt install unattended-upgrades`.
-2. **Point DNS at it:** add `A` records for `almanac.bg` and `www.almanac.bg` with the server's IPv4 (and `AAAA`
-   for IPv6).
-3. **Create the backup bucket:** any S3-compatible storage works. Hetzner Object Storage (about €6.49 a month for
-   1 TB, no per-request fees; Cloud Console → Object Storage) is the simple choice even if the server is elsewhere;
-   Cloudflare R2 or Backblaze B2 work too. Create a bucket (e.g. `almanac-backups`) and S3 credentials, and set the
-   `BACKUP_*` values in `.env` (`BACKUP_REGION` is the location in the endpoint, e.g. `fsn1`; `auto` for R2). If
-   the provider offers whole-server backups (Hetzner: **Backups**, +20%), turn them on too.
-4. **Install Docker and deploy:**
+1. **Създай сървъра:** Ubuntu 24.04, с вход през SSH ключ (без вход с парола). Във firewall-а на доставчика разреши
+   TCP 22 (в идеалния случай само от твоя IP адрес), 80 и 443 и UDP 443 (HTTP/3). Включи автоматичните обновления за
+   сигурност: `sudo apt install unattended-upgrades`.
+2. **Насочи DNS към него:** добави `A` записи за `almanac.bg` и `www.almanac.bg` с IPv4 адреса на сървъра (и `AAAA`
+   за IPv6).
+3. **Създай bucket за бекъпите:** става всяко S3-съвместимо хранилище. Hetzner Object Storage (около 6,49 € на месец
+   за 1 TB, без такси за заявки; Cloud Console → Object Storage) е лесният избор, дори сървърът да е другаде;
+   Cloudflare R2 и Backblaze B2 също вършат работа. Създай bucket (напр. `almanac-backups`) и S3 ключове и попълни
+   стойностите `BACKUP_*` в `.env` (`BACKUP_REGION` е локацията в endpoint-а, напр. `fsn1`; `auto` за R2). Ако
+   доставчикът предлага бекъпи на целия сървър (Hetzner: **Backups**, +20%), включи и тях.
+4. **Инсталирай Docker и пусни приложението:**
    ```bash
    curl -fsSL https://get.docker.com | sh
    git clone https://github.com/almanac-bg/almanac.git almanac && cd almanac
-   # The private question bank: give the server read access with a deploy key (ssh-keygen -t ed25519, then add
-   # the public key in almanac-questions → Settings → Deploy keys, read-only).
+   # Частната банка с въпроси: дай на сървъра достъп за четене с deploy key (ssh-keygen -t ed25519, после добави
+   # публичния ключ в almanac-questions → Settings → Deploy keys, само за четене).
    git clone git@github.com:almanac-bg/almanac-questions.git private
-   cp .env.example .env        # set DOMAIN, OPERATOR_*, the BACKUP_* values…
+   cp .env.example .env        # задай DOMAIN, OPERATOR_*, стойностите BACKUP_*…
    APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
-5. Open https://almanac.bg and register your account, then make it the admin:
+5. Отвори https://almanac.bg, регистрирай профила си и го направи администратор:
    ```bash
    docker compose exec app node apps/server/dist/cli.mjs admin add <your-username>
    ```
-   (`admin list` and `admin remove <username>` work the same way.)
-6. **Test the backup once** (the commands are in `deploy/litestream.yml`): restore into a scratch file and check it
-   exists. A backup that has never been restored isn't a backup yet. (CI also does a full backup-and-restore with
-   the production config on every push.)
-7. **Turn on error reports:** create a free Sentry account with the organization in the **EU** region (Frankfurt;
-   it can't be changed later), add a project of type "Browser JavaScript", and in its settings turn on "Prevent
-   Storing of IP Addresses". Put its DSN in `.env` as `SENTRY_DSN` and run the deploy command again. Server errors
-   and crashes in players' browsers then arrive in Sentry (and by email), grouped, with the line of code. Without
-   `SENTRY_DSN` nothing is sent anywhere.
-8. **Add an uptime check:** a free monitor (UptimeRobot's free plan is for non-commercial sites like this one, or
-   Better Stack) on `https://almanac.bg/api/health`, alerting you by email or push.
+   (`admin list` и `admin remove <username>` работят по същия начин.)
+6. **Тествай бекъпа веднъж** (командите са в `deploy/litestream.yml`): възстанови го във временен файл и провери, че
+   файлът съществува. Бекъп, който никога не е бил възстановяван, още не е бекъп. (CI също прави пълен бекъп и
+   възстановяване с продукционната конфигурация при всеки push.)
+7. **Включи отчетите за грешки:** създай безплатен профил в Sentry с организация в региона **EU** (Франкфурт; не
+   може да се смени по-късно), добави проект от тип „Browser JavaScript“ и в настройките му включи „Prevent Storing
+   of IP Addresses“. Сложи DSN-а му в `.env` като `SENTRY_DSN` и пусни командата за деплой отново. Оттам нататък
+   грешките на сървъра и сривовете в браузърите на играчите пристигат в Sentry (и по имейл), групирани и с реда от
+   кода. Без `SENTRY_DSN` нищо не се изпраща никъде.
+8. **Добави проверка за uptime:** безплатен монитор (UptimeRobot, чийто безплатен план е за некомерсиални сайтове като
+   този, или Better Stack) на `https://almanac.bg/api/health`, който те известява по имейл или с push известие.
 
-**Email (password resets, verification, streak reminders):**
-1. Create an account with a transactional email provider. Brevo (EU, free up to 300 emails a day), Mailgun EU and
-   Postmark all work.
-2. Authenticate the `almanac.bg` domain there by adding the DNS records it gives you (DKIM, DMARC, a verification
-   code), and add the sender `no-reply@almanac.bg`.
-3. Put the SMTP details in `.env` as `SMTP_URL` and run the deploy command again. Brevo's SMTP login contains an `@`:
-   write it as `%40` in the URL, e.g. `smtp://8a1b2c001%40smtp-brevo.com:KEY@smtp-relay.brevo.com:587`.
+**Имейли (нова парола, потвърждение, напомняния за серията):**
+1. Създай профил при доставчик на транзакционни имейли. Brevo (ЕС, безплатно до 300 имейла на ден), Mailgun EU и
+   Postmark вършат работа.
+2. Потвърди там домейна `almanac.bg`, като добавиш DNS записите, които ти дава (DKIM, DMARC, код за потвърждение), и
+   добави подателя `no-reply@almanac.bg`.
+3. Сложи SMTP данните в `.env` като `SMTP_URL` и пусни командата за деплой отново. SMTP потребителят на Brevo
+   съдържа `@`: в URL-а го пиши като `%40`, напр. `smtp://8a1b2c001%40smtp-brevo.com:KEY@smtp-relay.brevo.com:587`.
 
-Use port **587**: many providers (Hetzner among them) block outgoing ports 25 and 465 on new servers.
+Използвай порт **587**: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и 465 на нови сървъри.
 
-**Before launch:** set your name, a correspondence address, the email provider and the hosting provider in `.env`
-(`OPERATOR_NAME`, `OPERATOR_ADDRESS`, `EMAIL_PROVIDER`, `HOSTING_PROVIDER`; they're never in the code); the
-service is run by a private individual, and the privacy policy and terms show these details. Both documents are
-drafts: have them reviewed for your situation.
+**Преди старта:** попълни в `.env` името си, адрес за кореспонденция, доставчика на имейли и хостинг доставчика
+(`OPERATOR_NAME`, `OPERATOR_ADDRESS`, `EMAIL_PROVIDER`, `HOSTING_PROVIDER`; те никога не са в кода); услугата се
+поддържа от физическо лице и политиката за поверителност и условията за ползване показват тези данни. И двата
+документа са чернови: погрижи се да бъдат прегледани за твоя случай.
 
-**Updating:** `git pull && git -C private pull && APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build` (the release tag
-lets error reports say which version they came from). The new version builds while the old one keeps running.
-Then the old one stops gracefully: queued players are told an update is coming, no new matches start, and running
-matches play to the end (up to ~5½ minutes, `DRAIN_SECONDS`) before it restarts. While it's down for those few
-seconds, Caddy shows a page that reloads by itself, and players' browsers reconnect automatically.
+**Обновяване:** `git pull && git -C private pull && APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build` (така
+отчетите за грешки показват от коя версия идват). Новата версия се билдва, докато старата продължава да работи.
+После старата спира плавно: играчите в опашката научават, че идва обновяване, нови мачове не започват, а текущите
+се доиграват (до ~5½ минути, `DRAIN_SECONDS`) преди рестарта. През тези няколко секунди, докато приложението не
+работи, Caddy показва страница, която се презарежда сама, а браузърите на играчите се свързват отново автоматично.
 
-**Backups:** three layers.
-1. **Litestream (continuous, off-site):** every change reaches object storage within seconds; any moment of the last
-   7 days can be restored. Restore commands are in `deploy/litestream.yml`.
-2. **Daily snapshots (automatic, on the server):** after 04:00 Sofia time the app writes a consistent copy of the
-   database to `/data/backups/quiz-YYYY-MM-DD.db` and keeps the last 14 (`BACKUP_KEEP_DAYS`). Handy for undoing a
-   mistake quickly; they live on the same disk.
-3. **The provider's server backups** (if it offers them): daily images of the whole server, kept off the machine.
+**Бекъпи:** на три нива.
+1. **Litestream (непрекъснато, извън сървъра):** всяка промяна стига до object storage за секунди; може да се
+   възстанови всеки момент от последните 7 дни. Командите за възстановяване са в `deploy/litestream.yml`.
+2. **Дневни копия (автоматично, на сървъра):** след 04:00 софийско време приложението записва консистентно копие на
+   базата в `/data/backups/quiz-YYYY-MM-DD.db` и пази последните 14 (`BACKUP_KEEP_DAYS`). Удобни са за бързо
+   поправяне на грешка; намират се на същия диск.
+3. **Бекъпите на сървъра от доставчика** (ако ги предлага): дневни образи на целия сървър, пазени извън машината.
 
-To restore a daily snapshot:
+За да възстановиш дневно копие:
 ```bash
 docker compose stop app
-docker compose run --rm --no-deps --entrypoint sh app -c 'ls /data/backups'   # pick a day
+docker compose run --rm --no-deps --entrypoint sh app -c 'ls /data/backups'   # избери ден
 docker compose run --rm --no-deps --entrypoint sh app -c \
   'cp /data/quiz.db /data/quiz-before-restore.db && cp /data/backups/quiz-2026-10-25.db /data/quiz.db && rm -f /data/quiz.db-wal /data/quiz.db-shm'
 docker compose start app
 ```
 
-**Monitoring:**
-- **Uptime:** `/api/health` answers 200 only while the app and its database work (see step 8).
-- **Errors:** Sentry, when `SENTRY_DSN` is set (see step 7). Reports carry the place in the code and the account
-  number only; the browser sends them through the app (`/api/monitoring`), never to Sentry directly, and they are
-  capped at 20 a minute so a bug in a loop can't use up the free plan (5,000 a month). Everything is also in the log
-  (`💥` for the server, `🧯` for browsers).
-- **Launch statistics:** `/admin` → Статистика: active players per day, new players (accounts and guests), saved
-  guest accounts, matches, challenge links, the daily challenge, and how many new players come back the next day and
-  a week later. Counted on the server as things happen; no cookies, no tracking, no third parties.
-- **Updates:** Dependabot opens weekly pull requests for npm packages, the Node base image, Caddy, Litestream and
-  the CI actions (security fixes right away); CI tests each one.
+**Мониторинг:**
+- **Uptime:** `/api/health` отговаря с 200 само докато приложението и базата му работят (виж стъпка 8).
+- **Грешки:** Sentry, когато е зададен `SENTRY_DSN` (виж стъпка 7). Отчетите съдържат само мястото в кода и номера
+  на профила; браузърът ги праща през приложението (`/api/monitoring`), никога директно към Sentry, и са ограничени
+  до 20 на минута, за да не може бъг в цикъл да изразходва безплатния план (5000 на месец). Всичко е и в лога (`💥`
+  за сървъра, `🧯` за браузърите).
+- **Статистика за старта:** `/admin` → Статистика: активни играчи на ден, нови играчи (профили и гости), запазени
+  гост-профили, мачове, линкове с предизвикателство, дневното предизвикателство и колко от новите играчи се връщат на
+  следващия ден и след седмица. Брои се на сървъра в момента на събитията; без бисквитки, без проследяване, без
+  трети страни.
+- **Обновления:** Dependabot отваря седмични pull request-и за npm пакетите, базовия образ на Node, Caddy, Litestream
+  и CI actions (поправките за сигурност — веднага); CI тества всеки от тях.
 
-**Logs:** `docker compose logs -f app` (rotated: 5 × 10 MB per container).
+**Логове:** `docker compose logs -f app` (с ротация: 5 × 10 MB на контейнер).
 
-Live matches, queues and rooms are held in memory, so run a single app instance.
+Текущите мачове, опашките и стаите се държат в паметта, затова пускай само една инстанция на приложението.
 
-## Contributing
+## Принос
 
-Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately, as
-described in [SECURITY.md](SECURITY.md).
+Issues и pull request-и са добре дошли: виж [CONTRIBUTING.md](CONTRIBUTING.md). Проблеми със сигурността съобщавай
+поверително, както е описано в [SECURITY.md](SECURITY.md).
 
-## License
+## Лиценз
 
-The code is free software under the **GNU Affero General Public License v3.0 or later** ([LICENSE](LICENSE)). You
-may run, study, change and share it. If you run a changed version as a public website, its users must be able to get
-your source code: the footer's "Изходен код" link (`SOURCE_URL`) is there for that.
+Кодът е свободен софтуер под **GNU Affero General Public License v3.0 или по-нова версия** ([LICENSE](LICENSE)).
+Можеш да го стартираш, изучаваш, променяш и разпространяваш. Ако пуснеш променена версия като публичен уебсайт,
+потребителите ѝ трябва да могат да получат изходния ти код: линкът „Изходен код“ във футъра (`SOURCE_URL`) е точно за
+това.
 
-Not covered by the license:
-- **The name АЛМАНАХ, its logo and the almanac.bg domain.** A copy you run publicly needs its own name and branding
-  (`packages/shared/src/brand.ts`, the icons in `apps/web/public`).
-- **The game's question bank**, which isn't in this repository. The sample bank in it is part of the code and may be
-  used with it.
+Лицензът не обхваща:
+- **Името АЛМАНАХ, логото му и домейна almanac.bg.** Копие, което пускаш публично, трябва да има собствено име и
+  собствена визуална идентичност (`packages/shared/src/brand.ts`, иконите в `apps/web/public`).
+- **Банката с въпроси на играта**, която не е в това хранилище. Примерната банка в него е част от кода и може да се
+  използва заедно с него.
 
-## GitHub repository settings
+## Настройки на хранилището в GitHub
 
-`scripts/github-setup.sh almanac-bg/almanac` sets up the GitHub side (safe to run again): description, website and
-topics, issues and discussions, squash merges, Dependabot alerts and security updates, private vulnerability
-reporting, secret scanning, labels and a protected `main`. Some of these exist only for public repositories, so
-run it again after making the repository public. The social preview image (`.github/social-preview.png`) is
-uploaded by hand: Settings → General → Social preview.
-
+`scripts/github-setup.sh almanac-bg/almanac` настройва хранилището в GitHub (може спокойно да се пуска повторно):
+описание, уебсайт и topics, issues и discussions, squash merge, Dependabot alerts и security updates, private
+vulnerability reporting, secret scanning, етикети и защитен `main`. Някои от тези настройки съществуват само за
+публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично. Изображението за social
+preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.

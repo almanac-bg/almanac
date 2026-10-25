@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: A wrong question in the game
+  - name: Грешен въпрос в играта
     url: https://almanac.bg
-    about: Flag it from the question review after the match (🚩) — moderators see those first.
+    about: Сигнализирай от прегледа на въпросите след мача (🚩) — модераторите виждат тези сигнали първи.

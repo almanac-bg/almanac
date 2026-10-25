@@ -1,28 +1,32 @@
-# Changelog
+# История на промените
 
-All notable changes to АЛМАНАХ. Versions follow [Semantic Versioning](https://semver.org/); dates are Sofia time.
+Всички съществени промени в АЛМАНАХ. Версиите следват [Semantic Versioning](https://semver.org/); датите са по
+софийско време.
 
-## [0.9.0] — 2026-10-25 · Ready for launch
+## [0.9.0] — 2026-10-25 · Готово за старт
 
-The first complete version: everything the game needs to open to the public at almanac.bg.
+Първата пълна версия: всичко, което е нужно на играта, за да се отвори за всички на almanac.bg.
 
-### Play
-- Real-time quiz battles in Bulgarian: solo, a daily challenge, ranked Дуел and Роял (8 players, eliminations)
-  — plus Трио, Арена and 2 на 2 teams, ready to open as the game grows — and private rooms for friends.
-- Challenge links: ten fixed questions anyone with the link plays once, with a board per link.
-- Guest play: a first game in one tap, with the progress saved later by choosing a name and password.
-- Rematches with the same opponents, friends and invites, five jokers ("Двойно или нищо" risks 500 points).
-- Levels, cosmetics, 41 achievements, daily quests, a daily streak with shields, and monthly ranked seasons.
-- Fair matchmaking: bots play as strong as the rating they show, and win-trading between accounts is limited.
-- About 2,000 fact-checked questions in 10 categories; players submit more, moderators review them.
+### Игра
+- Куиз битки в реално време: соло, дневно предизвикателство, класирани Дуел и Роял (8 играчи, отпадане) — плюс Трио,
+  Арена и отбори 2 на 2, готови да се отворят, когато играта порасне — и частни стаи за приятели.
+- Линкове с предизвикателство: десет фиксирани въпроса, които всеки с линка играе веднъж, с отделна класация за всеки
+  линк.
+- Игра като гост: първа игра с едно докосване, а прогресът се запазва по-късно с избор на име и парола.
+- Реванши със същите съперници, приятели и покани, пет жокера („Двойно или нищо“ рискува 500 точки).
+- Нива, козметика, 41 постижения, дневни задачи, дневна серия с щитове и месечни класирани сезони.
+- Честен matchmaking: ботовете играят толкова силно, колкото показва рейтингът им, а размяната на победи между
+  профили е ограничена.
+- Около 2000 проверени въпроса в 10 категории; играчите предлагат още, модераторите ги преглеждат.
 
-### Built for running it
-- One Node server (Express, Socket.IO, SQLite) with a server-authoritative game engine that survives bad input,
-  dropped connections and restarts (running matches finish before a deploy).
-- Continuous backups (Litestream) tested by a full restore in CI, daily snapshots, and graceful updates.
-- Accounts with hashed sessions, email verification and password resets, moderation, reports and bans.
-- Privacy by design: GDPR data export and deletion, no tracking; launch statistics counted on the server.
-- Error reports (Sentry, optional), Dependabot, and server, game-engine and browser tests in CI.
-- Mobile-first, accessible web app that installs to the home screen.
+### За поддръжката
+- Един Node сървър (Express, Socket.IO, SQLite) с енджин на играта изцяло на сървъра, който издържа на невалидни
+  данни, прекъснати връзки и рестарти (текущите мачове завършват преди деплой).
+- Непрекъснати бекъпи (Litestream), проверени с пълно възстановяване в CI, дневни копия и плавни обновления.
+- Профили с хеширани сесии, потвърждение на имейл и нова парола по имейл, модерация, доклади и банове.
+- Поверителност по замисъл: износ и изтриване на данните по GDPR, без проследяване; статистиката за старта се брои
+  на сървъра.
+- Отчети за грешки (Sentry, по избор), Dependabot и тестове за сървъра, енджина на играта и браузъра в CI.
+- Достъпно уеб приложение, направено първо за телефони, което се инсталира на началния екран.
 
 [0.9.0]: ../../releases/tag/v0.9.0

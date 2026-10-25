@@ -10,7 +10,7 @@ const server = process.env.API_URL ?? 'http://localhost:3001';
 const manifest = JSON.stringify({
   name: `${BRAND.name} — ${BRAND.tagline.toLowerCase()}`,
   short_name: BRAND.name,
-  description: 'Куиз битки на български: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
+  description: 'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
   lang: 'bg',
   id: '/',
   start_url: '/',

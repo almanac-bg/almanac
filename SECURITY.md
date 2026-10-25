@@ -1,12 +1,12 @@
-# Security
+# Сигурност
 
-If you find a security problem — a way to cheat the server, get at other players' data, take over accounts or
-crash the service — please report it **privately**:
+Ако откриеш проблем със сигурността — начин да измамиш сървъра, да достигнеш до данни на други играчи, да превземеш
+профили или да сринеш услугата — моля, съобщи за него **поверително**:
 
-- with GitHub's **"Report a vulnerability"** button (Security tab of this repository), or
-- by email to the contact address in the game's privacy policy ([almanac.bg/privacy](https://almanac.bg/privacy)).
+- с бутона **„Report a vulnerability“** в GitHub (раздел Security на това хранилище) или
+- по имейл на адреса за контакт в политиката за поверителност на играта ([almanac.bg/privacy](https://almanac.bg/privacy)).
 
-Please don't open a public issue or test against other players' accounts. Include what you found and how to
-reproduce it; we'll answer within a few days and credit you if you'd like.
+Моля, не отваряй публичен issue и не тествай върху профилите на други играчи. Опиши какво намери и как да се
+възпроизведе; ще отговорим до няколко дни и ще посочим приноса ти, ако искаш.
 
-Only the latest version (the `main` branch, which runs on almanac.bg) gets fixes.
+Поправки получава само последната версия (клонът `main`, който работи на almanac.bg).

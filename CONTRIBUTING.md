@@ -1,45 +1,47 @@
-# Contributing to АЛМАНАХ
+# Принос към АЛМАНАХ
 
-Thanks for helping! Bug reports, fixes and improvements are all welcome. The game is in Bulgarian; code, comments
-and discussions here are in English (Bulgarian is fine too).
+Благодарим, че помагаш! Доклади за бъгове, поправки и подобрения — всичко е добре дошло. Дискусиите, issues и pull
+request-ите тук са на български (английският също е добре дошъл); кодът и коментарите в него са на английски.
 
-## Getting started
+## Първи стъпки
 
-Node 24+ is all you need (the database is SQLite, built into Node):
+Нужен ти е само Node 24+ (базата данни е SQLite, вградена в Node):
 
 ```bash
 npm install
-npm run dev        # server on :3001, web app on :5173
+npm run dev        # сървър на :3001, уеб приложение на :5173
 ```
 
-A fresh checkout plays a 120-question sample bank; the live game's bank is private. The first account you register
-in development is a moderator, so you can try `/admin` too. See the [README](README.md) for the layout of the code.
+Току-що клонираният код играе с примерна банка от 120 въпроса; банката на almanac.bg е частна. Първият профил, който
+регистрираш при разработка, е модератор, така че можеш да пробваш и `/admin`. Структурата на кода е описана в
+[README](README.md).
 
-## Before you open a pull request
+## Преди да отвориш pull request
 
-- `npm run typecheck` and `npm test` pass. For changes to the web app, also run the browser tests:
-  `BROWSER_PATH=<path to a Chromium-based browser> npm run test:browser` (CI runs them with Chrome).
-- New behaviour comes with a test: `apps/server/test` (Node's test runner) for the server and game rules,
-  `apps/web/e2e` (Playwright) for whole flows in the browser.
-- Database changes are a new migration appended to the list in `apps/server/src/db.ts`; never edit an existing one
-  (live databases have already run it).
-- Keep pull requests focused: one change, explained in its description.
+- `npm run typecheck` и `npm test` минават. При промени в уеб приложението пусни и браузърните тестове:
+  `BROWSER_PATH=<път до браузър, базиран на Chromium> npm run test:browser` (CI ги пуска с Chrome).
+- Новото поведение идва с тест: `apps/server/test` (test runner-ът на Node) за сървъра и правилата на играта,
+  `apps/web/e2e` (Playwright) за цели сценарии в браузъра.
+- Промяна в базата данни е нова миграция, добавена в края на списъка в `apps/server/src/db.ts`; никога не редактирай
+  съществуваща (живите бази вече са я изпълнили).
+- Pull request-ите да са фокусирани: една промяна, обяснена в описанието.
 
-## Style
+## Стил
 
-- Match the code around you: its naming, comment density and idioms. Comments say *why*, not what.
-- Text players see is in **Bulgarian** and **gender-neutral**: no masculine or feminine forms when addressing the
-  player ("Ти си в стая", "Имаш покана" — not "Поканен си", "готов", "влязъл").
-- The web app must work on a 320 px wide phone (no sideways scrolling), with 44 px touch targets, keyboard access
-  and screen-reader labels.
-- The server owns the rules: the clock, answers and scoring never trust the client.
+- Следвай кода около промяната: именуването, колко коментари има и идиомите му. Коментарите казват *защо*, а не
+  какво.
+- Текстът, който играчите виждат, е на **български** и е **неутрален по отношение на пола**: без мъжки или женски
+  форми, когато се обръщаш към играча („Ти си в стая“, „Имаш покана“ — а не „Поканен си“, „готов“, „влязъл“).
+- Уеб приложението трябва да работи на телефон с ширина 320 px (без хоризонтално скролиране), с цели за докосване от
+  44 px, достъп от клавиатура и етикети за екранни четци.
+- Сървърът държи правилата: за часовника, отговорите и точките никога не се вярва на клиента.
 
-## Questions for the game
+## Въпроси за играта
 
-Questions are added in the game itself ("Предложи въпрос", from level 3) and reviewed by moderators, not through
-pull requests.
+Въпросите се добавят в самата игра („Предложи въпрос“, от ниво 3) и се преглеждат от модератори, а не чрез pull
+request-и.
 
-## License
+## Лиценз
 
-By contributing, you agree that your contribution is licensed under the project's license, the
-[GNU AGPL v3.0 or later](LICENSE).
+Изпращайки принос, се съгласяваш той да се лицензира под лиценза на проекта —
+[GNU AGPL v3.0 или по-нова версия](LICENSE).

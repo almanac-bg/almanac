@@ -1,13 +1,13 @@
-# Code of Conduct
+# Кодекс на поведение
 
-We want this project to be friendly and welcoming to everyone, whatever their experience, background or identity.
+Искаме този проект да е приятелски и гостоприемен за всички, независимо от опита, произхода или идентичността им.
 
-- Be kind and patient; assume good intent.
-- Criticise ideas and code, never people.
-- No harassment, insults, discrimination or unwelcome attention, here or in the game.
+- Проявявай доброта и търпение; приемай, че другите имат добри намерения.
+- Критикувай идеите и кода, никога хората.
+- Без тормоз, обиди, дискриминация или нежелано внимание — нито тук, нито в играта.
 
-Maintainers may edit or remove contributions and comments that break this, and block people who keep doing so.
-To report a problem privately, write to the contact address in the game's privacy policy
-([almanac.bg/privacy](https://almanac.bg/privacy)).
+Поддържащите проекта могат да редактират или премахват приноси и коментари, които нарушават тези правила, и да
+блокират хора, които продължават да го правят. За да съобщиш поверително за проблем, пиши на адреса за контакт в
+политиката за поверителност на играта ([almanac.bg/privacy](https://almanac.bg/privacy)).
 
-This code follows the spirit of the [Contributor Covenant](https://www.contributor-covenant.org/).
+Този кодекс следва духа на [Contributor Covenant](https://www.contributor-covenant.org/).

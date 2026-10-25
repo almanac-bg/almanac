@@ -1,9 +1,9 @@
-## What and why
+## Какво и защо
 
-<!-- What does this change, and why? Link the issue if there is one. -->
+<!-- Какво променя това и защо? Добави линк към issue-то, ако има такова. -->
 
-## Checked
+## Проверено
 
-- [ ] `npm run typecheck` and `npm test` pass
-- [ ] New behaviour has a test (server: `apps/server/test`, browser: `apps/web/e2e`)
-- [ ] Player-facing text is Bulgarian and gender-neutral; works on a 320 px phone
+- [ ] `npm run typecheck` и `npm test` минават
+- [ ] Новото поведение има тест (сървър: `apps/server/test`, браузър: `apps/web/e2e`)
+- [ ] Текстът за играчите е на български и неутрален по отношение на пола; работи на телефон с ширина 320 px

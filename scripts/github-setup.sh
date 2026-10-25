@@ -20,7 +20,7 @@ try() { # try <label> <command…>: runs it, reporting success or GitHub's reaso
 
 echo "About"
 try "description, website and topics" gh repo edit "$repo" \
-  --description "АЛМАНАХ ⚡ Real-time multiplayer quiz battles in Bulgarian: duels, an 8-player Royale, a daily challenge and challenge links. React, Node.js, Socket.IO, SQLite." \
+  --description "АЛМАНАХ ⚡ Куиз битки в реално време: дуели, Роял за 8 играчи, дневно предизвикателство и предизвикателства с линк. React, Node.js, Socket.IO, SQLite." \
   --homepage "https://almanac.bg" \
   --add-topic quiz,trivia,quiz-game,multiplayer-game,realtime,browser-game,bulgaria,bulgarian,react,typescript,nodejs,socket-io,sqlite,vite,tailwindcss,pwa,self-hosted,agpl
 
@@ -44,14 +44,14 @@ JSON
 
 echo "Labels"
 label() { try "label: $1" gh label create "$1" --repo "$repo" --color "$2" --description "$3" --force; }
-label bug d73a4a "Something doesn't work as it should"
-label enhancement a2eeef "A new feature or an improvement"
-label ux 8b5cf6 "Layout, accessibility, wording, mobile"
-label game-balance f59e0b "Scoring, ratings, XP, bots, matchmaking"
-label questions 34d399 "The question bank and community questions"
-label security b60205 "Security or privacy"
-label dependencies 0366d6 "Dependency updates (Dependabot)"
-label "good first issue" 7057ff "A small, well-defined place to start"
+label bug d73a4a "Нещо не работи както трябва"
+label enhancement a2eeef "Нова възможност или подобрение"
+label ux 8b5cf6 "Изглед, достъпност, текстове, телефони"
+label game-balance f59e0b "Точки, рейтинг, XP, ботове, търсене на съперници"
+label questions 34d399 "Въпросите в играта и предложените от играчите"
+label security b60205 "Сигурност или поверителност"
+label dependencies 0366d6 "Обновяване на зависимости (Dependabot)"
+label "good first issue" 7057ff "Малка, ясна задача за начало"
 
 echo "Branch protection"
 # main can't be deleted or force-pushed (history is never rewritten); pushing and merging stay as they are.
