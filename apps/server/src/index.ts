@@ -140,11 +140,11 @@ for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
   });
 }
 
-// A public service must say who runs it (ЗЕТ чл. 4, GDPR чл. 13): no launching with placeholders in the legal pages.
-if (config.production && (!config.operator.name || !config.operator.address)) {
-  console.error(
-    '⚖️  Set OPERATOR_NAME and OPERATOR_ADDRESS (see .env.example): the privacy policy and terms need them.',
-  );
+// A public service must say who runs it (GDPR чл. 13: the identity and contact details; the name and CONTACT_EMAIL
+// are those). A postal address is optional: ЗЕТ чл. 4 asks for one from services provided for remuneration, which a
+// free game without ads is not. No launching with a placeholder in the legal pages.
+if (config.production && !config.operator.name) {
+  console.error('⚖️  Set OPERATOR_NAME (see .env.example): the privacy policy and terms say who runs the site.');
   process.exit(1);
 }
 if (config.production && config.gameTimeScale !== 1) {

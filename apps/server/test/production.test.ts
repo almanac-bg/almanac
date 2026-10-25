@@ -76,7 +76,7 @@ test('a link cut short by a mail app gets a Bulgarian answer, not a validator me
 test('production refuses to start without who runs the site (the legal pages need it)', async () => {
   await assert.rejects(
     startServer({ NODE_ENV: 'production', OPERATOR_NAME: '', OPERATOR_ADDRESS: '' }),
-    /OPERATOR_NAME and OPERATOR_ADDRESS/,
+    /Set OPERATOR_NAME/,
   );
 });
 

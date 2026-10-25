@@ -62,7 +62,7 @@ jobs:
       - run: docker build -t almanac .
       # Boot the image and wait for the health check to pass.
       - run: |
-          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI -e OPERATOR_ADDRESS=CI almanac
+          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI almanac
           for i in $(seq 1 30); do
             curl -sf http://localhost:3001/api/health && exit 0
             sleep 1
@@ -81,7 +81,7 @@ jobs:
           export BACKUP_ACCESS_KEY_ID=test BACKUP_SECRET_ACCESS_KEY=test
           env_args="-e BACKUP_BUCKET -e BACKUP_ENDPOINT -e BACKUP_REGION -e BACKUP_ACCESS_KEY_ID -e BACKUP_SECRET_ACCESS_KEY"
           config="-v $PWD/deploy/litestream.yml:/etc/litestream.yml:ro"
-          app_env="-e OPERATOR_NAME=CI -e OPERATOR_ADDRESS=CI"
+          app_env="-e OPERATOR_NAME=CI"
           # As in docker-compose.yml: Litestream runs as the app's user.
           as_app="--user 1000:1000"
           healthy() {
