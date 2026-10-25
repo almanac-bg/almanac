@@ -1,17 +1,17 @@
+import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
 import { MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
 import { Invites } from './components/Invites';
+import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { NavBar } from './components/NavBar';
 import { QueueOverlay } from './components/QueueOverlay';
 import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
 import { Spinner } from './components/ui';
-import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
-import { LegalLinks } from './components/LegalLinks';
 import { identify } from './lib/monitoring';
 import { markReturning } from './lib/returning';
 import { AuthPage } from './pages/AuthPage';
@@ -24,9 +24,9 @@ import {
   GamePage,
   LeaderboardPage,
   LockerPage,
-  prefetchPages,
   PrivacyPage,
   ProfilePage,
+  prefetchPages,
   ResetPasswordPage,
   RoomPage,
   SettingsPage,
@@ -48,6 +48,7 @@ export function App() {
   const signedIn = !!me;
   // A guest has no name or password to sign in with, so the sign-in page shouldn't open on "Вход" for them.
   const account = signedIn && !me.isGuest;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `pathname` and `signedIn` are the triggers, not inputs
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname, signedIn]);

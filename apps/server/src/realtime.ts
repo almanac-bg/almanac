@@ -12,8 +12,8 @@ import {
 } from '@quiz/shared';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
-import { config } from './config';
 import { challengeQuestions, claimChallengeAttempt, createChallenge } from './challenges';
+import { config } from './config';
 import { claimDailyAttempt, dailyQuestions } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
@@ -22,10 +22,10 @@ import { buildHuman, GameRegistry } from './game/registry';
 import { Rematches } from './game/rematch';
 import { RoomManager } from './game/rooms';
 import { guarded } from './guard';
-import { friendsChanged, notifyUser, setRealtime } from './notify';
-import { eventBucket, throttled } from './throttle';
 import { ACCOUNT_ONLY } from './guests';
 import { reportError } from './monitoring';
+import { friendsChanged, notifyUser, setRealtime } from './notify';
+import { eventBucket, throttled } from './throttle';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
@@ -39,7 +39,8 @@ function reply<T extends object>(ack: unknown, result: AckResult<T>) {
 const str = (x: unknown, max: number) => (typeof x === 'string' ? x.slice(0, max) : '');
 /** -1 for anything but a whole number: no player, question or option has that id. */
 const int = (x: unknown) => (Number.isSafeInteger(x) ? (x as number) : -1);
-const obj = (x: unknown): Record<string, unknown> => (x !== null && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
+const obj = (x: unknown): Record<string, unknown> =>
+  x !== null && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {};
 
 const MAX_SOCKETS_PER_USER = 10;
 
@@ -70,7 +71,13 @@ export function createRealtime(httpServer: HttpServer): Realtime {
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
   /** Set when the server is shutting down for an update. */
   let draining = false;
-  const rematches = new Rematches(io, games, matchmaker, () => !draining, (userId) => openSockets.has(userId));
+  const rematches = new Rematches(
+    io,
+    games,
+    matchmaker,
+    () => !draining,
+    (userId) => openSockets.has(userId),
+  );
 
   const presenceOf = (userId: number): Presence => {
     if (!openSockets.has(userId)) return 'offline';
@@ -91,7 +98,10 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     queues: matchmaker.counts(),
     modes: config.openQueues,
   });
-  setInterval(guarded('lobby stats', () => io.emit('lobby:stats', stats())), 3000).unref();
+  setInterval(
+    guarded('lobby stats', () => io.emit('lobby:stats', stats())),
+    3000,
+  ).unref();
 
   io.use((socket, next) => {
     const token = sessionTokenFromCookieHeader(socket.request.headers.cookie);
@@ -298,7 +308,9 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     on('room:team', (playerId) => rooms.switchTeam(userId, str(playerId, 32)));
     on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
 
-    on('invite:send', (p, ack) => reply(ack, guest() ? { ok: false, error: ACCOUNT_ONLY } : rooms.invite(userId, int(obj(p).userId))));
+    on('invite:send', (p, ack) =>
+      reply(ack, guest() ? { ok: false, error: ACCOUNT_ONLY } : rooms.invite(userId, int(obj(p).userId))),
+    );
 
     on('invite:decline', (p) => {
       const from = rooms.declineInvite(userId, str(obj(p).inviteId, 64));
@@ -323,7 +335,8 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     on('game:powerup', (p) => {
       const game = games.forUser(userId);
       const { index, powerup } = obj(p);
-      if (game && POWERUP_IDS.includes(powerup as PowerupId)) game.usePowerup(game.playerIdFor(userId), int(index), powerup as PowerupId);
+      if (game && POWERUP_IDS.includes(powerup as PowerupId))
+        game.usePowerup(game.playerIdFor(userId), int(index), powerup as PowerupId);
     });
 
     on('game:react', (emote) => {

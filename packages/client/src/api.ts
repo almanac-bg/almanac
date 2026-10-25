@@ -60,7 +60,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   me: () => request<{ user: MeUser | null }>('GET', '/me'),
   operator: () => request<OperatorInfo>('GET', '/legal'),
-  login: (username: string, password: string) => request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
+  login: (username: string, password: string) =>
+    request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
   register: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
@@ -74,12 +75,15 @@ export const api = {
   remindersOff: (u: string, k: string) =>
     request<{ ok: true }>('POST', `/reminders/off?u=${encodeURIComponent(u)}&k=${encodeURIComponent(k)}`),
   forgotPassword: (login: string) => request<{ ok: true }>('POST', '/auth/forgot', { login }),
-  resetPassword: (token: string, password: string) => request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
+  resetPassword: (token: string, password: string) =>
+    request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
   verifyEmail: (token: string) => request<{ ok: true }>('POST', '/auth/verify-email', { token }),
   /** A new address needs the password; re-sending the link to the pending one doesn't. */
-  setEmail: (email: string, password?: string) => request<{ user: MeUser }>('POST', '/account/email', { email, password }),
+  setEmail: (email: string, password?: string) =>
+    request<{ user: MeUser }>('POST', '/account/email', { email, password }),
   removeEmail: (password: string) => request<{ user: MeUser }>('DELETE', '/account/email', { password }),
-  changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/account/password', { current, next }),
+  changePassword: (current: string, next: string) =>
+    request<{ ok: true }>('POST', '/account/password', { current, next }),
   deleteAccount: (password: string) => request<{ ok: true }>('POST', '/account/delete', { password }),
   /** Where the browser downloads the data export (the session cookie authenticates it). */
   exportUrl: () => `${clientConfig().baseUrl}/api/account/export`,

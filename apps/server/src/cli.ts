@@ -25,5 +25,7 @@ if (command === 'list') {
   const user = getUserByName(username);
   if (!user) fail(`No player named "${username}". Register the account first, then run this again.`);
   run('UPDATE users SET is_admin = ? WHERE id = ?', command === 'add' ? 1 : 0, user.id);
-  console.log(command === 'add' ? `✅ ${user.username} is now an admin.` : `✅ ${user.username} is no longer an admin.`);
+  console.log(
+    command === 'add' ? `✅ ${user.username} is now an admin.` : `✅ ${user.username} is no longer an admin.`,
+  );
 }

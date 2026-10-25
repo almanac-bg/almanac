@@ -9,7 +9,8 @@ type Day = LaunchStats['days'][number];
 
 const v = (d: Day | undefined, metric: string) => d?.values[metric] ?? 0;
 const newPlayers = (d: Day | undefined) => v(d, 'signups') + v(d, 'guests');
-const matches = (d: Day) => Object.entries(d.values).reduce((sum, [k, n]) => sum + (k.startsWith('matches:') ? (n ?? 0) : 0), 0);
+const matches = (d: Day) =>
+  Object.entries(d.values).reduce((sum, [k, n]) => sum + (k.startsWith('matches:') ? (n ?? 0) : 0), 0);
 const shortDay = (day: string) => `${Number(day.slice(8))}.${day.slice(5, 7)}`;
 const pct = (part: number, whole: number) => (whole ? `${Math.round((100 * part) / whole)}%` : '—');
 
@@ -43,8 +44,16 @@ export function LaunchStatsPanel() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Активни днес" value={fmt(v(days[0], 'active'))} hint={`вчера ${fmt(v(days[1], 'active'))}`} />
-        <Tile label="Нови за 7 дни" value={fmt(week.reduce((s, d) => s + newPlayers(d), 0))} hint={`${fmt(sum(week, 'guests'))} като гости`} />
-        <Tile label="Гости → профил" value={pct(sum(month, 'claims'), sum(month, 'guests'))} hint="запазени гост-профили, 30 дни" />
+        <Tile
+          label="Нови за 7 дни"
+          value={fmt(week.reduce((s, d) => s + newPlayers(d), 0))}
+          hint={`${fmt(sum(week, 'guests'))} като гости`}
+        />
+        <Tile
+          label="Гости → профил"
+          value={pct(sum(month, 'claims'), sum(month, 'guests'))}
+          hint="запазени гост-профили, 30 дни"
+        />
         <Tile
           label="Връщат се"
           value={retention(days, 1, 14)}
@@ -55,7 +64,8 @@ export function LaunchStatsPanel() {
       <Card className="p-5 sm:p-6">
         <h2 className="font-display text-lg font-bold">Активни играчи на ден</h2>
         <p className="text-sm text-fg-3">
-          Изиграли поне един мач · последните 30 дни · общо {fmt(totals.accounts)} профила, {fmt(totals.guests)} гости, {fmt(totals.matches)} мача
+          Изиграли поне един мач · последните 30 дни · общо {fmt(totals.accounts)} профила, {fmt(totals.guests)} гости,{' '}
+          {fmt(totals.matches)} мача
         </p>
         <ActiveChart days={[...days].reverse()} />
       </Card>
@@ -66,7 +76,18 @@ export function LaunchStatsPanel() {
             <caption className="sr-only">Статистика по дни</caption>
             <thead className="text-left text-xs tracking-wide text-fg-3 uppercase">
               <tr className="border-b border-line">
-                {['Ден', 'Активни', 'Профили', 'Гости', 'Запазени', 'Мачове', 'Предизвик.', 'Дневно', 'Ден 2', 'Ден 8'].map((h) => (
+                {[
+                  'Ден',
+                  'Активни',
+                  'Профили',
+                  'Гости',
+                  'Запазени',
+                  'Мачове',
+                  'Предизвик.',
+                  'Дневно',
+                  'Ден 2',
+                  'Ден 8',
+                ].map((h) => (
                   <th key={h} scope="col" className="px-4 py-3 font-semibold first:pl-5">
                     {h}
                   </th>
@@ -97,8 +118,8 @@ export function LaunchStatsPanel() {
           </table>
         </div>
         <p className="border-t border-line px-5 py-3 text-xs text-fg-3">
-          „Предизвик.“: създадени линкове / изиграни. „Ден 2“ и „Ден 8“: от новите играчи през деня, колко са играли пак на
-          следващия ден и седмица по-късно.
+          „Предизвик.“: създадени линкове / изиграни. „Ден 2“ и „Ден 8“: от новите играчи през деня, колко са играли пак
+          на следващия ден и седмица по-късно.
         </p>
       </Card>
     </div>
@@ -115,7 +136,7 @@ function Tile({ label, value, hint }: { label: string; value: string; hint: stri
   );
 }
 
-/** One bar per day, oldest left. Hover (or tap) a day for its number; the table below has them all. */
+/** One bar per day, oldest left. Hover (or tap) a day for its number; the table below has the last two weeks. */
 function ActiveChart({ days }: { days: Day[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const values = days.map((d) => v(d, 'active'));
@@ -135,8 +156,11 @@ function ActiveChart({ days }: { days: Day[] }) {
       >
         {/* Recessive guide at the top value. */}
         <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-white/10" />
-        <span className="pointer-events-none absolute -top-2.5 right-0 bg-ink-2 pl-1 text-[11px] text-fg-3 tabular-nums">{fmt(max)}</span>
+        <span className="pointer-events-none absolute -top-2.5 right-0 bg-ink-2 pl-1 text-[11px] text-fg-3 tabular-nums">
+          {fmt(max)}
+        </span>
         {values.map((n, i) => (
+          // biome-ignore lint/a11y/noStaticElementInteractions: a hover readout only; the chart is a labelled image
           <div
             key={days[i].day}
             className="flex h-full flex-1 cursor-default items-end"

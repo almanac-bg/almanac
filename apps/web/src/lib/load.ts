@@ -20,7 +20,11 @@ const failure = (err: unknown): LoadFailure =>
  * the request too); `retry()` tries again on demand.
  */
 export function useLoad<T>(load: () => Promise<T>, key = '', refresh: unknown = null) {
-  const [state, setState] = useState<{ key: string; data: T | null; error: LoadFailure | null }>({ key, data: null, error: null });
+  const [state, setState] = useState<{ key: string; data: T | null; error: LoadFailure | null }>({
+    key,
+    data: null,
+    error: null,
+  });
   const [attempt, setAttempt] = useState(0);
   const connected = useStore((s) => s.connected);
   const loadRef = useRef(load);
@@ -28,6 +32,7 @@ export function useLoad<T>(load: () => Promise<T>, key = '', refresh: unknown = 
     loadRef.current = load;
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `refresh` and `attempt` are reload triggers, not inputs
   useEffect(() => {
     let alive = true;
     loadRef.current().then(
@@ -52,9 +57,9 @@ export function useLoad<T>(load: () => Promise<T>, key = '', refresh: unknown = 
 
   // Back online after a failed load: try again without being asked. (Only on the change, so a server error doesn't loop.)
   const failed = !!error;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on reconnect only; re-running on `failed` would loop
   useEffect(() => {
     if (connected && failed) retry();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected]);
 
   return { data, error, retry, setData };

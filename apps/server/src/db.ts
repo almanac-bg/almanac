@@ -10,7 +10,9 @@ fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 export const db = new DatabaseSync(config.dbPath);
 // WAL + a busy timeout is also what Litestream (continuous backups) needs. synchronous = NORMAL is safe in WAL mode
 // (a power cut can lose the last commits, never corrupt the file) and saves an fsync per write.
-db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+db.exec(
+  'PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;',
+);
 
 /** Append-only. Each entry runs once, tracked via PRAGMA user_version. */
 const MIGRATIONS: (string | (() => void))[] = [
@@ -358,7 +360,9 @@ function migrate() {
   const { user_version: current } = db.prepare('PRAGMA user_version').get() as { user_version: number };
   // A database from newer code would silently skip this code's future migrations — refuse it instead.
   if (current > MIGRATIONS.length) {
-    throw new Error(`Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`);
+    throw new Error(
+      `Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`,
+    );
   }
   for (let v = current; v < MIGRATIONS.length; v++) {
     tx(() => {

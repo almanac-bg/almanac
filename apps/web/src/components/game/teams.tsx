@@ -1,6 +1,6 @@
-import { type GamePlayer, type Standing, type TeamId, TEAMS } from '@quiz/shared';
-import clsx from 'clsx';
 import { fmt, type LiveGame } from '@quiz/client';
+import { type GamePlayer, type Standing, TEAMS, type TeamId } from '@quiz/shared';
+import clsx from 'clsx';
 import { useCountUp } from '../../lib/hooks';
 
 export const teamColor = (team: TeamId) => TEAMS[team].color;
@@ -46,9 +46,18 @@ export function TeamScoreBar({
   );
 
   return (
-    <div className="flex min-w-0 items-center gap-2 sm:gap-3" aria-label={`${TEAMS[0].name} ${totals[0]} : ${totals[1]} ${TEAMS[1].name}`}>
+    <div
+      className="flex min-w-0 items-center gap-2 sm:gap-3"
+      role="img"
+      aria-label={`${TEAMS[0].name} ${totals[0]} : ${totals[1]} ${TEAMS[1].name}`}
+    >
       {side(0, a)}
-      <div className={clsx('relative h-2 overflow-hidden rounded-full bg-white/10', compact ? 'w-full min-w-16 flex-1' : 'w-28 lg:w-40')}>
+      <div
+        className={clsx(
+          'relative h-2 overflow-hidden rounded-full bg-white/10',
+          compact ? 'w-full min-w-16 flex-1' : 'w-28 lg:w-40',
+        )}
+      >
         <div
           className="absolute inset-y-0 left-0 rounded-l-full transition-[width] duration-700"
           style={{ width: `${share * 100}%`, background: teamColor(0) }}

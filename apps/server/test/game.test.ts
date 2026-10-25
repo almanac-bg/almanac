@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import type { FinalStanding, GamePlayer, PowerupId, RevealPayload } from '@quiz/shared';
+import type { GameEmitter } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-game-'));
@@ -41,8 +42,13 @@ const bot = (id: string, kind: 'strong' | 'weak') => ({
   brain: { accuracy: kind === 'strong' ? 0.92 : 0.2, pace: 0.3 },
 });
 
-function setup(opts: { humans: number[]; bots?: ReturnType<typeof bot>[]; elimination?: boolean; powerups?: PowerupId[] }) {
-  const events: { to: string; event: string; payload: any }[] = [];
+function setup(opts: {
+  humans: number[];
+  bots?: ReturnType<typeof bot>[];
+  elimination?: boolean;
+  powerups?: PowerupId[];
+}) {
+  const events: { to: string; event: string; payload: unknown }[] = [];
   let standings: FinalStanding[] | null = null;
   const missed: number[] = [];
   const game = new Game(
@@ -62,10 +68,10 @@ function setup(opts: { humans: number[]; bots?: ReturnType<typeof bot>[]; elimin
       bots: opts.bots ?? [],
     },
     {
-      toGame: (event: string, payload: unknown) => events.push({ to: 'game', event, payload }),
-      toUser: (userId: number, event: string, payload: unknown) => events.push({ to: `u${userId}`, event, payload }),
-      toGameExcept: (_userId: number, event: string, payload: unknown) => events.push({ to: 'game', event, payload }),
-    } as never,
+      toGame: (event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
+      toUser: (userId, event, ...args) => events.push({ to: `u${userId}`, event, payload: args[0] }),
+      toGameExcept: (_userId, event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
+    } satisfies GameEmitter,
     {
       finalize: (_game, final) => {
         standings = final;

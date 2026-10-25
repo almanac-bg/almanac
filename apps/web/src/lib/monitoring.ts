@@ -32,7 +32,9 @@ export function startMonitoring() {
           return event;
         },
         beforeBreadcrumb(crumb) {
-          if (crumb.data) for (const key of ['url', 'from', 'to']) if (key in crumb.data) crumb.data[key] = withoutQuery(crumb.data[key]);
+          if (crumb.data)
+            for (const key of ['url', 'from', 'to'])
+              if (key in crumb.data) crumb.data[key] = withoutQuery(crumb.data[key]);
           return crumb;
         },
         // Noise nothing can be done about: other origins' scripts, browser quirks, extensions.

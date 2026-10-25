@@ -29,14 +29,21 @@ export function LoadError({
   if (compact) {
     // Sized by its card, not the screen: in a narrow card the button goes under the text, in a wide one beside it.
     return (
-      <div role="alert" className={clsx('@container rounded-2xl border border-rose-400/20 bg-rose-500/10 p-3', className)}>
+      <div
+        role="alert"
+        className={clsx('@container rounded-2xl border border-rose-400/20 bg-rose-500/10 p-3', className)}
+      >
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2.5 @md:grid-cols-[auto_minmax(0,1fr)_auto] @md:items-center">
           <Icon aria-hidden className="mt-0.5 size-5 text-rose-300 @md:mt-0" />
           <div className="text-sm">
             <p className="font-semibold text-rose-100">{title}</p>
             <p className="text-xs text-fg-3">{detail}</p>
           </div>
-          <Button variant="secondary" className="col-start-2 row-start-2 justify-self-start @md:col-start-3 @md:row-start-1" onClick={onRetry}>
+          <Button
+            variant="secondary"
+            className="col-start-2 row-start-2 justify-self-start @md:col-start-3 @md:row-start-1"
+            onClick={onRetry}
+          >
             <RotateCcw className="size-4" /> Опитай пак
           </Button>
         </div>

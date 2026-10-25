@@ -1,3 +1,4 @@
+import { api, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 import {
   AVATARS,
   EMOTES,
@@ -15,7 +16,6 @@ import { motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Card, Segmented } from '../components/ui';
-import { api, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
 
@@ -51,7 +51,10 @@ export function LockerPage() {
   };
   const label = (t: Tab, name: string) => (
     <>
-      {name} <span className="text-fg-3">{counts[t][0]}/{counts[t][1]}</span>
+      {name}{' '}
+      <span className="text-fg-3">
+        {counts[t][0]}/{counts[t][1]}
+      </span>
     </>
   );
 
@@ -60,7 +63,11 @@ export function LockerPage() {
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <Card className="relative flex flex-col items-center overflow-hidden p-8 text-center lg:sticky lg:top-24 lg:self-start">
           <div className="absolute -top-20 size-64 rounded-full bg-violet-600/30 blur-3xl" />
-          <motion.div key={`${me.avatar}-${me.frame}`} initial={{ scale: 0.85, rotate: -6 }} animate={{ scale: 1, rotate: 0 }}>
+          <motion.div
+            key={`${me.avatar}-${me.frame}`}
+            initial={{ scale: 0.85, rotate: -6 }}
+            animate={{ scale: 1, rotate: 0 }}
+          >
             <Avatar avatar={me.avatar} frame={me.frame} size={140} className="relative" />
           </motion.div>
           <h1 className="relative mt-5 flex items-center gap-2 font-display text-2xl font-bold">
@@ -128,6 +135,7 @@ export function LockerPage() {
                 return (
                   <button
                     key={t.id}
+                    type="button"
                     disabled={!open || equipped}
                     onClick={() => equip({ title: t.id })}
                     className={clsx(
@@ -139,9 +147,15 @@ export function LockerPage() {
                   >
                     <span>
                       <span className="block font-semibold">{t.name}</span>
-                      <span className="text-xs text-fg-3">{open ? (equipped ? 'Избрана' : 'Избери') : requirementLabel(t.req)}</span>
+                      <span className="text-xs text-fg-3">
+                        {open ? (equipped ? 'Избрана' : 'Избери') : requirementLabel(t.req)}
+                      </span>
                     </span>
-                    {equipped ? <Check className="size-5 text-violet-300" /> : !open && <Lock className="size-4 text-fg-3" />}
+                    {equipped ? (
+                      <Check className="size-5 text-violet-300" />
+                    ) : (
+                      !open && <Lock className="size-4 text-fg-3" />
+                    )}
                   </button>
                 );
               })}
@@ -149,7 +163,9 @@ export function LockerPage() {
           )}
           {tab === 'emote' && (
             <>
-              <p className="text-sm text-fg-3">Емоциите се използват по време на мултиплейър мачове — всички отключени са винаги под ръка.</p>
+              <p className="text-sm text-fg-3">
+                Емоциите се използват по време на мултиплейър мачове — всички отключени са винаги под ръка.
+              </p>
               <Grid>
                 {EMOTES.map((e) => (
                   <Item key={e.id} name="" req={e.req} unlocked={unlocked(e.req)}>
@@ -169,7 +185,9 @@ export function LockerPage() {
                       <span className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl">🃏</span>
                       <div>
                         <div className="font-display font-bold">{p.name}</div>
-                        <div className="text-xs text-fg-3">{open ? 'Отключен · веднъж на мач' : requirementLabel(p.req)}</div>
+                        <div className="text-xs text-fg-3">
+                          {open ? 'Отключен · веднъж на мач' : requirementLabel(p.req)}
+                        </div>
                       </div>
                       {!open && <Lock className="ml-auto size-4 text-fg-3" />}
                     </div>
@@ -211,6 +229,7 @@ function Item({
     // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer).
     <div className="group/lift grid">
       <motion.button
+        type="button"
         whileTap={clickable ? { scale: 0.96 } : undefined}
         disabled={!clickable}
         onClick={onEquip}
@@ -218,7 +237,8 @@ function Item({
         className={clsx(
           'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',
           equipped && 'border-violet-400/70 bg-violet-500/15 shadow-[0_0_24px_-8px_rgb(139_92_246/0.9)]',
-          clickable && 'hover:bg-white/10 group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
+          clickable &&
+            'hover:bg-white/10 group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
           saving && 'animate-pulse',
         )}
       >

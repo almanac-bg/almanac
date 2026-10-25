@@ -1,9 +1,9 @@
+import { actions, dropInvite, toast, useNow, useStore } from '@quiz/client';
 import type { Invite } from '@quiz/shared';
 import { Swords, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { actions, dropInvite, toast, useNow, useStore } from '@quiz/client';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 

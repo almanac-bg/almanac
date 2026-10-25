@@ -1,8 +1,9 @@
 // Relative import: the config is loaded by Node, which can't resolve the shared package's TS sources.
-import { BRAND } from '../../packages/shared/src/brand.ts';
+
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import { BRAND } from '../../packages/shared/src/brand.ts';
 
 const server = process.env.API_URL ?? 'http://localhost:3001';
 
@@ -10,7 +11,8 @@ const server = process.env.API_URL ?? 'http://localhost:3001';
 const manifest = JSON.stringify({
   name: `${BRAND.name} — ${BRAND.tagline.toLowerCase()}`,
   short_name: BRAND.name,
-  description: 'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
+  description:
+    'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
   lang: 'bg',
   id: '/',
   start_url: '/',
@@ -33,7 +35,8 @@ export default defineConfig({
     tailwindcss(),
     {
       name: 'brand',
-      transformIndexHtml: (html) => html.replaceAll('%BRAND_NAME%', BRAND.name).replaceAll('%BRAND_DOMAIN%', BRAND.domain),
+      transformIndexHtml: (html) =>
+        html.replaceAll('%BRAND_NAME%', BRAND.name).replaceAll('%BRAND_DOMAIN%', BRAND.domain),
       // The web app manifest comes from the same brand settings: a file in the build, and served by the dev server.
       generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
@@ -56,8 +59,16 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 3 },
-            { name: 'motion', test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/, priority: 2 },
-            { name: 'realtime', test: /node_modules[\\/](socket\.io-client|socket\.io-parser|engine\.io-client|engine\.io-parser|@socket\.io)[\\/]/, priority: 1 },
+            {
+              name: 'motion',
+              test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/,
+              priority: 2,
+            },
+            {
+              name: 'realtime',
+              test: /node_modules[\\/](socket\.io-client|socket\.io-parser|engine\.io-client|engine\.io-parser|@socket\.io)[\\/]/,
+              priority: 1,
+            },
             // Icons are tiny; one file beats a dozen 300-byte requests.
             { name: 'icons', test: /node_modules[\\/]lucide-react[\\/]/, priority: 1 },
           ],

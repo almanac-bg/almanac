@@ -47,8 +47,15 @@ export const openQuestionReportCount = () =>
 
 /** Questions with open reports, the most reported first. */
 export function openQuestionReports(): QuestionReportGroup[] {
-  const rows = all<{ question_id: string; reason: QuestionReportReason; details: string; created_at: number; reporter: string | null }>(
-    `SELECT r.question_id, r.reason, r.details, r.created_at, u.username AS reporter
+  const rows = all<{
+    id: number;
+    question_id: string;
+    reason: QuestionReportReason;
+    details: string;
+    created_at: number;
+    reporter: string | null;
+  }>(
+    `SELECT r.id, r.question_id, r.reason, r.details, r.created_at, u.username AS reporter
      FROM question_reports r LEFT JOIN users u ON u.id = r.user_id
      WHERE r.status = 'open' ORDER BY r.created_at`,
   );
@@ -57,7 +64,13 @@ export function openQuestionReports(): QuestionReportGroup[] {
     const q = questionById(r.question_id);
     if (!q) continue; // a community question that no longer exists
     const group = groups.get(r.question_id) ?? { question: info(q), reports: [] };
-    group.reports.push({ reason: r.reason, details: r.details, createdAt: r.created_at, reporter: r.reporter });
+    group.reports.push({
+      id: r.id,
+      reason: r.reason,
+      details: r.details,
+      createdAt: r.created_at,
+      reporter: r.reporter,
+    });
     groups.set(r.question_id, group);
   }
   return [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
@@ -68,7 +81,12 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
   if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
   tx(() => {
     if (action === 'hide') {
-      run('INSERT OR IGNORE INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, ?, ?)', questionId, adminId, Date.now());
+      run(
+        'INSERT OR IGNORE INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, ?, ?)',
+        questionId,
+        adminId,
+        Date.now(),
+      );
     }
     run(
       "UPDATE question_reports SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",

@@ -1,9 +1,4 @@
-import {
-  type ModerationAction,
-  REPORT_REASONS,
-  type ReportGroup,
-  type ReportReason,
-} from '@quiz/shared';
+import { type ModerationAction, REPORT_REASONS, type ReportGroup, type ReportReason } from '@quiz/shared';
 import { all, one, run, tx } from './db';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { reloadQuestionBank } from './questions';
@@ -12,9 +7,39 @@ import { GUEST_NAME, getUser, getUserByName, toPublicUser, type UserRow, usernam
 // ─── Username filter ─────────────────────────────────────────────────────────
 
 const TRANSLIT: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n',
-  о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sht', ъ: 'a',
-  ь: 'y', ю: 'yu', я: 'ya', ё: 'yo', ы: 'i', э: 'e',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sht',
+  ъ: 'a',
+  ь: 'y',
+  ю: 'yu',
+  я: 'ya',
+  ё: 'yo',
+  ы: 'i',
+  э: 'e',
 };
 const LEET: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', $: 's' };
 
@@ -32,18 +57,53 @@ function skeleton(text: string): string {
 
 // Substring matches (specific enough not to hit ordinary names).
 const BLOCKED_STEMS = [
-  'fuck', 'shit', 'cunt', 'nigg', 'fagot', 'whore', 'bitch', 'hitler', 'nazi', 'rapist', 'pedophil', 'pederas',
-  'putk', 'pichk', 'kurv', 'shiban', 'dupedav', 'ebalo', 'ebach', 'ebat', 'ebem', 'mamkati', 'mamkamu',
+  'fuck',
+  'shit',
+  'cunt',
+  'nigg',
+  'fagot',
+  'whore',
+  'bitch',
+  'hitler',
+  'nazi',
+  'rapist',
+  'pedophil',
+  'pederas',
+  'putk',
+  'pichk',
+  'kurv',
+  'shiban',
+  'dupedav',
+  'ebalo',
+  'ebach',
+  'ebat',
+  'ebem',
+  'mamkati',
+  'mamkamu',
 ];
 // Short stems: only at the start or end of a word, so "Себастиан" or "Шухуй…" style names aren't caught by accident.
 const BLOCKED_EDGES = ['huy', 'huj', 'pedal'];
 // Names that could impersonate staff or the game itself.
-const RESERVED_PREFIXES = ['admin', 'moderat', 'almanac', 'almanah', 'support', 'podrazhka', 'system', 'sistema', 'official', 'ofitsial'];
+const RESERVED_PREFIXES = [
+  'admin',
+  'moderat',
+  'almanac',
+  'almanah',
+  'support',
+  'podrazhka',
+  'system',
+  'sistema',
+  'official',
+  'ofitsial',
+];
 
 export function nameProblem(name: string): string | null {
   const whole = skeleton(name);
   if (BLOCKED_STEMS.some((s) => whole.includes(s))) return 'Името съдържа неподходящи думи.';
-  const words = name.split(/[\s_.\-\d]+/).map(skeleton).filter(Boolean);
+  const words = name
+    .split(/[\s_.\-\d]+/)
+    .map(skeleton)
+    .filter(Boolean);
   if (words.some((w) => BLOCKED_EDGES.some((s) => w === s || w.startsWith(s) || w.endsWith(s)))) {
     return 'Името съдържа неподходящи думи.';
   }
@@ -88,7 +148,8 @@ export function fileReport(reporterId: number, username: string, reason: unknown
     target.id,
   );
   // One open report per pair: a second one just updates it.
-  if (open) run('UPDATE reports SET reason = ?, details = ?, created_at = ? WHERE id = ?', reason, text, Date.now(), open.id);
+  if (open)
+    run('UPDATE reports SET reason = ?, details = ?, created_at = ? WHERE id = ?', reason, text, Date.now(), open.id);
   else {
     run(
       'INSERT INTO reports (reporter_id, target_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)',
@@ -129,17 +190,20 @@ export function openReports(): ReportGroup[] {
   return [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
 }
 
-export const openReportCount = () => one<{ n: number }>("SELECT COUNT(DISTINCT target_id) AS n FROM reports WHERE status = 'open'")!.n;
+export const openReportCount = () =>
+  one<{ n: number }>("SELECT COUNT(DISTINCT target_id) AS n FROM reports WHERE status = 'open'")!.n;
 
 /** Applies a moderator's decision and closes every open report about the player. */
 export function resolveReports(adminId: number, targetId: number, decision: ModerationAction): Result {
   const target = getUser(targetId);
   if (!target) return { ok: false, error: 'Няма такъв играч.' };
-  if (targetId === adminId && decision.action !== 'dismiss') return { ok: false, error: 'Не можеш да наказваш себе си.' };
+  if (targetId === adminId && decision.action !== 'dismiss')
+    return { ok: false, error: 'Не можеш да наказваш себе си.' };
 
   if (decision.action === 'rename') {
     const name = decision.username.trim();
-    if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(name)) return { ok: false, error: 'Името трябва да е 3–20 букви, цифри, точка, тире или долна черта.' };
+    if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(name))
+      return { ok: false, error: 'Името трябва да е 3–20 букви, цифри, точка, тире или долна черта.' };
     const problem = nameProblem(name);
     if (problem) return { ok: false, error: problem };
     const taken = getUserByName(name);
@@ -148,10 +212,20 @@ export function resolveReports(adminId: number, targetId: number, decision: Mode
 
   tx(() => {
     if (decision.action === 'rename') {
-      run('UPDATE users SET username = ?, username_key = ? WHERE id = ?', decision.username.trim(), usernameKey(decision.username.trim()), targetId);
+      run(
+        'UPDATE users SET username = ?, username_key = ? WHERE id = ?',
+        decision.username.trim(),
+        usernameKey(decision.username.trim()),
+        targetId,
+      );
     } else if (decision.action === 'ban') {
       const until = decision.days === null ? FOREVER : Date.now() + decision.days * 24 * 60 * 60_000;
-      run('UPDATE users SET banned_until = ?, ban_reason = ? WHERE id = ?', until, decision.reason.trim().slice(0, 200) || null, targetId);
+      run(
+        'UPDATE users SET banned_until = ?, ban_reason = ? WHERE id = ?',
+        until,
+        decision.reason.trim().slice(0, 200) || null,
+        targetId,
+      );
       run('DELETE FROM sessions WHERE user_id = ?', targetId);
     }
     run(
@@ -165,7 +239,10 @@ export function resolveReports(adminId: number, targetId: number, decision: Mode
 
   if (decision.action === 'rename') {
     reloadQuestionBank(); // their approved questions show the new name
-    notifyUser(targetId, 'notice', { kind: 'info', message: `Модератор смени името ти на „${decision.username.trim()}“.` });
+    notifyUser(targetId, 'notice', {
+      kind: 'info',
+      message: `Модератор смени името ти на „${decision.username.trim()}“.`,
+    });
     notifyUser(targetId, 'account:update');
   } else if (decision.action === 'ban') {
     removeFromPlay(targetId);

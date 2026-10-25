@@ -17,7 +17,10 @@ function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
   if (!raw) return DEFAULT_OPEN_QUEUES;
   if (raw === 'all') return ['duel', 'teams', 'trio', 'squad', 'royale'];
-  const modes = raw.split(',').map((m) => m.trim()).filter(isQueueMode);
+  const modes = raw
+    .split(',')
+    .map((m) => m.trim())
+    .filter(isQueueMode);
   return modes.length ? modes : DEFAULT_OPEN_QUEUES;
 }
 
@@ -34,7 +37,8 @@ export const config = {
   openQueues: openQueues(),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
   /** Daily database snapshots ("off" disables). Defaults to a backups folder next to the database. */
-  backupDir: process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),
+  backupDir:
+    process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),
   backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS ?? 14),
   /** Express "trust proxy" setting: which proxies may set X-Forwarded-For. */
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',

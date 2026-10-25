@@ -21,7 +21,11 @@ export function Avatar({
   const ring = Math.max(2, Math.round(size * 0.07));
   return (
     <div
-      className={clsx('relative shrink-0 rounded-full transition-[filter,opacity]', dim && 'opacity-40 grayscale', className)}
+      className={clsx(
+        'relative shrink-0 rounded-full transition-[filter,opacity]',
+        dim && 'opacity-40 grayscale',
+        className,
+      )}
       style={{ width: size, height: size }}
     >
       <div className="absolute inset-0 overflow-hidden rounded-full">
@@ -71,7 +75,17 @@ export function RankBadge({ rating, compact }: { rating: number; compact?: boole
   );
 }
 
-export function PlayerTag({ name, title, level, isBot }: { name: string; title: string; level: number; isBot?: boolean }) {
+export function PlayerTag({
+  name,
+  title,
+  level,
+  isBot,
+}: {
+  name: string;
+  title: string;
+  level: number;
+  isBot?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">

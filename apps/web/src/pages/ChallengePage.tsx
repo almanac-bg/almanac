@@ -1,3 +1,4 @@
+import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } from '@quiz/client';
 import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, ordinal, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { Clock, Gamepad2, Plus, RotateCcw, Save, Share2, Swords } from 'lucide-react';
@@ -8,7 +9,6 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
-import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 import { shareText } from '../lib/share';
 
@@ -30,7 +30,11 @@ export function ChallengePage() {
   const { data, error, retry } = useLoad(() => api.challenge(id), id);
 
   if (!data && error) {
-    return error.status === 404 ? <Missing /> : <LoadError title="Предизвикателството не се зареди" error={error} onRetry={retry} />;
+    return error.status === 404 ? (
+      <Missing />
+    ) : (
+      <LoadError title="Предизвикателството не се зареди" error={error} onRetry={retry} />
+    );
   }
   if (!data) {
     return (
@@ -70,12 +74,12 @@ function Challenge({ info }: { info: ChallengeInfo }) {
   // From the guest landing: "Приеми" was pressed there, so don't ask twice. Once only — Back or a reload won't restart it.
   const autoAccept = (location.state as AcceptState | null)?.accept === true;
   const autoStarted = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on connect; the values it reads mustn't re-trigger it
   useEffect(() => {
     if (!autoAccept || autoStarted.current || !connected) return;
     autoStarted.current = true;
     navigate(location.pathname, { replace: true, state: null });
     if (!info.attempted && !expired) void accept();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAccept, connected]);
 
   function share() {
@@ -90,7 +94,11 @@ function Challenge({ info }: { info: ChallengeInfo }) {
   }
 
   // Short words only: the display font is wide, and "предизвикателство" alone overflows a phone.
-  const title = own ? 'Ти предизвикваш' : info.creator ? `${info.creator.username} те предизвиква` : 'Покажи какво знаеш';
+  const title = own
+    ? 'Ти предизвикваш'
+    : info.creator
+      ? `${info.creator.username} те предизвиква`
+      : 'Покажи какво знаеш';
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -108,7 +116,10 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           />
 
           <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase" style={{ color: ACCENT_FROM }}>
+            <p
+              className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase"
+              style={{ color: ACCENT_FROM }}
+            >
               <Swords aria-hidden className="size-3.5" /> Предизвикателство
             </p>
             <Pill className={clsx('ml-auto', expired && 'text-fg-3')}>
@@ -125,7 +136,9 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           <div className="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
             {info.creator && !own && <Avatar avatar={info.creator.avatar} frame={info.creator.frame} size={64} />}
             <div className="min-w-0 flex-1 basis-48">
-              <h1 className="font-display text-[1.375rem] leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl">{title}</h1>
+              <h1 className="font-display text-[1.375rem] leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl">
+                {title}
+              </h1>
               <p className="mt-1 text-sm text-fg-3">
                 {MODE.questions} въпроса · {MODE.timeMs / 1000} секунди за всеки · един опит · без жокери
               </p>
@@ -207,7 +220,9 @@ function YourResult({ entry, total, expired }: { entry: ChallengeEntry; total: n
         {MEDALS[entry.rank - 1] ?? '🎯'}
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-semibold tracking-wide text-fg-3 uppercase">{expired ? 'Краен резултат' : 'Твоят резултат'}</p>
+        <p className="text-xs font-semibold tracking-wide text-fg-3 uppercase">
+          {expired ? 'Краен резултат' : 'Твоят резултат'}
+        </p>
         <p className="mt-0.5 font-display text-3xl font-bold tabular-nums">{fmt(entry.score)} т.</p>
         <p className="mt-1 text-sm text-fg-2">
           <span className="font-semibold text-fg tabular-nums">
@@ -255,7 +270,11 @@ function Board({ info }: { info: ChallengeInfo }) {
 
   return (
     <section aria-labelledby="challenge-board">
-      <SectionTitle aside={entries.length > 0 && <span className="text-sm text-fg-3">{plural(entries.length, 'играч', 'играчи')}</span>}>
+      <SectionTitle
+        aside={
+          entries.length > 0 && <span className="text-sm text-fg-3">{plural(entries.length, 'играч', 'играчи')}</span>
+        }
+      >
         <span id="challenge-board">Класиране</span>
       </SectionTitle>
       {entries.length === 0 ? (
@@ -263,7 +282,11 @@ function Board({ info }: { info: ChallengeInfo }) {
           <EmptyState
             icon="🏁"
             title="Още няма резултати"
-            body={info.expired ? 'Никой не го изигра навреме.' : 'Първият резултат оглавява класирането — и всеки следващ трябва да го бие.'}
+            body={
+              info.expired
+                ? 'Никой не го изигра навреме.'
+                : 'Първият резултат оглавява класирането — и всеки следващ трябва да го бие.'
+            }
           />
         </Card>
       ) : (
@@ -297,7 +320,10 @@ function EntryRow({ entry, creatorId }: { entry: ChallengeEntry; creatorId: numb
       {user ? (
         <Avatar avatar={user.avatar} frame={user.frame} size={40} />
       ) : (
-        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-white/5 text-lg text-fg-3">
+        <span
+          aria-hidden
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-white/5 text-lg text-fg-3"
+        >
           ?
         </span>
       )}
@@ -323,7 +349,10 @@ function EntryRow({ entry, creatorId }: { entry: ChallengeEntry; creatorId: numb
   );
   const row = clsx('flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5', entry.you && 'bg-violet-500/10');
   return user ? (
-    <Link to={`/profile/${encodeURIComponent(user.username)}`} className={clsx(row, 'focus-ring transition-colors hover:bg-white/[0.04]')}>
+    <Link
+      to={`/profile/${encodeURIComponent(user.username)}`}
+      className={clsx(row, 'focus-ring transition-colors hover:bg-white/[0.04]')}
+    >
       {body}
     </Link>
   ) : (
@@ -363,7 +392,13 @@ function CreateOwn() {
           <Save aria-hidden className="size-4" /> Запази прогреса
         </Button>
       ) : (
-        <Button variant="secondary" onClick={create} loading={busy} disabled={inGame} className="h-auto min-h-11 py-2 text-balance max-sm:w-full">
+        <Button
+          variant="secondary"
+          onClick={create}
+          loading={busy}
+          disabled={inGame}
+          className="h-auto min-h-11 py-2 text-balance max-sm:w-full"
+        >
           <Plus aria-hidden className="size-4 max-sm:hidden" /> Създай предизвикателство
         </Button>
       )}
@@ -386,7 +421,9 @@ function Missing() {
           🔗
         </span>
         <h1 className="font-display text-2xl font-bold">Линкът не работи</h1>
-        <p className="max-w-sm text-sm text-fg-3">Няма такова предизвикателство — линкът може да е непълен или вече изтрит.</p>
+        <p className="max-w-sm text-sm text-fg-3">
+          Няма такова предизвикателство — линкът може да е непълен или вече изтрит.
+        </p>
         <Link
           to="/"
           className="glass focus-ring mt-4 inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[15px] font-semibold hover:bg-white/10"

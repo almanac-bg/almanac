@@ -1,17 +1,17 @@
+import { api, longDate, timeAgo, toast, useStore } from '@quiz/client';
 import type { QuestionDraft, Submission, SubmissionStatus } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { Avatar, LevelBadge } from '../components/Avatar';
 import { LaunchStatsPanel } from '../components/admin/LaunchStatsPanel';
 import { QuestionReportsQueue } from '../components/admin/QuestionReportsQueue';
 import { ReportsQueue } from '../components/admin/ReportsQueue';
-import { Avatar, LevelBadge } from '../components/Avatar';
-import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { DraftEditor } from '../components/questions/DraftEditor';
+import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
-import { api, longDate, timeAgo, toast, useStore } from '@quiz/client';
 
 const toDraft = (s: Submission): QuestionDraft => ({
   category: s.category,
@@ -28,10 +28,18 @@ export function AdminPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');
   const section: Section = tab === 'reports' || tab === 'flags' || tab === 'stats' ? tab : 'questions';
-  const [counts, setCounts] = useState<{ pendingQuestions: number; openReports: number; questionReports: number } | null>(null);
+  const [counts, setCounts] = useState<{
+    pendingQuestions: number;
+    openReports: number;
+    questionReports: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (me.isAdmin) api.adminSummary().then(setCounts).catch(() => {});
+    if (me.isAdmin)
+      api
+        .adminSummary()
+        .then(setCounts)
+        .catch(() => {});
   }, [me.isAdmin]);
 
   if (!me.isAdmin) return <Navigate to="/" replace />;
@@ -57,8 +65,12 @@ export function AdminPage() {
           ]}
         />
       </div>
-      {section === 'questions' && <QuestionsQueue onPending={(n) => setCounts((c) => c && { ...c, pendingQuestions: n })} />}
-      {section === 'flags' && <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />}
+      {section === 'questions' && (
+        <QuestionsQueue onPending={(n) => setCounts((c) => c && { ...c, pendingQuestions: n })} />
+      )}
+      {section === 'flags' && (
+        <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />
+      )}
       {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />}
       {section === 'stats' && <LaunchStatsPanel />}
     </div>
@@ -70,6 +82,7 @@ function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
   const [items, setItems] = useState<Submission[] | null>(null);
   const [pending, setPending] = useState<number | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloads on `status`; `onPending` is recreated every render
   useEffect(() => {
     setItems(null);
     api
@@ -80,7 +93,6 @@ function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
         onPending(r.pending);
       })
       .catch((e) => toast({ kind: 'error', title: e.message }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   function reviewed(id: number, pendingNow: number) {
@@ -97,7 +109,10 @@ function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
           value={status}
           onChange={setStatus}
           options={[
-            { value: 'pending', label: <>Чакащи{pending ? <span className="ml-1.5 text-amber-300">{pending}</span> : null}</> },
+            {
+              value: 'pending',
+              label: <>Чакащи{pending ? <span className="ml-1.5 text-amber-300">{pending}</span> : null}</>,
+            },
             { value: 'approved', label: 'Одобрени' },
             { value: 'rejected', label: 'Отхвърлени' },
           ]}
@@ -153,7 +168,13 @@ function AuthorLine({ submission: s }: { submission: Submission }) {
   );
 }
 
-function PendingCard({ submission, onReviewed }: { submission: Submission; onReviewed: (id: number, pending: number) => void }) {
+function PendingCard({
+  submission,
+  onReviewed,
+}: {
+  submission: Submission;
+  onReviewed: (id: number, pending: number) => void;
+}) {
   const original = useMemo(() => toDraft(submission), [submission]);
   const [draft, setDraft] = useState<QuestionDraft>(original);
   const [editing, setEditing] = useState(false);
@@ -171,7 +192,10 @@ function PendingCard({ submission, onReviewed }: { submission: Submission; onRev
     setBusy('approve');
     try {
       const res = await api.approveSubmission(submission.id, edited ? cleanDraft(draft) : null);
-      toast({ kind: 'success', title: `Одобрен${edited ? ' (с редакция)' : ''} — ${submission.author.username} получава XP` });
+      toast({
+        kind: 'success',
+        title: `Одобрен${edited ? ' (с редакция)' : ''} — ${submission.author.username} получава XP`,
+      });
       onReviewed(submission.id, res.pending);
     } catch (e) {
       toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно одобрение.' });
@@ -213,6 +237,7 @@ function PendingCard({ submission, onReviewed }: { submission: Submission; onRev
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={300}
+              // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Откажи", so focus moves to it
               autoFocus
               placeholder="Причина (по желание) — авторът ще я види"
               className="h-10 w-full rounded-xl border border-line bg-black/30 px-3 text-sm outline-none placeholder:text-fg-3 focus:border-rose-400/60"

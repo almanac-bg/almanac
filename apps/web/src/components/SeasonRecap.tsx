@@ -1,8 +1,8 @@
+import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { RANK_TIERS, seasonName } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import { motion } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
-import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { sfx } from '../lib/sound';
 import { Button, Modal } from './ui';
 
@@ -49,7 +49,10 @@ export function SeasonRecap() {
             animate={{ scale: 1, rotate: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.15 }}
             className="mx-auto mt-6 grid size-28 place-items-center rounded-full text-5xl"
-            style={{ background: `radial-gradient(circle, ${tier.color}55, transparent 70%)`, boxShadow: `0 0 60px -10px ${tier.color}` }}
+            style={{
+              background: `radial-gradient(circle, ${tier.color}55, transparent 70%)`,
+              boxShadow: `0 0 60px -10px ${tier.color}`,
+            }}
           >
             🏅
           </motion.div>
@@ -62,7 +65,10 @@ export function SeasonRecap() {
               {reward.unlocks.map((u) => {
                 const { icon, name } = unlockPreview(u);
                 return (
-                  <span key={`${u.kind}:${u.id}`} className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm">
+                  <span
+                    key={`${u.kind}:${u.id}`}
+                    className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm"
+                  >
                     <span className="text-lg leading-none">{icon}</span>
                     {name}
                   </span>
@@ -72,7 +78,9 @@ export function SeasonRecap() {
           )}
         </>
       ) : (
-        <p className="mt-6 text-fg-2">Не изигра достатъчно класирани мачове, за да получиш награда. Новият сезон вече тече!</p>
+        <p className="mt-6 text-fg-2">
+          Не изигра достатъчно класирани мачове, за да получиш награда. Новият сезон вече тече!
+        </p>
       )}
       <Button className="mt-8 w-full" onClick={close} loading={closing}>
         Супер!

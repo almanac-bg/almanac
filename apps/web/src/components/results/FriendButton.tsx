@@ -19,7 +19,8 @@ interface Friends {
 const FriendsContext = createContext<Friends | null>(null);
 
 /** Someone you could add from the results: a human other than you, with a real account. */
-const addable = (p: GamePlayer, youId: string) => p.id !== youId && !p.isBot && p.userId !== null && !GUEST_NAME.test(p.name);
+const addable = (p: GamePlayer, youId: string) =>
+  p.id !== youId && !p.isBot && p.userId !== null && !GUEST_NAME.test(p.name);
 
 function relation(data: FriendsResponse, userId: number): Friendship {
   if (data.friends.some((f) => f.user.id === userId)) return 'friends';
@@ -52,7 +53,17 @@ export function FriendsProvider({ game, children }: { game: LiveGame; children: 
  * "+ Приятел" beside an opponent, or where things stand: request sent, theirs to accept, already friends.
  * `compact` (the podium's narrow columns on phones) keeps the words for screen readers only.
  */
-export function FriendButton({ player, youId, compact, className }: { player: GamePlayer; youId: string; compact?: boolean; className?: string }) {
+export function FriendButton({
+  player,
+  youId,
+  compact,
+  className,
+}: {
+  player: GamePlayer;
+  youId: string;
+  compact?: boolean;
+  className?: string;
+}) {
   const friends = useContext(FriendsContext);
   const [busy, setBusy] = useState(false);
   if (!friends || !addable(player, youId)) return null;
@@ -118,7 +129,13 @@ export function FriendButton({ player, youId, compact, className }: { player: Ga
           : 'border-line bg-white/5 text-fg-2 hover:bg-white/10 hover:text-fg',
       )}
     >
-      {busy ? <Spinner className="size-3.5" /> : incoming ? <UserCheck aria-hidden className="size-4" /> : <UserPlus aria-hidden className="size-4" />}
+      {busy ? (
+        <Spinner className="size-3.5" />
+      ) : incoming ? (
+        <UserCheck aria-hidden className="size-4" />
+      ) : (
+        <UserPlus aria-hidden className="size-4" />
+      )}
       <span aria-hidden className={label}>
         {incoming ? 'Приеми' : 'Приятел'}
       </span>

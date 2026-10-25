@@ -34,7 +34,11 @@ const PREFIX: Record<string, string> = {
   literature: 'lit',
   nature: 'nat',
 };
-const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 
 for (const { name, file, perCategory, perDifficulty } of BANKS) {
   const bank: Q[] = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -70,7 +74,10 @@ for (const { name, file, perCategory, perDifficulty } of BANKS) {
       const qs = bank.filter((q) => q.category === category);
       assert.ok(qs.length >= perCategory, `${category} has only ${qs.length} questions`);
       for (const d of ['easy', 'medium', 'hard']) {
-        assert.ok(qs.filter((q) => q.difficulty === d).length >= perDifficulty, `${category} needs at least ${perDifficulty} ${d} questions`);
+        assert.ok(
+          qs.filter((q) => q.difficulty === d).length >= perDifficulty,
+          `${category} needs at least ${perDifficulty} ${d} questions`,
+        );
       }
     }
   });
@@ -79,6 +86,7 @@ for (const { name, file, perCategory, perDifficulty } of BANKS) {
     // Options are shuffled at runtime anyway; a skewed file usually means a copy-paste slip.
     const counts = [0, 0, 0, 0];
     for (const q of bank) counts[q.answer]++;
-    for (const c of counts) assert.ok(c / bank.length > 0.15 && c / bank.length < 0.35, `answer distribution ${counts}`);
+    for (const c of counts)
+      assert.ok(c / bank.length > 0.15 && c / bank.length < 0.35, `answer distribution ${counts}`);
   });
 }

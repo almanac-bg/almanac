@@ -20,7 +20,9 @@ await build({
   // ws probes these optional native speedups inside try/catch.
   external: ['bufferutil', 'utf-8-validate'],
   // CommonJS dependencies bundled into ESM still call require() for Node built-ins.
-  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
   logLevel: 'info',
 });
 

@@ -1,13 +1,21 @@
-import { dayKey, isUnlocked, levelFromXp, type Loadout, type MeUser, newlyUnlocked, type UnlockContext } from '@quiz/shared';
+import {
+  dayKey,
+  isUnlocked,
+  type Loadout,
+  levelFromXp,
+  type MeUser,
+  newlyUnlocked,
+  type UnlockContext,
+} from '@quiz/shared';
 import { settleAchievements } from './achievements';
 import { verifyPassword } from './auth';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
 import { incomingRequests } from './friends';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
-import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
-import { questsInfo } from './quests';
 import { reloadQuestionBank } from './questions';
+import { questsInfo } from './quests';
+import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
 import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
@@ -94,7 +102,13 @@ export function updateLoadout(userId: number, patch: Partial<Loadout>): { ok: tr
  * grows. Left out are only secrets (password and token hashes) and other players' identities (who reported you).
  */
 export function exportAccount(userId: number) {
-  const { password_hash: _secret, username_key: _derived, email_key: _alsoDerived, reminder_key: _link, ...account } = getUser(userId)!;
+  const {
+    password_hash: _secret,
+    username_key: _derived,
+    email_key: _alsoDerived,
+    reminder_key: _link,
+    ...account
+  } = getUser(userId)!;
   const rows = (sql: string) => all<Record<string, unknown>>(sql, userId);
   return {
     exportedAt: new Date().toISOString(),
@@ -124,7 +138,9 @@ export function exportAccount(userId: number) {
     reportsFiled: rows('SELECT * FROM reports WHERE reporter_id = ?'),
     reportsAboutYou: rows('SELECT reason, status, action, created_at, resolved_at FROM reports WHERE target_id = ?'),
     questionReportsFiled: rows('SELECT * FROM question_reports WHERE user_id = ?'),
-    recentlySeenQuestions: rows('SELECT question_id, seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC'),
+    recentlySeenQuestions: rows(
+      'SELECT question_id, seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC',
+    ),
     loginSessions: rows('SELECT created_at, expires_at FROM sessions WHERE user_id = ?'),
     emailLinks: rows('SELECT purpose, email, created_at, expires_at, used_at FROM email_tokens WHERE user_id = ?'),
   };
@@ -134,11 +150,15 @@ export function exportAccount(userId: number) {
  * Deletes the account and everything tied to it (the schema cascades). Other players' match histories keep
  * the result row, but without the name. Approved questions stay in the game, without author credit.
  */
-export async function deleteAccount(userId: number, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function deleteAccount(
+  userId: number,
+  password: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = getUser(userId);
   if (!user) return { ok: false, error: 'Няма такъв потребител.' };
   // A guest has no password: being signed in on this device is the proof.
-  if (!user.is_guest && !(await verifyPassword(password, user.password_hash))) return { ok: false, error: 'Грешна парола.' };
+  if (!user.is_guest && !(await verifyPassword(password, user.password_hash)))
+    return { ok: false, error: 'Грешна парола.' };
   eraseAccount(userId);
   reloadQuestionBank(); // approved questions stop showing their name
   return { ok: true };

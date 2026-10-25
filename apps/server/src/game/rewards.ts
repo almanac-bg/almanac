@@ -150,7 +150,11 @@ function rewardHuman(
   if (!left && setup.teams) {
     if (won && rivals.length > 0) lines.push({ label: 'Отборна победа', amount: XP.teamWin });
   } else if (!left && multiplayer) {
-    const amount = won ? (rivals.length ? XP.winBase + XP.winPerOpponent * rivals.length : 0) : XP.perOpponentBeaten * beaten;
+    const amount = won
+      ? rivals.length
+        ? XP.winBase + XP.winPerOpponent * rivals.length
+        : 0
+      : XP.perOpponentBeaten * beaten;
     if (amount > 0) lines.push({ label: won ? 'Победа' : `${ordinal(s.placement)} място`, amount });
   }
   if (!left && (solo || daily || challenge)) {
@@ -179,7 +183,9 @@ function rewardHuman(
   }
 
   // ── Challenge link (recorded even after leaving: one attempt each) ──
-  const challengeResult = challenge ? recordChallengeResult(setup.challengeId!, userId, s.score, p.correct, p.answerMs) : null;
+  const challengeResult = challenge
+    ? recordChallengeResult(setup.challengeId!, userId, s.score, p.correct, p.answerMs)
+    : null;
 
   // ── Daily quests ──
   if (!left) {

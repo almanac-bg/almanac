@@ -112,7 +112,12 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
   const listed = guide.open ? jokers : intro;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full flex-col gap-2">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex w-full flex-col gap-2"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <ActiveJokers game={game} />
       </div>
@@ -123,6 +128,7 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
           return (
             <button
               key={p.id}
+              type="button"
               disabled={!!blocked || offline}
               onClick={() => actions.powerup(p.id)}
               title={blocked ? `${p.name} — ${blocked}` : p.description}
@@ -146,6 +152,7 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
           );
         })}
         <button
+          type="button"
           onClick={guide.toggle}
           aria-expanded={guide.open}
           aria-controls={guideId}
@@ -199,7 +206,12 @@ function JokerList({
 }) {
   const intro = !!onDismiss;
   return (
-    <div className={clsx('rounded-2xl border p-3', intro ? 'border-amber-300/35 bg-amber-400/[0.07]' : 'border-line bg-white/[0.03]')}>
+    <div
+      className={clsx(
+        'rounded-2xl border p-3',
+        intro ? 'border-amber-300/35 bg-amber-400/[0.07]' : 'border-line bg-white/[0.03]',
+      )}
+    >
       {intro && (
         <p className="mb-2 text-[11px] font-extrabold tracking-widest text-amber-300 uppercase">
           {jokers.length === 1 ? 'Нов жокер' : 'Нови жокери'}
@@ -224,6 +236,7 @@ function JokerList({
       {onDismiss && (
         <div className="mt-1 flex justify-end">
           <button
+            type="button"
             onClick={onDismiss}
             className="focus-ring -mr-1 -mb-1 h-11 rounded-xl px-3 text-sm font-bold text-amber-200 hover:bg-amber-400/10"
           >

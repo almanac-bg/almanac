@@ -187,7 +187,10 @@ export function cli(dbPath: string, ...args: string[]): { status: number | null;
     process.env.TEST_TARGET === 'dist'
       ? [path.join(serverDir, 'dist/cli.mjs')]
       : [require.resolve('tsx/cli'), path.join(serverDir, 'src/cli.ts')];
-  const r = spawnSync(process.execPath, [...entry, ...args], { env: { ...process.env, DB_PATH: dbPath }, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [...entry, ...args], {
+    env: { ...process.env, DB_PATH: dbPath },
+    encoding: 'utf8',
+  });
   return { status: r.status, output: `${r.stdout}${r.stderr}` };
 }
 
@@ -198,6 +201,7 @@ export function http(url: string) {
       headers: { cookie, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    // biome-ignore lint/suspicious/noExplicitAny: tests read whichever fields of a route's JSON they assert on
     return { status: r.status, body: (await r.json()) as any };
   };
   return {
@@ -207,26 +211,45 @@ export function http(url: string) {
 }
 
 export function connect(url: string, cookie: string, extraHeaders: Record<string, string> = {}): Client {
-  return io(url, { transports: ['websocket'], extraHeaders: { cookie, ...extraHeaders }, forceNew: true, reconnection: false });
+  return io(url, {
+    transports: ['websocket'],
+    extraHeaders: { cookie, ...extraHeaders },
+    forceNew: true,
+    reconnection: false,
+  });
 }
 
 export async function connected(...clients: Client[]) {
   await Promise.all(clients.map((c) => (c.connected ? null : onceEvent(c as never, 'connect'))));
 }
 
-type AnySocket = { emit: (...a: any[]) => unknown; once: (...a: any[]) => unknown };
+type ClientEvent = keyof ClientToServerEvents;
+type ServerEvent = keyof ServerToClientEvents;
+/** What an event's ack callback (its last argument) is called with. */
+type AckOf<F> = F extends (...args: infer P) => void
+  ? P extends [...unknown[], (res: infer R) => void]
+    ? R
+    : never
+  : never;
+/** The payload a server event carries. */
+type PayloadOf<E extends ServerEvent> = Parameters<ServerToClientEvents[E]>[0];
+/** Untyped emit/once: the helpers are generic over the event, and tests send malformed payloads on purpose. */
+type LooseSocket = {
+  emit: (event: string, ...args: unknown[]) => unknown;
+  once: (event: string, listener: (payload: never) => void) => unknown;
+};
 
 /** Emits and resolves with the server's ack. */
-export const emitAck = <T = any>(s: Client, event: string, ...args: unknown[]): Promise<T> =>
-  new Promise((resolve) => (s as unknown as AnySocket).emit(event, ...args, resolve));
+export const emitAck = <E extends ClientEvent>(s: Client, event: E, ...args: unknown[]) =>
+  new Promise<AckOf<ClientToServerEvents[E]>>((resolve) => (s as unknown as LooseSocket).emit(event, ...args, resolve));
 
 /** Next occurrence of an event, or a rejection after `ms`. */
-export const next = <T = any>(s: Client, event: string, ms = 5000): Promise<T> =>
-  new Promise((resolve, reject) => {
+export const next = <E extends ServerEvent>(s: Client, event: E, ms = 5000) =>
+  new Promise<PayloadOf<E>>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout waiting for ${event}`)), ms);
-    (s as unknown as AnySocket).once(event, (x: T) => {
+    (s as unknown as LooseSocket).once(event, (payload: PayloadOf<E>) => {
       clearTimeout(t);
-      resolve(x);
+      resolve(payload);
     });
   });
 

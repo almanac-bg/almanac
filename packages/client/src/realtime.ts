@@ -6,8 +6,8 @@ import {
   FREEZE_MS,
   type GameStartPayload,
   type Invite,
-  powerupById,
   type PowerupId,
+  powerupById,
   type QueueModeId,
   type RoomSettings,
   type ServerToClientEvents,
@@ -407,10 +407,12 @@ export const actions = {
     getSocket().emit('invite:decline', { inviteId: invite.id });
     dropInvite(invite.id);
   },
-  challenge: (userId: number) => ask<{ code: string }>(() => withTimeout().emitWithAck('friends:challenge', { userId })),
+  challenge: (userId: number) =>
+    ask<{ code: string }>(() => withTimeout().emitWithAck('friends:challenge', { userId })),
   answer: (choice: number) => {
     const g = getState().game;
-    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice)) return;
+    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice))
+      return;
     if (g.frozenUntil > Date.now()) return;
     if (!sendMove('game:answer', { index: g.question.index, choice })) return offlineToast('Отговорът не е изпратен.');
     effect('lock');

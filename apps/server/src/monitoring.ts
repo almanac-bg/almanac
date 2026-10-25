@@ -20,7 +20,7 @@ function parseDsn(raw: string | null): Dsn | null {
   if (!raw) return null;
   const url = URL.parse(raw);
   const project = url?.pathname.replace(/^\/+|\/+$/g, '');
-  if (!url || !url.username || !project) {
+  if (!url?.username || !project) {
     console.warn('📡 SENTRY_DSN is not a valid DSN; error reports are off.');
     return null;
   }
@@ -96,7 +96,11 @@ async function send(envelopeUrl: string, body: string) {
  * Logs a server error and, with monitoring on, reports it. `where` names the part of the game it came from
  * (it groups and tags the report); `userId` is only the account number, never a name or email.
  */
-export function reportError(err: unknown, where: string, details: { userId?: number; extra?: Record<string, unknown> } = {}) {
+export function reportError(
+  err: unknown,
+  where: string,
+  details: { userId?: number; extra?: Record<string, unknown> } = {},
+) {
   console.error(`💥 ${where}:`, err);
   if (!dsn) return Promise.resolve();
   const error = err instanceof Error ? err : new Error(String(err));

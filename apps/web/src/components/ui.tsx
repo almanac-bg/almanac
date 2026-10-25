@@ -23,9 +23,11 @@ const SIZES: Record<Size, string> = {
   lg: 'h-14 px-7 text-base rounded-2xl gap-2.5',
 };
 
+/** A plain button unless it says `type="submit"` (the HTML default would submit any form it sits in). */
 export function Button({
   variant = 'primary',
   size = 'md',
+  type = 'button',
   className,
   children,
   loading,
@@ -34,6 +36,7 @@ export function Button({
   return (
     <button
       {...rest}
+      type={type}
       disabled={rest.disabled || loading}
       className={clsx(
         'focus-ring inline-flex select-none items-center justify-center font-semibold transition-[filter,background,transform,opacity] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45',
@@ -73,7 +76,15 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
   );
 }
 
-export function Pill({ children, className, style }: { children: ReactNode; className?: string; style?: React.CSSProperties }) {
+export function Pill({
+  children,
+  className,
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <span
       style={style}
@@ -87,7 +98,8 @@ export function Pill({ children, className, style }: { children: ReactNode; clas
   );
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * A dialog that behaves like one: focus moves into it and stays there (Tab cycles inside), goes back where it was on
@@ -173,13 +185,17 @@ export function Modal({
             aria-labelledby={title ? titleId : labelledBy}
             aria-label={title || labelledBy ? undefined : label}
             tabIndex={-1}
-            className={clsx('glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none sm:p-8', className)}
+            className={clsx(
+              'glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none sm:p-8',
+              className,
+            )}
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           >
             <button
+              type="button"
               onClick={onClose}
               aria-label="Затвори"
               className="focus-ring absolute top-3 right-3 grid size-11 place-items-center rounded-full text-fg-3 hover:bg-white/10 hover:text-fg"
@@ -216,6 +232,7 @@ export function Segmented<T extends string | number>({
       {options.map((o) => (
         <button
           key={String(o.value)}
+          type="button"
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={clsx(

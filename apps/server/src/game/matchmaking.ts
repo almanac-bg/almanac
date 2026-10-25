@@ -1,11 +1,11 @@
 import { MODES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
-import type { IO } from './io';
 import { config } from '../config';
 import { guarded } from '../guard';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
 import { getUser } from '../users';
 import { makeBots } from './bots';
+import type { IO } from './io';
 import { averageOf, balanceTeams, buildHuman, type GameRegistry } from './registry';
 
 /** A player's first few multiplayer matches get kinder bots: the first win comes sooner. */
@@ -24,7 +24,10 @@ export class Matchmaker {
     private io: IO,
     private games: GameRegistry,
   ) {
-    setInterval(guarded('matchmaking', () => this.tick()), 1000).unref();
+    setInterval(
+      guarded('matchmaking', () => this.tick()),
+      1000,
+    ).unref();
   }
 
   join(userId: number, mode: QueueModeId) {
@@ -83,7 +86,10 @@ export class Matchmaker {
   /** A ranked match for exactly these players (bots fill the other seats), e.g. a rematch. */
   startWith(mode: QueueModeId, userIds: number[]) {
     for (const userId of userIds) this.leave(userId);
-    this.launch(mode, userIds.map((userId) => ({ userId, joinedAt: Date.now() })));
+    this.launch(
+      mode,
+      userIds.map((userId) => ({ userId, joinedAt: Date.now() })),
+    );
   }
 
   private launch(mode: QueueModeId, entries: Entry[]) {
@@ -92,7 +98,12 @@ export class Matchmaker {
     try {
       const humans = entries.map((e) => buildHuman(e.userId, mode));
       const gentle = entries.some((e) => (getUser(e.userId)?.mp_games ?? 0) < NEWCOMER_GAMES);
-      const bots = makeBots(def.players - humans.length, averageOf(humans), humans.map((h) => h.player.name), { gentle });
+      const bots = makeBots(
+        def.players - humans.length,
+        averageOf(humans),
+        humans.map((h) => h.player.name),
+        { gentle },
+      );
       if (def.teams) balanceTeams([...humans, ...bots]);
       this.games.start({
         mode,
@@ -110,7 +121,9 @@ export class Matchmaker {
     } catch (err) {
       void reportError(err, 'match start', { extra: { mode } });
       for (const e of entries) {
-        this.io.to(`user:${e.userId}`).emit('notice', { kind: 'error', message: 'Мачът не можа да започне. Опитай пак.' });
+        this.io
+          .to(`user:${e.userId}`)
+          .emit('notice', { kind: 'error', message: 'Мачът не можа да започне. Опитай пак.' });
       }
     }
   }

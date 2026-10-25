@@ -21,7 +21,11 @@ const count = (table: string) => one<{ n: number }>(`SELECT COUNT(*) AS n FROM $
 test('expired sessions and old email links are purged', () => {
   const now = Date.now();
   run("INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'a', 'a', 'x', 0)");
-  run("INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ('live', 1, 0, ?), ('dead', 1, 0, ?)", now + DAY, now - 1);
+  run(
+    "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ('live', 1, 0, ?), ('dead', 1, 0, ?)",
+    now + DAY,
+    now - 1,
+  );
   run(
     `INSERT INTO email_tokens (token_hash, user_id, purpose, created_at, expires_at)
      VALUES ('fresh', 1, 'reset', 0, ?), ('recent', 1, 'reset', 0, ?), ('old', 1, 'reset', 0, ?)`,
@@ -44,7 +48,7 @@ test('daily snapshots: one per day, a working copy, only the newest kept', async
   assert.equal(await snapshot(day(1), dir), null, 'one snapshot per day');
 
   const copy = new DatabaseSync(first!, { readOnly: true });
-  assert.equal((copy.prepare("SELECT username FROM users WHERE id = 1").get() as { username: string }).username, 'a');
+  assert.equal((copy.prepare('SELECT username FROM users WHERE id = 1').get() as { username: string }).username, 'a');
   copy.close();
 
   for (const d of [2, 3, 4, 5]) await snapshot(day(d), dir);

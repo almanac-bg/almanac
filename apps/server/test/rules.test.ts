@@ -61,7 +61,11 @@ test('days and seasons follow Sofia time, across DST changes', () => {
   assert.equal(dayEndsAt('2026-10-18'), Date.UTC(2026, 9, 18, 21, 0));
   // Winter time (UTC+2) after the switch.
   assert.equal(sofiaMidnight(2026, 10, 26), Date.UTC(2026, 9, 25, 22, 0));
-  assert.equal(sofiaMidnight(2026, 3, 29), Date.UTC(2026, 2, 28, 22, 0), 'midnight before the spring switch is still UTC+2');
+  assert.equal(
+    sofiaMidnight(2026, 3, 29),
+    Date.UTC(2026, 2, 28, 22, 0),
+    'midnight before the spring switch is still UTC+2',
+  );
   assert.equal(seasonEndsAt('2026-12'), Date.UTC(2026, 11, 31, 22, 0));
   assert.equal(shiftDay('2026-03-01', -1), '2026-02-28');
   assert.equal(shiftSeason('2026-12', 1), '2027-01');
@@ -75,9 +79,18 @@ test('unlock requirements', () => {
   assert.ok(meetsRequirement({ achievement: 'royale_win' }, ctx));
   assert.ok(meetsRequirement({ season: 'gold' }, ctx));
   assert.ok(!meetsRequirement({ season: 'platinum' }, ctx));
-  const gained = newlyUnlocked({ level: 2, achievements: new Set(), seasonTier: -1 }, { level: 3, achievements: new Set(), seasonTier: 1 });
-  assert.ok(gained.some((u) => u.kind === 'powerup' && u.id === 'freeze'), 'Леден удар at level 3');
-  assert.ok(gained.some((u) => u.kind === 'frame' && u.id === 'season_silver'), 'silver season frame');
+  const gained = newlyUnlocked(
+    { level: 2, achievements: new Set(), seasonTier: -1 },
+    { level: 3, achievements: new Set(), seasonTier: 1 },
+  );
+  assert.ok(
+    gained.some((u) => u.kind === 'powerup' && u.id === 'freeze'),
+    'Леден удар at level 3',
+  );
+  assert.ok(
+    gained.some((u) => u.kind === 'frame' && u.id === 'season_silver'),
+    'silver season frame',
+  );
 });
 
 test('question picking: ramp, category cap and seeded determinism', () => {
@@ -101,21 +114,66 @@ test('question picking: unseen first, then what the players saw longest ago', ()
   assert.equal(every.length, 30);
   const stale = new Set(pickQuestions(10, 'history', new Map()).map((q) => q.id));
   const seen = new Map(every.map((q) => [q.id, stale.has(q.id) ? 1 : 2]));
-  assert.deepEqual(new Set(pickQuestions(10, 'history', seen).map((q) => q.id)), stale, 'the longest-ago ones come back first');
+  assert.deepEqual(
+    new Set(pickQuestions(10, 'history', seen).map((q) => q.id)),
+    stale,
+    'the longest-ago ones come back first',
+  );
   const fresh = every.find((q) => q.difficulty === 'easy' && !stale.has(q.id))!;
   seen.delete(fresh.id);
-  assert.ok(pickQuestions(10, 'history', seen).some((q) => q.id === fresh.id), 'a question nobody saw beats them all');
+  assert.ok(
+    pickQuestions(10, 'history', seen).some((q) => q.id === fresh.id),
+    'a question nobody saw beats them all',
+  );
 });
 
 test('Bulgarian ordinals', () => {
-  assert.deepEqual([1, 2, 3, 4, 7, 8, 11, 12, 21].map(ordinal), ['1-во', '2-ро', '3-то', '4-то', '7-мо', '8-мо', '11-то', '12-то', '21-во']);
+  assert.deepEqual([1, 2, 3, 4, 7, 8, 11, 12, 21].map(ordinal), [
+    '1-во',
+    '2-ро',
+    '3-то',
+    '4-то',
+    '7-мо',
+    '8-мо',
+    '11-то',
+    '12-то',
+    '21-во',
+  ]);
 });
 
 test('username filter: catches disguised words, spares ordinary names', () => {
-  for (const bad of ['Fuck', 'f.u.c.k', 'ПУТКА', 'pu7ka', 'КуРвА', 'хуй123', 'Хуйло', 'sh1t_head', 'Пичкаджия', 'admin', 'Админ', 'Модератор_1', 'almanac', 'АЛМАНАХ']) {
+  for (const bad of [
+    'Fuck',
+    'f.u.c.k',
+    'ПУТКА',
+    'pu7ka',
+    'КуРвА',
+    'хуй123',
+    'Хуйло',
+    'sh1t_head',
+    'Пичкаджия',
+    'admin',
+    'Админ',
+    'Модератор_1',
+    'almanac',
+    'АЛМАНАХ',
+  ]) {
     assert.ok(nameProblem(bad), `should block "${bad}"`);
   }
-  for (const ok of ['Себастиан', 'Badminton', 'Маркетинг', 'Иван', 'Курт', 'Торпедо', 'Лебед', 'Мария_92', 'Kurtis', 'Huxley', 'Ребека', 'Supper']) {
+  for (const ok of [
+    'Себастиан',
+    'Badminton',
+    'Маркетинг',
+    'Иван',
+    'Курт',
+    'Торпедо',
+    'Лебед',
+    'Мария_92',
+    'Kurtis',
+    'Huxley',
+    'Ребека',
+    'Supper',
+  ]) {
     assert.equal(nameProblem(ok), null, `should allow "${ok}"`);
   }
 });

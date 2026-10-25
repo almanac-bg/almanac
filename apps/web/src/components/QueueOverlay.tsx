@@ -1,7 +1,7 @@
+import { actions, useNow, useStore } from '@quiz/client';
 import { avatarEmoji, MODES } from '@quiz/shared';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { actions, useNow, useStore } from '@quiz/client';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 
@@ -54,11 +54,14 @@ export function QueueOverlay() {
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {Array.from({ length: queue.needed }, (_, i) => (
                 <motion.span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one placeholder per seat; a seat is its position
                   key={i}
                   initial={false}
                   animate={{ scale: i < queue.found ? 1 : 0.85, opacity: i < queue.found ? 1 : 0.35 }}
                   className="grid size-10 place-items-center rounded-full border border-line bg-white/5 text-lg"
-                  style={i < queue.found ? { borderColor: mode.accent[0], boxShadow: `0 0 16px -4px ${mode.accent[0]}` } : {}}
+                  style={
+                    i < queue.found ? { borderColor: mode.accent[0], boxShadow: `0 0 16px -4px ${mode.accent[0]}` } : {}
+                  }
                 >
                   {i === 0 ? avatarEmoji(me.avatar) : i < queue.found ? <User className="size-4" /> : '·'}
                 </motion.span>

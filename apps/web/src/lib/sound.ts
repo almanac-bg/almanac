@@ -29,13 +29,10 @@ export function setMuted(value: boolean) {
 
 /** The mute setting as React state: every toggle (header, in-game, settings) stays in sync. */
 export function useMuted(): [boolean, (value: boolean) => void] {
-  const value = useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    isMuted,
-  );
+  const value = useSyncExternalStore((listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }, isMuted);
   return [value, setMuted];
 }
 
@@ -50,7 +47,14 @@ function audio(): AudioContext | null {
   }
 }
 
-function tone(freq: number, start: number, duration: number, type: OscillatorType = 'sine', gain = 0.12, slideTo?: number) {
+function tone(
+  freq: number,
+  start: number,
+  duration: number,
+  type: OscillatorType = 'sine',
+  gain = 0.12,
+  slideTo?: number,
+) {
   const ac = audio();
   if (!ac) return;
   const t0 = ac.currentTime + start;
@@ -75,22 +79,30 @@ export const sfx = {
     tone(880, 0, 0.12, 'sine', 0.1);
     tone(1320, 0.08, 0.22, 'sine', 0.1);
   },
-  correct: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.06, 0.22, 'triangle', 0.09)),
+  correct: () => {
+    for (const [i, f] of [523, 659, 784, 1047].entries()) tone(f, i * 0.06, 0.22, 'triangle', 0.09);
+  },
   wrong: () => {
     tone(220, 0, 0.28, 'sawtooth', 0.05, 140);
     tone(185, 0.05, 0.3, 'square', 0.03, 110);
   },
   pop: () => tone(900, 0, 0.07, 'sine', 0.06, 1400),
-  powerup: () => [700, 1050, 1400].forEach((f, i) => tone(f, i * 0.04, 0.12, 'sine', 0.07)),
+  powerup: () => {
+    for (const [i, f] of [700, 1050, 1400].entries()) tone(f, i * 0.04, 0.12, 'sine', 0.07);
+  },
   eliminated: () => {
     tone(160, 0, 0.5, 'sawtooth', 0.06, 60);
     tone(90, 0.02, 0.6, 'sine', 0.12, 45);
   },
-  win: () =>
-    [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.11, i === 6 ? 0.6 : 0.16, 'triangle', 0.09)),
-  levelUp: () => [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, 'sine', 0.08)),
+  win: () => {
+    for (const [i, f] of [523, 659, 784, 1047, 784, 1047, 1319].entries())
+      tone(f, i * 0.11, i === 6 ? 0.6 : 0.16, 'triangle', 0.09);
+  },
+  levelUp: () => {
+    for (const [i, f] of [784, 988, 1175, 1568, 1976].entries()) tone(f, i * 0.07, 0.3, 'sine', 0.08);
+  },
   freeze: () => {
-    [2093, 1760, 1568, 1319].forEach((f, i) => tone(f, i * 0.05, 0.35, 'sine', 0.05));
+    for (const [i, f] of [2093, 1760, 1568, 1319].entries()) tone(f, i * 0.05, 0.35, 'sine', 0.05);
     tone(110, 0, 0.5, 'triangle', 0.06, 80);
   },
   achievement: () => {

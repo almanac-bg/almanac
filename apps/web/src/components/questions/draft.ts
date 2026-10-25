@@ -36,7 +36,8 @@ export function validateDraft(d: QuestionDraft): DraftErrors {
   const options = d.options.map((o) => o.trim());
   if (options.some((o) => o.length < oMin)) errors.options = 'Попълни всички отговори.';
   else if (options.some((o) => o.length > oMax)) errors.options = `Отговорите могат да са до ${oMax} символа.`;
-  else if (new Set(options.map((o) => o.toLowerCase())).size !== 4) errors.options = 'Отговорите трябва да са различни.';
+  else if (new Set(options.map((o) => o.toLowerCase())).size !== 4)
+    errors.options = 'Отговорите трябва да са различни.';
 
   if (d.answer < 0 || d.answer > 3) errors.answer = 'Отбележи верния отговор.';
   return errors;

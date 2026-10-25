@@ -15,7 +15,12 @@ export function LegalLinks({ className = '' }: { className?: string }) {
         Политика за поверителност
       </Link>
       {sourceUrl && (
-        <a href={sourceUrl} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center hover:text-fg-2">
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex min-h-11 items-center hover:text-fg-2"
+        >
           Изходен код
         </a>
       )}

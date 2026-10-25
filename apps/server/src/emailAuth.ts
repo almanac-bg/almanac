@@ -37,10 +37,13 @@ function issueToken(userId: number, purpose: Purpose, email: string | null): str
 
 /** Marks a token used and returns what it was issued for; null if unknown, used, expired or the wrong kind. */
 function consumeToken(token: string, purpose: Purpose): { userId: number; email: string | null } | null {
-  const row = one<{ user_id: number; email: string | null; expires_at: number; used_at: number | null; purpose: string }>(
-    'SELECT user_id, email, expires_at, used_at, purpose FROM email_tokens WHERE token_hash = ?',
-    hashToken(token),
-  );
+  const row = one<{
+    user_id: number;
+    email: string | null;
+    expires_at: number;
+    used_at: number | null;
+    purpose: string;
+  }>('SELECT user_id, email, expires_at, used_at, purpose FROM email_tokens WHERE token_hash = ?', hashToken(token));
   if (!row || row.purpose !== purpose || row.used_at !== null || row.expires_at < Date.now()) return null;
   run('UPDATE email_tokens SET used_at = ? WHERE token_hash = ?', Date.now(), hashToken(token));
   return { userId: row.user_id, email: row.email };
@@ -78,7 +81,8 @@ export function verifyEmailToken(token: string): Result<{ userId: number }> {
     if (owner && owner.id !== t.userId) return { ok: false, error: 'Този имейл вече е свързан с друг профил.' };
     // The old address hears about the switch (someone with a moment at an unlocked device can't quietly take over).
     const before = getUser(t.userId)!;
-    if (before.email && before.email_key !== emailKey(t.email)) sendMail(emailChangedMail(before.email, before.username, false));
+    if (before.email && before.email_key !== emailKey(t.email))
+      sendMail(emailChangedMail(before.email, before.username, false));
     run(
       'UPDATE users SET email = ?, email_key = ?, pending_email = NULL WHERE id = ?',
       t.email,
@@ -112,7 +116,12 @@ export async function resetPassword(token: string, password: string): Promise<Re
 }
 
 /** Changes the password; every other session is logged out, the current one stays. */
-export async function changePassword(userId: number, current: string, next: string, keepToken: string | null): Promise<Result> {
+export async function changePassword(
+  userId: number,
+  current: string,
+  next: string,
+  keepToken: string | null,
+): Promise<Result> {
   const user = getUser(userId)!;
   if (!(await verifyPassword(current, user.password_hash))) return { ok: false, error: 'Текущата парола е грешна.' };
   const hash = await hashPassword(next);

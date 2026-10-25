@@ -93,7 +93,10 @@ export async function snapshot(now = Date.now(), dir = config.backupDir): Promis
   copy.exec('PRAGMA journal_mode = DELETE');
   copy.close();
   fs.renameSync(partial, file);
-  const snapshots = fs.readdirSync(dir).filter((f) => SNAPSHOT_NAME.test(f)).sort();
+  const snapshots = fs
+    .readdirSync(dir)
+    .filter((f) => SNAPSHOT_NAME.test(f))
+    .sort();
   for (const old of snapshots.slice(0, -config.backupKeepDays)) fs.rmSync(path.join(dir, old));
   return file;
 }

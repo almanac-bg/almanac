@@ -27,7 +27,10 @@ export type PreparedQuestion = Question;
  * code), so players can't look answers up and the content can't simply be copied. Builds made with it carry it next
  * to the bundle. Without it, the server plays the small public sample — enough to develop and run the tests.
  */
-const PRIVATE_BANK = [path.join(import.meta.dirname, 'data', 'questions.json'), path.resolve(import.meta.dirname, '../../../private/questions.json')];
+const PRIVATE_BANK = [
+  path.join(import.meta.dirname, 'data', 'questions.json'),
+  path.resolve(import.meta.dirname, '../../../private/questions.json'),
+];
 const SAMPLE_BANK = path.join(import.meta.dirname, 'data', 'questions.sample.json');
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH ?? PRIVATE_BANK.find((file) => fs.existsSync(file)) ?? SAMPLE_BANK;
 
@@ -56,12 +59,18 @@ export function questionBank(): Question[] {
       `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
        FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
     ).map((r) => ({ ...r, options: JSON.parse(r.options) as string[] }));
-    const hidden = new Set(all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id));
+    const hidden = new Set(
+      all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
+    );
     everything = new Map([...builtIn, ...community].map((q) => [q.id, q]));
     bank = [...everything.values()].filter((q) => !hidden.has(q.id));
-    console.log(`📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`);
+    console.log(
+      `📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`,
+    );
     if (QUESTIONS_PATH === SAMPLE_BANK) {
-      (config.production ? console.warn : console.log)('📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).');
+      (config.production ? console.warn : console.log)(
+        '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
+      );
     }
   }
   return bank;

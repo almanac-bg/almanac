@@ -103,6 +103,7 @@ export function DraftEditor({
             const correct = draft.answer === i;
             return (
               <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: answer slots; a text key remounts the input as you type
                 key={i}
                 className={clsx(
                   'relative flex items-center gap-2 overflow-hidden rounded-2xl border bg-black/25 py-1.5 pr-1.5 pl-3 transition-colors',

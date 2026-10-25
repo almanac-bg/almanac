@@ -13,6 +13,7 @@ const LETTERS = ['А', 'Б', 'В', 'Г'];
 export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
   const [data, setData] = useState<QuestionReports | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once; `onOpen` is recreated on every parent render
   useEffect(() => {
     api
       .adminQuestionReports()
@@ -21,7 +22,6 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
         onOpen(r.groups.length);
       })
       .catch((e) => toast({ kind: 'error', title: e.message }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function update(next: QuestionReports) {
@@ -72,6 +72,7 @@ function QuestionCard({ question, children }: { question: QuestionInfo; children
       <ol className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
         {question.options.map((o, i) => (
           <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
             key={i}
             className={clsx(
               'rounded-xl px-3 py-2',
@@ -87,14 +88,23 @@ function QuestionCard({ question, children }: { question: QuestionInfo; children
   );
 }
 
-function QuestionReportCard({ group, onResolved }: { group: QuestionReportGroup; onResolved: (r: QuestionReports) => void }) {
+function QuestionReportCard({
+  group,
+  onResolved,
+}: {
+  group: QuestionReportGroup;
+  onResolved: (r: QuestionReports) => void;
+}) {
   const [busy, setBusy] = useState<'dismiss' | 'hide' | null>(null);
 
   async function decide(action: 'dismiss' | 'hide') {
     setBusy(action);
     try {
       const r = await api.resolveQuestionReports(group.question.id, action);
-      toast({ kind: 'success', title: action === 'hide' ? 'Въпросът е скрит от нови мачове' : 'Сигналите са затворени' });
+      toast({
+        kind: 'success',
+        title: action === 'hide' ? 'Въпросът е скрит от нови мачове' : 'Сигналите са затворени',
+      });
       onResolved(r);
     } catch (e) {
       toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
@@ -115,8 +125,8 @@ function QuestionReportCard({ group, onResolved }: { group: QuestionReportGroup;
           </span>
         </div>
         <ul className="mt-4 space-y-2">
-          {group.reports.map((r, i) => (
-            <li key={i} className="rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
+          {group.reports.map((r) => (
+            <li key={r.id} className="rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{reasonLabel(r.reason)}</span>
                 <span className="text-xs text-fg-3">
@@ -128,7 +138,13 @@ function QuestionReportCard({ group, onResolved }: { group: QuestionReportGroup;
           ))}
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" loading={busy === 'dismiss'} disabled={!!busy} onClick={() => decide('dismiss')}>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={busy === 'dismiss'}
+            disabled={!!busy}
+            onClick={() => decide('dismiss')}
+          >
             <Check className="size-4" /> Въпросът е наред
           </Button>
           <Button
@@ -147,7 +163,13 @@ function QuestionReportCard({ group, onResolved }: { group: QuestionReportGroup;
   );
 }
 
-function HiddenQuestions({ questions, onChange }: { questions: QuestionInfo[]; onChange: (r: QuestionReports) => void }) {
+function HiddenQuestions({
+  questions,
+  onChange,
+}: {
+  questions: QuestionInfo[];
+  onChange: (r: QuestionReports) => void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
 
   async function unhide(id: string) {

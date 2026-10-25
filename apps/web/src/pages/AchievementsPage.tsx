@@ -1,3 +1,4 @@
+import { api, fmt, longDate } from '@quiz/client';
 import { ACHIEVEMENTS, type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
 import clsx from 'clsx';
 import { Lock } from 'lucide-react';
@@ -7,7 +8,6 @@ import { Link } from 'react-router';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
-import { api, fmt, longDate } from '@quiz/client';
 import { useLoad } from '../lib/load';
 
 type Filter = 'all' | 'unlocked' | 'locked';
@@ -41,10 +41,12 @@ export function AchievementsPage() {
   // One that only a closed ranked queue can award isn't on offer — unless it was earned while that queue was open.
   const available = ACHIEVEMENTS.filter((a) => !a.queue || open.includes(a.queue) || !!byId.get(a.id)?.unlockedAt);
   const unlocked = available.filter((a) => byId.get(a.id)?.unlockedAt).length;
-  const list = available.filter((a) => {
-    const done = !!byId.get(a.id)?.unlockedAt;
-    return filter === 'all' || (filter === 'unlocked' ? done : !done);
-  }).sort((a, b) => Number(!!byId.get(b.id)?.unlockedAt) - Number(!!byId.get(a.id)?.unlockedAt));
+  const list = available
+    .filter((a) => {
+      const done = !!byId.get(a.id)?.unlockedAt;
+      return filter === 'all' || (filter === 'unlocked' ? done : !done);
+    })
+    .sort((a, b) => Number(!!byId.get(b.id)?.unlockedAt) - Number(!!byId.get(a.id)?.unlockedAt));
 
   return (
     <div className="space-y-6">
@@ -54,7 +56,11 @@ export function AchievementsPage() {
           <p className="mt-1 text-fg-2">
             Отключени <b className="text-fg">{unlocked}</b> от {available.length}
           </p>
-          <ProgressBar value={unlocked / available.length} className="mt-3 w-64" gradient="linear-gradient(90deg,#fbbf24,#f472b6)" />
+          <ProgressBar
+            value={unlocked / available.length}
+            className="mt-3 w-64"
+            gradient="linear-gradient(90deg,#fbbf24,#f472b6)"
+          />
         </div>
         <Segmented
           value={filter}
@@ -93,7 +99,10 @@ export function AchievementsPage() {
                 )}
                 <div className="relative flex items-start gap-4">
                   <span
-                    className={clsx('grid size-14 shrink-0 place-items-center rounded-2xl text-3xl', !done && 'grayscale')}
+                    className={clsx(
+                      'grid size-14 shrink-0 place-items-center rounded-2xl text-3xl',
+                      !done && 'grayscale',
+                    )}
                     style={{ background: done ? `${rarity.color}22` : 'rgb(255 255 255 / 0.05)' }}
                   >
                     {done ? a.icon : <Lock className="size-5 text-fg-3" />}
@@ -122,7 +131,10 @@ export function AchievementsPage() {
                           {fmt(p.progress)} / {fmt(a.goal)}
                         </span>
                       </div>
-                      <ProgressBar value={p.progress / a.goal} gradient={`linear-gradient(90deg, ${rarity.color}99, ${rarity.color})`} />
+                      <ProgressBar
+                        value={p.progress / a.goal}
+                        gradient={`linear-gradient(90deg, ${rarity.color}99, ${rarity.color})`}
+                      />
                     </>
                   ) : (
                     <p className="text-xs text-fg-3">Изпълни го в мач</p>

@@ -79,7 +79,20 @@ export function seasonEndsAt(season: string): number {
   return sofiaMidnight(y, m + 1, 1);
 }
 
-const MONTHS = ['Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни', 'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'];
+const MONTHS = [
+  'Януари',
+  'Февруари',
+  'Март',
+  'Април',
+  'Май',
+  'Юни',
+  'Юли',
+  'Август',
+  'Септември',
+  'Октомври',
+  'Ноември',
+  'Декември',
+];
 
 /** "Октомври 2026" */
 export function seasonName(season: string): string {

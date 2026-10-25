@@ -57,7 +57,8 @@ export const getUserByName = (username: string) =>
   one<UserRow>('SELECT * FROM users WHERE username_key = ?', usernameKey(username));
 
 export const emailKey = (email: string) => email.trim().normalize('NFC').toLowerCase();
-export const getUserByEmail = (email: string) => one<UserRow>('SELECT * FROM users WHERE email_key = ?', emailKey(email));
+export const getUserByEmail = (email: string) =>
+  one<UserRow>('SELECT * FROM users WHERE email_key = ?', emailKey(email));
 
 /** Login accepts a username or a verified email. */
 export const getUserByLogin = (login: string) => (login.includes('@') ? getUserByEmail(login) : getUserByName(login));
@@ -80,7 +81,10 @@ export function publicUser(id: number): PublicUser | null {
 }
 
 export function achievementSet(userId: number): Set<string> {
-  const rows = all<{ achievement_id: string }>('SELECT achievement_id FROM user_achievements WHERE user_id = ?', userId);
+  const rows = all<{ achievement_id: string }>(
+    'SELECT achievement_id FROM user_achievements WHERE user_id = ?',
+    userId,
+  );
   return new Set(rows.map((r) => r.achievement_id));
 }
 

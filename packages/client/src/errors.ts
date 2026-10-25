@@ -13,7 +13,12 @@ export function reportError(kind: 'render' | 'error' | 'rejection', error: unkno
   void fetch(`${clientConfig().baseUrl}/api/client-errors`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind, message: err.message.slice(0, 500), stack: stack.slice(0, 4000) || undefined, url: location.pathname }),
+    body: JSON.stringify({
+      kind,
+      message: err.message.slice(0, 500),
+      stack: stack.slice(0, 4000) || undefined,
+      url: location.pathname,
+    }),
     keepalive: true,
   }).catch(() => {});
 }

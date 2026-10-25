@@ -72,7 +72,7 @@ test('browser crash reports are accepted (and never echo anything back)', async 
 test('at launch only Duel and Royale are open, and the lobby says so', async () => {
   const player = await register(srv.url, 'opashka_test');
   const socket = connect(srv.url, player.cookie);
-  const stats = next<{ modes: string[] }>(socket, 'lobby:stats');
+  const stats = next(socket, 'lobby:stats');
   await connected(socket);
   assert.deepEqual((await stats).modes, ['duel', 'royale']);
   const closed = await emitAck(socket, 'queue:join', 'trio');
@@ -85,7 +85,8 @@ test('at launch only Duel and Royale are open, and the lobby says so', async () 
 
 test('with error reporting on, the page carries the DSN and the tunnel only takes our own project', async () => {
   const envelope = (dsn: string) => `${JSON.stringify({ dsn })}\n{"type":"event"}\n{}\n`;
-  const post = (body: string) => fetch(`${srv.url}/api/monitoring`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body });
+  const post = (body: string) =>
+    fetch(`${srv.url}/api/monitoring`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body });
   assert.equal((await post(envelope(DSN))).status, 200);
   assert.equal((await post(envelope('https://other@evil.example/1'))).status, 400, 'not an open relay');
   if (fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'))) {

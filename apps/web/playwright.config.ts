@@ -24,7 +24,9 @@ const outputDir = path.join(import.meta.dirname, 'test-results');
 
 // A missing build would surface as a server that can't start or pages that 404. Checked once, in the runner.
 if (!process.env.TEST_WORKER_INDEX) {
-  const missing = [serverEntry, webIndex].filter((file) => !fs.existsSync(file)).map((file) => path.relative(root, file));
+  const missing = [serverEntry, webIndex]
+    .filter((file) => !fs.existsSync(file))
+    .map((file) => path.relative(root, file));
   if (missing.length) throw new Error(`No build to test (${missing.join(', ')} missing): run "npm run build" first.`);
 }
 

@@ -58,12 +58,19 @@ export function QuestsCard({ className }: { className?: string }) {
         <p className="min-w-0 flex-1 text-sm text-fg-2">
           {quests.bonusDone ? 'Бонусът за трите задачи е твой!' : 'Изпълни и трите за бонус'}
         </p>
-        <span className={clsx('shrink-0 text-sm font-bold tabular-nums', quests.bonusDone ? 'text-emerald-300' : 'text-amber-300')}>
+        <span
+          className={clsx(
+            'shrink-0 text-sm font-bold tabular-nums',
+            quests.bonusDone ? 'text-emerald-300' : 'text-amber-300',
+          )}
+        >
           {quests.bonusDone && <Check aria-hidden className="mr-0.5 inline size-4 align-[-3px]" />}+{quests.bonusXp} XP
         </span>
       </div>
 
-      <p className="relative mt-auto pt-4 text-xs text-fg-3 tabular-nums">Нови задачи след {countdown(quests.endsAt - now)}</p>
+      <p className="relative mt-auto pt-4 text-xs text-fg-3 tabular-nums">
+        Нови задачи след {countdown(quests.endsAt - now)}
+      </p>
     </Card>
   );
 }
@@ -92,7 +99,9 @@ function Quest({ quest: q }: { quest: QuestInfo }) {
             {q.text}
             {q.done && <span className="sr-only"> — изпълнена</span>}
           </p>
-          <span className={clsx('shrink-0 text-xs font-bold tabular-nums', q.done ? 'text-emerald-300' : 'text-violet-300')}>
+          <span
+            className={clsx('shrink-0 text-xs font-bold tabular-nums', q.done ? 'text-emerald-300' : 'text-violet-300')}
+          >
             +{q.xp} XP
           </span>
         </div>

@@ -9,10 +9,10 @@ import {
   type OperatorInfo,
   type ProfileStats,
   type QueueModeId,
+  type SubmissionStatus,
   seasonEndsAt,
   seasonKey,
   seasonName,
-  type SubmissionStatus,
 } from '@quiz/shared';
 import { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
@@ -20,8 +20,8 @@ import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } fro
 import { achievementProgress } from '../achievements';
 import {
   createSession,
-  destroySession,
   DUMMY_PASSWORD_HASH,
+  destroySession,
   hashPassword,
   hashToken,
   requireAuth,
@@ -30,8 +30,10 @@ import {
   userIdFromRequest,
   verifyPassword,
 } from '../auth';
+import { challengeInfo, challengePreview, myChallenges } from '../challenges';
 import { config } from '../config';
 import { dailyInfo, liveDailyStreak } from '../daily';
+import { all, one, run, tx } from '../db';
 import {
   changePassword,
   EmailSchema,
@@ -42,12 +44,10 @@ import {
   resetPassword,
   verifyEmailToken,
 } from '../emailAuth';
-import { challengeInfo, challengePreview, myChallenges } from '../challenges';
-import { all, one, run, tx } from '../db';
-import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
+import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
-import { disconnectSession, notifyUser, sendFriendsUpdate } from '../notify';
+import { disconnectSession, sendFriendsUpdate } from '../notify';
 import {
   hiddenQuestions,
   openQuestionReportCount,
@@ -56,9 +56,8 @@ import {
   resolveQuestionReports,
   unhideQuestion,
 } from '../questionReports';
-import { count, launchStats } from '../stats';
-import { throttled } from '../throttle';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
+import { count, launchStats } from '../stats';
 import {
   approveSubmission,
   DraftSchema,
@@ -68,7 +67,17 @@ import {
   rejectSubmission,
   submitQuestion,
 } from '../submissions';
-import { emailKey, getUser, getUserByLogin, getUserByName, isAdmin, toPublicUser, type UserRow, usernameKey } from '../users';
+import { throttled } from '../throttle';
+import {
+  emailKey,
+  getUser,
+  getUserByLogin,
+  getUserByName,
+  isAdmin,
+  toPublicUser,
+  type UserRow,
+  usernameKey,
+} from '../users';
 
 export const api = Router();
 
@@ -195,7 +204,10 @@ api.post('/auth/login', async (req, res) => {
 api.post('/auth/forgot', (req, res) => {
   const body = parse(z.object({ login: z.string().trim().min(1, 'Въведи име или имейл.').max(254) }), req, res);
   if (!body) return;
-  if (throttled(`forgot-ip:${req.ip}`, 5, 15 * 60_000) || throttled(`forgot:${usernameKey(body.login)}`, 3, 60 * 60_000)) {
+  if (
+    throttled(`forgot-ip:${req.ip}`, 5, 15 * 60_000) ||
+    throttled(`forgot:${usernameKey(body.login)}`, 3, 60 * 60_000)
+  ) {
     res.status(429).json({ error: 'Твърде много заявки. Опитай по-късно.' });
     return;
   }
@@ -309,7 +321,10 @@ async function confirmPassword(res: Response, password: string): Promise<boolean
 api.post('/account/email', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ email: z.string().max(254), password: z.string().max(200).optional() }), req, res);
   if (!body) return;
-  if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000) || throttled(`email-to:${emailKey(body.email)}`, 3, 24 * 60 * 60_000)) {
+  if (
+    throttled(`email:${res.locals.userId}`, 5, 60 * 60_000) ||
+    throttled(`email-to:${emailKey(body.email)}`, 3, 24 * 60 * 60_000)
+  ) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
@@ -338,13 +353,22 @@ api.delete('/account/email', requireAuth, requireAccount, async (req, res) => {
 });
 
 api.post('/account/password', requireAuth, requireAccount, async (req, res) => {
-  const body = parse(z.object({ current: z.string().min(1, 'Въведи текущата парола.').max(200), next: PasswordSchema }), req, res);
+  const body = parse(
+    z.object({ current: z.string().min(1, 'Въведи текущата парола.').max(200), next: PasswordSchema }),
+    req,
+    res,
+  );
   if (!body) return;
   if (throttled(`password:${res.locals.userId}`, 10, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
-  const result = await changePassword(res.locals.userId, body.current, body.next, sessionTokenFromCookieHeader(req.headers.cookie));
+  const result = await changePassword(
+    res.locals.userId,
+    body.current,
+    body.next,
+    sessionTokenFromCookieHeader(req.headers.cookie),
+  );
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
@@ -460,9 +484,15 @@ api.post('/client-errors', (req, res) => {
     .safeParse(req.body);
   if (body.success && !throttled(`client-error:${req.ip}`, 20, 10 * 60_000)) {
     // Untrusted text: one line for the message, an indented block for the stack, so it can't forge log entries.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: it strips control characters on purpose (log forging)
     const line = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
     const { kind, message, url, stack } = body.data;
-    const trace = stack ? `\n${stack.split('\n').map((l) => `    | ${line(l)}`).join('\n')}` : '';
+    const trace = stack
+      ? `\n${stack
+          .split('\n')
+          .map((l) => `    | ${line(l)}`)
+          .join('\n')}`
+      : '';
     console.error(`🧯 Browser ${kind} at ${line(url ?? '?')}: ${line(message)}${trace}`);
   }
   res.status(204).end();
@@ -470,7 +500,11 @@ api.post('/client-errors', (req, res) => {
 
 api.post('/reports', requireAuth, requireAccount, (req, res) => {
   const body = parse(
-    z.object({ username: z.string().trim().min(1).max(40), reason: z.string(), details: z.string().max(500).default('') }),
+    z.object({
+      username: z.string().trim().min(1).max(40),
+      reason: z.string(),
+      details: z.string().max(500).default(''),
+    }),
     req,
     res,
   );
@@ -559,7 +593,10 @@ api.post('/friends', requireAuth, requireAccount, (req, res) => {
   if (!body) return;
   // Per sender, and per pair (removing and re-requesting the same player can't become a notification loop).
   const pair = `${res.locals.userId}:${usernameKey(body.username)}`;
-  if (throttled(`friend-request:${res.locals.userId}`, 30, 60 * 60_000) || throttled(`friend-pair:${pair}`, 3, 24 * 60 * 60_000)) {
+  if (
+    throttled(`friend-request:${res.locals.userId}`, 30, 60 * 60_000) ||
+    throttled(`friend-pair:${pair}`, 3, 24 * 60 * 60_000)
+  ) {
     res.status(429).json({ error: 'Твърде много покани. Опитай по-късно.' });
     return;
   }
@@ -597,7 +634,10 @@ api.post('/submissions', requireAuth, requireAccount, (req, res) => {
 });
 
 api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
-  const status = z.enum(['pending', 'approved', 'rejected']).catch('pending').parse(req.query.status) as SubmissionStatus;
+  const status = z
+    .enum(['pending', 'approved', 'rejected'])
+    .catch('pending')
+    .parse(req.query.status) as SubmissionStatus;
   res.json({ submissions: listSubmissions(status), pending: pendingCount() });
 });
 
@@ -606,7 +646,11 @@ api.get('/admin/stats', requireAuth, requireAdmin, (_req, res) => {
 });
 
 api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {
-  res.json({ pendingQuestions: pendingCount(), openReports: openReportCount(), questionReports: openQuestionReportCount() });
+  res.json({
+    pendingQuestions: pendingCount(),
+    openReports: openReportCount(),
+    questionReports: openQuestionReportCount(),
+  });
 });
 
 api.post('/questions/:id/report', requireAuth, requireAccount, (req, res) => {
@@ -655,7 +699,11 @@ api.get('/admin/reports', requireAuth, requireAdmin, (_req, res) => {
 const Decision = z.discriminatedUnion('action', [
   z.object({ action: z.literal('dismiss') }),
   z.object({ action: z.literal('rename'), username: z.string().max(40) }),
-  z.object({ action: z.literal('ban'), days: z.number().int().min(1).max(3650).nullable(), reason: z.string().max(200).default('') }),
+  z.object({
+    action: z.literal('ban'),
+    days: z.number().int().min(1).max(3650).nullable(),
+    reason: z.string().max(200).default(''),
+  }),
 ]);
 
 api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, (req, res) => {
@@ -806,7 +854,9 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
     return {
       board,
       entries: info.entries,
-      me: info.played ? { rank: info.played.rank, user: toPublicUser(me), value: info.played.score, correct: info.played.correct } : null,
+      me: info.played
+        ? { rank: info.played.rank, user: toPublicUser(me), value: info.played.score, correct: info.played.correct }
+        : null,
       season: null,
     };
   }

@@ -1,8 +1,8 @@
 import { randomInt } from 'node:crypto';
 import { type BrowserContext, test as base, expect, type Page } from '@playwright/test';
 
-export { expect };
 export type { Page };
+export { expect };
 
 interface Fixtures {
   /** Another person: a fresh browser context (no cookies, no storage) on the same kind of device. */
@@ -24,6 +24,7 @@ function watch(context: BrowserContext, problems: string[]) {
 }
 
 export const test = base.extend<Fixtures>({
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object pattern here, even an empty one
   pageProblems: async ({}, use) => {
     const problems: string[] = [];
     await use(problems);

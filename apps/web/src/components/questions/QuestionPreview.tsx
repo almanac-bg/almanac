@@ -1,7 +1,7 @@
+import { DIFFICULTY_LABEL } from '@quiz/client';
 import { categoryById, type QuestionDraft } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { DIFFICULTY_LABEL } from '@quiz/client';
 import { LETTERS, OPTION_COLORS } from './draft';
 
 /** Read-only question card styled like the in-game one, with the correct answer highlighted. */
@@ -26,7 +26,12 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
           className="absolute -top-16 left-1/2 size-48 -translate-x-1/2 rounded-full opacity-25 blur-3xl"
           style={{ background: cat.color }}
         />
-        <p className={clsx('relative leading-snug font-bold text-balance break-words', compact ? 'text-base' : 'text-lg sm:text-xl')}>
+        <p
+          className={clsx(
+            'relative leading-snug font-bold text-balance break-words',
+            compact ? 'text-base' : 'text-lg sm:text-xl',
+          )}
+        >
           {draft.q.trim() || <span className="text-fg-3">Тук ще се появи въпросът…</span>}
         </p>
       </div>
@@ -37,6 +42,7 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
           const color = OPTION_COLORS[i];
           return (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
               key={i}
               className={clsx(
                 'relative flex min-h-12 items-center gap-3 overflow-hidden rounded-2xl border px-3 py-2.5',

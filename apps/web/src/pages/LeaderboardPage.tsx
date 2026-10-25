@@ -1,13 +1,13 @@
+import { api, fmt, pct, useStore } from '@quiz/client';
 import { type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
-import { CalendarDays, Trophy } from 'lucide-react';
 import clsx from 'clsx';
+import { CalendarDays, Trophy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
-import { api, fmt, pct, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 
 export function LeaderboardPage() {
@@ -41,7 +41,8 @@ export function LeaderboardPage() {
           </p>
           {data?.season && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
-              <Trophy className="size-3.5" /> Сезон {data.season.name} · завършва {new Date(data.season.endsAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' })}
+              <Trophy className="size-3.5" /> Сезон {data.season.name} · завършва{' '}
+              {new Date(data.season.endsAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' })}
             </p>
           )}
           {board === 'daily' && (
@@ -66,7 +67,11 @@ export function LeaderboardPage() {
           <EmptyState
             icon={board === 'daily' ? '📅' : '🏁'}
             title={board === 'daily' ? 'Още никой не е играл днес' : 'Още никой не е класиран'}
-            body={board === 'daily' ? 'Изиграй дневното предизвикателство от началната страница.' : 'Изиграй класиран мач и оглави тази класация.'}
+            body={
+              board === 'daily'
+                ? 'Изиграй дневното предизвикателство от началната страница.'
+                : 'Изиграй класиран мач и оглави тази класация.'
+            }
           />
         </Card>
       ) : (
@@ -89,7 +94,12 @@ export function LeaderboardPage() {
                   >
                     {i === 0 && <div className="absolute -top-16 size-48 rounded-full bg-amber-400/25 blur-3xl" />}
                     <span className="relative text-3xl">{['🥇', '🥈', '🥉'][i]}</span>
-                    <Avatar avatar={e.user.avatar} frame={e.user.frame} size={i === 0 ? 84 : 68} className="relative mt-2" />
+                    <Avatar
+                      avatar={e.user.avatar}
+                      frame={e.user.frame}
+                      size={i === 0 ? 84 : 68}
+                      className="relative mt-2"
+                    />
                     <div className="relative mt-3 flex items-center gap-1.5 font-semibold">
                       {e.user.username} <LevelBadge level={e.user.level} />
                     </div>
@@ -116,7 +126,9 @@ export function LeaderboardPage() {
           </Card>
           {!data.me && board !== 'level' && (
             <p className="text-center text-sm text-fg-3">
-              {board === 'daily' ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.' : 'Изиграй мач в този режим, за да влезеш в класацията.'}
+              {board === 'daily'
+                ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.'
+                : 'Изиграй мач в този режим, за да влезеш в класацията.'}
             </p>
           )}
         </>
@@ -129,7 +141,10 @@ function Row({ board, entry: e, me }: { board: LeaderboardBoard; entry: Leaderbo
   return (
     <Link
       to={`/profile/${encodeURIComponent(e.user.username)}`}
-      className={clsx('flex items-center gap-4 px-5 py-3 transition-colors hover:bg-white/[0.04]', me && 'bg-violet-500/10')}
+      className={clsx(
+        'flex items-center gap-4 px-5 py-3 transition-colors hover:bg-white/[0.04]',
+        me && 'bg-violet-500/10',
+      )}
     >
       <span className="w-8 text-right font-bold text-fg-3 tabular-nums">{e.rank}</span>
       <Avatar avatar={e.user.avatar} frame={e.user.frame} size={40} />

@@ -91,7 +91,12 @@ export const FRAMES: FrameDef[] = [
   { id: 'ocean', name: 'Океан', background: 'linear-gradient(135deg,#38bdf8,#6366f1)', req: { level: 6 } },
   { id: 'neon', name: 'Неон', background: 'linear-gradient(135deg,#f0abfc,#22d3ee)', req: { level: 9 } },
   { id: 'toxic', name: 'Токсик', background: 'linear-gradient(135deg,#d9f99d,#22c55e,#065f46)', req: { level: 12 } },
-  { id: 'gold', name: 'Злато', background: 'linear-gradient(135deg,#fef3c7,#f59e0b,#fde68a,#b45309)', req: { level: 15 } },
+  {
+    id: 'gold',
+    name: 'Злато',
+    background: 'linear-gradient(135deg,#fef3c7,#f59e0b,#fde68a,#b45309)',
+    req: { level: 15 },
+  },
   {
     id: 'holo',
     name: 'Холограма',
@@ -99,7 +104,12 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { level: 22 },
   },
-  { id: 'aurora', name: 'Аврора', background: 'linear-gradient(135deg,#a7f3d0,#22d3ee,#818cf8,#c084fc)', req: { level: 28 } },
+  {
+    id: 'aurora',
+    name: 'Аврора',
+    background: 'linear-gradient(135deg,#a7f3d0,#22d3ee,#818cf8,#c084fc)',
+    req: { level: 28 },
+  },
   {
     id: 'void',
     name: 'Бездна',
@@ -107,7 +117,12 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { level: 35 },
   },
-  { id: 'magma', name: 'Магма', background: 'linear-gradient(135deg,#1c1917,#dc2626,#f97316,#fde047)', req: { level: 42 } },
+  {
+    id: 'magma',
+    name: 'Магма',
+    background: 'linear-gradient(135deg,#1c1917,#dc2626,#f97316,#fde047)',
+    req: { level: 42 },
+  },
   {
     id: 'galaxy',
     name: 'Галактика',
@@ -142,8 +157,18 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { achievement: 'polymath' },
   },
-  { id: 'season_silver', name: 'Сезон: Сребро', background: 'linear-gradient(135deg,#f8fafc,#94a3b8,#e2e8f0)', req: { season: 'silver' } },
-  { id: 'season_gold', name: 'Сезон: Злато', background: 'linear-gradient(135deg,#fef9c3,#eab308,#fef08a,#a16207)', req: { season: 'gold' } },
+  {
+    id: 'season_silver',
+    name: 'Сезон: Сребро',
+    background: 'linear-gradient(135deg,#f8fafc,#94a3b8,#e2e8f0)',
+    req: { season: 'silver' },
+  },
+  {
+    id: 'season_gold',
+    name: 'Сезон: Злато',
+    background: 'linear-gradient(135deg,#fef9c3,#eab308,#fef08a,#a16207)',
+    req: { season: 'gold' },
+  },
   {
     id: 'season_platinum',
     name: 'Сезон: Платина',
@@ -235,7 +260,13 @@ export const POWERUPS: PowerupDef[] = [
     req: { level: 3 },
     multiplayerOnly: true,
   },
-  { id: 'retry', name: 'Втори шанс', icon: '🔁', description: 'Ако сгрешиш, имаш още един опит (за половин точки).', req: { level: 4 } },
+  {
+    id: 'retry',
+    name: 'Втори шанс',
+    icon: '🔁',
+    description: 'Ако сгрешиш, имаш още един опит (за половин точки).',
+    req: { level: 4 },
+  },
   { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 5 } },
 ];
 

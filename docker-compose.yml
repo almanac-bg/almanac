@@ -5,7 +5,7 @@ x-logging: &logging
   driver: json-file
   options:
     max-size: 10m
-    max-file: '5'
+    max-file: "5"
 
 services:
   app:
@@ -16,12 +16,12 @@ services:
     # On a deploy, running matches play out before the old container stops (see DRAIN_SECONDS).
     stop_grace_period: 6m
     # Least privilege: nothing to escalate to, and only /data (and a scratch /tmp) is writable.
-    security_opt: ['no-new-privileges:true']
+    security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     read_only: true
     tmpfs: [/tmp]
     environment:
-      COOKIE_SECURE: 'true'
+      COOKIE_SECURE: "true"
       # Caddy reaches the app through the Docker bridge (a private address); only it may set X-Forwarded-For.
       TRUST_PROXY: loopback, uniquelocal
       BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
@@ -41,7 +41,7 @@ services:
       - data:/data
     # Only reachable from the server itself (Caddy); never from the internet.
     ports:
-      - '127.0.0.1:3001:3001'
+      - "127.0.0.1:3001:3001"
 
   # HTTPS with automatic Let's Encrypt certificates, HTTP/3 and WebSocket proxying. It uses the host's network so it
   # sees every visitor's real address, IPv6 included (through Docker's port mapping, IPv6 visitors can all appear as
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     logging: *logging
     network_mode: host
-    security_opt: ['no-new-privileges:true']
+    security_opt: ["no-new-privileges:true"]
     depends_on:
       - app
     environment:
@@ -65,10 +65,10 @@ services:
   # COMPOSE_PROFILES=backup in .env; see deploy/litestream.yml for restoring.
   litestream:
     image: litestream/litestream:0.5.17
-    profiles: ['backup']
+    profiles: ["backup"]
     restart: unless-stopped
     logging: *logging
-    security_opt: ['no-new-privileges:true']
+    security_opt: ["no-new-privileges:true"]
     command: replicate
     environment:
       BACKUP_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}

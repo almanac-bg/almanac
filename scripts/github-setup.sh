@@ -42,6 +42,9 @@ try "secret scanning with push protection" gh api -X PATCH "repos/$repo" --input
 {"security_and_analysis": {"secret_scanning": {"status": "enabled"}, "secret_scanning_push_protection": {"status": "enabled"}}}
 JSON
 
+# CodeQL: GitHub's own security analysis of the code, on every push and pull request (free for public repositories).
+try "code scanning (CodeQL)" gh api -X PATCH "repos/$repo/code-scanning/default-setup" -f state=configured -f query_suite=default
+
 echo "Labels"
 label() { try "label: $1" gh label create "$1" --repo "$repo" --color "$2" --description "$3" --force; }
 label bug d73a4a "Нещо не работи както трябва"

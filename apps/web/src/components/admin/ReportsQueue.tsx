@@ -1,9 +1,9 @@
+import { api, timeAgo, toast } from '@quiz/client';
 import { type ModerationAction, REPORT_REASONS, type ReportGroup } from '@quiz/shared';
 import { Ban, Check, Flag, PenLine } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { api, timeAgo, toast } from '@quiz/client';
 import { Avatar, LevelBadge } from '../Avatar';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
 
@@ -19,6 +19,7 @@ const BAN_OPTIONS: { value: string; label: string }[] = [
 export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
   const [groups, setGroups] = useState<ReportGroup[] | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once; `onOpen` is recreated on every parent render
   useEffect(() => {
     api
       .adminReports()
@@ -27,7 +28,6 @@ export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
         onOpen(r.groups.length);
       })
       .catch((e) => toast({ kind: 'error', title: e.message }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function resolved(next: ReportGroup[]) {
@@ -88,10 +88,15 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
         <div className="flex flex-wrap items-center gap-3">
           <Avatar avatar={target.avatar} frame={target.frame} size={44} />
           <div className="min-w-0 flex-1">
-            <Link to={`/profile/${encodeURIComponent(target.username)}`} className="flex items-center gap-1.5 font-semibold hover:underline">
+            <Link
+              to={`/profile/${encodeURIComponent(target.username)}`}
+              className="flex items-center gap-1.5 font-semibold hover:underline"
+            >
               {target.username} <LevelBadge level={target.level} />
             </Link>
-            {target.bannedUntil && target.bannedUntil > Date.now() && <p className="text-xs text-rose-300">Профилът е спрян в момента</p>}
+            {target.bannedUntil && target.bannedUntil > Date.now() && (
+              <p className="text-xs text-rose-300">Профилът е спрян в момента</p>
+            )}
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 text-sm font-bold text-rose-300">
             <Flag className="size-3.5" /> {reports.length}
@@ -124,6 +129,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ново име"
+              // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Смени името", so focus moves to it
               autoFocus
               required
               className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-black/30 px-3 text-sm outline-none focus:border-violet-400/60"
@@ -143,7 +149,9 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               e.preventDefault();
               void decide(
                 { action: 'ban', days: days === 'forever' ? null : Number(days), reason },
-                days === 'forever' ? 'Профилът е спрян завинаги' : `Профилът е спрян за ${BAN_OPTIONS.find((o) => o.value === days)!.label}`,
+                days === 'forever'
+                  ? 'Профилът е спрян завинаги'
+                  : `Профилът е спрян за ${BAN_OPTIONS.find((o) => o.value === days)!.label}`,
               );
             }}
           >
@@ -167,13 +175,23 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
         )}
         {mode === 'idle' && (
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" loading={busy} onClick={() => decide({ action: 'dismiss' }, 'Докладите са отхвърлени')}>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy}
+              onClick={() => decide({ action: 'dismiss' }, 'Докладите са отхвърлени')}
+            >
               <Check className="size-4" /> Няма нарушение
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setMode('rename')}>
               <PenLine className="size-4" /> Смени името
             </Button>
-            <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setMode('ban')}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-rose-300 hover:bg-rose-500/10"
+              onClick={() => setMode('ban')}
+            >
               <Ban className="size-4" /> Спри профила
             </Button>
           </div>

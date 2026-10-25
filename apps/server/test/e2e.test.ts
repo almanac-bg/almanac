@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import type { GameStartPayload, PowerupEvent, QuestionPayload, RematchState, RevealPayload, RoomState } from '@quiz/shared';
+import type { GameStartPayload, PowerupEvent, QuestionPayload, RevealPayload, RoomState } from '@quiz/shared';
 import {
   type Account,
   autoPlay,
@@ -53,21 +53,34 @@ after(async () => {
 });
 
 test('auth', T, async () => {
-  const dup = await api.send('POST', '/api/auth/register', '', { username: A.user.username.toUpperCase(), password: 'secret123' });
+  const dup = await api.send('POST', '/api/auth/register', '', {
+    username: A.user.username.toUpperCase(),
+    password: 'secret123',
+  });
   assert.equal(dup.status, 409, 'duplicate username (case-insensitive, Cyrillic) is rejected');
   const bad = await api.send('POST', '/api/auth/login', '', { username: A.user.username, password: 'wrongpass' });
   assert.equal(bad.status, 401, 'wrong password is rejected');
-  assert.equal((await api.get('/api/me', A.cookie)).body.user?.username, A.user.username, '/me works with the session cookie');
+  assert.equal(
+    (await api.get('/api/me', A.cookie)).body.user?.username,
+    A.user.username,
+    '/me works with the session cookie',
+  );
 
   // Sessions are stored hashed (a leaked backup holds no usable logins)…
   const token = decodeURIComponent(A.cookie.split('=')[1]);
   const hash = createHash('sha256').update(token).digest('base64url');
-  assert.equal(srv.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE token = ?').get(token)!.n, 0, 'no raw token stored');
+  assert.equal(
+    srv.db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE token = ?').get(token)!.n,
+    0,
+    'no raw token stored',
+  );
   // …and slide: one used in the second half of its life is renewed to a full 30 days, cookie included.
   srv.db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run(Date.now() + 3 * 24 * 60 * 60_000, hash);
   const renewed = await fetch(`${srv.url}/api/me`, { headers: { cookie: A.cookie } });
   assert.match(renewed.headers.get('set-cookie') ?? '', /Max-Age=2592000/, 'the browser cookie is renewed too');
-  const { expires_at } = srv.db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(hash) as { expires_at: number };
+  const { expires_at } = srv.db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(hash) as {
+    expires_at: number;
+  };
   assert.ok(expires_at > Date.now() + 29 * 24 * 60 * 60_000, 'an active session is renewed');
   const anon = await api.get('/api/me');
   assert.equal(anon.status, 200);
@@ -91,13 +104,19 @@ test('solo', T, async () => {
   assert.deepEqual(await emitAck(sa, 'solo:start', { category: 'history' }), { ok: true });
   const { start, end } = await play;
   assert.equal(log.questions.length, 10);
-  assert.ok(log.questions.every((q) => q.category === 'history'), 'all from the chosen category');
+  assert.ok(
+    log.questions.every((q) => q.category === 'history'),
+    'all from the chosen category',
+  );
   assert.match(log.questions.map((q) => q.difficulty[0]).join(''), /^e*m*h*$/, 'difficulty ramps up');
   assert.equal(end.standings[0].correct, 10);
   assert.equal(start?.powerups.length, 0, 'no jokers at level 1');
   const ids = end.rewards!.achievements;
   assert.ok(ids.includes('first_game') && ids.includes('perfect'), `first_game + perfect (${ids})`);
-  assert.ok(end.rewards!.breakdown.some((l) => l.label === 'Първи мач за деня'), 'daily bonus');
+  assert.ok(
+    end.rewards!.breakdown.some((l) => l.label === 'Първи мач за деня'),
+    'daily bonus',
+  );
 });
 
 test('ranked duel with a mid-game reconnect', T, async () => {
@@ -109,7 +128,7 @@ test('ranked duel with a mid-game reconnect', T, async () => {
   sb.disconnect();
   await sleep(150);
   sb = connect(srv.url, B.cookie);
-  const synced = next<GameStartPayload>(sb, 'game:start');
+  const synced = next(sb, 'game:start');
   const pb = autoPlay(sb, 'wrong');
   const sync = await synced;
   assert.equal(sync.startsInMs, 0, 'reconnect re-syncs the running game');
@@ -144,6 +163,7 @@ test('private room', T, async () => {
   const onState = (s: RoomState | null) => s && states.push(s);
   sb.on('room:state', onState);
   const created = await emitAck(sa, 'room:create', { questions: 5, timeMs: 10000, category: 'music' });
+  assert.ok(created.ok);
   assert.match(created.code, /^\d{5}$/);
   assert.ok((await emitAck(sb, 'room:join', created.code)).ok);
   assert.equal((await emitAck(sb, 'room:join', '00000')).ok, false, 'unknown codes are rejected');
@@ -189,7 +209,7 @@ test('a match that ends while the player is offline shows its result on return',
   for (let i = 0; i < 200 && matches() === before; i++) await sleep(100); // the match runs out without them
 
   sb = connect(srv.url, B.cookie);
-  const start = next<GameStartPayload>(sb, 'game:start');
+  const start = next(sb, 'game:start');
   const end = next(sb, 'game:end');
   await connected(sb);
   assert.equal((await end).gameId, (await start).gameId, 'the finished match comes back with its result');
@@ -212,11 +232,12 @@ test('malformed socket messages are refused and never crash the server', T, asyn
     }
   }
   assert.ok((await emitAck(sh, 'room:create', fields)).ok, 'unknown room settings are ignored');
-  for (const event of ['room:settings', 'room:bot', 'room:kick', 'room:team', 'invite:decline'] as const) sh.emit(event, evil as never);
+  for (const event of ['room:settings', 'room:bot', 'room:kick', 'room:team', 'invite:decline'] as const)
+    sh.emit(event, evil as never);
   sh.emit('room:leave');
   await sleep(1500); // the burst above used up the socket's event budget
 
-  const question = next<QuestionPayload>(sh, 'game:question');
+  const question = next(sh, 'game:question');
   assert.deepEqual(await emitAck(sh, 'solo:start', { category: 'mixed' }), { ok: true });
   await question;
   for (const event of ['game:answer', 'game:powerup', 'game:react'] as const) {
@@ -242,61 +263,93 @@ test('guests play right away, stay off the boards, and keep everything when they
   const { end } = await play;
   assert.ok(end.rewards!.xpGained > 0, 'guests earn XP like anyone');
 
-  assert.equal((await api.send('POST', '/api/friends', G.cookie, { username: A.user.username })).status, 403, 'friends need an account');
+  assert.equal(
+    (await api.send('POST', '/api/friends', G.cookie, { username: A.user.username })).status,
+    403,
+    'friends need an account',
+  );
   assert.equal((await emitAck(sg, 'room:create', {})).ok, false, 'so do rooms of their own');
   assert.equal((await emitAck(sg, 'challenge:start', {})).ok, false, 'and new challenge links');
-  assert.equal((await api.send('POST', '/api/friends', A.cookie, { username: G.user.username })).status, 400, 'nobody can add a guest');
+  assert.equal(
+    (await api.send('POST', '/api/friends', A.cookie, { username: G.user.username })).status,
+    400,
+    'nobody can add a guest',
+  );
   const board = (await api.get('/api/leaderboard/level', G.cookie)).body;
   assert.ok(!board.entries.some((e: { user: { id: number } }) => e.user.id === G.user.id), 'guests are not listed');
   assert.ok(board.me.rank >= 1, 'but see where they would stand');
-  assert.equal((await api.send('POST', '/api/auth/register', '', { username: 'Гост_123456', password: 'secret123' })).status, 400);
+  assert.equal(
+    (await api.send('POST', '/api/auth/register', '', { username: 'Гост_123456', password: 'secret123' })).status,
+    400,
+  );
 
   const xp = (await api.get('/api/me', G.cookie)).body.user.xp;
-  const claimed = await api.send('POST', '/api/account/claim', G.cookie, { username: 'bivsh_gost', password: 'secret123' });
+  const claimed = await api.send('POST', '/api/account/claim', G.cookie, {
+    username: 'bivsh_gost',
+    password: 'secret123',
+  });
   assert.equal(claimed.status, 200, JSON.stringify(claimed.body));
   assert.equal(claimed.body.user.isGuest, false);
   assert.equal(claimed.body.user.username, 'bivsh_gost');
   assert.equal(claimed.body.user.xp, xp, 'progress kept');
-  assert.equal((await api.send('POST', '/api/auth/login', '', { username: 'bivsh_gost', password: 'secret123' })).status, 200);
-  assert.equal((await api.send('POST', '/api/account/claim', G.cookie, { username: 'drugo_ime', password: 'secret123' })).status, 400);
+  assert.equal(
+    (await api.send('POST', '/api/auth/login', '', { username: 'bivsh_gost', password: 'secret123' })).status,
+    200,
+  );
+  assert.equal(
+    (await api.send('POST', '/api/account/claim', G.cookie, { username: 'drugo_ime', password: 'secret123' })).status,
+    400,
+  );
   sg.close();
 });
 
-test('challenge links: one attempt each, own option order, a shared board, and the creator hears about it', T, async () => {
-  const log = newLog();
-  const play = autoPlay(sa, 'right', log);
-  const created = await emitAck(sa, 'challenge:start', {});
-  assert.ok(created.ok, JSON.stringify(created));
-  const { id } = created;
-  const { start, end } = await play;
-  assert.equal(start!.powerups.length, 0, 'no jokers');
-  assert.deepEqual(end.rewards!.challenge, { id, rank: 1, total: 1 });
+test(
+  'challenge links: one attempt each, own option order, a shared board, and the creator hears about it',
+  T,
+  async () => {
+    const log = newLog();
+    const play = autoPlay(sa, 'right', log);
+    const created = await emitAck(sa, 'challenge:start', {});
+    assert.ok(created.ok, JSON.stringify(created));
+    const { id } = created;
+    const { start, end } = await play;
+    assert.equal(start!.powerups.length, 0, 'no jokers');
+    assert.deepEqual(end.rewards!.challenge, { id, rank: 1, total: 1 });
 
-  const preview = await api.get(`/api/challenges/${id}/preview`);
-  assert.equal(preview.status, 200, 'the landing page works signed out');
-  assert.equal(preview.body.creator.username, A.user.username);
-  assert.equal(preview.body.topScore, end.standings[0].score);
+    const preview = await api.get(`/api/challenges/${id}/preview`);
+    assert.equal(preview.status, 200, 'the landing page works signed out');
+    assert.equal(preview.body.creator.username, A.user.username);
+    assert.equal(preview.body.topScore, end.standings[0].score);
 
-  const logB = newLog();
-  const told = next<{ message: string }>(sa, 'notice');
-  const playB = autoPlay(sb, 'wrong', logB);
-  assert.ok((await emitAck(sb, 'challenge:start', { id })).ok);
-  const { end: endB } = await playB;
-  assert.deepEqual(endB.rewards!.challenge, { id, rank: 2, total: 2 });
-  assert.deepEqual(logB.questions.map((q) => q.q), log.questions.map((q) => q.q), 'the same questions');
-  assert.notDeepEqual(logB.questions.map((q) => q.options), log.questions.map((q) => q.options), 'each in their own option order');
-  assert.match((await told).message, /изигра предизвикателството ти/);
-  assert.equal((await emitAck(sb, 'challenge:start', { id })).ok, false, 'one attempt each');
-  assert.equal((await emitAck(sb, 'challenge:start', { id: 'nope' })).ok, false);
+    const logB = newLog();
+    const told = next(sa, 'notice');
+    const playB = autoPlay(sb, 'wrong', logB);
+    assert.ok((await emitAck(sb, 'challenge:start', { id })).ok);
+    const { end: endB } = await playB;
+    assert.deepEqual(endB.rewards!.challenge, { id, rank: 2, total: 2 });
+    assert.deepEqual(
+      logB.questions.map((q) => q.q),
+      log.questions.map((q) => q.q),
+      'the same questions',
+    );
+    assert.notDeepEqual(
+      logB.questions.map((q) => q.options),
+      log.questions.map((q) => q.options),
+      'each in their own option order',
+    );
+    assert.match((await told).message, /изигра предизвикателството ти/);
+    assert.equal((await emitAck(sb, 'challenge:start', { id })).ok, false, 'one attempt each');
+    assert.equal((await emitAck(sb, 'challenge:start', { id: 'nope' })).ok, false);
 
-  const info = (await api.get(`/api/challenges/${id}`, B.cookie)).body;
-  assert.deepEqual(
-    info.entries.map((e: { user: { username: string } }) => e.user.username),
-    [A.user.username, B.user.username],
-  );
-  assert.ok(info.entries[1].you && info.attempted);
-  assert.equal((await api.get('/api/challenges', A.cookie)).body.challenges[0].players, 2);
-});
+    const info = (await api.get(`/api/challenges/${id}`, B.cookie)).body;
+    assert.deepEqual(
+      info.entries.map((e: { user: { username: string } }) => e.user.username),
+      [A.user.username, B.user.username],
+    );
+    assert.ok(info.entries[1].you && info.attempted);
+    assert.equal((await api.get('/api/challenges', A.cookie)).body.challenges[0].players, 2);
+  },
+);
 
 test('rematch: the same people play again once everyone asks; one "no" ends the offer', T, async () => {
   const duel = async () => {
@@ -308,16 +361,16 @@ test('rematch: the same people play again once everyone asks; one "no" ends the 
   };
 
   let end = await duel();
-  const seen = [next<RematchState>(sa, 'rematch:state'), next<RematchState>(sb, 'rematch:state')];
+  const seen = [next(sa, 'rematch:state'), next(sb, 'rematch:state')];
   sa.emit('rematch:request', { gameId: end.gameId });
   const [, offered] = await Promise.all(seen);
   assert.deepEqual(offered.ready, [`u${A.user.id}`], 'the other side sees who asked');
-  const off = next<RematchState>(sa, 'rematch:state');
+  const off = next(sa, 'rematch:state');
   sb.emit('rematch:decline', { gameId: end.gameId });
   assert.equal((await off).cancelled, true, 'the one who asked hears it is off');
 
   end = await duel();
-  const started = Promise.all([next<GameStartPayload>(sa, 'game:start'), next<GameStartPayload>(sb, 'game:start')]);
+  const started = Promise.all([next(sa, 'game:start'), next(sb, 'game:start')]);
   sa.emit('rematch:request', { gameId: end.gameId });
   sb.emit('rematch:request', { gameId: end.gameId });
   const [ga, gb] = await started;
@@ -332,14 +385,29 @@ test('rematch: the same people play again once everyone asks; one "no" ends the 
 
 test('streak reminders: opt in with a verified email, opt out from the email link', T, async () => {
   const C = await register(srv.url, 'napomnyane', 'remind@example.com');
-  assert.equal((await api.send('POST', '/api/account/reminders', C.cookie, { on: true })).status, 400, 'needs a verified email');
-  const token = tokenFrom(srv.mails().filter((m) => m.to === 'remind@example.com').at(-1)!);
+  assert.equal(
+    (await api.send('POST', '/api/account/reminders', C.cookie, { on: true })).status,
+    400,
+    'needs a verified email',
+  );
+  const token = tokenFrom(
+    srv
+      .mails()
+      .filter((m) => m.to === 'remind@example.com')
+      .at(-1)!,
+  );
   assert.equal((await api.send('POST', '/api/auth/verify-email', '', { token })).status, 200);
   const on = await api.send('POST', '/api/account/reminders', C.cookie, { on: true });
   assert.equal(on.body.user.streakReminders, true);
-  const { reminder_key: key } = srv.db.prepare('SELECT reminder_key FROM users WHERE id = ?').get(C.user.id) as { reminder_key: string };
+  const { reminder_key: key } = srv.db.prepare('SELECT reminder_key FROM users WHERE id = ?').get(C.user.id) as {
+    reminder_key: string;
+  };
   assert.equal((await api.send('POST', `/api/reminders/off?u=${C.user.id}&k=wrong`, '')).status, 400);
-  assert.equal((await api.send('POST', `/api/reminders/off?u=${C.user.id}&k=${key}`, '')).status, 200, 'one click, no sign-in');
+  assert.equal(
+    (await api.send('POST', `/api/reminders/off?u=${C.user.id}&k=${key}`, '')).status,
+    200,
+    'one click, no sign-in',
+  );
   assert.equal((await api.get('/api/me', C.cookie)).body.user.streakReminders, false);
 });
 
@@ -356,8 +424,16 @@ test('profiles, achievements, leaderboards, loadout', T, async () => {
   assert.equal(duel.body.entries[0].user.id, A.user.id);
   assert.ok(duel.body.season?.name, 'ranked boards are seasonal');
   assert.ok((await api.get('/api/leaderboard/level', B.cookie)).body.me.rank >= 1);
-  assert.equal((await api.send('PATCH', '/api/me/loadout', A.cookie, { avatar: 'crown' })).status, 200, 'royale_win avatar');
-  assert.equal((await api.send('PATCH', '/api/me/loadout', A.cookie, { avatar: 'star' })).status, 400, 'level-50 avatar is locked');
+  assert.equal(
+    (await api.send('PATCH', '/api/me/loadout', A.cookie, { avatar: 'crown' })).status,
+    200,
+    'royale_win avatar',
+  );
+  assert.equal(
+    (await api.send('PATCH', '/api/me/loadout', A.cookie, { avatar: 'star' })).status,
+    400,
+    'level-50 avatar is locked',
+  );
 });
 
 test('daily challenge', T, async () => {
@@ -375,10 +451,18 @@ test('daily challenge', T, async () => {
   const pb = autoPlay(sb, 'wrong', logB);
   assert.ok((await emitAck(sb, 'daily:start')).ok);
   const { end: eb } = await pb;
-  assert.deepEqual(logB.questions.map((q) => q.q), log.questions.map((q) => q.q), 'same questions for everyone');
+  assert.deepEqual(
+    logB.questions.map((q) => q.q),
+    log.questions.map((q) => q.q),
+    'same questions for everyone',
+  );
   const sorted = (l: typeof log) => l.questions.map((q) => [...q.options].sort());
   assert.deepEqual(sorted(logB), sorted(log), 'same options');
-  assert.notDeepEqual(logB.questions.map((q) => q.options), log.questions.map((q) => q.options), 'but in each player’s own order');
+  assert.notDeepEqual(
+    logB.questions.map((q) => q.options),
+    log.questions.map((q) => q.options),
+    'but in each player’s own order',
+  );
   assert.deepEqual(eb.rewards!.daily, { rank: 2, total: 2, streak: 1, shieldsUsed: 0, shieldEarned: false });
   const info = await api.get('/api/daily', A.cookie);
   assert.equal(info.body.played.rank, 1);
@@ -390,19 +474,27 @@ test('daily challenge', T, async () => {
 });
 
 test('friends, invites and challenges', T, async () => {
-  const update = next<{ requests: number }>(sb, 'friends:update');
+  const update = next(sb, 'friends:update');
   const req = await api.send('POST', '/api/friends', A.cookie, { username: B.user.username.toUpperCase() });
   assert.equal(req.status, 200);
   assert.equal(req.body.outgoing.length, 1);
   assert.equal((await update).requests, 1, 'the update carries the badge count');
   assert.equal((await api.get('/api/me', B.cookie)).body.user.friendRequests, 1);
-  assert.equal((await api.send('POST', '/api/friends', A.cookie, { username: B.user.username })).status, 400, 'no duplicate requests');
+  assert.equal(
+    (await api.send('POST', '/api/friends', A.cookie, { username: B.user.username })).status,
+    400,
+    'no duplicate requests',
+  );
   const accepted = await api.send('POST', `/api/friends/${A.user.id}/accept`, B.cookie);
   assert.equal(accepted.body.friends.length, 1);
   assert.equal((await api.get('/api/friends', A.cookie)).body.friends[0].presence, 'online');
-  assert.equal((await api.get(`/api/profile/${encodeURIComponent(B.user.username)}`, A.cookie)).body.friendship, 'friends');
+  assert.equal(
+    (await api.get(`/api/profile/${encodeURIComponent(B.user.username)}`, A.cookie)).body.friendship,
+    'friends',
+  );
 
   const room = await emitAck(sa, 'room:create', {});
+  assert.ok(room.ok);
   const invited = next(sb, 'invite');
   assert.ok((await emitAck(sa, 'invite:send', { userId: B.user.id })).ok);
   const invite = await invited;
@@ -420,9 +512,9 @@ test('friends, invites and challenges', T, async () => {
   const challenge = await emitAck(sa, 'friends:challenge', { userId: B.user.id });
   assert.ok(challenge.ok);
   assert.equal((await challenged).kind, 'challenge');
-  const roomState = next<RoomState>(sb, 'room:state');
+  const roomState = next(sb, 'room:state');
   assert.ok((await emitAck(sb, 'room:join', challenge.code)).ok);
-  assert.equal((await roomState).settings.maxPlayers, 2, 'a challenge is a 1v1 room');
+  assert.equal((await roomState)?.settings.maxPlayers, 2, 'a challenge is a 1v1 room');
   assert.equal((await api.get('/api/friends', B.cookie)).body.friends[0].presence, 'room');
   sa.emit('room:leave');
   sb.emit('room:leave');
@@ -434,6 +526,7 @@ test('team room', T, async () => {
   const onState = (s: RoomState | null) => s && states.push(s);
   sa.on('room:state', onState);
   const room = await emitAck(sa, 'room:create', { questions: 5 });
+  assert.ok(room.ok);
   await emitAck(sb, 'room:join', room.code);
   sa.emit('room:settings', { teams: true, elimination: true });
   sa.emit('room:bot', 'add');
@@ -488,7 +581,8 @@ test('jokers', T, async () => {
   sa.on('game:reveal', (r) => reveals.push(r));
   sa.on('game:question', (q: QuestionPayload) => {
     const right = rightOption(q);
-    const answer = (choice: number, ms: number) => setTimeout(() => sa.emit('game:answer', { index: q.index, choice }), ms);
+    const answer = (choice: number, ms: number) =>
+      setTimeout(() => sa.emit('game:answer', { index: q.index, choice }), ms);
     if (q.index === 0) {
       sa.emit('game:powerup', { index: 0, powerup: 'freeze' });
       sa.emit('game:powerup', { index: 0, powerup: 'double' }); // second joker on the same question → ignored
@@ -507,7 +601,9 @@ test('jokers', T, async () => {
   const bFrozen = new Promise<boolean>((res) =>
     sb.on('game:powerup', (e) => e.powerup === 'freeze' && e.targetId === `u${B.user.id}` && res(true)),
   );
-  sb.on('game:question', (q) => setTimeout(() => sb.emit('game:answer', { index: q.index, choice: rightOption(q) }), 20));
+  sb.on('game:question', (q) =>
+    setTimeout(() => sb.emit('game:answer', { index: q.index, choice: rightOption(q) }), 20),
+  );
   const aEnd = next(sa, 'game:end', 60_000);
   const bEnd = next(sb, 'game:end', 60_000);
   await emitAck(sa, 'queue:join', 'duel');
@@ -518,7 +614,10 @@ test('jokers', T, async () => {
 
   const me = `u${A.user.id}`;
   const them = `u${B.user.id}`;
-  assert.ok(['freeze', 'time', 'retry'].every((p) => start!.powerups.includes(p as never)), 'level 20 has all jokers');
+  assert.ok(
+    ['freeze', 'time', 'retry'].every((p) => start!.powerups.includes(p as never)),
+    'level 20 has all jokers',
+  );
   assert.ok(await Promise.race([bFrozen, sleep(10).then(() => false)]), 'the target is told it got frozen');
   assert.equal(frozeTarget, them, 'freeze targets the opponent');
   assert.equal(reveals[0].results[them].choice, null, 'a frozen player cannot answer');
@@ -539,14 +638,20 @@ test('community questions', T, async () => {
   const sub = await api.send('POST', '/api/submissions', B.cookie, draft);
   assert.equal(sub.status, 201, sub.body.error);
   assert.equal((await api.send('POST', '/api/submissions', B.cookie, draft)).status, 400, 'duplicates are rejected');
-  const invalid = await api.send('POST', '/api/submissions', B.cookie, { ...draft, q: 'кратко', options: ['a', 'a', 'b', 'c'] });
+  const invalid = await api.send('POST', '/api/submissions', B.cookie, {
+    ...draft,
+    q: 'кратко',
+    options: ['a', 'a', 'b', 'c'],
+  });
   assert.equal(invalid.status, 400);
   assert.equal((await api.get('/api/admin/submissions', B.cookie)).status, 403, 'non-admins cannot moderate');
   assert.equal((await api.get('/api/admin/submissions?status=pending', A.cookie)).body.submissions.length, 1);
 
   const notice = next(sb, 'notice');
   const edited = { ...draft, q: 'Тестов общностен въпрос за реките (редактиран)?' };
-  const approve = await api.send('POST', `/api/admin/submissions/${sub.body.submission.id}/approve`, A.cookie, { edits: edited });
+  const approve = await api.send('POST', `/api/admin/submissions/${sub.body.submission.id}/approve`, A.cookie, {
+    edits: edited,
+  });
   assert.equal(approve.status, 200);
   assert.equal(approve.body.pending, 0);
   assert.match((await notice).message, /одобрен/);
@@ -569,14 +674,20 @@ test('community questions', T, async () => {
 
 test('season settlement', T, async () => {
   srv.db
-    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 1300, 1310, 12, 8)")
+    .prepare(
+      "INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 1300, 1310, 12, 8)",
+    )
     .run(A.user.id);
   // A higher peak from only a handful of games in another mode doesn't count.
   srv.db
-    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'royale', 1750, 1800, 4, 4)")
+    .prepare(
+      "INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'royale', 1750, 1800, 4, 4)",
+    )
     .run(A.user.id);
   srv.db
-    .prepare("INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 900, 950, 1, 0)")
+    .prepare(
+      "INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 900, 950, 1, 0)",
+    )
     .run(B.user.id);
   const me = (await api.get('/api/me', A.cookie)).body.user;
   assert.equal(me.seasonRewards.length, 1);
@@ -617,12 +728,23 @@ test('email verification, password reset and change', T, async () => {
 
   // Changing the email needs the password (whoever controls the email can reset the password).
   assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com' })).status, 400);
-  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'wrong-pass' })).status, 400);
+  assert.equal(
+    (await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'wrong-pass' }))
+      .status,
+    400,
+  );
   // Someone else can't claim a verified address, but isn't told why until verification.
-  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'secret123' })).status, 200);
+  assert.equal(
+    (await api.send('POST', '/api/account/email', B.cookie, { email: 'pesho@example.com', password: 'secret123' }))
+      .status,
+    200,
+  );
   const stolen = (await api.send('POST', '/api/auth/verify-email', '', { token: tokenFrom(srv.mails().at(-1)!) })).body;
   assert.match(stolen.error, /друг профил/);
-  assert.equal((await api.send('POST', '/api/account/email', B.cookie, { email: 'not-an-email', password: 'secret123' })).status, 400);
+  assert.equal(
+    (await api.send('POST', '/api/account/email', B.cookie, { email: 'not-an-email', password: 'secret123' })).status,
+    400,
+  );
 
   // Unknown logins get the same answer and no email.
   const count = srv.mails().length;
@@ -635,7 +757,11 @@ test('email verification, password reset and change', T, async () => {
   assert.equal(reset.to, 'Pesho@Example.com');
   assert.match(reset.subject, /Нова парола/);
   const resetToken = tokenFrom(reset);
-  assert.equal((await api.send('POST', '/api/auth/reset', '', { token: resetToken, password: '123' })).status, 400, 'short passwords are refused');
+  assert.equal(
+    (await api.send('POST', '/api/auth/reset', '', { token: resetToken, password: '123' })).status,
+    400,
+    'short passwords are refused',
+  );
   const done = await fetch(`${srv.url}/api/auth/reset`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -645,14 +771,34 @@ test('email verification, password reset and change', T, async () => {
   const newCookie = cookieFrom(done);
   assert.equal((await api.get('/api/me', C.cookie)).body.user, null, 'old sessions are logged out');
   assert.equal((await api.get('/api/me', newCookie)).body.user.username, 'pesho_mail', 'the reset logs you in');
-  assert.equal((await api.send('POST', '/api/auth/reset', '', { token: resetToken, password: 'another-pass' })).status, 400, 'reset links are single-use');
-  assert.equal((await api.send('POST', '/api/auth/login', '', { username: 'pesho_mail', password: 'secret123' })).status, 401);
-  assert.equal((await api.send('POST', '/api/auth/login', '', { username: 'pesho@example.com', password: 'brand-new-pass' })).status, 200, 'login by email');
+  assert.equal(
+    (await api.send('POST', '/api/auth/reset', '', { token: resetToken, password: 'another-pass' })).status,
+    400,
+    'reset links are single-use',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/auth/login', '', { username: 'pesho_mail', password: 'secret123' })).status,
+    401,
+  );
+  assert.equal(
+    (await api.send('POST', '/api/auth/login', '', { username: 'pesho@example.com', password: 'brand-new-pass' }))
+      .status,
+    200,
+    'login by email',
+  );
 
   // Expired links don't work.
   await api.send('POST', '/api/auth/forgot', '', { login: 'pesho_mail' });
   srv.db.prepare('UPDATE email_tokens SET expires_at = 0 WHERE used_at IS NULL').run();
-  assert.equal((await api.send('POST', '/api/auth/reset', '', { token: tokenFrom(srv.mails().at(-1)!), password: 'whatever-pass' })).status, 400);
+  assert.equal(
+    (
+      await api.send('POST', '/api/auth/reset', '', {
+        token: tokenFrom(srv.mails().at(-1)!),
+        password: 'whatever-pass',
+      })
+    ).status,
+    400,
+  );
 
   // Changing the password needs the current one and keeps only this session.
   const second = await fetch(`${srv.url}/api/auth/login`, {
@@ -661,27 +807,74 @@ test('email verification, password reset and change', T, async () => {
     body: JSON.stringify({ username: 'pesho_mail', password: 'brand-new-pass' }),
   });
   const secondCookie = cookieFrom(second);
-  assert.equal((await api.send('POST', '/api/account/password', newCookie, { current: 'wrong', next: 'third-pass' })).status, 400);
-  assert.equal((await api.send('POST', '/api/account/password', newCookie, { current: 'brand-new-pass', next: 'third-pass' })).status, 200);
+  assert.equal(
+    (await api.send('POST', '/api/account/password', newCookie, { current: 'wrong', next: 'third-pass' })).status,
+    400,
+  );
+  assert.equal(
+    (await api.send('POST', '/api/account/password', newCookie, { current: 'brand-new-pass', next: 'third-pass' }))
+      .status,
+    200,
+  );
   assert.ok((await api.get('/api/me', newCookie)).body.user, 'the current session stays');
   assert.equal((await api.get('/api/me', secondCookie)).body.user, null, 'other sessions are logged out');
 
-  assert.equal((await api.send('DELETE', '/api/account/email', newCookie, {})).status, 400, 'removing it needs the password too');
+  assert.equal(
+    (await api.send('DELETE', '/api/account/email', newCookie, {})).status,
+    400,
+    'removing it needs the password too',
+  );
   const sentBefore = srv.mails().length;
-  assert.equal((await api.send('DELETE', '/api/account/email', newCookie, { password: 'third-pass' })).body.user.email, null, 'email can be removed');
-  const notice = srv.mails().slice(sentBefore).find((m) => m.to === 'Pesho@Example.com');
+  assert.equal(
+    (await api.send('DELETE', '/api/account/email', newCookie, { password: 'third-pass' })).body.user.email,
+    null,
+    'email can be removed',
+  );
+  const notice = srv
+    .mails()
+    .slice(sentBefore)
+    .find((m) => m.to === 'Pesho@Example.com');
   assert.match(notice?.subject ?? '', /премахнат/, 'the old address is told');
 });
 
 test('moderation: name filter, reports, rename, ban', T, async () => {
-  assert.equal((await api.send('POST', '/api/auth/register', '', { username: 'pu7ka', password: 'secret123' })).status, 400, 'offensive names are refused');
-  assert.equal((await api.send('POST', '/api/auth/register', '', { username: 'Admin_1', password: 'secret123' })).status, 400, 'reserved names are refused');
+  assert.equal(
+    (await api.send('POST', '/api/auth/register', '', { username: 'pu7ka', password: 'secret123' })).status,
+    400,
+    'offensive names are refused',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/auth/register', '', { username: 'Admin_1', password: 'secret123' })).status,
+    400,
+    'reserved names are refused',
+  );
 
   const D = await register(srv.url, 'troll_test');
-  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'nope' })).status, 400, 'reason is required');
-  assert.equal((await api.send('POST', '/api/reports', D.cookie, { username: 'troll_test', reason: 'name' })).status, 400, 'no self-reports');
-  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'behavior', details: 'спами емоции' })).status, 200);
-  assert.equal((await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'name' })).status, 200, 'a repeat report updates the open one');
+  assert.equal(
+    (await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'nope' })).status,
+    400,
+    'reason is required',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/reports', D.cookie, { username: 'troll_test', reason: 'name' })).status,
+    400,
+    'no self-reports',
+  );
+  assert.equal(
+    (
+      await api.send('POST', '/api/reports', B.cookie, {
+        username: 'troll_test',
+        reason: 'behavior',
+        details: 'спами емоции',
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await api.send('POST', '/api/reports', B.cookie, { username: 'troll_test', reason: 'name' })).status,
+    200,
+    'a repeat report updates the open one',
+  );
   assert.equal((await api.get('/api/admin/reports', B.cookie)).status, 403, 'only admins see reports');
   const queue = (await api.get('/api/admin/reports', A.cookie)).body.groups;
   assert.equal(queue.length, 1);
@@ -691,7 +884,11 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   assert.deepEqual((await api.get('/api/admin/summary', A.cookie)).body.openReports, 1);
 
   const resolve = (body: object) => api.send('POST', `/api/admin/reports/${D.user.id}/resolve`, A.cookie, body);
-  assert.equal((await resolve({ action: 'rename', username: 'kurva_1' })).status, 400, "moderators can't pick offensive names either");
+  assert.equal(
+    (await resolve({ action: 'rename', username: 'kurva_1' })).status,
+    400,
+    "moderators can't pick offensive names either",
+  );
   assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч' })).status, 200);
   assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
   assert.equal((await api.get('/api/admin/reports', A.cookie)).body.groups.length, 0, 'reports close when resolved');
@@ -703,13 +900,21 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   assert.equal(login.status, 403);
   assert.match(login.body.error, /спрян до .*Нечестна игра/);
   assert.equal((await resolve({ action: 'ban', days: null, reason: '' })).status, 200, 'permanent bans');
-  assert.match((await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' })).body.error, /за постоянно/);
+  assert.match(
+    (await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' })).body.error,
+    /за постоянно/,
+  );
 });
 
 test('data export and account deletion', T, async () => {
   const exp = await fetch(`${srv.url}/api/account/export`, { headers: { cookie: B.cookie } });
   assert.match(exp.headers.get('content-disposition') ?? '', /attachment/);
-  const data = (await exp.json()) as { account: { username: string }; matches: unknown[]; achievements: unknown[]; friends: unknown[] };
+  const data = (await exp.json()) as {
+    account: { username: string };
+    matches: unknown[];
+    achievements: unknown[];
+    friends: unknown[];
+  };
   assert.equal(data.account.username, B.user.username);
   assert.ok(data.matches.length > 0 && data.achievements.length > 0 && data.friends.length > 0);
 
@@ -723,12 +928,23 @@ test('data export and account deletion', T, async () => {
   assert.equal((await api.send('POST', '/api/account/delete', E.cookie, { password: 'secret123' })).status, 200);
   se.close();
   assert.equal((await api.get('/api/me', E.cookie)).body.user, null);
-  assert.equal((await api.send('POST', '/api/auth/login', '', { username: 'to_be_deleted', password: 'secret123' })).status, 401);
-  const rows = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'to_be_deleted'").get() as { n: number };
+  assert.equal(
+    (await api.send('POST', '/api/auth/login', '', { username: 'to_be_deleted', password: 'secret123' })).status,
+    401,
+  );
+  const rows = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'to_be_deleted'").get() as {
+    n: number;
+  };
   assert.equal(rows.n, 0, 'match history no longer names the player');
-  const anon = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'Изтрит играч'").get() as { n: number };
+  const anon = srv.db.prepare("SELECT COUNT(*) AS n FROM match_players WHERE name = 'Изтрит играч'").get() as {
+    n: number;
+  };
   assert.ok(anon.n >= 1);
-  assert.equal((srv.db.prepare('SELECT COUNT(*) AS n FROM category_stats WHERE user_id = ?').get(E.user.id) as { n: number }).n, 0, 'stats are erased');
+  assert.equal(
+    (srv.db.prepare('SELECT COUNT(*) AS n FROM category_stats WHERE user_id = ?').get(E.user.id) as { n: number }).n,
+    0,
+    'stats are erased',
+  );
 });
 
 test('players flag wrong questions; moderators hide them from new matches', T, async () => {
@@ -739,7 +955,8 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
   const id = log.questions[0].id;
   assert.match(id, /^science-\d+$/, 'questions carry their id');
 
-  const report = (questionId: string, body: object) => api.send('POST', `/api/questions/${questionId}/report`, B.cookie, body);
+  const report = (questionId: string, body: object) =>
+    api.send('POST', `/api/questions/${questionId}/report`, B.cookie, body);
   assert.equal((await report(id, { reason: 'nonsense' })).status, 400, 'a reason from the list');
   assert.equal((await report('no-such-question', { reason: 'wrong' })).status, 400);
   assert.equal((await report(id, { reason: 'wrong', details: 'Верният е Б' })).status, 200);
@@ -781,7 +998,10 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
 
 const webDist = path.resolve(import.meta.dirname, '../../web/dist');
 
-test('website files are served with the right caching', { ...T, skip: !fs.existsSync(webDist) && 'web app not built' }, async () => {
+test('website files are served with the right caching', {
+  ...T,
+  skip: !fs.existsSync(webDist) && 'web app not built',
+}, async () => {
   const page = await fetch(`${srv.url}/friends`);
   assert.equal(page.status, 200);
   assert.equal((await fetch(`${srv.url}/`, { method: 'HEAD' })).status, 200, 'HEAD works for uptime monitors');
@@ -791,7 +1011,11 @@ test('website files are served with the right caching', { ...T, skip: !fs.exists
   const asset = fs.readdirSync(path.join(webDist, 'assets')).find((f) => f.endsWith('.js'))!;
   const js = await fetch(`${srv.url}/assets/${asset}`);
   assert.equal(js.status, 200);
-  assert.match(js.headers.get('cache-control') ?? '', /max-age=31536000.*immutable/, 'hashed files are cached for good');
+  assert.match(
+    js.headers.get('cache-control') ?? '',
+    /max-age=31536000.*immutable/,
+    'hashed files are cached for good',
+  );
 
   const gone = await fetch(`${srv.url}/assets/index-from-an-old-deploy.js`);
   assert.equal(gone.status, 404, 'a missing build file is a 404, not the page');
@@ -801,5 +1025,9 @@ test('website files are served with the right caching', { ...T, skip: !fs.exists
   const shared = await (await fetch(`${srv.url}/c/${id}`)).text();
   assert.match(shared, new RegExp(`<title>${A.user.username} те предизвиква`));
   assert.match(shared, /property="og:description" content="Резултатът за биене: \d+ точки/);
-  assert.match(await (await fetch(`${srv.url}/c/unknown-id`)).text(), /<title>АЛМАНАХ — куиз битки<\/title>/, 'unknown links get the plain page');
+  assert.match(
+    await (await fetch(`${srv.url}/c/unknown-id`)).text(),
+    /<title>АЛМАНАХ — куиз битки<\/title>/,
+    'unknown links get the plain page',
+  );
 });

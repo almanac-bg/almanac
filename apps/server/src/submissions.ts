@@ -4,8 +4,8 @@ import {
   type Difficulty,
   levelFromXp,
   type QuestionDraft,
-  type Submission,
   SUBMISSION_RULES,
+  type Submission,
   type SubmissionStatus,
 } from '@quiz/shared';
 import { z } from 'zod';
@@ -29,18 +29,20 @@ export const DraftSchema = z
       .max(qMax, `Въпросът може да е най-много ${qMax} символа.`),
     options: z
       .array(
-        z
-          .string()
-          .trim()
-          .min(oMin, 'Попълни всички отговори.')
-          .max(oMax, `Отговорите могат да са до ${oMax} символа.`),
+        z.string().trim().min(oMin, 'Попълни всички отговори.').max(oMax, `Отговорите могат да са до ${oMax} символа.`),
       )
       .length(4, 'Трябват точно 4 отговора.'),
     answer: z.number().int().min(0).max(3),
   })
-  .refine((d) => new Set(d.options.map((o) => o.toLowerCase())).size === 4, { message: 'Отговорите трябва да са различни.' });
+  .refine((d) => new Set(d.options.map((o) => o.toLowerCase())).size === 4, {
+    message: 'Отговорите трябва да са различни.',
+  });
 
-const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 
 interface Row {
   id: number;
@@ -75,7 +77,10 @@ function toSubmission(r: Row, author?: UserRow): Submission {
   };
 }
 
-export function submitQuestion(userId: number, draft: QuestionDraft): { ok: true; submission: Submission } | { ok: false; error: string } {
+export function submitQuestion(
+  userId: number,
+  draft: QuestionDraft,
+): { ok: true; submission: Submission } | { ok: false; error: string } {
   const user = getUser(userId)!;
   if (levelFromXp(user.xp) < SUBMISSION_RULES.minLevel) {
     return { ok: false, error: `Можеш да предлагаш въпроси от ниво ${SUBMISSION_RULES.minLevel}.` };
@@ -90,7 +95,9 @@ export function submitQuestion(userId: number, draft: QuestionDraft): { ok: true
   const key = normalize(draft.q);
   const duplicate =
     questionBank().some((q) => normalize(q.q) === key) ||
-    all<{ q: string }>("SELECT q FROM question_submissions WHERE status = 'pending'").some((r) => normalize(r.q) === key);
+    all<{ q: string }>("SELECT q FROM question_submissions WHERE status = 'pending'").some(
+      (r) => normalize(r.q) === key,
+    );
   if (duplicate) return { ok: false, error: 'Такъв въпрос вече има.' };
 
   const { lastInsertRowid } = run(
@@ -110,9 +117,10 @@ export function submitQuestion(userId: number, draft: QuestionDraft): { ok: true
 
 export function mySubmissions(userId: number): Submission[] {
   const user = getUser(userId)!;
-  return all<Row>('SELECT * FROM question_submissions WHERE user_id = ? ORDER BY created_at DESC LIMIT 100', userId).map((r) =>
-    toSubmission(r, user),
-  );
+  return all<Row>(
+    'SELECT * FROM question_submissions WHERE user_id = ? ORDER BY created_at DESC LIMIT 100',
+    userId,
+  ).map((r) => toSubmission(r, user));
 }
 
 export function listSubmissions(status: SubmissionStatus): Submission[] {
@@ -128,7 +136,11 @@ export function pendingCount(): number {
 }
 
 /** Approves (optionally with the moderator's edits) and adds it to the live question bank. */
-export function approveSubmission(adminId: number, id: number, edits: QuestionDraft | null): { ok: true } | { ok: false; error: string } {
+export function approveSubmission(
+  adminId: number,
+  id: number,
+  edits: QuestionDraft | null,
+): { ok: true } | { ok: false; error: string } {
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };
@@ -177,7 +189,11 @@ export function approveSubmission(adminId: number, id: number, edits: QuestionDr
   return { ok: true };
 }
 
-export function rejectSubmission(adminId: number, id: number, reason: string): { ok: true } | { ok: false; error: string } {
+export function rejectSubmission(
+  adminId: number,
+  id: number,
+  reason: string,
+): { ok: true } | { ok: false; error: string } {
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };

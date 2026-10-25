@@ -11,7 +11,7 @@ import {
 } from '@quiz/shared';
 import { unlockContext } from '../account';
 import { friendsChanged } from '../notify';
-import { markSeen, pickQuestions, type PreparedQuestion, recentFor } from '../questions';
+import { markSeen, type PreparedQuestion, pickQuestions, recentFor } from '../questions';
 import { getRating } from '../seasons';
 import { getUser } from '../users';
 import type { Bot } from './bots';
@@ -60,7 +60,7 @@ export function averageOf(humans: HumanEntry[]) {
 export function balanceTeams<T extends { player: GamePlayer }>(entries: T[]): T[] {
   const sorted = [...entries].sort((a, b) => (b.player.rating ?? START_RATING) - (a.player.rating ?? START_RATING));
   const pattern: TeamId[] = [0, 1, 1, 0];
-  sorted.forEach((e, i) => (e.player.team = pattern[i % 4]));
+  for (const [i, e] of sorted.entries()) e.player.team = pattern[i % 4];
   return entries;
 }
 
@@ -131,10 +131,13 @@ export class GameRegistry {
     const room = (id: string) => `game:${id}`;
     let game: Game;
     const emitter: GameEmitter = {
-      toGame: (event, ...args) => (this.io.to(room(game.id)).emit as any)(event, ...args),
-      toUser: (userId, event, ...args) => (this.io.to(`user:${userId}`).emit as any)(event, ...args),
+      toGame: (event, ...args) => this.io.to(room(game.id)).emit(event, ...args),
+      toUser: (userId, event, ...args) => this.io.to(`user:${userId}`).emit(event, ...args),
       toGameExcept: (userId, event, ...args) =>
-        (this.io.to(room(game.id)).except(`user:${userId}`).emit as any)(event, ...args),
+        this.io
+          .to(room(game.id))
+          .except(`user:${userId}`)
+          .emit(event, ...args),
     };
     game = new Game(
       {
@@ -164,7 +167,10 @@ export class GameRegistry {
     // stuck "in a game" that never runs.
     for (const userId of userIds) {
       try {
-        markSeen(userId, questions.map((q) => q.id));
+        markSeen(
+          userId,
+          questions.map((q) => q.id),
+        );
       } catch (err) {
         console.error(`Could not record the questions user ${userId} saw`, err);
       }

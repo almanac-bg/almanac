@@ -15,14 +15,19 @@ const { installationSecret } = await import('../src/settings');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-run("INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'a', 'a', 'x', 0), (2, 'b', 'b', 'x', 0)");
+run(
+  "INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'a', 'a', 'x', 0), (2, 'b', 'b', 'x', 0)",
+);
 
 test('recently seen questions are kept per player, newest first, up to the limit', () => {
   mock.timers.enable({ apis: ['Date'], now: 1_000_000 });
   try {
     const batches = Math.ceil(RECENT_LIMIT / 10) + 10;
     for (let b = 0; b < batches; b++) {
-      markSeen(1, Array.from({ length: 10 }, (_, i) => `q-${b}-${i}`));
+      markSeen(
+        1,
+        Array.from({ length: 10 }, (_, i) => `q-${b}-${i}`),
+      );
       mock.timers.tick(60_000);
     }
     const seen = recentFor([1]);
@@ -55,11 +60,26 @@ test('hot queries use indexes', () => {
       ['2026-10', 'duel'],
       /season_board/,
     ],
-    ['daily leaderboard', 'SELECT * FROM daily_results WHERE day = ? ORDER BY score DESC LIMIT 50', ['2026-10-25'], /daily_board/],
+    [
+      'daily leaderboard',
+      'SELECT * FROM daily_results WHERE day = ? ORDER BY score DESC LIMIT 50',
+      ['2026-10-25'],
+      /daily_board/,
+    ],
     ['expired sessions cleanup', 'DELETE FROM sessions WHERE expires_at < ?', [0], /sessions_expiry/],
-    ['question history', 'SELECT question_id FROM seen_questions WHERE user_id IN (?, ?)', [1, 2], /PRIMARY KEY|seen_questions/],
+    [
+      'question history',
+      'SELECT question_id FROM seen_questions WHERE user_id IN (?, ?)',
+      [1, 2],
+      /PRIMARY KEY|seen_questions/,
+    ],
     ['match history', 'SELECT * FROM match_players WHERE user_id = ?', [1], /match_players_user/],
-    ['approved questions per author', 'SELECT COUNT(*) AS n FROM questions WHERE author_id = ?', [1], /questions_author/],
+    [
+      'approved questions per author',
+      'SELECT COUNT(*) AS n FROM questions WHERE author_id = ?',
+      [1],
+      /questions_author/,
+    ],
   ];
   for (const [name, sql, params, index] of cases) {
     const p = plan(sql, ...params);

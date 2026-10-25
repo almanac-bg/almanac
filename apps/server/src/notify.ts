@@ -36,7 +36,7 @@ export function notifyUser<E extends keyof ServerToClientEvents>(
   event: E,
   ...args: Parameters<ServerToClientEvents[E]>
 ) {
-  (io?.to(`user:${userId}`).emit as ((...a: unknown[]) => void) | undefined)?.(event, ...args);
+  io?.to(`user:${userId}`).emit(event, ...args);
 }
 
 /** Drops every live connection of a user (e.g. after a password reset logs them out everywhere). */
@@ -62,13 +62,15 @@ export function sendFriendsUpdate(userId: number) {
 
 /** Coalesced "your friends list changed" pings, so a flurry of presence changes sends one update. */
 const pending = new Set<number>();
-let flushTimer: NodeJS.Timeout | null = null;
+let flushQueued = false;
 
 export function friendsChanged(...userIds: number[]) {
   for (const id of userIds) pending.add(id);
-  flushTimer ??= setTimeout(
+  if (flushQueued) return;
+  flushQueued = true;
+  setTimeout(
     guarded('friends update', () => {
-      flushTimer = null;
+      flushQueued = false;
       const targets = new Set<number>();
       for (const id of pending) for (const friend of friendsOf(id)) targets.add(friend);
       pending.clear();

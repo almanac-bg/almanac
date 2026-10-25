@@ -1,4 +1,16 @@
 import {
+  actions,
+  fmt,
+  getState,
+  type LiveGame,
+  ordinal,
+  plural,
+  type ReviewItem,
+  toast,
+  unlockPreview,
+  useStore,
+} from '@quiz/client';
+import {
   achievementById,
   categoryById,
   type FinalStanding,
@@ -10,8 +22,8 @@ import {
   MODES,
   RARITIES,
   rankFor,
-  type TeamId,
   TEAMS,
+  type TeamId,
 } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
@@ -27,7 +39,6 @@ import { challengeShareText } from '../components/home/challengeLink';
 import { FriendButton, FriendsProvider } from '../components/results/FriendButton';
 import { RematchStrip, useRematch } from '../components/results/Rematch';
 import { Button, Card } from '../components/ui';
-import { actions, fmt, getState, type LiveGame, ordinal, plural, type ReviewItem, toast, unlockPreview, useStore } from '@quiz/client';
 import { dailyShareText, rememberDailyShare, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
@@ -61,7 +72,8 @@ export function Results({ game }: { game: LiveGame }) {
   const link = rewards?.challenge ?? null;
   const won = (!single && mine.placement === 1) || (!!link && link.rank === 1 && link.total > 1);
   const perfect = mine.correct === game.start.totalQuestions;
-  const sideCards = !!rewards && (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating);
+  const sideCards =
+    !!rewards && (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating);
   const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
@@ -157,11 +169,7 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
+      <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="text-xs font-bold tracking-[0.3em] text-fg-3 uppercase">
           {MODES[end.mode].name}
           {solo && category && ` · ${category.name}`}
@@ -175,7 +183,9 @@ export function Results({ game }: { game: LiveGame }) {
           className={clsx(
             'mt-3 font-display leading-none font-black outline-none',
             longWord ? 'text-[clamp(1.75rem,10vw,5rem)]' : 'text-[clamp(2.6rem,9vw,5rem)]',
-            won ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent' : 'text-gradient',
+            won
+              ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'
+              : 'text-gradient',
           )}
         >
           {headline}
@@ -206,7 +216,11 @@ export function Results({ game }: { game: LiveGame }) {
 
       {/* The standings offer "+ Приятел" beside each person you played with. */}
       <FriendsProvider game={game}>
-        {teamScores ? <TeamResult game={game} end={end} /> : !single && <Podium game={game} standings={end.standings} />}
+        {teamScores ? (
+          <TeamResult game={game} end={end} />
+        ) : (
+          !single && <Podium game={game} standings={end.standings} />
+        )}
       </FriendsProvider>
       {link && (
         <ChallengeStanding
@@ -235,7 +249,12 @@ export function Results({ game }: { game: LiveGame }) {
         {sideCards && (
           <div className="space-y-4">
             {rewards.daily && (
-              <DailyCard daily={rewards.daily} onBoard={dailyBoard} history={game.history} total={game.start.totalQuestions} />
+              <DailyCard
+                daily={rewards.daily}
+                onBoard={dailyBoard}
+                history={game.history}
+                total={game.start.totalQuestions}
+              />
             )}
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
@@ -322,7 +341,10 @@ function ChallengeStanding({
       className="mx-auto mt-8 max-w-xl"
     >
       <Card className="relative overflow-hidden p-6 text-center sm:p-7">
-        <div aria-hidden className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-lime-400/20 blur-3xl" />
+        <div
+          aria-hidden
+          className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-lime-400/20 blur-3xl"
+        />
         {first ? (
           <>
             <h2 className="relative font-display text-lg font-bold">Сега прати линка</h2>
@@ -334,7 +356,12 @@ function ChallengeStanding({
           <>
             <h2 className="sr-only">Класиране по линка</h2>
             <div className="relative flex items-baseline justify-center gap-2">
-              <span className={clsx('font-display text-5xl font-black', challenge.rank === 1 ? 'text-amber-300' : 'text-lime-300')}>
+              <span
+                className={clsx(
+                  'font-display text-5xl font-black',
+                  challenge.rank === 1 ? 'text-amber-300' : 'text-lime-300',
+                )}
+              >
                 #{challenge.rank}
               </span>
               <span className="text-fg-2">от {plural(challenge.total, 'играч', 'играчи')}</span>
@@ -357,7 +384,11 @@ function ChallengeStanding({
 
 /** The chip PlayerTag shows for bots, for the podium (which doesn't use PlayerTag). */
 function BotTag() {
-  return <span className="shrink-0 rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-3">БОТ</span>;
+  return (
+    <span className="shrink-0 rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-3">
+      БОТ
+    </span>
+  );
 }
 
 function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[] }) {
@@ -392,7 +423,12 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
                 </motion.span>
               )}
               <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 84 : 68} />
-              <div className={clsx('mt-2 flex max-w-full items-center gap-1 text-sm font-semibold', me && 'text-violet-300')}>
+              <div
+                className={clsx(
+                  'mt-2 flex max-w-full items-center gap-1 text-sm font-semibold',
+                  me && 'text-violet-300',
+                )}
+              >
                 <span className="truncate">{p.name}</span>
                 <LevelBadge level={p.level} />
               </div>
@@ -423,7 +459,10 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
             return (
               <div
                 key={s.id}
-                className={clsx('flex items-center gap-2 rounded-2xl px-3 py-2 sm:gap-3', s.id === game.start.youId && 'bg-violet-500/12')}
+                className={clsx(
+                  'flex items-center gap-2 rounded-2xl px-3 py-2 sm:gap-3',
+                  s.id === game.start.youId && 'bg-violet-500/12',
+                )}
               >
                 <span className="w-8 text-sm font-bold text-fg-3">{ordinal(s.placement)}</span>
                 <Avatar avatar={p.avatar} frame={p.frame} size={34} dim={s.left} />
@@ -454,7 +493,9 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
         const color = teamColor(team);
         const won = team === winner;
         const total = scores.find((x) => x.team === team)?.score ?? 0;
-        const members = end.standings.filter((s) => game.players[s.id]?.team === team).sort((a, b) => b.score - a.score);
+        const members = end.standings
+          .filter((s) => game.players[s.id]?.team === team)
+          .sort((a, b) => b.score - a.score);
         return (
           <motion.div
             key={team}
@@ -464,9 +505,15 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
           >
             <Card
               className={clsx('relative h-full overflow-hidden p-5', !won && 'opacity-85')}
-              style={{ borderColor: won ? `${color}99` : `${color}33`, boxShadow: won ? `0 0 48px -16px ${color}` : undefined }}
+              style={{
+                borderColor: won ? `${color}99` : `${color}33`,
+                boxShadow: won ? `0 0 48px -16px ${color}` : undefined,
+              }}
             >
-              <div className="absolute -top-16 -right-10 size-48 rounded-full opacity-25 blur-3xl" style={{ background: color }} />
+              <div
+                className="absolute -top-16 -right-10 size-48 rounded-full opacity-25 blur-3xl"
+                style={{ background: color }}
+              />
               <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="font-display text-lg font-bold" style={{ color }}>
@@ -483,14 +530,19 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
                   return (
                     <div
                       key={s.id}
-                      className={clsx('flex items-center gap-2 rounded-2xl px-2 py-2 sm:gap-3', s.id === game.start.youId && 'bg-violet-500/12')}
+                      className={clsx(
+                        'flex items-center gap-2 rounded-2xl px-2 py-2 sm:gap-3',
+                        s.id === game.start.youId && 'bg-violet-500/12',
+                      )}
                     >
                       <Avatar avatar={p.avatar} frame={p.frame} size={36} dim={s.left} />
                       <div className="min-w-0 flex-1 text-sm">
                         <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
                       </div>
                       <FriendButton player={p} youId={game.start.youId} compact />
-                      <span className="text-sm font-semibold text-fg-2 tabular-nums">{s.left ? 'напусна' : fmt(s.score)}</span>
+                      <span className="text-sm font-semibold text-fg-2 tabular-nums">
+                        {s.left ? 'напусна' : fmt(s.score)}
+                      </span>
                     </div>
                   );
                 })}
@@ -560,6 +612,7 @@ function DailyCard({
           <Share2 className="size-4" /> Сподели резултата
         </Button>
         <button
+          type="button"
           onClick={onBoard}
           className="focus-ring inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-amber-300 hover:text-amber-200"
         >
@@ -600,7 +653,9 @@ function RewardsCard({ rewards }: { rewards: MatchRewards }) {
       <div className="absolute -top-16 -left-10 size-48 rounded-full bg-violet-600/25 blur-3xl" />
       <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="font-display text-lg font-bold">Награди</h2>
-        <span className="font-display text-2xl font-black text-violet-300 sm:text-3xl">+{fmt(rewards.xpGained)} XP</span>
+        <span className="font-display text-2xl font-black text-violet-300 sm:text-3xl">
+          +{fmt(rewards.xpGained)} XP
+        </span>
       </div>
 
       <div className="relative mt-5">
@@ -636,7 +691,7 @@ function RewardsCard({ rewards }: { rewards: MatchRewards }) {
       <ul className="relative mt-5 space-y-1.5 text-sm">
         {rewards.breakdown.map((line, i) => (
           <motion.li
-            key={i}
+            key={line.label}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.5 + i * 0.08 }}
@@ -670,7 +725,10 @@ function AchievementsCard({ ids }: { ids: string[] }) {
               animate={{ opacity: 1, rotateX: 0 }}
               transition={{ delay: 1 + i * 0.18, type: 'spring', stiffness: 200, damping: 18 }}
               className="flex items-center gap-3 rounded-2xl border p-3"
-              style={{ borderColor: `${rarity.color}55`, background: `linear-gradient(110deg, ${rarity.color}1f, transparent 70%)` }}
+              style={{
+                borderColor: `${rarity.color}55`,
+                background: `linear-gradient(110deg, ${rarity.color}1f, transparent 70%)`,
+              }}
             >
               <span className="grid size-11 place-items-center rounded-xl bg-black/30 text-2xl">{a.icon}</span>
               <div className="min-w-0 flex-1">
@@ -736,7 +794,12 @@ function RatingCard({ rating }: { rating: { before: number; after: number } }) {
           {promoted && <span className="text-sm font-bold text-amber-300">Нов ранг!</span>}
         </div>
       </div>
-      <span className={clsx('font-display text-3xl font-black tabular-nums', delta >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+      <span
+        className={clsx(
+          'font-display text-3xl font-black tabular-nums',
+          delta >= 0 ? 'text-emerald-300' : 'text-rose-300',
+        )}
+      >
         {delta >= 0 ? '+' : ''}
         {delta}
       </span>

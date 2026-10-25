@@ -39,7 +39,12 @@ export function ChallengeCard({ className }: { className?: string }) {
     // Sized by its own width: beside another card it stacks, across the whole row the list moves to the side.
     <Card className={clsx('@container relative overflow-hidden p-5 sm:p-7', className)}>
       <div aria-hidden className="absolute -bottom-20 -left-12 size-56 rounded-full bg-lime-500/15 blur-3xl" />
-      <div className={clsx('relative grid grid-cols-[minmax(0,1fr)] gap-5', aside && '@xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @xl:gap-7')}>
+      <div
+        className={clsx(
+          'relative grid grid-cols-[minmax(0,1fr)] gap-5',
+          aside && '@xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @xl:gap-7',
+        )}
+      >
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-2 text-lime-300">
             <Link2 aria-hidden className="size-5" />
@@ -52,7 +57,9 @@ export function ChallengeCard({ className }: { className?: string }) {
           </p>
           <div className="mt-auto pt-5">
             {guest ? (
-              <GuestNudge>Предизвикателствата по линк са за играчи с профил. Запази прогреса си — отнема 10 секунди.</GuestNudge>
+              <GuestNudge>
+                Предизвикателствата по линк са за играчи с профил. Запази прогреса си — отнема 10 секунди.
+              </GuestNudge>
             ) : (
               // The label is long: on the narrowest phones the icon and some padding make way for it.
               <Button onClick={create} loading={busy} className="w-full @max-2xs:px-3 @sm:w-auto">
@@ -94,7 +101,12 @@ function ChallengeRow({ challenge: c, now }: { challenge: MyChallenge; now: numb
   const made = new Date(c.createdAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' });
 
   return (
-    <li className={clsx('flex items-center gap-1 rounded-2xl border border-line bg-black/20 py-0.5 pr-1 pl-3.5', expired && 'opacity-60')}>
+    <li
+      className={clsx(
+        'flex items-center gap-1 rounded-2xl border border-line bg-black/20 py-0.5 pr-1 pl-3.5',
+        expired && 'opacity-60',
+      )}
+    >
       <Link to={`/c/${c.id}`} className="focus-ring flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl py-1.5">
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{lead}</span>

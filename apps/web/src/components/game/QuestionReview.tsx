@@ -19,6 +19,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
   return (
     <Card className="mt-4 overflow-hidden">
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className="focus-ring flex w-full items-center justify-between gap-4 rounded-3xl p-5 text-left sm:px-6"
@@ -65,7 +66,15 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
   );
 }
 
-function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: boolean; onReport: (() => void) | null }) {
+function ReviewRow({
+  item,
+  reported,
+  onReport,
+}: {
+  item: ReviewItem;
+  reported: boolean;
+  onReport: (() => void) | null;
+}) {
   const category = categoryById(item.category);
   return (
     <li className="flex gap-3 px-5 py-4 sm:px-6">
@@ -74,6 +83,7 @@ function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: b
           'mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-xs font-bold',
           item.right ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300',
         )}
+        role="img"
         aria-label={item.right ? 'Верен отговор' : 'Грешен отговор'}
       >
         {item.right ? <Check className="size-4" /> : <X className="size-4" />}
@@ -96,6 +106,7 @@ function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: b
       </div>
       {onReport && (
         <button
+          type="button"
           onClick={onReport}
           disabled={reported}
           title={reported ? 'Сигнализирано — благодарим!' : 'Сигнализирай за грешка'}
@@ -112,7 +123,15 @@ function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: b
   );
 }
 
-function ReportQuestion({ item, onClose, onSent }: { item: ReviewItem | null; onClose: () => void; onSent: (id: string) => void }) {
+function ReportQuestion({
+  item,
+  onClose,
+  onSent,
+}: {
+  item: ReviewItem | null;
+  onClose: () => void;
+  onSent: (id: string) => void;
+}) {
   const [reason, setReason] = useState<QuestionReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);

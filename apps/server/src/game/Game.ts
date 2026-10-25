@@ -13,8 +13,8 @@ import {
   type ModeId,
   ordinal,
   type PlayerResult,
-  type PowerupId,
   POWERUPS,
+  type PowerupId,
   type QuestionPayload,
   SCORING,
   type ServerToClientEvents,
@@ -140,11 +140,14 @@ export class Game {
     const solo = setup.humans.length + setup.bots.length === 1;
     for (const h of setup.humans) {
       // Targeted power-ups are pointless without an opponent.
-      const powerups = solo ? h.powerups.filter((id) => !POWERUPS.find((p) => p.id === id)?.multiplayerOnly) : h.powerups;
+      const powerups = solo
+        ? h.powerups.filter((id) => !POWERUPS.find((p) => p.id === id)?.multiplayerOnly)
+        : h.powerups;
       this.participants.set(h.player.id, this.newParticipant(h.player, null, powerups, h.emotes));
     }
     for (const b of setup.bots) this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [], []));
-    this.schedule = setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
+    this.schedule =
+      setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
   }
 
   get questions() {
@@ -160,7 +163,8 @@ export class Game {
   }
 
   start() {
-    for (const p of this.humans) this.emit.toUser(p.player.userId!, 'game:start', this.startPayload(p.player.id, COUNTDOWN_MS));
+    for (const p of this.humans)
+      this.emit.toUser(p.player.userId!, 'game:start', this.startPayload(p.player.id, COUNTDOWN_MS));
     this.later(COUNTDOWN_MS, () => this.nextQuestion());
   }
 
@@ -173,7 +177,8 @@ export class Game {
     const now = Date.now();
     if (p.frozenUntil > now) {
       // Bots wait the freeze out; humans' clients keep the buttons disabled.
-      if (p.brain) this.later((p.frozenUntil - now) / config.gameTimeScale + 300, () => this.answer(playerId, index, choice));
+      if (p.brain)
+        this.later((p.frozenUntil - now) / config.gameTimeScale + 300, () => this.answer(playerId, index, choice));
       return;
     }
     const limit = this.setup.timeMs + p.extraMs;
@@ -203,7 +208,10 @@ export class Game {
     if (powerup === 'freeze') {
       const target = this.freezeTarget(p);
       if (!target) {
-        this.emit.toUser(userId, 'notice', { kind: 'info', message: 'Няма кого да замразиш — съперниците вече отговориха.' });
+        this.emit.toUser(userId, 'notice', {
+          kind: 'info',
+          message: 'Няма кого да замразиш — съперниците вече отговориха.',
+        });
         return;
       }
       target.frozenUntil = Date.now() + FREEZE_MS * config.gameTimeScale;
@@ -317,7 +325,9 @@ export class Game {
     const now = Date.now();
     const reconnecting = (p: Participant) =>
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
-    const waitingOn = [...this.participants.values()].filter((p) => this.isActive(p) && (p.connected || p.brain || reconnecting(p)));
+    const waitingOn = [...this.participants.values()].filter(
+      (p) => this.isActive(p) && (p.connected || p.brain || reconnecting(p)),
+    );
     if (waitingOn.some((p) => !p.answer)) return;
     if (this.questionTimer) clearTimeout(this.questionTimer);
     this.questionTimer = this.later(EARLY_REVEAL_MS, () => this.reveal());
@@ -333,7 +343,8 @@ export class Game {
     for (const p of this.participants.values()) {
       if (!this.isActive(p)) continue;
       // A "Втори шанс" miss with no second pick stands as the answer.
-      if (!p.answer && p.firstWrong !== null) p.answer = { choice: p.firstWrong, timeMs: this.setup.timeMs + p.extraMs, retried: false };
+      if (!p.answer && p.firstWrong !== null)
+        p.answer = { choice: p.firstWrong, timeMs: this.setup.timeMs + p.extraMs, retried: false };
       p.faced++;
       const cat = p.categories.get(q.category) ?? { answered: 0, correct: 0, correctMs: 0 };
       p.categories.set(q.category, cat);
@@ -454,7 +465,9 @@ export class Game {
         time: members.reduce((s, p) => s + p.answerMs, 0),
       };
     });
-    totals.sort((a, b) => Number(a.gone) - Number(b.gone) || b.score - a.score || b.correct - a.correct || a.time - b.time);
+    totals.sort(
+      (a, b) => Number(a.gone) - Number(b.gone) || b.score - a.score || b.correct - a.correct || a.time - b.time,
+    );
     return totals.map(({ team, score }) => ({ team, score }));
   }
 
@@ -538,7 +551,11 @@ export class Game {
   /** A multiplayer match is over once only one side is still in it. */
   private decided() {
     if (this.participants.size < 2) return false;
-    const sides = new Set([...this.participants.values()].filter((p) => this.isActive(p)).map((p) => (this.setup.teams ? p.player.team : p.player.id)));
+    const sides = new Set(
+      [...this.participants.values()]
+        .filter((p) => this.isActive(p))
+        .map((p) => (this.setup.teams ? p.player.team : p.player.id)),
+    );
     return sides.size < 2;
   }
 
@@ -651,13 +668,10 @@ export class Game {
   }
 
   private later(ms: number, fn: () => void): NodeJS.Timeout {
-    const t = setTimeout(
-      () => {
-        this.timers.delete(t);
-        this.guard(fn);
-      },
-      Math.max(0, ms) * config.gameTimeScale,
-    );
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      this.guard(fn);
+    }, Math.max(0, ms) * config.gameTimeScale);
     this.timers.add(t);
     return t;
   }
@@ -680,7 +694,11 @@ export class Game {
       try {
         this.clearTimers();
         for (const p of this.humans) {
-          if (!p.left) this.emit.toUser(p.player.userId!, 'notice', { kind: 'error', message: 'Мачът прекъсна заради грешка при нас. Съжаляваме!' });
+          if (!p.left)
+            this.emit.toUser(p.player.userId!, 'notice', {
+              kind: 'error',
+              message: 'Мачът прекъсна заради грешка при нас. Съжаляваме!',
+            });
         }
         this.hooks.onClosed(this);
       } catch (closeErr) {
@@ -695,7 +713,12 @@ export class Game {
     this.questionTimer = null;
   }
 
-  private newParticipant(player: GamePlayer, brain: BotBrain | null, powerups: PowerupId[], emotes: string[]): Participant {
+  private newParticipant(
+    player: GamePlayer,
+    brain: BotBrain | null,
+    powerups: PowerupId[],
+    emotes: string[],
+  ): Participant {
     return {
       player,
       brain,

@@ -1,9 +1,17 @@
 import { randomBytes } from 'node:crypto';
-import { type ChallengeEntry, type ChallengeInfo, type ChallengePreview, type MatchRewards, MODES, type MyChallenge, ordinal } from '@quiz/shared';
+import {
+  type ChallengeEntry,
+  type ChallengeInfo,
+  type ChallengePreview,
+  type MatchRewards,
+  MODES,
+  type MyChallenge,
+  ordinal,
+} from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { notifyUser } from './notify';
-import { pickQuestions, type PreparedQuestion, recentFor, reorderOptions } from './questions';
+import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions } from './questions';
 import { count } from './stats';
 import { toPublicUser, type UserRow } from './users';
 
@@ -78,7 +86,13 @@ function finished(id: string): ResultRow[] {
 }
 
 /** Saves a finished run (also one cut short by leaving: it was the one attempt) and tells the creator. */
-export function recordChallengeResult(id: string, userId: number, score: number, correct: number, timeMs: number): NonNullable<MatchRewards['challenge']> {
+export function recordChallengeResult(
+  id: string,
+  userId: number,
+  score: number,
+  correct: number,
+  timeMs: number,
+): NonNullable<MatchRewards['challenge']> {
   run(
     'UPDATE challenge_results SET finished_at = ?, score = ?, correct = ?, time_ms = ? WHERE challenge_id = ? AND user_id = ?',
     Date.now(),
@@ -104,7 +118,9 @@ export function recordChallengeResult(id: string, userId: number, score: number,
 export function challengeInfo(id: string, viewerId: number): ChallengeInfo | null {
   const challenge = getChallenge(id);
   if (!challenge) return null;
-  const creator = challenge.creator_id ? one<UserRow>('SELECT * FROM users WHERE id = ?', challenge.creator_id) : undefined;
+  const creator = challenge.creator_id
+    ? one<UserRow>('SELECT * FROM users WHERE id = ?', challenge.creator_id)
+    : undefined;
   const entries: ChallengeEntry[] = finished(id).map((r, i) => ({
     rank: i + 1,
     user: toPublicUser(r),
@@ -130,7 +146,10 @@ export function challengePreview(id: string): ChallengePreview | null {
   const challenge = getChallenge(id);
   if (!challenge) return null;
   const creator = challenge.creator_id
-    ? one<Pick<UserRow, 'username' | 'avatar' | 'frame'>>('SELECT username, avatar, frame FROM users WHERE id = ?', challenge.creator_id)
+    ? one<Pick<UserRow, 'username' | 'avatar' | 'frame'>>(
+        'SELECT username, avatar, frame FROM users WHERE id = ?',
+        challenge.creator_id,
+      )
     : undefined;
   const top = one<{ score: number | null; players: number }>(
     'SELECT MAX(score) AS score, COUNT(*) AS players FROM challenge_results WHERE challenge_id = ? AND finished_at IS NOT NULL',

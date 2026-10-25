@@ -1,9 +1,9 @@
+import { useStore } from '@quiz/client';
 import { BRAND, levelProgress } from '@quiz/shared';
 import clsx from 'clsx';
 import { ChartColumn, Gamepad2, Save, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router';
-import { useStore } from '@quiz/client';
 import { useMuted } from '../lib/sound';
 import { Avatar, LevelBadge } from './Avatar';
 import { ClaimAccountModal } from './ClaimAccount';
@@ -42,7 +42,8 @@ export function Logo({ className }: { className?: string }) {
   );
 }
 
-const ICON_BUTTON = 'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg';
+const ICON_BUTTON =
+  'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg';
 
 function OfflineDot() {
   return (
@@ -63,6 +64,7 @@ function GuestButton({ connected }: { connected: boolean }) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         aria-label="Гост — запази прогреса"
         title="Играеш като гост — запази прогреса си"
@@ -90,8 +92,8 @@ function GuestButton({ connected }: { connected: boolean }) {
         onClose={() => setOpen(false)}
         reason={
           <>
-            Играеш като гост (<b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>): профилът е само на това
-            устройство. Избери име и парола — нивото, серията и всичко изиграно остават твои, на всяко устройство.
+            Играеш като гост (<b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>): профилът е само на
+            това устройство. Избери име и парола — нивото, серията и всичко изиграно остават твои, на всяко устройство.
           </>
         }
       />
@@ -143,6 +145,7 @@ export function NavBar() {
               </span>
             )}
             <button
+              type="button"
               onClick={() => setMuted(!muted)}
               aria-label={muted ? 'Включи звука' : 'Изключи звука'}
               title={muted ? 'Включи звука' : 'Изключи звука'}

@@ -19,7 +19,7 @@ test('a restart lets the running match finish, refuses new ones, then exits', T,
     assert.ok((await emitAck(sa, 'solo:start', { category: 'mixed' })).ok);
     await firstQuestion;
 
-    const told = next<{ message: string }>(sb, 'server:draining');
+    const told = next(sb, 'server:draining');
     const exited = srv.kill('SIGTERM');
     assert.match((await told).message, /Обновяваме/, 'everyone hears about the restart');
     const refused = await emitAck(sb, 'queue:join', 'duel');

@@ -1,0 +1,6 @@
+# Line endings stay LF in the repository whatever the platform; images and fonts are binary.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary
+*.bundle binary

@@ -1,3 +1,4 @@
+import { actions, api, plural, toast, useStore } from '@quiz/client';
 import {
   BRAND,
   CATEGORIES,
@@ -8,11 +9,26 @@ import {
   type RoomPlayer,
   type RoomSettings,
   type RoomState,
-  type TeamId,
   TEAMS,
+  type TeamId,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeftRight, Bot, Check, Copy, Crown, LogOut, Minus, Play, Plus, Send, Share2, Skull, UserMinus, Users } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Bot,
+  Check,
+  Copy,
+  Crown,
+  LogOut,
+  Minus,
+  Play,
+  Plus,
+  Send,
+  Share2,
+  Skull,
+  UserMinus,
+  Users,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
@@ -21,9 +37,7 @@ import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { Button, Card, Modal, Segmented, Spinner } from '../components/ui';
-import { actions, api, plural, toast, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
-
 
 export function RoomPage() {
   const room = useStore((s) => s.room);
@@ -64,7 +78,11 @@ export function RoomPage() {
   async function share() {
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
       try {
-        await navigator.share({ title: BRAND.name, text: `Ела да играем в ${BRAND.name}! Стая ${room!.code}`, url: inviteUrl });
+        await navigator.share({
+          title: BRAND.name,
+          text: `Ела да играем в ${BRAND.name}! Стая ${room!.code}`,
+          url: inviteUrl,
+        });
         return;
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return; // the sheet was closed
@@ -99,7 +117,12 @@ export function RoomPage() {
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
           <p className="text-xs font-bold tracking-widest text-fuchsia-300 uppercase">Частна стая</p>
-          <button onClick={copy} className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl" title="Копирай линк за покана">
+          <button
+            type="button"
+            onClick={copy}
+            className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl"
+            title="Копирай линк за покана"
+          >
             <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
             <span className="grid size-9 place-items-center rounded-xl bg-white/5 text-fg-2 group-hover:bg-white/10">
               {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
@@ -130,15 +153,27 @@ export function RoomPage() {
           <Card className="p-4 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-display text-lg font-bold">
-                Играчи <span className="text-fg-3">{room.players.length}/{s.maxPlayers}</span>
+                Играчи{' '}
+                <span className="text-fg-3">
+                  {room.players.length}/{s.maxPlayers}
+                </span>
               </h2>
               {isHost && (
                 <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => actions.roomBot('add')} disabled={room.players.length >= s.maxPlayers}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => actions.roomBot('add')}
+                    disabled={room.players.length >= s.maxPlayers}
+                  >
                     <Bot className="size-4" /> Добави бот
                   </Button>
                   {hasBots && (
-                    <Button variant="ghost" onClick={() => actions.roomBot('remove')} aria-label="Махни бот" title="Махни бот">
+                    <Button
+                      variant="ghost"
+                      onClick={() => actions.roomBot('remove')}
+                      aria-label="Махни бот"
+                      title="Махни бот"
+                    >
                       <Minus className="size-4" />
                     </Button>
                   )}
@@ -239,7 +274,11 @@ export function RoomPage() {
 
           {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
           <div className="hidden space-y-3 lg:block">
-            {isHost ? startButton : <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>}
+            {isHost ? (
+              startButton
+            ) : (
+              <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>
+            )}
             {isHost && startHint && <p className="text-center text-xs text-fg-3">{startHint}</p>}
           </div>
         </Card>
@@ -269,8 +308,8 @@ export function RoomPage() {
 
       <Modal open={!!kickTarget} onClose={() => setKicking(null)} title="Премахване от стаята">
         <p className="text-fg-2">
-          Да премахна ли <b className="text-fg [overflow-wrap:anywhere]">{kickTarget?.name}</b> от стаята? Ще може да се върне само с
-          нова покана от теб.
+          Да премахна ли <b className="text-fg [overflow-wrap:anywhere]">{kickTarget?.name}</b> от стаята? Ще може да се
+          върне само с нова покана от теб.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setKicking(null)}>
@@ -391,6 +430,7 @@ function PlayerCard({
           {teamButton && kickable && <span aria-hidden className="h-6 w-px bg-line" />}
           {kickable && (
             <button
+              type="button"
               onClick={() => onKick(p)}
               aria-label={`Премахни ${p.name}`}
               title="Премахни от стаята"
@@ -410,14 +450,27 @@ function FreeSeats({ count, className }: { count: number; className?: string }) 
   return (
     <motion.div
       layout
-      className={clsx('grid place-items-center rounded-2xl border border-dashed border-line px-3 text-center text-sm text-fg-3', className)}
+      className={clsx(
+        'grid place-items-center rounded-2xl border border-dashed border-line px-3 text-center text-sm text-fg-3',
+        className,
+      )}
     >
       Още {plural(count, 'свободно място', 'свободни места')}
     </motion.div>
   );
 }
 
-function Seats({ room, meId, isHost, onKick }: { room: RoomState; meId: number; isHost: boolean; onKick: (p: RoomPlayer) => void }) {
+function Seats({
+  room,
+  meId,
+  isHost,
+  onKick,
+}: {
+  room: RoomState;
+  meId: number;
+  isHost: boolean;
+  onKick: (p: RoomPlayer) => void;
+}) {
   const free = room.settings.maxPlayers - room.players.length;
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
@@ -431,7 +484,17 @@ function Seats({ room, meId, isHost, onKick }: { room: RoomState; meId: number; 
   );
 }
 
-function TeamColumns({ room, meId, isHost, onKick }: { room: RoomState; meId: number; isHost: boolean; onKick: (p: RoomPlayer) => void }) {
+function TeamColumns({
+  room,
+  meId,
+  isHost,
+  onKick,
+}: {
+  room: RoomState;
+  meId: number;
+  isHost: boolean;
+  onKick: (p: RoomPlayer) => void;
+}) {
   const free = room.settings.maxPlayers - room.players.length;
   return (
     <div className="space-y-3">
@@ -441,7 +504,11 @@ function TeamColumns({ room, meId, isHost, onKick }: { room: RoomState; meId: nu
           const members = room.players.filter((p) => p.team === team);
           const other = TEAMS[team === 0 ? 1 : 0].name;
           return (
-            <div key={team} className="rounded-2xl border p-2 sm:p-2.5" style={{ borderColor: `${color}44`, background: `${color}0d` }}>
+            <div
+              key={team}
+              className="rounded-2xl border p-2 sm:p-2.5"
+              style={{ borderColor: `${color}44`, background: `${color}0d` }}
+            >
               <div className="mb-2 flex items-center gap-2 px-1">
                 <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
                 <span className="font-display text-sm font-bold" style={{ color }}>
@@ -461,6 +528,7 @@ function TeamColumns({ room, meId, isHost, onKick }: { room: RoomState; meId: nu
                       teamButton={
                         isHost && (
                           <button
+                            type="button"
                             onClick={() => actions.roomTeam(p.id)}
                             title={`Премести при ${other}`}
                             aria-label={`Премести ${p.name} при ${other}`}
@@ -564,14 +632,19 @@ function InviteFriends({ room }: { room: RoomState }) {
           , за да ги каниш направо оттук.
         </p>
       ) : online.length === 0 ? (
-        <p className="text-sm text-fg-3">Никой от приятелите ти не е онлайн в момента. Прати им линка с „Покани“ горе.</p>
+        <p className="text-sm text-fg-3">
+          Никой от приятелите ти не е онлайн в момента. Прати им линка с „Покани“ горе.
+        </p>
       ) : (
         <ul className="space-y-2">
           {online.map((f) => {
             const inRoom = room.players.some((p) => p.id === `u${f.user.id}`);
             const wasSent = sent.has(f.user.id);
             return (
-              <li key={f.user.id} className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.03] p-2.5">
+              <li
+                key={f.user.id}
+                className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.03] p-2.5"
+              >
                 <Avatar avatar={f.user.avatar} frame={f.user.frame} size={38} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{f.user.username}</div>

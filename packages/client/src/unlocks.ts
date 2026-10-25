@@ -1,6 +1,6 @@
 import {
-  achievementById,
   AVATARS,
+  achievementById,
   EMOTES,
   FRAMES,
   levelFromXp,

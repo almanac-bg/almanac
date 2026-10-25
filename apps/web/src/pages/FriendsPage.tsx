@@ -1,3 +1,4 @@
+import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
 import { type FriendEntry, type FriendsResponse, type Presence, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, DoorOpen, Save, Swords, UserMinus, UserPlus, X } from 'lucide-react';
@@ -8,7 +9,6 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
-import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 
 const PRESENCE: Record<Presence, { label: string; color: string }> = {
@@ -41,8 +41,8 @@ function GuestFriends() {
         </span>
         <p className="font-display text-lg font-bold">Приятелите са за играчи с профил</p>
         <p className="max-w-md text-sm text-fg-3">
-          Играеш като гост. Запази прогреса с име и парола — после добавяш приятели по име, виждаш кога са онлайн, каниш ги в
-          своя стая и ги предизвикваш на дуел.
+          Играеш като гост. Запази прогреса с име и парола — после добавяш приятели по име, виждаш кога са онлайн, каниш
+          ги в своя стая и ги предизвикваш на дуел.
         </p>
         <Button className="mt-4" onClick={() => setOpen(true)}>
           <Save className="size-4" /> Запази прогреса
@@ -98,7 +98,8 @@ function Friends() {
           <p className="mt-1 text-fg-2">
             {data.friends.length ? (
               <>
-                <b className="text-fg">{data.friends.length}</b> {data.friends.length === 1 ? 'приятел' : 'приятели'} · <span className="text-emerald-300">{online} онлайн</span>
+                <b className="text-fg">{data.friends.length}</b> {data.friends.length === 1 ? 'приятел' : 'приятели'} ·{' '}
+                <span className="text-emerald-300">{online} онлайн</span>
               </>
             ) : (
               'Играй с хора, които познаваш.'
@@ -116,13 +117,21 @@ function Friends() {
           <div className="grid gap-3 sm:grid-cols-2">
             <AnimatePresence initial={false}>
               {data.incoming.map((f) => (
-                <motion.div key={f.user.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
+                <motion.div
+                  key={f.user.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
                   <Card className="flex items-center gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
                     <PersonLink entry={f} />
                     <div className="flex shrink-0 gap-2">
                       <Button
                         size="sm"
-                        onClick={() => mutate(() => api.acceptFriend(f.user.id), `${f.user.username} вече е твой приятел!`)}
+                        onClick={() =>
+                          mutate(() => api.acceptFriend(f.user.id), `${f.user.username} вече е твой приятел!`)
+                        }
                       >
                         <Check className="size-4" /> Приеми
                       </Button>
@@ -248,7 +257,10 @@ function AddFriendForm({ onAdded }: { onAdded: (d: FriendsResponse) => void }) {
 function PersonLink({ entry, hint }: { entry: FriendEntry; hint?: string }) {
   const { user } = entry;
   return (
-    <Link to={`/profile/${encodeURIComponent(user.username)}`} className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl">
+    <Link
+      to={`/profile/${encodeURIComponent(user.username)}`}
+      className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+    >
       <Avatar avatar={user.avatar} frame={user.frame} size={44} />
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
@@ -270,7 +282,8 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
   const p = PRESENCE[presence];
   const reachable = presence === 'online' || presence === 'room' || presence === 'queue';
   const alreadyInRoom = !!room?.players.some((pl) => pl.userId === user.id);
-  const canInvite = !!room && !room.inGame && !inGame && presence !== 'offline' && presence !== 'game' && !alreadyInRoom;
+  const canInvite =
+    !!room && !room.inGame && !inGame && presence !== 'offline' && presence !== 'game' && !alreadyInRoom;
 
   async function challenge() {
     setBusy('challenge');
@@ -298,7 +311,10 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
       exit={{ opacity: 0, height: 0 }}
       className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5"
     >
-      <Link to={`/profile/${encodeURIComponent(user.username)}`} className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl">
+      <Link
+        to={`/profile/${encodeURIComponent(user.username)}`}
+        className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+      >
         <span className="relative">
           <Avatar avatar={user.avatar} frame={user.frame} size={46} dim={presence === 'offline'} />
           <span
@@ -336,6 +352,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
           <Swords className="size-4" /> Предизвикай
         </Button>
         <button
+          type="button"
           onClick={onRemove}
           aria-label={`Премахни ${user.username}`}
           title="Премахни от приятели"

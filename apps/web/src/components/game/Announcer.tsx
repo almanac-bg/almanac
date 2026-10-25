@@ -33,7 +33,9 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
         : mine.correct
           ? `Вярно! +${mine.points} точки.`
           : `${mine.choice === null ? 'Времето изтече.' : 'Грешно.'}${mine.points < 0 ? ` Минус ${-mine.points} точки.` : ''} ${right}`,
-      ...reveal.eliminated.map((id) => (id === youId ? 'Ти отпадна от мача.' : `${game.players[id]?.name ?? 'Играч'} отпада.`)),
+      ...reveal.eliminated.map((id) =>
+        id === youId ? 'Ти отпадна от мача.' : `${game.players[id]?.name ?? 'Играч'} отпада.`,
+      ),
     ];
     outcome = parts.join(' ');
   }

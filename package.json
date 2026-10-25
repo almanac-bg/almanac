@@ -14,12 +14,15 @@
     "start": "npm run start -w @quiz/server",
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/client && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/e2e",
     "test": "npm test -w @quiz/server",
-    "test:browser": "npm run build && npm run test:browser -w @quiz/web"
+    "test:browser": "npm run build && npm run test:browser -w @quiz/web",
+    "lint": "biome ci .",
+    "format": "biome check --write ."
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.3",
     "concurrently": "^10.0.6",
     "typescript": "^7.0.2"
   }

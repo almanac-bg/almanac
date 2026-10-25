@@ -73,7 +73,9 @@ const RULES: Record<string, Rule> = {
   streak_5: { progress: (a) => a.bestStreak },
   streak_10: { progress: (a) => a.bestStreak },
   speed_demon: { earned: (a) => a.fastestCorrectMs !== null && a.fastestCorrectMs < 1500 },
-  perfect: { earned: (_, m) => !!m && !m.left && m.questions >= 10 && m.faced === m.questions && m.correct === m.questions },
+  perfect: {
+    earned: (_, m) => !!m && !m.left && m.questions >= 10 && m.faced === m.questions && m.correct === m.questions,
+  },
   correct_100: { progress: (a) => a.correct },
   correct_1000: { progress: (a) => a.correct },
   polymath: { progress: (a) => a.categoriesCovered },
@@ -132,9 +134,13 @@ export function loadAggregate(userId: number): Aggregate {
       userId,
     ),
     maxRating: Math.round(
-      one<{ r: number | null }>('SELECT MAX(peak) AS r FROM season_ratings WHERE user_id = ?', userId)?.r ?? START_RATING,
+      one<{ r: number | null }>('SELECT MAX(peak) AS r FROM season_ratings WHERE user_id = ?', userId)?.r ??
+        START_RATING,
     ),
-    dailyCompleted: count('SELECT COUNT(*) AS n FROM daily_results WHERE user_id = ? AND finished_at IS NOT NULL', userId),
+    dailyCompleted: count(
+      'SELECT COUNT(*) AS n FROM daily_results WHERE user_id = ? AND finished_at IS NOT NULL',
+      userId,
+    ),
     bestDailyStreak: u.best_daily_streak,
     friends: count(
       "SELECT COUNT(*) AS n FROM friendships WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'",
@@ -177,7 +183,12 @@ export function settleAchievements(userId: number, match: MatchContext | null): 
       owned.add(def.id);
       ids.push(def.id);
       lines.push({ label: `Постижение: ${def.name}`, amount: def.xp });
-      run('INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES (?, ?, ?)', userId, def.id, Date.now());
+      run(
+        'INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES (?, ?, ?)',
+        userId,
+        def.id,
+        Date.now(),
+      );
       run('UPDATE users SET xp = xp + ? WHERE id = ?', def.xp, userId);
       changed = true;
     }

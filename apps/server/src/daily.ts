@@ -1,7 +1,7 @@
 import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS } from '@quiz/shared';
-import { all, one, run } from './db';
 import { config } from './config';
-import { pickQuestions, type PreparedQuestion, reorderOptions, seededRng } from './questions';
+import { all, one, run } from './db';
+import { type PreparedQuestion, pickQuestions, reorderOptions, seededRng } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
 import { getUser, toPublicUser, type UserRow } from './users';
@@ -11,7 +11,12 @@ function dailySet(day: string): PreparedQuestion[] {
   const existing = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (existing) return JSON.parse(existing.questions);
   // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
-  const questions = pickQuestions(MODES.daily.questions, 'mixed', new Map(), seededRng(`daily:${installationSecret('daily-seed')}:${day}`));
+  const questions = pickQuestions(
+    MODES.daily.questions,
+    'mixed',
+    new Map(),
+    seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
+  );
   run('INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)', day, JSON.stringify(questions));
   return JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day)!.questions);
 }
@@ -85,7 +90,8 @@ export function recordDailyResult(userId: number, day: string, score: number, co
   );
   const u = getUser(userId)!;
   const guest = u.is_guest === 1;
-  if (u.last_daily_day === day) return { ...rankOf(day, score, timeMs, guest), streak: u.daily_streak, shieldsUsed: 0, shieldEarned: false };
+  if (u.last_daily_day === day)
+    return { ...rankOf(day, score, timeMs, guest), streak: u.daily_streak, shieldsUsed: 0, shieldEarned: false };
 
   // Consecutive day: the streak grows. Missed days are covered by shields, one each, if there are enough.
   const missed = u.last_daily_day ? daysBetween(u.last_daily_day, day) - 1 : Infinity;
@@ -113,18 +119,22 @@ export function recordDailyResult(userId: number, day: string, score: number, co
 }
 
 /** A streak only counts while it's alive: played today or yesterday, or the days missed since are covered by shields. */
-export function liveDailyStreak(u: Pick<UserRow, 'daily_streak' | 'last_daily_day' | 'streak_shields'>, today = dayKey()) {
+export function liveDailyStreak(
+  u: Pick<UserRow, 'daily_streak' | 'last_daily_day' | 'streak_shields'>,
+  today = dayKey(),
+) {
   if (!u.last_daily_day) return 0;
   return daysBetween(u.last_daily_day, today) - 1 <= u.streak_shields ? u.daily_streak : 0;
 }
 
 export function dailyInfo(userId: number): DailyInfo {
   const day = dayKey();
-  const mine = one<{ finished_at: number | null; score: number | null; correct: number | null; time_ms: number | null }>(
-    'SELECT finished_at, score, correct, time_ms FROM daily_results WHERE user_id = ? AND day = ?',
-    userId,
-    day,
-  );
+  const mine = one<{
+    finished_at: number | null;
+    score: number | null;
+    correct: number | null;
+    time_ms: number | null;
+  }>('SELECT finished_at, score, correct, time_ms FROM daily_results WHERE user_id = ? AND day = ?', userId, day);
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
      WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0 ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
@@ -132,7 +142,9 @@ export function dailyInfo(userId: number): DailyInfo {
   );
   const me = getUser(userId)!;
   const guest = me.is_guest === 1;
-  const played = mine?.finished_at ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, guest) } : null;
+  const played = mine?.finished_at
+    ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, guest) }
+    : null;
   return {
     day,
     endsAt: dayEndsAt(day),

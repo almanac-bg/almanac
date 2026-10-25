@@ -1,4 +1,13 @@
-import { CATEGORIES, type CategoryId, dayEndsAt, dayKey, levelFromXp, type ModeId, type QuestsInfo, type XpLine } from '@quiz/shared';
+import {
+  CATEGORIES,
+  type CategoryId,
+  dayEndsAt,
+  dayKey,
+  levelFromXp,
+  type ModeId,
+  type QuestsInfo,
+  type XpLine,
+} from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { seededRng } from './questions';
@@ -45,25 +54,96 @@ const categoryQuest = (c: (typeof CATEGORIES)[number]): QuestDef => ({
 const SLOTS: { level?: number; queue?: 'royale'; def: QuestDef }[][] = [
   [
     { def: { id: 'play3', icon: '🎮', text: 'Изиграй 3 мача', goal: 3, xp: 60, count: () => 1 } },
-    { def: { id: 'mp2', icon: '⚔️', text: 'Изиграй 2 мултиплейър мача', goal: 2, xp: 70, count: (e) => (e.multiplayer ? 1 : 0) } },
-    { def: { id: 'daily', icon: '📅', text: 'Изиграй дневното предизвикателство', goal: 1, xp: 60, count: (e) => (e.mode === 'daily' ? 1 : 0) } },
-  ],
-  [
-    { def: { id: 'correct25', icon: '✅', text: 'Отговори вярно на 25 въпроса', goal: 25, xp: 80, count: (e) => e.correct } },
-    { def: { id: 'hard4', icon: '🧠', text: 'Отговори вярно на 4 трудни въпроса', goal: 4, xp: 80, count: (e) => e.hardCorrect } },
     {
-      def: { id: 'streak6', icon: '🔥', text: 'Направи серия от 6 верни отговора в един мач', goal: 6, xp: 80, best: true, count: (e) => e.bestStreak },
+      def: {
+        id: 'mp2',
+        icon: '⚔️',
+        text: 'Изиграй 2 мултиплейър мача',
+        goal: 2,
+        xp: 70,
+        count: (e) => (e.multiplayer ? 1 : 0),
+      },
     },
     {
-      def: { id: 'win2', icon: '🏆', text: 'Спечели 2 мултиплейър мача', goal: 2, xp: 100, count: (e) => (e.multiplayer && e.won ? 1 : 0) },
+      def: {
+        id: 'daily',
+        icon: '📅',
+        text: 'Изиграй дневното предизвикателство',
+        goal: 1,
+        xp: 60,
+        count: (e) => (e.mode === 'daily' ? 1 : 0),
+      },
+    },
+  ],
+  [
+    {
+      def: {
+        id: 'correct25',
+        icon: '✅',
+        text: 'Отговори вярно на 25 въпроса',
+        goal: 25,
+        xp: 80,
+        count: (e) => e.correct,
+      },
+    },
+    {
+      def: {
+        id: 'hard4',
+        icon: '🧠',
+        text: 'Отговори вярно на 4 трудни въпроса',
+        goal: 4,
+        xp: 80,
+        count: (e) => e.hardCorrect,
+      },
+    },
+    {
+      def: {
+        id: 'streak6',
+        icon: '🔥',
+        text: 'Направи серия от 6 верни отговора в един мач',
+        goal: 6,
+        xp: 80,
+        best: true,
+        count: (e) => e.bestStreak,
+      },
+    },
+    {
+      def: {
+        id: 'win2',
+        icon: '🏆',
+        text: 'Спечели 2 мултиплейър мача',
+        goal: 2,
+        xp: 100,
+        count: (e) => (e.multiplayer && e.won ? 1 : 0),
+      },
     },
   ],
   [
     ...CATEGORIES.map((c) => ({ def: categoryQuest(c) })),
-    { queue: 'royale', def: { id: 'royale', icon: '👑', text: 'Изиграй мач Роял', goal: 1, xp: 80, count: (e) => (e.mode === 'royale' ? 1 : 0) } },
-    { level: 2, def: { id: 'jokers3', icon: '🃏', text: 'Използвай 3 жокера', goal: 3, xp: 60, count: (e) => e.jokers } },
     {
-      def: { id: 'challenge', icon: '🔗', text: 'Изиграй предизвикателство по линк', goal: 1, xp: 70, count: (e) => (e.mode === 'challenge' ? 1 : 0) },
+      queue: 'royale',
+      def: {
+        id: 'royale',
+        icon: '👑',
+        text: 'Изиграй мач Роял',
+        goal: 1,
+        xp: 80,
+        count: (e) => (e.mode === 'royale' ? 1 : 0),
+      },
+    },
+    {
+      level: 2,
+      def: { id: 'jokers3', icon: '🃏', text: 'Използвай 3 жокера', goal: 3, xp: 60, count: (e) => e.jokers },
+    },
+    {
+      def: {
+        id: 'challenge',
+        icon: '🔗',
+        text: 'Изиграй предизвикателство по линк',
+        goal: 1,
+        xp: 70,
+        count: (e) => (e.mode === 'challenge' ? 1 : 0),
+      },
     },
   ],
 ];
@@ -82,7 +162,11 @@ interface Row {
  * and stored, so they don't change during the day.
  */
 function todays(userId: number, day: string): Row[] {
-  const rows = all<Row>('SELECT quest, progress, done_at FROM quest_progress WHERE user_id = ? AND day = ?', userId, day)
+  const rows = all<Row>(
+    'SELECT quest, progress, done_at FROM quest_progress WHERE user_id = ? AND day = ?',
+    userId,
+    day,
+  )
     .filter((r) => r.quest !== BONUS)
     .sort((a, b) => (SLOT_OF.get(a.quest) ?? 9) - (SLOT_OF.get(b.quest) ?? 9));
   if (rows.length) return rows;
@@ -116,7 +200,12 @@ export function questsInfo(userId: number, day = dayKey()): QuestsInfo {
         done: row.done_at !== null,
       })),
     bonusXp: QUEST_BONUS_XP,
-    bonusDone: !!one('SELECT 1 AS x FROM quest_progress WHERE user_id = ? AND day = ? AND quest = ?', userId, day, BONUS),
+    bonusDone: !!one(
+      'SELECT 1 AS x FROM quest_progress WHERE user_id = ? AND day = ? AND quest = ?',
+      userId,
+      day,
+      BONUS,
+    ),
   };
 }
 
@@ -145,7 +234,13 @@ export function advanceQuests(userId: number, event: QuestEvent, day = dayKey())
     else open++;
   }
   if (lines.length && open === 0) {
-    const { changes } = run('INSERT OR IGNORE INTO quest_progress (user_id, day, quest, progress, done_at) VALUES (?, ?, ?, 1, ?)', userId, day, BONUS, now);
+    const { changes } = run(
+      'INSERT OR IGNORE INTO quest_progress (user_id, day, quest, progress, done_at) VALUES (?, ?, ?, 1, ?)',
+      userId,
+      day,
+      BONUS,
+      now,
+    );
     if (changes) lines.push({ label: 'Всички задачи за деня', amount: QUEST_BONUS_XP });
   }
   return lines;

@@ -39,7 +39,9 @@ export function ConnectionBanner() {
             exit={{ opacity: 0, y: -8 }}
             className={clsx(
               'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-xl backdrop-blur-xl',
-              state === 'offline' ? 'border-rose-400/40 bg-rose-950/85 text-rose-100' : 'border-emerald-400/40 bg-emerald-950/85 text-emerald-100',
+              state === 'offline'
+                ? 'border-rose-400/40 bg-rose-950/85 text-rose-100'
+                : 'border-emerald-400/40 bg-emerald-950/85 text-emerald-100',
             )}
           >
             {state === 'offline' ? (

@@ -1,10 +1,11 @@
+import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
 import {
   ACHIEVEMENTS,
   achievementById,
   CATEGORIES,
   levelProgress,
-  type ModeId,
   MODES,
+  type ModeId,
   type ProfileStats,
   RANK_TIERS,
   RARITIES,
@@ -20,7 +21,6 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
-import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
@@ -54,7 +54,9 @@ export function ProfilePage() {
           <Avatar avatar={user.avatar} frame={user.frame} size={112} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-violet-300">{titleName(user.title)}</p>
-            <h1 className="line-clamp-2 font-display text-3xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">{user.username}</h1>
+            <h1 className="line-clamp-2 font-display text-3xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">
+              {user.username}
+            </h1>
             <p className="mt-1 text-sm text-fg-3">
               Играе от {longDate(user.createdAt)} · {data.achievements.length}/{ACHIEVEMENTS.length} постижения
             </p>
@@ -70,10 +72,16 @@ export function ProfilePage() {
           </div>
           {isMe ? (
             <div className="flex flex-wrap gap-2">
-              <Link to="/locker" className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10">
+              <Link
+                to="/locker"
+                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10"
+              >
                 Промени визията
               </Link>
-              <Link to="/settings" className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10">
+              <Link
+                to="/settings"
+                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10"
+              >
                 Настройки
               </Link>
             </div>
@@ -96,7 +104,11 @@ export function ProfilePage() {
           <Stat
             label="Победи"
             value={fmt(o.wins)}
-            hint={o.multiplayerGames ? `${pct(o.wins, o.multiplayerGames)}% от ${fmt(o.multiplayerGames)} мултиплейър` : undefined}
+            hint={
+              o.multiplayerGames
+                ? `${pct(o.wins, o.multiplayerGames)}% от ${fmt(o.multiplayerGames)} мултиплейър`
+                : undefined
+            }
           />
           <Stat
             label="Точност"
@@ -104,7 +116,10 @@ export function ProfilePage() {
             hint={`${fmt(o.correctAnswers)} от ${fmt(o.questionsAnswered)} верни`}
           />
           <Stat label="Най-дълга серия" value={`🔥 ${o.bestStreak}`} />
-          <Stat label="Най-бърз верен отговор" value={o.fastestCorrectMs !== null ? seconds(o.fastestCorrectMs) : '—'} />
+          <Stat
+            label="Най-бърз верен отговор"
+            value={o.fastestCorrectMs !== null ? seconds(o.fastestCorrectMs) : '—'}
+          />
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
           <Stat label="Рекорд в Соло" value={fmt(o.bestSoloScore)} />
           <Stat label="Използвани жокери" value={fmt(o.powerupsUsed)} />
@@ -254,7 +269,11 @@ export function ProfilePage() {
                     <td
                       className={clsx(
                         'px-3 py-3 text-right tabular-nums',
-                        r.ratingDelta === null ? 'text-fg-3' : r.ratingDelta >= 0 ? 'text-emerald-300' : 'text-rose-300',
+                        r.ratingDelta === null
+                          ? 'text-fg-3'
+                          : r.ratingDelta >= 0
+                            ? 'text-emerald-300'
+                            : 'text-rose-300',
                       )}
                     >
                       {r.ratingDelta === null ? '—' : `${r.ratingDelta >= 0 ? '+' : ''}${r.ratingDelta}`}
@@ -356,6 +375,7 @@ function ReportButton({ username }: { username: string }) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         title="Докладвай"
         aria-label="Докладвай играча"
@@ -373,7 +393,13 @@ function ReportButton({ username }: { username: string }) {
                 reason === r.id ? 'border-rose-400/50 bg-rose-500/10' : 'border-line hover:bg-white/5',
               )}
             >
-              <input type="radio" name="reason" checked={reason === r.id} onChange={() => setReason(r.id)} className="accent-rose-400" />
+              <input
+                type="radio"
+                name="reason"
+                checked={reason === r.id}
+                onChange={() => setReason(r.id)}
+                className="accent-rose-400"
+              />
               {r.label}
             </label>
           ))}
@@ -418,6 +444,7 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
   });
   const BAR = '#a78bfa';
 
+  // biome-ignore-start lint/a11y/useSemanticElements: CSS-grid rows; a <table> restyled so can lose its semantics
   return (
     <div role="table" aria-label="Точност по категории" className="space-y-1">
       {rows.map((r) => {
@@ -470,4 +497,5 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
       <p className="pt-2 text-xs text-fg-3">Дял верни отговори от всички зададени въпроси в категорията.</p>
     </div>
   );
+  // biome-ignore-end lint/a11y/useSemanticElements: end of the grid-laid table
 }

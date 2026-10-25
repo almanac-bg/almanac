@@ -23,6 +23,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      # Formatting, lint rules and import order (Biome; `npm run format` fixes most of it).
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       # Sources, then the production bundle that ships in the Docker image.

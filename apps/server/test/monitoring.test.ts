@@ -32,7 +32,11 @@ after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-const lines = (body: string) => body.trim().split('\n').map((l) => JSON.parse(l));
+const lines = (body: string) =>
+  body
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l));
 
 test('a server error becomes a Sentry event with its stack, place and account number — nothing more', async () => {
   received.length = 0;
@@ -53,7 +57,10 @@ test('a server error becomes a Sentry event with its stack, place and account nu
   assert.deepEqual(event.user, { id: '7' });
   const [exception] = event.exception.values;
   assert.deepEqual([exception.type, exception.value], ['TypeError', 'boom']);
-  assert.ok(exception.stacktrace.frames.some((f: { filename: string }) => f.filename.endsWith('monitoring.test.ts')), 'with frames');
+  assert.ok(
+    exception.stacktrace.frames.some((f: { filename: string }) => f.filename.endsWith('monitoring.test.ts')),
+    'with frames',
+  );
 });
 
 test('the same error repeating is reported once, and a flood is capped', async () => {

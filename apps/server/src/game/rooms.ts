@@ -97,7 +97,8 @@ export class RoomManager {
     }
     if (room.kicked.has(userId)) return { ok: false, error: 'Домакинът те премахна от тази стая.' };
     if (room.game) return { ok: false, error: 'Играта в тази стая вече е започнала.' };
-    if (room.members.length + room.bots.length >= room.settings.maxPlayers) return { ok: false, error: 'Стаята е пълна.' };
+    if (room.members.length + room.bots.length >= room.settings.maxPlayers)
+      return { ok: false, error: 'Стаята е пълна.' };
     this.leave(userId);
     this.add(room, userId);
     return { ok: true, code: room.code };
@@ -216,12 +217,15 @@ export class RoomManager {
     if (room.game) return { ok: false, error: 'Играта вече тече.' };
     // Someone whose connection just dropped is still listed for a few seconds, but only players who are here play.
     const players = room.members.filter((id) => this.isOnline(id));
-    if (players.length + room.bots.length < 2) return { ok: false, error: 'Трябват поне двама играчи — покани приятел или добави бот.' };
-    if (players.some((id) => this.games.forUser(id))) return { ok: false, error: 'Някой от играчите още е в друга игра.' };
+    if (players.length + room.bots.length < 2)
+      return { ok: false, error: 'Трябват поне двама играчи — покани приятел или добави бот.' };
+    if (players.some((id) => this.games.forUser(id)))
+      return { ok: false, error: 'Някой от играчите още е в друга игра.' };
     const teams = room.settings.teams;
     const teamOf = (playerId: string) => (teams ? (room.teams.get(playerId) ?? 0) : null);
     const seated = [...players.map((id) => `u${id}`), ...room.bots.map((b) => b.player.id)];
-    if (teams && new Set(seated.map(teamOf)).size < 2) return { ok: false, error: 'И двата отбора трябва да имат поне по един играч.' };
+    if (teams && new Set(seated.map(teamOf)).size < 2)
+      return { ok: false, error: 'И двата отбора трябва да имат поне по един играч.' };
     try {
       room.game = this.games.start({
         mode: 'custom',
@@ -261,7 +265,10 @@ export class RoomManager {
     this.clearGrace(userId);
     this.graceTimers.set(
       userId,
-      setTimeout(guarded('room grace', () => this.leave(userId)), RECONNECT_GRACE_MS),
+      setTimeout(
+        guarded('room grace', () => this.leave(userId)),
+        RECONNECT_GRACE_MS,
+      ),
     );
   }
 
@@ -284,7 +291,7 @@ export class RoomManager {
   private rebalance(room: Room) {
     room.teams.clear();
     const ids = [...room.members.map(memberId), ...room.bots.map((b) => b.player.id)];
-    ids.forEach((id, i) => room.teams.set(id, (i % 2) as TeamId));
+    for (const [i, id] of ids.entries()) room.teams.set(id, (i % 2) as TeamId);
   }
 
   private hostRoom(userId: number) {
@@ -322,7 +329,8 @@ function sanitize(patch: Partial<RoomSettings>, current: RoomSettings, occupied:
   if (Number.isInteger(patch.maxPlayers)) {
     next.maxPlayers = Math.min(maxPlayers, Math.max(minPlayers, occupied, patch.maxPlayers!));
   }
-  if ((ROOM_LIMITS.questions as readonly number[]).includes(patch.questions as number)) next.questions = patch.questions!;
+  if ((ROOM_LIMITS.questions as readonly number[]).includes(patch.questions as number))
+    next.questions = patch.questions!;
   if ((ROOM_LIMITS.timeMs as readonly number[]).includes(patch.timeMs as number)) next.timeMs = patch.timeMs!;
   if (isCategoryChoice(patch.category)) next.category = patch.category;
   if (typeof patch.elimination === 'boolean') next.elimination = patch.elimination;

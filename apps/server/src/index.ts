@@ -6,14 +6,14 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { ServerBusyError } from './auth';
 import { challengePreview } from './challenges';
 import { config } from './config';
-import { forwardEnvelope, publicDsn, reportError } from './monitoring';
-import { throttled } from './throttle';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
+import { forwardEnvelope, publicDsn, reportError } from './monitoring';
 import { questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
 import { securityHeaders } from './security';
+import { throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
 
@@ -70,12 +70,18 @@ if (fs.existsSync(config.webDist)) {
   // never the page (a tab from an older deploy then reloads instead of running HTML as JavaScript).
   app.use(
     '/assets',
-    express.static(path.join(config.webDist, 'assets'), { index: false, maxAge: '1y', immutable: true, fallthrough: false }),
+    express.static(path.join(config.webDist, 'assets'), {
+      index: false,
+      maxAge: '1y',
+      immutable: true,
+      fallthrough: false,
+    }),
   );
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   app.use((req, res, next) => {
     // HEAD too: uptime monitors often check with it.
-    if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
+    if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api') || req.path.startsWith('/socket.io'))
+      return next();
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
     res.setHeader('cache-control', 'no-cache');
     const challenge = /^\/c\/([\w-]{4,16})\/?$/.exec(req.path)?.[1];

@@ -1,14 +1,25 @@
+import { api, fmt, setState } from '@quiz/client';
 import { BRAND, type ChallengePreview, MODES } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeft, DoorOpen, Eye, EyeOff, LogIn, MailCheck, RotateCcw, Swords, TriangleAlert, Zap } from 'lucide-react';
+import {
+  ArrowLeft,
+  DoorOpen,
+  Eye,
+  EyeOff,
+  LogIn,
+  MailCheck,
+  RotateCcw,
+  Swords,
+  TriangleAlert,
+  Zap,
+} from 'lucide-react';
 import { motion } from 'motion/react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../components/Avatar';
+import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented, Spinner } from '../components/ui';
-import { api, fmt, setState } from '@quiz/client';
-import { LegalLinks } from '../components/LegalLinks';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isReturning, markReturning } from '../lib/returning';
 
@@ -50,6 +61,7 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [guestBusy, setGuestBusy] = useState(false);
+  const id = useId();
   const [guestError, setGuestError] = useState<string | null>(null);
 
   const preview = useLoad<ChallengePreview | null>(
@@ -64,7 +76,9 @@ export function AuthPage() {
     setBusy(true);
     try {
       const { user } =
-        mode === 'login' ? await api.login(username, password) : await api.register(username, password, email.trim() || undefined);
+        mode === 'login'
+          ? await api.login(username, password)
+          : await api.register(username, password, email.trim() || undefined);
       markReturning();
       setState({ me: user });
     } catch (err) {
@@ -90,7 +104,11 @@ export function AuthPage() {
   }
 
   // A live challenge: the guest account opens it with "accept" pressed. A dead link: the lobby.
-  const guestLanding: GuestLanding = challengeId ? (playable ? { to: pathname, state: { accept: true } } : { to: '/' }) : null;
+  const guestLanding: GuestLanding = challengeId
+    ? playable
+      ? { to: pathname, state: { accept: true } }
+      : { to: '/' }
+    : null;
 
   const guest = (
     <GuestPlay
@@ -109,7 +127,7 @@ export function AuthPage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         {FLOATERS.map((e, i) => (
           <span
-            key={i}
+            key={e}
             className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
             style={{
               left: `${(i * 37) % 95}%`,
@@ -142,7 +160,12 @@ export function AuthPage() {
           <Logo />
         </h1>
         <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
-        <p className={clsx('mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl', (inviteCode || challengeId) && 'max-sm:hidden')}>
+        <p
+          className={clsx(
+            'mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl',
+            (inviteCode || challengeId) && 'max-sm:hidden',
+          )}
+        >
           Бързи въпроси. Истински съперници. <span className="text-fg">Кой е най-умният в стаята?</span>
         </p>
       </motion.header>
@@ -181,6 +204,7 @@ export function AuthPage() {
             <>
               {challengeId && (
                 <button
+                  type="button"
                   onClick={() => setFormOpen(false)}
                   className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
                 >
@@ -191,8 +215,8 @@ export function AuthPage() {
                 <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
                   <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
                   <span>
-                    Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез като гост или с
-                    профила си, за да се присъединиш.
+                    Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез като
+                    гост или с профила си, за да се присъединиш.
                   </span>
                 </p>
               )}
@@ -218,14 +242,21 @@ export function AuthPage() {
                 {mode === 'login' ? 'Здравей отново!' : 'Създай профил'}
               </h2>
               <p className="mt-1 text-sm text-fg-3">
-                {mode === 'login' ? 'Влез и продължи там, където спря.' : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
+                {mode === 'login'
+                  ? 'Влез и продължи там, където спря.'
+                  : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
               </p>
               <form onSubmit={submit} className="mt-6 space-y-4">
-                <Field label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}>
+                <Field
+                  label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
+                  htmlFor={`${id}-username`}
+                >
                   <input
+                    id={`${id}-username`}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     autoComplete="username"
+                    // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
                     autoFocus={DESKTOP && returning}
                     required
                     minLength={mode === 'register' ? 3 : 1}
@@ -235,8 +266,9 @@ export function AuthPage() {
                   />
                 </Field>
                 {mode === 'register' && (
-                  <Field label="Имейл (по желание)">
+                  <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
                     <input
+                      id={`${id}-email`}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       type="email"
@@ -246,9 +278,10 @@ export function AuthPage() {
                     />
                   </Field>
                 )}
-                <Field label="Парола">
+                <Field label="Парола" htmlFor={`${id}-password`}>
                   <div className="relative">
                     <input
+                      id={`${id}-password`}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       type={show ? 'text' : 'password'}
@@ -291,7 +324,13 @@ export function AuthPage() {
                   {error}
                 </div>
 
-                <Button type="submit" size="lg" variant={returning ? 'primary' : 'secondary'} className="w-full" loading={busy}>
+                <Button
+                  type="submit"
+                  size="lg"
+                  variant={returning ? 'primary' : 'secondary'}
+                  className="w-full"
+                  loading={busy}
+                >
                   {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
                 </Button>
               </form>
@@ -432,6 +471,7 @@ function ChallengeLanding({
 
   const signIn = (
     <button
+      type="button"
       onClick={onSignIn}
       className="focus-ring mx-auto mt-3 flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-violet-300 hover:text-violet-200"
     >
@@ -467,9 +507,16 @@ function ChallengeLanding({
   const { creator, topScore, players, expired } = preview;
   return (
     <div>
-      <p className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase" style={{ color: mode.accent[0] }}>
+      <p
+        className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase"
+        style={{ color: mode.accent[0] }}
+      >
         <Swords aria-hidden className="size-3.5" /> Предизвикателство
-        {expired && <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">Изтекло</span>}
+        {expired && (
+          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">
+            Изтекло
+          </span>
+        )}
       </p>
       {/* On the narrowest phones the title goes under the avatar rather than breaking a word. */}
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -505,7 +552,8 @@ function ChallengeLanding({
       {expired ? (
         <>
           <p className="mt-5 text-sm text-fg-2">
-            Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и дневното предизвикателство те чакат.
+            Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и дневното предизвикателство
+            те чакат.
           </p>
           <Button size="lg" className="mt-5 w-full" loading={busy} onClick={onPlay}>
             <Zap aria-hidden className="size-5" /> Играй като гост
@@ -517,7 +565,8 @@ function ChallengeLanding({
             <Swords aria-hidden className="size-5 max-sm:hidden" /> Приеми предизвикателството
           </Button>
           <p className="mt-2.5 text-center text-sm text-fg-3">
-            Играеш веднага като гост, без регистрация. Прогресът се пази — запазваш профила с име и парола, когато решиш.
+            Играеш веднага като гост, без регистрация. Прогресът се пази — запазваш профила с име и парола, когато
+            решиш.
           </p>
         </>
       )}
@@ -539,6 +588,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => void }) {
   const [login, setLogin] = useState(initial);
+  const id = useId();
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -560,6 +610,7 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
   return (
     <div>
       <button
+        type="button"
         onClick={onBack}
         className="focus-ring -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
       >
@@ -570,15 +621,27 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
         <div className="mt-4 space-y-3 text-sm text-fg-2">
           <p className="rounded-2xl bg-emerald-500/10 p-4 text-emerald-200">
             <MailCheck className="mb-2 size-6" />
-            Ако профилът има потвърден имейл, изпратихме линк за нова парола. Провери пощата си (и папката за спам). Линкът е валиден 1 час.
+            Ако профилът има потвърден имейл, изпратихме линк за нова парола. Провери пощата си (и папката за спам).
+            Линкът е валиден 1 час.
           </p>
           <p className="text-fg-3">Без потвърден имейл паролата не може да се възстанови — тогава създай нов профил.</p>
         </div>
       ) : (
         <form onSubmit={submit} className="mt-4 space-y-4">
-          <p className="text-sm text-fg-3">Въведи потребителското си име или потвърдения си имейл. Ще ти изпратим линк за нова парола.</p>
-          <Field label="Потребителско име или имейл">
-            <input value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus={DESKTOP} autoComplete="username" className={INPUT} />
+          <p className="text-sm text-fg-3">
+            Въведи потребителското си име или потвърдения си имейл. Ще ти изпратим линк за нова парола.
+          </p>
+          <Field label="Потребителско име или имейл" htmlFor={id}>
+            <input
+              id={id}
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              required
+              // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
+              autoFocus={DESKTOP}
+              autoComplete="username"
+              className={INPUT}
+            />
           </Field>
           {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
@@ -590,11 +653,14 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/** A label above its input, tied to it by id: wrapping both would add the show-password toggle to the input's name. */
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">{label}</span>
+    <div>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+        {label}
+      </label>
       {children}
-    </label>
+    </div>
   );
 }

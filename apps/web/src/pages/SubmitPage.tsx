@@ -1,14 +1,14 @@
-import { categoryById, type QuestionDraft, type Submission, SUBMISSION_RULES } from '@quiz/shared';
+import { api, timeAgo, toast, useStore } from '@quiz/client';
+import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
 import { Lock, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { GuestNudge } from '../components/ClaimAccount';
 import { DraftEditor } from '../components/questions/DraftEditor';
+import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
-import { api, timeAgo, toast, useStore } from '@quiz/client';
 
 export function SubmitPage() {
   const me = useStore((s) => s.me)!;
@@ -24,7 +24,9 @@ export function SubmitPage() {
         </p>
       </div>
       {me.isGuest ? (
-        <GuestNudge>Въпросите влизат в играта с името на автора — запази профила си с име и парола, за да предлагаш.</GuestNudge>
+        <GuestNudge>
+          Въпросите влизат в играта с името на автора — запази профила си с име и парола, за да предлагаш.
+        </GuestNudge>
       ) : unlocked ? (
         <SubmitForm />
       ) : (
@@ -94,7 +96,8 @@ function SubmitForm() {
         <p className="mb-3 text-xs font-bold tracking-widest text-fg-3 uppercase">Преглед</p>
         <QuestionPreview draft={draft} />
         <p className="mt-4 text-xs text-fg-3">
-          Съвет: един безспорно верен отговор и три правдоподобни грешни. Без въпроси, чийто отговор се променя с времето.
+          Съвет: един безспорно верен отговор и три правдоподобни грешни. Без въпроси, чийто отговор се променя с
+          времето.
         </p>
       </div>
     </div>
@@ -128,7 +131,11 @@ function MySubmissions() {
         </div>
       ) : items.length === 0 ? (
         <Card>
-          <EmptyState icon="✍️" title="Още нямаш предложения" body="Първият ти одобрен въпрос отключва постижението „Автор“." />
+          <EmptyState
+            icon="✍️"
+            title="Още нямаш предложения"
+            body="Първият ти одобрен въпрос отключва постижението „Автор“."
+          />
         </Card>
       ) : (
         <Card className="divide-y divide-line">
@@ -144,7 +151,10 @@ function MySubmissions() {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5"
                 >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/5 text-xl" title={cat.name}>
+                  <span
+                    className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/5 text-xl"
+                    title={cat.name}
+                  >
                     {cat.icon}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -152,9 +162,13 @@ function MySubmissions() {
                     <p className="mt-0.5 text-xs text-fg-3">
                       Верен: <span className="text-emerald-300">{s.options[s.answer]}</span> · {timeAgo(s.createdAt)}
                     </p>
-                    {s.status === 'rejected' && s.reason && <p className="mt-1 text-xs text-rose-300">Причина: {s.reason}</p>}
+                    {s.status === 'rejected' && s.reason && (
+                      <p className="mt-1 text-xs text-rose-300">Причина: {s.reason}</p>
+                    )}
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                    {status.label}
+                  </span>
                 </motion.div>
               );
             })}

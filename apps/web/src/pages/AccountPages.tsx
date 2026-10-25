@@ -1,3 +1,4 @@
+import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
 import clsx from 'clsx';
 import {
   Check,
@@ -24,50 +25,55 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Modal, Spinner } from '../components/ui';
-import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 
 const INPUT =
   'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
 
-function PasswordInput({
+/** A labelled password input with a show/hide toggle (the label names the input alone, not the toggle). */
+function PasswordField({
+  label,
   value,
   onChange,
   autoComplete,
   placeholder,
 }: {
+  label: string;
   value: string;
   onChange: (v: string) => void;
   autoComplete: string;
   placeholder?: string;
 }) {
+  const id = useId();
   const [show, setShow] = useState(false);
   return (
-    <div className="relative">
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        type={show ? 'text' : 'password'}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        required
-        className={`${INPUT} pr-12`}
-      />
-      <button
-        type="button"
-        onClick={() => setShow(!show)}
-        aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-        className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
-      >
-        {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
-      </button>
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          type={show ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          required
+          className={`${INPUT} pr-12`}
+        />
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
+          className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+        >
+          {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+        </button>
+      </div>
     </div>
   );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">{children}</span>;
 }
 
 /** Standalone screen used by the email links (works signed in or out). */
@@ -119,14 +125,14 @@ export function ResetPasswordPage() {
         <p className="mt-3 text-sm text-rose-300">Линкът е непълен. Отвори го отново от писмото.</p>
       ) : (
         <form onSubmit={submit} className="mt-5 space-y-4">
-          <label className="block">
-            <Label>Нова парола</Label>
-            <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" placeholder="поне 6 символа" />
-          </label>
-          <label className="block">
-            <Label>Повтори паролата</Label>
-            <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
-          </label>
+          <PasswordField
+            label="Нова парола"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            placeholder="поне 6 символа"
+          />
+          <PasswordField label="Повтори паролата" value={confirm} onChange={setConfirm} autoComplete="new-password" />
           {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Запази и влез
@@ -273,8 +279,8 @@ function LogoutButton() {
             </p>
             <p className="mt-2 text-fg-2">
               Играеш като гост, без име и парола — след изход няма как да влезеш отново в{' '}
-              <b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>. Нивото, серията и всичко изиграно се губят
-              завинаги.
+              <b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>. Нивото, серията и всичко изиграно се
+              губят завинаги.
             </p>
           </div>
           <p className="mt-4 text-sm text-fg-2">Запази прогреса с име и парола — отнема 10 секунди.</p>
@@ -292,7 +298,12 @@ function LogoutButton() {
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Отказ
             </Button>
-            <Button variant="ghost" className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={logout} loading={busy}>
+            <Button
+              variant="ghost"
+              className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+              onClick={logout}
+              loading={busy}
+            >
               <LogOut className="size-4" /> Излез без запазване
             </Button>
           </div>
@@ -319,7 +330,8 @@ function LogoutButton() {
             <p className="mt-2 text-fg-2">
               {me.pendingEmail ? (
                 <>
-                  Линкът за потвърждение до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b> още не е отворен.{' '}
+                  Линкът за потвърждение до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b> още не
+                  е отворен.{' '}
                 </>
               ) : null}
               Ако забравиш паролата, профилът не може да бъде възстановен. Запомни името{' '}
@@ -382,6 +394,7 @@ function SwitchCard({
           </p>
         </div>
         <button
+          type="button"
           role="switch"
           aria-checked={on}
           aria-labelledby={`${id}-label`}
@@ -447,7 +460,12 @@ function ReminderSettings() {
       setState({ me: user });
       toast(
         user.streakReminders
-          ? { kind: 'success', icon: '🔥', title: 'Напомнянето е включено', body: 'Ще ти пишем вечерта, ако серията ти е в опасност.' }
+          ? {
+              kind: 'success',
+              icon: '🔥',
+              title: 'Напомнянето е включено',
+              body: 'Ще ти пишем вечерта, ако серията ти е в опасност.',
+            }
           : { kind: 'info', title: 'Напомнянето е изключено' },
       );
     } catch (err) {
@@ -463,8 +481,8 @@ function ReminderSettings() {
       title="Напомняне за серията"
       hint={
         <>
-          Имейл вечерта, ако серията ти от дневни предизвикателства ще изгори в полунощ, защото днешното още чака. Най-много
-          едно писмо на ден; спираш го оттук или от линка във всяко писмо.
+          Имейл вечерта, ако серията ти от дневни предизвикателства ще изгори в полунощ, защото днешното още чака.
+          Най-много едно писмо на ден; спираш го оттук или от линка във всяко писмо.
           {blocked && <span className="sr-only"> Нужен е потвърден имейл.</span>}
         </>
       }
@@ -479,8 +497,8 @@ function ReminderSettings() {
           <span className="min-w-0 flex-1 basis-48 text-fg-2">
             {me.pendingEmail ? (
               <>
-                Отвори линка, който изпратихме до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b>, и после
-                включи напомнянето.
+                Отвори линка, който изпратихме до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b>,
+                и после включи напомнянето.
               </>
             ) : (
               'Нужен е потвърден имейл — добави го по-горе.'
@@ -513,8 +531,8 @@ function ClaimSettings() {
         <h2 className="font-display text-lg font-bold">Запази прогреса</h2>
       </div>
       <p className="mt-1 text-sm text-fg-2">
-        Играеш като гост: профилът е само на това устройство. Ако излезеш или изчистиш данните на браузъра, нивото, серията и
-        всичко изиграно се губят. С име и парола остават твои — и получаваш:
+        Играеш като гост: профилът е само на това устройство. Ако излезеш или изчистиш данните на браузъра, нивото,
+        серията и всичко изиграно се губят. С име и парола остават твои — и получаваш:
       </p>
       <ul className="mt-3 space-y-1.5 text-sm text-fg-2">
         {CLAIM_PERKS.map((perk) => (
@@ -575,7 +593,11 @@ function DataSettings() {
             <Download className="size-4" /> Изтегли данните си
           </Button>
         </a>
-        <Button variant="ghost" className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={() => setOpen(true)}>
+        <Button
+          variant="ghost"
+          className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+          onClick={() => setOpen(true)}
+        >
           <Trash2 className="size-4" /> Изтрий профила
         </Button>
       </div>
@@ -588,10 +610,12 @@ function DataSettings() {
               : 'Профилът, нивото, статистиката, постиженията и приятелите ти ще бъдат изтрити завинаги. Това не може да се отмени.'}
           </p>
           {!guest && (
-            <label className="block">
-              <Label>Потвърди с паролата си</Label>
-              <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
-            </label>
+            <PasswordField
+              label="Потвърди с паролата си"
+              value={password}
+              onChange={setPassword}
+              autoComplete="current-password"
+            />
           )}
           {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -773,14 +797,14 @@ function PasswordSettings() {
         <h2 className="font-display text-lg font-bold">Парола</h2>
       </div>
       <form onSubmit={submit} className="mt-4 space-y-4">
-        <label className="block">
-          <Label>Текуща парола</Label>
-          <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" />
-        </label>
-        <label className="block">
-          <Label>Нова парола</Label>
-          <PasswordInput value={next} onChange={setNext} autoComplete="new-password" placeholder="поне 6 символа" />
-        </label>
+        <PasswordField label="Текуща парола" value={current} onChange={setCurrent} autoComplete="current-password" />
+        <PasswordField
+          label="Нова парола"
+          value={next}
+          onChange={setNext}
+          autoComplete="new-password"
+          placeholder="поне 6 символа"
+        />
         {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
         <Button type="submit" loading={busy}>
           Смени паролата

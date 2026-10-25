@@ -67,7 +67,10 @@ export class Rematches {
       mode,
       players: new Map(stayed.map((p) => [p.player.id, p.player.userId!])),
       ready: new Set(),
-      timer: setTimeout(guarded('rematch expiry', () => this.close(offer, true)), REMATCH_MS),
+      timer: setTimeout(
+        guarded('rematch expiry', () => this.close(offer, true)),
+        REMATCH_MS,
+      ),
     };
     offer.timer.unref();
     this.offers.set(game.id, offer);
@@ -81,7 +84,12 @@ export class Rematches {
   }
 
   private broadcast(offer: Offer, cancelled: boolean) {
-    const state: RematchState = { gameId: offer.gameId, ready: [...offer.ready], players: [...offer.players.keys()], cancelled };
+    const state: RematchState = {
+      gameId: offer.gameId,
+      ready: [...offer.ready],
+      players: [...offer.players.keys()],
+      cancelled,
+    };
     for (const userId of offer.players.values()) this.io.to(`user:${userId}`).emit('rematch:state', state);
   }
 }

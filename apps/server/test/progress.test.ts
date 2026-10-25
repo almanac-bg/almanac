@@ -25,7 +25,13 @@ const DAY = 24 * 60 * 60_000;
 let nextId = 1;
 function user(fields: Record<string, string | number | null> = {}) {
   const id = nextId++;
-  run("INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (?, ?, ?, 'x', ?)", id, `p${id}`, `p${id}`, Date.now());
+  run(
+    "INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (?, ?, ?, 'x', ?)",
+    id,
+    `p${id}`,
+    `p${id}`,
+    Date.now(),
+  );
   for (const [column, value] of Object.entries(fields)) run(`UPDATE users SET ${column} = ? WHERE id = ?`, value, id);
   return id;
 }
@@ -35,19 +41,36 @@ test('daily quests: three a day that stay put, paid once each, plus a bonus for 
   const day = '2026-10-25';
   const first = questsInfo(id, day);
   assert.equal(first.quests.length, 3);
-  assert.deepEqual(questsInfo(id, day).quests.map((q) => q.id), first.quests.map((q) => q.id), 'the same quests all day');
+  assert.deepEqual(
+    questsInfo(id, day).quests.map((q) => q.id),
+    first.quests.map((q) => q.id),
+    'the same quests all day',
+  );
 
   // A match that does a lot of everything, in three different modes, finishes any combination of quests.
   const big = { multiplayer: true, won: true, correct: 40, hardCorrect: 10, bestStreak: 10, jokers: 5 };
   const correctByCategory = new Map(CATEGORY_IDS.map((c) => [c, 10]));
-  const lines = (['daily', 'royale', 'challenge'] as const).flatMap((mode) => advanceQuests(id, { ...big, mode, correctByCategory }, day));
+  const lines = (['daily', 'royale', 'challenge'] as const).flatMap((mode) =>
+    advanceQuests(id, { ...big, mode, correctByCategory }, day),
+  );
   const after = questsInfo(id, day);
-  assert.ok(after.quests.every((q) => q.done && q.progress === q.goal), JSON.stringify(after.quests));
+  assert.ok(
+    after.quests.every((q) => q.done && q.progress === q.goal),
+    JSON.stringify(after.quests),
+  );
   assert.ok(after.bonusDone);
   assert.equal(lines.filter((l) => l.label.startsWith('Задача:')).length, 3, 'each quest pays once');
   assert.equal(lines.filter((l) => l.amount === QUEST_BONUS_XP && l.label === 'Всички задачи за деня').length, 1);
-  assert.deepEqual(advanceQuests(id, { ...big, mode: 'daily', correctByCategory }, day), [], 'nothing more to earn today');
-  assert.notDeepEqual(questsInfo(id, '2026-10-26').quests.map((q) => q.progress), after.quests.map((q) => q.progress), 'a new day starts fresh');
+  assert.deepEqual(
+    advanceQuests(id, { ...big, mode: 'daily', correctByCategory }, day),
+    [],
+    'nothing more to earn today',
+  );
+  assert.notDeepEqual(
+    questsInfo(id, '2026-10-26').quests.map((q) => q.progress),
+    after.quests.map((q) => q.progress),
+    'a new day starts fresh',
+  );
 });
 
 test('streak shields: earned every 7 days, spent on a missed day instead of the streak', () => {
@@ -70,7 +93,13 @@ test('the streak reminder goes out in the evening, once a day, with a working un
   const evening = sofiaMidnight(2026, 11, 10) + 19.5 * 60 * 60_000;
   const today = dayKey(evening);
   const outbox = () => (fs.existsSync(process.env.MAIL_OUTBOX!) ? fs.readdirSync(process.env.MAIL_OUTBOX!) : []);
-  const opted = user({ email: 'streak@example.com', streak_reminders: 1, reminder_key: 'secret', daily_streak: 5, last_daily_day: shiftDay(today, -1) });
+  const opted = user({
+    email: 'streak@example.com',
+    streak_reminders: 1,
+    reminder_key: 'secret',
+    daily_streak: 5,
+    last_daily_day: shiftDay(today, -1),
+  });
   user({ email: 'quiet@example.com', streak_reminders: 0, daily_streak: 5, last_daily_day: shiftDay(today, -1) });
   user({ email: 'done@example.com', streak_reminders: 1, reminder_key: 'k', daily_streak: 5, last_daily_day: today });
 
@@ -108,6 +137,9 @@ test('launch statistics: daily counters, and returns counted against the day a p
   const at = (day: string) => days.find((d) => d.day === day)!.values;
   assert.equal(days[0].day, today, 'newest first');
   assert.equal(at(today).active, 3);
-  assert.deepEqual([at(shiftDay(today, -1)).guests, at(shiftDay(today, -1)).signups, at(shiftDay(today, -1)).returned_d1], [1, 2, 1]);
+  assert.deepEqual(
+    [at(shiftDay(today, -1)).guests, at(shiftDay(today, -1)).signups, at(shiftDay(today, -1)).returned_d1],
+    [1, 2, 1],
+  );
   assert.equal(at(shiftDay(today, -7)).returned_d7, 1);
 });

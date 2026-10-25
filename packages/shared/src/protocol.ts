@@ -477,7 +477,7 @@ export interface QuestionInfo {
 /** Open reports about one question, for the moderation queue. */
 export interface QuestionReportGroup {
   question: QuestionInfo;
-  reports: { reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
+  reports: { id: number; reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
 }
 
 export type QuestionReportAction = 'dismiss' | 'hide';

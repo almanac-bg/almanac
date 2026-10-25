@@ -2,7 +2,10 @@ import { expect, me, signIn, startAsGuest, test, uniqueName } from './support';
 
 // Both ways a guest gets to "Запази прогреса": the "Гост" button in the header, and Settings.
 for (const via of ['header', 'settings'] as const) {
-  test(`a guest saves the account (from ${via}) and signs in with it on another device`, async ({ page, newPlayer }) => {
+  test(`a guest saves the account (from ${via}) and signs in with it on another device`, async ({
+    page,
+    newPlayer,
+  }) => {
     const username = uniqueName('Иван');
     const password = 'zapazi-me-42';
 

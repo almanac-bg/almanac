@@ -1,6 +1,6 @@
+import { dismissToast, useStore } from '@quiz/client';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'motion/react';
-import { dismissToast, useStore } from '@quiz/client';
 
 /** Notifications. Screen readers hear them too: errors interrupt, everything else waits its turn. */
 export function Toasts() {

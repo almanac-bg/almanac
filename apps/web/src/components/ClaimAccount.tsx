@@ -1,6 +1,6 @@
 import { api, setState, toast, useStore } from '@quiz/client';
 import { Eye, EyeOff, Save } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { markReturning } from '../lib/returning';
 import { Button, Modal } from './ui';
 
@@ -11,13 +11,22 @@ const INPUT =
  * A guest picks a name and password (and maybe an email): the same account from then on, with all its XP, streak and
  * history. `reason` says why it's being asked for (e.g. "За да добавяш приятели…").
  */
-export function ClaimAccountModal({ open, onClose, reason }: { open: boolean; onClose: () => void; reason?: ReactNode }) {
+export function ClaimAccountModal({
+  open,
+  onClose,
+  reason,
+}: {
+  open: boolean;
+  onClose: () => void;
+  reason?: ReactNode;
+}) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const id = useId();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -27,7 +36,14 @@ export function ClaimAccountModal({ open, onClose, reason }: { open: boolean; on
       const { user } = await api.claim(username.trim(), password, email.trim() || undefined);
       markReturning();
       setState({ me: user });
-      toast({ kind: 'success', title: 'Профилът е запазен!', body: `Вече влизаш като ${user.username} — от всяко устройство.` }, 6000);
+      toast(
+        {
+          kind: 'success',
+          title: 'Профилът е запазен!',
+          body: `Вече влизаш като ${user.username} — от всяко устройство.`,
+        },
+        6000,
+      );
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Нещо се обърка.');
@@ -42,8 +58,9 @@ export function ClaimAccountModal({ open, onClose, reason }: { open: boolean; on
         {reason ?? 'Избери име и парола — нивото, серията и всичко изиграно досега остават твои, на всяко устройство.'}
       </p>
       <form onSubmit={submit} className="mt-5 space-y-4">
-        <Field label="Потребителско име">
+        <Field label="Потребителско име" htmlFor={`${id}-username`}>
           <input
+            id={`${id}-username`}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
@@ -54,9 +71,10 @@ export function ClaimAccountModal({ open, onClose, reason }: { open: boolean; on
             className={INPUT}
           />
         </Field>
-        <Field label="Парола">
+        <Field label="Парола" htmlFor={`${id}-password`}>
           <div className="relative">
             <input
+              id={`${id}-password`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type={show ? 'text' : 'password'}
@@ -76,8 +94,9 @@ export function ClaimAccountModal({ open, onClose, reason }: { open: boolean; on
             </button>
           </div>
         </Field>
-        <Field label="Имейл (по желание)">
+        <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
           <input
+            id={`${id}-email`}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
@@ -105,7 +124,9 @@ export function GuestNudge({ className = '', children }: { className?: string; c
   const [open, setOpen] = useState(false);
   if (!guest) return null;
   return (
-    <div className={`flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-4 ${className}`}>
+    <div
+      className={`flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-4 ${className}`}
+    >
       <p className="min-w-0 flex-1 basis-56 text-sm text-amber-100">
         {children ?? 'Играеш като гост: прогресът е само на това устройство. Запази го с име и парола.'}
       </p>
@@ -117,11 +138,14 @@ export function GuestNudge({ className = '', children }: { className?: string; c
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/** A label above its input, tied to it by id: wrapping both would add the show-password toggle to the input's name. */
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">{label}</span>
+    <div>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+        {label}
+      </label>
       {children}
-    </label>
+    </div>
   );
 }

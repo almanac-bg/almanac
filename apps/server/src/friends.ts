@@ -57,7 +57,9 @@ export function incomingRequests(userId: number): number {
 const PRESENCE_ORDER = { game: 0, room: 1, queue: 2, online: 3, offline: 4 } as const;
 
 export function listFriends(userId: number): FriendsResponse {
-  const rows = all<UserRow & { requested_by: number; status: Row['status']; since_created: number; accepted_at: number | null }>(
+  const rows = all<
+    UserRow & { requested_by: number; status: Row['status']; since_created: number; accepted_at: number | null }
+  >(
     `SELECT u.*, f.requested_by, f.status, f.created_at AS since_created, f.accepted_at
      FROM friendships f JOIN users u ON u.id = CASE WHEN f.user_a = ? THEN f.user_b ELSE f.user_a END
      WHERE f.user_a = ? OR f.user_b = ?`,

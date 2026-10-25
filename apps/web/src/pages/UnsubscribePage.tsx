@@ -1,9 +1,9 @@
+import { api, refreshMe, useStore } from '@quiz/client';
 import { BellOff, CheckCircle2, XCircle } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Logo } from '../components/NavBar';
 import { Button, Card } from '../components/ui';
-import { api, refreshMe, useStore } from '@quiz/client';
 
 /** Standalone screen for the email link (works signed in or out), like the other email-link pages. */
 function Centered({ children }: { children: ReactNode }) {
@@ -72,7 +72,8 @@ export function UnsubscribePage() {
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
           <h1 className="mt-3 font-display text-2xl font-bold">Напомнянията са спрени</h1>
           <p className="mt-2 text-sm text-fg-2">
-            Няма да получаваш повече писма за серията. Ако ги искаш обратно, включи ги от Настройки → „Напомняне за серията“.
+            Няма да получаваш повече писма за серията. Ако ги искаш обратно, включи ги от Настройки → „Напомняне за
+            серията“.
           </p>
           {home}
         </div>
@@ -85,8 +86,8 @@ export function UnsubscribePage() {
       <BellOff className="size-8 text-violet-300" />
       <h1 className="mt-3 font-display text-2xl font-bold">Напомняния за серията</h1>
       <p className="mt-2 text-sm text-fg-2">
-        Тези писма идват вечерта, когато серията ти от дневни предизвикателства ще изгори в полунощ. Не ги искаш? Спри ги с
-        един бутон — серията и профилът ти остават, както са.
+        Тези писма идват вечерта, когато серията ти от дневни предизвикателства ще изгори в полунощ. Не ги искаш? Спри
+        ги с един бутон — серията и профилът ти остават, както са.
       </p>
       {typeof state === 'object' && (
         <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">

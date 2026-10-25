@@ -1,4 +1,5 @@
-import { categoryById, emoteById, type GamePlayer, MODES, type Standing, type TeamId, TEAMS } from '@quiz/shared';
+import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
+import { categoryById, emoteById, type GamePlayer, MODES, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Flame, Skull, Users, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -12,7 +13,6 @@ import { ConnectionBanner } from '../components/game/ConnectionBanner';
 import { ActiveJokers, type JokerGuide, PowerupBar, useJokerGuide } from '../components/game/Jokers';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
 import { Button, Modal, Spinner } from '../components/ui';
-import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
 import { useCountUp } from '../lib/hooks';
 import { sfx, useMuted } from '../lib/sound';
 import { Results } from './Results';
@@ -75,7 +75,12 @@ function Arena({ game }: { game: LiveGame }) {
             ) : game.question ? (
               <QuestionView key={`q${game.question.index}`} game={game} jokers={jokers} offline={offline} />
             ) : (
-              <motion.div key="wait" className="grid place-items-center py-32 text-fg-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <motion.div
+                key="wait"
+                className="grid place-items-center py-32 text-fg-3"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
                 Следващият въпрос идва…
               </motion.div>
             )}
@@ -130,6 +135,7 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
     <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
         <button
+          type="button"
           onClick={onLeave}
           aria-label="Напусни мача"
           className="focus-ring -ml-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
@@ -148,9 +154,14 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
           </div>
         ) : (
           q && (
-            <div className="hidden items-center gap-1 sm:flex" role="img" aria-label={`Въпрос ${q.index + 1} от ${q.total}`}>
+            <div
+              className="hidden items-center gap-1 sm:flex"
+              role="img"
+              aria-label={`Въпрос ${q.index + 1} от ${q.total}`}
+            >
               {Array.from({ length: q.total }, (_, i) => (
                 <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: one dot per question number
                   key={i}
                   className={clsx(
                     'h-1.5 rounded-full transition-all',
@@ -199,6 +210,7 @@ function MuteButton() {
   const label = muted ? 'Включи звука' : 'Изключи звука';
   return (
     <button
+      type="button"
       onClick={() => setMuted(!muted)}
       aria-label={label}
       title={label}
@@ -241,7 +253,9 @@ function Intro({ game }: { game: LiveGame }) {
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
             {game.start.mode === 'daily' ? '📅' : category?.icon}
           </motion.span>
-          <h2 className="mt-4 font-display text-3xl font-bold">{game.start.mode === 'daily' ? 'Въпросите на деня' : category?.name}</h2>
+          <h2 className="mt-4 font-display text-3xl font-bold">
+            {game.start.mode === 'daily' ? 'Въпросите на деня' : category?.name}
+          </h2>
           <p className="mt-2 text-fg-3">
             {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
             {game.start.mode === 'daily' && ' · без жокери'}
@@ -363,7 +377,12 @@ function TeamsVersus({ game }: { game: LiveGame }) {
             <div className="rounded-full p-0.5" style={{ boxShadow: `0 0 0 2px ${color}, 0 0 28px -6px ${color}` }}>
               <Avatar avatar={p.avatar} frame={p.frame} size={72} />
             </div>
-            <span className={clsx('flex max-w-full items-center gap-1 text-sm font-semibold', p.id === game.start.youId && 'text-violet-300')}>
+            <span
+              className={clsx(
+                'flex max-w-full items-center gap-1 text-sm font-semibold',
+                p.id === game.start.youId && 'text-violet-300',
+              )}
+            >
               <span className="truncate">{p.name}</span>
               <LevelBadge level={p.level} />
             </span>
@@ -404,7 +423,8 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
     if (!reveal) return map;
     for (const [pid, r] of Object.entries(reveal.results)) {
       if (r.choice === null || pid === youId) continue;
-      (map[r.choice] ??= []).push(game.players[pid]);
+      map[r.choice] ??= [];
+      map[r.choice].push(game.players[pid]);
     }
     return map;
   }, [reveal, game.players, youId]);
@@ -478,6 +498,7 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
         <div className="grid gap-3 sm:grid-cols-2">
           {q.options.map((text, i) => (
             <AnswerButton
+              // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
               key={i}
               index={i}
               text={text}
@@ -491,9 +512,7 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
             />
           ))}
         </div>
-        <AnimatePresence>
-          {frozen && <FreezeOverlay game={game} now={now} />}
-        </AnimatePresence>
+        <AnimatePresence>{frozen && <FreezeOverlay game={game} now={now} />}</AnimatePresence>
       </div>
 
       <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3">
@@ -501,7 +520,12 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
           {reveal && mine ? (
             <RevealSummary key="sum" result={mine} />
           ) : reveal ? null : game.myChoice !== null ? (
-            <motion.div key="wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap items-center gap-2">
+            <motion.div
+              key="wait"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-wrap items-center gap-2"
+            >
               <LockStatus game={game} offline={offline} />
               <ActiveJokers game={game} />
             </motion.div>
@@ -573,7 +597,9 @@ function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
         >
           ❄️
         </motion.span>
-        <p className="mt-2 font-display text-xl font-bold text-cyan-50">{by ? `${by} те замрази!` : 'Замразен отговор!'}</p>
+        <p className="mt-2 font-display text-xl font-bold text-cyan-50">
+          {by ? `${by} те замрази!` : 'Замразен отговор!'}
+        </p>
         <p className="mt-1 font-display text-3xl font-black text-cyan-200 tabular-nums">{left}</p>
       </div>
     </motion.div>
@@ -604,7 +630,10 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
     <div
       role="timer"
       aria-label={`Оставащо време: ${secs} ${secs === 1 ? 'секунда' : 'секунди'}`}
-      className={clsx('relative grid size-16 shrink-0 place-items-center sm:size-20', secs <= 3 && !stopped && 'motion-safe:animate-pulse')}
+      className={clsx(
+        'relative grid size-16 shrink-0 place-items-center sm:size-20',
+        secs <= 3 && !stopped && 'motion-safe:animate-pulse',
+      )}
     >
       <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90" aria-hidden>
         <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="5" />
@@ -653,7 +682,17 @@ function AnswerButton({
   const color = OPTION_COLORS[index];
   const revealed = correct !== null;
   const wrongPick = revealed && selected && !correct;
-  const state = revealed ? (correct ? 'correct' : wrongPick ? 'wrong' : 'dim') : selected ? 'selected' : locked || offline ? 'dim' : 'idle';
+  const state = revealed
+    ? correct
+      ? 'correct'
+      : wrongPick
+        ? 'wrong'
+        : 'dim'
+    : selected
+      ? 'selected'
+      : locked || offline
+        ? 'dim'
+        : 'idle';
 
   // What the colors and icons say, for screen readers.
   const name = [`${LETTERS[index]}) ${text}`];
@@ -669,6 +708,7 @@ function AnswerButton({
     // it out from under a resting pointer (which made it flicker between raised and lowered).
     <div className="group/lift grid">
       <motion.button
+        type="button"
         layout
         data-answer={index}
         aria-label={name.join(' — ')}
@@ -693,7 +733,11 @@ function AnswerButton({
               : 'glass hover:bg-white/[0.08]',
           removed && 'line-through',
         )}
-        style={state === 'selected' ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 36px -8px ${color}` } : undefined}
+        style={
+          state === 'selected'
+            ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 36px -8px ${color}` }
+            : undefined
+        }
       >
         <span
           className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5"
@@ -706,7 +750,13 @@ function AnswerButton({
             color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
           }}
         >
-          {state === 'correct' ? <Check className="size-5" strokeWidth={3} /> : state === 'wrong' ? <X className="size-5" strokeWidth={3} /> : LETTERS[index]}
+          {state === 'correct' ? (
+            <Check className="size-5" strokeWidth={3} />
+          ) : state === 'wrong' ? (
+            <X className="size-5" strokeWidth={3} />
+          ) : (
+            LETTERS[index]
+          )}
         </span>
         <span className="flex-1 text-[15px] font-semibold sm:text-base">{text}</span>
         {pickers.length > 0 && (
@@ -717,7 +767,9 @@ function AnswerButton({
               </motion.span>
             ))}
             {pickers.length > 4 && (
-              <span className="grid size-[26px] place-items-center rounded-full bg-white/15 text-[10px] font-bold">+{pickers.length - 4}</span>
+              <span className="grid size-[26px] place-items-center rounded-full bg-white/15 text-[10px] font-bold">
+                +{pickers.length - 4}
+              </span>
             )}
           </span>
         )}
@@ -739,16 +791,22 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
           <span className="font-display text-3xl font-black text-emerald-300 drop-shadow-[0_0_18px_rgb(52_211_153/0.6)]">
             +{fmt(result.points)}
           </span>
-          {result.doubled && <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-sm font-bold text-amber-300">×2</span>}
+          {result.doubled && (
+            <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-sm font-bold text-amber-300">×2</span>
+          )}
           {result.retried && (
-            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-sm font-bold text-amber-200">🔁 Втори шанс · ½ точки</span>
+            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-sm font-bold text-amber-200">
+              🔁 Втори шанс · ½ точки
+            </span>
           )}
           {result.streak >= 2 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-1 text-sm font-bold text-orange-300">
               <Flame className="size-4" /> Серия {result.streak}
             </span>
           )}
-          {result.timeMs !== null && <span className="text-sm text-fg-3">за {(result.timeMs / 1000).toFixed(1).replace('.', ',')} с</span>}
+          {result.timeMs !== null && (
+            <span className="text-sm text-fg-3">за {(result.timeMs / 1000).toFixed(1).replace('.', ',')} с</span>
+          )}
         </>
       ) : (
         <>
@@ -756,7 +814,9 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
             {result.choice === null ? 'Времето изтече ⏱️' : 'Грешно 😬'}
           </span>
           {result.points < 0 && (
-            <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-sm font-bold text-rose-300">💰 −{fmt(-result.points)}</span>
+            <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-sm font-bold text-rose-300">
+              💰 −{fmt(-result.points)}
+            </span>
           )}
         </>
       )}
@@ -851,7 +911,13 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
       </div>
       <div className="text-right">
         <div className={clsx('font-bold tabular-nums', out && 'text-fg-3')}>
-          {s.left ? 'напусна' : s.eliminatedAt !== null ? <Skull className="ml-auto size-4 text-rose-300" /> : fmt(score)}
+          {s.left ? (
+            'напусна'
+          ) : s.eliminatedAt !== null ? (
+            <Skull className="ml-auto size-4 text-rose-300" />
+          ) : (
+            fmt(score)
+          )}
         </div>
         <AnimatePresence>
           {result && (
@@ -912,20 +978,33 @@ function MobileStrip({ game }: { game: LiveGame }) {
           const answered = game.phase === 'question' && game.answered.includes(s.id);
           const reactions = game.reactions.filter((r) => r.playerId === s.id);
           const color = teams && p.team !== null ? teamColor(p.team) : null;
-          const status = s.left ? 'напусна' : s.eliminatedAt !== null ? 'отпадна' : `${s.score} точки${answered ? ', отговори' : ''}`;
+          const status = s.left
+            ? 'напусна'
+            : s.eliminatedAt !== null
+              ? 'отпадна'
+              : `${s.score} точки${answered ? ', отговори' : ''}`;
           return (
             <motion.li layout key={s.id} className="relative flex shrink-0 flex-col items-center gap-1">
               <span className="sr-only">
                 {me ? 'Ти' : p.name}
                 {p.isBot && ' (бот)'}: {status}
               </span>
-              <div className="relative rounded-full" style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined} aria-hidden>
+              <div
+                className="relative rounded-full"
+                style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined}
+                aria-hidden
+              >
                 <Avatar avatar={p.avatar} frame={p.frame} size={40} dim={out}>
-                  {answered && <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />}
+                  {answered && (
+                    <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />
+                  )}
                 </Avatar>
                 <PlayerMark me={me} bot={p.isBot} />
               </div>
-              <span className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')} aria-hidden>
+              <span
+                className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')}
+                aria-hidden
+              >
                 {out ? '💀' : fmt(s.score)}
               </span>
               {color && <span className="h-0.5 w-6 rounded-full" style={{ background: color }} aria-hidden />}
@@ -971,6 +1050,7 @@ function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
   return (
     <div className="fixed right-3 bottom-0 z-30 pb-[env(safe-area-inset-bottom)] sm:inset-x-0">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         aria-label="Реакции"
         aria-expanded={open}
@@ -990,11 +1070,15 @@ function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
         {emotes.map((id) => (
           <motion.button
             key={id}
+            type="button"
             whileTap={{ scale: 0.8 }}
             whileHover={{ scale: 1.2, y: -3 }}
             onClick={() => send(id)}
             disabled={offline}
-            className={clsx('focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl', (cooldown || offline) && 'opacity-50')}
+            className={clsx(
+              'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl',
+              (cooldown || offline) && 'opacity-50',
+            )}
             aria-label={`Реакция ${emoteById(id)?.emoji}`}
           >
             {emoteById(id)?.emoji}
@@ -1033,6 +1117,7 @@ function Feed({ game }: { game: LiveGame }) {
 function EliminationBanner({ game }: { game: LiveGame }) {
   const ids = game.phase === 'reveal' ? (game.reveal?.eliminated ?? []) : [];
   const [shown, setShown] = useState<string[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the ids, as `ids` is a new array every render
   useEffect(() => {
     if (!ids.length) return;
     const show = setTimeout(() => setShown(ids), 900);
@@ -1041,7 +1126,6 @@ function EliminationBanner({ game }: { game: LiveGame }) {
       clearTimeout(show);
       clearTimeout(hide);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids.join()]);
 
   return (
