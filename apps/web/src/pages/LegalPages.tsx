@@ -154,8 +154,8 @@ export function PrivacyPage() {
       <Section title="5. Кой още има достъп">
         <ul>
           <li>
-            <b>Хостинг:</b> <Provider kind="hosting" /> — сървърът
-            {op?.backups ? '' : ' и резервните копия'} се намират в Европейския съюз.
+            <b>Хостинг:</b> <Provider kind="hosting" /> —{' '}
+            {op?.backups ? 'сървърът се намира' : 'сървърът и резервните копия се намират'} в Европейския съюз.
           </li>
           {op?.backups && (
             <li>
