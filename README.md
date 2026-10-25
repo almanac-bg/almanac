@@ -98,7 +98,7 @@ and checks that it boots.
 | `CONTACT_EMAIL`    | `privacy@<domain>`                    | Contact address in the legal pages and emails                |
 | `EMAIL_PROVIDER`, `HOSTING_PROVIDER` |                    | Named in the privacy policy as processors                    |
 | `SOURCE_URL`       |                                       | Public repository, linked in the footer ("Изходен код")      |
-| `QUESTIONS_PATH`   | `private/questions.json`, else the sample | The built-in question bank                               |
+| `QUESTIONS_PATH`   | `private/questions.json`, else the sample | The built-in question bank (see [Adding questions](#adding-questions)) |
 
 The brand name lives in `packages/shared/src/brand.ts`.
 
@@ -116,7 +116,7 @@ apps/server       Express + Socket.IO + SQLite
   src/daily.ts            Daily challenge: one seeded question set per day, one attempt
   src/friends.ts          Friend requests and presence
   src/submissions.ts      Community questions and moderation
-  src/data/questions.sample.json  Public sample of the question bank (the real one is private/questions.json)
+  src/data/questions.sample.json  Public sample of the question bank (the real one is private, in private/)
 packages/client   Client core: API calls, realtime game state (zustand), formatting. The website
                   plugs in its sounds; kept separate so other clients can reuse it
 apps/web          React 19 + Vite + Tailwind 4 + Motion
@@ -207,11 +207,17 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
 Players can submit questions in the app, and moderators approve them in `/admin` — that's the way to contribute
 questions to the live game.
 
-The built-in bank lives in `private/questions.json`. It's kept out of the public repository (the folder is in
-`.gitignore`; in the private repository the file is tracked anyway), and `npm run build` puts it next to the
-server bundle, so Docker images built from the private repository include it. Without it, the server plays the
-public sample, `apps/server/src/data/questions.sample.json`. Both files have the same format, and `npm test`
-validates whichever are present. To add built-in questions, append to the bank:
+The live game's bank is kept in a separate private repository (`almanac-questions`), cloned into `private/`
+here, a folder this repository ignores:
+
+```bash
+git clone git@github.com:otsirh/almanac-questions.git private
+```
+
+With it present, the server uses `private/questions.json`, and `npm run build` puts it next to the server bundle,
+so a Docker image built on a machine that has it includes it. Without it, the server plays the public sample,
+`apps/server/src/data/questions.sample.json`. Both files have the same format, and `npm test` validates whichever
+are present. To add built-in questions, append to the bank (then commit and push in `private/`):
 
 ```json
 { "id": "gen-031", "category": "general", "difficulty": "easy",
@@ -247,8 +253,11 @@ Bulgaria:
 4. **Install Docker and deploy:**
    ```bash
    curl -fsSL https://get.docker.com | sh
-   git clone <your repo> almanac && cd almanac
-   cp .env.example .env        # set DOMAIN and the BACKUP_* values
+   git clone https://github.com/otsirh/almanac.bg.git almanac && cd almanac
+   # The private question bank: give the server read access with a deploy key (ssh-keygen -t ed25519, then add
+   # the public key in almanac-questions → Settings → Deploy keys, read-only).
+   git clone git@github.com:otsirh/almanac-questions.git private
+   cp .env.example .env        # set DOMAIN, OPERATOR_*, the BACKUP_* values…
    APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
 5. Open https://almanac.bg and register your account, then make it the admin:
@@ -282,7 +291,7 @@ Use port **587**: many providers (Hetzner among them) block outgoing ports 25 an
 service is run by a private individual, and the privacy policy and terms show these details. Both documents are
 drafts: have them reviewed for your situation.
 
-**Updating:** `git pull && APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build` (the release tag
+**Updating:** `git pull && git -C private pull && APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build` (the release tag
 lets error reports say which version they came from). The new version builds while the old one keeps running.
 Then the old one stops gracefully: queued players are told an update is coming, no new matches start, and running
 matches play to the end (up to ~5½ minutes, `DRAIN_SECONDS`) before it restarts. While it's down for those few
@@ -338,12 +347,11 @@ Not covered by the license:
 - **The game's question bank**, which isn't in this repository. The sample bank in it is part of the code and may be
   used with it.
 
-## Publishing the public repository
+## GitHub repository settings
 
-Development happens in a private repository that also holds the question bank. The public one is a copy without it,
-with its own history: `scripts/publish-public.sh <empty folder>` makes that copy (everything tracked, minus
-`private/`) as a fresh git repository, and checks that no question-bank file slipped in. After pushing it,
-`scripts/github-setup.sh <owner/repo>` sets up the GitHub side: description, website and topics, issues and
-discussions, squash merges, Dependabot alerts, private vulnerability reporting, secret scanning, labels and a
-protected `main` (upload `.github/social-preview.png` as the social preview by hand). Then set `SOURCE_URL`.
+`scripts/github-setup.sh otsirh/almanac.bg` sets up the GitHub side (safe to run again): description, website and
+topics, issues and discussions, squash merges, Dependabot alerts and security updates, private vulnerability
+reporting, secret scanning, labels and a protected `main`. Some of these exist only for public repositories, so
+run it again after making the repository public. The social preview image (`.github/social-preview.png`) is
+uploaded by hand: Settings → General → Social preview.
 
