@@ -17,9 +17,10 @@ import { motion } from 'motion/react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../components/Avatar';
-import { LegalLinks } from '../components/LegalLinks';
+import { LegalLinks, MINORS_NOTICE } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented, Spinner } from '../components/ui';
+import { credentialsProblem } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isReturning, markReturning } from '../lib/returning';
 
@@ -35,7 +36,7 @@ const FEATURES = [
 const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
 const INPUT =
-  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
+  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40 aria-invalid:border-rose-400/60';
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Нещо се обърка.');
 
@@ -59,6 +60,8 @@ export function AuthPage() {
   const [email, setEmail] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The field the error is about (when the check here found it): marked while the message shows.
+  const [invalid, setInvalid] = useState<'username' | 'password' | null>(null);
   const [busy, setBusy] = useState(false);
   const [guestBusy, setGuestBusy] = useState(false);
   const id = useId();
@@ -72,6 +75,10 @@ export function AuthPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    // The message goes in the box above the button (where the eyes are), the field gets marked and points to it.
+    const problem = credentialsProblem(username, password, { newAccount: mode === 'register' });
+    setInvalid(problem?.field ?? null);
+    if (problem) return setError(problem.message);
     setError(null);
     setBusy(true);
     try {
@@ -166,7 +173,7 @@ export function AuthPage() {
             (inviteCode || challengeId) && 'max-sm:hidden',
           )}
         >
-          Бързи въпроси. Истински съперници. <span className="text-fg">Кой е най-умният в стаята?</span>
+          Бързи въпроси. Истински съперници. <span className="text-fg">Кой знае най-много?</span>
         </p>
       </motion.header>
 
@@ -177,7 +184,8 @@ export function AuthPage() {
         className="relative min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
       >
         <div className="absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm" />
-        <Card className="relative bg-ink-2/70 p-5 sm:p-8">
+        {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
+        <Card className="relative bg-ink-2/95 p-5 sm:p-8">
           {challengeId && !formOpen ? (
             <ChallengeLanding
               preview={preview.data}
@@ -246,7 +254,7 @@ export function AuthPage() {
                   ? 'Влез и продължи там, където спря.'
                   : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
               </p>
-              <form onSubmit={submit} className="mt-6 space-y-4">
+              <form onSubmit={submit} noValidate className="mt-6 space-y-4">
                 <Field
                   label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
                   htmlFor={`${id}-username`}
@@ -256,6 +264,8 @@ export function AuthPage() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     autoComplete="username"
+                    aria-invalid={!!error && invalid === 'username'}
+                    aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
                     // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
                     autoFocus={DESKTOP && returning}
                     required
@@ -286,6 +296,8 @@ export function AuthPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       type={show ? 'text' : 'password'}
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                      aria-invalid={!!error && invalid === 'password'}
+                      aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
                       required
                       minLength={6}
                       placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
@@ -315,6 +327,7 @@ export function AuthPage() {
                 )}
 
                 <div
+                  id={`${id}-error`}
                   role="alert"
                   className={clsx(
                     'overflow-hidden rounded-xl bg-rose-500/10 text-sm text-rose-300 transition-all',
@@ -340,7 +353,7 @@ export function AuthPage() {
                   {guest}
                 </>
               )}
-              <Consent />
+              <Consent minors={mode === 'register'} />
             </>
           )}
         </Card>
@@ -370,20 +383,23 @@ export function AuthPage() {
   );
 }
 
-/** Playing as a guest also accepts the terms, so the line sits under every way in. */
-function Consent() {
+/** Playing as a guest also accepts the terms, so the line sits under every way in; under signing up, the age note too. */
+function Consent({ minors }: { minors?: boolean }) {
   return (
-    <p className="mt-5 text-center text-xs text-fg-3">
-      Като играеш, приемаш{' '}
-      <Link to="/terms" className="text-violet-300 hover:underline">
-        Условията за ползване
-      </Link>{' '}
-      и{' '}
-      <Link to="/privacy" className="text-violet-300 hover:underline">
-        Политиката за поверителност
-      </Link>
-      .
-    </p>
+    <div className="mt-5 space-y-1.5 text-center text-xs text-fg-3">
+      <p>
+        Като играеш, приемаш{' '}
+        <Link to="/terms" className="text-violet-300 hover:underline">
+          Условията за ползване
+        </Link>{' '}
+        и{' '}
+        <Link to="/privacy" className="text-violet-300 hover:underline">
+          Политиката за поверителност
+        </Link>
+        .
+      </p>
+      {minors && <p>{MINORS_NOTICE}</p>}
+    </div>
   );
 }
 
@@ -595,6 +611,7 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!login.trim()) return setError('Въведи име или имейл.');
     setBusy(true);
     setError(null);
     try {
@@ -627,7 +644,7 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
           <p className="text-fg-3">Без потвърден имейл паролата не може да се възстанови — тогава създай нов профил.</p>
         </div>
       ) : (
-        <form onSubmit={submit} className="mt-4 space-y-4">
+        <form onSubmit={submit} noValidate className="mt-4 space-y-4">
           <p className="text-sm text-fg-3">
             Въведи потребителското си име или потвърдения си имейл. Ще ти изпратим линк за нова парола.
           </p>
@@ -643,7 +660,11 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
               className={INPUT}
             />
           </Field>
-          {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+          {error && (
+            <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+              {error}
+            </p>
+          )}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Изпрати линк
           </Button>

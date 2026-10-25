@@ -1,9 +1,9 @@
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
 import { categoryById, emoteById, type GamePlayer, MODES, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Flame, Skull, Users, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
+import { Check, DoorOpen, Flame, Skull, Users, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
 import { MatchAnnouncer } from '../components/game/Announcer';
@@ -13,7 +13,9 @@ import { ConnectionBanner } from '../components/game/ConnectionBanner';
 import { ActiveJokers, type JokerGuide, PowerupBar, useJokerGuide } from '../components/game/Jokers';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
 import { Button, Modal, Spinner } from '../components/ui';
+import { accentFill } from '../lib/accent';
 import { useCountUp } from '../lib/hooks';
+import { useMediaQuery } from '../lib/media';
 import { sfx, useMuted } from '../lib/sound';
 import { Results } from './Results';
 
@@ -51,6 +53,9 @@ function Arena({ game }: { game: LiveGame }) {
   const jokers = useJokerGuide(game.start.powerups);
   const single = game.start.players.length === 1;
   const meEliminated = game.eliminated.includes(game.start.youId);
+  // In a private room leaving the match leaves the room too, so that's no place to suggest it.
+  const freeToGo = meEliminated && !game.start.roomCode;
+  const leave = () => leaveMatchScreen(actions.leaveGame);
 
   // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
   useBackGuard(() => setLeaving((open) => !open));
@@ -85,6 +90,7 @@ function Arena({ game }: { game: LiveGame }) {
               </motion.div>
             )}
           </AnimatePresence>
+          {!single && <EmoteBar emotes={game.start.emotes} offline={offline} />}
           <Feed game={game} />
         </div>
         {!single && (
@@ -94,28 +100,47 @@ function Arena({ game }: { game: LiveGame }) {
         )}
       </div>
 
-      {!single && <EmoteBar emotes={game.start.emotes} offline={offline} />}
       <EliminationBanner game={game} />
       <MatchAnnouncer game={game} />
       {meEliminated && game.phase !== 'countdown' && (
-        <div className="fixed inset-x-0 bottom-20 z-30 mx-auto w-fit rounded-full border border-rose-400/30 bg-rose-500/15 px-4 py-2 text-sm text-rose-200 backdrop-blur">
-          💀 Отпадна — гледаш като зрител
+        // Phones: at the bottom edge (the emotes are in the page there). Wider: above the emote bar. The button goes
+        // beside the first line and the second line runs under both, so a narrow phone loses as little of the screen.
+        <div
+          className={clsx(
+            'fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto grid w-fit max-w-[calc(100vw-1.5rem)] items-center gap-x-3 gap-y-0.5 rounded-2xl border border-rose-400/30 bg-ink-2/90 py-2 pl-4 text-sm backdrop-blur sm:bottom-20',
+            freeToGo ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
+          )}
+        >
+          <p className="text-balance text-rose-200">💀 Отпадна — гледаш като зрител</p>
+          {freeToGo && (
+            <>
+              <p className="col-span-2 text-xs text-fg-2">Можеш да излезеш — мястото ти се запазва.</p>
+              {/* Knocked out, leaving is no forfeit (the place stands, the rewards come at the end): no "are you sure". */}
+              <Button size="sm" variant="secondary" className="col-start-2 row-start-1" onClick={leave}>
+                <DoorOpen className="size-4" /> Излез
+              </Button>
+            </>
+          )}
         </div>
       )}
 
       <Modal open={leaving} onClose={() => setLeaving(false)} title="Да напуснеш ли мача?">
         <p className="text-fg-2">
-          {game.start.mode === 'daily'
-            ? 'Днешният опит ще се зачете с точките досега — нов опит има чак утре.'
-            : game.start.ranked
-              ? 'Оставаш на последно място и губиш рейтинг.'
-              : 'Прогресът от този мач няма да се зачете.'}
+          {meEliminated
+            ? game.start.roomCode
+              ? 'Мястото, на което отпадна, се запазва, но излизаш и от стаята.'
+              : 'Мястото, на което отпадна, се запазва — наградите идват, когато мачът свърши.'
+            : game.start.mode === 'daily'
+              ? 'Днешният опит ще се зачете с точките досега — нов опит има чак утре.'
+              : game.start.ranked
+                ? 'Оставаш на последно място и губиш рейтинг.'
+                : 'Прогресът от този мач няма да се зачете.'}
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setLeaving(false)}>
             Остани
           </Button>
-          <Button variant="danger" onClick={() => leaveMatchScreen(actions.leaveGame)}>
+          <Button variant={meEliminated ? 'primary' : 'danger'} onClick={leave}>
             Напусни
           </Button>
         </div>
@@ -143,8 +168,8 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
           <X className="size-5" />
         </button>
         <span
-          className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider whitespace-nowrap text-white uppercase"
-          style={{ background: `linear-gradient(90deg, ${mode.accent[0]}, ${mode.accent[1]})` }}
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider whitespace-nowrap uppercase"
+          style={accentFill(mode)}
         >
           {game.start.mode === 'daily' ? 'Днес' : mode.name}
         </span>
@@ -308,24 +333,27 @@ function Intro({ game }: { game: LiveGame }) {
 }
 
 function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
+  // Two 120px avatars and the "VS" between them don't fit the narrowest phones; there the name is smaller and gets the
+  // level's room too (the rank under it says more about the opponent).
+  const roomy = useMediaQuery('(min-width: 360px)');
   const side = (p: GamePlayer, dir: 1 | -1) => (
     <motion.div
       initial={{ x: -120 * dir, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 160, damping: 18, delay: 0.1 }}
-      className="flex w-36 flex-col items-center gap-3 sm:w-48"
+      className="flex w-36 min-w-0 flex-col items-center gap-3 sm:w-48"
     >
-      <Avatar avatar={p.avatar} frame={p.frame} size={120} />
-      <div className="flex items-center gap-1.5">
-        <span className="max-w-32 truncate font-display font-bold">{p.name}</span>
-        <LevelBadge level={p.level} />
+      <Avatar avatar={p.avatar} frame={p.frame} size={roomy ? 120 : 88} />
+      <div className="flex max-w-full items-center gap-1.5">
+        <span className={clsx('min-w-0 truncate font-display font-bold', !roomy && 'text-sm')}>{p.name}</span>
+        {roomy && <LevelBadge level={p.level} className="shrink-0" />}
       </div>
       {p.rating !== null && <RankBadge rating={p.rating} />}
       {p.isBot && <span className="text-xs text-fg-3">БОТ</span>}
     </motion.div>
   );
   return (
-    <div className="mt-8 flex items-start gap-4 sm:gap-10">
+    <div className="mt-8 flex max-w-full items-start gap-3 sm:gap-10">
       {side(a, 1)}
       <VsMark />
       {side(b, -1)}
@@ -339,7 +367,7 @@ function VsMark() {
       initial={{ scale: 4, opacity: 0, rotate: -15 }}
       animate={{ scale: 1, opacity: 1, rotate: 0 }}
       transition={{ delay: 0.45, type: 'spring', stiffness: 300, damping: 14 }}
-      className="mt-8 font-display text-5xl font-black text-fuchsia-400 italic drop-shadow-[0_0_24px_rgb(232_121_249/0.7)] sm:text-6xl"
+      className="mt-8 shrink-0 font-display text-5xl font-black text-fuchsia-400 italic drop-shadow-[0_0_24px_rgb(232_121_249/0.7)] sm:text-6xl"
     >
       VS
     </motion.span>
@@ -357,10 +385,10 @@ function TeamsVersus({ game }: { game: LiveGame }) {
         initial={{ x: -120 * dir, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 160, damping: 18, delay: 0.1 }}
-        className="flex w-36 flex-col items-center gap-4 sm:w-52"
+        className="flex w-36 min-w-0 flex-col items-center gap-4 sm:w-52"
       >
         <span
-          className="rounded-full border px-3 py-1 font-display text-sm font-bold"
+          className="max-w-full rounded-full border px-3 py-1 text-center font-display text-sm font-bold"
           style={{ color, borderColor: `${color}66`, background: `${color}18`, boxShadow: `0 0 24px -8px ${color}` }}
         >
           {TEAMS[team].name}
@@ -392,9 +420,9 @@ function TeamsVersus({ game }: { game: LiveGame }) {
     );
   };
   return (
-    <div className="mt-8 flex items-start gap-3 sm:gap-10">
+    <div className="mt-8 flex max-w-full items-start gap-3 sm:gap-10">
       {column(0, 1)}
-      <div className="self-center">
+      <div className="shrink-0 self-center">
         <VsMark />
       </div>
       {column(1, -1)}
@@ -1025,7 +1053,7 @@ function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
       aria-hidden
       className={clsx(
         'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[9px] leading-none font-extrabold tracking-wide',
-        me ? 'bg-violet-500 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
+        me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
       )}
     >
       {me ? 'ТИ' : 'БОТ'}
@@ -1035,10 +1063,14 @@ function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
 
 // ─── Emotes, feed, eliminations ────────────────────────────────────────────
 
-/** Full bar on desktop; on phones a single button that expands, so it never covers the answers. */
+/**
+ * Wider screens: the whole bar, fixed along the bottom (below the answers). Phones: a button in the page under the
+ * answers that opens them right there — floating over the screen, it sat on the last answers.
+ */
 function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
   const [cooldown, setCooldown] = useState(false);
   const [open, setOpen] = useState(false);
+  const trayId = useId();
   function send(id: string) {
     if (cooldown || offline) return;
     actions.react(id);
@@ -1047,45 +1079,51 @@ function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
     setOpen(false);
     setTimeout(() => setCooldown(false), 800);
   }
+  const buttons = emotes.map((id) => (
+    <motion.button
+      key={id}
+      type="button"
+      whileTap={{ scale: 0.8 }}
+      whileHover={{ scale: 1.2, y: -3 }}
+      onClick={() => send(id)}
+      disabled={offline}
+      className={clsx(
+        'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl',
+        (cooldown || offline) && 'opacity-50',
+      )}
+      aria-label={`Реакция ${emoteById(id)?.emoji}`}
+    >
+      {emoteById(id)?.emoji}
+    </motion.button>
+  ));
   return (
-    <div className="fixed right-3 bottom-0 z-30 pb-[env(safe-area-inset-bottom)] sm:inset-x-0">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label="Реакции"
-        aria-expanded={open}
-        className={clsx(
-          'focus-ring mb-3 ml-auto grid size-12 place-items-center rounded-full border border-line bg-ink-2/90 text-2xl shadow-xl backdrop-blur-xl sm:hidden',
-          open && 'hidden',
-        )}
-      >
-        😀
-      </button>
-      <div
-        className={clsx(
-          'mx-auto mb-3 w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl',
-          open ? 'flex' : 'hidden sm:flex',
-        )}
-      >
-        {emotes.map((id) => (
-          <motion.button
-            key={id}
-            type="button"
-            whileTap={{ scale: 0.8 }}
-            whileHover={{ scale: 1.2, y: -3 }}
-            onClick={() => send(id)}
-            disabled={offline}
-            className={clsx(
-              'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl',
-              (cooldown || offline) && 'opacity-50',
-            )}
-            aria-label={`Реакция ${emoteById(id)?.emoji}`}
+    <>
+      <div className="mx-auto mt-3 flex max-w-3xl flex-wrap items-center justify-end gap-2 sm:hidden">
+        {open && (
+          <div
+            id={trayId}
+            className="flex flex-wrap justify-end gap-1 rounded-2xl border border-line bg-ink-2/80 p-1.5"
           >
-            {emoteById(id)?.emoji}
-          </motion.button>
-        ))}
+            {buttons}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-label="Реакции"
+          aria-expanded={open}
+          aria-controls={open ? trayId : undefined}
+          className="focus-ring grid size-12 shrink-0 place-items-center rounded-full border border-line bg-ink-2/90 text-fg-2 hover:text-fg"
+        >
+          {open ? <X className="size-5" /> : <span className="text-2xl">😀</span>}
+        </button>
       </div>
-    </div>
+      <div className="fixed inset-x-0 bottom-0 z-30 hidden pb-[env(safe-area-inset-bottom)] sm:block">
+        <div className="mx-auto mb-3 flex w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl">
+          {buttons}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1132,7 +1170,8 @@ function EliminationBanner({ game }: { game: LiveGame }) {
     <AnimatePresence>
       {shown.length > 0 && (
         <motion.div
-          className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-rose-950/40 backdrop-blur-[2px]"
+          // Darkest behind the message, a light tint elsewhere: the reveal and the scores stay readable through it.
+          className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-[radial-gradient(circle,rgb(76_5_25/0.8)_8rem,rgb(76_5_25/0.15)_24rem)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

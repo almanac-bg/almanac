@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { startMonitoring } from './lib/monitoring';
 import { sfx } from './lib/sound';
 import './styles.css';
@@ -55,6 +56,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
+        <ReloadForUpdate />
         <App />
       </BrowserRouter>
     </ErrorBoundary>

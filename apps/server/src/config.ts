@@ -1,22 +1,36 @@
+import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, type QueueModeId } from '@quiz/shared';
+import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
 
+function seconds(raw: string | undefined, fallback: number): number {
+  const n = Number(raw ?? fallback);
+  return (Number.isFinite(n) && n >= 0 ? n : fallback) * 1000;
+}
+
 function botFillMs(): number | null {
-  const raw = process.env.BOT_FILL_SECONDS;
-  if (raw === 'off') return null;
-  const seconds = Number(raw ?? 8);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 8000;
+  return process.env.BOT_FILL_SECONDS === 'off' ? null : seconds(process.env.BOT_FILL_SECONDS, 8);
 }
 
 const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
+const webDist = path.resolve(serverRoot, '../web/dist');
+
+/** The id the web build stamps into its page (see apps/web/vite.config.ts); null without a build (development). */
+function webBuild(webDist: string): string | null {
+  try {
+    const html = fs.readFileSync(path.join(webDist, 'index.html'), 'utf8');
+    return /<meta name="app-build" content="([\w-]+)"/.exec(html)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). */
 function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
   if (!raw) return DEFAULT_OPEN_QUEUES;
-  if (raw === 'all') return ['duel', 'teams', 'trio', 'squad', 'royale'];
+  if (raw === 'all') return QUEUE_MODES;
   const modes = raw
     .split(',')
     .map((m) => m.trim())
@@ -30,9 +44,13 @@ export const config = {
   port: Number(process.env.PORT ?? 3001),
   production: process.env.NODE_ENV === 'production',
   dbPath,
-  webDist: path.resolve(serverRoot, '../web/dist'),
+  webDist,
+  /** Which build of the web app this server hosts: open tabs of an older one reload (see LobbyStats.build). */
+  webBuild: webBuild(webDist),
   /** How long a quick-match queue waits for humans before bots fill the empty seats. */
   botFillMs: botFillMs(),
+  /** …and how long while someone else is online and free to join: then a person is worth waiting a little for. */
+  botFillBusyMs: Math.max(botFillMs() ?? 0, seconds(process.env.BOT_FILL_BUSY_SECONDS, 20)),
   /** Ranked queues players can join; the others stay closed until there are enough people for them. */
   openQueues: openQueues(),
   cookieSecure: process.env.COOKIE_SECURE === 'true',

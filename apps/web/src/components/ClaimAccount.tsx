@@ -1,11 +1,13 @@
 import { api, setState, toast, useStore } from '@quiz/client';
 import { Eye, EyeOff, Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
+import { credentialsProblem } from '../lib/credentials';
 import { markReturning } from '../lib/returning';
+import { MINORS_NOTICE } from './LegalLinks';
 import { Button, Modal } from './ui';
 
 const INPUT =
-  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
+  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40 aria-invalid:border-rose-400/60';
 
 /**
  * A guest picks a name and password (and maybe an email): the same account from then on, with all its XP, streak and
@@ -25,11 +27,16 @@ export function ClaimAccountModal({
   const [email, setEmail] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The field the error is about (when the check here found it): marked while the message shows.
+  const [invalid, setInvalid] = useState<'username' | 'password' | null>(null);
   const [busy, setBusy] = useState(false);
   const id = useId();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const problem = credentialsProblem(username, password, { newAccount: true });
+    setInvalid(problem?.field ?? null);
+    if (problem) return setError(problem.message);
     setError(null);
     setBusy(true);
     try {
@@ -57,13 +64,15 @@ export function ClaimAccountModal({
       <p className="-mt-2 text-sm text-fg-2">
         {reason ?? 'Избери име и парола — нивото, серията и всичко изиграно досега остават твои, на всяко устройство.'}
       </p>
-      <form onSubmit={submit} className="mt-5 space-y-4">
+      <form onSubmit={submit} noValidate className="mt-5 space-y-4">
         <Field label="Потребителско име" htmlFor={`${id}-username`}>
           <input
             id={`${id}-username`}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
+            aria-invalid={!!error && invalid === 'username'}
+            aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
             required
             minLength={3}
             maxLength={20}
@@ -79,6 +88,8 @@ export function ClaimAccountModal({
               onChange={(e) => setPassword(e.target.value)}
               type={show ? 'text' : 'password'}
               autoComplete="new-password"
+              aria-invalid={!!error && invalid === 'password'}
+              aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
               required
               minLength={6}
               placeholder="поне 6 символа"
@@ -106,13 +117,14 @@ export function ClaimAccountModal({
           />
         </Field>
         {error && (
-          <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          <p id={`${id}-error`} role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {error}
           </p>
         )}
         <Button type="submit" size="lg" className="w-full" loading={busy}>
           <Save className="size-4.5" /> Запази профила
         </Button>
+        <p className="text-center text-xs text-fg-3">{MINORS_NOTICE}</p>
       </form>
     </Modal>
   );

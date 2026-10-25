@@ -6,6 +6,7 @@ import {
   levelFromXp,
   type ModeId,
   type QuestsInfo,
+  type QueueModeId,
   type XpLine,
 } from '@quiz/shared';
 import { config } from './config';
@@ -50,8 +51,11 @@ const categoryQuest = (c: (typeof CATEGORIES)[number]): QuestDef => ({
   count: (e) => e.correctByCategory.get(c.id) ?? 0,
 });
 
-/** One quest from each slot: showing up, playing well, and trying something different. */
-const SLOTS: { level?: number; queue?: 'royale'; def: QuestDef }[][] = [
+/**
+ * One quest from each slot: showing up, playing well, and trying something different. `account`: only for players
+ * with an account (a guest can't make a challenge link, so couldn't finish it alone).
+ */
+const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDef }[][] = [
   [
     { def: { id: 'play3', icon: '🎮', text: 'Изиграй 3 мача', goal: 3, xp: 60, count: () => 1 } },
     {
@@ -136,6 +140,7 @@ const SLOTS: { level?: number; queue?: 'royale'; def: QuestDef }[][] = [
       def: { id: 'jokers3', icon: '🃏', text: 'Използвай 3 жокера', goal: 3, xp: 60, count: (e) => e.jokers },
     },
     {
+      account: true,
       def: {
         id: 'challenge',
         icon: '🔗',
@@ -170,10 +175,14 @@ function todays(userId: number, day: string): Row[] {
     .filter((r) => r.quest !== BONUS)
     .sort((a, b) => (SLOT_OF.get(a.quest) ?? 9) - (SLOT_OF.get(b.quest) ?? 9));
   if (rows.length) return rows;
-  const level = levelFromXp(getUser(userId)?.xp ?? 0);
+  const user = getUser(userId);
+  const level = levelFromXp(user?.xp ?? 0);
+  const guest = user?.is_guest === 1;
   const rng = seededRng(`quests:${day}:${userId}`);
   const picked = SLOTS.map((slot) => {
-    const options = slot.filter((s) => (s.level ?? 0) <= level && (!s.queue || config.openQueues.includes(s.queue)));
+    const options = slot.filter(
+      (s) => (s.level ?? 0) <= level && (!s.queue || config.openQueues.includes(s.queue)) && !(s.account && guest),
+    );
     return options[Math.floor(rng() * options.length)].def.id;
   });
   for (const quest of picked) {

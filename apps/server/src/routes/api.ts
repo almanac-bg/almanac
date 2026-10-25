@@ -33,7 +33,7 @@ import {
 import { challengeInfo, challengePreview, myChallenges } from '../challenges';
 import { config } from '../config';
 import { dailyInfo, liveDailyStreak } from '../daily';
-import { all, one, run, tx } from '../db';
+import { all, isUniqueViolation, one, run, tx } from '../db';
 import {
   changePassword,
   EmailSchema,
@@ -67,7 +67,7 @@ import {
   rejectSubmission,
   submitQuestion,
 } from '../submissions';
-import { throttled } from '../throttle';
+import { network, throttled } from '../throttle';
 import {
   emailKey,
   getUser,
@@ -99,8 +99,16 @@ const Login = z.object({
   password: z.string().min(1, 'Въведи парола.').max(200),
 });
 
+/** An emailed link's token: a mail app that cuts the link short lands here. */
+const BROKEN_LINK = 'Линкът е непълен или повреден. Отвори го отново направо от писмото.';
+const Token = z.string().min(10, BROKEN_LINK).max(200, BROKEN_LINK);
+
+/**
+ * The body, or a 400 with the first problem in it. Schemas give their messages in Bulgarian; anything they don't word
+ * themselves gets a plain fallback rather than Zod's English.
+ */
 function parse<T>(schema: z.ZodType<T>, req: Request, res: Response): T | null {
-  const parsed = schema.safeParse(req.body);
+  const parsed = schema.safeParse(req.body, { error: () => 'Невалидни данни.' });
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Невалидни данни.' });
     return null;
@@ -136,8 +144,8 @@ const idParam = (req: Request) => Number(req.params.id);
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 api.post('/auth/register', async (req, res) => {
-  // Generous per-IP limit: a whole school class may sign up from one network.
-  if (throttled(`register:${req.ip}`, 30, 60 * 60_000)) {
+  // Generous per-network limit: a whole school class (or a mobile operator's shared address) may sign up from it.
+  if (throttled(`register:${network(req.ip)}`, 60, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много регистрации. Опитай по-късно.' });
     return;
   }
@@ -156,15 +164,23 @@ api.post('/auth/register', async (req, res) => {
   // In development the very first account runs the place. In production nobody gets admin by signing up: moderators
   // are made with the admin command line (src/cli.ts), so no name can be claimed by someone faster.
   const firstUser = !config.production && one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n === 0;
-  const { lastInsertRowid } = run(
-    'INSERT INTO users (username, username_key, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?)',
-    creds.username,
-    usernameKey(creds.username),
-    hash,
-    Date.now(),
-    firstUser ? 1 : 0,
-  );
-  const userId = Number(lastInsertRowid);
+  let userId: number;
+  try {
+    const { lastInsertRowid } = run(
+      'INSERT INTO users (username, username_key, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?)',
+      creds.username,
+      usernameKey(creds.username),
+      hash,
+      Date.now(),
+      firstUser ? 1 : 0,
+    );
+    userId = Number(lastInsertRowid);
+  } catch (err) {
+    // Someone took the name while the password was hashing (a double-tap on "sign up" is enough).
+    if (!isUniqueViolation(err)) throw err;
+    res.status(409).json({ error: 'Това име вече е заето.' });
+    return;
+  }
   if (creds.email) requestEmailChange(userId, creds.email);
   count('signups');
   setSessionCookie(res, createSession(userId));
@@ -177,8 +193,8 @@ api.post('/auth/login', async (req, res) => {
   // Per IP and account, per IP across accounts (password spraying), and per account across IPs (distributed guessing).
   const account = usernameKey(creds.username);
   if (
-    throttled(`login:${req.ip}:${account}`) ||
-    throttled(`login-ip:${req.ip}`, 40, 15 * 60_000) ||
+    throttled(`login:${network(req.ip)}:${account}`) ||
+    throttled(`login-ip:${network(req.ip)}`, 100, 15 * 60_000) ||
     throttled(`login-account:${account}`, 30, 15 * 60_000)
   ) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
@@ -205,7 +221,7 @@ api.post('/auth/forgot', (req, res) => {
   const body = parse(z.object({ login: z.string().trim().min(1, 'Въведи име или имейл.').max(254) }), req, res);
   if (!body) return;
   if (
-    throttled(`forgot-ip:${req.ip}`, 5, 15 * 60_000) ||
+    throttled(`forgot-ip:${network(req.ip)}`, 5, 15 * 60_000) ||
     throttled(`forgot:${usernameKey(body.login)}`, 3, 60 * 60_000)
   ) {
     res.status(429).json({ error: 'Твърде много заявки. Опитай по-късно.' });
@@ -216,9 +232,9 @@ api.post('/auth/forgot', (req, res) => {
 });
 
 api.post('/auth/reset', async (req, res) => {
-  const body = parse(z.object({ token: z.string().min(10).max(200), password: PasswordSchema }), req, res);
+  const body = parse(z.object({ token: Token, password: PasswordSchema }), req, res);
   if (!body) return;
-  if (throttled(`reset:${req.ip}`, 10, 15 * 60_000)) {
+  if (throttled(`reset:${network(req.ip)}`, 10, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
@@ -240,11 +256,11 @@ api.post('/auth/reset', async (req, res) => {
 /** The token alone proves mailbox ownership, so this works signed out too. */
 api.post('/auth/verify-email', (req, res) => {
   // Links can't be guessed (32 random bytes), but there's no reason to let anyone try thousands.
-  if (throttled(`verify:${req.ip}`, 20, 15 * 60_000)) {
+  if (throttled(`verify:${network(req.ip)}`, 20, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
-  const body = parse(z.object({ token: z.string().min(10).max(200) }), req, res);
+  const body = parse(z.object({ token: Token }), req, res);
   if (!body) return;
   const result = verifyEmailToken(body.token);
   if (!result.ok) {
@@ -261,7 +277,9 @@ api.post('/auth/guest', (req, res) => {
     res.json({ user: getMe(current) });
     return;
   }
-  if (throttled(`guest:${req.ip}`, 20, 60 * 60_000)) {
+  // A mobile operator puts thousands of phones behind one address, and a challenge link shared in a group chat sends
+  // them in together: the per-network cap is high, and a cap on all new guests is the brake on abuse.
+  if (throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) || throttled('guest:all', 5_000, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много нови игри от тази мрежа. Опитай по-късно или си направи профил.' });
     return;
   }
@@ -417,7 +435,8 @@ api.post('/account/claim', requireAuth, async (req, res) => {
       // Matches already played show the new name too.
       run('UPDATE match_players SET name = ? WHERE user_id = ?', creds.username, me.id);
     });
-  } catch {
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
   }
@@ -487,7 +506,7 @@ api.post('/client-errors', (req, res) => {
       kind: z.enum(['render', 'error', 'rejection']),
     })
     .safeParse(req.body);
-  if (body.success && !throttled(`client-error:${req.ip}`, 20, 10 * 60_000)) {
+  if (body.success && !throttled(`client-error:${network(req.ip)}`, 20, 10 * 60_000)) {
     // Untrusted text: one line for the message, an indented block for the stack, so it can't forge log entries.
     // biome-ignore lint/suspicious/noControlCharactersInRegex: it strips control characters on purpose (log forging)
     const line = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
@@ -538,7 +557,7 @@ api.get('/challenges', requireAuth, (_req, res) => {
 
 /** Signed out too: the link's landing page shows who's challenging and the score to beat. */
 api.get('/challenges/:id/preview', (req, res) => {
-  if (throttled(`challenge-preview:${req.ip}`, 120, 60_000)) {
+  if (throttled(`challenge-preview:${network(req.ip)}`, 120, 60_000)) {
     res.status(429).json({ error: 'Твърде много заявки.' });
     return;
   }

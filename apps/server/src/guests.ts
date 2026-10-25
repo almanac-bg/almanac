@@ -22,15 +22,20 @@ export function createGuest(): number {
   throw new Error('No free guest name');
 }
 
+/** Per maintenance run: erasing one takes up to ~10 ms, and a launch-day spike would all expire on the same day. */
+const PURGE_BATCH = 100;
+
 /**
  * A guest without a session can never be signed in to again (no password): it's erased once at least a day old, with
- * its stats — but the matches it played stay in other players' histories, without the name.
+ * its stats — but the matches it played stay in other players' histories, without the name. A batch at a time, so a
+ * big wave of them never stalls running matches; the rest go in the next runs.
  */
 export function purgeGuests(now = Date.now()): number {
   const ids = all<{ id: number }>(
     `SELECT id FROM users WHERE is_guest = 1 AND created_at < ?
-     AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id)`,
+     AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id) LIMIT ?`,
     now - 24 * 60 * 60 * 1000,
+    PURGE_BATCH,
   );
   for (const { id } of ids) eraseAccount(id);
   return ids.length;

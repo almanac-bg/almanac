@@ -1,5 +1,6 @@
 // Relative import: the config is loaded by Node, which can't resolve the shared package's TS sources.
 
+import { createHash } from 'node:crypto';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -46,6 +47,39 @@ export default defineConfig({
           res.setHeader('content-type', 'application/manifest+json');
           res.end(manifest);
         });
+      },
+    },
+    {
+      // The page names its build: the server reads it and tells open tabs, so one still running an older build
+      // reloads after a deploy instead of talking to a newer server (see main.tsx). Built from the output file names,
+      // which carry content hashes: a deploy that didn't change the app reloads nobody.
+      name: 'build-id',
+      transformIndexHtml: {
+        order: 'post',
+        handler(html, ctx) {
+          if (!ctx.bundle) return html;
+          const files = Object.keys(ctx.bundle)
+            .filter((f) => f.startsWith('assets/'))
+            .sort();
+          const id = createHash('sha256').update(files.join('\n')).digest('base64url').slice(0, 12);
+          return html.replace('</head>', `<meta name="app-build" content="${id}" />\n  </head>`);
+        },
+      },
+    },
+    {
+      // The page is in Bulgarian: the Cyrillic cuts of both fonts are needed for the first screen, but the browser
+      // only finds them after the CSS has loaded. Fetched early, the text doesn't flash in a fallback font.
+      name: 'preload-fonts',
+      transformIndexHtml: {
+        order: 'post',
+        handler(html, ctx) {
+          if (!ctx.bundle) return html;
+          const fonts = Object.keys(ctx.bundle).filter((f) =>
+            /^assets\/(onest|unbounded)-cyrillic-wght-normal-[\w-]+\.woff2$/.test(f),
+          );
+          const links = fonts.map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin />`);
+          return html.replace('</head>', `${links.join('\n    ')}\n  </head>`);
+        },
       },
     },
   ],

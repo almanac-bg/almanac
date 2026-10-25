@@ -57,6 +57,11 @@ export function claimDailyAttempt(userId: number): { ok: true; day: string } | {
   return { ok: true, day };
 }
 
+/** The run never got going (or its result couldn't be saved): the day's one attempt is the player's again. */
+export function releaseDailyAttempt(userId: number, day: string) {
+  run('DELETE FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NULL', userId, day);
+}
+
 /** Place on the day's board. Guests aren't listed on it, but a guest still sees where they'd stand. */
 function rankOf(day: string, score: number, timeMs: number, guest = false) {
   const better = one<{ n: number }>(

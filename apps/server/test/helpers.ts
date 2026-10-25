@@ -98,6 +98,7 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       DB_PATH: dbPath,
       QUESTIONS_PATH: questions,
       BOT_FILL_SECONDS: '1',
+      BOT_FILL_BUSY_SECONDS: '1',
       PUBLIC_QUEUES: 'all',
       GAME_TIME_SCALE: '0.05',
       MAIL_OUTBOX: outbox,

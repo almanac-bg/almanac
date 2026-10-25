@@ -62,7 +62,7 @@ jobs:
       - run: docker build -t almanac .
       # Boot the image and wait for the health check to pass.
       - run: |
-          docker run -d --name almanac -p 3001:3001 almanac
+          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI -e OPERATOR_ADDRESS=CI almanac
           for i in $(seq 1 30); do
             curl -sf http://localhost:3001/api/health && exit 0
             sleep 1
@@ -70,8 +70,9 @@ jobs:
           docker logs almanac
           exit 1
       # Backups, end to end with the production Litestream config: stream the live database to S3-compatible storage
-      # (moto stands in for the real thing), write more, then restore elsewhere and read it back. A backup that has
-      # never been restored isn't a backup.
+      # (moto stands in for the real thing), write more, then restore it the way the README does on a new server and
+      # run the app on the restored copy — it must be able to write there too. A backup that has never been restored
+      # isn't a backup.
       - name: Backup and restore with Litestream
         run: |
           set -eu
@@ -80,26 +81,41 @@ jobs:
           export BACKUP_ACCESS_KEY_ID=test BACKUP_SECRET_ACCESS_KEY=test
           env_args="-e BACKUP_BUCKET -e BACKUP_ENDPOINT -e BACKUP_REGION -e BACKUP_ACCESS_KEY_ID -e BACKUP_SECRET_ACCESS_KEY"
           config="-v $PWD/deploy/litestream.yml:/etc/litestream.yml:ro"
+          app_env="-e OPERATOR_NAME=CI -e OPERATOR_ADDRESS=CI"
+          # As in docker-compose.yml: Litestream runs as the app's user.
+          as_app="--user 1000:1000"
+          healthy() {
+            for i in $(seq 1 30); do docker exec "$1" wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1 && return 0; sleep 1; done
+            docker logs "$1"; return 1
+          }
           register() {
-            docker exec app wget -qO- --header='content-type: application/json' \
-              --post-data="{\"username\":\"$1\",\"password\":\"secret123\"}" http://127.0.0.1:3001/api/auth/register
+            docker exec "$1" wget -qO- --header='content-type: application/json' \
+              --post-data="{\"username\":\"$2\",\"password\":\"secret123\"}" http://127.0.0.1:3001/api/auth/register
+          }
+          users() {
+            docker exec "$1" node -e \
+              "const db = new (require('node:sqlite').DatabaseSync)('/data/quiz.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)"
           }
 
           docker network create backup
           docker run -d --name s3 --network backup motoserver/moto:5.2.4
-          docker run -d --name app --network backup -v data:/data almanac
-          for i in $(seq 1 30); do docker exec app wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1 && break; sleep 1; done
+          docker run -d --name app --network backup -v data:/data $app_env almanac
+          healthy app
           docker run --rm --network backup curlimages/curl:8.11.1 -sf -X PUT http://s3:5000/backups
 
-          register before_backup
-          docker run -d --name litestream --network backup -v data:/data $config $env_args "$LITESTREAM" replicate
+          register app before_backup
+          docker run -d --name litestream --network backup $as_app -v data:/data $config $env_args "$LITESTREAM" replicate
           sleep 5
-          register after_backup
+          register app after_backup
           sleep 5
           docker logs litestream
 
-          docker run --rm --network backup -v restored:/restore $config $env_args "$LITESTREAM" restore -o /restore/quiz.db /data/quiz.db
-          users=$(docker run --rm --user root -v restored:/restore almanac node -e \
-            "const db = new (require('node:sqlite').DatabaseSync)('/restore/quiz.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)")
-          echo "restored users: $users"
-          test "$users" = "before_backup,after_backup"
+          # A new server: the data volume created by the app's image (so it's the app user's), restored into, and the
+          # app started on it.
+          docker run --rm -v restored:/data --entrypoint true almanac
+          docker run --rm --network backup $as_app -v restored:/data $config $env_args "$LITESTREAM" restore -o /data/quiz.db /data/quiz.db
+          docker run -d --name restored --network backup -v restored:/data $app_env almanac
+          healthy restored
+          register restored after_restore
+          echo "restored users: $(users restored)"
+          test "$(users restored)" = "before_backup,after_backup,after_restore"

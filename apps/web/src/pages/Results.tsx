@@ -21,9 +21,11 @@ import {
   type MatchRewards,
   MODES,
   RARITIES,
+  RATED_GAMES_PER_PAIR,
   rankFor,
   TEAMS,
   type TeamId,
+  type UnratedReason,
 } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
@@ -70,10 +72,18 @@ export function Results({ game }: { game: LiveGame }) {
   const rewards = end.rewards;
   // A challenge link is played alone, but it has a board: first place over others is a win too.
   const link = rewards?.challenge ?? null;
-  const won = (!single && mine.placement === 1) || (!!link && link.rank === 1 && link.total > 1);
+  const won = (!single && mine.placement === 1 && !end.noContest) || (!!link && link.rank === 1 && link.total > 1);
+  // Everyone else walked out (after the match got going, or it would be no contest).
+  const byWalkout = won && !teamScores && end.standings.every((s) => s.id === youId || s.left);
+  const rivals = end.standings.length > 2 ? 'Съперниците напуснаха' : 'Съперникът напусна';
   const perfect = mine.correct === game.start.totalQuestions;
+  // A no contest says so in the headline; the other reasons a rating stayed put get a card.
+  const unrated = rewards?.unrated && rewards.unrated !== 'no_contest' ? rewards.unrated : null;
+  // A no contest has no podium to show, and nothing to award unless a question or two were answered.
+  const rewardsCard = !end.noContest || (!!rewards && rewards.xpGained > 0);
   const sideCards =
-    !!rewards && (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating);
+    !!rewards &&
+    (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating || !!unrated);
   const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
@@ -141,27 +151,31 @@ export function Results({ game }: { game: LiveGame }) {
   const linkBoard = (id: string) => navigate(`/c/${id}`);
 
   const category = categoryById(game.start.category);
-  const headline = daily
-    ? perfect
-      ? 'Перфектен ден!'
-      : 'Денят е изигран'
-    : link
-      ? link.total <= 1
-        ? 'Летвата е поставена!'
-        : link.rank === 1
-          ? 'Първо място!'
-          : `${ordinal(link.rank)} място`
-      : single
-        ? perfect
-          ? 'Перфектно!'
-          : 'Край на играта'
-        : teamScores
-          ? won
-            ? 'Победа!'
-            : 'Загуба'
-          : won
-            ? 'Победа!'
-            : `${ordinal(mine.placement)} място`;
+  const headline = end.noContest
+    ? rivals
+    : daily
+      ? perfect
+        ? 'Перфектен ден!'
+        : 'Денят е изигран'
+      : link
+        ? link.total <= 1
+          ? mine.score > 0
+            ? 'Летвата е поставена!'
+            : 'Линкът е готов'
+          : link.rank === 1
+            ? 'Първо място!'
+            : `${ordinal(link.rank)} място`
+        : single
+          ? perfect
+            ? 'Перфектно!'
+            : 'Край на играта'
+          : teamScores
+            ? won
+              ? 'Победа!'
+              : 'Загуба'
+            : won
+              ? 'Победа!'
+              : `${ordinal(mine.placement)} място`;
   // A long word ("Перфектно!", "поставена!") is wider than a small phone at the usual size: such headlines scale with
   // the screen instead (10vw always leaves room for ten letters).
   const longWord = headline.split(' ').some((w) => w.length > 7);
@@ -201,17 +215,26 @@ export function Results({ game }: { game: LiveGame }) {
             {TEAMS[winningTeam].name} печелят!
           </motion.p>
         )}
-        <p className="mt-3 text-fg-2">
-          {mine.eliminatedAt !== null ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Skull className="size-4 text-rose-300" /> Отпадна след въпрос {mine.eliminatedAt}
-            </span>
-          ) : (
-            <>
-              <b className="text-fg">{fmt(mine.score)}</b> точки · {mine.correct} от {game.start.totalQuestions} верни
-            </>
-          )}
-        </p>
+        {!end.noContest && (
+          <p className="mt-3 text-fg-2">
+            {mine.eliminatedAt !== null ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Skull className="size-4 text-rose-300" /> Отпадна след въпрос {mine.eliminatedAt}
+              </span>
+            ) : (
+              <>
+                <b className="text-fg">{fmt(mine.score)}</b> точки · {mine.correct} от {game.start.totalQuestions} верни
+              </>
+            )}
+          </p>
+        )}
+        {(end.noContest || byWalkout) && (
+          <p className={clsx('mx-auto max-w-md text-fg-3', end.noContest ? 'mt-4' : 'mt-2 text-sm')}>
+            {end.noContest
+              ? 'Още в началото, затова мачът не се зачита: без победа и без промяна в рейтинга.'
+              : `${rivals} по време на мача — победата е твоя.`}
+          </p>
+        )}
       </motion.header>
 
       {/* The standings offer "+ Приятел" beside each person you played with. */}
@@ -219,7 +242,7 @@ export function Results({ game }: { game: LiveGame }) {
         {teamScores ? (
           <TeamResult game={game} end={end} />
         ) : (
-          !single && <Podium game={game} standings={end.standings} />
+          !single && !end.noContest && <Podium game={game} standings={end.standings} />
         )}
       </FriendsProvider>
       {link && (
@@ -239,9 +262,10 @@ export function Results({ game }: { game: LiveGame }) {
         className={clsx(
           'mt-10 grid grid-cols-[minmax(0,1fr)] gap-4',
           sideCards ? 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]' : 'mx-auto max-w-2xl',
+          !rewardsCard && !sideCards && 'hidden',
         )}
       >
-        {rewards ? (
+        {!rewardsCard ? null : rewards ? (
           <RewardsCard rewards={rewards} />
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
@@ -249,16 +273,12 @@ export function Results({ game }: { game: LiveGame }) {
         {sideCards && (
           <div className="space-y-4">
             {rewards.daily && (
-              <DailyCard
-                daily={rewards.daily}
-                onBoard={dailyBoard}
-                history={game.history}
-                total={game.start.totalQuestions}
-              />
+              <DailyCard daily={rewards.daily} history={game.history} total={game.start.totalQuestions} />
             )}
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
             {rewards.rating && <RatingCard rating={rewards.rating} />}
+            {unrated && <UnratedCard reason={unrated} guest={guest} />}
           </div>
         )}
       </div>
@@ -422,7 +442,7 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
                   👑
                 </motion.span>
               )}
-              <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 84 : 68} />
+              <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 84 : 68} dim={s.left} />
               <div
                 className={clsx(
                   'mt-2 flex max-w-full items-center gap-1 text-sm font-semibold',
@@ -434,7 +454,8 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
               </div>
               {/* The bot chip goes on the score line: next to the name it would cut the name to a few letters. */}
               <div className="flex items-center gap-1.5 text-xs text-fg-3 tabular-nums">
-                {fmt(s.score)} т.{p.isBot && <BotTag />}
+                {s.left ? 'напусна' : `${fmt(s.score)} т.`}
+                {p.isBot && <BotTag />}
               </div>
               <FriendButton player={p} youId={game.start.youId} compact={top.length > 2} className="mt-1.5" />
               <div
@@ -464,7 +485,9 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
                   s.id === game.start.youId && 'bg-violet-500/12',
                 )}
               >
-                <span className="w-8 text-sm font-bold text-fg-3">{ordinal(s.placement)}</span>
+                <span className="w-10 shrink-0 text-sm font-bold whitespace-nowrap text-fg-3">
+                  {ordinal(s.placement)}
+                </span>
                 <Avatar avatar={p.avatar} frame={p.frame} size={34} dim={s.left} />
                 <div className="min-w-0 flex-1 text-sm">
                   <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
@@ -555,14 +578,13 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
   );
 }
 
+/** The day's standing and streak. The way to the full board is the main button in the action bar below. */
 function DailyCard({
   daily,
-  onBoard,
   history,
   total,
 }: {
   daily: NonNullable<MatchRewards['daily']>;
-  onBoard: () => void;
   history: ReviewItem[];
   total: number;
 }) {
@@ -571,7 +593,7 @@ function DailyCard({
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
-      <h2 className="relative font-display text-lg font-bold">Класиране за деня</h2>
+      <h2 className="relative font-display text-lg font-bold">Твоето място днес</h2>
       <div className="relative mt-3 flex items-baseline gap-2">
         <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
         <span className="text-fg-2">от {fmt(daily.total)} днес</span>
@@ -607,17 +629,10 @@ function DailyCard({
         </motion.div>
       )}
       <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
-      <div className="relative mt-4 flex flex-wrap items-center gap-3">
+      <div className="relative mt-4">
         <Button size="sm" onClick={() => shareText(text)}>
           <Share2 className="size-4" /> Сподели резултата
         </Button>
-        <button
-          type="button"
-          onClick={onBoard}
-          className="focus-ring inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-amber-300 hover:text-amber-200"
-        >
-          Виж класирането →
-        </button>
       </div>
     </Card>
   );
@@ -778,6 +793,22 @@ function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
           );
         })}
       </div>
+    </Card>
+  );
+}
+
+/** A ranked match that left the rating as it was, and why (instead of a puzzling "+0"). */
+function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_contest'>; guest: boolean }) {
+  return (
+    <Card className="p-6">
+      <h2 className="font-display text-lg font-bold">Рейтинг</h2>
+      <p className="mt-2 text-sm text-fg-2">
+        {reason === 'pair'
+          ? `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`
+          : guest
+            ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
+            : 'Мачовете срещу гости са без рейтинг.'}
+      </p>
     </Card>
   );
 }

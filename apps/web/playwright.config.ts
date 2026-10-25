@@ -91,7 +91,10 @@ export default defineConfig({
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s.
       GAME_TIME_SCALE: '0.15',
       BOT_FILL_SECONDS: '1',
+      BOT_FILL_BUSY_SECONDS: '1',
       BACKUP_DIR: 'off',
+      OPERATOR_NAME: 'Тест Тестов',
+      OPERATOR_ADDRESS: 'ул. Примерна 1, София',
       DRAIN_SECONDS: '0',
       // Nothing from the developer's shell: only Дуел and Роял open, no real email or error reports.
       PUBLIC_QUEUES: '',

@@ -30,6 +30,9 @@ export const SCORING = {
 
 export const START_RATING = 1000;
 
+/** Win-trading guard: the same two people only move each other's rating this many times a day. */
+export const RATED_GAMES_PER_PAIR = 3;
+
 export const RANK_TIERS = [
   { id: 'bronze', name: 'Бронз', min: -Infinity, color: '#d4915c' },
   { id: 'silver', name: 'Сребро', min: 1100, color: '#cbd5e1' },

@@ -22,12 +22,17 @@ import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { useMediaQuery } from '../lib/media';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
+
+/** The header's buttons: a row of their own under the level bar; from lg a column on the right. */
+const HEADER_ACTIONS = 'col-span-2 sm:col-span-1 sm:col-start-2 lg:col-start-3 lg:row-span-2 lg:row-start-1';
 
 export function ProfilePage() {
   const me = useStore((s) => s.me)!;
   const { username = me.username } = useParams();
+  const roomy = useMediaQuery('(min-width: 640px)');
   const friendsVersion = useStore((s) => s.friendsVersion);
   // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
   const { data, error, retry, setData } = useLoad(() => api.profile(username), username, `${me.xp}:${friendsVersion}`);
@@ -48,30 +53,32 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <Card className="relative overflow-hidden p-6 sm:p-8">
+      <Card className="relative overflow-hidden p-5 sm:p-8">
         <div className="absolute -top-24 -right-24 size-80 rounded-full bg-fuchsia-600/20 blur-3xl" />
-        <div className="relative flex flex-wrap items-center gap-6">
-          <Avatar avatar={user.avatar} frame={user.frame} size={112} />
-          <div className="min-w-0 flex-1">
+        {/* Phones: a smaller avatar beside the name, the level bar and the buttons full width under them. Wider: the
+            avatar spans the name and the bar; from lg the buttons go to the right. */}
+        <div className="relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 sm:gap-x-6 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+          <Avatar avatar={user.avatar} frame={user.frame} size={roomy ? 112 : 72} className="sm:row-span-2" />
+          <div className="min-w-0 sm:self-end">
             <p className="text-sm font-semibold text-violet-300">{titleName(user.title)}</p>
-            <h1 className="line-clamp-2 font-display text-3xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">
+            <h1 className="line-clamp-2 font-display text-2xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">
               {user.username}
             </h1>
             <p className="mt-1 text-sm text-fg-3">
               Играе от {longDate(user.createdAt)} · {data.achievements.length}/{ACHIEVEMENTS.length} постижения
             </p>
-            <div className="mt-4 max-w-md">
-              <div className="mb-1.5 flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 font-semibold">
-                  <LevelBadge level={progress.level} /> Ниво {progress.level}
-                </span>
-                <span className="text-fg-3 tabular-nums">{fmt(user.xp)} XP общо</span>
-              </div>
-              <ProgressBar value={progress.pct} />
+          </div>
+          <div className="col-span-2 max-w-md sm:col-span-1 sm:col-start-2 sm:self-start">
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 text-sm">
+              <span className="flex items-center gap-2 font-semibold">
+                <LevelBadge level={progress.level} /> Ниво {progress.level}
+              </span>
+              <span className="text-fg-3 tabular-nums">{fmt(user.xp)} XP общо</span>
             </div>
+            <ProgressBar value={progress.pct} />
           </div>
           {isMe ? (
-            <div className="flex flex-wrap gap-2">
+            <div className={clsx('flex flex-wrap gap-2', HEADER_ACTIONS)}>
               <Link
                 to="/locker"
                 className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10"
@@ -88,7 +95,7 @@ export function ProfilePage() {
           ) : (
             // Friends and reports need a saved account; a guest gets nothing here that would only be refused.
             !me.isGuest && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={clsx('flex flex-wrap items-center gap-2', HEADER_ACTIONS)}>
                 <FriendActions profile={data} onChange={setData} />
                 <ReportButton username={user.username} />
               </div>
@@ -435,7 +442,10 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-/** One series → one color. Value column doubles as the table view; hover/focus shows detail. */
+/**
+ * One series → one color. Value column doubles as the table view; hovering a row shows its counts, which screen
+ * readers get in the value cell (ten rows as tab stops only to show a tooltip were ten extra stops on the way down).
+ */
 function CategoryBars({ categories }: { categories: ProfileStats['categories'] }) {
   const [active, setActive] = useState<string | null>(null);
   const rows = CATEGORIES.map((c) => {
@@ -451,16 +461,14 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
         const accuracy = r.answered ? r.correct / r.answered : 0;
         const isActive = active === r.id;
         return (
+          // biome-ignore lint/a11y/useFocusableInteractive: a table row, not a widget (the hover adds nothing it says)
           <div
             key={r.id}
             role="row"
-            tabIndex={0}
             onMouseEnter={() => setActive(r.id)}
             onMouseLeave={() => setActive(null)}
-            onFocus={() => setActive(r.id)}
-            onBlur={() => setActive(null)}
             className={clsx(
-              'focus-ring relative grid grid-cols-[minmax(0,11.5rem)_1fr_3.5rem] items-center gap-3 rounded-xl px-2 py-1.5 outline-none',
+              'relative grid grid-cols-[minmax(0,11.5rem)_1fr_3.5rem] items-center gap-3 rounded-xl px-2 py-1.5',
               isActive && 'bg-white/[0.04]',
             )}
           >
@@ -478,10 +486,25 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
               )}
             </span>
             <span role="cell" className="text-right text-sm font-semibold tabular-nums">
-              {r.answered ? `${Math.round(accuracy * 100)}%` : <span className="text-fg-3">—</span>}
+              {r.answered ? (
+                <>
+                  {Math.round(accuracy * 100)}%
+                  <span className="sr-only">
+                    {' '}
+                    ({fmt(r.correct)} от {fmt(r.answered)} верни)
+                  </span>
+                </>
+              ) : (
+                <span className="text-fg-3">
+                  —<span className="sr-only"> (още няма отговори)</span>
+                </span>
+              )}
             </span>
             {isActive && (
-              <span className="pointer-events-none absolute top-full right-2 z-10 mt-1 rounded-xl border border-line bg-ink-2 px-3 py-2 text-xs whitespace-nowrap text-fg shadow-xl">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute top-full right-2 z-10 mt-1 rounded-xl border border-line bg-ink-2 px-3 py-2 text-xs whitespace-nowrap text-fg shadow-xl"
+              >
                 {r.answered ? (
                   <>
                     <b>{r.name}</b> · {fmt(r.correct)} от {fmt(r.answered)} верни

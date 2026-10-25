@@ -114,7 +114,7 @@ function Friends() {
           <SectionTitle>
             Покани за приятелство <span className="text-fuchsia-300">{data.incoming.length}</span>
           </SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
             <AnimatePresence initial={false}>
               {data.incoming.map((f) => (
                 <motion.div
@@ -124,15 +124,11 @@ function Friends() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
-                  <Card className="flex items-center gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
-                    <PersonLink entry={f} />
+                  {/* Where the name would be left a few letters, the buttons go under it. */}
+                  <Card className="flex flex-wrap items-center justify-end gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
+                    <PersonLink entry={f} className="basis-32" />
                     <div className="flex shrink-0 gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          mutate(() => api.acceptFriend(f.user.id), `${f.user.username} вече е твой приятел!`)
-                        }
-                      >
+                      <Button size="sm" onClick={() => mutate(() => api.acceptFriend(f.user.id), 'Вече сте приятели!')}>
                         <Check className="size-4" /> Приеми
                       </Button>
                       <Button
@@ -254,12 +250,12 @@ function AddFriendForm({ onAdded }: { onAdded: (d: FriendsResponse) => void }) {
   );
 }
 
-function PersonLink({ entry, hint }: { entry: FriendEntry; hint?: string }) {
+function PersonLink({ entry, hint, className }: { entry: FriendEntry; hint?: string; className?: string }) {
   const { user } = entry;
   return (
     <Link
       to={`/profile/${encodeURIComponent(user.username)}`}
-      className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+      className={clsx('focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl', className)}
     >
       <Avatar avatar={user.avatar} frame={user.frame} size={44} />
       <div className="min-w-0">

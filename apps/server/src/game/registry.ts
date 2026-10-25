@@ -10,6 +10,8 @@ import {
   unlockedIds,
 } from '@quiz/shared';
 import { unlockContext } from '../account';
+import { releaseChallengeAttempt } from '../challenges';
+import { releaseDailyAttempt } from '../daily';
 import { friendsChanged } from '../notify';
 import { markSeen, type PreparedQuestion, pickQuestions, recentFor } from '../questions';
 import { getRating } from '../seasons';
@@ -111,6 +113,13 @@ export class GameRegistry {
     return this.games.size;
   }
 
+  /** Ends every match still running (the server is stopping); returns how many there were. */
+  stopAll(): number {
+    const live = [...this.games.values()];
+    for (const game of live) game.stop();
+    return live.length;
+  }
+
   /** Resolves once no match is running (or after `maxMs`). */
   idle(maxMs: number): Promise<void> {
     if (this.games.size === 0 || maxMs <= 0) return Promise.resolve();
@@ -157,7 +166,18 @@ export class GameRegistry {
       },
       emitter,
       {
-        finalize: finalizeMatch,
+        finalize: (g, standings) => {
+          try {
+            return finalizeMatch(g, standings);
+          } catch (err) {
+            // Nothing of the match was saved: a daily or challenge-link run must not cost the player their one try.
+            for (const h of g.humans) {
+              if (g.setup.dailyDay) releaseDailyAttempt(h.player.userId!, g.setup.dailyDay);
+              if (g.setup.challengeId) releaseChallengeAttempt(g.setup.challengeId, h.player.userId!);
+            }
+            throw err;
+          }
+        },
         undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
         onClosed: (g) => this.close(g),
       },

@@ -16,13 +16,18 @@ interface Entry {
   joinedAt: number;
 }
 
-/** First-come-first-served queues per mode; bots fill the gaps after `config.botFillMs`. */
+/**
+ * First-come-first-served queues per mode. Bots fill the gaps after `config.botFillMs` — or `config.botFillBusyMs`
+ * while someone else who could join is online (`idleOnline`: online, not in a match or a queue): when few people
+ * play, an 8-second window almost never brings two of them together.
+ */
 export class Matchmaker {
   private queues = Object.fromEntries(QUEUE_MODES.map((m) => [m, [] as Entry[]])) as Record<QueueModeId, Entry[]>;
 
   constructor(
     private io: IO,
     private games: GameRegistry,
+    private idleOnline: () => number,
   ) {
     setInterval(
       guarded('matchmaking', () => this.tick()),
@@ -70,16 +75,25 @@ export class Matchmaker {
     if (mode) this.broadcast(mode);
   }
 
+  /** How long the queues wait for people before bots fill in; null with bots off. */
+  private fillMs(): number | null {
+    if (config.botFillMs === null) return null;
+    if (config.botFillBusyMs === config.botFillMs || QUEUE_MODES.every((m) => this.queues[m].length === 0))
+      return config.botFillMs;
+    return this.idleOnline() > 0 ? config.botFillBusyMs : config.botFillMs;
+  }
+
   private tick() {
     const now = Date.now();
+    const fill = this.fillMs();
     for (const mode of QUEUE_MODES) {
       const q = this.queues[mode];
       const needed = MODES[mode].players;
       while (q.length >= needed) this.launch(mode, q.splice(0, needed));
-      if (q.length > 0 && config.botFillMs !== null && now - q[0].joinedAt >= config.botFillMs) {
+      if (q.length > 0 && fill !== null && now - q[0].joinedAt >= fill) {
         this.launch(mode, q.splice(0, needed));
       }
-      this.broadcast(mode);
+      this.broadcast(mode, fill);
     }
   }
 
@@ -128,8 +142,9 @@ export class Matchmaker {
     }
   }
 
-  private broadcast(mode: QueueModeId) {
+  private broadcast(mode: QueueModeId, fill = this.fillMs()) {
     const q = this.queues[mode];
+    if (q.length === 0) return;
     const now = Date.now();
     for (const e of q) {
       this.io.to(`user:${e.userId}`).emit('queue:status', {
@@ -137,7 +152,7 @@ export class Matchmaker {
         found: q.length,
         needed: MODES[mode].players,
         waitedMs: now - e.joinedAt,
-        botFillMs: config.botFillMs === null ? null : Math.max(0, config.botFillMs - (now - q[0].joinedAt)),
+        botFillMs: fill === null ? null : Math.max(0, fill - (now - q[0].joinedAt)),
       });
     }
   }

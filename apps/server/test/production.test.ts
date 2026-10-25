@@ -1,4 +1,4 @@
-// The server as it runs in production (NODE_ENV=production): admins, browser hardening, health.
+// The server as it runs in production (NODE_ENV=production): admins, browser hardening, health, what it refuses.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +40,43 @@ test('nobody becomes an admin by signing up; the admin command line makes one', 
 
   assert.equal(cli(srv.dbPath, 'admin', 'remove', 'Собственик').status, 0);
   assert.equal((await api.get('/api/me', owner.cookie)).body.user.isAdmin, false);
+});
+
+test('a double-tapped sign-up makes one account and a clear "taken", never a server error', async () => {
+  const signUp = () =>
+    fetch(`${srv.url}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'dvoen_klik', password: 'secret123' }),
+    });
+  const responses = await Promise.all([signUp(), signUp(), signUp()]);
+  assert.deepEqual(responses.map((r) => r.status).sort(), [201, 409, 409]);
+  const taken = (await responses.find((r) => r.status === 409)!.json()) as { error: string };
+  assert.equal(taken.error, 'Това име вече е заето.');
+});
+
+test('a link cut short by a mail app gets a Bulgarian answer, not a validator message', async () => {
+  const post = async (route: string, body: unknown) => {
+    const res = await fetch(`${srv.url}/api${route}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return [res.status, ((await res.json()) as { error: string }).error] as const;
+  };
+  for (const route of ['/auth/verify-email', '/auth/reset']) {
+    const [status, error] = await post(route, { token: 'abc', password: 'secret123' });
+    assert.equal(status, 400);
+    assert.match(error, /^Линкът е непълен/);
+  }
+  assert.deepEqual(await post('/auth/verify-email', { token: 42 }), [400, 'Невалидни данни.']);
+});
+
+test('production refuses to start without who runs the site (the legal pages need it)', async () => {
+  await assert.rejects(
+    startServer({ NODE_ENV: 'production', OPERATOR_NAME: '', OPERATOR_ADDRESS: '' }),
+    /OPERATOR_NAME and OPERATOR_ADDRESS/,
+  );
 });
 
 test('responses carry the browser hardening headers', async () => {
@@ -93,6 +130,19 @@ test('with error reporting on, the page carries the DSN and the tunnel only take
     const page = await (await fetch(`${srv.url}/`)).text();
     assert.ok(page.includes(`<meta name="sentry-dsn" content="${DSN}" />`));
   }
+});
+
+test('the lobby names the web build the server hosts, so tabs of an older one can reload', async () => {
+  const built = fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'));
+  const player = await register(srv.url, 'build_test');
+  const socket = connect(srv.url, player.cookie);
+  const stats = next(socket, 'lobby:stats');
+  await connected(socket);
+  const { build } = await stats;
+  socket.close();
+  if (!built) return assert.equal(build, null);
+  const page = await (await fetch(`${srv.url}/`)).text();
+  assert.ok(build && page.includes(`<meta name="app-build" content="${build}" />`), `build ${build}`);
 });
 
 test('who runs the site comes from the configuration, not the code (and the footer can link the source)', async () => {

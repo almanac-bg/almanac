@@ -25,6 +25,7 @@ services:
       # Caddy reaches the app through the Docker bridge (a private address); only it may set X-Forwarded-For.
       TRUST_PROXY: loopback, uniquelocal
       BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
+      BOT_FILL_BUSY_SECONDS: ${BOT_FILL_BUSY_SECONDS:-20}
       PUBLIC_QUEUES: ${PUBLIC_QUEUES:-duel,royale}
       SENTRY_DSN: ${SENTRY_DSN:-}
       OPERATOR_NAME: ${OPERATOR_NAME:-}
@@ -69,6 +70,10 @@ services:
     restart: unless-stopped
     logging: *logging
     security_opt: ["no-new-privileges:true"]
+    # The app's user (node in the Node image): a database Litestream restores, and everything it keeps next to it,
+    # must be the app's to write. The app comes first, so the data volume is created as the app's.
+    user: "1000:1000"
+    depends_on: [app]
     command: replicate
     environment:
       BACKUP_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}

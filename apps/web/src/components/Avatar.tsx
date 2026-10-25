@@ -52,7 +52,8 @@ export function LevelBadge({ level, className }: { level: number; className?: st
     <span
       title={`Ниво ${level}`}
       className={clsx(
-        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-[11px] leading-none font-extrabold text-white shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
+        // A dark digit: white on this gradient is under 3:1.
+        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-[11px] leading-none font-extrabold text-ink shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
         className,
       )}
     >
@@ -92,7 +93,7 @@ export function PlayerTag({
         <span className="truncate font-semibold">{name}</span>
         <LevelBadge level={level} />
         {isBot && (
-          <span className="rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-3">БОТ</span>
+          <span className="rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-2">БОТ</span>
         )}
       </div>
       <div className="truncate text-xs text-fg-3">{titleName(title)}</div>

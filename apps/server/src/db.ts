@@ -356,6 +356,20 @@ const MIGRATIONS: (string | (() => void))[] = [
   `,
 ];
 
+/**
+ * A copy of the database as it was before this code's migrations (into the backups folder): migrations only go
+ * forward, so this is the way back to the previous version should a deploy go wrong. Taken once per schema version —
+ * a crash-looping deploy doesn't fill the disk with copies.
+ */
+function copyBeforeMigrating(from: number) {
+  if (!config.backupDir) return;
+  const file = path.join(config.backupDir, `quiz-v${from}-before-v${MIGRATIONS.length}.db`);
+  if (fs.existsSync(file)) return;
+  fs.mkdirSync(config.backupDir, { recursive: true });
+  db.exec(`VACUUM INTO '${file.replaceAll("'", "''")}'`);
+  console.log(`💾 Saved the database before migrating (v${from} → v${MIGRATIONS.length}): ${file}`);
+}
+
 function migrate() {
   const { user_version: current } = db.prepare('PRAGMA user_version').get() as { user_version: number };
   // A database from newer code would silently skip this code's future migrations — refuse it instead.
@@ -364,6 +378,7 @@ function migrate() {
       `Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`,
     );
   }
+  if (current > 0 && current < MIGRATIONS.length) copyBeforeMigrating(current);
   for (let v = current; v < MIGRATIONS.length; v++) {
     tx(() => {
       const step = MIGRATIONS[v];
@@ -396,9 +411,17 @@ export function run(sql: string, ...params: SQLInputValue[]) {
   return stmt(sql).run(...params);
 }
 
+/** A UNIQUE constraint said no: e.g. two sign-ups for the same name at once, both past the "is it free?" check. */
+export function isUniqueViolation(err: unknown): boolean {
+  return (err as { errcode?: unknown } | null)?.errcode === 2067; // SQLITE_CONSTRAINT_UNIQUE
+}
+
 let txDepth = 0;
 
-/** Runs `fn` in a transaction. Nested calls join the outer transaction. */
+/**
+ * Runs `fn` in a transaction. Nested calls join the outer transaction, so an inner failure that an outer caller catches
+ * still commits the outer work done so far.
+ */
 export function tx<T>(fn: () => T): T {
   if (txDepth > 0) return fn();
   db.exec('BEGIN');

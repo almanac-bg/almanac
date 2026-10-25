@@ -77,6 +77,11 @@ export function claimChallengeAttempt(id: string, userId: number): { ok: true } 
   return { ok: true };
 }
 
+/** The run never got going (or its result couldn't be saved): the link's one attempt is the player's again. */
+export function releaseChallengeAttempt(id: string, userId: number) {
+  run('DELETE FROM challenge_results WHERE challenge_id = ? AND user_id = ? AND finished_at IS NULL', id, userId);
+}
+
 function finished(id: string): ResultRow[] {
   return all<ResultRow>(
     `SELECT u.*, r.score, r.correct, r.time_ms FROM challenge_results r JOIN users u ON u.id = r.user_id

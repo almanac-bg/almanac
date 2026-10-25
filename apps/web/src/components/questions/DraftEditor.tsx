@@ -54,7 +54,7 @@ export function DraftEditor({
                   onClick={() => set({ category: c.id })}
                   aria-pressed={active}
                   className={clsx(
-                    'focus-ring flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors',
+                    'focus-ring flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors pointer-coarse:min-h-11',
                     active ? 'text-fg' : 'border-line bg-white/[0.03] text-fg-2 hover:bg-white/[0.07]',
                   )}
                   style={active ? { borderColor: `${c.color}99`, background: `${c.color}1f` } : undefined}
@@ -131,7 +131,7 @@ export function DraftEditor({
                   aria-pressed={correct}
                   title="Верен отговор"
                   className={clsx(
-                    'focus-ring inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition-colors',
+                    'focus-ring inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition-colors pointer-coarse:h-11',
                     correct ? 'bg-emerald-400 text-ink' : 'bg-white/5 text-fg-3 hover:bg-white/10 hover:text-fg-2',
                   )}
                 >

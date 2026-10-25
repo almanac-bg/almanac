@@ -39,6 +39,8 @@ const ABANDON_MS = 30_000;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
+/** A match the other side walks out of before this many questions were played counts for nobody who stayed. */
+const NO_CONTEST_QUESTIONS = 3;
 
 type Events = ServerToClientEvents;
 type Args<E extends keyof Events> = Parameters<Events[E]>;
@@ -125,6 +127,10 @@ export class Game {
   readonly schedule: number[];
   phase: Phase = 'countdown';
   index = -1;
+  /** Questions played to the reveal. */
+  played = 0;
+  /** Ended before the last question because only one side was left in it. */
+  endedByWalkout = false;
 
   private questionStartedAt = 0;
   private timers = new Set<NodeJS.Timeout>();
@@ -204,6 +210,7 @@ export class Game {
     if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
     const userId = p.player.userId!;
     const q = this.questions[this.index];
+    if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
     if (powerup === 'freeze') {
       const target = this.freezeTarget(p);
@@ -261,6 +268,7 @@ export class Game {
     p.leftOrder = ++this.leaves;
     p.connected = false;
     this.emit.toGame('game:presence', { playerId, connected: false, left: true });
+    if (this.decided()) this.endedByWalkout = true;
     if (this.humans.every((h) => h.left) || this.decided()) return this.end();
     this.maybeRevealEarly();
     this.checkAbandoned();
@@ -288,6 +296,11 @@ export class Game {
       start: this.startPayload(playerId, 0),
       question: this.phase === 'question' ? this.questionPayload() : null,
     };
+  }
+
+  /** The server is stopping and can't wait any longer: the match ends here, and the scores so far count. */
+  stop() {
+    this.guard(() => this.end());
   }
 
   // ─── Flow ────────────────────────────────────────────────────────────────
@@ -336,6 +349,7 @@ export class Game {
   private reveal() {
     if (this.phase !== 'question') return;
     this.phase = 'reveal';
+    this.played++;
     this.clearTimers();
 
     const q = this.questions[this.index];
@@ -423,9 +437,9 @@ export class Game {
     } catch (err) {
       void reportError(err, 'match results', { extra: { match: this.id, mode: this.setup.mode } });
     }
+    // `humans` leaves out anyone who deleted their account mid-match (finalize forgets their user id).
     for (const p of this.humans) {
-      const userId = p.player.userId;
-      if (userId === null) continue; // deleted their account mid-match
+      const userId = p.player.userId!;
       const mine = rewards.get(userId) ?? null;
       if (p.left) {
         // Knocked out, then off to something else: just say how it ended.
@@ -444,6 +458,7 @@ export class Game {
         standings,
         teamScores,
         rewards: mine,
+        noContest: this.noContest,
       };
       this.emit.toUser(userId, 'game:end', payload);
       if (!p.connected) this.hooks.undelivered(userId, this.startPayload(p.player.id, 0), payload);
@@ -546,6 +561,16 @@ export class Game {
   /** Walked out while still in the game (leaving after being knocked out isn't a forfeit). */
   forfeited(p: Participant) {
     return p.left && p.eliminatedAt === null;
+  }
+
+  /** The other side walked out before the match got going: no win, no rating, no match played for whoever stayed. */
+  get noContest() {
+    return this.endedByWalkout && this.played < NO_CONTEST_QUESTIONS;
+  }
+
+  /** How much of the match was played: one cut short (by a walkout, or the server stopping) pays for what it took. */
+  get playedShare() {
+    return this.played / this.questions.length;
   }
 
   /** A multiplayer match is over once only one side is still in it. */
@@ -664,7 +689,8 @@ export class Game {
   private checkAbandoned() {
     const anyoneHere = this.humans.some((h) => !h.left && h.connected);
     if (anyoneHere || this.abandonTimer) return;
-    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), ABANDON_MS);
+    // Not one of `timers` (every reveal clears those), but on the same game clock.
+    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), ABANDON_MS * config.gameTimeScale);
   }
 
   private later(ms: number, fn: () => void): NodeJS.Timeout {

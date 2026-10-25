@@ -1,4 +1,14 @@
-import { expect, expectLobby, expectNoSideScroll, type Page, playMatch, startSolo, test } from './support';
+import {
+  expect,
+  expectLobby,
+  expectNoSideScroll,
+  type Page,
+  playMatch,
+  signUp,
+  startSolo,
+  test,
+  uniqueName,
+} from './support';
 
 /**
  * Nothing on the main screens may be wider than the screen (a page that scrolls sideways on a phone is broken):
@@ -47,4 +57,25 @@ test('phones 320 and 375 px wide never scroll sideways', async ({ page }) => {
 
 test('a 1280×800 screen never scrolls sideways', { tag: '@desktop' }, async ({ page }) => {
   await checkScreens(page, [{ width: 1280, height: 800 }]);
+});
+
+// A request's card holds a name and two buttons: on a narrow phone the buttons go under the name.
+test('a friend request waiting fits the friends page on a 320 px phone', async ({ page, newPlayer }) => {
+  const anna = uniqueName('Анна');
+  await signUp(page, anna, 'parola-123');
+  const boris = await newPlayer();
+  await signUp(boris, uniqueName('Борис'), 'parola-123');
+  await boris.goto('/friends');
+  await boris.getByLabel('Потребителско име на приятел', { exact: true }).fill(anna);
+  await boris.getByRole('button', { name: 'Добави', exact: true }).click();
+  await expect(boris.getByText('Поканата е изпратена')).toBeVisible();
+
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 640 });
+    await page.goto('/friends');
+    await expect(page.getByRole('button', { name: 'Приеми', exact: true })).toBeVisible();
+    await expectNoSideScroll(page, `friends page with a request at ${width}px`);
+  }
+  await page.getByRole('button', { name: 'Приеми', exact: true }).click();
+  await expect(page.getByText('Вече сте приятели!')).toBeVisible();
 });

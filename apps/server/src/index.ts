@@ -13,7 +13,7 @@ import { questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
 import { securityHeaders } from './security';
-import { throttled } from './throttle';
+import { network, throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
 
@@ -23,18 +23,37 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(securityHeaders);
 app.use(express.json({ limit: '20kb' }));
-// For uptime monitors: answers only if the database does too.
+/** Below this much free space on the database's disk, writes are about to start failing (and backups with them). */
+const MIN_FREE_DISK = 256 * 1024 * 1024;
+
+function freeDisk(): number | null {
+  try {
+    const s = fs.statfsSync(path.dirname(config.dbPath));
+    return s.bavail * s.bsize;
+  } catch {
+    return null;
+  }
+}
+
+// For uptime monitors: answers only if the database does too, and its disk has room. A read alone stays green on a
+// full disk, while every match result fails to save.
 app.get('/api/health', (_req, res) => {
   try {
     db.prepare('SELECT 1').get();
-    res.json({ ok: true });
   } catch {
-    res.status(503).json({ ok: false });
+    res.status(503).json({ ok: false, problem: 'database' });
+    return;
   }
+  const free = freeDisk();
+  if (free !== null && free < MIN_FREE_DISK) {
+    res.status(503).json({ ok: false, problem: 'disk' });
+    return;
+  }
+  res.json({ ok: true });
 });
 // The browser SDK's error reports, passed on to Sentry (see monitoring.ts). Envelopes are plain text, not JSON.
 app.post('/api/monitoring', express.text({ type: () => true, limit: '256kb' }), (req, res) => {
-  if (throttled(`monitoring:${req.ip}`, 60, 60_000)) {
+  if (throttled(`monitoring:${network(req.ip)}`, 20, 60_000)) {
     res.status(429).end();
     return;
   }
@@ -121,8 +140,15 @@ for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
   });
 }
 
+// A public service must say who runs it (ЗЕТ чл. 4, GDPR чл. 13): no launching with placeholders in the legal pages.
 if (config.production && (!config.operator.name || !config.operator.address)) {
-  console.warn('⚖️  OPERATOR_NAME and OPERATOR_ADDRESS are not set: the privacy policy and terms show placeholders.');
+  console.error(
+    '⚖️  Set OPERATOR_NAME and OPERATOR_ADDRESS (see .env.example): the privacy policy and terms need them.',
+  );
+  process.exit(1);
+}
+if (config.production && config.gameTimeScale !== 1) {
+  console.warn(`⏱️  GAME_TIME_SCALE is ${config.gameTimeScale}: every timer in every match runs at that speed.`);
 }
 
 const server = http.createServer(app);

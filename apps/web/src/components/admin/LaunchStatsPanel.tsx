@@ -1,6 +1,7 @@
 import { api, fmt } from '@quiz/client';
 import type { LaunchStats } from '@quiz/shared';
-import { useState } from 'react';
+import clsx from 'clsx';
+import { useEffect, useRef, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { LoadError } from '../LoadError';
 import { Card, Spinner } from '../ui';
@@ -27,6 +28,7 @@ function retention(days: Day[], after: number, cohorts: number) {
  */
 export function LaunchStatsPanel() {
   const { data, error, retry } = useLoad(() => api.adminStats());
+  const [table, moreRight] = useMoreToTheRight(!!data);
   if (error && !data) return <LoadError title="Статистиката не се зареди" error={error} onRetry={retry} />;
   if (!data) {
     return (
@@ -70,52 +72,66 @@ export function LaunchStatsPanel() {
         <ActiveChart days={[...days].reverse()} />
       </Card>
 
+      {/* On a phone the table scrolls sideways: the day stays put, and a fade says there's more to the right. */}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm tabular-nums">
-            <caption className="sr-only">Статистика по дни</caption>
-            <thead className="text-left text-xs tracking-wide text-fg-3 uppercase">
-              <tr className="border-b border-line">
-                {[
-                  'Ден',
-                  'Активни',
-                  'Профили',
-                  'Гости',
-                  'Запазени',
-                  'Мачове',
-                  'Предизвик.',
-                  'Дневно',
-                  'Ден 2',
-                  'Ден 8',
-                ].map((h) => (
-                  <th key={h} scope="col" className="px-4 py-3 font-semibold first:pl-5">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {days.slice(0, 14).map((d, i) => (
-                <tr key={d.day} className="border-b border-line last:border-0">
-                  <th scope="row" className="px-4 py-2.5 pl-5 text-left font-semibold">
-                    {i === 0 ? 'Днес' : shortDay(d.day)}
-                  </th>
-                  <td className="px-4 py-2.5">{fmt(v(d, 'active'))}</td>
-                  <td className="px-4 py-2.5">{fmt(v(d, 'signups'))}</td>
-                  <td className="px-4 py-2.5">{fmt(v(d, 'guests'))}</td>
-                  <td className="px-4 py-2.5">{fmt(v(d, 'claims'))}</td>
-                  <td className="px-4 py-2.5">{fmt(matches(d))}</td>
-                  <td className="px-4 py-2.5">
-                    {fmt(v(d, 'challenges'))} / {fmt(v(d, 'challenge_runs'))}
-                  </td>
-                  <td className="px-4 py-2.5">{fmt(v(d, 'daily_runs'))}</td>
-                  {/* Returns are only known once the day after (or the week after) has come. */}
-                  <td className="px-4 py-2.5 text-fg-2">{i >= 1 ? pct(v(d, 'returned_d1'), newPlayers(d)) : '—'}</td>
-                  <td className="px-4 py-2.5 text-fg-2">{i >= 7 ? pct(v(d, 'returned_d7'), newPlayers(d)) : '—'}</td>
+        <div className="relative">
+          <div ref={table} className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm tabular-nums">
+              <caption className="sr-only">Статистика по дни</caption>
+              <thead className="text-left text-xs tracking-wide text-fg-3 uppercase">
+                <tr className="border-b border-line">
+                  {[
+                    'Ден',
+                    'Активни',
+                    'Профили',
+                    'Гости',
+                    'Запазени',
+                    'Мачове',
+                    'Предизвик.',
+                    'Дневно',
+                    'Ден 2',
+                    'Ден 8',
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      scope="col"
+                      className="px-4 py-3 font-semibold first:sticky first:left-0 first:bg-ink-2 first:pl-5"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {days.slice(0, 14).map((d, i) => (
+                  <tr key={d.day} className="border-b border-line last:border-0">
+                    <th scope="row" className="sticky left-0 bg-ink-2 px-4 py-2.5 pl-5 text-left font-semibold">
+                      {i === 0 ? 'Днес' : shortDay(d.day)}
+                    </th>
+                    <td className="px-4 py-2.5">{fmt(v(d, 'active'))}</td>
+                    <td className="px-4 py-2.5">{fmt(v(d, 'signups'))}</td>
+                    <td className="px-4 py-2.5">{fmt(v(d, 'guests'))}</td>
+                    <td className="px-4 py-2.5">{fmt(v(d, 'claims'))}</td>
+                    <td className="px-4 py-2.5">{fmt(matches(d))}</td>
+                    <td className="px-4 py-2.5">
+                      {fmt(v(d, 'challenges'))} / {fmt(v(d, 'challenge_runs'))}
+                    </td>
+                    <td className="px-4 py-2.5">{fmt(v(d, 'daily_runs'))}</td>
+                    {/* Returns are only known once the day after (or the week after) has come. */}
+                    <td className="px-4 py-2.5 text-fg-2">{i >= 1 ? pct(v(d, 'returned_d1'), newPlayers(d)) : '—'}</td>
+                    <td className="px-4 py-2.5 text-fg-2">{i >= 7 ? pct(v(d, 'returned_d7'), newPlayers(d)) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div
+            aria-hidden
+            className={clsx(
+              'pointer-events-none absolute inset-y-0 right-0 w-12 bg-linear-to-l from-ink-2 transition-opacity',
+              moreRight ? 'opacity-100' : 'opacity-0',
+            )}
+          />
         </div>
         <p className="border-t border-line px-5 py-3 text-xs text-fg-3">
           „Предизвик.“: създадени линкове / изиграни. „Ден 2“ и „Ден 8“: от новите играчи през деня, колко са играли пак
@@ -124,6 +140,26 @@ export function LaunchStatsPanel() {
       </Card>
     </div>
   );
+}
+
+/** A sideways-scrolling box and whether more of it is hidden to the right (checked again on scroll and on resize). */
+function useMoreToTheRight(ready: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const box = ref.current;
+    if (!ready || !box) return;
+    const check = () => setMore(box.scrollLeft + box.clientWidth < box.scrollWidth - 1);
+    check();
+    box.addEventListener('scroll', check, { passive: true });
+    const resized = new ResizeObserver(check);
+    resized.observe(box);
+    return () => {
+      box.removeEventListener('scroll', check);
+      resized.disconnect();
+    };
+  }, [ready]);
+  return [ref, more] as const;
 }
 
 function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {

@@ -180,11 +180,19 @@ export interface MatchRewards {
   achievements: string[];
   unlocks: UnlockRef[];
   rating: { before: number; after: number } | null;
+  /** Why a ranked match left the rating as it was (`rating` is null then). */
+  unrated: UnratedReason | null;
   /** `shieldsUsed`: missed days a streak shield covered; `shieldEarned`: this run completed a week. */
   daily: { rank: number; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
   /** A challenge-link run: where it placed among everyone who played that link. */
   challenge: { id: string; rank: number; total: number } | null;
 }
+
+/**
+ * `pair`: these two already played their rated games today (the win-trading guard). `guest`: guests play people
+ * unrated. `no_contest`: the other side walked out before the match got going.
+ */
+export type UnratedReason = 'pair' | 'guest' | 'no_contest';
 
 export interface FinalStanding extends Standing {
   placement: number;
@@ -199,6 +207,8 @@ export interface GameEndPayload {
   /** Team totals, winner first, in team games. */
   teamScores: { team: TeamId; score: number }[] | null;
   rewards: MatchRewards | null;
+  /** The other side walked out before the match got going: it counts for nobody who stayed. */
+  noContest: boolean;
 }
 
 export interface QueueStatus {
@@ -228,6 +238,8 @@ export interface LobbyStats {
   queues: Record<QueueModeId, number>;
   /** Ranked queues that are open. */
   modes: QueueModeId[];
+  /** The web app build the server hosts (null in development): a tab running another one reloads when it's safe. */
+  build: string | null;
 }
 
 /** After a match with other people: who wants to play the same opponents again. */

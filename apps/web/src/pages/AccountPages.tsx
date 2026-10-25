@@ -24,7 +24,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { Logo } from '../components/NavBar';
-import { Button, Card, Modal, Spinner } from '../components/ui';
+import { Button, buttonClass, Card, Modal, Spinner } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 
@@ -89,6 +89,8 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 // ─── /reset-password?token=… ─────────────────────────────────────────────────
+// The forms here say `noValidate`: the browser's own bubbles speak the device's language (often English); the checks
+// and the server's answers are shown in the form, in Bulgarian.
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -124,7 +126,7 @@ export function ResetPasswordPage() {
       {!token ? (
         <p className="mt-3 text-sm text-rose-300">Линкът е непълен. Отвори го отново от писмото.</p>
       ) : (
-        <form onSubmit={submit} className="mt-5 space-y-4">
+        <form noValidate onSubmit={submit} className="mt-5 space-y-4">
           <PasswordField
             label="Нова парола"
             value={password}
@@ -133,7 +135,11 @@ export function ResetPasswordPage() {
             placeholder="поне 6 символа"
           />
           <PasswordField label="Повтори паролата" value={confirm} onChange={setConfirm} autoComplete="new-password" />
-          {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+          {error && (
+            <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+              {error}
+            </p>
+          )}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Запази и влез
           </Button>
@@ -178,8 +184,8 @@ export function VerifyEmailPage() {
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
           <h1 className="mt-3 font-display text-2xl font-bold">Имейлът е потвърден</h1>
           <p className="mt-2 text-sm text-fg-2">Вече можеш да възстановиш паролата си, ако някога я забравиш.</p>
-          <Link to="/" className="mt-6 inline-block">
-            <Button>{signedIn ? 'Към играта' : 'Към входа'}</Button>
+          <Link to="/" className={clsx('mt-6', buttonClass())}>
+            {signedIn ? 'Към играта' : 'Към входа'}
           </Link>
         </div>
       ) : (
@@ -187,8 +193,8 @@ export function VerifyEmailPage() {
           <XCircle className="mx-auto size-12 text-rose-400" />
           <h1 className="mt-3 font-display text-2xl font-bold">Не стана</h1>
           <p className="mt-2 text-sm text-fg-2">{state.error}</p>
-          <Link to={signedIn ? '/settings' : '/'} className="mt-6 inline-block">
-            <Button variant="secondary">{signedIn ? 'Към настройките' : 'Към входа'}</Button>
+          <Link to={signedIn ? '/settings' : '/'} className={clsx('mt-6', buttonClass({ variant: 'secondary' }))}>
+            {signedIn ? 'Към настройките' : 'Към входа'}
           </Link>
         </div>
       )}
@@ -482,7 +488,8 @@ function ReminderSettings() {
       hint={
         <>
           Имейл вечерта, ако серията ти от дневни предизвикателства ще изгори в полунощ, защото днешното още чака.
-          Най-много едно писмо на ден; спираш го оттук или от линка във всяко писмо.
+          Най-много едно писмо на ден; спираш го оттук или от линка във всяко писмо. Под 14 години — със съгласие на
+          родител или настойник.
           {blocked && <span className="sr-only"> Нужен е потвърден имейл.</span>}
         </>
       }
@@ -588,10 +595,8 @@ function DataSettings() {
         .
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href="/api/account/export" download="almanac-data.json">
-          <Button variant="secondary" tabIndex={-1}>
-            <Download className="size-4" /> Изтегли данните си
-          </Button>
+        <a href="/api/account/export" download="almanac-data.json" className={buttonClass({ variant: 'secondary' })}>
+          <Download className="size-4" /> Изтегли данните си
         </a>
         <Button
           variant="ghost"
@@ -603,7 +608,7 @@ function DataSettings() {
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Изтриване на профила">
-        <form onSubmit={remove} className="space-y-4">
+        <form noValidate onSubmit={remove} className="space-y-4">
           <p className="text-sm text-fg-2">
             {guest
               ? 'Профилът на гост, нивото, статистиката и постиженията ти ще бъдат изтрити завинаги. Това не може да се отмени.'
@@ -617,7 +622,11 @@ function DataSettings() {
               autoComplete="current-password"
             />
           )}
-          {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+          {error && (
+            <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+              {error}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Отказ
@@ -694,7 +703,7 @@ function EmailSettings() {
         </div>
       )}
       {me.email && removing && (
-        <form onSubmit={remove} className="mt-3 flex flex-wrap gap-2">
+        <form noValidate onSubmit={remove} className="mt-3 flex flex-wrap gap-2">
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -731,6 +740,7 @@ function EmailSettings() {
       )}
 
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void save(email.trim(), 'save');
@@ -796,7 +806,7 @@ function PasswordSettings() {
         <KeyRound className="size-5 text-violet-300" />
         <h2 className="font-display text-lg font-bold">Парола</h2>
       </div>
-      <form onSubmit={submit} className="mt-4 space-y-4">
+      <form noValidate onSubmit={submit} className="mt-4 space-y-4">
         <PasswordField label="Текуща парола" value={current} onChange={setCurrent} autoComplete="current-password" />
         <PasswordField
           label="Нова парола"
@@ -805,7 +815,11 @@ function PasswordSettings() {
           autoComplete="new-password"
           placeholder="поне 6 символа"
         />
-        {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
+        {error && (
+          <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+            {error}
+          </p>
+        )}
         <Button type="submit" loading={busy}>
           Смени паролата
         </Button>

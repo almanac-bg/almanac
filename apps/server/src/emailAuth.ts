@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { hashPassword, hashToken as hashSessionToken, verifyPassword } from './auth';
 import { config } from './config';
 import { one, run, tx } from './db';
-import { emailChangedMail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
+import { emailChangedMail, type Mail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
 import { disconnectOtherSessions, disconnectUser } from './notify';
 import { emailKey, getUser, getUserByEmail, getUserByLogin } from './users';
 
@@ -74,23 +74,29 @@ export function removeEmail(userId: number) {
 }
 
 export function verifyEmailToken(token: string): Result<{ userId: number }> {
-  return tx(() => {
+  const { result, notice } = tx((): { result: Result<{ userId: number }>; notice?: Mail } => {
     const t = consumeToken(token, 'verify');
-    if (!t?.email) return { ok: false, error: 'Линкът е невалиден или е изтекъл.' };
+    if (!t?.email) return { result: { ok: false, error: 'Линкът е невалиден или е изтекъл.' } };
     const owner = getUserByEmail(t.email);
-    if (owner && owner.id !== t.userId) return { ok: false, error: 'Този имейл вече е свързан с друг профил.' };
-    // The old address hears about the switch (someone with a moment at an unlocked device can't quietly take over).
+    if (owner && owner.id !== t.userId)
+      return { result: { ok: false, error: 'Този имейл вече е свързан с друг профил.' } };
     const before = getUser(t.userId)!;
-    if (before.email && before.email_key !== emailKey(t.email))
-      sendMail(emailChangedMail(before.email, before.username, false));
     run(
       'UPDATE users SET email = ?, email_key = ?, pending_email = NULL WHERE id = ?',
       t.email,
       emailKey(t.email),
       t.userId,
     );
-    return { ok: true, userId: t.userId };
+    // The old address hears about the switch (someone with a moment at an unlocked device can't quietly take over).
+    const switched = before.email && before.email_key !== emailKey(t.email);
+    return {
+      result: { ok: true, userId: t.userId },
+      notice: switched ? emailChangedMail(before.email!, before.username, false) : undefined,
+    };
   });
+  // Sent once the change is saved: a mail can't be taken back.
+  if (notice) sendMail(notice);
+  return result;
 }
 
 /** Mails a reset link if the account has a verified email. Says nothing either way. */
@@ -104,15 +110,16 @@ export function requestPasswordReset(login: string) {
 /** Sets the new password and logs the account out everywhere. */
 export async function resetPassword(token: string, password: string): Promise<Result<{ userId: number }>> {
   const hash = await hashPassword(password);
-  return tx(() => {
+  const result = tx((): Result<{ userId: number }> => {
     const t = consumeToken(token, 'reset');
     if (!t) return { ok: false, error: 'Линкът е невалиден или е изтекъл. Поискай нов.' };
     run('UPDATE users SET password_hash = ? WHERE id = ?', hash, t.userId);
     run('DELETE FROM sessions WHERE user_id = ?', t.userId);
     run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'", t.userId);
-    disconnectUser(t.userId);
     return { ok: true, userId: t.userId };
   });
+  if (result.ok) disconnectUser(result.userId);
+  return result;
 }
 
 /** Changes the password; every other session is logged out, the current one stays. */

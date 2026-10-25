@@ -19,6 +19,7 @@ import {
   seasonName,
   TIME_ZONE,
   TITLES,
+  type UnlockRef,
   upcomingUnlocks,
 } from '@quiz/shared';
 import clsx from 'clsx';
@@ -51,6 +52,7 @@ import { QuestsCard } from '../components/home/QuestsCard';
 import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, Modal, ProgressBar, Spinner } from '../components/ui';
+import { accentFill } from '../lib/accent';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { savedDailyShare, shareText } from '../lib/share';
@@ -72,7 +74,7 @@ export function HomePage() {
   const [soloOpen, setSoloOpen] = useState(false);
   const [rankInfo, setRankInfo] = useState<{ mode: QueueModeId; open: boolean } | null>(null);
   const level = levelProgress(me.xp).level;
-  // Brand-new players get pointed at the gentlest ways in.
+  // Brand-new players get pointed at the gentlest way in (one pointer: two would leave them choosing again).
   const newcomer = level === 1;
   // Writing questions opens at level 3; until then the card would only hold a disabled button.
   const community = level >= SUBMISSION_RULES.minLevel || me.isAdmin;
@@ -148,7 +150,7 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard starter={newcomer} className="lg:col-start-1 lg:row-start-3" />
+        <DailyCard className="lg:col-start-1 lg:row-start-3" />
         <QuestsCard className="lg:col-start-2 lg:row-start-3" />
         <ChallengeCard className={clsx('lg:col-start-1 lg:row-start-4', !community && 'lg:col-span-2')} />
         <FriendsCard className="lg:col-start-2 lg:row-start-1" />
@@ -181,6 +183,7 @@ function queueSpan(i: number, n: number) {
 function ProfileCard({ className }: { className?: string }) {
   const me = useStore((s) => s.me)!;
   const progress = levelProgress(me.xp);
+  const next = upcomingUnlocks(progress.level, 1)[0];
   const roomy = useMediaQuery('(min-width: 640px)');
   return (
     <Card className={clsx('relative overflow-hidden p-4 sm:p-7', className)}>
@@ -207,11 +210,12 @@ function ProfileCard({ className }: { className?: string }) {
         </div>
         <ProgressBar value={progress.pct} className="h-2.5" />
       </div>
-      {/* Phones keep just the daily bonus here; the next unlock and the season wait for wider screens. */}
+      {/* Phones keep the daily bonus and the next unlock (what the bar above leads to); the season waits for wider
+          screens. */}
       <div
         className={clsx(
           'relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5',
-          !me.dailyBonusAvailable && 'max-sm:hidden',
+          !me.dailyBonusAvailable && !next && 'max-sm:hidden',
         )}
       >
         {me.dailyBonusAvailable && (
@@ -219,7 +223,7 @@ function ProfileCard({ className }: { className?: string }) {
             <Gift className="size-3.5" /> Днешният бонус +100 XP те чака
           </span>
         )}
-        <UpNext level={progress.level} className="max-sm:hidden" />
+        {next && <UpNext unlock={next} />}
         <SeasonChip ratings={me.ratings} className="max-sm:hidden" />
       </div>
       {/* Guests: right under the level it's about — all of this lives on this device until the account is saved. */}
@@ -288,8 +292,8 @@ function ModeCard({
 
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-white uppercase"
-            style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider uppercase"
+            style={accentFill(mode)}
           >
             {mode.short}
           </span>
@@ -346,8 +350,8 @@ function ModeCard({
             className="shrink-0 outline-none after:absolute after:inset-0 after:content-['']"
           >
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-white shadow-lg transition-transform group-hover:translate-x-0.5"
-              style={{ background: `linear-gradient(90deg, ${a}, ${b})`, boxShadow: `0 8px 24px -8px ${a}` }}
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold shadow-lg transition-transform group-hover:translate-x-0.5"
+              style={{ ...accentFill(mode), boxShadow: `0 8px 24px -8px ${a}` }}
             >
               Играй <span className="sr-only">{mode.name}</span>
               <ArrowRight aria-hidden className="size-4" />
@@ -487,23 +491,23 @@ function FriendsCard({ className }: { className?: string }) {
   );
 }
 
-function UpNext({ level, className }: { level: number; className?: string }) {
-  const next = upcomingUnlocks(level, 1)[0];
-  if (!next) return null;
-  const { icon, name } = unlockPreview(next);
+function UpNext({ unlock }: { unlock: UnlockRef & { level: number } }) {
+  const { icon, name } = unlockPreview(unlock);
   return (
-    <span
-      className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2',
-        className,
-      )}
-    >
-      Ниво {next.level}: <span className="text-base leading-none">{icon}</span> {name}
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs text-fg-2 sm:px-3">
+      <span className="shrink-0">Ниво {unlock.level}:</span>
+      <span aria-hidden className="text-base leading-none">
+        {icon}
+      </span>
+      <span className="truncate">{name}</span>
     </span>
   );
 }
 
-/** Without a verified email a forgotten password means a lost account — nudge until one is added. */
+/**
+ * Without a verified email a forgotten password means a lost account — nudge until one is added. Not before the first
+ * match, though (every finished match earns XP): a brand-new player's first screen is for playing.
+ */
 function EmailNudge() {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
@@ -515,7 +519,7 @@ function EmailNudge() {
     }
   });
   // A guest adds an email while saving the account (the profile card asks for that instead).
-  if (me.isGuest || me.email || me.pendingEmail || dismissed) return null;
+  if (me.isGuest || me.email || me.pendingEmail || dismissed || me.xp === 0) return null;
   return (
     // Phones: icon, text and close on the first row, the button under the text. Wider: all in one row.
     <div className="glass grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border-violet-400/30 py-2 pr-1.5 pl-4 sm:flex sm:pl-5">
@@ -616,7 +620,7 @@ function StreakShields({ shields, streak }: { shields: number; streak: number })
   );
 }
 
-function DailyCard({ className, starter }: { className?: string; starter?: boolean }) {
+function DailyCard({ className }: { className?: string }) {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
   const now = useNow(1000);
@@ -675,11 +679,6 @@ function DailyCard({ className, starter }: { className?: string; starter?: boole
             {streak > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-0.5 text-xs font-bold text-orange-300">
                 <Flame className="size-3.5" /> {streak} {streak === 1 ? 'ден' : 'дни'} поред
-              </span>
-            )}
-            {starter && info && !info.attempted && (
-              <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
-                Започни оттук
               </span>
             )}
             {/* Last in the row: its explanation opens as a line of its own under the chips. */}

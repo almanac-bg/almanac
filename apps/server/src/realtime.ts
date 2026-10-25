@@ -12,9 +12,9 @@ import {
 } from '@quiz/shared';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
-import { challengeQuestions, claimChallengeAttempt, createChallenge } from './challenges';
+import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
 import { config } from './config';
-import { claimDailyAttempt, dailyQuestions } from './daily';
+import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
@@ -50,7 +50,10 @@ const DRAINING = 'Обновяваме играта — нови мачове м
 export interface Realtime {
   io: IO;
   activeGames: () => number;
-  /** Stops new matches and empties the queues, then resolves once running matches have finished (or after `maxMs`). */
+  /**
+   * Stops new matches and empties the queues, then resolves once running matches have finished. Any still running after
+   * `maxMs` end there, with the scores so far, so nobody's match vanishes without a result.
+   */
   drain: (maxMs: number) => Promise<void>;
 }
 
@@ -67,7 +70,14 @@ export function createRealtime(httpServer: HttpServer): Realtime {
   });
   const openSockets = new Map<number, number>();
   const games = new GameRegistry(io);
-  const matchmaker = new Matchmaker(io, games);
+  // Someone online and free to join a queue (not in a match, a queue or a room): a reason to wait for a person.
+  const idleOnline = () => {
+    let n = 0;
+    for (const userId of openSockets.keys())
+      if (!games.forUser(userId) && !matchmaker.modeOf(userId) && !rooms.roomOf(userId)) n++;
+    return n;
+  };
+  const matchmaker: Matchmaker = new Matchmaker(io, games, idleOnline);
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
   /** Set when the server is shutting down for an update. */
   let draining = false;
@@ -97,6 +107,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     inGame: games.playersInGame,
     queues: matchmaker.counts(),
     modes: config.openQueues,
+    build: config.webBuild,
   });
   setInterval(
     guarded('lobby stats', () => io.emit('lobby:stats', stats())),
@@ -117,10 +128,13 @@ export function createRealtime(httpServer: HttpServer): Realtime {
   io.on('connection', (socket) => {
     const { userId, session } = socket.data;
     socket.join([`user:${userId}`, `session:${session}`]);
-    // Bursts are fine (answer + joker + emote); a stream of events is dropped.
+    // Bursts are fine (answer + joker + emote); a stream of events is dropped — with an answer for any that wait for
+    // one, so the page says "too fast" rather than "no connection".
     const allowed = eventBucket();
-    socket.use((_packet, next) => {
-      if (allowed()) next();
+    socket.use((packet, next) => {
+      if (allowed()) return next();
+      const ack = packet.at(-1);
+      if (typeof ack === 'function') ack({ ok: false, error: 'Твърде бързо — изчакай секунда.' });
     });
 
     /**
@@ -240,6 +254,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
         });
         reply(ack, { ok: true });
       } catch (err) {
+        releaseDailyAttempt(userId, claim.day);
         reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
       }
     });
@@ -276,6 +291,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
         });
         reply(ack, { ok: true, id });
       } catch (err) {
+        releaseChallengeAttempt(id, userId);
         reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
       }
     });
@@ -376,6 +392,8 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       for (const userId of matchmaker.clear()) notifyUser(userId, 'notice', { kind: 'info', message: DRAINING });
       io.emit('server:draining', { message: DRAINING });
       await games.idle(maxMs);
+      // A moment for the results to reach the players before the connections close.
+      if (games.stopAll() > 0) await new Promise((resolve) => setTimeout(resolve, 500));
     },
   };
 }

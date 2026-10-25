@@ -2,6 +2,7 @@ import { actions, useNow, useStore } from '@quiz/client';
 import { avatarEmoji, MODES } from '@quiz/shared';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { accentFill } from '../lib/accent';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 
@@ -41,8 +42,8 @@ export function QueueOverlay() {
             </div>
 
             <div
-              className="mt-4 rounded-full px-3 py-1 text-xs font-bold tracking-widest text-white uppercase"
-              style={{ background: `linear-gradient(90deg, ${mode.accent[0]}, ${mode.accent[1]})` }}
+              className="mt-4 rounded-full px-3 py-1 text-xs font-bold tracking-widest uppercase"
+              style={accentFill(mode)}
             >
               {mode.name} · {mode.short}
             </div>

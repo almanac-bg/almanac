@@ -107,7 +107,9 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
         ? 'само един жокер на въпрос'
         : p.id === 'freeze' && !canFreeze
           ? 'всички съперници вече отговориха'
-          : null;
+          : p.notOnEasy && game.question?.difficulty === 'easy'
+            ? 'само на среден и труден въпрос'
+            : null;
   const intro = jokers.filter((p) => guide.intro.includes(p.id) && !game.usedPowerups.includes(p.id));
   const listed = guide.open ? jokers : intro;
 
@@ -185,7 +187,7 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
 
       <span className="text-xs text-fg-3">
         {game.powerupThisQuestion
-          ? 'Вече игра жокер на този въпрос — следващият на следващия.'
+          ? 'Вече игра жокер на този въпрос — можеш пак на следващия.'
           : `Всеки жокер е по веднъж на мач и по един на въпрос.${
               game.start.powerups.includes('time') ? ` „Още време“ дава +${TIME_BONUS_MS / 1000} с.` : ''
             }`}

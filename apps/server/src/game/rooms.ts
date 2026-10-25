@@ -68,7 +68,7 @@ export class RoomManager {
     return this.byUser.get(userId);
   }
 
-  create(userId: number, patch: Partial<RoomSettings>): AckResult<{ code: string }> {
+  create(userId: number, patch: Record<string, unknown>): AckResult<{ code: string }> {
     this.leave(userId);
     let code: string;
     do code = String(randomInt(10000, 100000));
@@ -122,7 +122,7 @@ export class RoomManager {
     this.broadcast(room);
   }
 
-  updateSettings(userId: number, patch: Partial<RoomSettings>) {
+  updateSettings(userId: number, patch: Record<string, unknown>) {
     const room = this.hostRoom(userId);
     if (!room) return;
     const wasTeams = room.settings.teams;
@@ -323,15 +323,17 @@ export class RoomManager {
   }
 }
 
-function sanitize(patch: Partial<RoomSettings>, current: RoomSettings, occupied: number): RoomSettings {
+/** The settings a host sent (straight from the socket, so anything at all), applied where they make sense. */
+function sanitize(patch: Record<string, unknown>, current: RoomSettings, occupied: number): RoomSettings {
   const next = { ...current };
   const [minPlayers, maxPlayers] = ROOM_LIMITS.maxPlayers;
-  if (Number.isInteger(patch.maxPlayers)) {
-    next.maxPlayers = Math.min(maxPlayers, Math.max(minPlayers, occupied, patch.maxPlayers!));
+  const { maxPlayers: players, questions, timeMs } = patch;
+  if (typeof players === 'number' && Number.isInteger(players)) {
+    next.maxPlayers = Math.min(maxPlayers, Math.max(minPlayers, occupied, players));
   }
-  if ((ROOM_LIMITS.questions as readonly number[]).includes(patch.questions as number))
-    next.questions = patch.questions!;
-  if ((ROOM_LIMITS.timeMs as readonly number[]).includes(patch.timeMs as number)) next.timeMs = patch.timeMs!;
+  if (typeof questions === 'number' && (ROOM_LIMITS.questions as readonly number[]).includes(questions))
+    next.questions = questions;
+  if (typeof timeMs === 'number' && (ROOM_LIMITS.timeMs as readonly number[]).includes(timeMs)) next.timeMs = timeMs;
   if (isCategoryChoice(patch.category)) next.category = patch.category;
   if (typeof patch.elimination === 'boolean') next.elimination = patch.elimination;
   if (typeof patch.teams === 'boolean') next.teams = patch.teams;

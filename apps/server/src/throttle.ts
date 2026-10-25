@@ -1,3 +1,5 @@
+import { isIPv6 } from 'node:net';
+
 /** Tiny in-memory rate limiting: N events per key per window (IPs, accounts, rooms…). */
 const windows = new Map<string, { count: number; resetAt: number }>();
 
@@ -24,6 +26,25 @@ export function throttled(key: string, limit = 10, windowMs = 5 * 60_000): boole
   }
   entry.count++;
   return entry.count > limit;
+}
+
+/**
+ * The network an address belongs to, as a rate-limit key: an IPv4 address as is, an IPv6 address by its /64 — one phone
+ * or home gets a whole /64 and can pick a new address from it at will.
+ */
+export function network(ip: string | undefined): string {
+  if (!ip) return 'unknown';
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  if (!isIPv6(ip)) return ip;
+  const [head, tail = ''] = ip.toLowerCase().split('%')[0].split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...left, ...Array(8 - left.length - right.length).fill('0'), ...right] : left;
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
 }
 
 /**

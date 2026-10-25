@@ -226,8 +226,9 @@ function Item({
 }) {
   const clickable = unlocked && !equipped && !!onEquip;
   return (
-    // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer).
-    <div className="group/lift grid">
+    // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer). The
+    // wrapper's column is the tile's: a long requirement line truncates instead of widening it past the screen.
+    <div className="group/lift grid grid-cols-[minmax(0,1fr)]">
       <motion.button
         type="button"
         whileTap={clickable ? { scale: 0.96 } : undefined}

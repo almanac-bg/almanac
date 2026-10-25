@@ -158,22 +158,32 @@ test('when every human is gone, the match plays out without them instead of free
   assert.deepEqual(g.missed, [1], 'the result waits for the player');
 });
 
-test('"Двойно или нищо" costs 500 on a miss, never below zero', () => {
+test('"Двойно или нищо" is for medium and hard questions, and costs 500 on a miss, never below zero', () => {
   const g = setup({ humans: [1], powerups: ['double'] });
-  g.right(1);
-  advance(5_000);
+  const difficulty = () => g.game.questions[g.game.index].difficulty;
+  assert.equal(difficulty(), 'easy', 'a match opens with easy questions');
+  g.game.usePowerup('u1', g.game.index, 'double');
+  assert.equal(g.game.participants.get('u1')!.doubled, false, 'no bet on an easy one');
+  while (difficulty() === 'easy') {
+    g.right(1);
+    advance(5_000);
+  }
   const before = g.game.participants.get('u1')!.score;
   g.game.usePowerup('u1', g.game.index, 'double');
   g.wrong(1);
   advance(700);
-  assert.equal(g.reveals()[1].results.u1.points, -500);
+  assert.equal(g.reveals().at(-1)!.results.u1.points, -500);
   assert.equal(g.game.participants.get('u1')!.score, before - 500);
 
   const fresh = setup({ humans: [2], powerups: ['double'] });
+  while (fresh.game.questions[fresh.game.index].difficulty === 'easy') {
+    fresh.wrong(2);
+    advance(5_000);
+  }
   fresh.game.usePowerup('u2', fresh.game.index, 'double');
   fresh.wrong(2);
   advance(700);
-  assert.equal(fresh.reveals()[0].results.u2.points, 0, 'nothing to lose yet');
+  assert.equal(fresh.reveals().at(-1)!.results.u2.points, 0, 'nothing to lose yet');
 });
 
 test('ties: an unanswered question counts the whole clock', () => {

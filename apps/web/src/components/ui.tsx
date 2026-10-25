@@ -12,7 +12,8 @@ const VARIANTS: Record<Variant, string> = {
     'text-white bg-[linear-gradient(110deg,#a855f7,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110',
   secondary: 'glass text-fg hover:bg-white/10',
   ghost: 'text-fg-2 hover:text-fg hover:bg-white/5',
-  danger: 'text-white bg-rose-500/90 hover:bg-rose-500 shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
+  // rose-600, darker on hover: white on rose-500 is under 4:1.
+  danger: 'text-white bg-rose-600 hover:bg-rose-700 shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
   gold: 'text-amber-950 bg-[linear-gradient(110deg,#fde68a,#f59e0b)] shadow-[0_8px_28px_-10px_rgb(245_158_11/0.8)] hover:brightness-105',
 };
 
@@ -22,6 +23,15 @@ const SIZES: Record<Size, string> = {
   md: 'h-11 px-5 text-[15px] rounded-2xl gap-2',
   lg: 'h-14 px-7 text-base rounded-2xl gap-2.5',
 };
+
+/** A button's look, for a link that should look like one (a <Button> inside a link would be a second tab stop). */
+export function buttonClass({ variant = 'primary', size = 'md' }: { variant?: Variant; size?: Size } = {}) {
+  return clsx(
+    'focus-ring inline-flex select-none items-center justify-center font-semibold transition-[filter,background,transform,opacity] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45',
+    VARIANTS[variant],
+    SIZES[size],
+  );
+}
 
 /** A plain button unless it says `type="submit"` (the HTML default would submit any form it sits in). */
 export function Button({
@@ -38,12 +48,7 @@ export function Button({
       {...rest}
       type={type}
       disabled={rest.disabled || loading}
-      className={clsx(
-        'focus-ring inline-flex select-none items-center justify-center font-semibold transition-[filter,background,transform,opacity] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45',
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={clsx(buttonClass({ variant, size }), className)}
     >
       {loading ? <Spinner className="size-4" /> : children}
     </button>

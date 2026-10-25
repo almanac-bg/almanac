@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import { config } from './config';
+import { throttled } from './throttle';
 
 /**
  * Error reports to Sentry (its EU region), so a crash reaches the owner's inbox instead of only the server log.
@@ -126,8 +127,16 @@ export function reportError(
 }
 
 /**
+ * Browser reports use the same monthly quota, and the DSN is public: anyone can post envelopes, from any number of
+ * addresses. Past these, they're dropped (the browser SDK already skips repeats on its side).
+ */
+const BROWSER_PER_MINUTE = 10;
+const BROWSER_PER_DAY = 150;
+
+/**
  * The browser SDK's tunnel: passes an envelope on to Sentry if it's addressed to this site's own project (so the
- * endpoint can't be used to send anything anywhere else). Returns false when it isn't.
+ * endpoint can't be used to send anything anywhere else). Returns false when it isn't. Over the cap it's accepted and
+ * dropped, so the SDK doesn't retry.
  */
 export function forwardEnvelope(body: string): boolean {
   if (!dsn) return false;
@@ -139,6 +148,8 @@ export function forwardEnvelope(body: string): boolean {
     return false;
   }
   if (header.dsn !== dsn.raw) return false;
+  if (throttled('monitoring:browser', BROWSER_PER_MINUTE, 60_000)) return true;
+  if (throttled('monitoring:browser-day', BROWSER_PER_DAY, 24 * 60 * 60_000)) return true;
   void send(dsn.url, body);
   return true;
 }

@@ -3,13 +3,17 @@
  * then, after the page is up, and sends through our own server (/api/monitoring): the browser never contacts Sentry,
  * and no IP address or personal data goes with a report — only the account number.
  */
-type Sentry = typeof import('@sentry/browser');
+type Sentry = typeof import('./sentry');
 
 let sentry: Sentry | null = null;
 let userId: number | null = null;
 
-/** Links can carry secrets (password-reset and unsubscribe tokens): reports keep only the path. */
-const withoutQuery = (url: unknown) => (typeof url === 'string' ? url.split(/[?#]/)[0] : url);
+/**
+ * Reports keep only the path of a link: query strings can carry secrets (password-reset and unsubscribe tokens), and
+ * profile and room paths name a player or a private room.
+ */
+const scrub = (url: unknown) =>
+  typeof url === 'string' ? url.split(/[?#]/)[0].replace(/\/(profile|join)\/[^/]+/g, '/$1/*') : url;
 
 const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content || undefined;
 
@@ -17,7 +21,7 @@ export function startMonitoring() {
   const dsn = meta('sentry-dsn');
   if (!dsn) return;
   const load = () =>
-    void import('@sentry/browser').then((Sentry) => {
+    void import('./sentry').then((Sentry) => {
       Sentry.init({
         dsn,
         tunnel: '/api/monitoring',
@@ -28,13 +32,12 @@ export function startMonitoring() {
         // Errors only: no performance tracing or session replays.
         tracesSampleRate: 0,
         beforeSend(event) {
-          if (event.request) event.request = { url: withoutQuery(event.request.url) as string | undefined };
+          if (event.request) event.request = { url: scrub(event.request.url) as string | undefined };
           return event;
         },
         beforeBreadcrumb(crumb) {
           if (crumb.data)
-            for (const key of ['url', 'from', 'to'])
-              if (key in crumb.data) crumb.data[key] = withoutQuery(crumb.data[key]);
+            for (const key of ['url', 'from', 'to']) if (key in crumb.data) crumb.data[key] = scrub(crumb.data[key]);
           return crumb;
         },
         // Noise nothing can be done about: other origins' scripts, browser quirks, extensions.

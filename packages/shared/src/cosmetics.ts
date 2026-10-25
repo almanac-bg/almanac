@@ -48,6 +48,8 @@ export interface PowerupDef {
   req: Requirement;
   /** Needs an opponent to target. */
   multiplayerOnly?: boolean;
+  /** Not on an easy question: a bet on one is no bet (and every match opens with easy ones). */
+  notOnEasy?: boolean;
 }
 
 export const AVATARS: AvatarDef[] = [
@@ -249,8 +251,9 @@ export const POWERUPS: PowerupDef[] = [
     id: 'double',
     name: 'Двойно или нищо',
     icon: '💰',
-    description: 'Удвоява точките за въпроса, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
+    description: 'Удвоява точките за среден или труден въпрос, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
     req: { level: 6 },
+    notOnEasy: true,
   },
   {
     id: 'freeze',

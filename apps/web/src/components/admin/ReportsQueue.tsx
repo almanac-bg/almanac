@@ -119,6 +119,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
 
         {mode === 'rename' && (
           <form
+            noValidate
             className="mt-4 flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();

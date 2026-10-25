@@ -19,6 +19,10 @@ const REMINDER_HOURS = [19, 22] as const;
 /** Per maintenance run, so a big list doesn't flood the mail provider (and its daily quota) in one go. */
 const REMINDERS_PER_RUN = 200;
 const SNAPSHOT_NAME = /^quiz-\d{4}-\d{2}-\d{2}\.db$/;
+/** The copy taken before a deploy's migrations (see db.ts): the way back if that deploy goes wrong. */
+const PRE_MIGRATION_NAME = /^quiz-v\d+-before-v\d+\.db$/;
+/** …which stops being an option after a month (the privacy policy promises backups forget within 30 days). */
+const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, and addresses
@@ -75,7 +79,7 @@ export function sendStreakReminders(now = Date.now()): number {
 
 /**
  * Today's consistent copy of the database (`quiz-2026-10-25.db`), at most one per day; older ones beyond
- * BACKUP_KEEP_DAYS are deleted. Resolves to the new file, or null if there was nothing to do.
+ * BACKUP_KEEP_DAYS are deleted, and so are pre-migration copies older than a month. Resolves to the new file, or null if there was nothing to do.
  *
  * The copy is made a few hundred pages at a time off the main thread, so live matches don't stall while it runs.
  */
@@ -98,6 +102,9 @@ export async function snapshot(now = Date.now(), dir = config.backupDir): Promis
     .filter((f) => SNAPSHOT_NAME.test(f))
     .sort();
   for (const old of snapshots.slice(0, -config.backupKeepDays)) fs.rmSync(path.join(dir, old));
+  for (const f of fs.readdirSync(dir).filter((f) => PRE_MIGRATION_NAME.test(f))) {
+    if (now - fs.statSync(path.join(dir, f)).mtimeMs > PRE_MIGRATION_KEEP_MS) fs.rmSync(path.join(dir, f));
+  }
   return file;
 }
 

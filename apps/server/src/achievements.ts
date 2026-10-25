@@ -40,7 +40,10 @@ export interface Aggregate {
 export interface MatchContext {
   mode: ModeId;
   won: boolean;
+  /** Didn't play the match out: walked out, or the other side did before it got going. */
   left: boolean;
+  /** Played to the last question (the other side didn't walk out). */
+  completed: boolean;
   teams: boolean;
   questions: number;
   faced: number;
@@ -82,9 +85,9 @@ const RULES: Record<string, Rule> = {
   specialist: { progress: (a) => a.maxCategoryCorrect },
   high_scorer: { progress: (a) => a.bestSoloScore },
   power_player: { progress: (a) => a.powerupsUsed },
-  comeback: { earned: (_, m) => !!m && m.won && !m.teams && m.lastAtHalfway },
+  comeback: { earned: (_, m) => !!m && m.won && m.completed && !m.teams && m.lastAtHalfway },
   flawless_duel: { earned: (_, m) => !!m && m.won && m.mode === 'duel' && m.correct === m.questions },
-  photo_finish: { earned: (_, m) => !!m && m.won && m.winMargin !== null && m.winMargin < 100 },
+  photo_finish: { earned: (_, m) => !!m && m.won && m.completed && m.winMargin !== null && m.winMargin < 100 },
   giant_slayer: { earned: (_, m) => !!m && !m.left && m.beatLevelGap >= 5 },
   team_win: { progress: (a) => a.teamWins },
   team_carry: { earned: (_, m) => !!m && m.won && m.teams && m.topScorer },
