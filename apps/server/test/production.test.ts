@@ -129,6 +129,9 @@ test('each public page has its own title and address; the game says noindex; a w
   for (const [from, to] of [
     ['/privacy/', '/privacy'],
     ['/index.html', '/'],
+    // Never to another site: browsers read "//example.com" and "/\\example.com" as one.
+    ['//example.com/', '/example.com'],
+    ['/\\example.com/', '/example.com'],
   ]) {
     const res = await get(from);
     assert.deepEqual([res.status, res.headers.get('location')], [301, to], from);

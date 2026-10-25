@@ -106,8 +106,11 @@ if (fs.existsSync(config.webDist)) {
   app.use((req, res, next) => {
     if (!forPage(req)) return next();
     if (req.path === '/index.html') return res.redirect(301, '/');
-    if (req.path.length > 1 && req.path.endsWith('/'))
-      return res.redirect(301, req.path.replace(/\/+$/, '') + req.url.slice(req.path.length));
+    if (req.path.length > 1 && req.path.endsWith('/')) {
+      // Exactly one "/" in front: "//example.com/" (or "/\\example.com/") must not turn into a link to another site.
+      const path = `/${req.path.replace(/^[/\\]+/, '').replace(/\/+$/, '')}`;
+      return res.redirect(301, path + req.url.slice(req.path.length));
+    }
     next();
   });
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
