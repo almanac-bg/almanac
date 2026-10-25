@@ -334,6 +334,16 @@ const MIGRATIONS: (string | (() => void))[] = [
   );
   CREATE INDEX challenge_results_user ON challenge_results(user_id, started_at);
   `,
+
+  // v9: launch statistics, counted as things happen (Sofia days), so they survive guest clean-up and need no tracking.
+  `
+  CREATE TABLE daily_stats (
+    day TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    value INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, metric)
+  ) WITHOUT ROWID;
+  `,
 ];
 
 function migrate() {

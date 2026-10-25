@@ -242,91 +242,93 @@ function ModeCard({
   return (
     // The whole card plays: the "Играй" button stretches over it (its ::after). The rank chip sits above as its own button.
     // A container: a card that spans more of the grid (however many modes are open) sets itself bigger.
-    <motion.article
-      whileHover={{ y: -4 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className={clsx(
-        'glass group @container relative isolate flex min-h-44 flex-col overflow-hidden rounded-3xl p-5 transition-[scale,box-shadow] duration-150 sm:min-h-48 sm:p-6',
-        'has-[[data-play]:active]:scale-[0.98] has-[[data-play]:focus-visible]:shadow-[0_0_0_2px_var(--color-ink),0_0_0_4px_var(--color-cyan)]',
-        big && 'lg:min-h-full',
-        className,
-      )}
-    >
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10 opacity-20 transition-opacity duration-300 group-hover:opacity-40"
-        style={{ background: `radial-gradient(120% 90% at 100% 0%, ${a}, transparent 60%), radial-gradient(90% 80% at 0% 100%, ${b}55, transparent 70%)` }}
-      />
-      {/* How many play: the chip says "1 на 1", "8 играчи"… in words, this says it big. */}
-      <span
-        aria-hidden
+    // The card lifts on hover; the hover is detected on this wrapper, which stays put (a lifted card could otherwise
+    // slip out from under a resting pointer and flicker).
+    <div className={clsx('group/lift grid', className)}>
+      <article
         className={clsx(
-          'absolute right-4 -z-10 font-display leading-none font-black text-transparent opacity-60 transition-[rotate,opacity] duration-500 group-hover:-rotate-3 group-hover:opacity-100',
-          big ? 'top-4 text-[8rem]' : 'top-3 text-[4.5rem] @lg:top-1 @lg:text-[7rem]',
+          'glass group @container relative isolate flex min-h-44 flex-col overflow-hidden rounded-3xl p-5 transition-[scale,box-shadow,translate] duration-150 sm:min-h-48 sm:p-6',
+          'group-hover/lift:-translate-y-1 motion-reduce:group-hover/lift:translate-y-0',
+          'has-[[data-play]:active]:scale-[0.98] has-[[data-play]:focus-visible]:shadow-[0_0_0_2px_var(--color-ink),0_0_0_4px_var(--color-cyan)]',
+          big && 'lg:min-h-full',
         )}
-        style={{ WebkitTextStroke: `1.5px ${a}88`, backgroundImage: `linear-gradient(160deg, ${a}40, transparent 75%)`, WebkitBackgroundClip: 'text' }}
       >
-        {mode.players}
-      </span>
-
-      <div className="flex flex-wrap items-center gap-2">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 opacity-20 transition-opacity duration-300 group-hover:opacity-40"
+          style={{ background: `radial-gradient(120% 90% at 100% 0%, ${a}, transparent 60%), radial-gradient(90% 80% at 0% 100%, ${b}55, transparent 70%)` }}
+        />
+        {/* How many play: the chip says "1 на 1", "8 играчи"… in words, this says it big. */}
         <span
-          className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-white uppercase"
-          style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
+          aria-hidden
+          className={clsx(
+            'absolute right-4 -z-10 font-display leading-none font-black text-transparent opacity-60 transition-[rotate,opacity] duration-500 group-hover:-rotate-3 group-hover:opacity-100',
+            big ? 'top-4 text-[8rem]' : 'top-3 text-[4.5rem] @lg:top-1 @lg:text-[7rem]',
+          )}
+          style={{ WebkitTextStroke: `1.5px ${a}88`, backgroundImage: `linear-gradient(160deg, ${a}40, transparent 75%)`, WebkitBackgroundClip: 'text' }}
         >
-          {mode.short}
+          {mode.players}
         </span>
-        {starter && (
-          <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">Започни оттук</span>
-        )}
-        {rating !== undefined && onRankInfo && (
-          <button
-            type="button"
-            onClick={onRankInfo}
-            className="focus-ring relative z-10 -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
-          >
-            <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
-            <RankBadge rating={rating} compact />
-            <CircleHelp aria-hidden className="size-3.5 text-fg-3" />
-            <span className="sr-only">— какво е рангът?</span>
-          </button>
-        )}
-      </div>
-      <h3 className={clsx('mt-3 font-display font-bold', big ? 'text-3xl sm:text-4xl' : 'text-2xl @lg:text-4xl')}>{mode.name}</h3>
-      <p className={clsx('mt-1 text-sm text-fg-2', big ? 'max-w-[17rem]' : 'max-w-[17rem] @lg:max-w-md')}>{mode.tagline}</p>
-      <p className={clsx('mt-2 text-sm text-fg-3', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>{mode.description}</p>
-      {big && (
-        <div className="mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
-          {CATEGORIES.map((c, i) => (
-            <span
-              key={c.id}
-              title={c.name}
-              className="grid size-10 place-items-center rounded-xl border border-line bg-white/5 text-lg transition-transform duration-300 group-hover:-translate-y-1"
-              style={{ transitionDelay: `${i * 25}ms` }}
-            >
-              {c.icon}
-            </span>
-          ))}
-        </div>
-      )}
 
-      <div className="mt-auto flex items-center justify-between gap-3 pt-5 sm:pt-6">
-        <span className="text-xs text-fg-3">
-          {mode.questions} въпроса · {mode.timeMs / 1000} с
-          {searching ? <span className="ml-2 text-emerald-300">● {searching} търсят</span> : null}
-        </span>
-        {/* Not positioned, so its ::after covers the card rather than the button. */}
-        <button data-play onClick={onPlay} className="shrink-0 outline-none after:absolute after:inset-0 after:content-['']">
+        <div className="flex flex-wrap items-center gap-2">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-white shadow-lg transition-transform group-hover:translate-x-0.5"
-            style={{ background: `linear-gradient(90deg, ${a}, ${b})`, boxShadow: `0 8px 24px -8px ${a}` }}
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-white uppercase"
+            style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
           >
-            Играй <span className="sr-only">{mode.name}</span>
-            <ArrowRight aria-hidden className="size-4" />
+            {mode.short}
           </span>
-        </button>
-      </div>
-    </motion.article>
+          {starter && (
+            <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">Започни оттук</span>
+          )}
+          {rating !== undefined && onRankInfo && (
+            <button
+              type="button"
+              onClick={onRankInfo}
+              className="focus-ring relative z-10 -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
+            >
+              <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
+              <RankBadge rating={rating} compact />
+              <CircleHelp aria-hidden className="size-3.5 text-fg-3" />
+              <span className="sr-only">— какво е рангът?</span>
+            </button>
+          )}
+        </div>
+        <h3 className={clsx('mt-3 font-display font-bold', big ? 'text-3xl sm:text-4xl' : 'text-2xl @lg:text-4xl')}>{mode.name}</h3>
+        <p className={clsx('mt-1 text-sm text-fg-2', big ? 'max-w-[17rem]' : 'max-w-[17rem] @lg:max-w-md')}>{mode.tagline}</p>
+        <p className={clsx('mt-2 text-sm text-fg-3', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>{mode.description}</p>
+        {big && (
+          <div className="mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
+            {CATEGORIES.map((c, i) => (
+              <span
+                key={c.id}
+                title={c.name}
+                className="grid size-10 place-items-center rounded-xl border border-line bg-white/5 text-lg transition-transform duration-300 group-hover:-translate-y-1"
+                style={{ transitionDelay: `${i * 25}ms` }}
+              >
+                {c.icon}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-3 pt-5 sm:pt-6">
+          <span className="text-xs text-fg-3">
+            {mode.questions} въпроса · {mode.timeMs / 1000} с
+            {searching ? <span className="ml-2 text-emerald-300">● {searching} търсят</span> : null}
+          </span>
+          {/* Not positioned, so its ::after covers the card rather than the button. */}
+          <button data-play onClick={onPlay} className="shrink-0 outline-none after:absolute after:inset-0 after:content-['']">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-white shadow-lg transition-transform group-hover:translate-x-0.5"
+              style={{ background: `linear-gradient(90deg, ${a}, ${b})`, boxShadow: `0 8px 24px -8px ${a}` }}
+            >
+              Играй <span className="sr-only">{mode.name}</span>
+              <ArrowRight aria-hidden className="size-4" />
+            </span>
+          </button>
+        </div>
+      </article>
+    </div>
   );
 }
 

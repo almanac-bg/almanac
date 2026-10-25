@@ -18,5 +18,7 @@ export const LEGAL = {
   email: 'privacy@almanac.bg',
   /** Email / SMTP provider that delivers password-reset emails. */
   emailProvider: '[Доставчик на имейли, напр. Brevo (Франция)]',
+  /** Where the server and backups run (company and country). */
+  hosting: '[Хостинг, напр. Hetzner Online GmbH (Германия)]',
   updated: '25 октомври 2026 г.',
 } as const;

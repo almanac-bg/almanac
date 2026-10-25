@@ -1,0 +1,25 @@
+# Weekly update pull requests (and immediate ones for security advisories). CI runs on each, so a green one is
+# safe to merge; patch and minor npm updates come grouped as one pull request.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  # The Node base image (security fixes in Node itself, e.g. its built-in SQLite).
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+
+  # Caddy and Litestream.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly, day: monday }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }

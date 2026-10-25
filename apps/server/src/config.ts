@@ -51,6 +51,10 @@ export const config = {
    * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
    */
   drainMs: Number(process.env.DRAIN_SECONDS ?? (process.env.NODE_ENV === 'production' ? 330 : 0)) * 1000,
+  /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
+  sentryDsn: process.env.SENTRY_DSN || null,
+  /** Tags error reports with the deployed version (e.g. the git commit). */
+  release: process.env.APP_RELEASE || null,
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */
   gameTimeScale: Number(process.env.GAME_TIME_SCALE ?? 1),
 };

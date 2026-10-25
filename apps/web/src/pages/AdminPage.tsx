@@ -3,6 +3,7 @@ import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { LaunchStatsPanel } from '../components/admin/LaunchStatsPanel';
 import { QuestionReportsQueue } from '../components/admin/QuestionReportsQueue';
 import { ReportsQueue } from '../components/admin/ReportsQueue';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -20,13 +21,13 @@ const toDraft = (s: Submission): QuestionDraft => ({
   answer: s.answer,
 });
 
-type Section = 'questions' | 'flags' | 'reports';
+type Section = 'questions' | 'flags' | 'reports' | 'stats';
 
 export function AdminPage() {
   const me = useStore((s) => s.me)!;
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');
-  const section: Section = tab === 'reports' || tab === 'flags' ? tab : 'questions';
+  const section: Section = tab === 'reports' || tab === 'flags' || tab === 'stats' ? tab : 'questions';
   const [counts, setCounts] = useState<{ pendingQuestions: number; openReports: number; questionReports: number } | null>(null);
 
   useEffect(() => {
@@ -52,12 +53,14 @@ export function AdminPage() {
             { value: 'questions', label: <>Въпроси{badge(counts?.pendingQuestions)}</> },
             { value: 'flags', label: <>Сигнали{badge(counts?.questionReports)}</> },
             { value: 'reports', label: <>Доклади{badge(counts?.openReports)}</> },
+            { value: 'stats', label: 'Статистика' },
           ]}
         />
       </div>
       {section === 'questions' && <QuestionsQueue onPending={(n) => setCounts((c) => c && { ...c, pendingQuestions: n })} />}
       {section === 'flags' && <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />}
       {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />}
+      {section === 'stats' && <LaunchStatsPanel />}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
 import { purgeGuests } from './guests';
 import { sendMail, streakReminderMail } from './mailer';
+import { reportError } from './monitoring';
+import { count } from './stats';
 import type { UserRow } from './users';
 
 /** Snapshots are taken in the quiet hours, from 04:00 Sofia time (or later that day, after a restart). */
@@ -67,6 +69,7 @@ export function sendStreakReminders(now = Date.now()): number {
     );
     sent++;
   }
+  count('reminders', sent, today);
   return sent;
 }
 
@@ -109,7 +112,7 @@ export function startMaintenance() {
         if (file) console.log(`💾 Backup saved: ${file}`);
       }
     } catch (err) {
-      console.error('🧹 Maintenance failed:', err);
+      void reportError(err, 'maintenance');
     } finally {
       running = false;
     }

@@ -2,6 +2,7 @@ import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS }
 import { all, one, run } from './db';
 import { config } from './config';
 import { pickQuestions, type PreparedQuestion, reorderOptions, seededRng } from './questions';
+import { count } from './stats';
 import { getUser, toPublicUser, type UserRow } from './users';
 
 /** Today's question set — generated once per day from a date seed, then frozen in the database. */
@@ -45,6 +46,7 @@ export function claimDailyAttempt(userId: number): { ok: true; day: string } | {
     };
   }
   run('INSERT INTO daily_results (user_id, day, started_at) VALUES (?, ?, ?)', userId, day, Date.now());
+  count('daily_runs');
   return { ok: true, day };
 }
 

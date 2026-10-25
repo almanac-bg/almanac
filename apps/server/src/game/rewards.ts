@@ -17,6 +17,7 @@ import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { advanceQuests } from '../quests';
 import { getRating, recordRating } from '../seasons';
+import { count, countActive } from '../stats';
 import { DELETED_NAME, getUser } from '../users';
 import type { Game, Participant } from './Game';
 
@@ -65,6 +66,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       game.startedAt,
       Date.now(),
     );
+    count(`matches:${setup.mode}`);
 
     const deltas =
       setup.ranked && isQueueMode(setup.mode)
@@ -160,7 +162,10 @@ function rewardHuman(
   }
   const today = dayKey();
   const claimDaily = !left && before.last_daily_bonus !== today;
-  if (claimDaily) lines.push({ label: 'Първи мач за деня', amount: XP.daily });
+  if (claimDaily) {
+    lines.push({ label: 'Първи мач за деня', amount: XP.daily });
+    countActive(before.created_at, today);
+  }
 
   // ── Daily challenge (recorded even after leaving: one attempt per day) ──
   let dailyResult: MatchRewards['daily'] = null;

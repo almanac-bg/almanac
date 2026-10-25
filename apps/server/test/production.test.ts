@@ -1,13 +1,17 @@
 // The server as it runs in production (NODE_ENV=production): admins, browser hardening, health.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
+// Error reporting on, pointed at a port nothing listens on (reports are dropped quietly).
+const DSN = 'http://public@127.0.0.1:9/1';
 
 before(async () => {
   // PUBLIC_QUEUES as it ships (unset): only some ranked queues are open.
-  srv = await startServer({ NODE_ENV: 'production', PUBLIC_QUEUES: '' });
+  srv = await startServer({ NODE_ENV: 'production', PUBLIC_QUEUES: '', SENTRY_DSN: DSN });
 });
 
 after(async () => {
@@ -69,4 +73,15 @@ test('at launch only Duel and Royale are open, and the lobby says so', async () 
   assert.ok((await emitAck(socket, 'queue:join', 'duel')).ok);
   socket.emit('queue:leave');
   socket.close();
+});
+
+test('with error reporting on, the page carries the DSN and the tunnel only takes our own project', async () => {
+  const envelope = (dsn: string) => `${JSON.stringify({ dsn })}\n{"type":"event"}\n{}\n`;
+  const post = (body: string) => fetch(`${srv.url}/api/monitoring`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body });
+  assert.equal((await post(envelope(DSN))).status, 200);
+  assert.equal((await post(envelope('https://other@evil.example/1'))).status, 400, 'not an open relay');
+  if (fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'))) {
+    const page = await (await fetch(`${srv.url}/`)).text();
+    assert.ok(page.includes(`<meta name="sentry-dsn" content="${DSN}" />`));
+  }
 });

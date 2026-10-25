@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource-variable/unbounded": "^5.3.0",
     "@quiz/client": "*",
     "@quiz/shared": "*",
+    "@sentry/browser": "^11.9.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "lucide-react": "^1.59.0",
@@ -24,6 +26,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/canvas-confetti": "^1.9.0",
     "@types/react": "^19.3.0",

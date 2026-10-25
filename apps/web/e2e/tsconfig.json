@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node runs the tests; the DOM is there for the callbacks that run inside the page (page.evaluate…).
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [".", "../playwright.config.ts"]
+}

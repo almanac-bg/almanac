@@ -6,6 +6,27 @@ import { defineConfig } from 'vite';
 
 const server = process.env.API_URL ?? 'http://localhost:3001';
 
+/** "Add to Home Screen": the game opens full-screen with its own icon, like an app. */
+const manifest = JSON.stringify({
+  name: `${BRAND.name} — ${BRAND.tagline.toLowerCase()}`,
+  short_name: BRAND.name,
+  description: 'Куиз битки на български: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
+  lang: 'bg',
+  id: '/',
+  start_url: '/',
+  scope: '/',
+  display: 'standalone',
+  background_color: '#07060d',
+  theme_color: '#07060d',
+  categories: ['games', 'education', 'entertainment'],
+  icons: [
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    // Launchers crop these to their own shape; the bolt sits inside the safe zone.
+    { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ],
+});
+
 export default defineConfig({
   plugins: [
     react(),
@@ -13,9 +34,22 @@ export default defineConfig({
     {
       name: 'brand',
       transformIndexHtml: (html) => html.replaceAll('%BRAND_NAME%', BRAND.name).replaceAll('%BRAND_DOMAIN%', BRAND.domain),
+      // The web app manifest comes from the same brand settings: a file in the build, and served by the dev server.
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
+      },
+      configureServer(dev) {
+        dev.middlewares.use('/manifest.webmanifest', (_req, res) => {
+          res.setHeader('content-type', 'application/manifest+json');
+          res.end(manifest);
+        });
+      },
     },
   ],
   build: {
+    // Public source maps: an error report then points at the real line of code (Sentry fetches them from the site).
+    // The browser only downloads them when its developer tools are open.
+    sourcemap: true,
     rolldownOptions: {
       output: {
         // Libraries change rarely: in their own files they stay cached across deploys of the app's code.

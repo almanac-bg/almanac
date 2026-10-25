@@ -12,6 +12,7 @@ import { Toasts } from './components/Toasts';
 import { Spinner } from './components/ui';
 import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
 import { LegalLinks } from './components/LegalLinks';
+import { identify } from './lib/monitoring';
 import { markReturning } from './lib/returning';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
@@ -65,6 +66,7 @@ export function App() {
 
   // One realtime connection per signed-in session.
   const userId = me?.id;
+  useEffect(() => identify(userId ?? null), [userId]);
   useEffect(() => {
     if (!userId) return;
     connectRealtime();

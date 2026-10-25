@@ -4,6 +4,7 @@ import { config } from './config';
 import { all, one, run } from './db';
 import { notifyUser } from './notify';
 import { pickQuestions, type PreparedQuestion, recentFor, reorderOptions } from './questions';
+import { count } from './stats';
 import { toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
@@ -35,6 +36,7 @@ export function createChallenge(creatorId: number): string {
     now,
     now + CHALLENGE_DAYS * DAY,
   );
+  count('challenges');
   return id;
 }
 
@@ -63,6 +65,7 @@ export function claimChallengeAttempt(id: string, userId: number): { ok: true } 
     userId,
     Date.now(),
   );
+  count('challenge_runs');
   return { ok: true };
 }
 

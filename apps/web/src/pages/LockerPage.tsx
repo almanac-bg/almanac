@@ -208,32 +208,34 @@ function Item({
 }) {
   const clickable = unlocked && !equipped && !!onEquip;
   return (
-    <motion.button
-      whileHover={clickable ? { y: -3 } : undefined}
-      whileTap={clickable ? { scale: 0.96 } : undefined}
-      disabled={!clickable}
-      onClick={onEquip}
-      title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
-      className={clsx(
-        'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center',
-        equipped && 'border-violet-400/70 bg-violet-500/15 shadow-[0_0_24px_-8px_rgb(139_92_246/0.9)]',
-        clickable && 'hover:bg-white/10',
-        saving && 'animate-pulse',
-      )}
-    >
-      <span className={clsx(!unlocked && 'opacity-30 grayscale')}>{children}</span>
-      {name && <span className="w-full truncate text-xs font-semibold">{name}</span>}
-      {!unlocked && (
-        <span className="flex max-w-full items-center gap-1 text-[10px] leading-tight text-fg-3">
-          {'level' in req && <Lock className="size-3 shrink-0" />}
-          <span className="truncate">{requirementLabel(req, true)}</span>
-        </span>
-      )}
-      {equipped && (
-        <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-violet-500">
-          <Check className="size-3" strokeWidth={3} />
-        </span>
-      )}
-    </motion.button>
+    // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer).
+    <div className="group/lift grid">
+      <motion.button
+        whileTap={clickable ? { scale: 0.96 } : undefined}
+        disabled={!clickable}
+        onClick={onEquip}
+        title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
+        className={clsx(
+          'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',
+          equipped && 'border-violet-400/70 bg-violet-500/15 shadow-[0_0_24px_-8px_rgb(139_92_246/0.9)]',
+          clickable && 'hover:bg-white/10 group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
+          saving && 'animate-pulse',
+        )}
+      >
+        <span className={clsx(!unlocked && 'opacity-30 grayscale')}>{children}</span>
+        {name && <span className="w-full truncate text-xs font-semibold">{name}</span>}
+        {!unlocked && (
+          <span className="flex max-w-full items-center gap-1 text-[10px] leading-tight text-fg-3">
+            {'level' in req && <Lock className="size-3 shrink-0" />}
+            <span className="truncate">{requirementLabel(req, true)}</span>
+          </span>
+        )}
+        {equipped && (
+          <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-violet-500">
+            <Check className="size-3" strokeWidth={3} />
+          </span>
+        )}
+      </motion.button>
+    </div>
   );
 }

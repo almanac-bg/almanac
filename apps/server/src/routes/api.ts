@@ -55,6 +55,7 @@ import {
   resolveQuestionReports,
   unhideQuestion,
 } from '../questionReports';
+import { count, launchStats } from '../stats';
 import { throttled } from '../throttle';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import {
@@ -155,6 +156,7 @@ api.post('/auth/register', async (req, res) => {
   );
   const userId = Number(lastInsertRowid);
   if (creds.email) requestEmailChange(userId, creds.email);
+  count('signups');
   setSessionCookie(res, createSession(userId));
   res.status(201).json({ user: getMe(userId) });
 });
@@ -246,6 +248,7 @@ api.post('/auth/guest', (req, res) => {
     return;
   }
   const userId = createGuest();
+  count('guests');
   setSessionCookie(res, createSession(userId));
   res.status(201).json({ user: getMe(userId) });
 });
@@ -383,6 +386,7 @@ api.post('/account/claim', requireAuth, async (req, res) => {
     return;
   }
   if (creds.email) requestEmailChange(me.id, creds.email);
+  count('claims');
   res.json({ user: getMe(me.id) });
 });
 
@@ -588,6 +592,10 @@ api.post('/submissions', requireAuth, requireAccount, (req, res) => {
 api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
   const status = z.enum(['pending', 'approved', 'rejected']).catch('pending').parse(req.query.status) as SubmissionStatus;
   res.json({ submissions: listSubmissions(status), pending: pendingCount() });
+});
+
+api.get('/admin/stats', requireAuth, requireAdmin, (_req, res) => {
+  res.json(launchStats());
 });
 
 api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {

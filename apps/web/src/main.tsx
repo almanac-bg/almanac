@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { startMonitoring } from './lib/monitoring';
 import { sfx } from './lib/sound';
 import './styles.css';
 
@@ -47,6 +48,8 @@ window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
   window.location.reload();
 });
+
+startMonitoring();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

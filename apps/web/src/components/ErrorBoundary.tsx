@@ -1,5 +1,6 @@
 import { reportError } from '@quiz/client';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { captureError } from '../lib/monitoring';
 import { Background } from './Background';
 import { Button, Card } from './ui';
 
@@ -13,6 +14,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     reportError('render', error, info.componentStack ?? undefined);
+    captureError(error);
   }
 
   render() {

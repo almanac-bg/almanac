@@ -25,6 +25,7 @@ import { guarded } from './guard';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
 import { eventBucket, throttled } from './throttle';
 import { ACCOUNT_ONLY } from './guests';
+import { reportError } from './monitoring';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
@@ -121,7 +122,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
         try {
           (listener as (...a: unknown[]) => void)(...args);
         } catch (err) {
-          console.error(`💥 socket "${event}" from user ${userId}:`, err);
+          void reportError(err, `socket ${event}`, { userId });
           const ack = args.at(-1);
           if (typeof ack === 'function') ack({ ok: false, error: 'Нещо се обърка. Опитай пак.' });
         }

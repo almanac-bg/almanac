@@ -49,7 +49,10 @@ test real multiplayer locally, open a second browser (or a private window) with 
 - **`production.test.ts`** runs the server as in production: admins only through the admin command line, browser security
   headers, the health check, crash reports.
 - **`maintenance.test.ts`** covers the cleanup of expired logins and the daily database snapshots.
-- **`progress.test.ts`** covers daily quests, streak shields, the evening streak reminder and guest cleanup.
+- **`progress.test.ts`** covers daily quests, streak shields, the evening streak reminder, guest cleanup and the launch
+  statistics.
+- **`monitoring.test.ts`** checks the error reports sent to Sentry, their rate limit, and that the browser tunnel
+  only forwards to the site's own project.
 - **`questions.test.ts`** validates the question bank. New questions must pass it.
 - **`rules.test.ts`** checks the scoring and progression rules, including Sofia-time day and season boundaries across
   DST changes.
@@ -76,6 +79,8 @@ and checks that it boots.
 | `BACKUP_DIR`       | `backups` next to the database        | Daily database snapshots; `off` disables them                |
 | `BACKUP_KEEP_DAYS` | `14`                                  | How many daily snapshots to keep                             |
 | `DRAIN_SECONDS`    | `330` in production, `0` otherwise    | On shutdown, how long running matches may finish first       |
+| `SENTRY_DSN`       |                                       | Sentry project for error reports; unset → errors only go to the log |
+| `APP_RELEASE`      |                                       | Version tag on error reports (the deploy command sets the git commit) |
 
 The brand name lives in `packages/shared/src/brand.ts`.
 
@@ -166,6 +171,8 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
   - After a match players can review every question and flag a mistake. Moderators see the flags in `/admin` →
     Сигнали, most reported first, and can hide a question from new matches at once (and undo that).
   - The word lists are in `apps/server/src/moderation.ts`.
+- **Phones:** the site installs to the home screen (a web app manifest with icons): it then opens full-screen like an
+  app, without an app store.
 - **Privacy (GDPR):**
   - The privacy policy and terms of use are at `/privacy` and `/terms`.
   - Players can download all their data as JSON and delete their account from Настройки.
@@ -189,23 +196,35 @@ Players can submit questions in the app. To add built-in ones, append to `apps/s
 `answer` is the index of the correct option. Options are shuffled for every match. Categories are `general`,
 `science`, `history`, `geography`, `movies`, `music`, `sports`, `technology`, `literature` and `nature`.
 
-## Deploying (Hetzner + Docker)
+## Deploying (any VPS + Docker)
 
 The stack is three containers: the app (plain Node, with SQLite on a volume), Caddy, which handles HTTPS and gets
-and renews Let's Encrypt certificates automatically, and Litestream, which streams every database change to object
-storage. A **CX22** (2 vCPU, 4 GB) is plenty to start: in a load test, 1,500 simultaneous players used about 5% CPU.
+and renews Let's Encrypt certificates automatically, and Litestream, which streams every database change to
+S3-compatible object storage. Nothing ties it to one provider. **2 vCPU and 4 GB** is plenty to start: in a load
+test, 1,500 simultaneous players used about 5% of one core. All images run on x86 and ARM.
 
-1. **Create the server:** a Hetzner Cloud server with Ubuntu 24.04. In the firewall, allow TCP 22, 80 and 443, and UDP 443 (HTTP/3).
+Choosing the server (prices as of October 2026; check before ordering), in the EU for GDPR and low latency to
+Bulgaria:
+- **Hetzner** CX23 (€5.99) or CAX11 (ARM, €6.49), in Falkenstein, Nuremberg or Helsinki: the best value when in stock
+  (they've often been sold out since September 2026). The always-orderable CPX22 costs about three times more.
+- **netcup** VPS 500 (about €8, month to month; Germany or Vienna) or **OVHcloud** VPS-1 (€4.49): good alternatives.
+
+1. **Create the server:** Ubuntu 24.04, logged in with an SSH key (no password logins). In the provider's firewall
+   allow TCP 22 (ideally only from your own IP), 80 and 443, and UDP 443 (HTTP/3). Turn on automatic security
+   updates: `sudo apt install unattended-upgrades`.
 2. **Point DNS at it:** add `A` records for `almanac.bg` and `www.almanac.bg` with the server's IPv4 (and `AAAA`
    for IPv6).
-3. **Create the backup bucket:** in the Hetzner Cloud Console → Object Storage, create a bucket (e.g. `almanac-backups`)
-   and S3 credentials for it. Also tick **Backups** on the server itself.
+3. **Create the backup bucket:** any S3-compatible storage works. Hetzner Object Storage (about €6.49 a month for
+   1 TB, no per-request fees; Cloud Console → Object Storage) is the simple choice even if the server is elsewhere;
+   Cloudflare R2 or Backblaze B2 work too. Create a bucket (e.g. `almanac-backups`) and S3 credentials, and set the
+   `BACKUP_*` values in `.env` (`BACKUP_REGION` is the location in the endpoint, e.g. `fsn1`; `auto` for R2). If
+   the provider offers whole-server backups (Hetzner: **Backups**, +20%), turn them on too.
 4. **Install Docker and deploy:**
    ```bash
    curl -fsSL https://get.docker.com | sh
    git clone <your repo> almanac && cd almanac
    cp .env.example .env        # set DOMAIN and the BACKUP_* values
-   docker compose up -d --build
+   APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
 5. Open https://almanac.bg and register your account, then make it the admin:
    ```bash
@@ -213,32 +232,44 @@ storage. A **CX22** (2 vCPU, 4 GB) is plenty to start: in a load test, 1,500 sim
    ```
    (`admin list` and `admin remove <username>` work the same way.)
 6. **Test the backup once** (the commands are in `deploy/litestream.yml`): restore into a scratch file and check it
-   exists. A backup that has never been restored isn't a backup yet.
+   exists. A backup that has never been restored isn't a backup yet. (CI also does a full backup-and-restore with
+   the production config on every push.)
+7. **Turn on error reports:** create a free Sentry account with the organization in the **EU** region (Frankfurt;
+   it can't be changed later), add a project of type "Browser JavaScript", and in its settings turn on "Prevent
+   Storing of IP Addresses". Put its DSN in `.env` as `SENTRY_DSN` and run the deploy command again. Server errors
+   and crashes in players' browsers then arrive in Sentry (and by email), grouped, with the line of code. Without
+   `SENTRY_DSN` nothing is sent anywhere.
+8. **Add an uptime check:** a free monitor (UptimeRobot's free plan is for non-commercial sites like this one, or
+   Better Stack) on `https://almanac.bg/api/health`, alerting you by email or push.
 
-**Email (password resets):**
+**Email (password resets, verification, streak reminders):**
 1. Create an account with a transactional email provider. Brevo (EU, free up to 300 emails a day), Mailgun EU and
    Postmark all work.
-2. Verify the `almanac.bg` domain there by adding the SPF and DKIM DNS records the provider gives you.
-3. Put the SMTP details in `.env` as `SMTP_URL` and run `docker compose up -d`.
+2. Authenticate the `almanac.bg` domain there by adding the DNS records it gives you (DKIM, DMARC, a verification
+   code), and add the sender `no-reply@almanac.bg`.
+3. Put the SMTP details in `.env` as `SMTP_URL` and run the deploy command again. Brevo's SMTP login contains an `@`:
+   write it as `%40` in the URL, e.g. `smtp://8a1b2c001%40smtp-brevo.com:KEY@smtp-relay.brevo.com:587`.
 
-Use port **587**: Hetzner blocks outgoing ports 25 and 465 on new cloud servers.
+Use port **587**: many providers (Hetzner among them) block outgoing ports 25 and 465 on new servers.
 
-**Before launch:** fill in your name and a correspondence address (`LEGAL` in `packages/shared/src/brand.ts`); the
+**Before launch:** fill in your name, a correspondence address, the email provider and the hosting provider
+(`LEGAL` in `packages/shared/src/brand.ts`); the
 service is run by a private individual, and the privacy policy and terms show these details. Both documents are
 drafts: have them reviewed for your situation.
 
-**Updating:** `git pull && docker compose up -d --build`. The new version builds while the old one keeps running.
+**Updating:** `git pull && APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build` (the release tag
+lets error reports say which version they came from). The new version builds while the old one keeps running.
 Then the old one stops gracefully: queued players are told an update is coming, no new matches start, and running
 matches play to the end (up to ~5½ minutes, `DRAIN_SECONDS`) before it restarts. While it's down for those few
 seconds, Caddy shows a page that reloads by itself, and players' browsers reconnect automatically.
 
 **Backups:** three layers.
-1. **Litestream (continuous, off-site):** every change reaches Hetzner Object Storage within seconds; any moment of
-   the last 7 days can be restored. Restore commands are in `deploy/litestream.yml`.
+1. **Litestream (continuous, off-site):** every change reaches object storage within seconds; any moment of the last
+   7 days can be restored. Restore commands are in `deploy/litestream.yml`.
 2. **Daily snapshots (automatic, on the server):** after 04:00 Sofia time the app writes a consistent copy of the
    database to `/data/backups/quiz-YYYY-MM-DD.db` and keeps the last 14 (`BACKUP_KEEP_DAYS`). Handy for undoing a
    mistake quickly; they live on the same disk.
-3. **Hetzner's server backups:** daily images of the whole server, kept off the machine (+20% of its price).
+3. **The provider's server backups** (if it offers them): daily images of the whole server, kept off the machine.
 
 To restore a daily snapshot:
 ```bash
@@ -249,9 +280,17 @@ docker compose run --rm --no-deps --entrypoint sh app -c \
 docker compose start app
 ```
 
-**Monitoring:** add a free uptime check (e.g. UptimeRobot or Better Stack) on `https://almanac.bg/api/health`. It
-answers 200 only while the app and its database work. Crashes in players' browsers are reported to the server log
-as lines starting with 🧯.
+**Monitoring:**
+- **Uptime:** `/api/health` answers 200 only while the app and its database work (see step 8).
+- **Errors:** Sentry, when `SENTRY_DSN` is set (see step 7). Reports carry the place in the code and the account
+  number only; the browser sends them through the app (`/api/monitoring`), never to Sentry directly, and they are
+  capped at 20 a minute so a bug in a loop can't use up the free plan (5,000 a month). Everything is also in the log
+  (`💥` for the server, `🧯` for browsers).
+- **Launch statistics:** `/admin` → Статистика: active players per day, new players (accounts and guests), saved
+  guest accounts, matches, challenge links, the daily challenge, and how many new players come back the next day and
+  a week later. Counted on the server as things happen; no cookies, no tracking, no third parties.
+- **Updates:** Dependabot opens weekly pull requests for npm packages, the Node base image, Caddy, Litestream and
+  the CI actions (security fixes right away); CI tests each one.
 
 **Logs:** `docker compose logs -f app` (rotated: 5 × 10 MB per container).
 

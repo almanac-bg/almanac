@@ -19,6 +19,19 @@ jobs:
       # Sources, then the production bundle that ships in the Docker image.
       - run: npm test
       - run: npm run test:dist -w @quiz/server
+      # The built app in a real browser (the runner's Google Chrome): guest play, challenge links, saving an account,
+      # layouts. See apps/web/playwright.config.ts.
+      - run: npm run test:browser -w @quiz/web
+      # What went wrong, to look at: the HTML report, with screenshots and the retry's trace.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   docker:
     runs-on: ubuntu-latest
@@ -41,3 +54,37 @@ jobs:
           done
           docker logs almanac
           exit 1
+      # Backups, end to end with the production Litestream config: stream the live database to S3-compatible storage
+      # (moto stands in for the real thing), write more, then restore elsewhere and read it back. A backup that has
+      # never been restored isn't a backup.
+      - name: Backup and restore with Litestream
+        run: |
+          set -eu
+          LITESTREAM=$(sed -n 's/.*image: \(litestream\/litestream:.*\)/\1/p' docker-compose.yml)
+          export BACKUP_BUCKET=backups BACKUP_ENDPOINT=http://s3:5000 BACKUP_REGION=us-east-1
+          export BACKUP_ACCESS_KEY_ID=test BACKUP_SECRET_ACCESS_KEY=test
+          env_args="-e BACKUP_BUCKET -e BACKUP_ENDPOINT -e BACKUP_REGION -e BACKUP_ACCESS_KEY_ID -e BACKUP_SECRET_ACCESS_KEY"
+          config="-v $PWD/deploy/litestream.yml:/etc/litestream.yml:ro"
+          register() {
+            docker exec app wget -qO- --header='content-type: application/json' \
+              --post-data="{\"username\":\"$1\",\"password\":\"secret123\"}" http://127.0.0.1:3001/api/auth/register
+          }
+
+          docker network create backup
+          docker run -d --name s3 --network backup motoserver/moto:5.2.4
+          docker run -d --name app --network backup -v data:/data almanac
+          for i in $(seq 1 30); do docker exec app wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1 && break; sleep 1; done
+          docker run --rm --network backup curlimages/curl:8.11.1 -sf -X PUT http://s3:5000/backups
+
+          register before_backup
+          docker run -d --name litestream --network backup -v data:/data $config $env_args "$LITESTREAM" replicate
+          sleep 5
+          register after_backup
+          sleep 5
+          docker logs litestream
+
+          docker run --rm --network backup -v restored:/restore $config $env_args "$LITESTREAM" restore -o /restore/quiz.db /data/quiz.db
+          users=$(docker run --rm --user root -v restored:/restore almanac node -e \
+            "const db = new (require('node:sqlite').DatabaseSync)('/restore/quiz.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)")
+          echo "restored users: $users"
+          test "$users" = "before_backup,after_backup"

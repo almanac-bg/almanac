@@ -525,3 +525,9 @@ export interface MyChallenge {
   myScore: number | null;
   leader: { username: string; score: number } | null;
 }
+
+/** Admin → Статистика: daily counters (newest day first) and totals. */
+export interface LaunchStats {
+  days: { day: string; values: Partial<Record<string, number>> }[];
+  totals: { accounts: number; guests: number; matches: number };
+}

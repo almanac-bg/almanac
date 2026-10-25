@@ -2,6 +2,7 @@ import { MODES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 import type { IO } from './io';
 import { config } from '../config';
 import { guarded } from '../guard';
+import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
 import { getUser } from '../users';
 import { makeBots } from './bots';
@@ -107,7 +108,7 @@ export class Matchmaker {
         bots,
       });
     } catch (err) {
-      console.error('Failed to start match', err);
+      void reportError(err, 'match start', { extra: { mode } });
       for (const e of entries) {
         this.io.to(`user:${e.userId}`).emit('notice', { kind: 'error', message: 'Мачът не можа да започне. Опитай пак.' });
       }

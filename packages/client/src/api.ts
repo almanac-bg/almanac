@@ -4,6 +4,7 @@ import type {
   ChallengePreview,
   DailyInfo,
   FriendsResponse,
+  LaunchStats,
   LeaderboardBoard,
   LeaderboardResponse,
   Loadout,
@@ -88,6 +89,7 @@ export const api = {
   reportQuestion: (questionId: string, reason: QuestionReportReason, details: string) =>
     request<{ ok: true }>('POST', `/questions/${encodeURIComponent(questionId)}/report`, { reason, details }),
   adminQuestionReports: () => request<QuestionReports>('GET', '/admin/question-reports'),
+  adminStats: () => request<LaunchStats>('GET', '/admin/stats'),
   resolveQuestionReports: (questionId: string, action: QuestionReportAction) =>
     request<QuestionReports>('POST', `/admin/question-reports/${encodeURIComponent(questionId)}/resolve`, { action }),
   unhideQuestion: (questionId: string) =>

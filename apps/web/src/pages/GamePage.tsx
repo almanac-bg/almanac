@@ -663,61 +663,66 @@ function AnswerButton({
   else if (selected) name.push('твоят избор');
   if (pickers.length) name.push(`избран от ${pickers.map((p) => p.name).join(', ')}`);
 
+  const liftable = !disabled && !locked && !removed;
   return (
-    <motion.button
-      layout
-      data-answer={index}
-      aria-label={name.join(' — ')}
-      disabled={disabled || locked || removed}
-      onClick={() => actions.answer(index)}
-      initial={{ opacity: 0, y: 14 }}
-      animate={{
-        opacity: removed ? 0.25 : state === 'dim' ? 0.45 : 1,
-        y: 0,
-        x: state === 'wrong' ? [0, -8, 8, -5, 5, 0] : 0,
-        scale: state === 'correct' ? [1, 1.04, 1] : 1,
-      }}
-      transition={{ delay: revealed ? 0 : 0.05 * index, duration: state === 'wrong' ? 0.45 : 0.3 }}
-      whileHover={!disabled && !locked && !removed ? { y: -3 } : undefined}
-      whileTap={!disabled && !locked && !removed ? { scale: 0.97 } : undefined}
-      className={clsx(
-        'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow] duration-200 sm:min-h-[5.5rem] sm:gap-4 sm:p-5',
-        state === 'correct'
-          ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
-          : state === 'wrong'
-            ? 'border-rose-400/70 bg-rose-500/20'
-            : 'glass hover:bg-white/[0.08]',
-        removed && 'line-through',
-      )}
-      style={state === 'selected' ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 36px -8px ${color}` } : undefined}
-    >
-      <span
-        className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5"
-        style={{ background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : color }}
-      />
-      <span
-        className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold"
-        style={{
-          background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
-          color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
+    // The hover lift is on the button, the hover itself on this wrapper that stays put: lifting the button can't move
+    // it out from under a resting pointer (which made it flicker between raised and lowered).
+    <div className="group/lift grid">
+      <motion.button
+        layout
+        data-answer={index}
+        aria-label={name.join(' — ')}
+        disabled={disabled || locked || removed}
+        onClick={() => actions.answer(index)}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{
+          opacity: removed ? 0.25 : state === 'dim' ? 0.45 : 1,
+          y: 0,
+          x: state === 'wrong' ? [0, -8, 8, -5, 5, 0] : 0,
+          scale: state === 'correct' ? [1, 1.04, 1] : 1,
         }}
+        transition={{ delay: revealed ? 0 : 0.05 * index, duration: state === 'wrong' ? 0.45 : 0.3 }}
+        whileTap={liftable ? { scale: 0.97 } : undefined}
+        className={clsx(
+          'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 sm:min-h-[5.5rem] sm:gap-4 sm:p-5',
+          liftable && 'group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
+          state === 'correct'
+            ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
+            : state === 'wrong'
+              ? 'border-rose-400/70 bg-rose-500/20'
+              : 'glass hover:bg-white/[0.08]',
+          removed && 'line-through',
+        )}
+        style={state === 'selected' ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 36px -8px ${color}` } : undefined}
       >
-        {state === 'correct' ? <Check className="size-5" strokeWidth={3} /> : state === 'wrong' ? <X className="size-5" strokeWidth={3} /> : LETTERS[index]}
-      </span>
-      <span className="flex-1 text-[15px] font-semibold sm:text-base">{text}</span>
-      {pickers.length > 0 && (
-        <span className="flex -space-x-2">
-          {pickers.slice(0, 4).map((p) => (
-            <motion.span key={p.id} initial={{ scale: 0 }} animate={{ scale: 1 }} title={p.name}>
-              <Avatar avatar={p.avatar} frame={p.frame} size={26} />
-            </motion.span>
-          ))}
-          {pickers.length > 4 && (
-            <span className="grid size-[26px] place-items-center rounded-full bg-white/15 text-[10px] font-bold">+{pickers.length - 4}</span>
-          )}
+        <span
+          className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5"
+          style={{ background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : color }}
+        />
+        <span
+          className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold"
+          style={{
+            background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
+            color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
+          }}
+        >
+          {state === 'correct' ? <Check className="size-5" strokeWidth={3} /> : state === 'wrong' ? <X className="size-5" strokeWidth={3} /> : LETTERS[index]}
         </span>
-      )}
-    </motion.button>
+        <span className="flex-1 text-[15px] font-semibold sm:text-base">{text}</span>
+        {pickers.length > 0 && (
+          <span className="flex -space-x-2">
+            {pickers.slice(0, 4).map((p) => (
+              <motion.span key={p.id} initial={{ scale: 0 }} animate={{ scale: 1 }} title={p.name}>
+                <Avatar avatar={p.avatar} frame={p.frame} size={26} />
+              </motion.span>
+            ))}
+            {pickers.length > 4 && (
+              <span className="grid size-[26px] place-items-center rounded-full bg-white/15 text-[10px] font-bold">+{pickers.length - 4}</span>
+            )}
+          </span>
+        )}
+      </motion.button>
+    </div>
   );
 }
 

@@ -17,6 +17,7 @@ const { liveDailyStreak, recordDailyResult } = await import('../src/daily');
 const { sendStreakReminders } = await import('../src/maintenance');
 const { purgeGuests } = await import('../src/guests');
 const { getUser } = await import('../src/users');
+const { count, countActive, launchStats } = await import('../src/stats');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -93,4 +94,20 @@ test('guest accounts nobody can sign in to any more are cleared after a day', ()
   assert.equal(purgeGuests(now), 1);
   const exists = (id: number) => !!one('SELECT 1 AS x FROM users WHERE id = ?', id);
   assert.deepEqual([stale, active, fresh, member].map(exists), [false, true, true, true]);
+});
+
+test('launch statistics: daily counters, and returns counted against the day a player joined', () => {
+  const today = '2026-11-20';
+  const joined = (daysAgo: number) => sofiaMidnight(2026, 11, 20 - daysAgo) + 12 * 60 * 60_000;
+  count('guests', 1, shiftDay(today, -1));
+  count('signups', 2, shiftDay(today, -1));
+  countActive(joined(1), today); // joined yesterday, back today: D1
+  countActive(joined(7), today); // a week ago: D7
+  countActive(joined(3), today); // neither
+  const { days } = launchStats(10, today);
+  const at = (day: string) => days.find((d) => d.day === day)!.values;
+  assert.equal(days[0].day, today, 'newest first');
+  assert.equal(at(today).active, 3);
+  assert.deepEqual([at(shiftDay(today, -1)).guests, at(shiftDay(today, -1)).signups, at(shiftDay(today, -1)).returned_d1], [1, 2, 1]);
+  assert.equal(at(shiftDay(today, -7)).returned_d7, 1);
 });

@@ -23,6 +23,7 @@ import {
   TIME_BONUS_MS,
 } from '@quiz/shared';
 import { config } from '../config';
+import { reportError } from '../monitoring';
 import { type PreparedQuestion, shuffle } from '../questions';
 import type { BotBrain } from './bots';
 
@@ -409,7 +410,7 @@ export class Game {
     try {
       rewards = this.hooks.finalize(this, standings);
     } catch (err) {
-      console.error(`Failed to persist match ${this.id}`, err);
+      void reportError(err, 'match results', { extra: { match: this.id, mode: this.setup.mode } });
     }
     for (const p of this.humans) {
       const userId = p.player.userId;
@@ -669,11 +670,11 @@ export class Game {
     try {
       fn();
     } catch (err) {
-      console.error(`💥 Match ${this.id} failed:`, err);
+      void reportError(err, 'match', { extra: { match: this.id, mode: this.setup.mode } });
       try {
         if (this.phase !== 'ended') return this.end();
       } catch (endErr) {
-        console.error(`💥 Match ${this.id} could not end cleanly:`, endErr);
+        void reportError(endErr, 'match end', { extra: { match: this.id } });
       }
       // Ending it failed too: drop the match so its players are free to play again.
       try {
@@ -683,7 +684,7 @@ export class Game {
         }
         this.hooks.onClosed(this);
       } catch (closeErr) {
-        console.error(`💥 Match ${this.id} could not be closed:`, closeErr);
+        void reportError(closeErr, 'match close', { extra: { match: this.id } });
       }
     }
   }
