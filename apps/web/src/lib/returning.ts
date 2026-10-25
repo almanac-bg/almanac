@@ -3,7 +3,8 @@ const KEY = 'quiz:returning';
 
 export function isReturning(): boolean {
   try {
-    return localStorage.getItem(KEY) === '1';
+    // window's, not the bare global: in the server's render (Node) that one exists only to print a warning.
+    return window.localStorage.getItem(KEY) === '1';
   } catch {
     return false;
   }

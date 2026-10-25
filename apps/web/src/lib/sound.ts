@@ -7,7 +7,8 @@ const listeners = new Set<() => void>();
 
 function readMuted() {
   try {
-    return localStorage.getItem('quiz:muted') === '1';
+    // window's, not the bare global: in the server's render (Node) that one exists only to print a warning.
+    return window.localStorage.getItem('quiz:muted') === '1';
   } catch {
     return false;
   }
