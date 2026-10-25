@@ -2,7 +2,7 @@
 # Sets up a GitHub repository for АЛМАНАХ: About (description, website, topics), features, merge rules, security
 # features, labels and a protected main branch. Safe to run again. Needs the GitHub CLI (gh), logged in as an admin.
 #
-#   scripts/github-setup.sh otsirh/almanac.bg
+#   scripts/github-setup.sh almanac-bg/almanac
 #
 # Some features exist only for public repositories (private vulnerability reporting, free secret scanning, rules on
 # private repositories without a paid plan): on a private one those steps say so and are skipped.

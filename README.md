@@ -211,7 +211,7 @@ The live game's bank is kept in a separate private repository (`almanac-question
 here, a folder this repository ignores:
 
 ```bash
-git clone git@github.com:otsirh/almanac-questions.git private
+git clone git@github.com:almanac-bg/almanac-questions.git private
 ```
 
 With it present, the server uses `private/questions.json`, and `npm run build` puts it next to the server bundle,
@@ -253,10 +253,10 @@ Bulgaria:
 4. **Install Docker and deploy:**
    ```bash
    curl -fsSL https://get.docker.com | sh
-   git clone https://github.com/otsirh/almanac.bg.git almanac && cd almanac
+   git clone https://github.com/almanac-bg/almanac.git almanac && cd almanac
    # The private question bank: give the server read access with a deploy key (ssh-keygen -t ed25519, then add
    # the public key in almanac-questions → Settings → Deploy keys, read-only).
-   git clone git@github.com:otsirh/almanac-questions.git private
+   git clone git@github.com:almanac-bg/almanac-questions.git private
    cp .env.example .env        # set DOMAIN, OPERATOR_*, the BACKUP_* values…
    APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
@@ -349,7 +349,7 @@ Not covered by the license:
 
 ## GitHub repository settings
 
-`scripts/github-setup.sh otsirh/almanac.bg` sets up the GitHub side (safe to run again): description, website and
+`scripts/github-setup.sh almanac-bg/almanac` sets up the GitHub side (safe to run again): description, website and
 topics, issues and discussions, squash merges, Dependabot alerts and security updates, private vulnerability
 reporting, secret scanning, labels and a protected `main`. Some of these exist only for public repositories, so
 run it again after making the repository public. The social preview image (`.github/social-preview.png`) is
