@@ -551,6 +551,10 @@ export interface OperatorInfo {
   email: string;
   emailProvider: string | null;
   hosting: string | null;
+  /** Where the off-site backups are kept, when that's not the hosting provider. */
+  backups: string | null;
+  /** Forwards mail sent to the contact address, if a service does. */
+  inbox: string | null;
   /** Where this site's source code is published (offered in the footer, as the AGPL asks of hosted copies). */
   sourceUrl: string | null;
 }

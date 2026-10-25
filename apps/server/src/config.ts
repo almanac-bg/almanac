@@ -80,6 +80,8 @@ export const config = {
     email: process.env.CONTACT_EMAIL || `privacy@${BRAND.domain}`,
     emailProvider: process.env.EMAIL_PROVIDER || null,
     hosting: process.env.HOSTING_PROVIDER || null,
+    backups: process.env.BACKUP_PROVIDER || null,
+    inbox: process.env.INBOX_PROVIDER || null,
   },
   /** Where this site's source code is published; linked in the footer (the AGPL asks hosted copies to offer it). */
   sourceUrl: process.env.SOURCE_URL || null,

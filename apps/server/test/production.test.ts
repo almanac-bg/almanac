@@ -19,6 +19,7 @@ before(async () => {
     OPERATOR_NAME: 'Тест Тестов',
     OPERATOR_ADDRESS: 'ул. Примерна 1, София',
     SOURCE_URL: 'https://example.test/almanac',
+    BACKUP_PROVIDER: 'Примерни бекъпи',
   });
 });
 
@@ -151,4 +152,6 @@ test('who runs the site comes from the configuration, not the code (and the foot
   assert.equal(legal.address, 'ул. Примерна 1, София');
   assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
+  assert.equal(legal.backups, 'Примерни бекъпи');
+  assert.equal(legal.inbox, null, 'unset: the policy leaves the line out');
 });
