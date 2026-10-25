@@ -629,9 +629,7 @@ function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
         >
           ❄️
         </motion.span>
-        <p className="mt-2 font-display text-xl font-bold text-cyan-50">
-          {by ? `${by} те замрази!` : 'Замразен отговор!'}
-        </p>
+        <p className="mt-2 font-display text-xl font-bold text-cyan-50">{by ? `${by} те замрази!` : 'Замразиха те!'}</p>
         <p className="mt-1 font-display text-3xl font-black text-cyan-200 tabular-nums">{left}</p>
       </div>
     </motion.div>

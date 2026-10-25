@@ -25,7 +25,6 @@ test('a challenge link brings a signed-out friend in to beat the score', async (
   await page.getByRole('button', { name: 'Създай предизвикателство', exact: true }).click();
   await expect(page).toHaveURL(/\/game$/);
   expect(await playMatch(page)).toEqual({ answered: 10, total: 10 });
-  await expect(page.getByRole('heading', { name: 'Летвата е поставена!', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Сега прати линка', exact: true })).toBeVisible();
 
   // …then shares the link.
@@ -43,6 +42,9 @@ test('a challenge link brings a signed-out friend in to beat the score', async (
   const { challenges } = (await res.json()) as { challenges: MyChallenge[] };
   expect(challenges).toEqual([expect.objectContaining({ id, players: 1, myScore: expect.any(Number) })]);
   const toBeat = challenges[0].myScore!;
+  // Every pick is the first answer, so now and then none is right: then there's no bar to speak of yet.
+  const headline = toBeat > 0 ? 'Летвата е поставена!' : 'Линкът е готов';
+  await expect(page.getByRole('heading', { name: headline, exact: true })).toBeVisible();
 
   // A friend opens the link, signed out: who's challenging, and the score to beat.
   const friend = await newPlayer();

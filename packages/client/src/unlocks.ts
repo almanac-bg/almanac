@@ -36,7 +36,7 @@ export function requirementLabel(req: Requirement, compact = false): string {
   if ('level' in req) return `Ниво ${req.level}`;
   if ('season' in req) {
     const tier = RANK_TIERS.find((t) => t.id === req.season)!.name;
-    return compact ? `🏅 Сезон ${tier}` : `Завърши сезон в ранг ${tier} или по-високо`;
+    return compact ? `🏅 Сезон ${tier}` : `Завърши сезон в ранг ${tier} или по-висок`;
   }
   const name = achievementById(req.achievement)?.name ?? req.achievement;
   return compact ? `🏆 ${name}` : `Постижение „${name}“`;

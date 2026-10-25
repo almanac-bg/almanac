@@ -235,8 +235,7 @@ function bind(s: GameSocket) {
     }
     if (powerup === 'freeze' && targetId) {
       const by = playerId === you ? 'Ти' : nameOf(g, playerId);
-      const target = targetId === you ? 'теб' : nameOf(g, targetId);
-      pushFeed(`${by} замрази ${target}!`, '❄️');
+      pushFeed(targetId === you ? `${by} те замрази!` : `${by} замрази ${nameOf(g, targetId)}!`, '❄️');
     } else if (playerId !== you) {
       pushFeed(`${nameOf(g, playerId)} използва „${def?.name ?? powerup}“`, def?.icon ?? '🃏');
     }

@@ -233,7 +233,7 @@ test('at launch only Duel and Royale are open, and the lobby says so', async () 
   assert.deepEqual((await stats).modes, ['duel', 'royale']);
   const closed = await emitAck(socket, 'queue:join', 'trio');
   assert.equal(closed.ok, false);
-  assert.match(closed.error, /Дуел или Роял/);
+  assert.match(closed.error, /„Дуел“ или „Роял“/);
   assert.ok((await emitAck(socket, 'queue:join', 'duel')).ok);
   socket.emit('queue:leave');
   socket.close();

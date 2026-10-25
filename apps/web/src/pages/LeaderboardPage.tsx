@@ -41,7 +41,7 @@ export function LeaderboardPage() {
               ? 'Най-опитните играчи по натрупан XP.'
               : board === 'daily'
                 ? 'Резултати от днешното предизвикателство. Нулира се в полунощ.'
-                : `Рейтинг в класирания режим ${MODES[board].name}.`}
+                : `Рейтинг в класирания режим „${MODES[board].name}“.`}
           </p>
           {data?.season && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">

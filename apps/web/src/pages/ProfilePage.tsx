@@ -12,7 +12,7 @@ import {
   RARITIES,
   REPORT_REASONS,
   type ReportReason,
-  seasonName,
+  seasonTitle,
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
@@ -138,7 +138,7 @@ export function ProfilePage() {
             value={o.fastestCorrectMs !== null ? seconds(o.fastestCorrectMs) : '—'}
           />
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
-          <Stat label="Рекорд в Соло" value={fmt(o.bestSoloScore)} />
+          <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
           <Stat label="Използвани жокери" value={fmt(o.powerupsUsed)} />
           <Stat label="Дневна серия" value={`📅 ${o.dailyStreak}`} hint={`Най-дълга: ${o.bestDailyStreak}`} />
           <Stat label="Одобрени въпроси" value={`✍️ ${o.questionsApproved}`} />
@@ -159,7 +159,7 @@ export function ProfilePage() {
                 >
                   <span className="text-xl">{t ? '🏅' : '—'}</span>
                   <span className="text-sm">
-                    <span className="block font-semibold">{seasonName(season)}</span>
+                    <span className="block font-semibold">{seasonTitle(season)}</span>
                     <span className="text-xs" style={{ color: t?.color }}>
                       {t ? t.name : 'Без ранг'}
                     </span>

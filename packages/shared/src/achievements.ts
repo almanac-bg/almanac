@@ -71,7 +71,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'trio_win',
     name: 'Начело на триото',
-    description: 'Спечели класиран мач Трио.',
+    description: 'Спечели класиран мач „Трио“.',
     icon: '🥇',
     rarity: 'common',
     xp: 120,
@@ -81,7 +81,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'squad_win',
     name: 'Арената е твоя',
-    description: 'Спечели класиран мач Арена.',
+    description: 'Спечели класиран мач „Арена“.',
     icon: '🦸',
     rarity: 'rare',
     xp: 200,
@@ -91,7 +91,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'royale_win',
     name: 'Короната на Роял',
-    description: 'Спечели Роял с 8 играчи.',
+    description: 'Спечели „Роял“ с 8 играчи.',
     icon: '👑',
     rarity: 'epic',
     xp: 400,
@@ -187,8 +187,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   },
   {
     id: 'high_scorer',
-    name: 'Рекордна игра',
-    description: 'Събери 9000+ точки в една соло игра.',
+    name: 'Рекорден мач',
+    description: 'Събери 9000+ точки в един соло мач.',
     icon: '📈',
     rarity: 'epic',
     xp: 400,
@@ -266,7 +266,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'team_carry',
     name: 'Носиш отбора',
-    description: 'Спечели отборен мач като най-резултатния играч.',
+    description: 'Спечели отборен мач с най-много точки от всички.',
     icon: '🏋️',
     rarity: 'rare',
     xp: 250,
@@ -283,7 +283,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_7',
     name: 'Седмица подред',
-    description: 'Играй дневното предизвикателство 7 дни поред.',
+    description: 'Играй дневното предизвикателство 7 дни подред.',
     icon: '🗓️',
     rarity: 'rare',
     xp: 300,
@@ -292,7 +292,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_30',
     name: 'Месец подред',
-    description: 'Играй дневното предизвикателство 30 дни поред.',
+    description: 'Играй дневното предизвикателство 30 дни подред.',
     icon: '📆',
     rarity: 'epic',
     xp: 750,
@@ -301,7 +301,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_100',
     name: 'Сто изгрева',
-    description: 'Играй дневното предизвикателство 100 дни поред.',
+    description: 'Играй дневното предизвикателство 100 дни подред.',
     icon: '🌅',
     rarity: 'legendary',
     xp: 2000,
@@ -318,7 +318,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'friends_5',
     name: 'Компанията',
-    description: 'Имай 5 приятели.',
+    description: 'Добави 5 приятели.',
     icon: '👯',
     rarity: 'common',
     xp: 100,

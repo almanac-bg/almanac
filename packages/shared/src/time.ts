@@ -79,23 +79,30 @@ export function seasonEndsAt(season: string): number {
   return sofiaMidnight(y, m + 1, 1);
 }
 
+// Lowercase, as Bulgarian writes them in a sentence.
 const MONTHS = [
-  'Януари',
-  'Февруари',
-  'Март',
-  'Април',
-  'Май',
-  'Юни',
-  'Юли',
-  'Август',
-  'Септември',
-  'Октомври',
-  'Ноември',
-  'Декември',
+  'януари',
+  'февруари',
+  'март',
+  'април',
+  'май',
+  'юни',
+  'юли',
+  'август',
+  'септември',
+  'октомври',
+  'ноември',
+  'декември',
 ];
 
-/** "Октомври 2026" */
+/** "октомври 2026", for a sentence: "Сезон октомври 2026". */
 export function seasonName(season: string): string {
   const [y, m] = season.split('-').map(Number);
   return `${MONTHS[m - 1]} ${y}`;
+}
+
+/** "Октомври 2026": the season's name where it starts a heading or a label. */
+export function seasonTitle(season: string): string {
+  const name = seasonName(season);
+  return name[0].toUpperCase() + name.slice(1);
 }

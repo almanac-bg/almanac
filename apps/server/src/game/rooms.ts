@@ -220,7 +220,7 @@ export class RoomManager {
     if (players.length + room.bots.length < 2)
       return { ok: false, error: 'Трябват поне двама играчи — покани приятел или добави бот.' };
     if (players.some((id) => this.games.forUser(id)))
-      return { ok: false, error: 'Някой от играчите още е в друга игра.' };
+      return { ok: false, error: 'Някой от играчите още е в друг мач.' };
     const teams = room.settings.teams;
     const teamOf = (playerId: string) => (teams ? (room.teams.get(playerId) ?? 0) : null);
     const seated = [...players.map((id) => `u${id}`), ...room.bots.map((b) => b.player.id)];

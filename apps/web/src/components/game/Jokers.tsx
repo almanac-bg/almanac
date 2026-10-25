@@ -74,7 +74,7 @@ function hasFreezeTarget(game: LiveGame): boolean {
 export function ActiveJokers({ game }: { game: LiveGame }) {
   const chips: string[] = [];
   if (game.doubled) chips.push('💰 ×2 точки');
-  if (game.retryArmed && !game.retryPrompt) chips.push('🔁 Втори шанс е активен');
+  if (game.retryArmed && !game.retryPrompt) chips.push('🔁 „Втори шанс“ е активен');
   if (game.extraMs > 0) chips.push(`⏳ +${Math.round(game.extraMs / 1000)} с`);
   if (!chips.length) return null;
   return (

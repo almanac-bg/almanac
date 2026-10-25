@@ -30,7 +30,7 @@ const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙',
 
 const FEATURES = [
   { icon: '⚔️', title: 'Дуели 1 на 1', body: 'Класирани битки в реално време' },
-  { icon: '👑', title: 'Роял за 8', body: 'Елиминации до последния оцелял' },
+  { icon: '👑', title: 'Роял за 8', body: 'Елиминации, докато остане само един' },
   { icon: '🏆', title: 'Нива и постижения', body: 'Отключвай аватари, рамки и титли' },
 ];
 
@@ -445,7 +445,7 @@ function AboutGame({ cta }: { cta: ReactNode }) {
       <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
         <div>
           <h3 className="t-card">{CATEGORIES.length} категории въпроси</h3>
-          <p className="mt-1.5 text-sm text-fg-3">Избираш категория в Соло или играеш микс от всички.</p>
+          <p className="mt-1.5 text-sm text-fg-3">Избираш категория в „Соло“ или играеш микс от всички.</p>
           <ul className="mt-4 flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
               <li key={c.id} className="rounded-full border border-line bg-white/5 px-3 py-1.5 text-sm text-fg-2">
@@ -457,8 +457,9 @@ function AboutGame({ cta }: { cta: ReactNode }) {
         <div>
           <h3 className="t-card">Нива, ранг и колекция</h3>
           <p className="mt-1.5 text-sm text-fg-2">
-            Всеки мач носи опит: качваш нива, пазиш серията си с дневното предизвикателство и отключваш аватари, рамки и
-            титли. Класираните мачове местят рейтинга ти — от {RANK_TIERS[0].name} до {RANK_TIERS.at(-1)?.name}.
+            Всеки мач носи XP: качваш нива, пазиш серията си с дневното предизвикателство и отключваш аватари, рамки и
+            титли. Класираните мачове местят рейтинга ти, а с него и ранга — от {RANK_TIERS[0].name} до{' '}
+            {RANK_TIERS.at(-1)?.name}.
           </p>
           {cta && <div className="mt-6 max-w-sm">{cta}</div>}
         </div>

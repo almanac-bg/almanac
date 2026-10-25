@@ -175,7 +175,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
                   className="h-auto min-h-14 w-full py-2 text-balance sm:w-auto"
                   loading={starting}
                   disabled={inGame}
-                  title={inGame ? 'Довърши играта, в която си' : undefined}
+                  title={inGame ? 'Довърши мача, в който си' : undefined}
                   onClick={accept}
                 >
                   <Swords aria-hidden className="size-5 max-sm:hidden" /> Приеми предизвикателството

@@ -381,7 +381,7 @@ function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boolean; o
     <Modal open={open} onClose={onClose} title="Рейтинг и рангове">
       <div className="space-y-4 text-sm text-fg-2">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-white/5 p-3.5">
-          Твоят рейтинг в {MODES[mode].name}: <RankBadge rating={rating} />
+          Твоят рейтинг в „{MODES[mode].name}“: <RankBadge rating={rating} />
         </p>
         <p>
           Всеки класиран режим има свой рейтинг, който започва от {START_RATING}. След мач той расте за всеки съперник,
@@ -409,7 +409,7 @@ function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boolean; o
         </ul>
         <p className="text-fg-3">
           Сезонът трае месец. В края му получаваш XP за най-високия ранг, достигнат в режим с поне {SEASON_MIN_GAMES}{' '}
-          мача (наградата е до всеки ранг горе). В новия сезон рейтингът започва по-близо до {START_RATING}.
+          мача (наградата за всеки ранг е показана по-горе). В новия сезон рейтингът започва по-близо до {START_RATING}.
         </p>
       </div>
       <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -686,7 +686,7 @@ function DailyCard({ className }: { className?: string }) {
             </span>
             {streak > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-0.5 text-xs font-bold text-orange-300">
-                <Flame className="size-3.5" /> {streak} {streak === 1 ? 'ден' : 'дни'} поред
+                <Flame className="size-3.5" /> {streak} {streak === 1 ? 'ден' : 'дни'} подред
               </span>
             )}
             {/* Last in the row: its explanation opens as a line of its own under the chips. */}

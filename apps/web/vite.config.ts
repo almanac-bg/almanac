@@ -36,7 +36,7 @@ const manifest = JSON.stringify({
   name: `${BRAND.name} — ${BRAND.tagline.toLowerCase()}`,
   short_name: BRAND.name,
   description:
-    'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и предизвикателства към приятели.',
+    'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и линкове, с които предизвикваш приятели.',
   lang: 'bg',
   id: '/',
   start_url: '/',

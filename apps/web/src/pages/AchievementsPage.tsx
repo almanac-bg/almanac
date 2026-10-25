@@ -150,7 +150,7 @@ export function AchievementsPage() {
       <p className="text-center text-xs text-fg-3">
         Някои постижения отключват специални аватари, рамки и титли —{' '}
         <Link to="/locker" className="font-semibold text-violet-300 hover:text-violet-200">
-          виж Колекция
+          виж „Колекция“
         </Link>
         .
       </p>

@@ -129,7 +129,7 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
       def: {
         id: 'royale',
         icon: '👑',
-        text: 'Изиграй мач Роял',
+        text: 'Изиграй мач „Роял“',
         goal: 1,
         xp: 80,
         count: (e) => (e.mode === 'royale' ? 1 : 0),

@@ -7,7 +7,7 @@ const storageKey = (day: string) => `quiz:daily-share:${day}`;
  * The day's result as a spoiler-free emoji line, Wordle-style:
  *   ⚡ АЛМАНАХ · 25.10.2026
  *   🟩🟩🟥🟩🟩🟥🟩🟩🟩🟩 8/10
- *   🔥 5 дни поред
+ *   🔥 5 дни подред
  *   almanac.bg
  */
 export function dailyShareText(history: ReviewItem[], total: number, streak: number, day = dayKey()): string {
@@ -18,7 +18,7 @@ export function dailyShareText(history: ReviewItem[], total: number, streak: num
   }).join('');
   const correct = history.filter((h) => h.right).length;
   const lines = [`⚡ ${BRAND.name} · ${d}.${m}.${y}`, `${squares} ${correct}/${total}`];
-  if (streak > 1) lines.push(`🔥 ${streak} дни поред`);
+  if (streak > 1) lines.push(`🔥 ${streak} дни подред`);
   lines.push(BRAND.domain);
   return lines.join('\n');
 }

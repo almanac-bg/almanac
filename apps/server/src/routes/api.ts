@@ -279,7 +279,7 @@ api.post('/auth/guest', (req, res) => {
   // A mobile operator puts thousands of phones behind one address, and a challenge link shared in a group chat sends
   // them in together: the per-network cap is high, and a cap on all new guests is the brake on abuse.
   if (throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) || throttled('guest:all', 5_000, 60 * 60_000)) {
-    res.status(429).json({ error: 'Твърде много нови игри от тази мрежа. Опитай по-късно или си направи профил.' });
+    res.status(429).json({ error: 'Твърде много нови гости от тази мрежа. Опитай по-късно или си направи профил.' });
     return;
   }
   const userId = createGuest();

@@ -61,13 +61,13 @@ export function verifyEmailMail(to: string, username: string, link: string): Mai
   return {
     to,
     subject: `Потвърди имейла си в ${BRAND.name}`,
-    text: `Здравей, ${username}!\n\nПотвърди имейла си, за да можеш да възстановиш паролата си, ако я забравиш:\n${link}\n\nЛинкът е валиден 24 часа. Ако не си ти, просто игнорирай това писмо.`,
+    text: `Здравей, ${username}!\n\nПотвърди имейла си, за да можеш да възстановиш паролата си, ако я забравиш:\n${link}\n\nЛинкът е валиден 24 часа. Ако заявката не е от теб, просто игнорирай това писмо.`,
     html: layout(
       `Здравей, ${username}!`,
       'Потвърди имейла си, за да можеш да възстановиш паролата си, ако някога я забравиш.',
       'Потвърди имейла',
       link,
-      'Линкът е валиден 24 часа. Ако не си ти, просто игнорирай това писмо.',
+      'Линкът е валиден 24 часа. Ако заявката не е от теб, просто игнорирай това писмо.',
     ),
   };
 }
@@ -79,10 +79,10 @@ export function emailChangedMail(to: string, username: string, removed: boolean)
   return {
     to,
     subject: `${what} в ${BRAND.name}`,
-    text: `Здравей, ${username}!\n\n${what} (${BRAND.domain}). Затова това е последното писмо, което получаваш на този адрес.\n\n${advice}`,
+    text: `Здравей, ${username}!\n\n${what} (${BRAND.domain}). Това е последното писмо, което ще получиш на този адрес.\n\n${advice}`,
     html: layout(
       `Здравей, ${username}!`,
-      `${what}. Затова това е последното писмо, което получаваш на този адрес.`,
+      `${what}. Това е последното писмо, което ще получиш на този адрес.`,
       'Към настройките',
       `${config.appUrl}/settings`,
       escapeHtml(advice),
@@ -135,18 +135,18 @@ export function streakReminderMail(
   unsubscribe: { page: string; api: string },
 ): Mail {
   const lead = `Серията ти от ${streak} дни в дневното предизвикателство изтича в полунощ.`;
-  const shield = shields > 0 ? ' Имаш и защита на серията, но защо да я хабиш?' : '';
-  const stop = 'Не искаш тези писма? Спри напомнянията';
+  const shield = shields > 0 ? ' Имаш и щит за серията, но защо да го хабиш?' : '';
+  const stop = 'Не искаш тези писма?';
   return {
     to,
     subject: `🔥 Серията ти от ${streak} дни изтича довечера`,
-    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, две минути:\n${config.appUrl}/\n\n${stop}: ${unsubscribe.page}`,
+    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, две минути:\n${config.appUrl}/\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
     html: layout(
       `Здравей, ${username}!`,
       escapeHtml(`${lead}${shield} Десет въпроса, две минути.`),
       'Играй днешното',
       `${config.appUrl}/`,
-      `${escapeHtml(stop)}: <a href="${unsubscribe.page}" style="color:#a78bfa">спри ги тук</a>.`,
+      `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#a78bfa">Спри напомнянията</a>.`,
     ),
     headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
   };

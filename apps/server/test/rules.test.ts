@@ -14,6 +14,7 @@ import {
   rankFor,
   seasonEndsAt,
   seasonName,
+  seasonTitle,
   shiftDay,
   shiftSeason,
   sofiaMidnight,
@@ -69,7 +70,8 @@ test('days and seasons follow Sofia time, across DST changes', () => {
   assert.equal(seasonEndsAt('2026-12'), Date.UTC(2026, 11, 31, 22, 0));
   assert.equal(shiftDay('2026-03-01', -1), '2026-02-28');
   assert.equal(shiftSeason('2026-12', 1), '2027-01');
-  assert.equal(seasonName('2026-10'), 'Октомври 2026');
+  assert.equal(seasonName('2026-10'), 'октомври 2026');
+  assert.equal(seasonTitle('2026-10'), 'Октомври 2026');
 });
 
 test('unlock requirements', () => {

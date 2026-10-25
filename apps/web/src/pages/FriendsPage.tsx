@@ -16,7 +16,7 @@ const PRESENCE: Record<Presence, { label: string; color: string }> = {
   online: { label: 'Онлайн', color: '#34d399' },
   queue: { label: 'Търси мач', color: '#fbbf24' },
   room: { label: 'В стая', color: '#e879f9' },
-  game: { label: 'В игра', color: '#a78bfa' },
+  game: { label: 'В мач', color: '#a78bfa' },
   offline: { label: 'Офлайн', color: '#64748b' },
 };
 
@@ -345,7 +345,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
           onClick={challenge}
           loading={busy === 'challenge'}
           disabled={!reachable || inGame}
-          title={reachable ? 'Създава стая 1 на 1 и праща покана' : 'Може да предизвикаш само приятел, който е онлайн'}
+          title={reachable ? 'Създава стая 1 на 1 и праща покана' : 'Можеш да предизвикаш само приятел, който е онлайн'}
         >
           <Swords className="size-4" /> Предизвикай
         </Button>

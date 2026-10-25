@@ -4,7 +4,7 @@ import { useOperator } from '../lib/operator';
 
 /** Small print where an account is made: under 14 (Bulgaria's age of consent online) the terms ask for a parent's. */
 export const MINORS_NOTICE =
-  'Ако си под 14 години, за профил и за имейл напомнянията е нужно съгласие на родител или настойник.';
+  'Ако си под 14 години, за профил и за напомнянията по имейл е нужно съгласие на родител или настойник.';
 
 /** Footer links to the legal pages (kept apart from the pages themselves, which load on demand). */
 export function LegalLinks({ className = '' }: { className?: string }) {

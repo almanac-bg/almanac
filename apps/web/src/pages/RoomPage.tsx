@@ -270,7 +270,7 @@ export function RoomPage() {
             onChange={(elimination) => update({ elimination })}
             icon={<Skull className="size-4 text-rose-300" />}
             title="Елиминации"
-            hint={s.teams ? 'Не важи при отборна игра' : 'Последният отпада на всеки няколко въпроса'}
+            hint={s.teams ? 'Не важи при отборен мач' : 'Последният отпада на всеки няколко въпроса'}
             accent="accent-rose-400"
           />
 
@@ -564,7 +564,7 @@ const PRESENCE_LABEL: Record<Presence, string> = {
   online: 'Онлайн',
   queue: 'Търси мач',
   room: 'В стая',
-  game: 'В игра',
+  game: 'В мач',
   offline: 'Офлайн',
 };
 

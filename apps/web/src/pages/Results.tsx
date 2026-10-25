@@ -168,7 +168,7 @@ export function Results({ game }: { game: LiveGame }) {
         : single
           ? perfect
             ? 'Перфектно!'
-            : 'Край на играта'
+            : 'Край на мача'
           : teamScores
             ? won
               ? 'Победа!'

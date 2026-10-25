@@ -1,5 +1,5 @@
 import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
-import { RANK_TIERS, seasonName } from '@quiz/shared';
+import { RANK_TIERS, seasonTitle } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import { motion } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
@@ -40,7 +40,7 @@ export function SeasonRecap() {
     <Modal open={open} onClose={close} labelledBy={headingId} className="max-w-md text-center">
       <p className="t-eyebrow text-fg-3">Сезонът приключи</p>
       <h2 id={headingId} className="mt-2 font-display text-2xl font-bold">
-        {seasonName(reward.season)}
+        {seasonTitle(reward.season)}
       </h2>
       {tier ? (
         <>

@@ -179,7 +179,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     if (draining) socket.emit('server:draining', { message: DRAINING });
 
     // Starting anything new is refused while the server drains for a restart.
-    const busyError = () => (games.forUser(userId) ? 'Вече си в игра.' : draining ? DRAINING : null);
+    const busyError = () => (games.forUser(userId) ? 'Вече си в мач.' : draining ? DRAINING : null);
     /** Guests play; friends, rooms of their own and challenge links wait until they claim the account. */
     const guest = () => getUser(userId)?.is_guest === 1;
     /** Going on to something new: off the queue, and any rematch offer from the last match is declined. */
@@ -191,8 +191,8 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     on('queue:join', (mode, ack) => {
       if (!isQueueMode(mode)) return reply(ack, { ok: false, error: 'Непознат режим.' });
       if (!config.openQueues.includes(mode)) {
-        const open = config.openQueues.map((m) => MODES[m].name).join(' или ');
-        return reply(ack, { ok: false, error: `Този режим ще отвори скоро — дотогава опитай ${open}.` });
+        const open = config.openQueues.map((m) => `„${MODES[m].name}“`).join(' или ');
+        return reply(ack, { ok: false, error: `Този режим ще се отвори скоро — дотогава опитай ${open}.` });
       }
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });

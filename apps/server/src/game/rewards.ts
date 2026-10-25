@@ -177,7 +177,7 @@ function rewardHuman(
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
   if (counts && p.faced === game.questions.length && p.correct === game.questions.length) {
-    lines.push({ label: 'Перфектна игра', amount: XP.perfect });
+    lines.push({ label: 'Перфектен мач', amount: XP.perfect });
   }
   const today = dayKey();
   const claimDaily = counts && before.last_daily_bonus !== today;
