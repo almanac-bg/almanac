@@ -135,6 +135,17 @@ export function pickQuestions(
     });
 }
 
+/**
+ * The same questions with the options in an order of their own for this seed (e.g. a day and a player): a set everyone
+ * plays stays the same, but "the answers were Б, А, Г…" gives nothing away.
+ */
+export function reorderOptions(questions: PreparedQuestion[], seed: string): PreparedQuestion[] {
+  return questions.map((q) => {
+    const order = shuffle([0, 1, 2, 3], seededRng(`${seed}:${q.id}`));
+    return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
+  });
+}
+
 /** How many of a player's most recent questions are remembered (most of the bank); older ones count as new again. */
 export const RECENT_LIMIT = 1500;
 

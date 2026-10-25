@@ -290,6 +290,50 @@ const MIGRATIONS: (string | (() => void))[] = [
     const update = db.prepare('UPDATE sessions SET token = ? WHERE token = ?');
     for (const { token } of rows) update.run(createHash('sha256').update(token).digest('base64url'), token);
   },
+
+  // v8: guest accounts (play first, sign up later), streak shields and opt-in streak reminders, daily quests,
+  // and challenge links (a fixed set of questions anyone with the link can play once).
+  `
+  ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN streak_shields INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN streak_reminders INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN reminder_key TEXT;
+  ALTER TABLE users ADD COLUMN reminded_day TEXT;
+  CREATE INDEX users_guests ON users(created_at) WHERE is_guest = 1;
+  CREATE INDEX users_reminders ON users(last_daily_day) WHERE streak_reminders = 1;
+
+  CREATE TABLE quest_progress (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    quest TEXT NOT NULL,
+    progress INTEGER NOT NULL DEFAULT 0,
+    done_at INTEGER,
+    PRIMARY KEY (user_id, day, quest)
+  ) WITHOUT ROWID;
+  CREATE INDEX quest_progress_day ON quest_progress(day);
+
+  CREATE TABLE challenges (
+    id TEXT PRIMARY KEY,
+    creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    questions TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX challenges_creator ON challenges(creator_id, created_at);
+  CREATE INDEX challenges_expiry ON challenges(expires_at);
+
+  CREATE TABLE challenge_results (
+    challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    started_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    score INTEGER,
+    correct INTEGER,
+    time_ms INTEGER,
+    PRIMARY KEY (challenge_id, user_id)
+  );
+  CREATE INDEX challenge_results_user ON challenge_results(user_id, started_at);
+  `,
 ];
 
 function migrate() {

@@ -152,7 +152,8 @@ export function RoomPage() {
             )}
           </Card>
 
-          <InviteFriends room={room} />
+          {/* Guests have no friends list (the room link above works for everyone). */}
+          {!me.isGuest && <InviteFriends room={room} />}
         </div>
 
         <Card className="space-y-5 self-start p-5 sm:p-6">

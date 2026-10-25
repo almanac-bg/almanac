@@ -1,10 +1,8 @@
-import { type DailyInfo, dayEndsAt, dayKey, MODES, shiftDay } from '@quiz/shared';
+import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS } from '@quiz/shared';
 import { all, one, run } from './db';
-import { pickQuestions, type PreparedQuestion, seededRng, shuffle } from './questions';
+import { config } from './config';
+import { pickQuestions, type PreparedQuestion, reorderOptions, seededRng } from './questions';
 import { getUser, toPublicUser, type UserRow } from './users';
-
-/** When this server process started: a daily attempt begun before that died with the previous process. */
-const BOOTED_AT = Date.now();
 
 /** Today's question set — generated once per day from a date seed, then frozen in the database. */
 function dailySet(day: string): PreparedQuestion[] {
@@ -20,10 +18,7 @@ function dailySet(day: string): PreparedQuestion[] {
  * gets their own option order — so "Б, А, Г…" from a friend (or a second account) gives nothing away.
  */
 export function dailyQuestions(day: string, userId: number): PreparedQuestion[] {
-  return dailySet(day).map((q) => {
-    const order = shuffle([0, 1, 2, 3], seededRng(`daily:${day}:${userId}:${q.id}`));
-    return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
-  });
+  return reorderOptions(dailySet(day), `daily:${day}:${userId}`);
 }
 
 /**
@@ -37,7 +32,7 @@ export function claimDailyAttempt(userId: number): { ok: true; day: string } | {
     userId,
     day,
   );
-  if (existing && !existing.finished_at && existing.started_at < BOOTED_AT) {
+  if (existing && !existing.finished_at && existing.started_at < config.bootedAt) {
     run('UPDATE daily_results SET started_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
     return { ok: true, day };
   }
@@ -53,16 +48,23 @@ export function claimDailyAttempt(userId: number): { ok: true; day: string } | {
   return { ok: true, day };
 }
 
-function rankOf(day: string, score: number, timeMs: number) {
+/** Place on the day's board. Guests aren't listed on it, but a guest still sees where they'd stand. */
+function rankOf(day: string, score: number, timeMs: number, guest = false) {
   const better = one<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM daily_results WHERE day = ? AND finished_at IS NOT NULL
-     AND (score > ? OR (score = ? AND time_ms < ?))`,
+    `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0
+     AND (d.score > ? OR (d.score = ? AND d.time_ms < ?))`,
     day,
     score,
     score,
     timeMs,
   )!.n;
-  const total = one<{ n: number }>('SELECT COUNT(*) AS n FROM daily_results WHERE day = ? AND finished_at IS NOT NULL', day)!.n;
+  const listed = one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0`,
+    day,
+  )!.n;
+  const total = listed + (guest ? 1 : 0);
   return { rank: better + 1, total };
 }
 
@@ -78,21 +80,38 @@ export function recordDailyResult(userId: number, day: string, score: number, co
     day,
   );
   const u = getUser(userId)!;
-  const streak = u.last_daily_day === day ? u.daily_streak : u.last_daily_day === shiftDay(day, -1) ? u.daily_streak + 1 : 1;
+  const guest = u.is_guest === 1;
+  if (u.last_daily_day === day) return { ...rankOf(day, score, timeMs, guest), streak: u.daily_streak, shieldsUsed: 0, shieldEarned: false };
+
+  // Consecutive day: the streak grows. Missed days are covered by shields, one each, if there are enough.
+  const missed = u.last_daily_day ? daysBetween(u.last_daily_day, day) - 1 : Infinity;
+  let shields = u.streak_shields;
+  let shieldsUsed = 0;
+  let streak = 1;
+  if (missed === 0) streak = u.daily_streak + 1;
+  else if (missed <= shields && u.daily_streak > 0) {
+    shields -= missed;
+    shieldsUsed = missed;
+    streak = u.daily_streak + 1;
+  }
+  const shieldEarned = streak % STREAK_SHIELDS.every === 0 && shields < STREAK_SHIELDS.max;
+  if (shieldEarned) shields++;
   run(
-    'UPDATE users SET daily_streak = ?, best_daily_streak = MAX(best_daily_streak, ?), last_daily_day = ? WHERE id = ?',
+    `UPDATE users SET daily_streak = ?, best_daily_streak = MAX(best_daily_streak, ?), last_daily_day = ?, streak_shields = ?
+     WHERE id = ?`,
     streak,
     streak,
     day,
+    shields,
     userId,
   );
-  return { ...rankOf(day, score, timeMs), streak };
+  return { ...rankOf(day, score, timeMs, guest), streak, shieldsUsed, shieldEarned };
 }
 
-/** A streak only counts if it's still alive (played today or yesterday). */
-export function liveDailyStreak(u: Pick<UserRow, 'daily_streak' | 'last_daily_day'>) {
-  const today = dayKey();
-  return u.last_daily_day === today || u.last_daily_day === shiftDay(today, -1) ? u.daily_streak : 0;
+/** A streak only counts while it's alive: played today or yesterday, or the days missed since are covered by shields. */
+export function liveDailyStreak(u: Pick<UserRow, 'daily_streak' | 'last_daily_day' | 'streak_shields'>, today = dayKey()) {
+  if (!u.last_daily_day) return 0;
+  return daysBetween(u.last_daily_day, today) - 1 <= u.streak_shields ? u.daily_streak : 0;
 }
 
 export function dailyInfo(userId: number): DailyInfo {
@@ -104,17 +123,19 @@ export function dailyInfo(userId: number): DailyInfo {
   );
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0 ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
     day,
   );
-  const played = mine?.finished_at ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!) } : null;
+  const me = getUser(userId)!;
+  const guest = me.is_guest === 1;
+  const played = mine?.finished_at ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, guest) } : null;
   return {
     day,
     endsAt: dayEndsAt(day),
-    streak: liveDailyStreak(getUser(userId)!),
+    streak: liveDailyStreak(me),
     attempted: !!mine,
     played: played && { score: played.score, correct: played.correct, rank: played.rank },
-    total: rankOf(day, 0, 0).total,
+    total: rankOf(day, 0, 0, guest && !!mine?.finished_at).total,
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),
   };
 }

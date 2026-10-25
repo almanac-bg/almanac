@@ -85,7 +85,8 @@ export type FriendResult = { ok: true; otherId: number; accepted: boolean } | { 
 /** Sends a request — or accepts one if the other player already asked. */
 export function requestFriend(userId: number, username: string): FriendResult {
   const other = getUserByName(username.trim());
-  if (!other) return { ok: false, error: 'Няма играч с това име.' };
+  // Guests (no account yet) can't be added: they may be gone tomorrow.
+  if (!other || other.is_guest) return { ok: false, error: 'Няма играч с това име.' };
   if (other.id === userId) return { ok: false, error: 'Не можеш да добавиш себе си.' };
   const state = friendship(userId, other.id);
   if (state === 'friends') return { ok: false, error: 'Вече сте приятели.' };

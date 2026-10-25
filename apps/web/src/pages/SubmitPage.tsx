@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
+import { GuestNudge } from '../components/ClaimAccount';
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
@@ -22,8 +23,14 @@ export function SubmitPage() {
           <b className="text-violet-300">+{SUBMISSION_RULES.approvedXp} XP</b> и прогрес към постиженията „Автор“.
         </p>
       </div>
-      {unlocked ? <SubmitForm /> : <LockedCard level={me.level} />}
-      {unlocked && <MySubmissions />}
+      {me.isGuest ? (
+        <GuestNudge>Въпросите влизат в играта с името на автора — запази профила си с име и парола, за да предлагаш.</GuestNudge>
+      ) : unlocked ? (
+        <SubmitForm />
+      ) : (
+        <LockedCard level={me.level} />
+      )}
+      {unlocked && !me.isGuest && <MySubmissions />}
     </div>
   );
 }

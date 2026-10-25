@@ -4,26 +4,24 @@ import clsx from 'clsx';
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { api, fmt, pct, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 
-const BOARDS: { value: LeaderboardBoard; label: string }[] = [
-  { value: 'level', label: 'Ниво' },
-  { value: 'daily', label: 'Днес' },
-  { value: 'duel', label: MODES.duel.name },
-  { value: 'teams', label: MODES.teams.name },
-  { value: 'trio', label: MODES.trio.name },
-  { value: 'squad', label: MODES.squad.name },
-  { value: 'royale', label: MODES.royale.name },
-];
-
 export function LeaderboardPage() {
   const me = useStore((s) => s.me)!;
+  // Boards for the ranked queues that are open; a closed queue's board would only show last season's leftovers.
+  const open = useOpenQueues();
+  const boards: { value: LeaderboardBoard; label: string }[] = [
+    { value: 'level', label: 'Ниво' },
+    { value: 'daily', label: 'Днес' },
+    ...open.map((m) => ({ value: m, label: MODES[m].name })),
+  ];
   const [params, setParams] = useSearchParams();
   const requested = params.get('board') as LeaderboardBoard | null;
-  const board: LeaderboardBoard = BOARDS.some((b) => b.value === requested) ? requested! : 'level';
+  const board: LeaderboardBoard = boards.some((b) => b.value === requested) ? requested! : 'level';
   const setBoard = (b: LeaderboardBoard) => setParams(b === 'level' ? {} : { board: b }, { replace: true });
   const { data, error, retry } = useLoad(() => api.leaderboard(board), board);
 
@@ -52,7 +50,7 @@ export function LeaderboardPage() {
             </p>
           )}
         </div>
-        <Segmented value={board} onChange={setBoard} options={BOARDS} />
+        <Segmented value={board} onChange={setBoard} options={boards} />
       </div>
 
       {error && !data ? (

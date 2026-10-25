@@ -56,6 +56,7 @@ function setup(opts: { humans: number[]; bots?: ReturnType<typeof bot>[]; elimin
       elimination: opts.elimination ?? false,
       teams: false,
       dailyDay: null,
+      challengeId: null,
       questions: pickQuestions(10, 'mixed', new Map()),
       humans: opts.humans.map((id) => ({ player: player(`u${id}`, id), powerups: opts.powerups ?? [], emotes: [] })),
       bots: opts.bots ?? [],

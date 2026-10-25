@@ -40,8 +40,11 @@ export function savedDailyShare(day = dayKey()): string | null {
   }
 }
 
-/** Phones get the system share sheet; elsewhere the text goes to the clipboard. */
-export async function shareText(text: string) {
+/**
+ * Phones get the system share sheet; elsewhere the text goes to the clipboard, and `copied` says what was copied
+ * (a result by default, e.g. "Линкът е копиран" for an invite).
+ */
+export async function shareText(text: string, copied = 'Резултатът е копиран') {
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {
     try {
       await navigator.share({ text });
@@ -52,7 +55,7 @@ export async function shareText(text: string) {
   }
   try {
     await navigator.clipboard.writeText(text);
-    toast({ kind: 'success', title: 'Резултатът е копиран', body: 'Постави го в чата с приятелите си.' });
+    toast({ kind: 'success', title: copied, body: 'Постави го в чата с приятелите си.' });
   } catch {
     toast({ kind: 'error', title: 'Браузърът не позволи копиране.' });
   }

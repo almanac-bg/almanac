@@ -1,10 +1,11 @@
 import { type FriendEntry, type FriendsResponse, type Presence, titleName } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, DoorOpen, Swords, UserMinus, UserPlus, X } from 'lucide-react';
+import { Check, DoorOpen, Save, Swords, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
+import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
 import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
@@ -21,6 +22,49 @@ const PRESENCE: Record<Presence, { label: string; color: string }> = {
 const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Нещо се обърка.');
 
 export function FriendsPage() {
+  const guest = useStore((s) => !!s.me?.isGuest);
+  return guest ? <GuestFriends /> : <Friends />;
+}
+
+/** Friends need a saved account (a guest may be gone tomorrow), so a guest gets the why and the way, not a form that fails. */
+function GuestFriends() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="font-display text-3xl font-bold">Приятели</h1>
+        <p className="mt-1 text-fg-2">Играй с хора, които познаваш.</p>
+      </div>
+      <Card className="grid place-items-center gap-2 px-6 py-12 text-center">
+        <span aria-hidden className="text-5xl">
+          👯
+        </span>
+        <p className="font-display text-lg font-bold">Приятелите са за играчи с профил</p>
+        <p className="max-w-md text-sm text-fg-3">
+          Играеш като гост. Запази прогреса с име и парола — после добавяш приятели по име, виждаш кога са онлайн, каниш ги в
+          своя стая и ги предизвикваш на дуел.
+        </p>
+        <Button className="mt-4" onClick={() => setOpen(true)}>
+          <Save className="size-4" /> Запази прогреса
+        </Button>
+        <p className="mt-2 max-w-sm text-xs text-fg-3">
+          Имаш код за стая от приятел? Въведи го на{' '}
+          <Link to="/" className="text-violet-300 hover:underline">
+            началната страница
+          </Link>{' '}
+          — за това не ти трябва профил.
+        </p>
+      </Card>
+      <ClaimAccountModal
+        open={open}
+        onClose={() => setOpen(false)}
+        reason="За да добавяш приятели, избери име и парола. Нивото, серията и всичко изиграно досега остават твои."
+      />
+    </div>
+  );
+}
+
+function Friends() {
   // The server bumps the version whenever the list changes (a request, a friend online…): reload, keeping the list on screen.
   const version = useStore((s) => s.friendsVersion);
   const { data, error, retry, setData } = useLoad(() => api.friends(), '', version);

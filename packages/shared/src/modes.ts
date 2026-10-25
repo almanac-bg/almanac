@@ -1,7 +1,7 @@
 import type { CategoryChoice } from './categories';
 
 export type QueueModeId = 'duel' | 'teams' | 'trio' | 'squad' | 'royale';
-export type ModeId = 'solo' | 'daily' | QueueModeId | 'custom';
+export type ModeId = 'solo' | 'daily' | 'challenge' | QueueModeId | 'custom';
 
 export interface ModeDef {
   id: ModeId;
@@ -46,6 +46,19 @@ export const MODES: Record<ModeId, ModeDef> = {
     tagline: 'Едни и същи 10 въпроса за всички. Един опит.',
     description: 'Без жокери. Класирането се нулира в полунощ.',
     accent: ['#fde047', '#f97316'],
+  },
+  challenge: {
+    id: 'challenge',
+    name: 'Предизвикателство',
+    short: 'ЛИНК',
+    players: 1,
+    questions: 10,
+    timeMs: 15_000,
+    elimination: false,
+    teams: false,
+    tagline: 'Твоите 10 въпроса. Кой ще те бие?',
+    description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без жокери.',
+    accent: ['#a3e635', '#14b8a6'],
   },
   duel: {
     id: 'duel',
@@ -128,6 +141,12 @@ export const MODES: Record<ModeId, ModeDef> = {
 };
 
 export const QUEUE_MODES: QueueModeId[] = ['duel', 'teams', 'trio', 'squad', 'royale'];
+
+/**
+ * Ranked queues open to everyone. While few people play, fewer queues mean people meet each other instead of bots;
+ * the server can open more (PUBLIC_QUEUES) and tells clients which are open in the lobby stats.
+ */
+export const DEFAULT_OPEN_QUEUES: QueueModeId[] = ['duel', 'royale'];
 
 export function isQueueMode(value: unknown): value is QueueModeId {
   return QUEUE_MODES.includes(value as QueueModeId);

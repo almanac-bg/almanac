@@ -60,6 +60,9 @@ export const SEASON_CARRYOVER = 0.5;
 /** The streak bonus keeps growing for a month: a long streak is worth protecting. */
 export const DAILY_XP = { complete: 50, perStreakDay: 10, streakCap: 30 } as const;
 
+/** A shield for every 7 days in a row (holding at most 2); a missed day uses one up instead of breaking the streak. */
+export const STREAK_SHIELDS = { every: 7, max: 2 } as const;
+
 export function rankFor(rating: number): RankTier {
   let tier: RankTier = RANK_TIERS[0];
   for (const t of RANK_TIERS) if (rating >= t.min) tier = t;

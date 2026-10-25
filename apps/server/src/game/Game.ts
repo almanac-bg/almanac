@@ -11,6 +11,7 @@ import {
   type GameStartPayload,
   type MatchRewards,
   type ModeId,
+  ordinal,
   type PlayerResult,
   type PowerupId,
   POWERUPS,
@@ -24,7 +25,6 @@ import {
 import { config } from '../config';
 import { type PreparedQuestion, shuffle } from '../questions';
 import type { BotBrain } from './bots';
-import { ordinal } from './rewards';
 
 const COUNTDOWN_MS = 3_500;
 /** Accept answers that were in flight when the clock hit zero. */
@@ -67,6 +67,8 @@ export interface GameSetup {
   teams: boolean;
   /** Calendar day of a daily-challenge run. */
   dailyDay: string | null;
+  /** The challenge link this run is for. */
+  challengeId: string | null;
   questions: PreparedQuestion[];
   humans: { player: GamePlayer; powerups: PowerupId[]; emotes: string[] }[];
   bots: { player: GamePlayer; brain: BotBrain }[];

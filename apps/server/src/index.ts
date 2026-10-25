@@ -4,6 +4,7 @@ import path from 'node:path';
 import { BRAND } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError } from './auth';
+import { challengePreview } from './challenges';
 import { config } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
@@ -49,6 +50,7 @@ app.use('/api', (err: unknown, _req: Request, res: Response, _next: NextFunction
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {
   const indexHtml = path.join(config.webDist, 'index.html');
+  const page = fs.readFileSync(indexHtml, 'utf8');
   // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
   // never the page (a tab from an older deploy then reloads instead of running HTML as JavaScript).
   app.use(
@@ -61,8 +63,35 @@ if (fs.existsSync(config.webDist)) {
     if (!['GET', 'HEAD'].includes(req.method) || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
     res.setHeader('cache-control', 'no-cache');
-    res.sendFile(indexHtml);
+    const challenge = /^\/c\/([\w-]{4,16})\/?$/.exec(req.path)?.[1];
+    const shared = challenge ? challengePage(page, challenge) : null;
+    if (shared) res.type('html').send(shared);
+    else res.sendFile(indexHtml);
   });
+}
+
+/**
+ * A challenge link's page with its own title and preview text, so a link pasted into Messenger or Viber reads
+ * "Мария те предизвиква…" with the score to beat, not the generic site description.
+ */
+function challengePage(html: string, id: string): string | null {
+  const preview = challengePreview(id);
+  if (!preview) return null;
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const title = esc(`${preview.creator?.username ?? 'Някой'} те предизвиква в ${BRAND.name}`);
+  const description = esc(
+    preview.expired
+      ? 'Това предизвикателство изтече — но можеш да създадеш свое.'
+      : preview.topScore !== null
+        ? `Резултатът за биене: ${preview.topScore} точки. 10 въпроса, един опит — можеш ли повече?`
+        : '10 въпроса, един опит. Приемаш ли?',
+  );
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
+    .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
+    .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
+    .replace(/(<meta property="og:url" content=")[^"]*/, `$1${config.appUrl}/c/${id}`);
 }
 
 const server = http.createServer(app);

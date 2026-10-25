@@ -25,6 +25,7 @@ services:
       # Caddy reaches the app through the Docker bridge (a private address); only it may set X-Forwarded-For.
       TRUST_PROXY: loopback, uniquelocal
       BOT_FILL_SECONDS: ${BOT_FILL_SECONDS:-8}
+      PUBLIC_QUEUES: ${PUBLIC_QUEUES:-duel,royale}
       APP_URL: https://${DOMAIN:-almanac.bg}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}

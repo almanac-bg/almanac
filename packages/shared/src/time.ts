@@ -57,6 +57,13 @@ export function shiftDay(day: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
 }
 
+/** Calendar days from `from` to `to` (both day keys): 1 for consecutive days. */
+export function daysBetween(from: string, to: string): number {
+  const a = parseDay(from);
+  const b = parseDay(to);
+  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
+}
+
 export function dayEndsAt(day: string): number {
   const { y, m, d } = parseDay(day);
   return sofiaMidnight(y, m, d + 1);

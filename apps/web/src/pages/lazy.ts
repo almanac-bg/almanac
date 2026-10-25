@@ -8,6 +8,7 @@ const loaders = {
   account: () => import('./AccountPages'),
   achievements: () => import('./AchievementsPage'),
   admin: () => import('./AdminPage'),
+  challenge: () => import('./ChallengePage'),
   friends: () => import('./FriendsPage'),
   game: () => import('./GamePage'),
   leaderboard: () => import('./LeaderboardPage'),
@@ -16,6 +17,7 @@ const loaders = {
   profile: () => import('./ProfilePage'),
   room: () => import('./RoomPage'),
   submit: () => import('./SubmitPage'),
+  unsubscribe: () => import('./UnsubscribePage'),
 };
 
 type Loader = keyof typeof loaders;
@@ -29,6 +31,7 @@ function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeo
 
 export const AchievementsPage = page('achievements', 'AchievementsPage');
 export const AdminPage = page('admin', 'AdminPage');
+export const ChallengePage = page('challenge', 'ChallengePage');
 export const FriendsPage = page('friends', 'FriendsPage');
 export const GamePage = page('game', 'GamePage');
 export const LeaderboardPage = page('leaderboard', 'LeaderboardPage');
@@ -40,6 +43,7 @@ export const RoomPage = page('room', 'RoomPage');
 export const SettingsPage = page('account', 'SettingsPage');
 export const SubmitPage = page('submit', 'SubmitPage');
 export const TermsPage = page('legal', 'TermsPage');
+export const UnsubscribePage = page('unsubscribe', 'UnsubscribePage');
 export const VerifyEmailPage = page('account', 'VerifyEmailPage');
 
 /** Warms the browser's module cache with every page (each loads once; later imports reuse it). */

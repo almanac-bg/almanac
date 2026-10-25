@@ -1,10 +1,12 @@
 import { BRAND, levelProgress } from '@quiz/shared';
 import clsx from 'clsx';
-import { ChartColumn, Gamepad2, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
+import { ChartColumn, Gamepad2, Save, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
+import { useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useStore } from '@quiz/client';
 import { useMuted } from '../lib/sound';
 import { Avatar, LevelBadge } from './Avatar';
+import { ClaimAccountModal } from './ClaimAccount';
 
 // The header doesn't list "Профил": the avatar and name next to it already lead there (and it's what makes the row fit).
 const LINKS = [
@@ -41,6 +43,61 @@ export function Logo({ className }: { className?: string }) {
 }
 
 const ICON_BUTTON = 'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg';
+
+function OfflineDot() {
+  return (
+    <span
+      aria-hidden
+      className="absolute top-0.5 left-7.5 size-3 animate-pulse rounded-full border-2 border-ink bg-rose-400 shadow-[0_0_10px_rgb(251_113_133/0.8)]"
+    />
+  );
+}
+
+/**
+ * Playing as a guest: a standing reminder that opens "Запази прогреса". On phones it takes the avatar's place (the tab
+ * bar already leads to the profile), so the header still fits a 320px screen.
+ */
+function GuestButton({ connected }: { connected: boolean }) {
+  const me = useStore((s) => s.me)!;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Гост — запази прогреса"
+        title="Играеш като гост — запази прогреса си"
+        className="focus-ring relative flex h-11 shrink-0 items-center gap-2 rounded-2xl p-1 hover:bg-white/5 sm:border sm:border-amber-300/30 sm:bg-amber-400/10 sm:px-3 sm:text-sm sm:font-semibold sm:text-amber-100 sm:hover:bg-amber-400/15"
+      >
+        <span className="relative sm:hidden">
+          <Avatar avatar={me.avatar} frame={me.frame} size={36} />
+          <span
+            aria-hidden
+            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[9px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
+          >
+            Гост
+          </span>
+          {!connected && <OfflineDot />}
+        </span>
+        <Save aria-hidden className="size-4 max-sm:hidden" />
+        {/* As much of the label as the row has room for: the nav icons (md) and their labels (xl) take the rest. */}
+        <span aria-hidden className="max-sm:hidden">
+          Гост<span className="md:max-lg:hidden"> · Запази</span>
+          <span className="hidden lg:max-xl:inline"> прогреса</span>
+        </span>
+      </button>
+      <ClaimAccountModal
+        open={open}
+        onClose={() => setOpen(false)}
+        reason={
+          <>
+            Играеш като гост (<b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>): профилът е само на това
+            устройство. Избери име и парола — нивото, серията и всичко изиграно остават твои, на всяко устройство.
+          </>
+        }
+      />
+    </>
+  );
+}
 
 export function NavBar() {
   const me = useStore((s) => s.me)!;
@@ -93,22 +150,25 @@ export function NavBar() {
             >
               {muted ? <VolumeX className="size-4.5" /> : <Volume2 className="size-4.5" />}
             </button>
+            {me.isGuest && <GuestButton connected={connected} />}
             <NavLink
               to="/profile"
               end
               className={({ isActive }) =>
-                clsx('focus-ring relative flex shrink-0 items-center gap-2.5 rounded-2xl p-1 sm:pr-3', isActive ? 'bg-white/10' : 'hover:bg-white/5')
+                clsx(
+                  'focus-ring relative flex shrink-0 items-center gap-2.5 rounded-2xl p-1',
+                  // A guest's generated name says nothing (the "Гост" button does), so only the avatar shows.
+                  !me.isGuest && 'sm:pr-3',
+                  // Phones reach the profile from the tab bar; for a guest the "Гост" button takes this spot.
+                  me.isGuest && 'max-sm:hidden',
+                  isActive ? 'bg-white/10' : 'hover:bg-white/5',
+                )
               }
             >
               <span className="sr-only">Профил</span>
               <Avatar avatar={me.avatar} frame={me.frame} size={36} />
-              {!connected && (
-                <span
-                  aria-hidden
-                  className="absolute top-0.5 left-7.5 size-3 animate-pulse rounded-full border-2 border-ink bg-rose-400 shadow-[0_0_10px_rgb(251_113_133/0.8)]"
-                />
-              )}
-              <div className="hidden w-28 sm:block">
+              {!connected && <OfflineDot />}
+              <div className={clsx('hidden w-28', !me.isGuest && 'sm:block')}>
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{me.username}</span>
                   <LevelBadge level={progress.level} />

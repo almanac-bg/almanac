@@ -1,22 +1,27 @@
 import clsx from 'clsx';
 import {
+  Check,
   CheckCircle2,
   Download,
   Eye,
   EyeOff,
+  Flame,
   KeyRound,
   LogOut,
   Mail,
   MailCheck,
   MailWarning,
+  Save,
   ShieldAlert,
   Trash2,
+  TriangleAlert,
   Volume2,
   VolumeX,
   XCircle,
 } from 'lucide-react';
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ClaimAccountModal } from '../components/ClaimAccount';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Modal, Spinner } from '../components/ui';
 import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
@@ -195,14 +200,22 @@ export function SettingsPage() {
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-bold">Настройки</h1>
           <p className="mt-1 text-fg-2 [overflow-wrap:anywhere]">
-            Профил <b className="text-fg">{me.username}</b>
+            {me.isGuest ? 'Профил на гост' : 'Профил'} <b className="text-fg">{me.username}</b>
           </p>
         </div>
         <LogoutButton />
       </div>
-      <EmailSettings />
+      {/* A guest has no email or password yet: saving the account comes first, and brings both. */}
+      {me.isGuest ? (
+        <ClaimSettings />
+      ) : (
+        <>
+          <EmailSettings />
+          <ReminderSettings />
+        </>
+      )}
       <SoundSettings />
-      <PasswordSettings />
+      {!me.isGuest && <PasswordSettings />}
       <DataSettings />
     </div>
   );
@@ -216,28 +229,77 @@ function clearSession() {
 
 const EMAIL_INPUT_ID = 'settings-email';
 
+/** Takes you to the email field (after a dialog that leads there has closed and handed focus back). */
+function focusEmailField(delay = 0) {
+  setTimeout(() => {
+    const input = document.getElementById(EMAIL_INPUT_ID);
+    input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    input?.focus({ preventScroll: true });
+  }, delay);
+}
+
 function LogoutButton() {
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function logout() {
     setBusy(true);
     await api.logout().catch(() => {});
-    markReturning(); // next time the sign-in page opens on "Вход"
+    // Next time the sign-in page opens on "Вход" — unless this was a guest, who has nothing to sign in with.
+    if (!me.isGuest) markReturning();
     clearSession();
     navigate('/', { replace: true });
   }
 
   function addEmail() {
     setOpen(false);
-    // After the dialog has closed and handed focus back.
-    setTimeout(() => {
-      const input = document.getElementById(EMAIL_INPUT_ID);
-      input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      input?.focus({ preventScroll: true });
-    }, 350);
+    focusEmailField(350);
+  }
+
+  if (me.isGuest) {
+    return (
+      <>
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          <LogOut className="size-4" /> Изход
+        </Button>
+        <Modal open={open} onClose={() => setOpen(false)} title="Изход от профила на гост">
+          {/* No name or password to come back with: leaving is losing the account, so say it plainly. */}
+          <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm">
+            <p className="flex items-center gap-2 font-semibold text-rose-200">
+              <TriangleAlert className="size-5 shrink-0" /> Профилът ще бъде изгубен
+            </p>
+            <p className="mt-2 text-fg-2">
+              Играеш като гост, без име и парола — след изход няма как да влезеш отново в{' '}
+              <b className="text-fg [overflow-wrap:anywhere]">{me.username}</b>. Нивото, серията и всичко изиграно се губят
+              завинаги.
+            </p>
+          </div>
+          <p className="mt-4 text-sm text-fg-2">Запази прогреса с име и парола — отнема 10 секунди.</p>
+          {/* Saving leads; leaving anyway stays available but quiet. Phones stack them full width. */}
+          <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <Button
+              onClick={() => {
+                setOpen(false);
+                setClaiming(true);
+              }}
+              className="sm:mr-auto"
+            >
+              <Save className="size-4" /> Запази прогреса
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Отказ
+            </Button>
+            <Button variant="ghost" className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200" onClick={logout} loading={busy}>
+              <LogOut className="size-4" /> Излез без запазване
+            </Button>
+          </div>
+        </Modal>
+        <ClaimAccountModal open={claiming} onClose={() => setClaiming(false)} />
+      </>
+    );
   }
 
   return (
@@ -283,23 +345,40 @@ function LogoutButton() {
   );
 }
 
-function SoundSettings() {
-  const [muted, setMuted] = useMuted();
+/** An on/off setting: a card with a title, what it does, and a 44px switch named by the title. */
+function SwitchCard({
+  icon,
+  title,
+  hint,
+  on,
+  onToggle,
+  disabled,
+  busy,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  hint: ReactNode;
+  on: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  /** More about the setting under the hint (e.g. why it can't be switched on yet). */
+  children?: ReactNode;
+}) {
   const id = useId();
-  const on = !muted;
-
   return (
     <Card className="p-6">
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {on ? <Volume2 className="size-5 text-violet-300" /> : <VolumeX className="size-5 text-fg-3" />}
+          <div className="flex items-center gap-2 [&>svg]:shrink-0">
+            {icon}
             <h2 id={`${id}-label`} className="font-display text-lg font-bold">
-              Звук
+              {title}
             </h2>
           </div>
           <p id={`${id}-hint`} className="mt-1 text-sm text-fg-3">
-            Ефекти в играта: часовникът, верните и грешните отговори, наградите.
+            {hint}
           </p>
         </div>
         <button
@@ -307,11 +386,13 @@ function SoundSettings() {
           aria-checked={on}
           aria-labelledby={`${id}-label`}
           aria-describedby={`${id}-hint`}
-          onClick={() => {
-            setMuted(on);
-            if (!on) sfx.pop(); // a taste of what was just switched on
-          }}
-          className="focus-ring grid h-11 w-16 shrink-0 place-items-center rounded-2xl"
+          aria-busy={busy || undefined}
+          disabled={disabled || busy}
+          onClick={onToggle}
+          className={clsx(
+            'focus-ring grid h-11 w-16 shrink-0 place-items-center rounded-2xl',
+            disabled ? 'cursor-not-allowed opacity-45' : busy && 'cursor-progress',
+          )}
         >
           <span
             aria-hidden
@@ -329,11 +410,129 @@ function SoundSettings() {
           </span>
         </button>
       </div>
+      {children}
+    </Card>
+  );
+}
+
+function SoundSettings() {
+  const [muted, setMuted] = useMuted();
+  const on = !muted;
+  return (
+    <SwitchCard
+      icon={on ? <Volume2 className="size-5 text-violet-300" /> : <VolumeX className="size-5 text-fg-3" />}
+      title="Звук"
+      hint="Ефекти в играта: часовникът, верните и грешните отговори, наградите."
+      on={on}
+      onToggle={() => {
+        setMuted(on);
+        if (!on) sfx.pop(); // a taste of what was just switched on
+      }}
+    />
+  );
+}
+
+/** The opt-in evening email when the daily streak is about to break (needs a verified address to go to). */
+function ReminderSettings() {
+  const me = useStore((s) => s.me)!;
+  const [busy, setBusy] = useState(false);
+  const on = me.streakReminders;
+  // Switching off always works; switching on needs somewhere to send the email.
+  const blocked = !on && !me.email;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      const { user } = await api.setReminders(!on);
+      setState({ me: user });
+      toast(
+        user.streakReminders
+          ? { kind: 'success', icon: '🔥', title: 'Напомнянето е включено', body: 'Ще ти пишем вечерта, ако серията ти е в опасност.' }
+          : { kind: 'info', title: 'Напомнянето е изключено' },
+      );
+    } catch (err) {
+      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SwitchCard
+      icon={<Flame className={clsx('size-5', on ? 'text-orange-300' : 'text-fg-3')} />}
+      title="Напомняне за серията"
+      hint={
+        <>
+          Имейл вечерта, ако серията ти от дневни предизвикателства ще изгори в полунощ, защото днешното още чака. Най-много
+          едно писмо на ден; спираш го оттук или от линка във всяко писмо.
+          {blocked && <span className="sr-only"> Нужен е потвърден имейл.</span>}
+        </>
+      }
+      on={on}
+      onToggle={toggle}
+      disabled={blocked}
+      busy={busy}
+    >
+      {blocked && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
+          <MailWarning aria-hidden className="size-5 shrink-0 text-amber-300" />
+          <span className="min-w-0 flex-1 basis-48 text-fg-2">
+            {me.pendingEmail ? (
+              <>
+                Отвори линка, който изпратихме до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b>, и после
+                включи напомнянето.
+              </>
+            ) : (
+              'Нужен е потвърден имейл — добави го по-горе.'
+            )}
+          </span>
+          {!me.pendingEmail && (
+            <Button size="sm" variant="secondary" onClick={() => focusEmailField()}>
+              <Mail className="size-4" /> Добави имейл
+            </Button>
+          )}
+        </div>
+      )}
+    </SwitchCard>
+  );
+}
+
+const CLAIM_PERKS = [
+  'вход от всяко устройство',
+  'приятели, свои стаи и предизвикателства',
+  'с имейл: нова парола, ако я забравиш, и напомняне за серията',
+];
+
+/** Settings for a guest: saving the account (name, password, maybe email) instead of the email and password cards. */
+function ClaimSettings() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="border-amber-300/25 bg-amber-400/[0.06] p-6">
+      <div className="flex items-center gap-2">
+        <Save className="size-5 text-amber-300" />
+        <h2 className="font-display text-lg font-bold">Запази прогреса</h2>
+      </div>
+      <p className="mt-1 text-sm text-fg-2">
+        Играеш като гост: профилът е само на това устройство. Ако излезеш или изчистиш данните на браузъра, нивото, серията и
+        всичко изиграно се губят. С име и парола остават твои — и получаваш:
+      </p>
+      <ul className="mt-3 space-y-1.5 text-sm text-fg-2">
+        {CLAIM_PERKS.map((perk) => (
+          <li key={perk} className="flex items-start gap-2">
+            <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-amber-300" /> {perk}
+          </li>
+        ))}
+      </ul>
+      <Button className="mt-4 w-full sm:w-auto" onClick={() => setOpen(true)}>
+        <Save className="size-4" /> Запази профила
+      </Button>
+      <ClaimAccountModal open={open} onClose={() => setOpen(false)} />
     </Card>
   );
 }
 
 function DataSettings() {
+  const guest = useStore((s) => !!s.me?.isGuest);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -345,7 +544,8 @@ function DataSettings() {
     setBusy(true);
     setError(null);
     try {
-      await api.deleteAccount(password);
+      // A guest has no password: being signed in on this device is the proof.
+      await api.deleteAccount(guest ? '' : password);
       clearSession();
       navigate('/', { replace: true });
       toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });
@@ -383,18 +583,22 @@ function DataSettings() {
       <Modal open={open} onClose={() => setOpen(false)} title="Изтриване на профила">
         <form onSubmit={remove} className="space-y-4">
           <p className="text-sm text-fg-2">
-            Профилът, нивото, статистиката, постиженията и приятелите ти ще бъдат изтрити завинаги. Това не може да се отмени.
+            {guest
+              ? 'Профилът на гост, нивото, статистиката и постиженията ти ще бъдат изтрити завинаги. Това не може да се отмени.'
+              : 'Профилът, нивото, статистиката, постиженията и приятелите ти ще бъдат изтрити завинаги. Това не може да се отмени.'}
           </p>
-          <label className="block">
-            <Label>Потвърди с паролата си</Label>
-            <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
-          </label>
+          {!guest && (
+            <label className="block">
+              <Label>Потвърди с паролата си</Label>
+              <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
+            </label>
+          )}
           {error && <p className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Отказ
             </Button>
-            <Button type="submit" variant="danger" loading={busy} disabled={!password}>
+            <Button type="submit" variant="danger" loading={busy} disabled={!guest && !password}>
               Изтрий завинаги
             </Button>
           </div>
@@ -449,7 +653,9 @@ function EmailSettings() {
         <Mail className="size-5 text-violet-300" />
         <h2 className="font-display text-lg font-bold">Имейл</h2>
       </div>
-      <p className="mt-1 text-sm text-fg-3">Използва се само за възстановяване на паролата. Не го показваме на никого.</p>
+      <p className="mt-1 text-sm text-fg-3">
+        За нова парола, ако забравиш старата, и за напомнянето за серията, ако го включиш. Не го показваме на никого.
+      </p>
 
       {me.email && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3">

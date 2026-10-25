@@ -3,10 +3,11 @@
 Real-time multiplayer quiz battles, in Bulgarian. It has:
 
 - **Modes:** solo practice, a daily challenge, ranked 1v1 duels and 2v2 teams, 3- and 5-player free-for-alls, an
-  8-player Royale with eliminations, and private rooms for friends.
-- **Progression:** accounts level up, unlock cosmetics and jokers, earn achievements, climb monthly seasons and keep
-  detailed statistics.
-- **Social:** players can add friends, invite and challenge each other, and submit their own questions for review.
+  8-player Royale with eliminations, private rooms for friends, and challenge links anyone can play.
+- **Progression:** accounts level up, unlock cosmetics and jokers, earn achievements, finish daily quests, keep a
+  daily streak (with shields), climb monthly seasons and keep detailed statistics.
+- **Social:** players can add friends, invite and challenge each other, ask for a rematch, and submit their own
+  questions for review. Visitors can play straight away as guests and save their progress later.
 
 ## Quick start
 
@@ -38,7 +39,8 @@ test real multiplayer locally, open a second browser (or a private window) with 
 - **`e2e.test.ts`** boots a real server with a throwaway database and plays through everything with real sockets.
   Two players and bots cover: solo, a ranked duel with a reconnect, Royale eliminations, private rooms and teams,
   the daily challenge, friends, invites and challenges, every joker, community questions with moderation, season
-  rewards, flagging and hiding wrong questions, results replayed after a dropped connection, malformed socket
+  rewards, flagging and hiding wrong questions, guests, challenge links, rematches, streak-reminder opt-out, results
+  replayed after a dropped connection, malformed socket
   messages (which must never crash the server), and how the website's files are cached.
 - **`game.test.ts`** drives the match engine on a mocked clock: leaving and forfeits, dropped connections, abandoned
   matches, "Двойно или нищо", tie-breaks and bot strength.
@@ -47,6 +49,7 @@ test real multiplayer locally, open a second browser (or a private window) with 
 - **`production.test.ts`** runs the server as in production: admins only through the admin command line, browser security
   headers, the health check, crash reports.
 - **`maintenance.test.ts`** covers the cleanup of expired logins and the daily database snapshots.
+- **`progress.test.ts`** covers daily quests, streak shields, the evening streak reminder and guest cleanup.
 - **`questions.test.ts`** validates the question bank. New questions must pass it.
 - **`rules.test.ts`** checks the scoring and progression rules, including Sofia-time day and season boundaries across
   DST changes.
@@ -62,6 +65,7 @@ and checks that it boots.
 | `PORT`             | `3001`                                | Server port                                                  |
 | `DB_PATH`          | `apps/server/data/quiz.db`            | SQLite file (created and migrated automatically)             |
 | `BOT_FILL_SECONDS` | `8`                                   | Queue wait before bots fill empty seats; `off` disables bots |
+| `PUBLIC_QUEUES`    | `duel,royale`                         | Ranked queues players can join (`all`, or a list of `duel`, `teams`, `trio`, `squad`, `royale`) |
 | `COOKIE_SECURE`    | `false`                               | Set `true` when served over HTTPS                            |
 | `TRUST_PROXY`      | `loopback`                            | Express `trust proxy`; which reverse proxies to trust        |
 | `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
@@ -106,6 +110,13 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
   - Трио: 3 players.
   - Арена: 5 players.
   - Роял: 8 players. The lowest scorer is knocked out after questions 3, 5, 7, 9, 11 and 13.
+  - Предизвикателство (challenge link, `/c/<id>`): a player makes a link with 10 fixed questions and plays it first;
+    anyone with the link (guests too) plays the same questions once, in their own option order, with no jokers, and
+    lands on the link's own board. The creator hears about every result. Links last 7 days.
+  - At launch only Дуел and Роял are open as ranked queues (`PUBLIC_QUEUES`), so the first players meet each other
+    instead of bots; Отбори, Трио and Арена open as the game grows (and stay playable in private rooms).
+- **Rematch:** after a ranked match with other people, anyone can ask for a rematch for a minute; once everyone asks,
+  the same people play again (one "no", or walking away, ends the offer).
   - Частна стая: 2–8 players, with configurable questions, timer, category, eliminations and teams.
 - **Scoring:** 500 for a correct answer, up to +500 for speed (measured against the regular timer), and +50 per streak
   step (capped at +250). Ties go to more correct answers, then less total time; an unanswered question counts the
@@ -134,12 +145,20 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
   to 1000. At season end, players get XP and exclusive frames and titles for the best peak rank (Бронз → Майстор) they reached
   in a mode where they played at least 10 ranked games.
 - **Progression:** every match grants XP: participation, correct answers (by difficulty), placement, a perfect-game
-  bonus, the first match of the day, the daily streak (growing for 30 days, with milestones at 7, 30 and 100) and
-  achievements. Reaching level L takes `50·L·(L−1)` total
-  XP.
+  bonus, the first match of the day, the daily streak (growing for 30 days, with milestones at 7, 30 and 100), daily
+  quests and achievements. Reaching level L takes `50·L·(L−1)` total XP.
+- **Daily quests:** three a day (Sofia time), one each for showing up, playing well and trying something different,
+  chosen per player and fixed for the day; XP is paid as they're completed, plus a bonus for all three.
+- **Streak shields:** every 7 days of daily streak earns a shield (at most 2); a missed day uses one up instead of
+  breaking the streak. Players with a verified email can opt in to one evening email when their streak is about to
+  break (with a one-click unsubscribe). With Brevo's free plan (300 emails a day) that covers a few hundred players.
 - **Accounts:** players log in with their username or a verified email. An optional email (verified by link) enables
   "Забравена парола?": a single-use reset link that expires in 1 hour and logs the account out everywhere.
   Passwords can be changed in Настройки.
+- **Guests:** "Играй като гост" makes an account without a name or password, so the first game is one tap away.
+  Guests play everything except what needs a lasting identity (friends, rooms of their own, challenge links of their
+  own, questions, reports), aren't listed on leaderboards, and can save their progress with a name and password at
+  any time. A guest account nobody can sign in to any more (no session left) is erased after a day.
 - **Moderation:**
   - An offensive-name filter covers Cyrillic, Latin and leetspeak, and reserves names like admin and АЛМАНАХ.
   - Players can report others from their profile.
@@ -155,7 +174,7 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
   challenge them to a 1v1 with one click.
 - **Community questions:** players at level 3+ submit questions. Moderators (`/admin`) approve them, editing if
   needed, or reject them. Approved questions join the game immediately with author credit, and the author gets XP.
-- **Achievements:** 39 in total. Definitions are in `packages/shared/src/achievements.ts` and the rules in
+- **Achievements:** 41 in total. Definitions are in `packages/shared/src/achievements.ts` and the rules in
   `apps/server/src/achievements.ts`.
 
 ## Adding questions

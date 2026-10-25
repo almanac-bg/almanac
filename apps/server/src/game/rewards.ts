@@ -6,13 +6,16 @@ import {
   levelFromXp,
   type MatchRewards,
   newlyUnlocked,
+  ordinal,
   START_RATING,
   type XpLine,
 } from '@quiz/shared';
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
+import { recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
+import { advanceQuests } from '../quests';
 import { getRating, recordRating } from '../seasons';
 import { DELETED_NAME, getUser } from '../users';
 import type { Game, Participant } from './Game';
@@ -34,17 +37,6 @@ const RATING_K = 40;
 const RATING_K_BOTS = 24;
 /** Win-trading guard: the same two people only move each other's rating this many times a day. */
 const RATED_GAMES_PER_PAIR = 3;
-
-/** "1-во", "2-ро", "3-то", "7-мо"… */
-export function ordinal(n: number): string {
-  const last = n % 10;
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 19) return `${n}-то`;
-  if (last === 1) return `${n}-во`;
-  if (last === 2) return `${n}-ро`;
-  if (last === 7 || last === 8) return `${n}-мо`;
-  return `${n}-то`;
-}
 
 /** Writes the match, updates every human's stats, XP, rating and achievements. */
 export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<number, MatchRewards> {
@@ -136,6 +128,7 @@ function rewardHuman(
   const won = multiplayer && s.placement === 1 && !left;
   const solo = setup.mode === 'solo';
   const daily = setup.dailyDay !== null;
+  const challenge = setup.challengeId !== null;
   // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
   // there earns nothing extra (else a room full of bots is an XP farm).
   const rivals = standings.filter((o) => {
@@ -158,7 +151,7 @@ function rewardHuman(
     const amount = won ? (rivals.length ? XP.winBase + XP.winPerOpponent * rivals.length : 0) : XP.perOpponentBeaten * beaten;
     if (amount > 0) lines.push({ label: won ? 'Победа' : `${ordinal(s.placement)} място`, amount });
   }
-  if (!left && (solo || daily)) {
+  if (!left && (solo || daily || challenge)) {
     const amount = Math.floor(s.score / XP.soloScoreDivisor);
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
@@ -178,6 +171,25 @@ function rewardHuman(
       const streakBonus = Math.min(dailyResult.streak, DAILY_XP.streakCap) * DAILY_XP.perStreakDay;
       if (dailyResult.streak > 1) lines.push({ label: `Дневна серия ×${dailyResult.streak}`, amount: streakBonus });
     }
+  }
+
+  // ── Challenge link (recorded even after leaving: one attempt each) ──
+  const challengeResult = challenge ? recordChallengeResult(setup.challengeId!, userId, s.score, p.correct, p.answerMs) : null;
+
+  // ── Daily quests ──
+  if (!left) {
+    lines.push(
+      ...advanceQuests(userId, {
+        mode: setup.mode,
+        multiplayer,
+        won,
+        correct: p.correct,
+        hardCorrect: p.correctByDifficulty.hard,
+        bestStreak: p.bestStreak,
+        jokers: p.usedPowerups.size,
+        correctByCategory: new Map([...p.categories].map(([category, c]) => [category, c.correct])),
+      }),
+    );
   }
 
   // ── Lifetime stats ──
@@ -266,6 +278,7 @@ function rewardHuman(
     unlocks: newlyUnlocked(ctxBefore, unlockContext(userId)),
     rating,
     daily: dailyResult,
+    challenge: challengeResult,
   };
 }
 

@@ -34,7 +34,19 @@ export interface UserRow {
   pending_email: string | null;
   banned_until: number | null;
   ban_reason: string | null;
+  /** Created by "Играй като гост": no password until claimed with a name and password. */
+  is_guest: number;
+  /** Earned every 7 days of daily streak (at most 2); a missed day uses one up instead of breaking the streak. */
+  streak_shields: number;
+  /** Opted in to an evening email when the daily streak is about to break. */
+  streak_reminders: number;
+  /** Secret in the reminder email's unsubscribe link. */
+  reminder_key: string | null;
+  reminded_day: string | null;
 }
+
+/** Names guests get ("Гост_482113"); nobody can register one. */
+export const GUEST_NAME = /^(гост|gost|guest)[\s_.-]*\d*$/iu;
 
 /** Shown in other players' match history once an account is deleted. */
 export const DELETED_NAME = 'Изтрит играч';

@@ -18,6 +18,7 @@ import { HomePage } from './pages/HomePage';
 import {
   AchievementsPage,
   AdminPage,
+  ChallengePage,
   FriendsPage,
   GamePage,
   LeaderboardPage,
@@ -30,11 +31,12 @@ import {
   SettingsPage,
   SubmitPage,
   TermsPage,
+  UnsubscribePage,
   VerifyEmailPage,
 } from './pages/lazy';
 
 /** Email links and legal pages work whether or not you're signed in. */
-const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/privacy', '/terms'];
+const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/unsubscribe', '/privacy', '/terms'];
 
 export function App() {
   const me = useStore((s) => s.me);
@@ -43,11 +45,15 @@ export function App() {
 
   // A new page — or the lobby right after signing in — starts at the top, not at the old scroll offset.
   const signedIn = !!me;
+  // A guest has no name or password to sign in with, so the sign-in page shouldn't open on "Вход" for them.
+  const account = signedIn && !me.isGuest;
   useEffect(() => {
     window.scrollTo(0, 0);
-    // This device has an account now: next time the sign-in page opens on "Вход".
-    if (signedIn) markReturning();
   }, [pathname, signedIn]);
+  useEffect(() => {
+    // This device has an account now: next time the sign-in page opens on "Вход".
+    if (account) markReturning();
+  }, [account]);
 
   useEffect(() => {
     api
@@ -93,6 +99,7 @@ export function App() {
           <Routes>
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
           </Routes>
@@ -131,6 +138,7 @@ function SignedIn() {
             <Route path="/game" element={<GamePage />} />
             <Route path="/room" element={<RoomPage />} />
             <Route path="/join/:code" element={<JoinRoute />} />
+            <Route path="/c/:id" element={<ChallengePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/:username" element={<ProfilePage />} />
             <Route path="/achievements" element={<AchievementsPage />} />

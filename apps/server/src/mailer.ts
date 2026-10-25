@@ -10,6 +10,7 @@ export interface Mail {
   subject: string;
   text: string;
   html: string;
+  headers?: Record<string, string>;
 }
 
 const transport = config.smtpUrl ? nodemailer.createTransport(config.smtpUrl) : null;
@@ -97,5 +98,28 @@ export function resetPasswordMail(to: string, username: string, link: string): M
       link,
       'Линкът е валиден 1 час и може да се използва веднъж. Ако заявката не е от теб, игнорирай това писмо — старата ти парола остава.',
     ),
+  };
+}
+
+/**
+ * The evening nudge when a daily streak is about to break. Opt-in, and every one carries a working unsubscribe link,
+ * plus the one-click unsubscribe headers mail apps show as their own button.
+ */
+export function streakReminderMail(to: string, username: string, streak: number, shields: number, unsubscribe: { page: string; api: string }): Mail {
+  const lead = `Серията ти от ${streak} дни в дневното предизвикателство изтича в полунощ.`;
+  const shield = shields > 0 ? ' Имаш и защита на серията, но защо да я хабиш?' : '';
+  const stop = 'Не искаш тези писма? Спри напомнянията';
+  return {
+    to,
+    subject: `🔥 Серията ти от ${streak} дни изтича довечера`,
+    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, две минути:\n${config.appUrl}/\n\n${stop}: ${unsubscribe.page}`,
+    html: layout(
+      `Здравей, ${username}!`,
+      escape(`${lead}${shield} Десет въпроса, две минути.`),
+      'Играй днешното',
+      `${config.appUrl}/`,
+      `${escape(stop)}: <a href="${unsubscribe.page}" style="color:#a78bfa">спри ги тук</a>.`,
+    ),
+    headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
   };
 }

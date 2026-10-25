@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   type CategoryId,
   isQueueMode,
@@ -40,7 +41,9 @@ import {
   resetPassword,
   verifyEmailToken,
 } from '../emailAuth';
-import { all, one, run } from '../db';
+import { challengeInfo, challengePreview, myChallenges } from '../challenges';
+import { all, one, run, tx } from '../db';
+import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { disconnectSession, notifyUser, sendFriendsUpdate } from '../notify';
@@ -92,6 +95,20 @@ function parse<T>(schema: z.ZodType<T>, req: Request, res: Response): T | null {
     return null;
   }
   return parsed.data;
+}
+
+function sameSecret(a: string, b: string) {
+  const [x, y] = [Buffer.from(a), Buffer.from(b)];
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** For what needs a real account (see ACCOUNT_ONLY): guests are asked to claim theirs first. */
+function requireAccount(_req: Request, res: Response, next: NextFunction) {
+  if (getUser(res.locals.userId)?.is_guest) {
+    res.status(403).json({ error: ACCOUNT_ONLY });
+    return;
+  }
+  next();
 }
 
 function requireAdmin(_req: Request, res: Response, next: NextFunction) {
@@ -217,6 +234,22 @@ api.post('/auth/verify-email', (req, res) => {
   res.json({ ok: true });
 });
 
+/** "Играй като гост": a real account without a name or password yet, so a first game is one tap away. */
+api.post('/auth/guest', (req, res) => {
+  const current = userIdFromRequest(req, res);
+  if (current) {
+    res.json({ user: getMe(current) });
+    return;
+  }
+  if (throttled(`guest:${req.ip}`, 20, 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много нови игри от тази мрежа. Опитай по-късно или си направи профил.' });
+    return;
+  }
+  const userId = createGuest();
+  setSessionCookie(res, createSession(userId));
+  res.status(201).json({ user: getMe(userId) });
+});
+
 api.post('/auth/logout', (req, res) => {
   const token = sessionTokenFromCookieHeader(req.headers.cookie);
   if (token) {
@@ -263,7 +296,7 @@ async function confirmPassword(res: Response, password: string): Promise<boolean
   return true;
 }
 
-api.post('/account/email', requireAuth, async (req, res) => {
+api.post('/account/email', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ email: z.string().max(254), password: z.string().max(200).optional() }), req, res);
   if (!body) return;
   if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000) || throttled(`email-to:${emailKey(body.email)}`, 3, 24 * 60 * 60_000)) {
@@ -287,14 +320,14 @@ api.post('/account/email', requireAuth, async (req, res) => {
   res.json({ user: getMe(res.locals.userId) });
 });
 
-api.delete('/account/email', requireAuth, async (req, res) => {
+api.delete('/account/email', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
   if (!body || !(await confirmPassword(res, body.password))) return;
   removeEmail(res.locals.userId);
   res.json({ user: getMe(res.locals.userId) });
 });
 
-api.post('/account/password', requireAuth, async (req, res) => {
+api.post('/account/password', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ current: z.string().min(1, 'Въведи текущата парола.').max(200), next: PasswordSchema }), req, res);
   if (!body) return;
   if (throttled(`password:${res.locals.userId}`, 10, 15 * 60_000)) {
@@ -309,13 +342,87 @@ api.post('/account/password', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+/** A guest picks a name and password (and maybe an email): the same account, with everything played so far. */
+api.post('/account/claim', requireAuth, async (req, res) => {
+  const me = getUser(res.locals.userId)!;
+  if (!me.is_guest) {
+    res.status(400).json({ error: 'Профилът ти вече има име и парола.' });
+    return;
+  }
+  if (throttled(`claim:${me.id}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const creds = parse(Registration, req, res);
+  if (!creds) return;
+  const problem = nameProblem(creds.username);
+  if (problem) {
+    res.status(400).json({ error: problem });
+    return;
+  }
+  const taken = getUserByName(creds.username);
+  if (taken && taken.id !== me.id) {
+    res.status(409).json({ error: 'Това име вече е заето.' });
+    return;
+  }
+  const hash = await hashPassword(creds.password);
+  try {
+    tx(() => {
+      run(
+        'UPDATE users SET username = ?, username_key = ?, password_hash = ?, is_guest = 0 WHERE id = ? AND is_guest = 1',
+        creds.username,
+        usernameKey(creds.username),
+        hash,
+        me.id,
+      );
+      // Matches already played show the new name too.
+      run('UPDATE match_players SET name = ? WHERE user_id = ?', creds.username, me.id);
+    });
+  } catch {
+    res.status(409).json({ error: 'Това име вече е заето.' });
+    return;
+  }
+  if (creds.email) requestEmailChange(me.id, creds.email);
+  res.json({ user: getMe(me.id) });
+});
+
+/** The evening "your streak is about to break" email (needs a verified address). */
+api.post('/account/reminders', requireAuth, requireAccount, (req, res) => {
+  const body = parse(z.object({ on: z.boolean() }), req, res);
+  if (!body) return;
+  if (body.on && !getUser(res.locals.userId)!.email) {
+    res.status(400).json({ error: 'Първо добави и потвърди имейл.' });
+    return;
+  }
+  run(
+    'UPDATE users SET streak_reminders = ?, reminder_key = COALESCE(reminder_key, ?) WHERE id = ?',
+    body.on ? 1 : 0,
+    randomBytes(16).toString('base64url'),
+    res.locals.userId,
+  );
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+/** The unsubscribe link in reminder emails (and the mail apps' one-click unsubscribe): no sign-in needed. */
+api.post('/reminders/off', (req, res) => {
+  const { u, k } = req.query;
+  const user = typeof u === 'string' && /^\d{1,12}$/.test(u) ? getUser(Number(u)) : undefined;
+  if (!user?.reminder_key || typeof k !== 'string' || !sameSecret(user.reminder_key, k)) {
+    res.status(400).json({ error: 'Линкът не е валиден.' });
+    return;
+  }
+  run('UPDATE users SET streak_reminders = 0 WHERE id = ?', user.id);
+  res.json({ ok: true });
+});
+
 api.get('/account/export', requireAuth, (_req, res) => {
   res.setHeader('content-disposition', 'attachment; filename="almanac-data.json"');
   res.type('application/json').send(JSON.stringify(exportAccount(res.locals.userId), null, 2));
 });
 
 api.post('/account/delete', requireAuth, async (req, res) => {
-  const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
+  // Guests have no password (deleteAccount asks everyone else for theirs).
+  const body = parse(z.object({ password: z.string().max(200).default('') }), req, res);
   if (!body) return;
   if (throttled(`delete:${res.locals.userId}`, 5, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
@@ -350,7 +457,7 @@ api.post('/client-errors', (req, res) => {
   res.status(204).end();
 });
 
-api.post('/reports', requireAuth, (req, res) => {
+api.post('/reports', requireAuth, requireAccount, (req, res) => {
   const body = parse(
     z.object({ username: z.string().trim().min(1).max(40), reason: z.string(), details: z.string().max(500).default('') }),
     req,
@@ -370,6 +477,37 @@ api.get('/achievements', requireAuth, (_req, res) => {
 });
 
 // ─── Daily & seasons ─────────────────────────────────────────────────────────
+
+// ─── Challenge links ─────────────────────────────────────────────────────────
+
+const challengeId = (req: Request) => String(req.params.id).slice(0, 16);
+
+api.get('/challenges', requireAuth, (_req, res) => {
+  res.json({ challenges: myChallenges(res.locals.userId) });
+});
+
+/** Signed out too: the link's landing page shows who's challenging and the score to beat. */
+api.get('/challenges/:id/preview', (req, res) => {
+  if (throttled(`challenge-preview:${req.ip}`, 120, 60_000)) {
+    res.status(429).json({ error: 'Твърде много заявки.' });
+    return;
+  }
+  const preview = challengePreview(challengeId(req));
+  if (!preview) {
+    res.status(404).json({ error: 'Няма такова предизвикателство.' });
+    return;
+  }
+  res.json(preview);
+});
+
+api.get('/challenges/:id', requireAuth, (req, res) => {
+  const info = challengeInfo(challengeId(req), res.locals.userId);
+  if (!info) {
+    res.status(404).json({ error: 'Няма такова предизвикателство.' });
+    return;
+  }
+  res.json(info);
+});
 
 api.get('/daily', requireAuth, (_req, res) => {
   res.json(dailyInfo(res.locals.userId));
@@ -405,7 +543,7 @@ api.get('/friends', requireAuth, (_req, res) => {
   res.json(listFriends(res.locals.userId));
 });
 
-api.post('/friends', requireAuth, (req, res) => {
+api.post('/friends', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ username: z.string().trim().min(1, 'Въведи име.').max(40) }), req, res);
   if (!body) return;
   // Per sender, and per pair (removing and re-requesting the same player can't become a notification loop).
@@ -417,7 +555,7 @@ api.post('/friends', requireAuth, (req, res) => {
   friendReply(res, res.locals.userId, requestFriend(res.locals.userId, body.username));
 });
 
-api.post('/friends/:id/accept', requireAuth, (req, res) => {
+api.post('/friends/:id/accept', requireAuth, requireAccount, (req, res) => {
   friendReply(res, res.locals.userId, acceptFriend(res.locals.userId, idParam(req)));
 });
 
@@ -436,7 +574,7 @@ api.get('/submissions/mine', requireAuth, (_req, res) => {
   res.json({ submissions: mySubmissions(res.locals.userId) });
 });
 
-api.post('/submissions', requireAuth, (req, res) => {
+api.post('/submissions', requireAuth, requireAccount, (req, res) => {
   const draft = parse(DraftSchema, req, res);
   if (!draft) return;
   const result = submitQuestion(res.locals.userId, draft);
@@ -456,7 +594,7 @@ api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {
   res.json({ pendingQuestions: pendingCount(), openReports: openReportCount(), questionReports: openQuestionReportCount() });
 });
 
-api.post('/questions/:id/report', requireAuth, (req, res) => {
+api.post('/questions/:id/report', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ reason: z.string(), details: z.string().max(500).default('') }), req, res);
   if (!body) return;
   if (throttled(`question-report:${res.locals.userId}`, 30, 60 * 60_000)) {
@@ -659,9 +797,10 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
   }
 
   if (board === 'level') {
-    const rows = all<BoardRow>('SELECT * FROM users ORDER BY xp DESC, id ASC LIMIT ?', LIMIT);
+    // Guests play but aren't listed (they can be made by the dozen); they still see where they'd stand.
+    const rows = all<BoardRow>('SELECT * FROM users WHERE is_guest = 0 ORDER BY xp DESC, id ASC LIMIT ?', LIMIT);
     const me = getUser(userId)!;
-    const rank = one<{ n: number }>('SELECT COUNT(*) + 1 AS n FROM users WHERE xp > ?', me.xp)!.n;
+    const rank = one<{ n: number }>('SELECT COUNT(*) + 1 AS n FROM users WHERE is_guest = 0 AND xp > ?', me.xp)!.n;
     return { board, entries: rows.map((r, i) => toEntry(r, i + 1)), me: toEntry(me, rank), season: null };
   }
 
@@ -669,7 +808,7 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
   const mode: QueueModeId = board;
   const rows = all<BoardRow>(
     `SELECT u.*, r.rating, r.games, r.wins FROM season_ratings r JOIN users u ON u.id = r.user_id
-     WHERE r.season = ? AND r.mode = ? AND r.games > 0 ORDER BY r.rating DESC, u.id ASC LIMIT ?`,
+     WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 ORDER BY r.rating DESC, u.id ASC LIMIT ?`,
     season,
     mode,
     LIMIT,
@@ -683,7 +822,8 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
   );
   const rank = mine
     ? one<{ n: number }>(
-        'SELECT COUNT(*) + 1 AS n FROM season_ratings WHERE season = ? AND mode = ? AND games > 0 AND rating > ?',
+        `SELECT COUNT(*) + 1 AS n FROM season_ratings r JOIN users u ON u.id = r.user_id
+         WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 AND r.rating > ?`,
         season,
         mode,
         mine.rating!,

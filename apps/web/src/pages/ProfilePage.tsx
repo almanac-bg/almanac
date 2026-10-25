@@ -78,10 +78,13 @@ export function ProfilePage() {
               </Link>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <FriendActions profile={data} onChange={setData} />
-              <ReportButton username={user.username} />
-            </div>
+            // Friends and reports need a saved account; a guest gets nothing here that would only be refused.
+            !me.isGuest && (
+              <div className="flex flex-wrap items-center gap-2">
+                <FriendActions profile={data} onChange={setData} />
+                <ReportButton username={user.username} />
+              </div>
+            )
           )}
         </div>
       </Card>

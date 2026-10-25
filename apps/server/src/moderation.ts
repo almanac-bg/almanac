@@ -7,7 +7,7 @@ import {
 import { all, one, run, tx } from './db';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { reloadQuestionBank } from './questions';
-import { getUser, getUserByName, toPublicUser, type UserRow, usernameKey } from './users';
+import { GUEST_NAME, getUser, getUserByName, toPublicUser, type UserRow, usernameKey } from './users';
 
 // ─── Username filter ─────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ export function nameProblem(name: string): string | null {
   if (words.some((w) => BLOCKED_EDGES.some((s) => w === s || w.startsWith(s) || w.endsWith(s)))) {
     return 'Името съдържа неподходящи думи.';
   }
-  if (RESERVED_PREFIXES.some((p) => whole.startsWith(p))) return 'Това име е запазено.';
+  if (RESERVED_PREFIXES.some((p) => whole.startsWith(p)) || GUEST_NAME.test(name.trim())) return 'Това име е запазено.';
   return null;
 }
 

@@ -35,7 +35,13 @@ export interface MeUser extends PublicUser {
   isAdmin: boolean;
   /** Best tier index ever finished a season at (-1 = none); unlocks season cosmetics. */
   bestSeasonTier: number;
-  daily: { day: string; played: boolean; streak: number };
+  /** `shields`: missed days the streak can survive (earned every 7 days, at most 2). */
+  daily: { day: string; played: boolean; streak: number; shields: number };
+  quests: QuestsInfo;
+  /** Playing as a guest: no name or password yet ("Запази прогреса си" turns it into a full account). */
+  isGuest: boolean;
+  /** Opted in to the evening "your streak is about to break" email. */
+  streakReminders: boolean;
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
@@ -43,6 +49,25 @@ export interface MeUser extends PublicUser {
   email: string | null;
   /** Address waiting for its verification link to be clicked. */
   pendingEmail: string | null;
+}
+
+export interface QuestInfo {
+  id: string;
+  icon: string;
+  text: string;
+  goal: number;
+  progress: number;
+  xp: number;
+  done: boolean;
+}
+
+/** Three small goals a day (Sofia time), plus a bonus for finishing all of them. */
+export interface QuestsInfo {
+  day: string;
+  endsAt: number;
+  quests: QuestInfo[];
+  bonusXp: number;
+  bonusDone: boolean;
 }
 
 // ─── Realtime ────────────────────────────────────────────────────────────────
@@ -155,7 +180,10 @@ export interface MatchRewards {
   achievements: string[];
   unlocks: UnlockRef[];
   rating: { before: number; after: number } | null;
-  daily: { rank: number; total: number; streak: number } | null;
+  /** `shieldsUsed`: missed days a streak shield covered; `shieldEarned`: this run completed a week. */
+  daily: { rank: number; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
+  /** A challenge-link run: where it placed among everyone who played that link. */
+  challenge: { id: string; rank: number; total: number } | null;
 }
 
 export interface FinalStanding extends Standing {
@@ -198,6 +226,19 @@ export interface LobbyStats {
   online: number;
   inGame: number;
   queues: Record<QueueModeId, number>;
+  /** Ranked queues that are open. */
+  modes: QueueModeId[];
+}
+
+/** After a match with other people: who wants to play the same opponents again. */
+export interface RematchState {
+  gameId: string;
+  /** Player ids (as in the match) who asked for a rematch. */
+  ready: string[];
+  /** Everyone the rematch needs. */
+  players: string[];
+  /** Someone declined or left; the offer is over. */
+  cancelled: boolean;
 }
 
 export type Presence = 'offline' | 'online' | 'queue' | 'room' | 'game';
@@ -236,6 +277,7 @@ export interface ServerToClientEvents {
   notice: (p: { kind: 'info' | 'error'; message: string }) => void;
   /** The server is restarting for an update: running matches finish, no new ones start until it's back. */
   'server:draining': (p: { message: string }) => void;
+  'rematch:state': (p: RematchState) => void;
 }
 
 export interface ClientToServerEvents {
@@ -243,6 +285,10 @@ export interface ClientToServerEvents {
   'queue:leave': () => void;
   'solo:start': (opts: { category: CategoryChoice }, ack: Ack) => void;
   'daily:start': (ack: Ack) => void;
+  /** Plays a challenge link (`id`), or creates a new one and plays it first (no `id`). */
+  'challenge:start': (p: { id?: string }, ack: Ack<{ id: string }>) => void;
+  'rematch:request': (p: { gameId: string }) => void;
+  'rematch:decline': (p: { gameId: string }) => void;
   'room:create': (settings: Partial<RoomSettings>, ack: Ack<{ code: string }>) => void;
   'room:join': (code: string, ack: Ack<{ code: string }>) => void;
   'room:leave': () => void;
@@ -435,3 +481,47 @@ export interface QuestionReportGroup {
 }
 
 export type QuestionReportAction = 'dismiss' | 'hide';
+
+// ─── Challenge links ─────────────────────────────────────────────────────────
+
+export interface ChallengeEntry {
+  rank: number;
+  /** null once the account is gone. */
+  user: PublicUser | null;
+  score: number;
+  correct: number;
+  timeMs: number;
+  you: boolean;
+}
+
+export interface ChallengeInfo {
+  id: string;
+  creator: PublicUser | null;
+  createdAt: number;
+  expiresAt: number;
+  questions: number;
+  /** Finished runs, best first. */
+  entries: ChallengeEntry[];
+  /** You started it (one attempt each). */
+  attempted: boolean;
+  expired: boolean;
+}
+
+/** What a signed-out visitor sees on a challenge link. */
+export interface ChallengePreview {
+  id: string;
+  creator: Pick<PublicUser, 'username' | 'avatar' | 'frame'> | null;
+  topScore: number | null;
+  players: number;
+  expired: boolean;
+}
+
+export interface MyChallenge {
+  id: string;
+  createdAt: number;
+  expiresAt: number;
+  players: number;
+  /** Your own score on it (null if you haven't finished it). */
+  myScore: number | null;
+  leader: { username: string; score: number } | null;
+}

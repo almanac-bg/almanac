@@ -1,12 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
-import { dayKey, sofiaHour } from '@quiz/shared';
+import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
+import { purgeOldChallenges } from './challenges';
 import { config } from './config';
-import { db, run } from './db';
+import { liveDailyStreak } from './daily';
+import { all, db, run } from './db';
+import { purgeGuests } from './guests';
+import { sendMail, streakReminderMail } from './mailer';
+import type { UserRow } from './users';
 
 /** Snapshots are taken in the quiet hours, from 04:00 Sofia time (or later that day, after a restart). */
 const SNAPSHOT_HOUR = 4;
+/** Streak reminders go out in the evening, Sofia time: late enough to matter, early enough to still play. */
+const REMINDER_HOURS = [19, 22] as const;
+/** Per maintenance run, so a big list doesn't flood the mail provider (and its daily quota) in one go. */
+const REMINDERS_PER_RUN = 200;
 const SNAPSHOT_NAME = /^quiz-\d{4}-\d{2}-\d{2}\.db$/;
 
 /**
@@ -20,6 +29,45 @@ export function purgeExpired(now = Date.now()) {
     `UPDATE users SET pending_email = NULL WHERE pending_email IS NOT NULL AND NOT EXISTS (
        SELECT 1 FROM email_tokens t WHERE t.user_id = users.id AND t.purpose = 'verify')`,
   );
+  run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
+  purgeOldChallenges(now);
+  purgeGuests(now);
+}
+
+/**
+ * Emails players who asked for it when their daily streak (2+ days) breaks at midnight unless they play today.
+ * Once a day each; returns how many were sent.
+ */
+export function sendStreakReminders(now = Date.now()): number {
+  const hour = sofiaHour(now);
+  if (hour < REMINDER_HOURS[0] || hour > REMINDER_HOURS[1]) return 0;
+  const today = dayKey(now);
+  // A streak can still be alive a few days back if shields cover the gap; liveDailyStreak decides.
+  const candidates = all<UserRow>(
+    `SELECT * FROM users WHERE streak_reminders = 1 AND email IS NOT NULL AND is_guest = 0
+     AND last_daily_day >= ? AND last_daily_day < ? AND (reminded_day IS NULL OR reminded_day < ?)
+     AND (banned_until IS NULL OR banned_until < ?) LIMIT ?`,
+    shiftDay(today, -3),
+    today,
+    today,
+    now,
+    REMINDERS_PER_RUN,
+  );
+  let sent = 0;
+  for (const u of candidates) {
+    run('UPDATE users SET reminded_day = ? WHERE id = ?', today, u.id);
+    const streak = liveDailyStreak(u, today);
+    if (streak < 2 || !u.reminder_key) continue;
+    const query = `u=${u.id}&k=${encodeURIComponent(u.reminder_key)}`;
+    sendMail(
+      streakReminderMail(u.email!, u.username, streak, u.streak_shields, {
+        page: `${config.appUrl}/unsubscribe?${query}`,
+        api: `${config.appUrl}/api/reminders/off?${query}`,
+      }),
+    );
+    sent++;
+  }
+  return sent;
 }
 
 /**
@@ -54,6 +102,8 @@ export function startMaintenance() {
     running = true;
     try {
       purgeExpired();
+      const reminded = sendStreakReminders();
+      if (reminded) console.log(`🔥 Streak reminders sent: ${reminded}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

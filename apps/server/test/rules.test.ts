@@ -27,7 +27,7 @@ process.env.DB_PATH = path.join(tmp, 'rules.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
-const { ordinal } = await import('../src/game/rewards');
+const { ordinal } = await import('@quiz/shared');
 const { nameProblem } = await import('../src/moderation');
 
 test('elimination schedule leaves a two-player final', () => {

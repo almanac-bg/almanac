@@ -12,15 +12,19 @@ import {
 } from '@quiz/shared';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
+import { config } from './config';
+import { challengeQuestions, claimChallengeAttempt, createChallenge } from './challenges';
 import { claimDailyAttempt, dailyQuestions } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry } from './game/registry';
+import { Rematches } from './game/rematch';
 import { RoomManager } from './game/rooms';
 import { guarded } from './guard';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
 import { eventBucket, throttled } from './throttle';
+import { ACCOUNT_ONLY } from './guests';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
@@ -65,6 +69,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
   /** Set when the server is shutting down for an update. */
   let draining = false;
+  const rematches = new Rematches(io, games, matchmaker, () => !draining, (userId) => openSockets.has(userId));
 
   const presenceOf = (userId: number): Presence => {
     if (!openSockets.has(userId)) return 'offline';
@@ -83,6 +88,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     online: openSockets.size,
     inGame: games.playersInGame,
     queues: matchmaker.counts(),
+    modes: config.openQueues,
   });
   setInterval(guarded('lobby stats', () => io.emit('lobby:stats', stats())), 3000).unref();
 
@@ -149,12 +155,24 @@ export function createRealtime(httpServer: HttpServer): Realtime {
 
     // Starting anything new is refused while the server drains for a restart.
     const busyError = () => (games.forUser(userId) ? 'Вече си в игра.' : draining ? DRAINING : null);
+    /** Guests play; friends, rooms of their own and challenge links wait until they claim the account. */
+    const guest = () => getUser(userId)?.is_guest === 1;
+    /** Going on to something new: off the queue, and any rematch offer from the last match is declined. */
+    const moveOn = () => {
+      matchmaker.leave(userId);
+      rematches.cancelFor(userId);
+    };
 
     on('queue:join', (mode, ack) => {
       if (!isQueueMode(mode)) return reply(ack, { ok: false, error: 'Непознат режим.' });
+      if (!config.openQueues.includes(mode)) {
+        const open = config.openQueues.map((m) => MODES[m].name).join(' или ');
+        return reply(ack, { ok: false, error: `Този режим ще отвори скоро — дотогава опитай ${open}.` });
+      }
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       rooms.leave(userId);
+      rematches.cancelFor(userId);
       matchmaker.join(userId, mode);
       reply(ack, { ok: true });
     });
@@ -166,7 +184,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       if (!isCategoryChoice(category)) return reply(ack, { ok: false, error: 'Непозната категория.' });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      matchmaker.leave(userId);
+      moveOn();
       rooms.leave(userId);
       try {
         games.start({
@@ -192,7 +210,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       if (busy) return reply(ack, { ok: false, error: busy });
       const claim = claimDailyAttempt(userId);
       if (!claim.ok) return reply(ack, claim);
-      matchmaker.leave(userId);
+      moveOn();
       rooms.leave(userId);
       try {
         games.start({
@@ -215,10 +233,47 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       }
     });
 
-    on('room:create', (settings, ack) => {
+    on('challenge:start', (p, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      matchmaker.leave(userId);
+      let id = str(obj(p).id, 16);
+      if (!id) {
+        if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
+        if (throttled(`challenge-create:${userId}`, 20, 24 * 60 * 60_000)) {
+          return reply(ack, { ok: false, error: 'Стига предизвикателства за днес — изпрати тези, които вече имаш.' });
+        }
+        id = createChallenge(userId);
+      }
+      const claim = claimChallengeAttempt(id, userId);
+      if (!claim.ok) return reply(ack, claim);
+      moveOn();
+      rooms.leave(userId);
+      try {
+        games.start({
+          mode: 'challenge',
+          ranked: false,
+          roomCode: null,
+          hostUserId: null,
+          questionCount: MODES.challenge.questions,
+          timeMs: MODES.challenge.timeMs,
+          category: 'mixed',
+          elimination: false,
+          challengeId: id,
+          questions: challengeQuestions(id, userId),
+          humans: [buildHuman(userId, 'challenge')],
+          bots: [],
+        });
+        reply(ack, { ok: true, id });
+      } catch (err) {
+        reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
+      }
+    });
+
+    on('room:create', (settings, ack) => {
+      if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
+      const busy = busyError();
+      if (busy) return reply(ack, { ok: false, error: busy });
+      moveOn();
       reply(ack, rooms.create(userId, obj(settings)));
     });
 
@@ -229,7 +284,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       if (throttled(`room-join:${userId}`, 20, 10 * 60_000)) {
         return reply(ack, { ok: false, error: 'Твърде много опити да влезеш в стая. Изчакай няколко минути.' });
       }
-      matchmaker.leave(userId);
+      moveOn();
       reply(ack, rooms.join(userId, str(code, 10)));
     });
 
@@ -242,7 +297,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     on('room:team', (playerId) => rooms.switchTeam(userId, str(playerId, 32)));
     on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
 
-    on('invite:send', (p, ack) => reply(ack, rooms.invite(userId, int(obj(p).userId))));
+    on('invite:send', (p, ack) => reply(ack, guest() ? { ok: false, error: ACCOUNT_ONLY } : rooms.invite(userId, int(obj(p).userId))));
 
     on('invite:decline', (p) => {
       const from = rooms.declineInvite(userId, str(obj(p).inviteId, 64));
@@ -251,9 +306,10 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     });
 
     on('friends:challenge', (p, ack) => {
+      if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      matchmaker.leave(userId);
+      moveOn();
       reply(ack, rooms.challenge(userId, int(obj(p).userId)));
     });
 
@@ -273,6 +329,9 @@ export function createRealtime(httpServer: HttpServer): Realtime {
       const game = games.forUser(userId);
       if (game) game.react(game.playerIdFor(userId), str(emote, 16));
     });
+
+    on('rematch:request', (p) => rematches.request(userId, str(obj(p).gameId, 64)));
+    on('rematch:decline', (p) => rematches.decline(userId, str(obj(p).gameId, 64)));
 
     on('game:leave', () => {
       const game = games.forUser(userId);

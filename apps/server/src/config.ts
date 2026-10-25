@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { BRAND } from '@quiz/shared';
+import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, type QueueModeId } from '@quiz/shared';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
 
@@ -12,13 +12,26 @@ function botFillMs(): number | null {
 
 const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
 
+/** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). */
+function openQueues(): QueueModeId[] {
+  const raw = process.env.PUBLIC_QUEUES?.trim();
+  if (!raw) return DEFAULT_OPEN_QUEUES;
+  if (raw === 'all') return ['duel', 'teams', 'trio', 'squad', 'royale'];
+  const modes = raw.split(',').map((m) => m.trim()).filter(isQueueMode);
+  return modes.length ? modes : DEFAULT_OPEN_QUEUES;
+}
+
 export const config = {
+  /** When this process started: a one-attempt run (daily, challenge link) begun before it died with the old process. */
+  bootedAt: Date.now(),
   port: Number(process.env.PORT ?? 3001),
   production: process.env.NODE_ENV === 'production',
   dbPath,
   webDist: path.resolve(serverRoot, '../web/dist'),
   /** How long a quick-match queue waits for humans before bots fill the empty seats. */
   botFillMs: botFillMs(),
+  /** Ranked queues players can join; the others stay closed until there are enough people for them. */
+  openQueues: openQueues(),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
   /** Daily database snapshots ("off" disables). Defaults to a backups folder next to the database. */
   backupDir: process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),

@@ -10,6 +10,7 @@ import type {
   PowerupId,
   QuestionPayload,
   QueueStatus,
+  RematchState,
   RevealPayload,
   RoomState,
   Standing,
@@ -94,6 +95,8 @@ interface State {
   friendsVersion: number;
   /** The server is restarting for an update (cleared when it's back). */
   maintenance: string | null;
+  /** Who asked for a rematch of the match just played (null: nobody yet, or the offer is over). */
+  rematch: RematchState | null;
 }
 
 export const useStore = create<State>(() => ({
@@ -109,6 +112,7 @@ export const useStore = create<State>(() => ({
   invites: [],
   friendsVersion: 0,
   maintenance: null,
+  rematch: null,
 }));
 
 export const setState = useStore.setState;

@@ -1,3 +1,5 @@
+import type { QueueModeId } from './modes';
+
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export interface AchievementDef {
@@ -9,6 +11,8 @@ export interface AchievementDef {
   xp: number;
   /** Achievements with a goal show a progress bar. */
   goal?: number;
+  /** Only earnable in this ranked queue (hidden while it's closed). */
+  queue?: QueueModeId;
 }
 
 export const RARITIES: Record<Rarity, { name: string; color: string }> = {
@@ -24,8 +28,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'games_100', name: 'Стара школа', description: 'Изиграй 100 мача.', icon: '🎖️', rarity: 'epic', xp: 500, goal: 100 },
   { id: 'first_win', name: 'Вкус на победа', description: 'Спечели мултиплейър мач.', icon: '🏆', rarity: 'common', xp: 100, goal: 1 },
   { id: 'duelist', name: 'Дуелен инстинкт', description: 'Спечели 10 класирани дуела.', icon: '⚔️', rarity: 'rare', xp: 300, goal: 10 },
-  { id: 'trio_win', name: 'Начело на триото', description: 'Спечели класиран мач Трио.', icon: '🥇', rarity: 'common', xp: 120, goal: 1 },
-  { id: 'squad_win', name: 'Арената е твоя', description: 'Спечели класиран мач Арена.', icon: '🦸', rarity: 'rare', xp: 200, goal: 1 },
+  { id: 'trio_win', name: 'Начело на триото', description: 'Спечели класиран мач Трио.', icon: '🥇', rarity: 'common', xp: 120, goal: 1, queue: 'trio' },
+  { id: 'squad_win', name: 'Арената е твоя', description: 'Спечели класиран мач Арена.', icon: '🦸', rarity: 'rare', xp: 200, goal: 1, queue: 'squad' },
   { id: 'royale_win', name: 'Короната на Роял', description: 'Спечели Роял с 8 играчи.', icon: '👑', rarity: 'epic', xp: 400, goal: 1 },
   { id: 'party_animal', name: 'Душата на купона', description: 'Изиграй 25 мултиплейър мача.', icon: '🎉', rarity: 'rare', xp: 250, goal: 25 },
   { id: 'host', name: 'Добре дошли!', description: 'Бъди домакин на мач в частна стая.', icon: '🏠', rarity: 'common', xp: 75, goal: 1 },

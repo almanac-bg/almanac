@@ -1,12 +1,13 @@
 // The server as it runs in production (NODE_ENV=production): admins, browser hardening, health.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { cli, http, register, startServer, type TestServer } from './helpers';
+import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
 
 before(async () => {
-  srv = await startServer({ NODE_ENV: 'production' });
+  // PUBLIC_QUEUES as it ships (unset): only some ranked queues are open.
+  srv = await startServer({ NODE_ENV: 'production', PUBLIC_QUEUES: '' });
 });
 
 after(async () => {
@@ -54,4 +55,18 @@ test('browser crash reports are accepted (and never echo anything back)', async 
     body: JSON.stringify({ kind: 'render', message: 'Test crash', url: '/friends' }),
   });
   assert.equal(res.status, 204);
+});
+
+test('at launch only Duel and Royale are open, and the lobby says so', async () => {
+  const player = await register(srv.url, 'opashka_test');
+  const socket = connect(srv.url, player.cookie);
+  const stats = next<{ modes: string[] }>(socket, 'lobby:stats');
+  await connected(socket);
+  assert.deepEqual((await stats).modes, ['duel', 'royale']);
+  const closed = await emitAck(socket, 'queue:join', 'trio');
+  assert.equal(closed.ok, false);
+  assert.match(closed.error, /Дуел или Роял/);
+  assert.ok((await emitAck(socket, 'queue:join', 'duel')).ok);
+  socket.emit('queue:leave');
+  socket.close();
 });

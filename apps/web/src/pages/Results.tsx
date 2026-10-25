@@ -15,15 +15,19 @@ import {
 } from '@quiz/shared';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull } from 'lucide-react';
+import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { animate, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
+import { GuestNudge } from '../components/ClaimAccount';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
+import { challengeShareText } from '../components/home/challengeLink';
+import { FriendButton, FriendsProvider } from '../components/results/FriendButton';
+import { RematchStrip, useRematch } from '../components/results/Rematch';
 import { Button, Card } from '../components/ui';
-import { actions, fmt, type LiveGame, ordinal, plural, type ReviewItem, toast, unlockPreview, useStore } from '@quiz/client';
+import { actions, fmt, getState, type LiveGame, ordinal, plural, type ReviewItem, toast, unlockPreview, useStore } from '@quiz/client';
 import { dailyShareText, rememberDailyShare, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
@@ -42,18 +46,23 @@ export function Results({ game }: { game: LiveGame }) {
   const end = game.end!;
   const navigate = useNavigate();
   const room = useStore((s) => s.room);
+  const guest = useStore((s) => !!s.me?.isGuest);
   const [busy, setBusy] = useState(false);
   const youId = game.start.youId;
   const mine = end.standings.find((s) => s.id === youId)!;
   const solo = end.mode === 'solo';
   const daily = end.mode === 'daily';
+  const challenge = end.mode === 'challenge';
   const single = game.start.players.length === 1;
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
-  const won = !single && mine.placement === 1;
-  const perfect = mine.correct === game.start.totalQuestions;
   const rewards = end.rewards;
+  // A challenge link is played alone, but it has a board: first place over others is a win too.
+  const link = rewards?.challenge ?? null;
+  const won = (!single && mine.placement === 1) || (!!link && link.rank === 1 && link.total > 1);
+  const perfect = mine.correct === game.start.totalQuestions;
   const sideCards = !!rewards && (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating);
+  const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
   // The match just ended: start from the top, with focus (and screen readers) on the outcome.
@@ -61,6 +70,19 @@ export function Results({ game }: { game: LiveGame }) {
     window.scrollTo(0, 0);
     headlineRef.current?.focus({ preventScroll: true });
   }, []);
+
+  // Off to another page (a board, the back button): the finished match is dropped once this screen is gone. Dropping
+  // it before the route changes would make /game send the player home first. Checked a tick later, so a new match
+  // taking over or a remount on the same screen (StrictMode) keeps it.
+  const gameId = end.gameId;
+  useEffect(
+    () => () => {
+      setTimeout(() => {
+        if (getState().game?.start.gameId === gameId && window.location.pathname !== '/game') actions.closeGame();
+      }, 0);
+    },
+    [gameId],
+  );
 
   useEffect(() => {
     if (won || (single && perfect)) {
@@ -71,8 +93,15 @@ export function Results({ game }: { game: LiveGame }) {
 
   async function again() {
     const mode = end.mode;
+    if (mode === 'challenge') {
+      // A link plays once; "again" is a new link of your own (the match opens by itself).
+      setBusy(true);
+      const res = await actions.startChallenge();
+      setBusy(false);
+      if (!res.ok) toast({ kind: 'error', title: res.error });
+      return;
+    }
     if (mode === 'custom') {
-      actions.closeGame();
       navigate(room ? '/room' : '/');
       return;
     }
@@ -96,27 +125,34 @@ export function Results({ game }: { game: LiveGame }) {
     navigate('/');
   }
 
-  function dailyBoard() {
-    actions.closeGame();
-    navigate('/leaderboard?board=daily');
-  }
+  const dailyBoard = () => navigate('/leaderboard?board=daily');
+  const linkBoard = (id: string) => navigate(`/c/${id}`);
 
   const category = categoryById(game.start.category);
   const headline = daily
     ? perfect
       ? 'Перфектен ден!'
       : 'Денят е изигран'
-    : solo
-      ? perfect
-        ? 'Перфектно!'
-        : 'Край на играта'
-      : teamScores
-        ? won
-          ? 'Победа!'
-          : 'Загуба'
-        : won
-          ? 'Победа!'
-          : `${ordinal(mine.placement)} място`;
+    : link
+      ? link.total <= 1
+        ? 'Летвата е поставена!'
+        : link.rank === 1
+          ? 'Първо място!'
+          : `${ordinal(link.rank)} място`
+      : single
+        ? perfect
+          ? 'Перфектно!'
+          : 'Край на играта'
+        : teamScores
+          ? won
+            ? 'Победа!'
+            : 'Загуба'
+          : won
+            ? 'Победа!'
+            : `${ordinal(mine.placement)} място`;
+  // A long word ("Перфектно!", "поставена!") is wider than a small phone at the usual size: such headlines scale with
+  // the screen instead (10vw always leaves room for ten letters).
+  const longWord = headline.split(' ').some((w) => w.length > 7);
 
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
@@ -137,7 +173,8 @@ export function Results({ game }: { game: LiveGame }) {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.1 }}
           className={clsx(
-            'mt-3 font-display text-[clamp(2.6rem,9vw,5rem)] leading-none font-black outline-none',
+            'mt-3 font-display leading-none font-black outline-none',
+            longWord ? 'text-[clamp(1.75rem,10vw,5rem)]' : 'text-[clamp(2.6rem,9vw,5rem)]',
             won ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent' : 'text-gradient',
           )}
         >
@@ -167,7 +204,20 @@ export function Results({ game }: { game: LiveGame }) {
         </p>
       </motion.header>
 
-      {teamScores ? <TeamResult game={game} end={end} /> : !single && <Podium game={game} standings={end.standings} />}
+      {/* The standings offer "+ Приятел" beside each person you played with. */}
+      <FriendsProvider game={game}>
+        {teamScores ? <TeamResult game={game} end={end} /> : !single && <Podium game={game} standings={end.standings} />}
+      </FriendsProvider>
+      {link && (
+        <ChallengeStanding
+          challenge={link}
+          score={mine.score}
+          questions={game.start.totalQuestions}
+          onBoard={() => linkBoard(link.id)}
+        />
+      )}
+      {/* Phones keep the offer in the sticky bar at the bottom; wider screens show it here, under who played. */}
+      {rematch && <RematchStrip rematch={rematch} className="mt-6 max-sm:hidden" />}
 
       {/* Explicit minmax(0, …) columns: an implicit auto column would grow to the widest line and push the page sideways.
           With nothing for the second column (a plain solo game), the rewards stand alone in the middle. */}
@@ -194,34 +244,114 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       </div>
 
+      <GuestNudge className="mt-4">
+        {rewards
+          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
+          : undefined}
+      </GuestNudge>
+
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
-      {/* Phones: the next step stays in reach at the bottom while the rewards and the review scroll by. */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-10 flex gap-2 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:static sm:mx-0 sm:flex-wrap sm:justify-center sm:gap-3 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        {daily ? (
-          // One attempt a day — no "play again".
-          <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={dailyBoard}>
-            <ChartColumn className="size-5" /> Класиране за деня
-          </Button>
-        ) : (
-          <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={again} loading={busy}>
-            {end.mode === 'custom' ? (
-              <>
-                Обратно в стаята <ArrowRight className="size-5" />
-              </>
-            ) : (
-              <>
-                <RotateCcw className="size-5" /> Играй пак
-              </>
-            )}
-          </Button>
-        )}
-        <Button size="lg" variant="secondary" onClick={home}>
-          <Home className="size-5" />
-          <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
-        </Button>
+      {/* Phones: the next step stays in reach at the bottom while the rewards and the review scroll by — and so does a
+          rematch offer, which can arrive at any moment. */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
+        <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
+          {daily ? (
+            // One attempt a day — no "play again".
+            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={dailyBoard}>
+              <ChartColumn className="size-5" /> Класиране за деня
+            </Button>
+          ) : challenge && guest ? (
+            // A link plays once and guests can't make their own: home is the way on.
+            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={home}>
+              <Home className="size-5" /> Към началото
+            </Button>
+          ) : (
+            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={again} loading={busy}>
+              {challenge ? (
+                <>
+                  <Swords className="size-5" />
+                  <span className="sm:hidden">Предизвикай</span>
+                  <span className="max-sm:hidden">Ново предизвикателство</span>
+                </>
+              ) : end.mode === 'custom' ? (
+                <>
+                  Обратно в стаята <ArrowRight className="size-5" />
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="size-5" /> Играй пак
+                </>
+              )}
+            </Button>
+          )}
+          {!(challenge && guest) && (
+            <Button size="lg" variant="secondary" onClick={home}>
+              <Home className="size-5" />
+              <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
+            </Button>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A challenge link's result, where a match would show its podium: your place among everyone who played the link, and
+ * the link to pass on. The first to finish it (usually whoever made it) sets the score the others chase.
+ */
+function ChallengeStanding({
+  challenge,
+  score,
+  questions,
+  onBoard,
+}: {
+  challenge: NonNullable<MatchRewards['challenge']>;
+  score: number;
+  questions: number;
+  onBoard: () => void;
+}) {
+  const first = challenge.total <= 1;
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, type: 'spring', stiffness: 180, damping: 20 }}
+      className="mx-auto mt-8 max-w-xl"
+    >
+      <Card className="relative overflow-hidden p-6 text-center sm:p-7">
+        <div aria-hidden className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-lime-400/20 blur-3xl" />
+        {first ? (
+          <>
+            <h2 className="relative font-display text-lg font-bold">Сега прати линка</h2>
+            <p className="relative mx-auto mt-2 max-w-sm text-sm text-fg-2">
+              Всеки, който го отвори, играе същите {questions} въпроса веднъж, без жокери. Линкът важи 7 дни.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="sr-only">Класиране по линка</h2>
+            <div className="relative flex items-baseline justify-center gap-2">
+              <span className={clsx('font-display text-5xl font-black', challenge.rank === 1 ? 'text-amber-300' : 'text-lime-300')}>
+                #{challenge.rank}
+              </span>
+              <span className="text-fg-2">от {plural(challenge.total, 'играч', 'играчи')}</span>
+            </div>
+            <p className="relative mt-2 text-xs text-fg-3">Класирането се променя, докато другите играят линка.</p>
+          </>
+        )}
+        <div className="relative mt-5 grid gap-2 sm:flex sm:justify-center sm:gap-3">
+          <Button onClick={() => shareText(challengeShareText(challenge.id, score, questions), 'Линкът е копиран')}>
+            <Share2 className="size-4" /> Сподели линка
+          </Button>
+          <Button variant="secondary" onClick={onBoard}>
+            <ChartColumn className="size-4" /> Виж класирането
+          </Button>
+        </div>
+      </Card>
+    </motion.section>
   );
 }
 
@@ -270,6 +400,7 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
               <div className="flex items-center gap-1.5 text-xs text-fg-3 tabular-nums">
                 {fmt(s.score)} т.{p.isBot && <BotTag />}
               </div>
+              <FriendButton player={p} youId={game.start.youId} compact={top.length > 2} className="mt-1.5" />
               <div
                 className={clsx(
                   'mt-3 grid w-full place-items-start justify-center rounded-t-2xl border border-b-0 border-line pt-3 text-3xl',
@@ -292,13 +423,14 @@ function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[
             return (
               <div
                 key={s.id}
-                className={clsx('flex items-center gap-3 rounded-2xl px-3 py-2', s.id === game.start.youId && 'bg-violet-500/12')}
+                className={clsx('flex items-center gap-2 rounded-2xl px-3 py-2 sm:gap-3', s.id === game.start.youId && 'bg-violet-500/12')}
               >
                 <span className="w-8 text-sm font-bold text-fg-3">{ordinal(s.placement)}</span>
                 <Avatar avatar={p.avatar} frame={p.frame} size={34} dim={s.left} />
                 <div className="min-w-0 flex-1 text-sm">
                   <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
                 </div>
+                <FriendButton player={p} youId={game.start.youId} compact />
                 <span className="text-sm text-fg-2 tabular-nums">
                   {s.left ? 'напусна' : s.eliminatedAt !== null ? `💀 ${s.eliminatedAt}` : fmt(s.score)}
                 </span>
@@ -351,12 +483,13 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
                   return (
                     <div
                       key={s.id}
-                      className={clsx('flex items-center gap-3 rounded-2xl px-2 py-2', s.id === game.start.youId && 'bg-violet-500/12')}
+                      className={clsx('flex items-center gap-2 rounded-2xl px-2 py-2 sm:gap-3', s.id === game.start.youId && 'bg-violet-500/12')}
                     >
                       <Avatar avatar={p.avatar} frame={p.frame} size={36} dim={s.left} />
                       <div className="min-w-0 flex-1 text-sm">
                         <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
                       </div>
+                      <FriendButton player={p} youId={game.start.youId} compact />
                       <span className="text-sm font-semibold text-fg-2 tabular-nums">{s.left ? 'напусна' : fmt(s.score)}</span>
                     </div>
                   );
@@ -395,6 +528,31 @@ function DailyCard({
         <p className="relative mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-bold text-orange-300">
           🔥 Серия {plural(daily.streak, 'ден', 'дни')}
         </p>
+      )}
+      {daily.shieldsUsed > 0 && (
+        <p className="relative mt-3 flex items-start gap-2.5 rounded-2xl border border-sky-300/20 bg-sky-400/10 px-3.5 py-2.5 text-sm text-sky-100">
+          <span aria-hidden className="text-lg leading-5">
+            🛡️
+          </span>
+          {daily.shieldsUsed === 1
+            ? 'Щит спаси серията ти: пропуснатият ден не я прекъсна.'
+            : `${daily.shieldsUsed} щита спасиха серията ти: пропуснатите дни не я прекъснаха.`}
+        </p>
+      )}
+      {daily.shieldEarned && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.1, type: 'spring', stiffness: 260, damping: 18 }}
+          className="relative mt-3 flex items-center gap-3 rounded-2xl border border-sky-300/35 bg-[linear-gradient(110deg,rgb(56_189_248/0.22),rgb(167_139_250/0.14))] px-3.5 py-3"
+        >
+          <span aria-hidden className="text-3xl leading-none drop-shadow-[0_0_14px_rgb(56_189_248/0.7)]">
+            🛡️
+          </span>
+          <p className="text-sm text-sky-50">
+            <b className="font-display">Имаш нов щит!</b> Ако пропуснеш ден, той ще запази серията.
+          </p>
+        </motion.div>
       )}
       <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
       <div className="relative mt-4 flex flex-wrap items-center gap-3">

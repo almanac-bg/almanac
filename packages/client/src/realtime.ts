@@ -83,6 +83,17 @@ function bind(s: GameSocket) {
 
   s.on('room:state', (room) => setState({ room }));
 
+  s.on('rematch:state', (rematch) => {
+    const mine = getState().game?.start;
+    if (rematch.cancelled) {
+      // Only news to someone who was waiting on it.
+      if (mine && rematch.ready.includes(mine.youId)) toast({ kind: 'info', title: 'Реваншът няма да се състои.' });
+      return setState((s) => ({ rematch: s.rematch?.gameId === rematch.gameId ? null : s.rematch }));
+    }
+    if (mine && !rematch.ready.includes(mine.youId)) effect('invite');
+    setState({ rematch });
+  });
+
   s.on('game:start', (start) => {
     clearTimeout(resyncTimer);
     if (start.gameId === leftGameId) {
@@ -94,6 +105,7 @@ function bind(s: GameSocket) {
     const now = Date.now();
     setState({
       queue: null,
+      rematch: null,
       game: {
         start,
         players: Object.fromEntries(start.players.map((p) => [p.id, p])),
@@ -370,6 +382,14 @@ export const actions = {
   },
   startSolo: (category: CategoryChoice) => ask(() => withTimeout().emitWithAck('solo:start', { category })),
   startDaily: () => ask(() => withTimeout().emitWithAck('daily:start')),
+  /** Plays a challenge link, or (no id) makes a new one and plays it first. */
+  startChallenge: (id?: string) => ask<{ id: string }>(() => withTimeout().emitWithAck('challenge:start', { id })),
+  requestRematch: (gameId: string) => getSocket().emit('rematch:request', { gameId }),
+  /** Leaving the results screen: the others shouldn't wait for a rematch that won't come. */
+  declineRematch: (gameId: string) => {
+    getSocket().emit('rematch:decline', { gameId });
+    setState({ rematch: null });
+  },
   createRoom: (settings: Partial<RoomSettings> = {}) =>
     ask<{ code: string }>(() => withTimeout().emitWithAck('room:create', settings)),
   joinRoom: (code: string) => ask<{ code: string }>(() => withTimeout().emitWithAck('room:join', code)),

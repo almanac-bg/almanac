@@ -5,7 +5,6 @@ import {
   MIXED_CATEGORY,
   type ModeDef,
   MODES,
-  QUEUE_MODES,
   type QueueModeId,
   RANK_TIERS,
   rankFor,
@@ -15,6 +14,7 @@ import {
   seasonKey,
   seasonName,
   START_RATING,
+  STREAK_SHIELDS,
   SUBMISSION_RULES,
   TIME_ZONE,
   TITLES,
@@ -24,10 +24,12 @@ import clsx from 'clsx';
 import {
   ArrowRight,
   CalendarDays,
+  ChevronDown,
   CircleHelp,
   DoorOpen,
   Flame,
   Gift,
+  Lock,
   MailWarning,
   PenLine,
   Plus,
@@ -38,18 +40,29 @@ import {
   X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { ClaimAccountModal, GuestNudge } from '../components/ClaimAccount';
+import { ChallengeCard } from '../components/home/ChallengeCard';
+import { useOpenQueues } from '../components/home/openQueues';
+import { QuestsCard } from '../components/home/QuestsCard';
+import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, Modal, ProgressBar, Spinner } from '../components/ui';
-import { actions, api, fmt, toast, unlockPreview, useNow, useStore } from '@quiz/client';
+import { actions, api, fmt, plural, toast, unlockPreview, useNow, useStore } from '@quiz/client';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { savedDailyShare, shareText } from '../lib/share';
 
 /** Below this the "N играят в момента" count reads as an empty room rather than a busy one, so it stays hidden. */
 const LIVE_COUNT_MIN = 5;
+
+/**
+ * "предизвикателство" is wider than a small phone's card in the display font, and browsers don't hyphenate Bulgarian:
+ * a soft hyphen lets it break where Bulgarian would (and stays invisible when it fits).
+ */
+const DAILY_TITLE = MODES.daily.name.replace('предизвикателство', 'предизвика\u00ADтелство');
 
 export function HomePage() {
   const me = useStore((s) => s.me)!;
@@ -63,6 +76,8 @@ export function HomePage() {
   const newcomer = level === 1;
   // Writing questions opens at level 3; until then the card would only hold a disabled button.
   const community = level >= SUBMISSION_RULES.minLevel || me.isAdmin;
+  // Only the ranked queues the server has open (a closed one would only refuse the player).
+  const ranked = useOpenQueues();
 
   async function queue(mode: QueueModeId) {
     const res = await actions.joinQueue(mode);
@@ -90,8 +105,8 @@ export function HomePage() {
 
       <EmailNudge />
 
-      {/* Phones read top to bottom: who you are, what to play, the daily, then friends and the rest.
-          From lg up the same pieces form a grid with the modes across the middle. */}
+      {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
+          From lg up the same pieces form a grid with the modes across the middle and "today" under them. */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-x-4 lg:gap-y-8">
         <ProfileCard className="lg:col-start-1 lg:row-start-1" />
 
@@ -109,17 +124,16 @@ export function HomePage() {
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <ModeCard
               mode={MODES.solo}
-              className="sm:col-span-2 lg:col-span-1 lg:row-span-2"
+              className={clsx('sm:col-span-2', ranked.length ? 'lg:col-span-1' : 'lg:col-span-3', ranked.length > 1 && 'lg:row-span-2')}
               big
               starter={newcomer}
               onPlay={() => setSoloOpen(true)}
             />
-            {QUEUE_MODES.map((id) => (
+            {ranked.map((id, i) => (
               <ModeCard
                 key={id}
                 mode={MODES[id]}
-                className={clsx(id === 'royale' && 'sm:col-span-2 lg:col-span-3')}
-                wide={id === 'royale'}
+                className={queueSpan(i, ranked.length)}
                 searching={lobby?.queues[id] ?? 0}
                 rating={me.ratings[id] ?? START_RATING}
                 onRankInfo={() => setRankInfo({ mode: id, open: true })}
@@ -129,9 +143,11 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard starter={newcomer} className={clsx('lg:col-start-1 lg:row-start-3', !community && 'lg:col-span-2')} />
+        <DailyCard starter={newcomer} className="lg:col-start-1 lg:row-start-3" />
+        <QuestsCard className="lg:col-start-2 lg:row-start-3" />
+        <ChallengeCard className={clsx('lg:col-start-1 lg:row-start-4', !community && 'lg:col-span-2')} />
         <FriendsCard className="lg:col-start-2 lg:row-start-1" />
-        {community && <CommunityCard className="lg:col-start-2 lg:row-start-3" />}
+        {community && <CommunityCard className="lg:col-start-2 lg:row-start-4" />}
       </div>
 
       <SoloPicker open={soloOpen} onClose={() => setSoloOpen(false)} />
@@ -139,6 +155,21 @@ export function HomePage() {
         <RankInfo mode={rankInfo.mode} open={rankInfo.open} onClose={() => setRankInfo({ ...rankInfo, open: false })} />
       )}
     </div>
+  );
+}
+
+/**
+ * Grid spans for the i-th of n open ranked modes, so the grid has no holes however many are open.
+ * Tablets (2 columns, Соло across the top): they pair up, an odd last one takes a whole row.
+ * Desktops (3 columns, Соло down the left): one or two go wide beside it; more pair up, an odd last one wide —
+ * with all five, the last runs the full width under Соло.
+ */
+function queueSpan(i: number, n: number) {
+  const last = i === n - 1;
+  return clsx(
+    n % 2 === 1 && last && 'sm:col-span-2',
+    (n <= 2 || (n === 3 && last)) && 'lg:col-span-2',
+    n === 5 && last && 'lg:col-span-3',
   );
 }
 
@@ -181,6 +212,8 @@ function ProfileCard({ className }: { className?: string }) {
         <UpNext level={progress.level} className="max-sm:hidden" />
         <SeasonChip ratings={me.ratings} className="max-sm:hidden" />
       </div>
+      {/* Guests: right under the level it's about — all of this lives on this device until the account is saved. */}
+      <GuestNudge className="relative mt-4 sm:mt-5" />
     </Card>
   );
 }
@@ -189,7 +222,6 @@ function ModeCard({
   mode,
   className,
   big,
-  wide,
   searching,
   rating,
   starter,
@@ -199,7 +231,6 @@ function ModeCard({
   mode: ModeDef;
   className?: string;
   big?: boolean;
-  wide?: boolean;
   searching?: number;
   /** Ranked modes: the player's rating, shown as a rank chip that explains itself. */
   rating?: number;
@@ -210,11 +241,12 @@ function ModeCard({
   const [a, b] = mode.accent;
   return (
     // The whole card plays: the "Играй" button stretches over it (its ::after). The rank chip sits above as its own button.
+    // A container: a card that spans more of the grid (however many modes are open) sets itself bigger.
     <motion.article
       whileHover={{ y: -4 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className={clsx(
-        'glass group relative isolate flex min-h-44 flex-col overflow-hidden rounded-3xl p-5 transition-[scale,box-shadow] duration-150 sm:min-h-48 sm:p-6',
+        'glass group @container relative isolate flex min-h-44 flex-col overflow-hidden rounded-3xl p-5 transition-[scale,box-shadow] duration-150 sm:min-h-48 sm:p-6',
         'has-[[data-play]:active]:scale-[0.98] has-[[data-play]:focus-visible]:shadow-[0_0_0_2px_var(--color-ink),0_0_0_4px_var(--color-cyan)]',
         big && 'lg:min-h-full',
         className,
@@ -230,7 +262,7 @@ function ModeCard({
         aria-hidden
         className={clsx(
           'absolute right-4 -z-10 font-display leading-none font-black text-transparent opacity-60 transition-[rotate,opacity] duration-500 group-hover:-rotate-3 group-hover:opacity-100',
-          big ? 'top-4 text-[8rem]' : wide ? 'top-1 text-[7rem]' : 'top-3 text-[4.5rem]',
+          big ? 'top-4 text-[8rem]' : 'top-3 text-[4.5rem] @lg:top-1 @lg:text-[7rem]',
         )}
         style={{ WebkitTextStroke: `1.5px ${a}88`, backgroundImage: `linear-gradient(160deg, ${a}40, transparent 75%)`, WebkitBackgroundClip: 'text' }}
       >
@@ -260,9 +292,9 @@ function ModeCard({
           </button>
         )}
       </div>
-      <h3 className={clsx('mt-3 font-display font-bold', big || wide ? 'text-3xl sm:text-4xl' : 'text-2xl')}>{mode.name}</h3>
-      <p className={clsx('mt-1 text-sm text-fg-2', wide ? 'max-w-md' : 'max-w-[17rem]')}>{mode.tagline}</p>
-      <p className={clsx('mt-2 text-sm text-fg-3', wide ? 'max-w-md' : 'max-w-xs')}>{mode.description}</p>
+      <h3 className={clsx('mt-3 font-display font-bold', big ? 'text-3xl sm:text-4xl' : 'text-2xl @lg:text-4xl')}>{mode.name}</h3>
+      <p className={clsx('mt-1 text-sm text-fg-2', big ? 'max-w-[17rem]' : 'max-w-[17rem] @lg:max-w-md')}>{mode.tagline}</p>
+      <p className={clsx('mt-2 text-sm text-fg-3', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>{mode.description}</p>
       {big && (
         <div className="mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
           {CATEGORIES.map((c, i) => (
@@ -351,8 +383,10 @@ function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boolean; o
 
 function FriendsCard({ className }: { className?: string }) {
   const navigate = useNavigate();
+  const guest = useStore((s) => !!s.me?.isGuest);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
+  const [claiming, setClaiming] = useState(false);
 
   async function create() {
     setBusy('create');
@@ -381,11 +415,17 @@ function FriendsCard({ className }: { className?: string }) {
           <span className="text-xs font-bold tracking-widest uppercase">С приятели</span>
         </div>
         <h2 className="mt-2 font-display text-xl font-bold">Частна стая</h2>
-        <p className="mt-1 text-sm text-fg-3">До 8 играчи, твои правила. Сподели кода и започвай.</p>
-        <Button className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
-          <Plus className="size-4" /> Създай стая
-        </Button>
-        <form onSubmit={join} className="mt-3 flex gap-2">
+        <p className="mt-1 text-sm text-fg-3">
+          {guest
+            ? 'До 8 играчи. Имаш код от приятел? Въведи го и влизаш в стаята.'
+            : 'До 8 играчи, твои правила. Сподели кода и започвай.'}
+        </p>
+        {!guest && (
+          <Button className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
+            <Plus className="size-4" /> Създай стая
+          </Button>
+        )}
+        <form onSubmit={join} className={clsx('flex gap-2', guest ? 'mt-5' : 'mt-3')}>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
@@ -398,7 +438,20 @@ function FriendsCard({ className }: { className?: string }) {
             Влез
           </Button>
         </form>
+        {/* Guests can join a room but not open one: the button is still there, and on tap it says why. */}
+        {guest && (
+          <Button variant="secondary" className="mt-3 w-full" onClick={() => setClaiming(true)}>
+            <Lock className="size-4" /> Създай своя стая
+          </Button>
+        )}
       </div>
+      {guest && (
+        <ClaimAccountModal
+          open={claiming}
+          onClose={() => setClaiming(false)}
+          reason="Свои стаи създават играчите с профил. Избери име и парола — нивото, серията и всичко изиграно досега остават твои."
+        />
+      )}
     </Card>
   );
 }
@@ -425,7 +478,8 @@ function EmailNudge() {
       return false;
     }
   });
-  if (me.email || me.pendingEmail || dismissed) return null;
+  // A guest adds an email while saving the account (the profile card asks for that instead).
+  if (me.isGuest || me.email || me.pendingEmail || dismissed) return null;
   return (
     // Phones: icon, text and close on the first row, the button under the text. Wider: all in one row.
     <div className="glass grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border-violet-400/30 py-2 pr-1.5 pl-4 sm:flex sm:pl-5">
@@ -470,11 +524,45 @@ function SeasonChip({ ratings, className }: { ratings: Partial<Record<QueueModeI
   );
 }
 
-const countdown = (ms: number) => {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
-};
+/**
+ * The streak's shields, as a chip that explains itself on tap — a hover title alone would leave touch screens guessing.
+ * The explanation is a full-width line of the chip row it sits in.
+ */
+function StreakShields({ shields, streak }: { shields: number; streak: number }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const toNext = STREAK_SHIELDS.every - (streak % STREAK_SHIELDS.every);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={id}
+        title="Щитове за серията"
+        className="focus-ring group/shield -my-2.5 inline-flex min-h-11 items-center rounded-full"
+      >
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors',
+            shields ? 'bg-sky-400/15 text-sky-200 group-hover/shield:bg-sky-400/25' : 'bg-white/5 text-fg-3 group-hover/shield:bg-white/10',
+          )}
+        >
+          <span aria-hidden>🛡️</span>×{shields}
+          <span className="sr-only">{shields === 1 ? ' щит' : ' щита'} за серията — какво е това?</span>
+          <ChevronDown aria-hidden className={clsx('size-3.5 transition-transform', open && 'rotate-180')} />
+        </span>
+      </button>
+      <p id={id} hidden={!open} className="basis-full rounded-2xl border border-sky-300/20 bg-sky-400/10 px-3.5 py-2.5 text-xs text-sky-100">
+        Щитът пази серията: ако пропуснеш ден, един щит се изразходва и серията продължава. Получаваш по един на всеки{' '}
+        {STREAK_SHIELDS.every} поредни дни (най-много {STREAK_SHIELDS.max}).{' '}
+        <span className="text-sky-200/80">
+          {shields >= STREAK_SHIELDS.max ? 'Имаш максимума.' : `До следващия: ${plural(toNext, 'ден', 'дни')}.`}
+        </span>
+      </p>
+    </>
+  );
+}
 
 function DailyCard({ className, starter }: { className?: string; starter?: boolean }) {
   const me = useStore((s) => s.me)!;
@@ -510,12 +598,13 @@ function DailyCard({ className, starter }: { className?: string; starter?: boole
   const streak = info?.streak ?? me.daily.streak;
 
   return (
-    <Card className={clsx('relative overflow-hidden p-5 sm:p-7', className)}>
+    // Sized by its own width: the day's top three go beside the button only where the title still fits next to them.
+    <Card className={clsx('@container relative overflow-hidden p-5 sm:p-7', className)}>
       <div
         className="absolute inset-0 opacity-25"
         style={{ background: `radial-gradient(100% 120% at 100% 0%, ${a}, transparent 55%), radial-gradient(80% 90% at 0% 100%, ${b}55, transparent 70%)` }}
       />
-      <div className={clsx('relative grid gap-5 sm:gap-6', !failed && 'sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]')}>
+      <div className={clsx('relative grid h-full gap-5 @2xl:gap-6', !failed && '@2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]')}>
         <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -532,8 +621,10 @@ function DailyCard({ className, starter }: { className?: string; starter?: boole
             {starter && info && !info.attempted && (
               <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">Започни оттук</span>
             )}
+            {/* Last in the row: its explanation opens as a line of its own under the chips. */}
+            {(streak > 0 || me.daily.shields > 0) && <StreakShields shields={me.daily.shields} streak={streak} />}
           </div>
-          <h2 className="mt-3 font-display text-xl font-bold sm:text-2xl">{MODES.daily.name}</h2>
+          <h2 className="mt-3 font-display text-xl font-bold sm:text-2xl">{DAILY_TITLE}</h2>
           <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
 
           <div className="mt-auto pt-5">

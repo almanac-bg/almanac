@@ -1,0 +1,96 @@
+// Coming back every day: daily quests, streak shields, the evening streak reminder, and cleaning up guest accounts.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { after, test } from 'node:test';
+import { CATEGORY_IDS, dayKey, shiftDay, sofiaMidnight } from '@quiz/shared';
+
+// Server modules open the database on import — point them at a throwaway one first.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-progress-'));
+process.env.DB_PATH = path.join(tmp, 'progress.db');
+process.env.MAIL_OUTBOX = path.join(tmp, 'outbox');
+process.env.APP_URL = 'https://almanac.test';
+const { one, run } = await import('../src/db');
+const { advanceQuests, QUEST_BONUS_XP, questsInfo } = await import('../src/quests');
+const { liveDailyStreak, recordDailyResult } = await import('../src/daily');
+const { sendStreakReminders } = await import('../src/maintenance');
+const { purgeGuests } = await import('../src/guests');
+const { getUser } = await import('../src/users');
+
+after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+const DAY = 24 * 60 * 60_000;
+let nextId = 1;
+function user(fields: Record<string, string | number | null> = {}) {
+  const id = nextId++;
+  run("INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (?, ?, ?, 'x', ?)", id, `p${id}`, `p${id}`, Date.now());
+  for (const [column, value] of Object.entries(fields)) run(`UPDATE users SET ${column} = ? WHERE id = ?`, value, id);
+  return id;
+}
+
+test('daily quests: three a day that stay put, paid once each, plus a bonus for all three', () => {
+  const id = user();
+  const day = '2026-10-25';
+  const first = questsInfo(id, day);
+  assert.equal(first.quests.length, 3);
+  assert.deepEqual(questsInfo(id, day).quests.map((q) => q.id), first.quests.map((q) => q.id), 'the same quests all day');
+
+  // A match that does a lot of everything, in three different modes, finishes any combination of quests.
+  const big = { multiplayer: true, won: true, correct: 40, hardCorrect: 10, bestStreak: 10, jokers: 5 };
+  const correctByCategory = new Map(CATEGORY_IDS.map((c) => [c, 10]));
+  const lines = (['daily', 'royale', 'challenge'] as const).flatMap((mode) => advanceQuests(id, { ...big, mode, correctByCategory }, day));
+  const after = questsInfo(id, day);
+  assert.ok(after.quests.every((q) => q.done && q.progress === q.goal), JSON.stringify(after.quests));
+  assert.ok(after.bonusDone);
+  assert.equal(lines.filter((l) => l.label.startsWith('Задача:')).length, 3, 'each quest pays once');
+  assert.equal(lines.filter((l) => l.amount === QUEST_BONUS_XP && l.label === 'Всички задачи за деня').length, 1);
+  assert.deepEqual(advanceQuests(id, { ...big, mode: 'daily', correctByCategory }, day), [], 'nothing more to earn today');
+  assert.notDeepEqual(questsInfo(id, '2026-10-26').quests.map((q) => q.progress), after.quests.map((q) => q.progress), 'a new day starts fresh');
+});
+
+test('streak shields: earned every 7 days, spent on a missed day instead of the streak', () => {
+  const d = (n: number) => shiftDay('2026-11-01', n);
+  const id = user({ daily_streak: 6, last_daily_day: d(-1) });
+  const week = recordDailyResult(id, d(0), 5000, 8, 60_000);
+  assert.equal(week.streak, 7);
+  assert.ok(week.shieldEarned);
+  assert.equal(getUser(id)!.streak_shields, 1);
+
+  assert.equal(liveDailyStreak(getUser(id)!, d(2)), 7, 'one missed day: still alive, thanks to the shield');
+  const saved = recordDailyResult(id, d(2), 5000, 8, 60_000);
+  assert.deepEqual([saved.streak, saved.shieldsUsed, getUser(id)!.streak_shields], [8, 1, 0]);
+
+  assert.equal(liveDailyStreak(getUser(id)!, d(5)), 0, 'two missed days with no shields left: gone');
+  assert.equal(recordDailyResult(id, d(5), 5000, 8, 60_000).streak, 1);
+});
+
+test('the streak reminder goes out in the evening, once a day, with a working unsubscribe', () => {
+  const evening = sofiaMidnight(2026, 11, 10) + 19.5 * 60 * 60_000;
+  const today = dayKey(evening);
+  const outbox = () => (fs.existsSync(process.env.MAIL_OUTBOX!) ? fs.readdirSync(process.env.MAIL_OUTBOX!) : []);
+  const opted = user({ email: 'streak@example.com', streak_reminders: 1, reminder_key: 'secret', daily_streak: 5, last_daily_day: shiftDay(today, -1) });
+  user({ email: 'quiet@example.com', streak_reminders: 0, daily_streak: 5, last_daily_day: shiftDay(today, -1) });
+  user({ email: 'done@example.com', streak_reminders: 1, reminder_key: 'k', daily_streak: 5, last_daily_day: today });
+
+  assert.equal(sendStreakReminders(evening - 6 * 60 * 60_000), 0, 'not in the afternoon');
+  assert.equal(sendStreakReminders(evening), 1, 'only the opted-in player whose streak is at stake');
+  assert.equal(sendStreakReminders(evening + 60 * 60_000), 0, 'once a day');
+  const mail = JSON.parse(fs.readFileSync(path.join(process.env.MAIL_OUTBOX!, outbox()[0]), 'utf8'));
+  assert.equal(mail.to, 'streak@example.com');
+  assert.match(mail.headers['List-Unsubscribe'], new RegExp(`/api/reminders/off\\?u=${opted}&k=secret`));
+  assert.equal(mail.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.ok(mail.text.includes(`https://almanac.test/unsubscribe?u=${opted}&k=secret`));
+});
+
+test('guest accounts nobody can sign in to any more are cleared after a day', () => {
+  const now = Date.now();
+  const stale = user({ is_guest: 1, created_at: now - 2 * DAY });
+  const active = user({ is_guest: 1, created_at: now - 2 * DAY });
+  const fresh = user({ is_guest: 1, created_at: now - 60_000 });
+  const member = user({ created_at: now - 2 * DAY });
+  run("INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ('t', ?, 0, ?)", active, now + DAY);
+  assert.equal(purgeGuests(now), 1);
+  const exists = (id: number) => !!one('SELECT 1 AS x FROM users WHERE id = ?', id);
+  assert.deepEqual([stale, active, fresh, member].map(exists), [false, true, true, true]);
+});

@@ -79,6 +79,12 @@ export class Matchmaker {
     }
   }
 
+  /** A ranked match for exactly these players (bots fill the other seats), e.g. a rematch. */
+  startWith(mode: QueueModeId, userIds: number[]) {
+    for (const userId of userIds) this.leave(userId);
+    this.launch(mode, userIds.map((userId) => ({ userId, joinedAt: Date.now() })));
+  }
+
   private launch(mode: QueueModeId, entries: Entry[]) {
     const def = MODES[mode];
     for (const e of entries) this.io.to(`user:${e.userId}`).emit('queue:status', null);

@@ -98,6 +98,7 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       DB_PATH: dbPath,
       QUESTIONS_PATH: questions,
       BOT_FILL_SECONDS: '1',
+      PUBLIC_QUEUES: 'all',
       GAME_TIME_SCALE: '0.05',
       MAIL_OUTBOX: outbox,
       APP_URL: 'https://almanac.test',
@@ -169,6 +170,14 @@ export async function register(url: string, username: string, email?: string): P
   });
   const body = (await r.json()) as { user: MeUser };
   if (!r.ok) throw new Error(`register ${username}: ${JSON.stringify(body)}`);
+  return { cookie: r.headers.get('set-cookie')!.split(';')[0], user: body.user };
+}
+
+/** "Играй като гост": an account with no name or password yet. */
+export async function guest(url: string): Promise<Account> {
+  const r = await fetch(`${url}/api/auth/guest`, { method: 'POST' });
+  const body = (await r.json()) as { user: MeUser };
+  if (!r.ok) throw new Error(`guest: ${JSON.stringify(body)}`);
   return { cookie: r.headers.get('set-cookie')!.split(';')[0], user: body.user };
 }
 

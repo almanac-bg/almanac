@@ -6,6 +6,7 @@ import { all, one, run, tx } from './db';
 import { incomingRequests } from './friends';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
+import { questsInfo } from './quests';
 import { reloadQuestionBank } from './questions';
 import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser } from './users';
 
@@ -59,7 +60,11 @@ export function getMe(userId: number): MeUser | null {
       day: today,
       played: !!one('SELECT 1 AS x FROM daily_results WHERE user_id = ? AND day = ?', userId, today),
       streak: liveDailyStreak(row),
+      shields: row.streak_shields,
     },
+    quests: questsInfo(userId, today),
+    isGuest: row.is_guest === 1,
+    streakReminders: row.streak_reminders === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     email: row.email,
@@ -89,7 +94,7 @@ export function updateLoadout(userId: number, patch: Partial<Loadout>): { ok: tr
  * grows. Left out are only secrets (password and token hashes) and other players' identities (who reported you).
  */
 export function exportAccount(userId: number) {
-  const { password_hash: _secret, username_key: _derived, email_key: _alsoDerived, ...account } = getUser(userId)!;
+  const { password_hash: _secret, username_key: _derived, email_key: _alsoDerived, reminder_key: _link, ...account } = getUser(userId)!;
   const rows = (sql: string) => all<Record<string, unknown>>(sql, userId);
   return {
     exportedAt: new Date().toISOString(),
@@ -99,6 +104,9 @@ export function exportAccount(userId: number) {
     seasonRatings: rows('SELECT * FROM season_ratings WHERE user_id = ?'),
     seasonRewards: rows('SELECT * FROM season_rewards WHERE user_id = ?'),
     dailyResults: rows('SELECT * FROM daily_results WHERE user_id = ?'),
+    dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
+    challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
+    challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),
     matches: rows(
       `SELECT m.mode, m.ranked, m.room_code, m.player_count, m.question_count, m.started_at, m.ended_at, mp.*
        FROM match_players mp JOIN matches m ON m.id = mp.match_id WHERE mp.user_id = ? ORDER BY m.ended_at`,
@@ -129,7 +137,15 @@ export function exportAccount(userId: number) {
 export async function deleteAccount(userId: number, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = getUser(userId);
   if (!user) return { ok: false, error: 'Няма такъв потребител.' };
-  if (!(await verifyPassword(password, user.password_hash))) return { ok: false, error: 'Грешна парола.' };
+  // A guest has no password: being signed in on this device is the proof.
+  if (!user.is_guest && !(await verifyPassword(password, user.password_hash))) return { ok: false, error: 'Грешна парола.' };
+  eraseAccount(userId);
+  reloadQuestionBank(); // approved questions stop showing their name
+  return { ok: true };
+}
+
+/** Removes an account for good (see deleteAccount); also used for guest accounts nobody can sign in to any more. */
+export function eraseAccount(userId: number) {
   removeFromPlay(userId);
   tx(() => {
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
@@ -138,6 +154,4 @@ export async function deleteAccount(userId: number, password: string): Promise<{
     run('DELETE FROM users WHERE id = ?', userId);
   });
   disconnectUser(userId);
-  reloadQuestionBank(); // approved questions stop showing their name
-  return { ok: true };
 }

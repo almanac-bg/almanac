@@ -6,3 +6,4 @@ export * from './modes';
 export * from './progression';
 export * from './protocol';
 export * from './time';
+export * from './words';

@@ -1,5 +1,7 @@
 import type {
   AchievementProgress,
+  ChallengeInfo,
+  ChallengePreview,
   DailyInfo,
   FriendsResponse,
   LeaderboardBoard,
@@ -7,6 +9,7 @@ import type {
   Loadout,
   MeUser,
   ModerationAction,
+  MyChallenge,
   ProfileStats,
   QuestionDraft,
   QuestionInfo,
@@ -58,6 +61,15 @@ export const api = {
   register: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
+  /** Play first, sign up later: a guest account on this device. */
+  guest: () => request<{ user: MeUser }>('POST', '/auth/guest'),
+  /** A guest picks a name and password; everything played so far stays. */
+  claim: (username: string, password: string, email?: string) =>
+    request<{ user: MeUser }>('POST', '/account/claim', { username, password, email: email || undefined }),
+  setReminders: (on: boolean) => request<{ user: MeUser }>('POST', '/account/reminders', { on }),
+  /** From the reminder email's unsubscribe link (works signed out). */
+  remindersOff: (u: string, k: string) =>
+    request<{ ok: true }>('POST', `/reminders/off?u=${encodeURIComponent(u)}&k=${encodeURIComponent(k)}`),
   forgotPassword: (login: string) => request<{ ok: true }>('POST', '/auth/forgot', { login }),
   resetPassword: (token: string, password: string) => request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
   verifyEmail: (token: string) => request<{ ok: true }>('POST', '/auth/verify-email', { token }),
@@ -90,6 +102,9 @@ export const api = {
   leaderboard: (board: LeaderboardBoard) => request<LeaderboardResponse>('GET', `/leaderboard/${board}`),
 
   daily: () => request<DailyInfo>('GET', '/daily'),
+  myChallenges: () => request<{ challenges: MyChallenge[] }>('GET', '/challenges'),
+  challenge: (id: string) => request<ChallengeInfo>('GET', `/challenges/${encodeURIComponent(id)}`),
+  challengePreview: (id: string) => request<ChallengePreview>('GET', `/challenges/${encodeURIComponent(id)}/preview`),
   season: () => request<SeasonInfo>('GET', '/season'),
   seasonSeen: () => request<{ ok: true }>('POST', '/season/seen'),
 

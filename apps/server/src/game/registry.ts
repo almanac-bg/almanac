@@ -42,8 +42,8 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       title: row.title,
       team: null,
     },
-    // The daily challenge is a level playing field: no jokers.
-    powerups: mode === 'daily' ? [] : (unlockedIds('powerup', ctx) as PowerupId[]),
+    // Runs everyone compares (the daily, challenge links) are a level playing field: no jokers.
+    powerups: mode === 'daily' || mode === 'challenge' ? [] : (unlockedIds('powerup', ctx) as PowerupId[]),
     emotes: unlockedIds('emote', ctx),
   };
 }
@@ -75,7 +75,8 @@ export interface NewGame {
   elimination: boolean;
   teams?: boolean;
   dailyDay?: string | null;
-  /** Fixed question set (daily challenge); otherwise picked fresh. */
+  challengeId?: string | null;
+  /** Fixed question set (daily challenge, challenge link); otherwise picked fresh. */
   questions?: PreparedQuestion[];
   humans: HumanEntry[];
   bots: Bot[];
@@ -146,6 +147,7 @@ export class GameRegistry {
         elimination: opts.elimination,
         teams: opts.teams ?? false,
         dailyDay: opts.dailyDay ?? null,
+        challengeId: opts.challengeId ?? null,
         questions,
         humans: opts.humans,
         bots: opts.bots,

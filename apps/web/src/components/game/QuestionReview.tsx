@@ -1,4 +1,4 @@
-import { api, type ReviewItem, toast } from '@quiz/client';
+import { api, type ReviewItem, toast, useStore } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, X } from 'lucide-react';
@@ -11,6 +11,8 @@ import { LETTERS } from './answers';
 export function QuestionReview({ items }: { items: ReviewItem[] }) {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState<ReviewItem | null>(null);
+  // Flagging needs a saved account (the server refuses guests).
+  const canReport = useStore((s) => !s.me?.isGuest);
   const [reported, setReported] = useState<Set<string>>(new Set());
   const right = items.filter((i) => i.right).length;
 
@@ -24,7 +26,13 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
         <div>
           <h2 className="font-display text-lg font-bold">Преглед на въпросите</h2>
           <p className="text-sm text-fg-3">
-            {right} от {items.length} верни · видя ли грешка във въпрос? Сигнализирай с <Flag className="inline size-3.5" />
+            {right} от {items.length} верни
+            {canReport && (
+              <>
+                {' '}
+                · видя ли грешка във въпрос? Сигнализирай с <Flag className="inline size-3.5" />
+              </>
+            )}
           </p>
         </div>
         <ChevronDown className={clsx('size-5 shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
@@ -42,7 +50,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
                 key={item.index}
                 item={item}
                 reported={reported.has(item.id)}
-                onReport={() => setReporting(item)}
+                onReport={canReport ? () => setReporting(item) : null}
               />
             ))}
           </motion.ol>
@@ -57,7 +65,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
   );
 }
 
-function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: boolean; onReport: () => void }) {
+function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: boolean; onReport: (() => void) | null }) {
   const category = categoryById(item.category);
   return (
     <li className="flex gap-3 px-5 py-4 sm:px-6">
@@ -86,18 +94,20 @@ function ReviewRow({ item, reported, onReport }: { item: ReviewItem; reported: b
           </p>
         )}
       </div>
-      <button
-        onClick={onReport}
-        disabled={reported}
-        title={reported ? 'Сигнализирано — благодарим!' : 'Сигнализирай за грешка'}
-        aria-label={reported ? 'Сигнализирано' : `Сигнализирай за грешка във въпрос ${item.index + 1}`}
-        className={clsx(
-          'focus-ring -mt-1.5 -mr-2 grid size-11 shrink-0 place-items-center rounded-xl transition-colors',
-          reported ? 'text-amber-300' : 'text-fg-3 hover:bg-white/10 hover:text-amber-300',
-        )}
-      >
-        <Flag className={clsx('size-4', reported && 'fill-current')} />
-      </button>
+      {onReport && (
+        <button
+          onClick={onReport}
+          disabled={reported}
+          title={reported ? 'Сигнализирано — благодарим!' : 'Сигнализирай за грешка'}
+          aria-label={reported ? 'Сигнализирано' : `Сигнализирай за грешка във въпрос ${item.index + 1}`}
+          className={clsx(
+            'focus-ring -mt-1.5 -mr-2 grid size-11 shrink-0 place-items-center rounded-xl transition-colors',
+            reported ? 'text-amber-300' : 'text-fg-3 hover:bg-white/10 hover:text-amber-300',
+          )}
+        >
+          <Flag className={clsx('size-4', reported && 'fill-current')} />
+        </button>
+      )}
     </li>
   );
 }
