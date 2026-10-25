@@ -239,6 +239,11 @@ api.post('/auth/reset', async (req, res) => {
 
 /** The token alone proves mailbox ownership, so this works signed out too. */
 api.post('/auth/verify-email', (req, res) => {
+  // Links can't be guessed (32 random bytes), but there's no reason to let anyone try thousands.
+  if (throttled(`verify:${req.ip}`, 20, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
+    return;
+  }
   const body = parse(z.object({ token: z.string().min(10).max(200) }), req, res);
   if (!body) return;
   const result = verifyEmailToken(body.token);

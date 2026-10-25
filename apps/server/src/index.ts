@@ -110,7 +110,7 @@ function challengePage(html: string, id: string): string | null {
     .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
     .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`)
     .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`)
-    .replace(/(<meta property="og:url" content=")[^"]*/, `$1${config.appUrl}/c/${id}`);
+    .replace(/(<meta property="og:url" content=")[^"]*/, `$1${config.appUrl}/c/${encodeURIComponent(preview.id)}`);
 }
 
 // Last resort: a bug no guard caught. Report it, then exit (state may be broken); Docker restarts the server.

@@ -101,7 +101,8 @@ export function reportError(
   where: string,
   details: { userId?: number; extra?: Record<string, unknown> } = {},
 ) {
-  console.error(`💥 ${where}:`, err);
+  // `where` can hold a request path: an argument, never part of the format string (a "%s" in it would garble the log).
+  console.error('💥 %s:', where, err);
   if (!dsn) return Promise.resolve();
   const error = err instanceof Error ? err : new Error(String(err));
   const now = Date.now();
