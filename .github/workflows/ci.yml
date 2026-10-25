@@ -1,17 +1,26 @@
 name: CI
 
+# Pushes to main, and pull requests (a pull request's branch isn't also built on push: one run each).
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Node 24 (development, long-term support until 2028) and Node 26 (long-term support from October 2026):
+    # the whole suite has to pass on both before the Docker image moves to a newer Node.
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24, 26]
+    name: test (Node ${{ matrix.node }})
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -23,10 +32,10 @@ jobs:
       # layouts. See apps/web/playwright.config.ts.
       - run: npm run test:browser -w @quiz/web
       # What went wrong, to look at: the HTML report, with screenshots and the retry's trace.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-node${{ matrix.node }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
@@ -37,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The production compose file must parse (anchors, profiles, env interpolation)…
       - run: DOMAIN=example.test docker compose config --quiet
       # …and Caddy must accept its config: a mistake there takes HTTPS down.
