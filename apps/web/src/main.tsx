@@ -1,15 +1,18 @@
 // Self-hosted fonts: no requests to Google (privacy) and no extra DNS/TLS round-trips.
 import '@fontsource-variable/onest';
 import '@fontsource-variable/unbounded';
-import { ApiError, configureClient, type Effect, reportError } from '@quiz/client';
+import { ApiError, configureClient, type Effect, reportError, setState } from '@quiz/client';
 import { StrictMode } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { startMonitoring } from './lib/monitoring';
+import { paintedSignedOut } from './lib/painted';
 import { sfx } from './lib/sound';
+import { preloadPage } from './pages/lazy';
 import './styles.css';
 
 const SOUNDS: Partial<Record<Effect, () => void>> = {
@@ -52,13 +55,26 @@ window.addEventListener('vite:preloadError', (event) => {
 
 startMonitoring();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <BrowserRouter>
-        <ReloadForUpdate />
-        <App />
-      </BrowserRouter>
-    </ErrorBoundary>
-  </StrictMode>,
-);
+// The landing page the server drew for a visitor without a session (lib/painted.ts): no need to ask who's signed in
+// before showing it. (The app still asks, in the background.)
+if (paintedSignedOut) setState({ authChecked: true, me: null });
+
+const root = createRoot(document.getElementById('root')!);
+// The page's code first (the legal pages load on demand), then the whole app in one synchronous render: a page the
+// server drew is swapped for the same page with no frame of "loading" in between.
+preloadPage(window.location.pathname)
+  .catch(() => {})
+  .then(() =>
+    flushSync(() =>
+      root.render(
+        <StrictMode>
+          <ErrorBoundary>
+            <BrowserRouter>
+              <ReloadForUpdate />
+              <App />
+            </BrowserRouter>
+          </ErrorBoundary>
+        </StrictMode>,
+      ),
+    ),
+  );

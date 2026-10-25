@@ -1,6 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
+import {
+  BRAND,
+  DEFAULT_OPEN_QUEUES,
+  isQueueMode,
+  type OperatorInfo,
+  QUEUE_MODES,
+  type QueueModeId,
+} from '@quiz/shared';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
 
@@ -15,6 +22,8 @@ function botFillMs(): number | null {
 
 const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
 const webDist = path.resolve(serverRoot, '../web/dist');
+/** The web app's renderer for the pages the server sends already drawn (apps/web/src/paint.tsx). */
+const webPaint = path.resolve(serverRoot, '../web/dist-ssr/paint.mjs');
 
 /** The id the web build stamps into its page (see apps/web/vite.config.ts); null without a build (development). */
 function webBuild(webDist: string): string | null {
@@ -45,6 +54,7 @@ export const config = {
   production: process.env.NODE_ENV === 'production',
   dbPath,
   webDist,
+  webPaint,
   /** Which build of the web app this server hosts: open tabs of an older one reload (see LobbyStats.build). */
   webBuild: webBuild(webDist),
   /** How long a quick-match queue waits for humans before bots fill the empty seats. */
@@ -92,3 +102,6 @@ export const config = {
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */
   gameTimeScale: Number(process.env.GAME_TIME_SCALE ?? 1),
 };
+
+/** Who runs the site, as the legal pages show it: from /api/legal, or in the page the server sends. */
+export const operatorInfo: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl };

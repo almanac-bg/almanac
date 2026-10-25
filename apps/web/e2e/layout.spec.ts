@@ -112,3 +112,19 @@ test('a wrong address shows "page not found", signed out and signed in', async (
   const expected = (p: string) => p.includes('status of 404') && p.includes('/no-such-page');
   pageProblems.splice(0, pageProblems.length, ...pageProblems.filter((p) => !expected(p)));
 });
+
+// What a search engine that doesn't run scripts gets, or a slow phone before the code arrives: the page itself.
+test('without JavaScript the landing page and the legal pages are there in full', async ({ browser }) => {
+  // browser.newContext() picks up the config's `use` options (baseURL among them).
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /^АЛМАНАХ — онлайн куиз битки/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Играй като гост', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Онлайн викторина срещу истински хора', exact: true })).toBeVisible();
+  // A plain link without the app: the browser loads the next page, which comes drawn too.
+  await page.getByRole('link', { name: 'Политика за поверителност', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
+  await expect(page.getByText('Тест Тестов', { exact: true })).toBeVisible();
+  await context.close();
+});

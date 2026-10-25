@@ -6,7 +6,6 @@ import {
   type LeaderboardEntry,
   type LeaderboardResponse,
   type ModeId,
-  type OperatorInfo,
   type ProfileStats,
   type QueueModeId,
   type SubmissionStatus,
@@ -31,7 +30,7 @@ import {
   verifyPassword,
 } from '../auth';
 import { challengeInfo, challengePreview, myChallenges } from '../challenges';
-import { config } from '../config';
+import { config, operatorInfo } from '../config';
 import { dailyInfo, liveDailyStreak } from '../daily';
 import { all, isUniqueViolation, one, run, tx } from '../db';
 import {
@@ -303,8 +302,7 @@ api.post('/auth/logout', (req, res) => {
 
 /** For the privacy policy, terms and footer (works signed out). */
 api.get('/legal', (_req, res) => {
-  const info: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl };
-  res.json(info);
+  res.json(operatorInfo);
 });
 
 /** Signed-out visitors get `{ user: null }` rather than a 401, so the first page load stays quiet. */

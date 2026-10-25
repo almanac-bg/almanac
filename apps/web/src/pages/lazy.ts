@@ -21,11 +21,26 @@ const loaders = {
 };
 
 type Loader = keyof typeof loaders;
+type Module = Record<string, ComponentType>;
+
+/** The modules that have arrived: a page from one of them renders at once, without a moment of "loading". */
+const ready = new Map<Loader, Module>();
+
+function load(loader: Loader): Promise<Module> {
+  return loaders[loader]().then((mod) => {
+    ready.set(loader, mod as unknown as Module);
+    return mod as unknown as Module;
+  });
+}
 
 function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeof loaders)[L]>>) {
-  return lazy(async () => {
-    const mod = (await loaders[loader]()) as unknown as Record<string, ComponentType>;
-    return { default: mod[name as string] };
+  const pick = (mod: Module) => ({ default: mod[name as string] });
+  return lazy(() => {
+    const mod = ready.get(loader);
+    // A thenable that settles on the spot: React then renders the page straight away instead of suspending.
+    // biome-ignore lint/suspicious/noThenProperty: that thenable is the point
+    if (mod) return { then: (resolve: (m: { default: ComponentType }) => void) => resolve(pick(mod)) } as never;
+    return load(loader).then(pick);
   });
 }
 
@@ -48,5 +63,13 @@ export const VerifyEmailPage = page('account', 'VerifyEmailPage');
 
 /** Warms the browser's module cache with every page (each loads once; later imports reuse it). */
 export function prefetchPages() {
-  for (const load of Object.values(loaders)) void load().catch(() => {});
+  for (const loader of Object.keys(loaders) as Loader[]) void load(loader).catch(() => {});
+}
+
+/**
+ * The code of the page at this address, when it loads on demand: fetched before the app first draws it, so a page
+ * the server sent drawn never blinks to "loading" (main.tsx). Only the legal pages are both.
+ */
+export function preloadPage(pathname: string): Promise<unknown> {
+  return pathname === '/privacy' || pathname === '/terms' ? load('legal') : Promise.resolve();
 }

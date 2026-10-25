@@ -164,6 +164,45 @@ test('search engines get the public pages in a sitemap and, on the home page onl
   for (const route of ['/privacy', '/settings', '/no-such-page']) assert.deepEqual(data(await text(route)), [], route);
 });
 
+const paintable = fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist-ssr/paint.mjs'));
+
+test('the landing page and the legal pages arrive drawn; with a session, the app draws the lobby itself', {
+  skip: !built || !paintable,
+}, async () => {
+  const get = async (route: string, cookie?: string) => {
+    const res = await fetch(`${srv.url}${route}`, { headers: cookie ? { cookie } : {} });
+    const html = await res.text();
+    return { html, vary: res.headers.get('vary'), root: /<div id="root"[^>]*>/.exec(html)?.[0] };
+  };
+  const session = 'quiz_session=anything';
+
+  const landing = await get('/');
+  assert.equal(landing.root, '<div id="root" data-painted="signed-out">');
+  assert.match(landing.html, /Онлайн викторина срещу истински хора/);
+  assert.match(landing.html, /Играй като гост/);
+  // Nothing drawn invisible, waiting for an entrance animation that only the browser would play.
+  assert.doesNotMatch(landing.html, /opacity:0/);
+  assert.match(landing.vary ?? '', /cookie/i);
+  const lobby = await get('/', session);
+  assert.equal(lobby.root, '<div id="root">');
+  assert.doesNotMatch(lobby.html, /Онлайн викторина/);
+
+  // The legal pages read the same for everyone, and name who runs the site in the text itself.
+  for (const cookie of [undefined, session]) {
+    const privacy = await get('/privacy', cookie);
+    assert.equal(privacy.root, '<div id="root" data-painted="">');
+    assert.match(privacy.html, /<b>Тест Тестов<\/b>, физическо лице/);
+  }
+  const terms = await get('/terms');
+  assert.equal(terms.root, '<div id="root" data-painted="">');
+
+  // Every page carries who runs the site, for the footer and the legal pages; the game's own screens aren't drawn.
+  const settings = await get('/settings');
+  assert.equal(settings.root, '<div id="root">');
+  const operator = /<script type="application\/json" id="operator">([^<]*)<\/script>/.exec(settings.html)?.[1];
+  assert.equal((JSON.parse(operator ?? 'null') as OperatorInfo | null)?.name, 'Тест Тестов');
+});
+
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {
   const app = fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src/App.tsx'), 'utf8');
   const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) => m[1].replace(/:[a-z]+/g, 'x1'));

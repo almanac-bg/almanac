@@ -22,6 +22,7 @@ import { Logo } from '../components/NavBar';
 import { Button, Card, Segmented, Spinner } from '../components/ui';
 import { credentialsProblem } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
+import { painted } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
 import { usePageTitle } from '../lib/title';
 
@@ -54,7 +55,8 @@ export function AuthPage() {
   const navigate = useNavigate();
   const inviteCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
   const challengeId = /^\/c\/([\w-]{1,16})\/?$/.exec(pathname)?.[1] ?? null;
-  usePageTitle(challengeId ? 'Предизвикателство' : null);
+  // A challenge link's page comes with its own title from the server: "Мария те предизвиква в АЛМАНАХ".
+  usePageTitle(challengeId ? undefined : null);
   // Newcomers mostly arrive to play (or sign up); a device that has signed in before most likely wants to sign in again.
   const [returning] = useState(isReturning);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => (returning ? 'login' : 'register'));
@@ -141,7 +143,7 @@ export function AuthPage() {
         left, form right. */}
       <div className="relative isolate mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center md:gap-x-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-16">
         <motion.header
-          initial={{ opacity: 0, y: 20 }}
+          initial={painted ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
           className="relative @container min-w-0 md:self-end"
@@ -173,7 +175,7 @@ export function AuthPage() {
         </motion.header>
 
         <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.97 }}
+          initial={painted ? false : { opacity: 0, y: 30, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
           className="relative min-w-0 md:col-start-2 md:row-span-2 md:row-start-1"
@@ -362,7 +364,7 @@ export function AuthPage() {
           {FEATURES.map((f, i) => (
             <motion.li
               key={f.title}
-              initial={{ opacity: 0, y: 12 }}
+              initial={painted ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 + i * 0.1 }}
               className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4 md:flex lg:block"

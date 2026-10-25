@@ -1,4 +1,5 @@
-import { BRAND } from './brand';
+// With its extension: the web build's config loads this file in Node (for the sitemap), which needs it.
+import { BRAND } from './brand.ts';
 
 /**
  * The site's addresses, in one place for the server (status codes, titles in the page, what search engines may

@@ -43,8 +43,9 @@
     </style>
   </head>
   <body>
-    <!-- Painted instantly while the app's code downloads; React replaces it. -->
-    <div id="root"><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span>⚡</div></div>
+    <!-- Painted instantly while the app's code downloads; React replaces it. Between the markers the server may put
+         the page itself, already drawn (see src/lib/painted.ts). -->
+    <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span>⚡</div><!--/app--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

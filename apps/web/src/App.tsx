@@ -14,6 +14,7 @@ import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
 import { Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
+import { onServer } from './lib/painted';
 import { markReturning } from './lib/returning';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
@@ -40,6 +41,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 
 /** Email links and legal pages work whether or not you're signed in. */
 const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/unsubscribe', '/privacy', '/terms'];
+/** …and the legal pages don't even ask: they read the same either way (and the server may have drawn them). */
+const LEGAL_PATHS = ['/privacy', '/terms'];
 
 export function App() {
   const me = useStore((s) => s.me);
@@ -50,9 +53,12 @@ export function App() {
   const signedIn = !!me;
   // A guest has no name or password to sign in with, so the sign-in page shouldn't open on "Вход" for them.
   const account = signedIn && !me.isGuest;
+  // Not on the first render: that page opens where the browser puts it (a page the server drew may be scrolled already).
+  const opened = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `pathname` and `signedIn` are the triggers, not inputs
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (opened.current) window.scrollTo(0, 0);
+    opened.current = true;
   }, [pathname, signedIn]);
   useEffect(() => {
     // This device has an account now: next time the sign-in page opens on "Вход".
@@ -85,7 +91,7 @@ export function App() {
     return () => clearTimeout(timer);
   }, [userId]);
 
-  if (!authChecked) {
+  if (!authChecked && !onServer && !LEGAL_PATHS.includes(pathname)) {
     return (
       <div className="grid min-h-dvh place-items-center">
         <Background />

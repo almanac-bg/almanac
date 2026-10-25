@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { BRAND, PUBLIC_PAGES, routeKind } from '@quiz/shared';
+import { pathToFileURL } from 'node:url';
+import { BRAND, type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { ServerBusyError } from './auth';
+import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
-import { config } from './config';
+import { config, operatorInfo } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError } from './monitoring';
@@ -79,10 +80,12 @@ app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction)
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {
   const indexHtml = path.join(config.webDist, 'index.html');
-  // With error reporting on, the page tells the browser where to report (see apps/web/src/lib/monitoring.ts).
+  // With error reporting on, the page tells the browser where to report (see apps/web/src/lib/monitoring.ts). Who runs
+  // the site comes with every page, for the legal pages and the footer (apps/web/src/lib/operator.ts).
   const meta = [
     publicDsn && `<meta name="sentry-dsn" content="${publicDsn}" />`,
     publicDsn && config.release && `<meta name="app-release" content="${config.release}" />`,
+    `<script type="application/json" id="operator">${jsonInHtml(operatorInfo)}</script>`,
   ].filter(Boolean);
   const page = fs.readFileSync(indexHtml, 'utf8').replace('</head>', `${meta.join('')}</head>`);
   // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
@@ -109,17 +112,19 @@ if (fs.existsSync(config.webDist)) {
   });
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   // Each public page with its own title, description and address in the page itself (link previews and search
-  // engines read the page, not the app); the rest of the game says "don't index".
+  // engines read the page, not the app), and the page itself already drawn; the rest of the game says "don't index".
+  const drawn = await paintPages();
   const publicPages = new Map(
-    Object.entries(PUBLIC_PAGES).map(([route, meta]) => [
-      route,
-      withHead(page, {
+    Object.entries(PUBLIC_PAGES).map(([route, meta]) => {
+      const html = withHead(page, {
         ...meta,
         url: `${config.appUrl}${route === '/' ? '/' : route}`,
         index: true,
         data: route === '/' ? siteData() : undefined,
-      }),
-    ]),
+      });
+      const app = drawn.get(route);
+      return [route, { html, painted: app ? withApp(html, app, route === '/' ? 'signed-out' : '') : html }];
+    }),
   );
   const appPage = withHead(page, { index: false });
   app.use((req, res, next) => {
@@ -140,7 +145,10 @@ if (fs.existsSync(config.webDist)) {
     }
     const pub = publicPages.get(req.path);
     if (pub) {
-      res.type('html').send(pub);
+      // The landing page is drawn for a visitor without a session; with one, the app opens the lobby instead.
+      const session = req.path === '/' && sessionTokenFromCookieHeader(req.headers.cookie) !== null;
+      if (req.path === '/') res.vary('Cookie');
+      res.type('html').send(session ? pub.html : pub.painted);
       return;
     }
     // A screen of the game (its own title comes with it), or an address that isn't one: the app shows "not found".
@@ -148,6 +156,39 @@ if (fs.existsSync(config.webDist)) {
       .status(kind === 'app' ? 200 : 404)
       .type('html')
       .send(appPage);
+  });
+}
+
+/** JSON inside a <script> element: "<" escaped, so no text in it can close the element early. */
+function jsonInHtml(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+type Paint = (url: string, operator: OperatorInfo) => Promise<string>;
+
+/**
+ * The public pages already drawn, by the web app's own renderer (apps/web/src/paint.tsx): once, at startup. Search
+ * engines and first visits get the page itself instead of a loading screen. Without the renderer (development) or
+ * if it fails, the plain page, which the app draws in the browser.
+ */
+async function paintPages(): Promise<Map<string, string>> {
+  const drawn = new Map<string, string>();
+  if (!fs.existsSync(config.webPaint)) return drawn;
+  try {
+    const { paint } = (await import(pathToFileURL(config.webPaint).href)) as { paint: Paint };
+    for (const route of Object.keys(PUBLIC_PAGES)) drawn.set(route, await paint(route, operatorInfo));
+  } catch (err) {
+    console.error('🖌️  Drawing the public pages failed: they go out plain.', err);
+    void reportError(err, 'drawing the public pages');
+  }
+  return drawn;
+}
+
+/** The page with the app drawn into it; `painted` says what the server knew ("signed-out", see lib/painted.ts). */
+function withApp(html: string, app: string, painted: 'signed-out' | ''): string {
+  // A function, not a string: "$" in the page's text must not read as a replacement pattern.
+  return html.replace(/<div id="root"><!--app-->[\s\S]*?<!--\/app--><\/div>/, () => {
+    return `<div id="root" data-painted="${painted}">${app}</div>`;
   });
 }
 
@@ -198,9 +239,7 @@ function withHead(
     // Only on pages to be listed: a canonical address on a "noindex" page is a mixed signal.
     if (head.index) extra.push(`<link rel="canonical" href="${esc(head.url)}" />`);
   }
-  // "<" escaped, so no text in it can close the script early.
-  if (head.data)
-    extra.push(`<script type="application/ld+json">${JSON.stringify(head.data).replace(/</g, '\\u003c')}</script>`);
+  if (head.data) extra.push(`<script type="application/ld+json">${jsonInHtml(head.data)}</script>`);
   return out.replace('</head>', `${extra.join('')}</head>`);
 }
 
