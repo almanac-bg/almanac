@@ -1,6 +1,11 @@
 # АЛМАНАХ ⚡ — almanac.bg
 
-Real-time multiplayer quiz battles, in Bulgarian. It has:
+Real-time multiplayer quiz battles, in Bulgarian: play at **[almanac.bg](https://almanac.bg)**. This is its complete
+source code, free software under the [AGPL-3.0](LICENSE).
+
+![АЛМАНАХ](apps/web/public/og.jpg)
+
+It has:
 
 - **Modes:** solo practice, a daily challenge, ranked 1v1 duels and 2v2 teams, 3- and 5-player free-for-alls, an
   8-player Royale with eliminations, private rooms for friends, and challenge links anyone can play.
@@ -11,7 +16,7 @@ Real-time multiplayer quiz battles, in Bulgarian. It has:
 
 ## Quick start
 
-Requires Node 22.13+. It uses the built-in `node:sqlite`, so there's no database to install.
+Requires Node 24+. It uses the built-in `node:sqlite`, so there's no database to install.
 
 ```bash
 npm install
@@ -20,7 +25,11 @@ npm run dev
 
 Open http://localhost:5173, register an account, and play. In development **the first account you register becomes
 the admin**, so it can approve community questions. In production nobody becomes an admin by signing up; see
-step 5 of [Deploying](#deploying-hetzner--docker).
+step 5 of [Deploying](#deploying-any-vps--docker).
+
+The game's real question bank (about 2,000 questions) isn't part of the public code, so answers can't be looked up
+during a match. A checkout without it plays the 120-question sample in `apps/server/src/data/questions.sample.json`,
+which is enough to develop with and to run every test. See [Questions](#adding-questions).
 
 When no other humans are queuing, bots fill the empty seats after a few seconds, so every mode is playable alone. To
 test real multiplayer locally, open a second browser (or a private window) with another account.
@@ -74,13 +83,18 @@ and checks that it boots.
 | `APP_URL`          | `http://localhost:5173`               | Public origin used in email links                            |
 | `SMTP_URL`         |                                       | e.g. `smtp://user:pass@host:587`. Unset → emails are printed to the console |
 | `MAIL_FROM`        | `АЛМАНАХ <no-reply@almanac.bg>`       | Sender address                                               |
-| `QUESTIONS_PATH`   | `apps/server/src/data/questions.json` | Built-in question bank                                       |
 | `GAME_TIME_SCALE`  | `1`                                   | Multiplies all in-game timers. For automated tests only      |
 | `BACKUP_DIR`       | `backups` next to the database        | Daily database snapshots; `off` disables them                |
 | `BACKUP_KEEP_DAYS` | `14`                                  | How many daily snapshots to keep                             |
 | `DRAIN_SECONDS`    | `330` in production, `0` otherwise    | On shutdown, how long running matches may finish first       |
 | `SENTRY_DSN`       |                                       | Sentry project for error reports; unset → errors only go to the log |
 | `APP_RELEASE`      |                                       | Version tag on error reports (the deploy command sets the git commit) |
+
+| `OPERATOR_NAME`, `OPERATOR_ADDRESS` |                      | Who runs the site, shown in the privacy policy and terms (required) |
+| `CONTACT_EMAIL`    | `privacy@<domain>`                    | Contact address in the legal pages and emails                |
+| `EMAIL_PROVIDER`, `HOSTING_PROVIDER` |                    | Named in the privacy policy as processors                    |
+| `SOURCE_URL`       |                                       | Public repository, linked in the footer ("Изходен код")      |
+| `QUESTIONS_PATH`   | `private/questions.json`, else the sample | The built-in question bank                               |
 
 The brand name lives in `packages/shared/src/brand.ts`.
 
@@ -98,7 +112,7 @@ apps/server       Express + Socket.IO + SQLite
   src/daily.ts            Daily challenge: one seeded question set per day, one attempt
   src/friends.ts          Friend requests and presence
   src/submissions.ts      Community questions and moderation
-  src/data/questions.json Built-in question bank (~2,000 questions, 10 categories)
+  src/data/questions.sample.json  Public sample of the question bank (the real one is private/questions.json)
 packages/client   Client core: API calls, realtime game state (zustand), formatting. The website
                   plugs in its sounds; kept separate so other clients can reuse it
 apps/web          React 19 + Vite + Tailwind 4 + Motion
@@ -186,7 +200,14 @@ apps/web          React 19 + Vite + Tailwind 4 + Motion
 
 ## Adding questions
 
-Players can submit questions in the app. To add built-in ones, append to `apps/server/src/data/questions.json`:
+Players can submit questions in the app, and moderators approve them in `/admin` — that's the way to contribute
+questions to the live game.
+
+The built-in bank lives in `private/questions.json`. It's kept out of the public repository (the folder is in
+`.gitignore`; in the private repository the file is tracked anyway), and `npm run build` puts it next to the
+server bundle, so Docker images built from the private repository include it. Without it, the server plays the
+public sample, `apps/server/src/data/questions.sample.json`. Both files have the same format, and `npm test`
+validates whichever are present. To add built-in questions, append to the bank:
 
 ```json
 { "id": "gen-031", "category": "general", "difficulty": "easy",
@@ -252,8 +273,8 @@ Bulgaria:
 
 Use port **587**: many providers (Hetzner among them) block outgoing ports 25 and 465 on new servers.
 
-**Before launch:** fill in your name, a correspondence address, the email provider and the hosting provider
-(`LEGAL` in `packages/shared/src/brand.ts`); the
+**Before launch:** set your name, a correspondence address, the email provider and the hosting provider in `.env`
+(`OPERATOR_NAME`, `OPERATOR_ADDRESS`, `EMAIL_PROVIDER`, `HOSTING_PROVIDER`; they're never in the code); the
 service is run by a private individual, and the privacy policy and terms show these details. Both documents are
 drafts: have them reviewed for your situation.
 
@@ -295,3 +316,27 @@ docker compose start app
 **Logs:** `docker compose logs -f app` (rotated: 5 × 10 MB per container).
 
 Live matches, queues and rooms are held in memory, so run a single app instance.
+
+## Contributing
+
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately, as
+described in [SECURITY.md](SECURITY.md).
+
+## License
+
+The code is free software under the **GNU Affero General Public License v3.0 or later** ([LICENSE](LICENSE)). You
+may run, study, change and share it. If you run a changed version as a public website, its users must be able to get
+your source code: the footer's "Изходен код" link (`SOURCE_URL`) is there for that.
+
+Not covered by the license:
+- **The name АЛМАНАХ, its logo and the almanac.bg domain.** A copy you run publicly needs its own name and branding
+  (`packages/shared/src/brand.ts`, the icons in `apps/web/public`).
+- **The game's question bank**, which isn't in this repository. The sample bank in it is part of the code and may be
+  used with it.
+
+## Publishing the public repository
+
+Development happens in a private repository that also holds the question bank. The public one is a copy without it,
+with its own history: `scripts/publish-public.sh <empty folder>` makes that copy (everything tracked, minus
+`private/`) as a fresh git repository, and checks that no question-bank file slipped in.
+

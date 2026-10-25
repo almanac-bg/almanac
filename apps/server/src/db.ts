@@ -344,6 +344,14 @@ const MIGRATIONS: (string | (() => void))[] = [
     PRIMARY KEY (day, metric)
   ) WITHOUT ROWID;
   `,
+
+  // v10: values this installation generates once and keeps (e.g. the secret in the daily challenge's seed).
+  `
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  ) WITHOUT ROWID;
+  `,
 ];
 
 function migrate() {

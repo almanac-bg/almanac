@@ -12,3 +12,6 @@ dist/
 test-results/
 playwright-report/
 blob-report/
+
+# The real question bank: tracked only in the private repository, never published (see README).
+/private/

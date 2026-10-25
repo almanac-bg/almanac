@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
+import type { OperatorInfo } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -11,7 +12,14 @@ const DSN = 'http://public@127.0.0.1:9/1';
 
 before(async () => {
   // PUBLIC_QUEUES as it ships (unset): only some ranked queues are open.
-  srv = await startServer({ NODE_ENV: 'production', PUBLIC_QUEUES: '', SENTRY_DSN: DSN });
+  srv = await startServer({
+    NODE_ENV: 'production',
+    PUBLIC_QUEUES: '',
+    SENTRY_DSN: DSN,
+    OPERATOR_NAME: 'Тест Тестов',
+    OPERATOR_ADDRESS: 'ул. Примерна 1, София',
+    SOURCE_URL: 'https://example.test/almanac',
+  });
 });
 
 after(async () => {
@@ -84,4 +92,12 @@ test('with error reporting on, the page carries the DSN and the tunnel only take
     const page = await (await fetch(`${srv.url}/`)).text();
     assert.ok(page.includes(`<meta name="sentry-dsn" content="${DSN}" />`));
   }
+});
+
+test('who runs the site comes from the configuration, not the code (and the footer can link the source)', async () => {
+  const legal = (await (await fetch(`${srv.url}/api/legal`)).json()) as OperatorInfo;
+  assert.equal(legal.name, 'Тест Тестов');
+  assert.equal(legal.address, 'ул. Примерна 1, София');
+  assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
+  assert.equal(legal.sourceUrl, 'https://example.test/almanac');
 });

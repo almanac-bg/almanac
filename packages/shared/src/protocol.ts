@@ -531,3 +531,14 @@ export interface LaunchStats {
   days: { day: string; values: Partial<Record<string, number>> }[];
   totals: { accounts: number; guests: number; matches: number };
 }
+
+/** Who runs this site, for the privacy policy and terms (set by the operator in the server's configuration). */
+export interface OperatorInfo {
+  name: string | null;
+  address: string | null;
+  email: string;
+  emailProvider: string | null;
+  hosting: string | null;
+  /** Where this site's source code is published (offered in the footer, as the AGPL asks of hosted copies). */
+  sourceUrl: string | null;
+}

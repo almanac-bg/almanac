@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Card } from '../components/ui';
+import { useOperator } from '../lib/operator';
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -32,12 +33,33 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const Operator = () => (
-  <p>
-    Услугата се предоставя и данните се обработват от <b>{LEGAL.operator}</b>, физическо лице, адрес за кореспонденция:{' '}
-    {LEGAL.address}. Имейл за въпроси относно личните данни: <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
-  </p>
-);
+/** A detail set in the server's configuration; until it is, a visible gap rather than made-up text. */
+function Detail({ value }: { value: string | null | undefined }) {
+  return <>{value === undefined ? '…' : (value ?? '[не е посочено]')}</>;
+}
+
+function ContactEmail() {
+  const email = useOperator()?.email;
+  return email ? <a href={`mailto:${email}`}>{email}</a> : <>…</>;
+}
+
+function Operator() {
+  const op = useOperator();
+  return (
+    <p>
+      Услугата се предоставя и данните се обработват от{' '}
+      <b>
+        <Detail value={op?.name} />
+      </b>
+      , физическо лице, адрес за кореспонденция: <Detail value={op?.address} />. Имейл за въпроси относно личните данни:{' '}
+      <ContactEmail />.
+    </p>
+  );
+}
+
+function Provider({ kind }: { kind: 'hosting' | 'emailProvider' }) {
+  return <Detail value={useOperator()?.[kind]} />;
+}
 
 export function PrivacyPage() {
   return (
@@ -122,10 +144,10 @@ export function PrivacyPage() {
       <Section title="5. Кой още има достъп">
         <ul>
           <li>
-            <b>Хостинг:</b> {LEGAL.hosting} — сървърът и резервните копия се намират в Европейския съюз.
+            <b>Хостинг:</b> <Provider kind="hosting" /> — сървърът и резервните копия се намират в Европейския съюз.
           </li>
           <li>
-            <b>Изпращане на имейли:</b> {LEGAL.emailProvider} — получава само адреса и съдържанието на писмото за потвърждение,
+            <b>Изпращане на имейли:</b> <Provider kind="emailProvider" /> — получава само адреса и съдържанието на писмото за потвърждение,
             нова парола или напомняне за серията.
           </li>
           <li>
@@ -184,7 +206,7 @@ export function PrivacyPage() {
             за отказ във всяко писмо.
           </li>
           <li>
-            <b>Коригиране, ограничаване и възражение</b> — пиши ни на <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
+            <b>Коригиране, ограничаване и възражение</b> — пиши ни на <ContactEmail />.
           </li>
           <li>
             <b>Жалба</b> — до Комисията за защита на личните данни (КЗЛД), София 1592, бул. „Проф. Цветан Лазаров“ № 2,{' '}
@@ -293,7 +315,7 @@ export function TermsPage() {
       <Section title="9. Промени и приложимо право">
         <p>
           При съществени промени ще те уведомим в играта. Прилага се българското право. Въпроси:{' '}
-          <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
+          <ContactEmail />.
         </p>
       </Section>
     </LegalLayout>

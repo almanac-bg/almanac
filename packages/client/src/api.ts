@@ -11,6 +11,7 @@ import type {
   MeUser,
   ModerationAction,
   MyChallenge,
+  OperatorInfo,
   ProfileStats,
   QuestionDraft,
   QuestionInfo,
@@ -58,6 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   me: () => request<{ user: MeUser | null }>('GET', '/me'),
+  operator: () => request<OperatorInfo>('GET', '/legal'),
   login: (username: string, password: string) => request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
   register: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),

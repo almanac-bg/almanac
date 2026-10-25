@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, LEGAL } from '@quiz/shared';
+import { BRAND } from '@quiz/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
 
@@ -71,7 +71,7 @@ export function verifyEmailMail(to: string, username: string, link: string): Mai
 /** To the previous address when a profile's email is changed or removed: the owner hears about it. */
 export function emailChangedMail(to: string, username: string, removed: boolean): Mail {
   const what = removed ? 'Имейлът беше премахнат от профила ти' : 'Профилът ти вече използва друг имейл';
-  const advice = `Ако промяната не е от теб, смени паролата си веднага и ни пиши на ${LEGAL.email}.`;
+  const advice = `Ако промяната не е от теб, смени паролата си веднага и ни пиши на ${config.operator.email}.`;
   return {
     to,
     subject: `${what} в ${BRAND.name}`,

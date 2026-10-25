@@ -24,6 +24,9 @@ await build({
   logLevel: 'info',
 });
 
-// The question bank is read from disk next to the bundle (see questions.ts).
+// The question banks are read from disk next to the bundle (see questions.ts): the public sample always, and the
+// private bank when this checkout has it.
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
-fs.copyFileSync(path.join(root, 'src/data/questions.json'), path.join(out, 'data/questions.json'));
+fs.copyFileSync(path.join(root, 'src/data/questions.sample.json'), path.join(out, 'data/questions.sample.json'));
+const privateBank = path.resolve(root, '../../private/questions.json');
+if (fs.existsSync(privateBank)) fs.copyFileSync(privateBank, path.join(out, 'data/questions.json'));

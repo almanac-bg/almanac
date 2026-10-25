@@ -11,6 +11,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-database-'));
 process.env.DB_PATH = path.join(tmp, 'database.db');
 const { all, run } = await import('../src/db');
 const { markSeen, RECENT_LIMIT, recentFor } = await import('../src/questions');
+const { installationSecret } = await import('../src/settings');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -66,4 +67,11 @@ test('hot queries use indexes', () => {
     // An index-ordered walk ("SCAN users USING INDEX …" + LIMIT) is fine; a bare table scan or an extra sort isn't.
     assert.doesNotMatch(p, /SCAN \w+(?! USING)(?:$| \|)|TEMP B-TREE/, `${name} scans or sorts the whole table: ${p}`);
   }
+});
+
+test("an installation's secrets are random, made once and kept", () => {
+  const seed = installationSecret('daily-seed');
+  assert.ok(seed.length >= 40);
+  assert.equal(installationSecret('daily-seed'), seed, 'the same every time');
+  assert.notEqual(installationSecret('another'), seed);
 });

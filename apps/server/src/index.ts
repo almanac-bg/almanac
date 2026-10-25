@@ -115,6 +115,10 @@ for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
   });
 }
 
+if (config.production && (!config.operator.name || !config.operator.address)) {
+  console.warn('⚖️  OPERATOR_NAME and OPERATOR_ADDRESS are not set: the privacy policy and terms show placeholders.');
+}
+
 const server = http.createServer(app);
 const realtime = createRealtime(server);
 startMaintenance();

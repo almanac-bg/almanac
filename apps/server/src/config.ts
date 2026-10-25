@@ -51,6 +51,16 @@ export const config = {
    * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
    */
   drainMs: Number(process.env.DRAIN_SECONDS ?? (process.env.NODE_ENV === 'production' ? 330 : 0)) * 1000,
+  /** Who runs this site: shown in the privacy policy and terms. Personal details live here, not in the code. */
+  operator: {
+    name: process.env.OPERATOR_NAME || null,
+    address: process.env.OPERATOR_ADDRESS || null,
+    email: process.env.CONTACT_EMAIL || `privacy@${BRAND.domain}`,
+    emailProvider: process.env.EMAIL_PROVIDER || null,
+    hosting: process.env.HOSTING_PROVIDER || null,
+  },
+  /** Where this site's source code is published; linked in the footer (the AGPL asks hosted copies to offer it). */
+  sourceUrl: process.env.SOURCE_URL || null,
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
   /** Tags error reports with the deployed version (e.g. the git commit). */

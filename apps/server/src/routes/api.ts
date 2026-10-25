@@ -6,6 +6,7 @@ import {
   type LeaderboardEntry,
   type LeaderboardResponse,
   type ModeId,
+  type OperatorInfo,
   type ProfileStats,
   type QueueModeId,
   seasonEndsAt,
@@ -264,6 +265,12 @@ api.post('/auth/logout', (req, res) => {
 });
 
 // ─── Me ──────────────────────────────────────────────────────────────────────
+
+/** For the privacy policy, terms and footer (works signed out). */
+api.get('/legal', (_req, res) => {
+  const info: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl };
+  res.json(info);
+});
 
 /** Signed-out visitors get `{ user: null }` rather than a 401, so the first page load stays quiet. */
 api.get('/me', (req, res) => {

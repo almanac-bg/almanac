@@ -2,6 +2,7 @@ import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS }
 import { all, one, run } from './db';
 import { config } from './config';
 import { pickQuestions, type PreparedQuestion, reorderOptions, seededRng } from './questions';
+import { installationSecret } from './settings';
 import { count } from './stats';
 import { getUser, toPublicUser, type UserRow } from './users';
 
@@ -9,7 +10,8 @@ import { getUser, toPublicUser, type UserRow } from './users';
 function dailySet(day: string): PreparedQuestion[] {
   const existing = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (existing) return JSON.parse(existing.questions);
-  const questions = pickQuestions(MODES.daily.questions, 'mixed', new Map(), seededRng(`daily:${day}`));
+  // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
+  const questions = pickQuestions(MODES.daily.questions, 'mixed', new Map(), seededRng(`daily:${installationSecret('daily-seed')}:${day}`));
   run('INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)', day, JSON.stringify(questions));
   return JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day)!.questions);
 }

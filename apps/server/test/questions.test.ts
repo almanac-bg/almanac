@@ -1,4 +1,5 @@
-// Guards the built-in question bank: every batch of new questions has to pass this.
+// Guards the question banks: the public sample, and the private bank when this checkout has it. Every batch of new
+// questions has to pass this.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,13 @@ interface Q {
   answer: number;
 }
 
-const bank: Q[] = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../src/data/questions.json'), 'utf8'));
+const BANKS = [
+  // Just enough to play every mode while developing.
+  { name: 'public sample', file: '../src/data/questions.sample.json', perCategory: 12, perDifficulty: 2 },
+  { name: 'private bank', file: '../../../private/questions.json', perCategory: 30, perDifficulty: 6 },
+]
+  .map((b) => ({ ...b, file: path.join(import.meta.dirname, b.file) }))
+  .filter((b) => fs.existsSync(b.file));
 const PREFIX: Record<string, string> = {
   general: 'gen',
   science: 'sci',
@@ -29,45 +36,49 @@ const PREFIX: Record<string, string> = {
 };
 const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-test('every question is well-formed', () => {
-  for (const q of bank) {
-    const where = `${q.id}: ${q.q}`;
-    assert.ok(CATEGORY_IDS.includes(q.category as never), `${where} — unknown category`);
-    assert.ok(q.id.startsWith(`${PREFIX[q.category]}-`), `${where} — id prefix doesn't match category`);
-    assert.ok(['easy', 'medium', 'hard'].includes(q.difficulty), `${where} — bad difficulty`);
-    assert.ok(q.q.trim().length >= 10 && q.q.length <= 150, `${where} — question length`);
-    assert.equal(q.options.length, 4, `${where} — needs 4 options`);
-    for (const o of q.options) assert.ok(o.trim().length > 0 && o.length <= 45, `${where} — option "${o}" length`);
-    assert.equal(new Set(q.options.map((o) => normalize(o))).size, 4, `${where} — options must differ`);
-    assert.ok(Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3, `${where} — answer index`);
-  }
-});
+for (const { name, file, perCategory, perDifficulty } of BANKS) {
+  const bank: Q[] = JSON.parse(fs.readFileSync(file, 'utf8'));
 
-test('ids and question texts are unique', () => {
-  const ids = new Set<string>();
-  const texts = new Map<string, string>();
-  for (const q of bank) {
-    assert.ok(!ids.has(q.id), `duplicate id ${q.id}`);
-    ids.add(q.id);
-    const key = normalize(q.q);
-    assert.ok(!texts.has(key), `duplicate question: ${q.id} and ${texts.get(key)}`);
-    texts.set(key, q.id);
-  }
-});
-
-test('every category can fill any match', () => {
-  for (const category of CATEGORY_IDS) {
-    const qs = bank.filter((q) => q.category === category);
-    assert.ok(qs.length >= 30, `${category} has only ${qs.length} questions`);
-    for (const d of ['easy', 'medium', 'hard']) {
-      assert.ok(qs.filter((q) => q.difficulty === d).length >= 6, `${category} needs at least 6 ${d} questions`);
+  test(`${name}: every question is well-formed`, () => {
+    for (const q of bank) {
+      const where = `${q.id}: ${q.q}`;
+      assert.ok(CATEGORY_IDS.includes(q.category as never), `${where} — unknown category`);
+      assert.ok(q.id.startsWith(`${PREFIX[q.category]}-`), `${where} — id prefix doesn't match category`);
+      assert.ok(['easy', 'medium', 'hard'].includes(q.difficulty), `${where} — bad difficulty`);
+      assert.ok(q.q.trim().length >= 10 && q.q.length <= 150, `${where} — question length`);
+      assert.equal(q.options.length, 4, `${where} — needs 4 options`);
+      for (const o of q.options) assert.ok(o.trim().length > 0 && o.length <= 45, `${where} — option "${o}" length`);
+      assert.equal(new Set(q.options.map((o) => normalize(o))).size, 4, `${where} — options must differ`);
+      assert.ok(Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3, `${where} — answer index`);
     }
-  }
-});
+  });
 
-test('correct answers are spread across positions', () => {
-  // Options are shuffled at runtime anyway; a skewed file usually means a copy-paste slip.
-  const counts = [0, 0, 0, 0];
-  for (const q of bank) counts[q.answer]++;
-  for (const c of counts) assert.ok(c / bank.length > 0.15 && c / bank.length < 0.35, `answer distribution ${counts}`);
-});
+  test(`${name}: ids and question texts are unique`, () => {
+    const ids = new Set<string>();
+    const texts = new Map<string, string>();
+    for (const q of bank) {
+      assert.ok(!ids.has(q.id), `duplicate id ${q.id}`);
+      ids.add(q.id);
+      const key = normalize(q.q);
+      assert.ok(!texts.has(key), `duplicate question: ${q.id} and ${texts.get(key)}`);
+      texts.set(key, q.id);
+    }
+  });
+
+  test(`${name}: every category can fill any match`, () => {
+    for (const category of CATEGORY_IDS) {
+      const qs = bank.filter((q) => q.category === category);
+      assert.ok(qs.length >= perCategory, `${category} has only ${qs.length} questions`);
+      for (const d of ['easy', 'medium', 'hard']) {
+        assert.ok(qs.filter((q) => q.difficulty === d).length >= perDifficulty, `${category} needs at least ${perDifficulty} ${d} questions`);
+      }
+    }
+  });
+
+  test(`${name}: correct answers are spread across positions`, () => {
+    // Options are shuffled at runtime anyway; a skewed file usually means a copy-paste slip.
+    const counts = [0, 0, 0, 0];
+    for (const q of bank) counts[q.answer]++;
+    for (const c of counts) assert.ok(c / bank.length > 0.15 && c / bank.length < 0.35, `answer distribution ${counts}`);
+  });
+}
