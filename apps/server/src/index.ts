@@ -113,7 +113,12 @@ if (fs.existsSync(config.webDist)) {
   const publicPages = new Map(
     Object.entries(PUBLIC_PAGES).map(([route, meta]) => [
       route,
-      withHead(page, { ...meta, url: `${config.appUrl}${route === '/' ? '/' : route}`, index: true }),
+      withHead(page, {
+        ...meta,
+        url: `${config.appUrl}${route === '/' ? '/' : route}`,
+        index: true,
+        data: route === '/' ? siteData() : undefined,
+      }),
     ]),
   );
   const appPage = withHead(page, { index: false });
@@ -146,8 +151,29 @@ if (fs.existsSync(config.webDist)) {
   });
 }
 
+/**
+ * What the home page tells search engines about the site, as structured data: its name (the one shown above a search
+ * result instead of the bare domain) and who runs it. Only the WebSite type: a game's own type (VideoGame) asks for
+ * ratings, and without them Search Console would list it as an error.
+ */
+function siteData() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: BRAND.name,
+    alternateName: [BRAND.domain, 'Almanac'],
+    url: `${config.appUrl}/`,
+    inLanguage: 'bg',
+    description: PUBLIC_PAGES['/'].description,
+    ...(config.operator.name && { publisher: { '@type': 'Person', name: config.operator.name } }),
+  };
+}
+
 /** The page with this title, description and address in its head; `index` says whether search engines may list it. */
-function withHead(html: string, head: { title?: string; description?: string; url?: string; index: boolean }): string {
+function withHead(
+  html: string,
+  head: { title?: string; description?: string; url?: string; index: boolean; data?: object },
+): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   let out = html;
   if (head.title) {
@@ -172,6 +198,9 @@ function withHead(html: string, head: { title?: string; description?: string; ur
     // Only on pages to be listed: a canonical address on a "noindex" page is a mixed signal.
     if (head.index) extra.push(`<link rel="canonical" href="${esc(head.url)}" />`);
   }
+  // "<" escaped, so no text in it can close the script early.
+  if (head.data)
+    extra.push(`<script type="application/ld+json">${JSON.stringify(head.data).replace(/</g, '\\u003c')}</script>`);
   return out.replace('</head>', `${extra.join('')}</head>`);
 }
 

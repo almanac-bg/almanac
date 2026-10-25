@@ -18,11 +18,11 @@ async function checkScreens(page: Page, sizes: { width: number; height: number }
   for (const size of sizes) {
     await page.setViewportSize(size);
     await page.goto('/');
-    await expect(page.getByRole('button', { name: 'Играй като гост', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Играй като гост', exact: true }).first()).toBeVisible();
     await expectNoSideScroll(page, `landing page at ${size.width}px`);
   }
 
-  await page.getByRole('button', { name: 'Играй като гост', exact: true }).click();
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
   await expectLobby(page);
   for (const size of sizes) {
     await page.setViewportSize(size);

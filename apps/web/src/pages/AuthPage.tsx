@@ -1,5 +1,5 @@
 import { api, fmt, setState } from '@quiz/client';
-import { BRAND, type ChallengePreview, MODES } from '@quiz/shared';
+import { BRAND, CATEGORIES, type ChallengePreview, isQueueMode, MODES, type ModeId, RANK_TIERS } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   ArrowLeft,
@@ -32,6 +32,9 @@ const FEATURES = [
   { icon: '👑', title: 'Роял за 8', body: 'Елиминации до последния оцелял' },
   { icon: '🏆', title: 'Нива и постижения', body: 'Отключвай аватари, рамки и титли' },
 ];
+
+/** The modes the page below the first screen describes, in the order a newcomer meets them. */
+const ABOUT_MODES: ModeId[] = ['duel', 'royale', 'daily', 'challenge', 'solo', 'custom'];
 
 /** On phones autofocus would pop the keyboard and scroll past the logo. */
 const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
@@ -129,266 +132,338 @@ export function AuthPage() {
     />
   );
 
-  return (
-    // Phones: brand, then the form (in reach without scrolling), then the pitch. Tablets and up: brand and pitch left,
-    // form right.
-    <div className="relative isolate mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center md:gap-x-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-16">
-      <motion.header
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
-        className="relative @container min-w-0 md:self-end"
-      >
-        {/* With an invite or a challenge, phones skip the pitch: the card says it all and stays on the first screen. */}
-        <span
-          className={clsx(
-            'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
-            (inviteCode || challengeId) && 'max-sm:hidden',
-          )}
-        >
-          <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Онлайн куиз битки
-        </span>
-        <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
-          <Logo />
-        </h1>
-        <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
-        <p
-          className={clsx(
-            'mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl',
-            (inviteCode || challengeId) && 'max-sm:hidden',
-          )}
-        >
-          Бързи въпроси. Истински съперници. <br className="max-sm:hidden" />
-          <span className="text-fg">Кой знае най-много?</span>
-        </p>
-      </motion.header>
+  // The plain landing page tells more below the first screen; an invite or a challenge keeps to its card.
+  const about = !inviteCode && !challengeId;
 
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
-        className="relative min-w-0 md:col-start-2 md:row-span-2 md:row-start-1"
-      >
-        {/* The glow hugs the card only (not the links under it) and never takes a click. */}
-        <div className="relative">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm"
-          />
-          {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
-          <Card className="relative bg-ink-2/95 p-5 sm:p-8">
-            {challengeId && !formOpen ? (
-              <ChallengeLanding
-                preview={preview.data}
-                error={preview.error}
-                onRetry={preview.retry}
-                busy={guestBusy}
-                guestError={guestError}
-                onPlay={() => playAsGuest(guestLanding)}
-                onSignIn={() => {
-                  setFormOpen(true);
-                  setMode('login');
-                  setError(null);
-                }}
-              />
-            ) : mode === 'forgot' ? (
-              <ForgotPassword
-                initial={username}
-                onBack={() => {
-                  setMode('login');
-                  setError(null);
-                }}
-              />
-            ) : (
-              <>
-                {challengeId && (
-                  <button
-                    type="button"
-                    onClick={() => setFormOpen(false)}
-                    className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
-                  >
-                    <ArrowLeft className="size-4" /> Към предизвикателството
-                  </button>
-                )}
-                {inviteCode && (
-                  <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
-                    <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
-                    <span>
-                      Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез като
-                      гост или с профила си, за да се присъединиш.
-                    </span>
-                  </p>
-                )}
-                {/* One main action per screen: playing as a guest for a new device, signing in for a known one. */}
-                {!returning && (
-                  <>
-                    {guest}
-                    <Or>или с профил</Or>
-                  </>
-                )}
-                <Segmented
-                  value={mode}
-                  onChange={(m) => {
-                    setMode(m);
+  return (
+    <>
+      {/* Phones: brand, then the form (in reach without scrolling), then the pitch. Tablets and up: brand and pitch
+        left, form right. */}
+      <div className="relative isolate mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center md:gap-x-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-16">
+        <motion.header
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
+          className="relative @container min-w-0 md:self-end"
+        >
+          {/* With an invite or a challenge, phones skip the pitch: the card says it all and stays on the first screen. */}
+          <span
+            className={clsx(
+              'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
+              (inviteCode || challengeId) && 'max-sm:hidden',
+            )}
+          >
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Онлайн куиз битки
+          </span>
+          <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
+            <Logo />
+            {/* What the name is, for screen readers and search results: the logo alone says only "АЛМАНАХ". */}
+            <span className="sr-only"> — онлайн куиз битки в реално време</span>
+          </h1>
+          <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
+          <p
+            className={clsx(
+              'mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl',
+              (inviteCode || challengeId) && 'max-sm:hidden',
+            )}
+          >
+            Бързи въпроси. Истински съперници. <br className="max-sm:hidden" />
+            <span className="text-fg">Кой знае най-много?</span>
+          </p>
+        </motion.header>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
+          className="relative min-w-0 md:col-start-2 md:row-span-2 md:row-start-1"
+        >
+          {/* The glow hugs the card only (not the links under it) and never takes a click. */}
+          <div className="relative">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -inset-px rounded-[28px] bg-[linear-gradient(140deg,#a855f766,transparent_40%,#22d3ee55)] blur-sm"
+            />
+            {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
+            <Card className="relative bg-ink-2/95 p-5 sm:p-8">
+              {challengeId && !formOpen ? (
+                <ChallengeLanding
+                  preview={preview.data}
+                  error={preview.error}
+                  onRetry={preview.retry}
+                  busy={guestBusy}
+                  guestError={guestError}
+                  onPlay={() => playAsGuest(guestLanding)}
+                  onSignIn={() => {
+                    setFormOpen(true);
+                    setMode('login');
                     setError(null);
                   }}
-                  options={[
-                    { value: 'login', label: 'Вход' },
-                    { value: 'register', label: 'Регистрация' },
-                  ]}
                 />
-                <h2 className="mt-6 t-section">{mode === 'login' ? 'Здравей отново!' : 'Създай профил'}</h2>
-                <p className="mt-1 text-sm text-fg-3">
-                  {mode === 'login'
-                    ? 'Влез и продължи там, където спря.'
-                    : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
-                </p>
-                <form onSubmit={submit} noValidate className="mt-6 space-y-4">
-                  <Field
-                    label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
-                    htmlFor={`${id}-username`}
-                  >
-                    <input
-                      id={`${id}-username`}
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      autoComplete="username"
-                      aria-invalid={!!error && invalid === 'username'}
-                      aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
-                      // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
-                      autoFocus={DESKTOP && returning}
-                      required
-                      minLength={mode === 'register' ? 3 : 1}
-                      maxLength={mode === 'register' ? 20 : 254}
-                      placeholder="напр. Мозъчко"
-                      className={INPUT}
-                    />
-                  </Field>
-                  {mode === 'register' && (
-                    <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
+              ) : mode === 'forgot' ? (
+                <ForgotPassword
+                  initial={username}
+                  onBack={() => {
+                    setMode('login');
+                    setError(null);
+                  }}
+                />
+              ) : (
+                <>
+                  {challengeId && (
+                    <button
+                      type="button"
+                      onClick={() => setFormOpen(false)}
+                      className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
+                    >
+                      <ArrowLeft className="size-4" /> Към предизвикателството
+                    </button>
+                  )}
+                  {inviteCode && (
+                    <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
+                      <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
+                      <span>
+                        Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез
+                        като гост или с профила си, за да се присъединиш.
+                      </span>
+                    </p>
+                  )}
+                  {/* One main action per screen: playing as a guest for a new device, signing in for a known one. */}
+                  {!returning && (
+                    <>
+                      {guest}
+                      <Or>или с профил</Or>
+                    </>
+                  )}
+                  <Segmented
+                    value={mode}
+                    onChange={(m) => {
+                      setMode(m);
+                      setError(null);
+                    }}
+                    options={[
+                      { value: 'login', label: 'Вход' },
+                      { value: 'register', label: 'Регистрация' },
+                    ]}
+                  />
+                  <h2 className="mt-6 t-section">{mode === 'login' ? 'Здравей отново!' : 'Създай профил'}</h2>
+                  <p className="mt-1 text-sm text-fg-3">
+                    {mode === 'login'
+                      ? 'Влез и продължи там, където спря.'
+                      : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
+                  </p>
+                  <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+                    <Field
+                      label={mode === 'login' ? 'Потребителско име или имейл' : 'Потребителско име'}
+                      htmlFor={`${id}-username`}
+                    >
                       <input
-                        id={`${id}-email`}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        type="email"
-                        autoComplete="email"
-                        placeholder="за възстановяване на паролата"
+                        id={`${id}-username`}
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        autoComplete="username"
+                        aria-invalid={!!error && invalid === 'username'}
+                        aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
+                        // biome-ignore lint/a11y/noAutofocus: desktop only (DESKTOP): on a phone it would pop the keyboard
+                        autoFocus={DESKTOP && returning}
+                        required
+                        minLength={mode === 'register' ? 3 : 1}
+                        maxLength={mode === 'register' ? 20 : 254}
+                        placeholder="напр. Мозъчко"
                         className={INPUT}
                       />
                     </Field>
-                  )}
-                  <Field label="Парола" htmlFor={`${id}-password`}>
-                    <div className="relative">
-                      <input
-                        id={`${id}-password`}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        type={show ? 'text' : 'password'}
-                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                        aria-invalid={!!error && invalid === 'password'}
-                        aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
-                        required
-                        minLength={6}
-                        placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
-                        className={`${INPUT} pr-12`}
-                      />
+                    {mode === 'register' && (
+                      <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
+                        <input
+                          id={`${id}-email`}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          type="email"
+                          autoComplete="email"
+                          placeholder="за възстановяване на паролата"
+                          className={INPUT}
+                        />
+                      </Field>
+                    )}
+                    <Field label="Парола" htmlFor={`${id}-password`}>
+                      <div className="relative">
+                        <input
+                          id={`${id}-password`}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          type={show ? 'text' : 'password'}
+                          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                          aria-invalid={!!error && invalid === 'password'}
+                          aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
+                          required
+                          minLength={6}
+                          placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
+                          className={`${INPUT} pr-12`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShow(!show)}
+                          aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
+                          className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+                        >
+                          {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+                        </button>
+                      </div>
+                    </Field>
+                    {mode === 'login' && (
                       <button
                         type="button"
-                        onClick={() => setShow(!show)}
-                        aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-                        className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
+                        onClick={() => {
+                          setMode('forgot');
+                          setError(null);
+                        }}
+                        className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
                       >
-                        {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+                        Забравена парола?
                       </button>
-                    </div>
-                  </Field>
-                  {mode === 'login' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('forgot');
-                        setError(null);
-                      }}
-                      className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded text-sm font-semibold text-violet-300 hover:text-violet-200"
-                    >
-                      Забравена парола?
-                    </button>
-                  )}
-
-                  <div
-                    id={`${id}-error`}
-                    role="alert"
-                    className={clsx(
-                      'overflow-hidden rounded-xl bg-rose-500/10 text-sm text-rose-300 transition-all',
-                      error ? 'max-h-20 px-3 py-2.5' : 'max-h-0',
                     )}
-                  >
-                    {error}
-                  </div>
 
-                  <Button
-                    type="submit"
-                    size="lg"
-                    variant={returning ? 'primary' : 'secondary'}
-                    className="w-full"
-                    loading={busy}
-                  >
-                    {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
-                  </Button>
-                </form>
-                {returning && (
-                  <>
-                    <Or>или</Or>
-                    {guest}
-                  </>
-                )}
-                <Consent minors={mode === 'register'} />
-              </>
-            )}
-          </Card>
+                    <div
+                      id={`${id}-error`}
+                      role="alert"
+                      className={clsx(
+                        'overflow-hidden rounded-xl bg-rose-500/10 text-sm text-rose-300 transition-all',
+                        error ? 'max-h-20 px-3 py-2.5' : 'max-h-0',
+                      )}
+                    >
+                      {error}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      size="lg"
+                      variant={returning ? 'primary' : 'secondary'}
+                      className="w-full"
+                      loading={busy}
+                    >
+                      {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
+                    </Button>
+                  </form>
+                  {returning && (
+                    <>
+                      <Or>или</Or>
+                      {guest}
+                    </>
+                  )}
+                  <Consent minors={mode === 'register'} />
+                </>
+              )}
+            </Card>
+          </div>
+        </motion.div>
+
+        <ul className="relative grid gap-3 sm:grid-cols-3 md:col-start-1 md:row-start-2 md:grid-cols-1 md:self-start lg:max-w-xl lg:grid-cols-3">
+          {FEATURES.map((f, i) => (
+            <motion.li
+              key={f.title}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 + i * 0.1 }}
+              className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4 md:flex lg:block"
+            >
+              <div aria-hidden className="text-2xl">
+                {f.icon}
+              </div>
+              <div>
+                <div className="text-sm font-bold sm:mt-2 md:mt-0 lg:mt-2">{f.title}</div>
+                <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
+              </div>
+            </motion.li>
+          ))}
+        </ul>
+
+        {/* After the pitch on phones; under the card from tablets up. With more below, at the bottom of the page. */}
+        {!about && <LegalLinks className="justify-center md:col-start-2 md:row-start-3" />}
+        {/* Floating avatars: last in the page, so search engines don't take them for its opening words. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          {FLOATERS.map((e, i) => (
+            <span
+              key={e}
+              className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
+              style={{
+                left: `${(i * 37) % 95}%`,
+                top: `${(i * 53 + 7) % 90}%`,
+                animationDelay: `${-i * 0.9}s`,
+                animationDuration: `${5 + (i % 4)}s`,
+              }}
+            >
+              {e}
+            </span>
+          ))}
         </div>
-      </motion.div>
+      </div>
+      {about && <AboutGame cta={returning ? null : guest} />}
+    </>
+  );
+}
 
-      <ul className="relative grid gap-3 sm:grid-cols-3 md:col-start-1 md:row-start-2 md:grid-cols-1 md:self-start lg:max-w-xl lg:grid-cols-3">
-        {FEATURES.map((f, i) => (
-          <motion.li
-            key={f.title}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 + i * 0.1 }}
-            className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4 md:flex lg:block"
-          >
-            <div aria-hidden className="text-2xl">
-              {f.icon}
-            </div>
-            <div>
-              <div className="text-sm font-bold sm:mt-2 md:mt-0 lg:mt-2">{f.title}</div>
-              <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
-            </div>
-          </motion.li>
-        ))}
+/**
+ * Below the first screen: the game in words, for a newcomer who scrolls before trying and for search engines (the
+ * first screen alone is a logo, a slogan and a form).
+ */
+function AboutGame({ cta }: { cta: ReactNode }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className="mx-auto max-w-6xl px-4 pt-10 pb-6 sm:px-5 sm:pt-16">
+      <p className="t-eyebrow text-violet-300">Как се играе</p>
+      <h2 id={id} className="mt-2 t-section text-balance sm:text-3xl">
+        Онлайн викторина срещу истински хора
+      </h2>
+      <p className="mt-3 max-w-2xl text-fg-2 sm:text-lg">
+        Всеки въпрос е с четири отговора и часовник: верният носи точки, а бързият — още повече. Играеш в браузъра, на
+        телефона или на компютъра. Без изтегляне, без реклами, безплатно.
+      </p>
+
+      <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {ABOUT_MODES.map((modeId) => {
+          const m = MODES[modeId];
+          return (
+            <li key={modeId} className="glass rounded-2xl p-5">
+              <div
+                aria-hidden
+                className="h-1 w-10 rounded-full"
+                style={{ background: `linear-gradient(90deg, ${m.accent[0]}, ${m.accent[1]})` }}
+              />
+              <h3 className="mt-4 flex flex-wrap items-baseline gap-x-2 t-card">
+                {m.name} {isQueueMode(modeId) && <span className="t-eyebrow text-fg-3">{m.short}</span>}
+              </h3>
+              <p className="mt-1.5 text-sm font-semibold text-fg">{m.tagline}</p>
+              <p className="mt-1 text-sm text-fg-3">{m.description}</p>
+            </li>
+          );
+        })}
       </ul>
 
-      {/* After the pitch on phones; under the card from tablets up. */}
-      <LegalLinks className="justify-center md:col-start-2 md:row-start-3" />
-      {/* Floating avatars: last in the page, so search engines don't take them for its opening words. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        {FLOATERS.map((e, i) => (
-          <span
-            key={e}
-            className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
-            style={{
-              left: `${(i * 37) % 95}%`,
-              top: `${(i * 53 + 7) % 90}%`,
-              animationDelay: `${-i * 0.9}s`,
-              animationDuration: `${5 + (i % 4)}s`,
-            }}
-          >
-            {e}
-          </span>
-        ))}
+      <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
+        <div>
+          <h3 className="t-card">{CATEGORIES.length} категории въпроси</h3>
+          <p className="mt-1.5 text-sm text-fg-3">Избираш категория в Соло или играеш микс от всички.</p>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => (
+              <li key={c.id} className="rounded-full border border-line bg-white/5 px-3 py-1.5 text-sm text-fg-2">
+                <span aria-hidden>{c.icon}</span> {c.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 className="t-card">Нива, ранг и колекция</h3>
+          <p className="mt-1.5 text-sm text-fg-2">
+            Всеки мач носи опит: качваш нива, пазиш серията си с дневното предизвикателство и отключваш аватари, рамки и
+            титли. Класираните мачове местят рейтинга ти — от {RANK_TIERS[0].name} до {RANK_TIERS.at(-1)?.name}.
+          </p>
+          {cta && <div className="mt-6 max-w-sm">{cta}</div>}
+        </div>
       </div>
-    </div>
+
+      <LegalLinks className="mt-12 justify-center border-t border-line pt-2" />
+    </section>
   );
 }
 

@@ -4,9 +4,32 @@ import { createHash } from 'node:crypto';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { BRAND } from '../../packages/shared/src/brand.ts';
+import { BRAND, LEGAL } from '../../packages/shared/src/brand.ts';
+import { PUBLIC_PAGES } from '../../packages/shared/src/routes.ts';
 
 const server = process.env.API_URL ?? 'http://localhost:3001';
+
+const origin = `https://${BRAND.domain}`;
+
+/** For search engines: the public pages (the rest of the game is noindex), and where the sitemap is. */
+const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${Object.keys(PUBLIC_PAGES)
+  .map(
+    (path) => `  <url><loc>${origin}${path}</loc>${path === '/' ? '' : `<lastmod>${LEGAL.updatedIso}</lastmod>`}</url>`,
+  )
+  .join('\n')}
+</urlset>
+`;
+// /api/legal stays crawlable: the legal pages show who runs the site from it.
+const robots = `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /socket.io/
+Allow: /api/legal
+
+Sitemap: ${origin}/sitemap.xml
+`;
 
 /** "Add to Home Screen": the game opens full-screen with its own icon, like an app. */
 const manifest = JSON.stringify({
@@ -41,6 +64,8 @@ export default defineConfig({
       // The web app manifest comes from the same brand settings: a file in the build, and served by the dev server.
       generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
+        this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemap });
+        this.emitFile({ type: 'asset', fileName: 'robots.txt', source: robots });
       },
       configureServer(dev) {
         dev.middlewares.use('/manifest.webmanifest', (_req, res) => {

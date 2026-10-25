@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
+import { BRAND, type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -136,6 +136,32 @@ test('each public page has its own title and address; the game says noindex; a w
   const icon = await get('/favicon.ico');
   assert.equal(icon.status, 200);
   assert.match(icon.headers.get('content-type') ?? '', /icon/);
+});
+
+test('search engines get the public pages in a sitemap and, on the home page only, the site name', {
+  skip: !built,
+}, async () => {
+  const text = async (route: string) => (await fetch(`${srv.url}${route}`)).text();
+  const sitemap = await text('/sitemap.xml');
+  const listed = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+  assert.deepEqual(
+    listed,
+    Object.keys(PUBLIC_PAGES).map((route) => `https://${BRAND.domain}${route}`),
+  );
+  const robots = await text('/robots.txt');
+  assert.match(robots, /^Disallow: \/api\/$/m);
+  assert.match(robots, /^Allow: \/api\/legal$/m);
+  assert.match(robots, new RegExp(`^Sitemap: https://${BRAND.domain}/sitemap.xml$`, 'm'));
+
+  const data = (html: string) =>
+    [...html.matchAll(/<script type="application\/ld\+json">([^<]*)<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const [site, ...more] = data(await text('/'));
+  assert.equal(more.length, 0);
+  assert.equal(site['@type'], 'WebSite');
+  assert.equal(site.name, BRAND.name);
+  assert.equal(site.url, 'https://almanac.test/');
+  assert.equal(site.publisher.name, 'Тест Тестов');
+  for (const route of ['/privacy', '/settings', '/no-such-page']) assert.deepEqual(data(await text(route)), [], route);
 });
 
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {

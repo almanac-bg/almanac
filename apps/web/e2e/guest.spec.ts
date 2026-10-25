@@ -3,7 +3,7 @@ import { expect, expectLobby, me, playMatch, startSolo, test } from './support';
 test('a newcomer plays a first solo match as a guest', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/АЛМАНАХ/);
-  await page.getByRole('button', { name: 'Играй като гост', exact: true }).click();
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
 
   await expectLobby(page);
   await expect(page.getByRole('heading', { name: 'Задачи за деня', exact: true })).toBeVisible();

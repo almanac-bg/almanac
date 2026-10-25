@@ -37,7 +37,9 @@ export function Logo({ className }: { className?: string }) {
   return (
     <span className={clsx('font-display font-black tracking-tight', className)}>
       <span className="text-gradient">{BRAND.name}</span>
-      <span className="text-fuchsia-400">⚡</span>
+      <span aria-hidden className="text-fuchsia-400">
+        ⚡
+      </span>
     </span>
   );
 }

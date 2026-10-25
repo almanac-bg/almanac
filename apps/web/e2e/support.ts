@@ -77,10 +77,13 @@ export async function expectLobby(page: Page) {
   await expect(page.getByText('Няма връзка — свързване…')).toHaveCount(0);
 }
 
-/** The landing page's "Играй като гост": a guest account, straight into the lobby. */
+/**
+ * The landing page's "Играй като гост" (the card's: the page repeats it under the game's description): a guest
+ * account, straight into the lobby.
+ */
 export async function startAsGuest(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Играй като гост', exact: true }).click();
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
   await expectLobby(page);
 }
 
