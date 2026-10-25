@@ -8,7 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The production compose file must parse (anchors, profiles, env interpolation)…
       - run: DOMAIN=example.test docker compose config --quiet
       # …and Caddy must accept its config: a mistake there takes HTTPS down.
