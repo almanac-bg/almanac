@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND } from '@quiz/shared';
+import { BRAND, TIME_ZONE } from '@quiz/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
 
@@ -98,6 +98,24 @@ export function resetPasswordMail(to: string, username: string, link: string): M
       link,
       'Линкът е валиден 1 час и може да се използва веднъж. Ако заявката не е от теб, игнорирай това писмо — старата ти парола остава.',
     ),
+  };
+}
+
+/** A month before an account nobody has used for three years is deleted (the privacy policy's limit). */
+export function inactiveAccountMail(to: string, username: string, deleteOn: number): Mail {
+  const date = new Intl.DateTimeFormat('bg-BG', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: TIME_ZONE,
+  }).format(deleteOn);
+  const lead = `Профилът ти в ${BRAND.name} не е използван от три години. За да не пазим данни, които никой не ползва, на ${date} ще го изтрием заедно с нивото, статистиката и всичко изиграно.`;
+  const keep = 'Искаш да го запазиш? Просто влез в профила си дотогава — нищо друго не е нужно.';
+  return {
+    to,
+    subject: `Профилът ти в ${BRAND.name} ще бъде изтрит след месец`,
+    text: `Здравей, ${username}!\n\n${lead}\n\n${keep}\n${config.appUrl}/`,
+    html: layout(`Здравей, ${username}!`, escapeHtml(lead), 'Влез в профила', `${config.appUrl}/`, escapeHtml(keep)),
   };
 }
 

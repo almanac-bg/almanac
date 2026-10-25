@@ -2,13 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
+import { eraseAccount } from './account';
 import { purgeOldChallenges } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
 import { purgeGuests } from './guests';
-import { sendMail, streakReminderMail } from './mailer';
+import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
+import { reloadQuestionBank } from './questions';
 import { count } from './stats';
 import type { UserRow } from './users';
 
@@ -38,6 +40,43 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
   purgeOldChallenges(now);
   purgeGuests(now);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** An account nobody has signed in to for this long is deleted (the privacy policy says so)… */
+export const INACTIVE_MS = 3 * 365 * DAY_MS;
+/** …after an email this long before, when it has a verified address to send one to. */
+export const INACTIVE_WARNING_MS = 30 * DAY_MS;
+/** Per maintenance run: the mail provider's daily quota is shared with everything else. */
+const INACTIVE_BATCH = 20;
+
+/**
+ * Accounts unused for three years: a warning email a month before (signing in cancels it), then deletion, as for an
+ * account deleted from Settings. Without a verified email there's no one to warn. Administrators' accounts are kept.
+ * Returns how many were warned and deleted.
+ */
+export function retireInactiveAccounts(now = Date.now()): { warned: number; erased: number } {
+  const lastSeen = 'COALESCE(last_seen_at, created_at)';
+  const warn = all<UserRow>(
+    `SELECT * FROM users WHERE is_guest = 0 AND is_admin = 0 AND email IS NOT NULL AND inactivity_warned_at IS NULL
+     AND ${lastSeen} < ? LIMIT ?`,
+    now - INACTIVE_MS + INACTIVE_WARNING_MS,
+    INACTIVE_BATCH,
+  );
+  for (const u of warn) {
+    run('UPDATE users SET inactivity_warned_at = ? WHERE id = ?', now, u.id);
+    sendMail(inactiveAccountMail(u.email!, u.username, now + INACTIVE_WARNING_MS));
+  }
+  const erase = all<{ id: number }>(
+    `SELECT id FROM users WHERE is_guest = 0 AND is_admin = 0 AND ${lastSeen} < ?
+     AND (email IS NULL OR inactivity_warned_at < ?) LIMIT ?`,
+    now - INACTIVE_MS,
+    now - INACTIVE_WARNING_MS,
+    INACTIVE_BATCH,
+  );
+  for (const { id } of erase) eraseAccount(id);
+  if (erase.length) reloadQuestionBank(); // approved questions stop showing their names
+  return { warned: warn.length, erased: erase.length };
 }
 
 /**
@@ -115,6 +154,9 @@ export function startMaintenance() {
     running = true;
     try {
       purgeExpired();
+      const inactive = retireInactiveAccounts();
+      if (inactive.warned || inactive.erased)
+        console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);
       const reminded = sendStreakReminders();
       if (reminded) console.log(`🔥 Streak reminders sent: ${reminded}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {

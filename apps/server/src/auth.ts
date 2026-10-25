@@ -59,6 +59,11 @@ export const DUMMY_PASSWORD_HASH = `scrypt$${randomBytes(16).toString('base64')}
 /** Sessions are stored hashed: a leaked database or backup holds no usable logins. */
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');
 
+/** The account is in use: it won't be deleted as unused, and any warning that it would be no longer stands. */
+function seen(userId: number, now: number) {
+  run('UPDATE users SET last_seen_at = ?, inactivity_warned_at = NULL WHERE id = ?', now, userId);
+}
+
 export function createSession(userId: number): string {
   const token = randomBytes(32).toString('base64url');
   const now = Date.now();
@@ -69,6 +74,7 @@ export function createSession(userId: number): string {
     now,
     now + SESSION_MS,
   );
+  seen(userId, now);
   return token;
 }
 
@@ -101,7 +107,10 @@ export function resolveSession(token: string | null): { userId: number; renewed:
   }
   if (session.banned_until !== null && session.banned_until > now) return null;
   const renewed = session.expires_at - now < SESSION_MS / 2;
-  if (renewed) run('UPDATE sessions SET expires_at = ? WHERE token = ?', now + SESSION_MS, hash);
+  if (renewed) {
+    run('UPDATE sessions SET expires_at = ? WHERE token = ?', now + SESSION_MS, hash);
+    seen(session.user_id, now);
+  }
   return { userId: session.user_id, renewed };
 }
 

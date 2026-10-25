@@ -354,6 +354,16 @@ const MIGRATIONS: (string | (() => void))[] = [
     value TEXT NOT NULL
   ) WITHOUT ROWID;
   `,
+
+  // v11: when each account was last used, so accounts unused for years can be deleted (the privacy policy's limit).
+  // Until then, the latest session's start (sessions last 30 days) or the sign-up.
+  `
+  ALTER TABLE users ADD COLUMN last_seen_at INTEGER;
+  ALTER TABLE users ADD COLUMN inactivity_warned_at INTEGER;
+  UPDATE users SET last_seen_at = MAX(created_at, COALESCE(
+    (SELECT MAX(expires_at) - 2592000000 FROM sessions WHERE sessions.user_id = users.id), 0));
+  CREATE INDEX users_last_seen ON users(last_seen_at) WHERE is_guest = 0;
+  `,
 ];
 
 /**

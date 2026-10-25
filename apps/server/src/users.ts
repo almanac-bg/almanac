@@ -43,6 +43,10 @@ export interface UserRow {
   /** Secret in the reminder email's unsubscribe link. */
   reminder_key: string | null;
   reminded_day: string | null;
+  /** Last sign-in, or last time a session was extended (so within a couple of weeks of the last visit). */
+  last_seen_at: number | null;
+  /** When the "your account will be deleted" email went out; cleared by signing in. */
+  inactivity_warned_at: number | null;
 }
 
 /** Names guests get ("Гост_482113"); nobody can register one. */
