@@ -30,14 +30,14 @@ export function QuestsCard({ className }: { className?: string }) {
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sky-300">
           <ListChecks aria-hidden className="size-5" />
-          <span className="text-xs font-bold tracking-widest uppercase">Всеки ден нови</span>
+          <span className="t-eyebrow">Всеки ден нови</span>
         </div>
         <span className={clsx('text-xs font-bold tabular-nums', done === total ? 'text-emerald-300' : 'text-fg-3')}>
           {done}/{total}
           <span className="sr-only"> изпълнени</span>
         </span>
       </div>
-      <h2 className="relative mt-2 font-display text-xl font-bold">Задачи за деня</h2>
+      <h2 className="relative mt-2 t-card">Задачи за деня</h2>
       <p className="relative mt-1 text-sm text-fg-3">Всеки мач брои. Щом изпълниш задача, XP идва сам.</p>
 
       <ul className="relative mt-5 space-y-4">

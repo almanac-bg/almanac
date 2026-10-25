@@ -35,7 +35,7 @@ export function LeaderboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold">Класации</h1>
+          <h1 className="t-page">Класации</h1>
           <p className="mt-1 text-fg-2">
             {board === 'level'
               ? 'Най-опитните играчи по натрупан XP.'

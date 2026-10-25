@@ -54,7 +54,7 @@ function InviteCard({ invite }: { invite: Invite }) {
       <div className="flex items-center gap-3">
         <Avatar avatar={invite.from.avatar} frame={invite.from.frame} size={48} />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-fuchsia-300 uppercase">
+          <p className="flex items-center gap-1.5 t-eyebrow text-fuchsia-300">
             {challenge ? <Swords className="size-3.5" /> : <Users className="size-3.5" />}
             {challenge ? 'Предизвикателство' : 'Покана'}
           </p>

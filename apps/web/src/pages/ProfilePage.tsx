@@ -3,6 +3,7 @@ import {
   ACHIEVEMENTS,
   achievementById,
   CATEGORIES,
+  isQueueMode,
   levelProgress,
   MODES,
   type ModeId,
@@ -36,6 +37,7 @@ export function ProfilePage() {
   usePageTitle(username === me.username ? 'Профил' : username);
   const roomy = useMediaQuery('(min-width: 640px)');
   const friendsVersion = useStore((s) => s.friendsVersion);
+  const openQueues = useStore((s) => s.lobby?.modes);
   // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
   const { data, error, retry, setData } = useLoad(() => api.profile(username), username, `${me.xp}:${friendsVersion}`);
 
@@ -52,6 +54,11 @@ export function ProfilePage() {
   const { user, overview: o } = data;
   const progress = levelProgress(user.xp);
   const isMe = user.id === me.id;
+  const played = MODE_ORDER.filter((id) => data.modes.some((m) => m.mode === id));
+  // Only what can be played today: a ranked queue that hasn't opened yet would read as a to-do nobody can do.
+  const unplayed = MODE_ORDER.filter(
+    (id) => !played.includes(id) && (!isQueueMode(id) || (openQueues ?? []).includes(id)),
+  );
 
   return (
     <div className="space-y-8">
@@ -108,7 +115,8 @@ export function ProfilePage() {
 
       <section>
         <SectionTitle>Статистика</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Ten tiles: two columns of five on phones, one row of five per line from tablets up (no orphan row). */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Stat label="Изиграни мачове" value={fmt(o.gamesPlayed)} />
           <Stat
             label="Победи"
@@ -167,7 +175,7 @@ export function ProfilePage() {
         <section>
           <SectionTitle>Режими</SectionTitle>
           <Card className="divide-y divide-line">
-            {MODE_ORDER.map((id) => {
+            {played.map((id) => {
               const m = data.modes.find((x) => x.mode === id);
               const mode = MODES[id];
               const multiplayer = id !== 'solo';
@@ -189,6 +197,12 @@ export function ProfilePage() {
                 </div>
               );
             })}
+            {/* The modes not played yet, in one line rather than a row each saying "nothing yet". */}
+            {unplayed.length > 0 && (
+              <p className="px-5 py-3.5 text-sm text-fg-3">
+                Още без мачове: {unplayed.map((id) => MODES[id].name).join(', ')}
+              </p>
+            )}
           </Card>
         </section>
 

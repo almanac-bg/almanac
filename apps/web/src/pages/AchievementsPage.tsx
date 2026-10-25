@@ -54,7 +54,7 @@ export function AchievementsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold">Постижения</h1>
+          <h1 className="t-page">Постижения</h1>
           <p className="mt-1 text-fg-2">
             Отключени <b className="text-fg">{unlocked}</b> от {available.length}
           </p>

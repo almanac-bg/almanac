@@ -72,7 +72,7 @@ export function LockerPage() {
           >
             <Avatar avatar={me.avatar} frame={me.frame} size={140} className="relative" />
           </motion.div>
-          <h1 className="relative mt-5 flex items-center gap-2 font-display text-2xl font-bold">
+          <h1 className="relative mt-5 flex items-center gap-2 t-section">
             {me.username} <LevelBadge level={level} />
           </h1>
           <p className="relative mt-1 font-semibold text-violet-300">{titleName(me.title)}</p>
@@ -81,7 +81,7 @@ export function LockerPage() {
 
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-2xl font-bold">Колекция</h2>
+            <h2 className="t-section">Колекция</h2>
             <Segmented
               value={tab}
               onChange={setTab}

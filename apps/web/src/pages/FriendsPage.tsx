@@ -34,14 +34,14 @@ function GuestFriends() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-3xl font-bold">Приятели</h1>
+        <h1 className="t-page">Приятели</h1>
         <p className="mt-1 text-fg-2">Играй с хора, които познаваш.</p>
       </div>
       <Card className="grid place-items-center gap-2 px-6 py-12 text-center">
         <span aria-hidden className="text-5xl">
           👯
         </span>
-        <p className="font-display text-lg font-bold">Приятелите са за играчи с профил</p>
+        <p className="t-card">Приятелите са за играчи с профил</p>
         <p className="max-w-md text-sm text-fg-3">
           Играеш като гост. Запази прогреса с име и парола — после добавяш приятели по име, виждаш кога са онлайн, каниш
           ги в своя стая и ги предизвикваш на дуел.
@@ -96,7 +96,7 @@ function Friends() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold">Приятели</h1>
+          <h1 className="t-page">Приятели</h1>
           <p className="mt-1 text-fg-2">
             {data.friends.length ? (
               <>

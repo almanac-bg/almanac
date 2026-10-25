@@ -118,10 +118,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           />
 
           <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p
-              className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase"
-              style={{ color: ACCENT_FROM }}
-            >
+            <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: ACCENT_FROM }}>
               <Swords aria-hidden className="size-3.5" /> Предизвикателство
             </p>
             <Pill className={clsx('ml-auto', expired && 'text-fg-3')}>
@@ -161,7 +158,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
             ) : (
               <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold tracking-wide text-fg-3 uppercase">Резултат за биене</p>
+                  <p className="t-eyebrow text-fg-3">Резултат за биене</p>
                   {leader ? (
                     <>
                       <p className="mt-1 font-display text-3xl font-bold tabular-nums">{fmt(leader.score)} т.</p>
@@ -222,9 +219,7 @@ function YourResult({ entry, total, expired }: { entry: ChallengeEntry; total: n
         {MEDALS[entry.rank - 1] ?? '🎯'}
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-semibold tracking-wide text-fg-3 uppercase">
-          {expired ? 'Краен резултат' : 'Твоят резултат'}
-        </p>
+        <p className="t-eyebrow text-fg-3">{expired ? 'Краен резултат' : 'Твоят резултат'}</p>
         <p className="mt-0.5 font-display text-3xl font-bold tabular-nums">{fmt(entry.score)} т.</p>
         <p className="mt-1 text-sm text-fg-2">
           <span className="font-semibold text-fg tabular-nums">
@@ -382,7 +377,7 @@ function CreateOwn() {
   return (
     <Card className="flex flex-wrap items-center gap-x-5 gap-y-4 p-5 sm:p-6">
       <div className="min-w-0 flex-1 basis-64">
-        <h2 className="font-display text-lg font-bold">Предизвикай и ти</h2>
+        <h2 className="t-card">Предизвикай и ти</h2>
         <p className="mt-1 text-sm text-fg-3">
           {guest
             ? 'Свои предизвикателства правят играчи с профил. Запази прогреса си — отнема 10 секунди.'
@@ -422,7 +417,7 @@ function Missing() {
         <span aria-hidden className="text-5xl">
           🔗
         </span>
-        <h1 className="font-display text-2xl font-bold">Линкът не работи</h1>
+        <h1 className="t-section">Линкът не работи</h1>
         <p className="max-w-sm text-sm text-fg-3">
           Няма такова предизвикателство — линкът може да е непълен или вече изтрит.
         </p>

@@ -57,7 +57,7 @@ export function UnsubscribePage() {
       <Centered>
         <div className="text-center">
           <XCircle className="mx-auto size-12 text-rose-400" />
-          <h1 className="mt-3 font-display text-2xl font-bold">Линкът е непълен</h1>
+          <h1 className="mt-3 t-section">Линкът е непълен</h1>
           <p className="mt-2 text-sm text-fg-2">
             Отвори го отново от писмото. Напомнянията се спират и от Настройки, след като влезеш.
           </p>
@@ -72,7 +72,7 @@ export function UnsubscribePage() {
       <Centered>
         <div role="status" className="text-center">
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
-          <h1 className="mt-3 font-display text-2xl font-bold">Напомнянията са спрени</h1>
+          <h1 className="mt-3 t-section">Напомнянията са спрени</h1>
           <p className="mt-2 text-sm text-fg-2">
             Няма да получаваш повече писма за серията. Ако ги искаш обратно, включи ги от Настройки → „Напомняне за
             серията“.
@@ -86,7 +86,7 @@ export function UnsubscribePage() {
   return (
     <Centered>
       <BellOff className="size-8 text-violet-300" />
-      <h1 className="mt-3 font-display text-2xl font-bold">Напомняния за серията</h1>
+      <h1 className="mt-3 t-section">Напомняния за серията</h1>
       <p className="mt-2 text-sm text-fg-2">
         Тези писма идват вечерта, когато серията ти от дневни предизвикателства ще изгори в полунощ. Не ги искаш? Спри
         ги с един бутон — серията и профилът ти остават, както са.

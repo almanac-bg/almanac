@@ -118,7 +118,7 @@ export function RoomPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="text-xs font-bold tracking-widest text-fuchsia-300 uppercase">Частна стая</p>
+          <p className="t-eyebrow text-fuchsia-300">Частна стая</p>
           <button
             type="button"
             onClick={copy}
@@ -154,7 +154,7 @@ export function RoomPage() {
         <div className="min-w-0 space-y-6">
           <Card className="p-4 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-display text-lg font-bold">
+              <h2 className="t-card">
                 Играчи{' '}
                 <span className="text-fg-3">
                   {room.players.length}/{s.maxPlayers}
@@ -195,7 +195,7 @@ export function RoomPage() {
 
         <Card className="space-y-5 self-start p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <h2 className="font-display text-lg font-bold">Настройки</h2>
+            <h2 className="t-card">Настройки</h2>
             {!isHost && <span className="text-xs text-fg-3">Само домакинът ги променя</span>}
           </div>
 
@@ -609,7 +609,7 @@ function InviteFriends({ room }: { room: RoomState }) {
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-bold">Покани приятели</h2>
+        <h2 className="t-card">Покани приятели</h2>
         <Link
           to="/friends"
           className="focus-ring -my-2.5 inline-flex min-h-11 shrink-0 items-center rounded-lg text-sm font-semibold whitespace-nowrap text-violet-300 hover:text-violet-200"

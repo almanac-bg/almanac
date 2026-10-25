@@ -56,7 +56,7 @@ export function LoadError({
       <span className="grid size-14 place-items-center rounded-2xl bg-rose-500/10 text-rose-300">
         <Icon aria-hidden className="size-7" />
       </span>
-      <p className="font-display text-lg font-bold">{title}</p>
+      <p className="t-card">{title}</p>
       <p className="max-w-sm text-sm text-fg-3">{detail}</p>
       <Button variant="secondary" className="mt-2" onClick={onRetry}>
         <RotateCcw className="size-4" /> Опитай пак

@@ -84,6 +84,23 @@ body {
   background: rgb(139 92 246 / 0.45);
 }
 
+/*
+ * The type scale: four display steps and one label style, named once instead of retyped on every page.
+ * Page titles · section titles · card titles · the small uppercase labels above them ("С ПРИЯТЕЛИ", "КЛАСИРАНЕ").
+ */
+@utility t-page {
+  @apply font-display text-3xl font-bold tracking-tight sm:text-4xl;
+}
+@utility t-section {
+  @apply font-display text-2xl font-bold tracking-tight;
+}
+@utility t-card {
+  @apply font-display text-lg font-bold;
+}
+@utility t-eyebrow {
+  @apply text-[11px] font-bold tracking-[0.16em] uppercase;
+}
+
 @layer components {
   .glass {
     background: linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.025));

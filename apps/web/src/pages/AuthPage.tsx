@@ -130,31 +130,14 @@ export function AuthPage() {
   );
 
   return (
-    // Phones: brand, then the form (in reach without scrolling), then the pitch. Desktop: brand and pitch left, form right.
-    <div className="relative mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-center lg:gap-x-16">
-      {/* floating avatars */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        {FLOATERS.map((e, i) => (
-          <span
-            key={e}
-            className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
-            style={{
-              left: `${(i * 37) % 95}%`,
-              top: `${(i * 53 + 7) % 90}%`,
-              animationDelay: `${-i * 0.9}s`,
-              animationDuration: `${5 + (i % 4)}s`,
-            }}
-          >
-            {e}
-          </span>
-        ))}
-      </div>
-
+    // Phones: brand, then the form (in reach without scrolling), then the pitch. Tablets and up: brand and pitch left,
+    // form right.
+    <div className="relative isolate mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center md:gap-x-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-16">
       <motion.header
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
-        className="relative @container min-w-0 lg:self-end"
+        className="relative @container min-w-0 md:self-end"
       >
         {/* With an invite or a challenge, phones skip the pitch: the card says it all and stays on the first screen. */}
         <span
@@ -175,7 +158,8 @@ export function AuthPage() {
             (inviteCode || challengeId) && 'max-sm:hidden',
           )}
         >
-          Бързи въпроси. Истински съперници. <span className="text-fg">Кой знае най-много?</span>
+          Бързи въпроси. Истински съперници. <br className="max-sm:hidden" />
+          <span className="text-fg">Кой знае най-много?</span>
         </p>
       </motion.header>
 
@@ -183,7 +167,7 @@ export function AuthPage() {
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
-        className="relative min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+        className="relative min-w-0 md:col-start-2 md:row-span-2 md:row-start-1"
       >
         {/* The glow hugs the card only (not the links under it) and never takes a click. */}
         <div className="relative">
@@ -253,9 +237,7 @@ export function AuthPage() {
                     { value: 'register', label: 'Регистрация' },
                   ]}
                 />
-                <h2 className="mt-6 font-display text-2xl font-bold">
-                  {mode === 'login' ? 'Здравей отново!' : 'Създай профил'}
-                </h2>
+                <h2 className="mt-6 t-section">{mode === 'login' ? 'Здравей отново!' : 'Създай профил'}</h2>
                 <p className="mt-1 text-sm text-fg-3">
                   {mode === 'login'
                     ? 'Влез и продължи там, където спря.'
@@ -365,28 +347,47 @@ export function AuthPage() {
             )}
           </Card>
         </div>
-        <LegalLinks className="mt-4 justify-center" />
       </motion.div>
 
-      <ul className="relative grid gap-3 sm:grid-cols-3 lg:col-start-1 lg:row-start-2 lg:max-w-xl lg:self-start">
+      <ul className="relative grid gap-3 sm:grid-cols-3 md:col-start-1 md:row-start-2 md:grid-cols-1 md:self-start lg:max-w-xl lg:grid-cols-3">
         {FEATURES.map((f, i) => (
           <motion.li
             key={f.title}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 + i * 0.1 }}
-            className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4"
+            className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4 md:flex lg:block"
           >
             <div aria-hidden className="text-2xl">
               {f.icon}
             </div>
             <div>
-              <div className="text-sm font-bold sm:mt-2">{f.title}</div>
+              <div className="text-sm font-bold sm:mt-2 md:mt-0 lg:mt-2">{f.title}</div>
               <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
             </div>
           </motion.li>
         ))}
       </ul>
+
+      {/* After the pitch on phones; under the card from tablets up. */}
+      <LegalLinks className="justify-center md:col-start-2 md:row-start-3" />
+      {/* Floating avatars: last in the page, so search engines don't take them for its opening words. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        {FLOATERS.map((e, i) => (
+          <span
+            key={e}
+            className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
+            style={{
+              left: `${(i * 37) % 95}%`,
+              top: `${(i * 53 + 7) % 90}%`,
+              animationDelay: `${-i * 0.9}s`,
+              animationDuration: `${5 + (i % 4)}s`,
+            }}
+          >
+            {e}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -477,7 +478,7 @@ function ChallengeLanding({
     return (
       <div role="alert" className="grid place-items-center gap-3 py-10 text-center">
         <TriangleAlert aria-hidden className="size-8 text-rose-300" />
-        <p className="font-display text-lg font-bold">Предизвикателството не се зареди</p>
+        <p className="t-card">Предизвикателството не се зареди</p>
         <p className="max-w-xs text-sm text-fg-3">{error.message}</p>
         <Button variant="secondary" className="mt-1" onClick={onRetry}>
           <RotateCcw aria-hidden className="size-4" /> Опитай пак
@@ -514,7 +515,7 @@ function ChallengeLanding({
         <span aria-hidden className="text-5xl">
           🔗
         </span>
-        <h2 className="mt-3 font-display text-2xl font-bold">Линкът не работи</h2>
+        <h2 className="mt-3 t-section">Линкът не работи</h2>
         <p className="mt-2 text-sm text-fg-3">
           Няма такова предизвикателство — линкът може да е непълен или вече изтрит. Можеш да играеш и без него.
         </p>
@@ -531,10 +532,7 @@ function ChallengeLanding({
   const { creator, topScore, players, expired } = preview;
   return (
     <div>
-      <p
-        className="flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase"
-        style={{ color: mode.accent[0] }}
-      >
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
         <Swords aria-hidden className="size-3.5" /> Предизвикателство
         {expired && (
           <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">
@@ -641,7 +639,7 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
       >
         <ArrowLeft className="size-4" /> Обратно към вход
       </button>
-      <h2 className="mt-5 font-display text-2xl font-bold">Забравена парола</h2>
+      <h2 className="mt-5 t-section">Забравена парола</h2>
       {sent ? (
         <div className="mt-4 space-y-3 text-sm text-fg-2">
           <p className="rounded-2xl bg-emerald-500/10 p-4 text-emerald-200">

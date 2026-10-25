@@ -38,7 +38,7 @@ export function SeasonRecap() {
   if (!reward) return null;
   return (
     <Modal open={open} onClose={close} labelledBy={headingId} className="max-w-md text-center">
-      <p className="text-xs font-bold tracking-[0.3em] text-fg-3 uppercase">Сезонът приключи</p>
+      <p className="t-eyebrow text-fg-3">Сезонът приключи</p>
       <h2 id={headingId} className="mt-2 font-display text-2xl font-bold">
         {seasonName(reward.season)}
       </h2>

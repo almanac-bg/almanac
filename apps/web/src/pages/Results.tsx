@@ -184,7 +184,7 @@ export function Results({ game }: { game: LiveGame }) {
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
       <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-        <p className="text-xs font-bold tracking-[0.3em] text-fg-3 uppercase">
+        <p className="t-eyebrow text-fg-3">
           {MODES[end.mode].name}
           {solo && category && ` · ${category.name}`}
         </p>
@@ -196,7 +196,8 @@ export function Results({ game }: { game: LiveGame }) {
           transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.1 }}
           className={clsx(
             'mt-3 font-display leading-none font-black outline-none',
-            longWord ? 'text-[clamp(1.75rem,10vw,5rem)]' : 'text-[clamp(2.6rem,9vw,5rem)]',
+            longWord ? 'text-[clamp(1.75rem,8.5vw,4.5rem)]' : 'text-[clamp(2.25rem,7vw,4.5rem)]',
+            'text-balance',
             won
               ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'
               : 'text-gradient',
@@ -261,7 +262,8 @@ export function Results({ game }: { game: LiveGame }) {
       <div
         className={clsx(
           'mt-10 grid grid-cols-[minmax(0,1fr)] gap-4',
-          sideCards ? 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]' : 'mx-auto max-w-2xl',
+          // Cards keep their own height: stretched to the tallest one, the rewards card would end in an empty block.
+          sideCards ? 'md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-start' : 'mx-auto max-w-2xl',
           !rewardsCard && !sideCards && 'hidden',
         )}
       >
@@ -363,11 +365,11 @@ function ChallengeStanding({
       <Card className="relative overflow-hidden p-6 text-center sm:p-7">
         <div
           aria-hidden
-          className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-lime-400/20 blur-3xl"
+          className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-indigo-400/20 blur-3xl"
         />
         {first ? (
           <>
-            <h2 className="relative font-display text-lg font-bold">Сега прати линка</h2>
+            <h2 className="relative t-card">Сега прати линка</h2>
             <p className="relative mx-auto mt-2 max-w-sm text-sm text-fg-2">
               Всеки, който го отвори, играе същите {questions} въпроса веднъж, без жокери. Линкът важи 7 дни.
             </p>
@@ -379,7 +381,7 @@ function ChallengeStanding({
               <span
                 className={clsx(
                   'font-display text-5xl font-black',
-                  challenge.rank === 1 ? 'text-amber-300' : 'text-lime-300',
+                  challenge.rank === 1 ? 'text-amber-300' : 'text-indigo-300',
                 )}
               >
                 #{challenge.rank}
@@ -539,7 +541,7 @@ function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload }) {
               />
               <div className="relative flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-display text-lg font-bold" style={{ color }}>
+                  <p className="t-card" style={{ color }}>
                     {won && <span className="mr-1.5">👑</span>}
                     {TEAMS[team].name}
                   </p>
@@ -593,7 +595,7 @@ function DailyCard({
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
-      <h2 className="relative font-display text-lg font-bold">Твоето място днес</h2>
+      <h2 className="relative t-card">Твоето място днес</h2>
       <div className="relative mt-3 flex items-baseline gap-2">
         <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
         <span className="text-fg-2">от {fmt(daily.total)} днес</span>
@@ -667,7 +669,7 @@ function RewardsCard({ rewards }: { rewards: MatchRewards }) {
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -left-10 size-48 rounded-full bg-violet-600/25 blur-3xl" />
       <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="font-display text-lg font-bold">Награди</h2>
+        <h2 className="t-card">Награди</h2>
         <span className="font-display text-2xl font-black text-violet-300 sm:text-3xl">
           +{fmt(rewards.xpGained)} XP
         </span>
@@ -728,7 +730,7 @@ function AchievementsCard({ ids }: { ids: string[] }) {
   }, []);
   return (
     <Card className="p-6">
-      <h2 className="font-display text-lg font-bold">Нови постижения</h2>
+      <h2 className="t-card">Нови постижения</h2>
       <div className="mt-4 space-y-2.5">
         {ids.map((id, i) => {
           const a = achievementById(id)!;
@@ -768,7 +770,7 @@ function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
   return (
     <Card className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4">
-        <h2 className="font-display text-lg font-bold">Отключено</h2>
+        <h2 className="t-card">Отключено</h2>
         <Link
           to="/locker"
           className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-violet-300 hover:text-violet-200"
@@ -801,7 +803,7 @@ function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
 function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_contest'>; guest: boolean }) {
   return (
     <Card className="p-6">
-      <h2 className="font-display text-lg font-bold">Рейтинг</h2>
+      <h2 className="t-card">Рейтинг</h2>
       <p className="mt-2 text-sm text-fg-2">
         {reason === 'pair'
           ? `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`
@@ -819,7 +821,7 @@ function RatingCard({ rating }: { rating: { before: number; after: number } }) {
   return (
     <Card className="flex items-center justify-between gap-4 p-6">
       <div>
-        <h2 className="font-display text-lg font-bold">Рейтинг</h2>
+        <h2 className="t-card">Рейтинг</h2>
         <div className="mt-2 flex items-center gap-2">
           <RankBadge rating={rating.after} />
           {promoted && <span className="text-sm font-bold text-amber-300">Нов ранг!</span>}

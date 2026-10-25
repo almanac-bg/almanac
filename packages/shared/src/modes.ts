@@ -58,7 +58,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     tagline: 'Твоите 10 въпроса. Кой ще те бие?',
     description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без жокери.',
-    accent: ['#a3e635', '#14b8a6'],
+    accent: ['#a5b4fc', '#8b5cf6'],
   },
   duel: {
     id: 'duel',

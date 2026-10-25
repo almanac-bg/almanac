@@ -71,7 +71,8 @@ function Arena({ game }: { game: LiveGame }) {
 
       <div
         className={clsx(
-          'mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 pt-4 pb-28 sm:px-6',
+          // Wider screens: the match sits a little lower than the very top, rather than pinned under the bar.
+          'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 pb-28 sm:px-6 md:pt-[6vh]',
           !single && 'lg:grid-cols-[minmax(0,1fr)_320px]',
         )}
       >
@@ -269,9 +270,10 @@ function Intro({ game }: { game: LiveGame }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className="flex flex-col items-center py-8 text-center sm:py-12"
+      // The countdown is the only thing on screen: in the middle of it.
+      className="flex min-h-[55dvh] flex-col items-center justify-center py-8 text-center"
     >
-      <p className="text-xs font-bold tracking-[0.3em] text-fg-3 uppercase">{mode.name}</p>
+      <p className="t-eyebrow text-fg-3">{mode.name}</p>
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
@@ -761,6 +763,8 @@ function AnswerButton({
             : state === 'wrong'
               ? 'border-rose-400/70 bg-rose-500/20'
               : 'glass hover:bg-white/[0.08]',
+          // Your own pick, once the answer is out: a ring in the result's colour (the pick's accent outline is gone).
+          revealed && selected && (correct ? 'ring-2 ring-emerald-200/70' : 'ring-2 ring-rose-200/70'),
           removed && 'line-through',
         )}
         style={
@@ -860,7 +864,7 @@ function Scoreboard({ game }: { game: LiveGame }) {
   if (game.start.teams) return <TeamScoreboard game={game} />;
   return (
     <div className="glass sticky top-20 rounded-3xl p-3">
-      <p className="px-2 pt-1 pb-2 text-xs font-bold tracking-widest text-fg-3 uppercase">Класиране</p>
+      <p className="px-2 pt-1 pb-2 t-eyebrow text-fg-3">Класиране</p>
       <ul className="space-y-1">
         {game.standings.map((s) => (
           <ScoreRow key={s.id} game={game} standing={s} />
@@ -891,7 +895,7 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
               </span>
               {myTeam === team && <span className="text-xs font-semibold text-fg-3">· твоят отбор</span>}
               {leader === team && <span className="text-sm">👑</span>}
-              <TeamTotal value={totals[team]} className="ml-auto font-display text-lg font-bold" />
+              <TeamTotal value={totals[team]} className="ml-auto t-card" />
             </div>
             <ul className="space-y-1 p-2">
               {members.map((s) => (

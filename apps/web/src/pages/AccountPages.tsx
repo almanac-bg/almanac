@@ -124,7 +124,7 @@ export function ResetPasswordPage() {
   return (
     <Centered>
       <KeyRound className="size-8 text-violet-300" />
-      <h1 className="mt-3 font-display text-2xl font-bold">Нова парола</h1>
+      <h1 className="mt-3 t-section">Нова парола</h1>
       {!token ? (
         <p className="mt-3 text-sm text-rose-300">Линкът е непълен. Отвори го отново от писмото.</p>
       ) : (
@@ -185,7 +185,7 @@ export function VerifyEmailPage() {
       ) : state === 'done' ? (
         <div className="text-center">
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
-          <h1 className="mt-3 font-display text-2xl font-bold">Имейлът е потвърден</h1>
+          <h1 className="mt-3 t-section">Имейлът е потвърден</h1>
           <p className="mt-2 text-sm text-fg-2">Вече можеш да възстановиш паролата си, ако някога я забравиш.</p>
           <Link to="/" className={clsx('mt-6', buttonClass())}>
             {signedIn ? 'Към играта' : 'Към входа'}
@@ -194,7 +194,7 @@ export function VerifyEmailPage() {
       ) : (
         <div className="text-center">
           <XCircle className="mx-auto size-12 text-rose-400" />
-          <h1 className="mt-3 font-display text-2xl font-bold">Не стана</h1>
+          <h1 className="mt-3 t-section">Не стана</h1>
           <p className="mt-2 text-sm text-fg-2">{state.error}</p>
           <Link to={signedIn ? '/settings' : '/'} className={clsx('mt-6', buttonClass({ variant: 'secondary' }))}>
             {signedIn ? 'Към настройките' : 'Към входа'}
@@ -214,7 +214,7 @@ export function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-bold">Настройки</h1>
+          <h1 className="t-page">Настройки</h1>
           <p className="mt-1 text-fg-2 [overflow-wrap:anywhere]">
             {me.isGuest ? 'Профил на гост' : 'Профил'} <b className="text-fg">{me.username}</b>
           </p>
@@ -391,11 +391,12 @@ function SwitchCard({
   const id = useId();
   return (
     <Card className="p-6">
-      <div className="flex items-center gap-4">
+      {/* The switch sits level with the title, not halfway down a long description. */}
+      <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 [&>svg]:shrink-0">
             {icon}
-            <h2 id={`${id}-label`} className="font-display text-lg font-bold">
+            <h2 id={`${id}-label`} className="t-card">
               {title}
             </h2>
           </div>
@@ -539,7 +540,7 @@ function ClaimSettings() {
     <Card className="border-amber-300/25 bg-amber-400/[0.06] p-6">
       <div className="flex items-center gap-2">
         <Save className="size-5 text-amber-300" />
-        <h2 className="font-display text-lg font-bold">Запази прогреса</h2>
+        <h2 className="t-card">Запази прогреса</h2>
       </div>
       <p className="mt-1 text-sm text-fg-2">
         Играеш като гост: профилът е само на това устройство. Ако излезеш или изчистиш данните на браузъра, нивото,
@@ -589,7 +590,7 @@ function DataSettings() {
     <Card className="p-6">
       <div className="flex items-center gap-2">
         <ShieldAlert className="size-5 text-violet-300" />
-        <h2 className="font-display text-lg font-bold">Твоите данни</h2>
+        <h2 className="t-card">Твоите данни</h2>
       </div>
       <p className="mt-1 text-sm text-fg-3">
         Виж как ги пазим в{' '}
@@ -688,7 +689,7 @@ function EmailSettings() {
     <Card className="p-6">
       <div className="flex items-center gap-2">
         <Mail className="size-5 text-violet-300" />
-        <h2 className="font-display text-lg font-bold">Имейл</h2>
+        <h2 className="t-card">Имейл</h2>
       </div>
       <p className="mt-1 text-sm text-fg-3">
         За нова парола, ако забравиш старата, и за напомнянето за серията, ако го включиш. Не го показваме на никого.
@@ -773,7 +774,7 @@ function EmailSettings() {
           aria-label="Парола за потвърждение"
           className={`${INPUT} min-w-0 sm:flex-1`}
         />
-        <Button type="submit" size="lg" className="w-full sm:w-auto" loading={busy === 'save'}>
+        <Button type="submit" variant="secondary" size="lg" className="w-full sm:w-auto" loading={busy === 'save'}>
           {me.email ? 'Смени' : 'Добави'}
         </Button>
       </form>
@@ -808,7 +809,7 @@ function PasswordSettings() {
     <Card className="p-6">
       <div className="flex items-center gap-2">
         <KeyRound className="size-5 text-violet-300" />
-        <h2 className="font-display text-lg font-bold">Парола</h2>
+        <h2 className="t-card">Парола</h2>
       </div>
       <form noValidate onSubmit={submit} className="mt-4 space-y-4">
         <PasswordField label="Текуща парола" value={current} onChange={setCurrent} autoComplete="current-password" />
@@ -824,7 +825,7 @@ function PasswordSettings() {
             {error}
           </p>
         )}
-        <Button type="submit" loading={busy}>
+        <Button type="submit" variant="secondary" loading={busy}>
           Смени паролата
         </Button>
       </form>

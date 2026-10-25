@@ -64,7 +64,7 @@ export function LaunchStatsPanel() {
       </div>
 
       <Card className="p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold">Активни играчи на ден</h2>
+        <h2 className="t-card">Активни играчи на ден</h2>
         <p className="text-sm text-fg-3">
           Изиграли поне един мач · последните 30 дни · общо {fmt(totals.accounts)} профила, {fmt(totals.guests)} гости,{' '}
           {fmt(totals.matches)} мача
@@ -165,7 +165,7 @@ function useMoreToTheRight(ready: boolean) {
 function Tile({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card className="p-4 sm:p-5">
-      <p className="text-xs font-semibold tracking-wide text-fg-3 uppercase">{label}</p>
+      <p className="t-eyebrow text-fg-3">{label}</p>
       <p className="mt-1 font-display text-3xl font-bold tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-fg-3">{hint}</p>
     </Card>

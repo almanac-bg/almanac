@@ -186,7 +186,7 @@ function HiddenQuestions({
 
   return (
     <section className="space-y-3 pt-4">
-      <h2 className="font-display text-lg font-bold">Скрити въпроси ({questions.length})</h2>
+      <h2 className="t-card">Скрити въпроси ({questions.length})</h2>
       {questions.map((q) => (
         <Card key={q.id} className="p-5">
           <QuestionCard question={q}>

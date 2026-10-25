@@ -14,7 +14,7 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
         <Logo />
       </Link>
       <Card className="mt-6 bg-ink-2/70 p-6 sm:p-10">
-        <h1 className="font-display text-2xl font-bold sm:text-3xl">{title}</h1>
+        <h1 className="t-page">{title}</h1>
         <p className="mt-2 text-sm text-fg-3">Последна промяна: {LEGAL.updated}</p>
         <div className="mt-8 space-y-8 text-[15px] leading-relaxed text-fg-2 [&_a]:text-violet-300 [&_a]:underline [&_b]:text-fg [&_li]:mt-1.5 [&_ul]:list-disc [&_ul]:pl-5">
           {children}
@@ -28,7 +28,7 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-3 font-display text-lg font-bold text-fg">{title}</h2>
+      <h2 className="mb-3 t-card text-fg">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
   );

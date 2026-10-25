@@ -38,7 +38,7 @@ export function ChallengeCard({ className }: { className?: string }) {
   return (
     // Sized by its own width: beside another card it stacks, across the whole row the list moves to the side.
     <Card className={clsx('@container relative overflow-hidden p-5 sm:p-7', className)}>
-      <div aria-hidden className="absolute -bottom-20 -left-12 size-56 rounded-full bg-lime-500/15 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-20 -left-12 size-56 rounded-full bg-indigo-500/15 blur-3xl" />
       <div
         className={clsx(
           'relative grid grid-cols-[minmax(0,1fr)] gap-5',
@@ -46,11 +46,11 @@ export function ChallengeCard({ className }: { className?: string }) {
         )}
       >
         <div className="flex min-w-0 flex-col">
-          <div className="flex items-center gap-2 text-lime-300">
+          <div className="flex items-center gap-2 text-indigo-300">
             <Link2 aria-hidden className="size-5" />
-            <span className="text-xs font-bold tracking-widest uppercase">С линк</span>
+            <span className="t-eyebrow">С линк</span>
           </div>
-          <h2 className="mt-2 font-display text-xl font-bold">Предизвикай приятел</h2>
+          <h2 className="mt-2 t-card">Предизвикай приятел</h2>
           <p className="mt-1 max-w-md text-sm text-fg-3">
             {MODES.challenge.questions} въпроса, без жокери. Изиграй ги и прати линка: всеки, който го отвори, играе
             същите въпроси веднъж. Линкът важи 7 дни.
@@ -62,7 +62,7 @@ export function ChallengeCard({ className }: { className?: string }) {
               </GuestNudge>
             ) : (
               // The label is long: on the narrowest phones the icon and some padding make way for it.
-              <Button onClick={create} loading={busy} className="w-full @max-2xs:px-3 @sm:w-auto">
+              <Button variant="secondary" onClick={create} loading={busy} className="w-full @max-2xs:px-3 @sm:w-auto">
                 <Swords className="size-4 @max-2xs:hidden" /> Създай предизвикателство
               </Button>
             )}
@@ -72,7 +72,7 @@ export function ChallengeCard({ className }: { className?: string }) {
           <LoadError compact title="Предизвикателствата ти не се заредиха" error={mine.error} onRetry={mine.retry} />
         ) : recent.length > 0 ? (
           <section aria-labelledby="my-challenges" className="min-w-0">
-            <h3 id="my-challenges" className="mb-2.5 text-xs font-bold tracking-widest text-fg-3 uppercase">
+            <h3 id="my-challenges" className="mb-2.5 t-eyebrow text-fg-3">
               Твоите предизвикателства
             </h3>
             <ul className="space-y-2">

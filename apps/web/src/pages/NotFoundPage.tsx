@@ -21,7 +21,7 @@ export function NotFoundPage({ standalone = false }: { standalone?: boolean }) {
         <p className="text-gradient font-display text-6xl font-black" aria-hidden>
           404
         </p>
-        <h1 className="mt-4 font-display text-2xl font-bold">Тази страница не съществува</h1>
+        <h1 className="mt-4 t-section">Тази страница не съществува</h1>
         <p className="mt-2 text-sm text-fg-2">Може линкът да е непълен или страницата вече да я няма.</p>
         <Link to="/" className={clsx(buttonClass({ size: 'lg' }), 'mt-6 w-full')}>
           Към началото

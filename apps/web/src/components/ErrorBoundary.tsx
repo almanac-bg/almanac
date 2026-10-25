@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
         <Background />
         <Card className="max-w-md p-8 text-center">
           <div className="text-5xl">🧯</div>
-          <h1 className="mt-4 font-display text-2xl font-bold">Нещо се обърка</h1>
+          <h1 className="mt-4 t-section">Нещо се обърка</h1>
           <p className="mt-2 text-fg-2">
             Получихме сигнал за грешката и ще я оправим. Презареди страницата, за да продължиш — профилът и прогресът ти
             са запазени.

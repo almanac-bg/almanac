@@ -25,7 +25,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
         className="focus-ring flex w-full items-center justify-between gap-4 rounded-3xl p-5 text-left sm:px-6"
       >
         <div>
-          <h2 className="font-display text-lg font-bold">Преглед на въпросите</h2>
+          <h2 className="t-card">Преглед на въпросите</h2>
           <p className="text-sm text-fg-3">
             {right} от {items.length} верни
             {canReport && (

@@ -214,11 +214,7 @@ function JokerList({
         intro ? 'border-amber-300/35 bg-amber-400/[0.07]' : 'border-line bg-white/[0.03]',
       )}
     >
-      {intro && (
-        <p className="mb-2 text-[11px] font-extrabold tracking-widest text-amber-300 uppercase">
-          {jokers.length === 1 ? 'Нов жокер' : 'Нови жокери'}
-        </p>
-      )}
+      {intro && <p className="mb-2 t-eyebrow text-amber-300">{jokers.length === 1 ? 'Нов жокер' : 'Нови жокери'}</p>}
       <ul className="space-y-2">
         {jokers.map((p) => {
           const blocked = intro ? null : blockedBy(p);

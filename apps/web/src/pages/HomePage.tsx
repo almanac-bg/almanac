@@ -51,7 +51,7 @@ import { useOpenQueues } from '../components/home/openQueues';
 import { QuestsCard } from '../components/home/QuestsCard';
 import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
-import { Button, Card, Modal, ProgressBar, Spinner } from '../components/ui';
+import { Button, buttonClass, Card, Modal, ProgressBar, Spinner } from '../components/ui';
 import { accentFill } from '../lib/accent';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
@@ -111,13 +111,13 @@ export function HomePage() {
       <EmailNudge />
 
       {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
-          From lg up the same pieces form a grid with the modes across the middle and "today" under them. */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-x-4 lg:gap-y-8">
-        <ProfileCard className="lg:col-start-1 lg:row-start-1" />
+          From tablets up (md) the same pieces form a grid with the modes across the middle and "today" under them. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2 md:gap-x-4 md:gap-y-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <ProfileCard className="md:col-start-1 md:row-start-1" />
 
-        <section aria-labelledby="modes-title" className="lg:col-span-2 lg:row-start-2">
+        <section aria-labelledby="modes-title" className="md:col-span-2 md:row-start-2">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-            <h2 id="modes-title" className="font-display text-xl font-bold sm:text-2xl">
+            <h2 id="modes-title" className="t-section">
               Избери битка
             </h2>
             {lobby && lobby.inGame >= LIVE_COUNT_MIN && (
@@ -152,11 +152,11 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard className="lg:col-start-1 lg:row-start-3" />
-        <QuestsCard className="lg:col-start-2 lg:row-start-3" />
-        <ChallengeCard className={clsx('lg:col-start-1 lg:row-start-4', !community && 'lg:col-span-2')} />
-        <FriendsCard className="lg:col-start-2 lg:row-start-1" />
-        {community && <CommunityCard className="lg:col-start-2 lg:row-start-4" />}
+        <DailyCard className="md:col-start-1 md:row-start-3" />
+        <QuestsCard className="md:col-start-2 md:row-start-3" />
+        <ChallengeCard className={clsx('md:col-start-1 md:row-start-4', !community && 'md:col-span-2')} />
+        <FriendsCard className="md:col-start-2 md:row-start-1" />
+        {community && <CommunityCard className="md:col-start-2 md:row-start-4" />}
       </div>
 
       <SoloPicker open={soloOpen} onClose={() => setSoloOpen(false)} />
@@ -195,7 +195,8 @@ function ProfileCard({ className }: { className?: string }) {
         <div className="min-w-0">
           <p className="text-sm text-fg-3">Здравей,</p>
           {/* Names run to 20 characters: wrap them (even mid-word) onto a second line rather than cut them off. */}
-          <h1 className="line-clamp-2 font-display text-xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl">
+          {/* Half the width on tablets: a size down there, so a name doesn't break mid-word. */}
+          <h1 className="line-clamp-2 font-display text-xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl md:text-2xl lg:text-3xl">
             {me.username}
           </h1>
           <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
@@ -292,7 +293,8 @@ function ModeCard({
           {mode.players}
         </span>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* In a narrow card the chips wrap before they reach the big numeral in the corner. */}
+        <div className={clsx('flex flex-wrap items-center gap-2', !big && '@max-sm:pr-16')}>
           <span
             className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider uppercase"
             style={accentFill(mode)}
@@ -324,19 +326,22 @@ function ModeCard({
           {mode.tagline}
         </p>
         <p className={clsx('mt-2 text-sm text-fg-3', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>{mode.description}</p>
+        {/* Desktop: the card is two rows tall, so it lists what you can train in instead of leaving the space empty. */}
         {big && (
-          <div className="mt-6 hidden max-w-xs flex-wrap gap-2 lg:flex">
+          <ul aria-label="Категории" className="mt-6 hidden grid-cols-2 gap-2 lg:grid">
             {CATEGORIES.map((c, i) => (
-              <span
+              <li
                 key={c.id}
-                title={c.name}
-                className="grid size-10 place-items-center rounded-xl border border-line bg-white/5 text-lg transition-transform duration-300 group-hover:-translate-y-1"
+                className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-white/5 px-2.5 py-2 text-xs font-semibold text-fg-2 transition-transform duration-300 group-hover:-translate-y-0.5"
                 style={{ transitionDelay: `${i * 25}ms` }}
               >
-                {c.icon}
-              </span>
+                <span aria-hidden className="text-base leading-none">
+                  {c.icon}
+                </span>
+                <span className="leading-tight">{c.name}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-5 sm:pt-6">
@@ -351,8 +356,9 @@ function ModeCard({
             onClick={onPlay}
             className="shrink-0 outline-none after:absolute after:inset-0 after:content-['']"
           >
+            {/* A real button's size and shape, in the mode's colours: the main action of the page. */}
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold shadow-lg transition-transform group-hover:translate-x-0.5"
+              className={clsx(buttonClass({ variant: 'accent' }), 'group-hover:translate-x-0.5')}
               style={{ ...accentFill(mode), boxShadow: `0 8px 24px -8px ${a}` }}
             >
               Играй <span className="sr-only">{mode.name}</span>
@@ -449,16 +455,16 @@ function FriendsCard({ className }: { className?: string }) {
       <div className="relative">
         <div className="flex items-center gap-2 text-fuchsia-300">
           <Users className="size-5" />
-          <span className="text-xs font-bold tracking-widest uppercase">С приятели</span>
+          <span className="t-eyebrow">С приятели</span>
         </div>
-        <h2 className="mt-2 font-display text-xl font-bold">Частна стая</h2>
+        <h2 className="mt-2 t-card">Частна стая</h2>
         <p className="mt-1 text-sm text-fg-3">
           {guest
             ? 'До 8 играчи. Имаш код от приятел? Въведи го и влизаш в стаята.'
             : 'До 8 играчи, твои правила. Сподели кода и започвай.'}
         </p>
         {!guest && (
-          <Button className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
+          <Button variant="secondary" className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
             <Plus className="size-4" /> Създай стая
           </Button>
         )}
@@ -686,7 +692,8 @@ function DailyCard({ className }: { className?: string }) {
             {/* Last in the row: its explanation opens as a line of its own under the chips. */}
             {(streak > 0 || me.daily.shields > 0) && <StreakShields shields={me.daily.shields} streak={streak} />}
           </div>
-          <h2 className="mt-3 font-display text-xl font-bold sm:text-2xl">{DAILY_TITLE}</h2>
+          {/* The soft hyphen is for 320 px phones; wider, the long word just goes to the next line. */}
+          <h2 className="mt-3 t-card md:[hyphens:none] lg:text-2xl">{DAILY_TITLE}</h2>
           <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
 
           <div className="mt-auto pt-5">
@@ -736,7 +743,7 @@ function DailyCard({ className }: { className?: string }) {
 
         {!failed && (
           <div className="rounded-2xl border border-line bg-black/20 p-4">
-            <p className="mb-3 text-xs font-bold tracking-widest text-fg-3 uppercase">Топ на деня</p>
+            <p className="mb-3 t-eyebrow text-fg-3">Топ на деня</p>
             {!info ? (
               <div className="grid place-items-center py-4">
                 <Spinner className="size-5 text-amber-300" />
@@ -804,9 +811,9 @@ function CommunityCard({ className }: { className?: string }) {
       <div className="absolute -right-10 -bottom-16 size-48 rounded-full bg-emerald-500/15 blur-3xl" />
       <div className="relative flex items-center gap-2 text-emerald-300">
         <PenLine className="size-5" />
-        <span className="text-xs font-bold tracking-widest uppercase">Общност</span>
+        <span className="t-eyebrow">Общност</span>
       </div>
-      <h2 className="relative mt-2 font-display text-xl font-bold">Предложи въпрос</h2>
+      <h2 className="relative mt-2 t-card">Предложи въпрос</h2>
       <p className="relative mt-1 text-sm text-fg-3">
         Знаеш нещо интересно? Изпрати въпрос — одобрените влизат в играта с твоето име и +{SUBMISSION_RULES.approvedXp}{' '}
         XP.

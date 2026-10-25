@@ -19,7 +19,7 @@ export function SubmitPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-3xl font-bold">Предложи въпрос</h1>
+        <h1 className="t-page">Предложи въпрос</h1>
         <p className="mt-1 max-w-2xl text-fg-2">
           Измисли въпрос за играта. Модератор го преглежда и ако бъде одобрен, влиза в мачовете с твоето име — плюс{' '}
           <b className="text-violet-300">{SUBMISSION_RULES.approvedXp} XP</b> и прогрес към постиженията „Първо перо“ и
@@ -46,7 +46,7 @@ function LockedCard({ level }: { level: number }) {
       <span className="grid size-16 place-items-center rounded-2xl bg-white/5">
         <Lock className="size-7 text-fg-3" />
       </span>
-      <h2 className="font-display text-xl font-bold">Отключва се на ниво {SUBMISSION_RULES.minLevel}</h2>
+      <h2 className="t-card">Отключва се на ниво {SUBMISSION_RULES.minLevel}</h2>
       <p className="max-w-sm text-sm text-fg-2">
         Изиграй още няколко мача — нужни са ти още {plural(SUBMISSION_RULES.minLevel - level, 'ниво', 'нива')}, за да
         предлагаш въпроси.
@@ -97,7 +97,7 @@ function SubmitForm() {
         </form>
       </Card>
       <div className="lg:sticky lg:top-24 lg:self-start">
-        <p className="mb-3 text-xs font-bold tracking-widest text-fg-3 uppercase">Преглед</p>
+        <p className="mb-3 t-eyebrow text-fg-3">Преглед</p>
         <QuestionPreview draft={draft} />
         <p className="mt-4 text-xs text-fg-3">
           Съвет: един безспорно верен отговор и три правдоподобни грешни. Без въпроси, чийто отговор се променя с

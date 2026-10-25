@@ -51,10 +51,10 @@ export function AdminPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="flex items-center gap-1.5 text-xs font-bold tracking-widest text-emerald-300 uppercase">
+          <p className="flex items-center gap-1.5 t-eyebrow text-emerald-300">
             <ShieldCheck className="size-4" /> Модератор
           </p>
-          <h1 className="mt-1 font-display text-3xl font-bold">Модерация</h1>
+          <h1 className="mt-1 t-page">Модерация</h1>
         </div>
         <Segmented
           value={section}

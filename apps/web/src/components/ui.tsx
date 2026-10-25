@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'accent';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
@@ -15,11 +15,14 @@ const VARIANTS: Record<Variant, string> = {
   // rose-600, darker on hover: white on rose-500 is under 4:1.
   danger: 'text-white bg-rose-600 hover:bg-rose-700 shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
   gold: 'text-amber-950 bg-[linear-gradient(110deg,#fde68a,#f59e0b)] shadow-[0_8px_28px_-10px_rgb(245_158_11/0.8)] hover:brightness-105',
+  // A game mode's own colours, given by the caller (style={accentFill(mode)}).
+  accent: 'hover:brightness-110',
 };
 
 const SIZES: Record<Size, string> = {
   // Compact for a mouse, a full 44px tap target on touch screens.
-  sm: 'h-9 pointer-coarse:h-11 px-3.5 text-sm rounded-xl gap-1.5',
+  // One control radius at every size; fully round corners are for chips and badges.
+  sm: 'h-9 pointer-coarse:h-11 px-3.5 text-sm rounded-2xl gap-1.5',
   md: 'h-11 px-5 text-[15px] rounded-2xl gap-2',
   lg: 'h-14 px-7 text-base rounded-2xl gap-2.5',
 };
@@ -75,7 +78,7 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
 export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-4">
-      <h2 className="font-display text-lg font-bold tracking-tight sm:text-xl">{children}</h2>
+      <h2 className="t-section">{children}</h2>
       {aside}
     </div>
   );
