@@ -6,7 +6,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
-import { type GameEndPayload, type GamePlayer, RATED_GAMES_PER_PAIR, shiftDay } from '@quiz/shared';
+import {
+  type GameEndPayload,
+  type GamePlayer,
+  POWERUPS,
+  RATED_GAMES_PER_PAIR,
+  shiftDay,
+  xpToReach,
+} from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
@@ -16,10 +23,13 @@ process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 process.env.BACKUP_DIR = 'off';
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { Game } = await import('../src/game/Game');
-const { finalizeMatch } = await import('../src/game/rewards');
+const { botK, finalizeMatch } = await import('../src/game/rewards');
+const { buildHuman } = await import('../src/game/registry');
 const { pickQuestions } = await import('../src/questions');
 const { createGuest } = await import('../src/guests');
 const { questsInfo } = await import('../src/quests');
+const { dailyQuestions, redrawDailyWithout } = await import('../src/daily');
+const { reloadQuestionBank } = await import('../src/questions');
 const { one, run } = await import('../src/db');
 const { getUser, usernameKey } = await import('../src/users');
 
@@ -206,4 +216,105 @@ test('a guest never draws a quest only an account can finish', () => {
   const quests = (userId: number) => days.flatMap((day) => questsInfo(userId, day).quests.map((q) => q.id));
   assert.ok(!quests(g).includes('challenge'));
   assert.ok(quests(a).includes('challenge'), 'accounts do get it');
+});
+
+test('a newcomer draws quests a first day can finish; the harder ones come from level 3', () => {
+  const days = Array.from({ length: 60 }, (_, i) => shiftDay('2026-12-01', i));
+  const drawn = (userId: number) => new Set(days.flatMap((day) => questsInfo(userId, day).quests.map((q) => q.id)));
+  const newcomer = drawn(account());
+  for (const id of ['correct25', 'hard4', 'streak6', 'win2']) assert.ok(!newcomer.has(id), id);
+  assert.ok(![...newcomer].some((id) => id.startsWith('cat:')), 'no category quests yet');
+  assert.ok(newcomer.has('correct15') && newcomer.has('joker1'), 'the starter ones instead');
+
+  const seasonedId = account();
+  run('UPDATE users SET xp = ? WHERE id = ?', xpToReach(3), seasonedId);
+  const seasoned = drawn(seasonedId);
+  for (const id of ['correct25', 'hard4', 'streak6', 'win2']) assert.ok(seasoned.has(id), id);
+  assert.ok(!seasoned.has('correct15') && !seasoned.has('joker1'), 'and the starter ones are behind them');
+});
+
+test('games against bots move a rating less and less above 1000, and not at all from the bots’ ceiling up', () => {
+  assert.equal(botK(800), 24);
+  assert.equal(botK(1000), 24);
+  assert.equal(botK(1300), 12);
+  assert.equal(botK(1600), 0);
+  assert.equal(botK(1900), 0, 'no climbing (or sliding) on bots at the top');
+});
+
+test('in the ranked queues everyone has all five jokers; in solo and rooms, the ones their level has unlocked', () => {
+  const newcomer = account();
+  assert.deepEqual(
+    buildHuman(newcomer, 'duel').powerups,
+    POWERUPS.map((p) => p.id),
+  );
+  assert.deepEqual(buildHuman(newcomer, 'solo').powerups, [], 'level 1 has none of its own yet');
+  assert.deepEqual(buildHuman(newcomer, 'daily').powerups, [], 'and the daily has none for anyone');
+});
+
+test('a private room with nobody else in it is practice: winning there is no win', () => {
+  const host = account();
+  const ends: GameEndPayload[] = [];
+  const game = new Game(
+    {
+      mode: 'custom',
+      ranked: false,
+      roomCode: '12345',
+      hostUserId: host,
+      timeMs: TIME,
+      category: 'mixed',
+      elimination: false,
+      teams: false,
+      dailyDay: null,
+      challengeId: null,
+      questions: pickQuestions(5, 'mixed', new Map()),
+      humans: [{ player: player(host), powerups: [], emotes: [] }],
+      // Pinned luck (0.5): this bot never knows the answer.
+      bots: [{ player: { ...player(0), id: 'b1', userId: null, isBot: true }, brain: { accuracy: 0.2, pace: 0.3 } }],
+    },
+    {
+      toGame: () => {},
+      toUser: (_userId, event, ...args) => {
+        if (event === 'game:end') ends.push(args[0] as GameEndPayload);
+      },
+      toGameExcept: () => {},
+    } satisfies GameEmitter,
+    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
+  );
+  game.start();
+  advance(COUNTDOWN);
+  while (game.phase !== 'ended') {
+    game.answer(`u${host}`, game.index, game.questions[game.index].answer);
+    advance(NEXT_QUESTION + TIME);
+  }
+  const [end] = ends;
+  assert.equal(end.standings[0].id, `u${host}`, 'the room shows who won');
+  assert.ok(!end.rewards!.achievements.includes('first_win'));
+  assert.equal(getUser(host)!.wins, 0);
+});
+
+test('a question hidden before anyone has played the day leaves the day’s set; once someone has, the set stands', () => {
+  const hide = (id: string) => {
+    run('INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, NULL, ?)', id, Date.now());
+    reloadQuestionBank();
+  };
+  try {
+    const fresh = '2027-01-10';
+    const wrong = dailyQuestions(fresh, 1)[3].id;
+    hide(wrong);
+    assert.equal(redrawDailyWithout(wrong, fresh), true);
+    assert.ok(!dailyQuestions(fresh, 1).some((q) => q.id === wrong), 'drawn again without it');
+
+    const started = '2027-01-11';
+    const kept = dailyQuestions(started, 1)[3].id;
+    run('INSERT INTO daily_results (user_id, day, started_at) VALUES (?, ?, ?)', account(), started, Date.now());
+    hide(kept);
+    assert.equal(redrawDailyWithout(kept, started), false);
+    assert.ok(
+      dailyQuestions(started, 1).some((q) => q.id === kept),
+      'the board compares the same ten questions',
+    );
+  } finally {
+    run('DELETE FROM hidden_questions');
+    reloadQuestionBank();
+  }
 });

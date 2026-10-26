@@ -11,6 +11,9 @@ import { all, one, run } from './db';
 import { bestSeasonTier } from './seasons';
 import { getUser } from './users';
 
+/** Right answers in a category that count it as covered for "Всестранен ум". */
+const POLYMATH_PER_CATEGORY = 3;
+
 /** Lifetime numbers achievements are measured against. */
 export interface Aggregate {
   gamesPlayed: number;
@@ -18,11 +21,11 @@ export interface Aggregate {
   wins: number;
   correct: number;
   bestStreak: number;
-  fastestCorrectMs: number | null;
   bestSoloScore: number;
   powerupsUsed: number;
   hostedGames: number;
   level: number;
+  /** Categories with at least POLYMATH_PER_CATEGORY right answers. */
   categoriesCovered: number;
   maxCategoryCorrect: number;
   modeWins: Partial<Record<ModeId, number>>;
@@ -45,6 +48,10 @@ export interface MatchContext {
   /** Played to the last question (the other side didn't walk out). */
   completed: boolean;
   teams: boolean;
+  /** Players were knocked out along the way (Royale, an elimination room). */
+  elimination: boolean;
+  /** This match's fastest right answer to a medium or hard question. */
+  fastestHardCorrectMs: number | null;
   questions: number;
   faced: number;
   correct: number;
@@ -75,7 +82,7 @@ const RULES: Record<string, Rule> = {
   host: { progress: (a) => a.hostedGames },
   streak_5: { progress: (a) => a.bestStreak },
   streak_10: { progress: (a) => a.bestStreak },
-  speed_demon: { earned: (a) => a.fastestCorrectMs !== null && a.fastestCorrectMs < 1500 },
+  speed_demon: { earned: (_, m) => !!m && m.fastestHardCorrectMs !== null && m.fastestHardCorrectMs < 2500 },
   perfect: {
     earned: (_, m) => !!m && !m.left && m.questions >= 10 && m.faced === m.questions && m.correct === m.questions,
   },
@@ -85,7 +92,8 @@ const RULES: Record<string, Rule> = {
   specialist: { progress: (a) => a.maxCategoryCorrect },
   high_scorer: { progress: (a) => a.bestSoloScore },
   power_player: { progress: (a) => a.powerupsUsed },
-  comeback: { earned: (_, m) => !!m && m.won && m.completed && !m.teams && m.lastAtHalfway },
+  // Not with eliminations: whoever is last at halfway is knocked out there.
+  comeback: { earned: (_, m) => !!m && m.won && m.completed && !m.teams && !m.elimination && m.lastAtHalfway },
   flawless_duel: { earned: (_, m) => !!m && m.won && m.mode === 'duel' && m.correct === m.questions },
   photo_finish: { earned: (_, m) => !!m && m.won && m.completed && m.winMargin !== null && m.winMargin < 100 },
   giant_slayer: { earned: (_, m) => !!m && !m.left && m.beatLevelGap >= 5 },
@@ -124,16 +132,19 @@ export function loadAggregate(userId: number): Aggregate {
     wins: u.wins,
     correct: u.correct_answers,
     bestStreak: u.best_streak,
-    fastestCorrectMs: u.fastest_correct_ms,
     bestSoloScore: u.best_solo_score,
     powerupsUsed: u.powerups_used,
     hostedGames: u.hosted_games,
     level: levelFromXp(u.xp),
-    categoriesCovered: cats.filter((c) => c.correct > 0).length,
+    categoriesCovered: cats.filter((c) => c.correct >= POLYMATH_PER_CATEGORY).length,
     maxCategoryCorrect: Math.max(0, ...cats.map((c) => c.correct)),
     modeWins: Object.fromEntries(modeWins.map((r) => [r.mode, r.wins])),
+    // In a private room, only against people: a room of friends against bots is practice.
     teamWins: count(
-      'SELECT COUNT(*) AS n FROM match_players WHERE user_id = ? AND team IS NOT NULL AND placement = 1 AND left_match = 0',
+      `SELECT COUNT(*) AS n FROM match_players mp JOIN matches m ON m.id = mp.match_id
+       WHERE mp.user_id = ? AND mp.team IS NOT NULL AND mp.placement = 1 AND mp.left_match = 0
+         AND (m.room_code IS NULL OR EXISTS (
+           SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team))`,
       userId,
     ),
     maxRating: Math.round(

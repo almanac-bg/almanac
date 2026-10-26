@@ -51,11 +51,15 @@ const categoryQuest = (c: (typeof CATEGORIES)[number]): QuestDef => ({
   count: (e) => e.correctByCategory.get(c.id) ?? 0,
 });
 
+/** From this level on, the quests that take some skill or a certain category; before it, ones a first day can finish. */
+const SEASONED = 3;
+
 /**
- * One quest from each slot: showing up, playing well, and trying something different. `account`: only for players
- * with an account (a guest can't make a challenge link, so couldn't finish it alone).
+ * One quest from each slot: showing up, playing well, and trying something different. `level`/`below`: from that level
+ * on, or only under it (the starter ones). `account`: only for players with an account (a guest can't make a challenge
+ * link, so couldn't finish it alone).
  */
-const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDef }[][] = [
+const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: true; def: QuestDef }[][] = [
   [
     { def: { id: 'play3', icon: '🎮', text: 'Изиграй 3 мача', goal: 3, xp: 60, count: () => 1 } },
     {
@@ -81,6 +85,18 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
   ],
   [
     {
+      below: SEASONED,
+      def: {
+        id: 'correct15',
+        icon: '✅',
+        text: 'Отговори вярно на 15 въпроса',
+        goal: 15,
+        xp: 80,
+        count: (e) => e.correct,
+      },
+    },
+    {
+      level: SEASONED,
       def: {
         id: 'correct25',
         icon: '✅',
@@ -91,6 +107,7 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
       },
     },
     {
+      level: SEASONED,
       def: {
         id: 'hard4',
         icon: '🧠',
@@ -101,6 +118,7 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
       },
     },
     {
+      level: SEASONED,
       def: {
         id: 'streak6',
         icon: '🔥',
@@ -112,6 +130,7 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
       },
     },
     {
+      level: SEASONED,
       def: {
         id: 'win2',
         icon: '🏆',
@@ -123,7 +142,11 @@ const SLOTS: { level?: number; queue?: QueueModeId; account?: true; def: QuestDe
     },
   ],
   [
-    ...CATEGORIES.map((c) => ({ def: categoryQuest(c) })),
+    ...CATEGORIES.map((c) => ({ level: SEASONED, def: categoryQuest(c) })),
+    {
+      below: SEASONED,
+      def: { id: 'joker1', icon: '🃏', text: 'Използвай жокер в мач', goal: 1, xp: 50, count: (e) => e.jokers },
+    },
     {
       queue: 'royale',
       def: {
@@ -181,7 +204,11 @@ function todays(userId: number, day: string): Row[] {
   const rng = seededRng(`quests:${day}:${userId}`);
   const picked = SLOTS.map((slot) => {
     const options = slot.filter(
-      (s) => (s.level ?? 0) <= level && (!s.queue || config.openQueues.includes(s.queue)) && !(s.account && guest),
+      (s) =>
+        (s.level ?? 0) <= level &&
+        level < (s.below ?? Number.POSITIVE_INFINITY) &&
+        (!s.queue || config.openQueues.includes(s.queue)) &&
+        !(s.account && guest),
     );
     return options[Math.floor(rng() * options.length)].def.id;
   });

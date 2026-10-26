@@ -362,6 +362,12 @@ function bind(s: GameSocket) {
 
   s.on('account:update', () => void refreshMe());
 
+  // Kept on the server until seen (the bell's list); said at once to whoever's here.
+  s.on('notification', ({ item, unread }) => {
+    toast({ kind: 'info', icon: item.icon, title: item.text }, 6000);
+    setState((st) => ({ me: st.me && { ...st.me, unreadNotifications: unread } }));
+  });
+
   s.on('notice', ({ kind, message }) => toast({ kind, title: message }));
 
   s.on('server:draining', ({ message }) => setState({ maintenance: message }));

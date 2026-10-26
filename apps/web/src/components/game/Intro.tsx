@@ -3,15 +3,18 @@ import { categoryById, type GamePlayer, MODES, TEAMS, type TeamId } from '@quiz/
 import clsx from 'clsx';
 import { Skull } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { PlayerMark } from './Scoreboard';
+import { SCORING_LINE, takeScoringHint } from './scoring';
 import { myTeamOf, teamColor } from './teams';
 
 /** Before the first question: the countdown, and who plays whom. */
 export function Intro({ game }: { game: LiveGame }) {
+  // Once per match (the countdown screen mounts once): the first few matches spell out how points are counted.
+  const [scoring] = useState(takeScoringHint);
   const now = useNow(100);
   const left = Math.max(0, Math.ceil((game.countdownEndsAt - now) / 1000));
   const lastLeft = useRef(left);
@@ -75,6 +78,7 @@ export function Intro({ game }: { game: LiveGame }) {
           ))}
         </div>
       )}
+      {scoring && <p className="mt-6 max-w-sm text-sm text-balance text-fg-2">{SCORING_LINE}</p>}
       {game.start.eliminationSchedule.length > 0 && (
         <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
           <Skull className="size-4" /> Последният отпада след въпроси {game.start.eliminationSchedule.join(', ')}

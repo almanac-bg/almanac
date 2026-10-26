@@ -95,10 +95,23 @@ test('unlock requirements', () => {
   );
 });
 
-test('question picking: ramp, category cap and seeded determinism', () => {
+test('question picking: a ramp with blurred seams, category cap and seeded determinism', () => {
   const picked = pickQuestions(10, 'mixed', new Map());
   assert.equal(picked.length, 10);
-  assert.match(picked.map((q) => q.difficulty[0]).join(''), /^e*m*h*$/);
+  const level: Record<string, number> = { easy: 0, medium: 1, hard: 2 };
+  const matches = Array.from({ length: 300 }, () =>
+    pickQuestions(10, 'mixed', new Map()).map((q) => level[q.difficulty]),
+  );
+  for (const m of matches) {
+    const firstHard = m.indexOf(2);
+    assert.ok(firstHard === -1 || !m.slice(firstHard).includes(0), `an easy one after a hard one: ${m.join('')}`);
+  }
+  const mean = (from: number, to: number) =>
+    matches.reduce((sum, m) => sum + m.slice(from, to).reduce((a, b) => a + b, 0), 0) / (matches.length * (to - from));
+  assert.ok(mean(0, 3) < mean(3, 7) && mean(3, 7) < mean(7, 10), 'still easier at the start, harder at the end');
+  assert.ok(matches.filter((m) => m[0] === 0).length > 0.9 * matches.length, 'it nearly always opens with an easy one');
+  const firstMedium = new Set(matches.map((m) => m.indexOf(1)));
+  assert.ok(firstMedium.size >= 3, 'the first medium question moves around');
   const perCategory = new Map<string, number>();
   for (const q of picked) perCategory.set(q.category, (perCategory.get(q.category) ?? 0) + 1);
   assert.ok(Math.max(...perCategory.values()) <= 3, 'no category dominates a mixed match');

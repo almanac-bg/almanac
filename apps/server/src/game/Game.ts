@@ -103,6 +103,8 @@ export interface Participant {
   streak: number;
   bestStreak: number;
   fastestCorrectMs: number | null;
+  /** The fastest right answer to a medium or hard question (an easy one can be guessed before it's read). */
+  fastestHardCorrectMs: number | null;
   correctMs: number;
   answerMs: number;
   correctByDifficulty: Record<Difficulty, number>;
@@ -132,6 +134,8 @@ export interface Participant {
 type Phase = 'countdown' | 'question' | 'reveal' | 'ended';
 
 const BOT_EMOTES = { good: ['fire', 'cool', 'thumbs'], bad: ['lol', 'wow', 'dead'] };
+/** The jokers bots play: the two about their own answer, none aimed at a person. */
+const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double'];
 
 export class Game {
   readonly id = randomUUID();
@@ -172,7 +176,8 @@ export class Game {
         : h.powerups;
       this.participants.set(h.player.id, this.newParticipant(h.player, null, powerups, h.emotes));
     }
-    for (const b of setup.bots) this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [], []));
+    for (const b of setup.bots)
+      this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_JOKERS], []));
     this.alone = solo;
     this.schedule =
       setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
@@ -260,8 +265,12 @@ export class Game {
     switch (powerup) {
       case 'fifty':
         p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i))).slice(0, 2);
-        this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
-        this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
+        // A bot has nobody to tell which ones went; the others only see that it was played.
+        if (p.brain) this.toGame('game:powerup', { playerId, powerup });
+        else {
+          this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
+          this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
+        }
         break;
       case 'double':
         p.doubled = true;
@@ -451,6 +460,7 @@ export class Game {
         cat.correctMs += timeMs;
         p.bestStreak = Math.max(p.bestStreak, p.streak);
         p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
+        if (q.difficulty !== 'easy') p.fastestHardCorrectMs = Math.min(p.fastestHardCorrectMs ?? timeMs, timeMs);
         points = answerPoints({ timeMs, limitMs: this.setup.timeMs, streak: p.streak, doubled: p.doubled, retried });
       } else {
         p.streak = 0;
@@ -588,24 +598,49 @@ export class Game {
 
   // ─── Bots ────────────────────────────────────────────────────────────────
 
-  /** A bot's answer to the current question and how long it takes (game ms), or null when it zones out. */
-  private botMove(brain: BotBrain): { choice: number; afterMs: number } | null {
+  /**
+   * How a bot plays the current question: whether it knows the answer, how long it takes (game ms), and a joker it
+   * plays on the way, as a person would — 50/50 when it doesn't know, "Двойно или нищо" mostly when it does (now and
+   * then on a hunch, which costs it). Null when it zones out.
+   */
+  private botMove(p: Participant): { knows: boolean; afterMs: number; joker: PowerupId | null } | null {
+    const brain = p.brain!;
     const q = this.questions[this.index];
     if (Math.random() < 0.04) return null; // zoned out — lets the clock run down
     const difficultyShift = { easy: 0.15, medium: 0, hard: -0.2 }[q.difficulty];
-    const correct = Math.random() < clamp(brain.accuracy + difficultyShift, 0.1, 0.97);
-    const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer);
-    const choice = correct ? q.answer : wrong[Math.floor(Math.random() * wrong.length)];
-    const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (correct ? -0.05 : 0.1), 0.08, 0.92);
-    return { choice, afterMs: Math.max(900, fraction * this.setup.timeMs) };
+    const knows = Math.random() < clamp(brain.accuracy + difficultyShift, 0.1, 0.97);
+    const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
+    const playable = (id: PowerupId) =>
+      p.powerups.includes(id) &&
+      !p.usedPowerups.has(id) &&
+      !(q.difficulty === 'easy' && POWERUPS.find((d) => d.id === id)?.notOnEasy);
+    const joker =
+      !knows && playable('fifty') && Math.random() < 0.35
+        ? 'fifty'
+        : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
+          ? 'double'
+          : null;
+    return { knows, afterMs: Math.max(900, fraction * this.setup.timeMs), joker };
+  }
+
+  /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
+  private botChoice(p: Participant, knows: boolean): number {
+    const q = this.questions[this.index];
+    if (knows) return q.answer;
+    const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i));
+    if (p.removed.length) return Math.random() < 0.5 ? q.answer : wrong[0];
+    return wrong[Math.floor(Math.random() * wrong.length)];
   }
 
   private scheduleBots() {
     const index = this.index;
     for (const p of this.participants.values()) {
       if (!p.brain || !this.isActive(p)) continue;
-      const move = this.botMove(p.brain);
-      if (move) this.later(move.afterMs, () => this.answer(p.player.id, index, move.choice));
+      const move = this.botMove(p);
+      if (!move) continue;
+      const { joker } = move;
+      if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
+      this.later(move.afterMs, () => this.answer(p.player.id, index, this.botChoice(p, move.knows)));
     }
   }
 
@@ -624,8 +659,8 @@ export class Game {
       }
       for (const p of this.participants.values()) {
         if (!p.brain || !this.isActive(p) || p.answer) continue;
-        const move = this.botMove(p.brain);
-        if (move) p.answer = { choice: move.choice, timeMs: move.afterMs, retried: false };
+        const move = this.botMove(p);
+        if (move) p.answer = { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
       }
       this.reveal();
     }
@@ -853,6 +888,7 @@ export class Game {
       streak: 0,
       bestStreak: 0,
       fastestCorrectMs: null,
+      fastestHardCorrectMs: null,
       correctMs: 0,
       answerMs: 0,
       correctByDifficulty: { easy: 0, medium: 0, hard: 0 },

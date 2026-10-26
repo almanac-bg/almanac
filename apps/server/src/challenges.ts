@@ -10,7 +10,7 @@ import {
 } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
-import { notifyUser } from './notify';
+import { notify } from './notifications';
 import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions } from './questions';
 import { count } from './stats';
 import { toPublicUser, type UserRow } from './users';
@@ -112,9 +112,15 @@ export function recordChallengeResult(
   const creator = getChallenge(id)?.creator_id;
   const player = results[rank - 1];
   if (creator && creator !== userId && player) {
-    notifyUser(creator, 'notice', {
-      kind: 'info',
-      message: `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място.`,
+    // Kept for the creator (they're rarely on the page when a friend plays): the reason to come back and send another.
+    const creatorPlace = results.findIndex((r) => r.id === creator) + 1;
+    const beaten = rank === 1 && creatorPlace > 1;
+    notify(creator, {
+      icon: beaten ? '⚔️' : '🔗',
+      text: beaten
+        ? `${player.username} те изпревари на линка ти: ${score} точки — вече си ${ordinal(creatorPlace)}.`
+        : `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място. Води ${results[0].username}.`,
+      link: `/c/${id}`,
     });
   }
   return { id, rank, total: results.length };

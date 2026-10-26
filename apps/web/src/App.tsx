@@ -28,6 +28,7 @@ import {
   GamePage,
   LeaderboardPage,
   LockerPage,
+  NotificationsPage,
   PrivacyPage,
   ProfilePage,
   prefetchPages,
@@ -175,6 +176,7 @@ function SignedIn() {
             <Route path="/profile/:username" element={<ProfilePage />} />
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/locker" element={<LockerPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/submit" element={<SubmitPage />} />

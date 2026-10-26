@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BRAND, type OperatorInfo, PUBLIC_PAGES, pageTitle, routeKind } from '@quiz/shared';
+import { BRAND, PUBLIC_PAGES, pageTitle, routeKind, type SiteInfo } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
-import { config, operatorInfo } from './config';
+import { config } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError } from './monitoring';
@@ -14,6 +14,7 @@ import { questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
 import { securityHeaders } from './security';
+import { siteInfo } from './site';
 import { network, throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
@@ -100,12 +101,12 @@ app.get('/.well-known/security.txt', (_req, res) => {
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {
   const indexHtml = path.join(config.webDist, 'index.html');
-  // With error reporting on, the page tells the browser where to report (see apps/web/src/lib/monitoring.ts). Who runs
-  // the site comes with every page, for the legal pages and the footer (apps/web/src/lib/operator.ts).
+  // With error reporting on, the page tells the browser where to report (see apps/web/src/lib/monitoring.ts). What the
+  // pages say about the site (who runs it, its source, how many questions) comes with every page (apps/web/src/lib/site.ts).
   const meta = [
     publicDsn && `<meta name="sentry-dsn" content="${publicDsn}" />`,
     publicDsn && config.release && `<meta name="app-release" content="${config.release}" />`,
-    `<script type="application/json" id="operator">${jsonInHtml(operatorInfo)}</script>`,
+    `<script type="application/json" id="site">${jsonInHtml(siteInfo)}</script>`,
   ].filter(Boolean);
   const page = fs.readFileSync(indexHtml, 'utf8').replace('</head>', `${meta.join('')}</head>`);
   // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
@@ -200,7 +201,7 @@ function jsonInHtml(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-type Paint = (url: string, operator: OperatorInfo, version?: { returning: boolean }) => Promise<string>;
+type Paint = (url: string, site: SiteInfo, version?: { returning: boolean }) => Promise<string>;
 /** A public page drawn: the landing page in its two versions (new device, or one that has signed in before). */
 type Drawn = Map<string, { app: string; returning?: string }>;
 
@@ -216,8 +217,8 @@ async function paintPages(): Promise<Drawn> {
     const { paint } = (await import(pathToFileURL(config.webPaint).href)) as { paint: Paint };
     for (const route of Object.keys(PUBLIC_PAGES)) {
       drawn.set(route, {
-        app: await paint(route, operatorInfo),
-        returning: route === '/' ? await paint(route, operatorInfo, { returning: true }) : undefined,
+        app: await paint(route, siteInfo),
+        returning: route === '/' ? await paint(route, siteInfo, { returning: true }) : undefined,
       });
     }
   } catch (err) {

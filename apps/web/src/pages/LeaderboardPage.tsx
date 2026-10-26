@@ -3,6 +3,7 @@ import { BRAND, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName }
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { useOpenQueues } from '../components/home/openQueues';
@@ -30,7 +31,12 @@ export function LeaderboardPage() {
   const { data, error, retry } = useLoad(() => api.leaderboard(board), board);
   const roomy = useMediaQuery('(min-width: 640px)');
 
-  const meInList = data?.entries.some((e) => e.user.id === me.id);
+  // The daily board, among friends: the same day, just you and the people you know (you're in that list yourself).
+  const [scope, setScope] = useState<'all' | 'friends'>('all');
+  const amongFriends = board === 'daily' && scope === 'friends';
+  const entries = (amongFriends ? data?.friends : data?.entries) ?? [];
+  const meEntry = amongFriends ? null : (data?.me ?? null);
+  const meInList = entries.some((e) => e.user.id === me.id);
 
   return (
     <div className="space-y-6">
@@ -59,6 +65,17 @@ export function LeaderboardPage() {
         <Segmented value={board} onChange={setBoard} options={boards} />
       </div>
 
+      {board === 'daily' && !me.isGuest && (
+        <Segmented
+          value={scope}
+          onChange={setScope}
+          options={[
+            { value: 'all', label: 'Цяла България' },
+            { value: 'friends', label: 'Приятели' },
+          ]}
+        />
+      )}
+
       {error && !data ? (
         <Card>
           <LoadError title="Класацията не се зареди" error={error} onRetry={retry} />
@@ -67,11 +84,17 @@ export function LeaderboardPage() {
         <div className="grid place-items-center py-24">
           <Spinner className="size-8 text-violet-400" />
         </div>
-      ) : data.entries.length === 0 ? (
+      ) : entries.length === 0 ? (
         <Card>
           <EmptyState
             icon={board === 'daily' ? '📅' : '🏁'}
-            title={board === 'daily' ? 'Още никой не е играл днес' : 'Още никой не е класиран'}
+            title={
+              amongFriends
+                ? 'Никой от приятелите ти не е играл днес'
+                : board === 'daily'
+                  ? 'Още никой не е играл днес'
+                  : 'Още никой не е класиран'
+            }
             body={
               board === 'daily'
                 ? 'Изиграй дневното предизвикателство от началната страница.'
@@ -84,7 +107,7 @@ export function LeaderboardPage() {
           {/* A podium on every screen: on phones three narrow columns (full-width cards pushed the list, and "you", three
               screens down), first place in the middle and raised. */}
           <ol className="grid grid-cols-3 items-end gap-2 sm:gap-3">
-            {data.entries.slice(0, 3).map((e, i) => (
+            {entries.slice(0, 3).map((e, i) => (
               <motion.li
                 key={e.user.id}
                 initial={{ opacity: 0, y: 16 }}
@@ -124,27 +147,27 @@ export function LeaderboardPage() {
           </ol>
 
           {/* Not with three players or fewer: it would be an empty strip under the podium. */}
-          {(data.entries.length > 3 || (!meInList && data.me)) && (
+          {(entries.length > 3 || (!meInList && meEntry)) && (
             <Card className="divide-y divide-line">
-              {data.entries.slice(3).map((e) => (
+              {entries.slice(3).map((e) => (
                 <Row key={e.user.id} board={board} entry={e} me={e.user.id === me.id} />
               ))}
-              {!meInList && data.me && (
+              {!meInList && meEntry && (
                 <>
                   <div className="px-5 py-1 text-center text-xs text-fg-3">⋯</div>
-                  <Row board={board} entry={data.me} me />
+                  <Row board={board} entry={meEntry} me />
                 </>
               )}
             </Card>
           )}
-          {!data.me && board !== 'level' && (
+          {!meEntry && !amongFriends && board !== 'level' && (
             <p className="text-center text-sm text-fg-3">
               {board === 'daily'
                 ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.'
                 : 'Изиграй мач в този режим, за да влезеш в класацията.'}
             </p>
           )}
-          {data.entries.length <= 3 && <BringFriends />}
+          {entries.length <= 3 && <BringFriends />}
         </>
       )}
     </div>

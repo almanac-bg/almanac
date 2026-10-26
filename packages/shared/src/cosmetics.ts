@@ -219,6 +219,8 @@ export const TITLES: TitleDef[] = [
   { id: 'author', name: 'Златно перо', req: { achievement: 'author_10' } },
   { id: 'daily', name: 'Всеки ден по малко', req: { achievement: 'daily_streak_7' } },
   { id: 'sunrises', name: 'Сто изгрева', req: { achievement: 'daily_streak_100' } },
+  // Every season played (any tier): something to keep from Bronze too.
+  { id: 'season_bronze', name: 'Сезонен боец', req: { season: 'bronze' } },
   { id: 'season_gold', name: 'Златен сезон', req: { season: 'gold' } },
   { id: 'season_diamond', name: 'Диамантен ум', req: { season: 'diamond' } },
   { id: 'season_master', name: 'Сезонно майсторство', req: { season: 'master' } },

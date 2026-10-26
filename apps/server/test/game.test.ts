@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
-import type { FinalStanding, GamePlayer, PowerupId, RevealPayload } from '@quiz/shared';
+import type { FinalStanding, GamePlayer, PowerupId, QuestionPayload, RevealPayload } from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
@@ -291,4 +291,55 @@ test('bots play as strong as the rating they show, never rate above the cap, and
   assert.ok(strong.brain.accuracy > weak.brain.accuracy, 'strength follows rating, not level');
   assert.ok(strong.brain.pace < weak.brain.pace, 'stronger bots answer sooner');
   assert.ok(gentle.brain.accuracy < weak.brain.accuracy);
+});
+
+/** Plays a match to the end, the human always wrong; what the bot did comes from the events. */
+function playOut(g: ReturnType<typeof setup>) {
+  for (let i = 0; g.game.phase !== 'ended' && i < 100; i++) {
+    if (g.game.phase === 'question') g.wrong(1);
+    advance(2_000);
+  }
+  assert.equal(g.game.phase, 'ended');
+}
+
+/** Each joker a bot played, with the question it was played on. */
+function botJokers(g: ReturnType<typeof setup>, botId: string) {
+  const played: { powerup: PowerupId; question: QuestionPayload; payload: object; to: string }[] = [];
+  let question: QuestionPayload | null = null;
+  for (const e of g.events) {
+    if (e.event === 'game:question') question = e.payload as QuestionPayload;
+    const p = e.payload as { playerId?: string; powerup?: PowerupId };
+    if (e.event === 'game:powerup' && p.playerId === botId)
+      played.push({ powerup: p.powerup!, question: question!, payload: p, to: e.to });
+  }
+  return played;
+}
+
+test('bots play 50/50 when they are unsure, never on an easy question, once, and the others only see that it was played', () => {
+  // Luck pinned at 0.3: a weak bot knows the easy ones, not the rest; it reaches for 50/50, and the toss lands right.
+  mock.method(Math, 'random', () => 0.3);
+  const g = setup({ humans: [1], bots: [bot('b1', 'weak')] });
+  playOut(g);
+  const [fifty, ...more] = botJokers(g, 'b1');
+  assert.equal(more.length, 0, 'once a match');
+  assert.equal(fifty.powerup, 'fifty');
+  assert.notEqual(fifty.question.difficulty, 'easy');
+  assert.equal(fifty.to, 'game');
+  assert.equal('removed' in fifty.payload, false, 'which answers went is nobody else’s business');
+  const reveal = g.reveals().find((r) => r.index === fifty.question.index)!;
+  assert.equal(reveal.results.b1.correct, true, 'two answers left, and the coin came down right');
+});
+
+test('bots bet "Двойно или нищо" when they know, never on an easy question, once', () => {
+  mock.method(Math, 'random', () => 0.1);
+  const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
+  playOut(g);
+  const played = botJokers(g, 'b1');
+  assert.deepEqual(
+    played.map((j) => j.powerup),
+    ['double'],
+  );
+  assert.notEqual(played[0].question.difficulty, 'easy');
+  const result = g.reveals().find((r) => r.index === played[0].question.index)!.results.b1;
+  assert.ok(result.correct && result.doubled && result.points >= 1000, 'the bet paid double');
 });

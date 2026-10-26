@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Card } from '../components/ui';
-import { useOperator } from '../lib/operator';
+import { useSite } from '../lib/site';
 import { usePageTitle } from '../lib/title';
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
@@ -40,13 +40,13 @@ function Detail({ value }: { value: string | null | undefined }) {
 }
 
 function ContactEmail() {
-  const email = useOperator()?.email;
+  const email = useSite()?.email;
   // An address and nothing else goes into the link.
   return email && /^[^\s@<>"']+@[^\s@<>"']+$/.test(email) ? <a href={`mailto:${email}`}>{email}</a> : (email ?? '…');
 }
 
 function Operator() {
-  const op = useOperator();
+  const op = useSite();
   return (
     <p>
       Услугата се предоставя и данните се обработват от{' '}
@@ -60,12 +60,12 @@ function Operator() {
 }
 
 function Provider({ kind }: { kind: 'hosting' | 'emailProvider' }) {
-  return <Detail value={useOperator()?.[kind]} />;
+  return <Detail value={useSite()?.[kind]} />;
 }
 
 export function PrivacyPage() {
   usePageTitle('Политика за поверителност');
-  const op = useOperator();
+  const op = useSite();
   return (
     <LegalLayout title="Политика за поверителност">
       <p>
@@ -108,6 +108,10 @@ export function PrivacyPage() {
           <li>
             <b>Социални данни:</b> списък с приятели и покани, предложени от теб въпроси, доклади от теб и за теб,
             сигналите ти за грешки във въпроси.
+          </li>
+          <li>
+            <b>Известия:</b> кратки бележки за теб (кой е изиграл твой линк и с какъв резултат, одобрен въпрос, поискан
+            реванш) и дали си ги видял.
           </li>
           <li>
             <b>Модериране:</b> решенията на администраторите по профила ти — спиране (докога и защо) и смяна на името.
@@ -199,6 +203,7 @@ export function PrivacyPage() {
           </li>
           <li>Сесията за вход — до 30 дни; линковете за потвърждение и нова парола — 24 часа и 1 час.</li>
           <li>Напредъкът по дневните задачи — 7 дни.</li>
+          <li>Известията — до 90 дни (и само последните 50).</li>
           <li>
             Предизвикателствата с линк се играят 7 дни; 90 дни след като изтекат, се изтриват заедно с резултатите в
             тях.
@@ -290,7 +295,7 @@ export function TermsPage() {
         <Operator />
         <p>
           Играта е безплатна и се предоставя „както е“ — с цел развлечение. Въпросите са проверени внимателно, но може
-          да съдържат грешки.
+          да съдържат грешки — сигнализирай за тях от прегледа на въпросите след мача.
         </p>
       </Section>
 

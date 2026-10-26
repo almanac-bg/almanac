@@ -31,7 +31,7 @@ import {
   verifyPassword,
 } from '../auth';
 import { challengeInfo, challengePreview, myChallenges } from '../challenges';
-import { config, operatorInfo } from '../config';
+import { config } from '../config';
 import { dailyInfo, forgetGuestDaily, liveDailyStreak } from '../daily';
 import { all, isUniqueViolation, one, run, tx } from '../db';
 import {
@@ -49,6 +49,7 @@ import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend,
 import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { reportError } from '../monitoring';
+import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession, sendFriendsUpdate } from '../notify';
 import {
   hiddenQuestions,
@@ -59,6 +60,7 @@ import {
   unhideQuestion,
 } from '../questionReports';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
+import { siteInfo } from '../site';
 import { count, launchStats } from '../stats';
 import {
   approveSubmission,
@@ -315,7 +317,7 @@ api.post('/auth/logout', (req, res) => {
 
 /** For the privacy policy, terms and footer (works signed out). */
 api.get('/legal', (_req, res) => {
-  res.json(operatorInfo);
+  res.json(siteInfo);
 });
 
 /** Delivery reports from the mail provider (see emailEvents.ts); SNS posts them as text/plain. */
@@ -563,6 +565,15 @@ api.post('/reports', requireAuth, requireAccount, (req, res) => {
     res.status(400).json({ error: result.error });
     return;
   }
+  res.json({ ok: true });
+});
+
+api.get('/notifications', requireAuth, (_req, res) => {
+  res.json({ notifications: listNotifications(res.locals.userId) });
+});
+
+api.post('/notifications/read', requireAuth, (_req, res) => {
+  markNotificationsRead(res.locals.userId);
   res.json({ ok: true });
 });
 
@@ -909,6 +920,7 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
           ? { rank: info.played.rank, user: toPublicUser(me), value: info.played.score, correct: info.played.correct }
           : null,
       season: null,
+      friends: info.friends,
     };
   }
 

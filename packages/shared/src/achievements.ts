@@ -136,7 +136,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'speed_demon',
     name: 'Демон на скоростта',
-    description: 'Отговори вярно за под 1,5 секунди.',
+    description: 'Отговори вярно за под 2,5 секунди на среден или труден въпрос.',
     icon: '⚡',
     rarity: 'rare',
     xp: 150,
@@ -170,7 +170,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'polymath',
     name: 'Всестранен ум',
-    description: 'Отговори вярно във всички 10 категории.',
+    description: 'Отговори вярно на поне 3 въпроса във всяка от 10-те категории.',
     icon: '🌈',
     rarity: 'rare',
     xp: 250,
@@ -206,7 +206,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'comeback',
     name: 'Голям обрат',
-    description: 'Спечели мач, в който по средата си на последно място.',
+    description: 'Спечели мач без отпадане, в който по средата си на последно място.',
     icon: '🔄',
     rarity: 'epic',
     xp: 400,
@@ -354,7 +354,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'season_gold',
     name: 'Златен сезон',
-    description: 'Завърши сезон в ранг Злато или по-висок.',
+    description: 'Достигни ранг Злато или по-висок през сезон.',
     icon: '🏅',
     rarity: 'epic',
     xp: 500,

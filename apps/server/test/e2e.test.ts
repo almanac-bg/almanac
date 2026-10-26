@@ -5,7 +5,14 @@ import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import type { GameStartPayload, PowerupEvent, QuestionPayload, RevealPayload, RoomState } from '@quiz/shared';
+import {
+  type GameStartPayload,
+  type PowerupEvent,
+  type QuestionPayload,
+  type RevealPayload,
+  type RoomState,
+  SEASON_REWARD_XP,
+} from '@quiz/shared';
 import {
   type Account,
   autoPlay,
@@ -179,7 +186,8 @@ test('solo', T, async () => {
     log.questions.every((q) => q.category === 'history'),
     'all from the chosen category',
   );
-  assert.match(log.questions.map((q) => q.difficulty[0]).join(''), /^e*m*h*$/, 'difficulty ramps up');
+  const ramp = log.questions.map((q) => q.difficulty[0]).join('');
+  assert.doesNotMatch(ramp, /h.*e/, `harder towards the end, never an easy one after a hard one (${ramp})`);
   assert.equal(end.standings[0].correct, 10);
   assert.equal(start?.powerups.length, 0, 'no jokers at level 1');
   const ids = end.rewards!.achievements;
@@ -415,7 +423,8 @@ test(
     assert.equal(preview.body.topScore, end.standings[0].score);
 
     const logB = newLog();
-    const told = next(sa, 'notice');
+    const unreadBefore = (await api.get('/api/me', A.cookie)).body.user.unreadNotifications;
+    const told = next(sa, 'notification');
     const playB = autoPlay(sb, 'wrong', logB);
     assert.ok((await emitAck(sb, 'challenge:start', { id })).ok);
     const { end: endB } = await playB;
@@ -430,7 +439,17 @@ test(
       log.questions.map((q) => q.options),
       'each in their own option order',
     );
-    assert.match((await told).message, /изигра предизвикателството ти/);
+    // Told at once, and kept for later: the creator is rarely on the page when a friend plays the link.
+    const { item, unread } = await told;
+    assert.match(item.text, /изигра предизвикателството ти/);
+    assert.equal(item.link, `/c/${id}`);
+    assert.equal(unread, unreadBefore + 1);
+    const kept = (await api.get('/api/notifications', A.cookie)).body.notifications;
+    assert.equal(kept[0].id, item.id);
+    assert.equal(kept[0].read, false);
+    assert.equal((await api.send('POST', '/api/notifications/read', A.cookie)).status, 200);
+    assert.equal((await api.get('/api/me', A.cookie)).body.user.unreadNotifications, 0);
+    assert.equal((await api.get('/api/notifications', A.cookie)).body.notifications[0].read, true);
     assert.equal((await emitAck(sb, 'challenge:start', { id })).ok, false, 'one attempt each');
     assert.equal((await emitAck(sb, 'challenge:start', { id: 'nope' })).ok, false);
 
@@ -624,6 +643,12 @@ test('friends, invites and challenges', T, async () => {
   );
   const accepted = await api.send('POST', `/api/friends/${A.user.id}/accept`, B.cookie);
   assert.equal(accepted.body.friends.length, 1);
+  // The day among friends: both played today's daily (A right, B wrong), so A leads the two of them.
+  const today = (await api.get('/api/daily', B.cookie)).body.friends as { user: { id: number } }[];
+  assert.deepEqual(
+    today.map((e) => e.user.id),
+    [A.user.id, B.user.id],
+  );
   assert.equal((await api.get('/api/friends', A.cookie)).body.friends[0].presence, 'online');
   assert.equal(
     (await api.get(`/api/profile/${encodeURIComponent(B.user.username)}`, A.cookie)).body.friendship,
@@ -658,6 +683,30 @@ test('friends, invites and challenges', T, async () => {
   await bothOutOfRooms();
 });
 
+test('a rematch asked for after the other had gone is waiting for them when they are back', T, async () => {
+  const pa = autoPlay(sa, 'right');
+  const pb = autoPlay(sb, 'wrong');
+  assert.ok((await emitAck(sa, 'queue:join', 'duel')).ok);
+  assert.ok((await emitAck(sb, 'queue:join', 'duel')).ok);
+  const [{ end }] = await Promise.all([pa, pb]);
+  sa.close();
+  // Friends by now: B sees when the server has noticed A is gone.
+  await eventually(async () =>
+    assert.equal((await api.get('/api/friends', B.cookie)).body.friends[0].presence, 'offline'),
+  );
+  const asked = next(sb, 'rematch:state');
+  sb.emit('rematch:request', { gameId: end.gameId });
+  await asked;
+  sb.emit('rematch:decline', { gameId: end.gameId });
+  await eventually(async () => {
+    const [note] = (await api.get('/api/notifications', A.cookie)).body.notifications;
+    assert.match(note.text, new RegExp(`^${B.user.username} поиска реванш`));
+    assert.equal(note.link, `/profile/${encodeURIComponent(B.user.username)}`);
+  });
+  sa = connect(srv.url, A.cookie);
+  await connected(sa);
+});
+
 test('team room', T, async () => {
   const states: RoomState[] = [];
   const onState = (s: RoomState | null) => s && states.push(s);
@@ -686,7 +735,7 @@ test('team room', T, async () => {
   assert.equal(end.teamScores!.length, 2);
   assert.ok(end.teamScores![0].score >= end.teamScores![1].score);
   assert.equal(end.standings.find((s) => s.id === `u${A.user.id}`)!.placement, 1);
-  assert.ok(end.rewards!.achievements.includes('team_win'));
+  assert.ok(!end.rewards!.achievements.includes('team_win'), 'two friends against bots in a room is practice');
   sa.off('room:state', onState);
   sa.emit('room:leave');
   sb.emit('room:leave');
@@ -700,6 +749,9 @@ test('ranked 2 на 2 queue', T, async () => {
   assert.equal(start!.players.length, 4);
   assert.equal(start!.players.filter((p) => p.team === 0).length, 2, 'two teams of two');
   assert.ok(end.rewards!.rating, 'team rating moves');
+  // A ranked match against bots is a real one: its win counts.
+  const won = end.standings.find((s) => s.id === `u${A.user.id}`)!.placement === 1;
+  assert.equal(end.rewards!.achievements.includes('team_win'), won);
 });
 
 test('jokers', T, async () => {
@@ -785,14 +837,14 @@ test('community questions', T, async () => {
   assert.equal((await api.get('/api/admin/submissions', B.cookie)).status, 403, 'non-admins cannot moderate');
   assert.equal((await api.get('/api/admin/submissions?status=pending', A.cookie)).body.submissions.length, 1);
 
-  const notice = next(sb, 'notice');
+  const notice = next(sb, 'notification');
   const edited = { ...draft, q: 'Тестов общностен въпрос за реките (редактиран)?' };
   const approve = await api.send('POST', `/api/admin/submissions/${sub.body.submission.id}/approve`, A.cookie, {
     edits: edited,
   });
   assert.equal(approve.status, 200);
   assert.equal(approve.body.pending, 0);
-  assert.match((await notice).message, /одобрен/);
+  assert.match((await notice).item.text, /одобрен/);
   const mine = (await api.get('/api/submissions/mine', B.cookie)).body.submissions[0];
   assert.equal(mine.status, 'approved');
   assert.match(mine.q, /редактиран/);
@@ -830,10 +882,14 @@ test('season settlement', T, async () => {
   const me = (await api.get('/api/me', A.cookie)).body.user;
   assert.equal(me.seasonRewards.length, 1);
   assert.equal(me.seasonRewards[0].tier, 'gold');
-  assert.equal(me.seasonRewards[0].xp, 500);
+  assert.equal(me.seasonRewards[0].xp, SEASON_REWARD_XP.gold);
   assert.equal(me.bestSeasonTier, 2);
   assert.ok(me.achievements.includes('season_gold'));
   assert.ok(me.seasonRewards[0].unlocks.some((u: { id: string }) => u.id === 'season_gold'));
+  assert.ok(
+    me.seasonRewards[0].unlocks.some((u: { id: string }) => u.id === 'season_bronze'),
+    'every season played leaves a title',
+  );
   assert.equal((await api.send('PATCH', '/api/me/loadout', A.cookie, { frame: 'season_gold' })).status, 200);
   assert.equal((await api.get('/api/me', B.cookie)).body.user.seasonRewards[0].tier, null, 'too few games → no tier');
   await api.send('POST', '/api/season/seen', A.cookie);

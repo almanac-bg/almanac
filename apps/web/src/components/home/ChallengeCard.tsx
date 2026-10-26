@@ -1,12 +1,12 @@
 import { actions, api, fmt, plural, timeAgo, toast, useNow, useStore } from '@quiz/client';
 import { MODES, type MyChallenge } from '@quiz/shared';
 import clsx from 'clsx';
-import { ChevronRight, Link2, Share2, Swords } from 'lucide-react';
+import { ChevronRight, Link2, Lock, Share2, Swords } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
 import { shareText } from '../../lib/share';
-import { GuestNudge } from '../ClaimAccount';
+import { ClaimAccountModal } from '../ClaimAccount';
 import { LoadError } from '../LoadError';
 import { Button, Card } from '../ui';
 import { challengeShareText } from './challengeLink';
@@ -21,6 +21,7 @@ const LISTED = 3;
 export function ChallengeCard({ className }: { className?: string }) {
   const guest = useStore((s) => !!s.me?.isGuest);
   const [busy, setBusy] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   // Guests have no links of their own to list.
   const mine = useLoad(() => (guest ? Promise.resolve(null) : api.myChallenges()), guest ? 'guest' : 'player');
   const now = useNow(60_000);
@@ -53,13 +54,21 @@ export function ChallengeCard({ className }: { className?: string }) {
           <h2 className="mt-2 t-card">Предизвикай приятел</h2>
           <p className="mt-1 max-w-md text-sm text-fg-3">
             {MODES.challenge.questions} въпроса, без жокери. Изиграй ги и прати линка: всеки, който го отвори, играе
-            същите въпроси веднъж. Линкът важи 7 дни.
+            същите въпроси веднъж. Линкът важи 7 дни.{guest && ' Създават ги играчите с профил.'}
           </p>
           <div className="mt-auto pt-5">
             {guest ? (
-              <GuestNudge>
-                Предизвикателствата по линк са за играчи с профил. Запази прогреса си — отнема 10 секунди.
-              </GuestNudge>
+              // Said once, quietly (the lobby has one "save your progress" box, on the profile card).
+              <>
+                <Button variant="secondary" className="w-full @sm:w-auto" onClick={() => setClaiming(true)}>
+                  <Lock aria-hidden className="size-4" /> Създай предизвикателство
+                </Button>
+                <ClaimAccountModal
+                  open={claiming}
+                  onClose={() => setClaiming(false)}
+                  reason="Предизвикателства по линк създават играчите с профил. Избери име и парола — нивото, серията и всичко изиграно досега остават твои."
+                />
+              </>
             ) : (
               // The label is long: on the narrowest phones the icon and some padding make way for it.
               <Button variant="secondary" onClick={create} loading={busy} className="w-full @max-2xs:px-3 @sm:w-auto">

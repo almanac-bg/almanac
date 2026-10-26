@@ -62,14 +62,14 @@ export const RANK_TIERS = [
 export type RankTier = (typeof RANK_TIERS)[number];
 export type RankTierId = RankTier['id'];
 
-/** Season-end XP by the best tier reached in any ranked mode. */
+/** Season-end XP by the best tier reached in any ranked mode: once a month, so worth noticing next to a day's play. */
 export const SEASON_REWARD_XP: Record<RankTierId, number> = {
-  bronze: 100,
-  silver: 250,
-  gold: 500,
-  platinum: 800,
-  diamond: 1200,
-  master: 2000,
+  bronze: 300,
+  silver: 750,
+  gold: 1500,
+  platinum: 2400,
+  diamond: 3600,
+  master: 6000,
 };
 /** Ranked games needed in one mode for its peak to count toward the season's rewards. */
 export const SEASON_MIN_GAMES = 10;

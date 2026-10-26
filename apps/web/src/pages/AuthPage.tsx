@@ -33,18 +33,20 @@ import { credentialsProblem } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
+import { useSite } from '../lib/site';
 import { usePageTitle } from '../lib/title';
 
 const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 
+// What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
-  { icon: '⚔️', title: 'Дуели 1 на 1', body: 'Класирани битки в реално време' },
-  { icon: '👑', title: 'Роял за 8', body: 'Елиминации, докато остане само един' },
-  { icon: '🏆', title: 'Нива и постижения', body: 'Отключвай аватари, рамки и титли' },
+  { icon: '📅', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класиране до полунощ' },
+  { icon: '🔗', title: 'Предизвикай приятел', body: 'Пращаш линк, играе същите въпроси, когато може' },
+  { icon: '⚔️', title: 'Дуели и Роял', body: 'Битки в реално време, до 8 играчи' },
 ];
 
 /** The modes the page below the first screen describes, in the order a newcomer meets them. */
-const ABOUT_MODES: ModeId[] = ['duel', 'royale', 'daily', 'challenge', 'solo', 'custom'];
+const ABOUT_MODES: ModeId[] = ['daily', 'challenge', 'duel', 'royale', 'solo', 'custom'];
 
 /** On phones autofocus would pop the keyboard and scroll past the logo. */
 const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
@@ -182,9 +184,10 @@ export function AuthPage() {
               (inviteCode || challengeId) && 'max-sm:hidden',
             )}
           >
-            Бързи въпроси. Истински съперници. <br className="max-sm:hidden" />
+            Бързи въпроси срещу приятели и цяла България. <br className="max-sm:hidden" />
             <span className="text-fg">Кой знае най-много?</span>
           </p>
+          <ProofLine className={clsx('mt-3', (inviteCode || challengeId) && 'max-sm:hidden')} />
         </motion.header>
 
         <motion.div
@@ -417,6 +420,14 @@ export function AuthPage() {
   );
 }
 
+/** The game in numbers, under the slogan: how many questions, and what it costs (nothing). */
+function ProofLine({ className }: { className?: string }) {
+  const questions = useSite()?.questions;
+  // One string: the drawn page holds the sentence whole (no markers between its parts).
+  const line = `${questions ? `Над ${fmt(questions)} въпроса` : 'Въпроси'} в ${CATEGORIES.length} категории · безплатно · без реклами`;
+  return <p className={clsx('text-sm text-fg-3', className)}>{line}</p>;
+}
+
 /**
  * Below the first screen: the game in words, for a newcomer who scrolls before trying and for search engines (the
  * first screen alone is a logo, a slogan and a form).
@@ -427,7 +438,7 @@ function AboutGame({ cta }: { cta: ReactNode }) {
     <section aria-labelledby={id} className="mx-auto max-w-6xl px-4 pt-10 pb-6 sm:px-5 sm:pt-16">
       <p className="t-eyebrow text-violet-300">Как се играе</p>
       <h2 id={id} className="mt-2 t-section text-balance sm:text-3xl">
-        Онлайн викторина срещу истински хора
+        Онлайн викторина с приятели и цяла България
       </h2>
       <p className="mt-3 max-w-2xl text-fg-2 sm:text-lg">
         Всеки въпрос е с четири отговора и часовник: верният носи точки, а бързият — още повече. Играеш в браузъра, на

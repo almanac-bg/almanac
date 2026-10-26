@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { CircleHelp } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { SCORING_LINE } from './scoring';
 import { myTeamOf } from './teams';
 
 // ─── Explaining them ───────────────────────────────────────────────────────
@@ -238,6 +239,7 @@ function JokerList({
           );
         })}
       </ul>
+      {!intro && <p className="mt-3 border-t border-line pt-2 text-xs text-fg-3">{SCORING_LINE}</p>}
       {onDismiss && (
         <div className="mt-1 flex justify-end">
           <button

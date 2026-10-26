@@ -1,5 +1,6 @@
 import type {
   AchievementProgress,
+  AppNotification,
   ChallengeInfo,
   ChallengePreview,
   DailyInfo,
@@ -11,7 +12,6 @@ import type {
   MeUser,
   ModerationAction,
   MyChallenge,
-  OperatorInfo,
   ProfileStats,
   QuestionDraft,
   QuestionInfo,
@@ -21,6 +21,7 @@ import type {
   ReportGroup,
   ReportReason,
   SeasonInfo,
+  SiteInfo,
   Submission,
   SubmissionStatus,
 } from '@quiz/shared';
@@ -67,7 +68,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   me: () => request<{ user: MeUser | null }>('GET', '/me'),
-  operator: () => request<OperatorInfo>('GET', '/legal'),
+  site: () => request<SiteInfo>('GET', '/legal'),
   login: (username: string, password: string) =>
     request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
   register: (username: string, password: string, email?: string) =>
@@ -114,6 +115,9 @@ export const api = {
 
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
+  notifications: () => request<{ notifications: AppNotification[] }>('GET', '/notifications'),
+  /** The list was opened: everything in it is seen. */
+  readNotifications: () => request<{ ok: true }>('POST', '/notifications/read'),
   profile: (username: string) => request<ProfileStats>('GET', `/profile/${encodeURIComponent(username)}`),
   leaderboard: (board: LeaderboardBoard) => request<LeaderboardResponse>('GET', `/leaderboard/${board}`),
 

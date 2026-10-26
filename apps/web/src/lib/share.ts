@@ -1,4 +1,4 @@
-import { type ReviewItem, toast } from '@quiz/client';
+import { fmt, ordinal, type ReviewItem, toast } from '@quiz/client';
 import { BRAND, dayKey } from '@quiz/shared';
 
 const storageKey = (day: string) => `quiz:daily-share:${day}`;
@@ -20,6 +20,52 @@ export function dailyShareText(history: ReviewItem[], total: number, streak: num
   const lines = [`⚡ ${BRAND.name} · ${d}.${m}.${y}`, `${squares} ${correct}/${total}`];
   if (streak > 1) lines.push(`🔥 ${streak} дни подред`);
   lines.push(BRAND.domain);
+  return lines.join('\n');
+}
+
+/** Right and wrong as squares, in order: what a match was like, without giving a question away. */
+const squares = (history: ReviewItem[]) => history.map((h) => (h.right ? '🟩' : '🟥')).join('');
+
+/**
+ * A finished match as a few lines to send: what happened (a crown, a win, a place; right answers in a category for a
+ * solo game), the score, the squares, a new level, and where to play — every share is an invitation.
+ */
+export function matchShareText(m: {
+  modeName: string;
+  /** The category of a solo game. */
+  category: string | null;
+  place: number;
+  players: number;
+  won: boolean;
+  teams: boolean;
+  royale: boolean;
+  score: number;
+  history: ReviewItem[];
+  total: number;
+  /** The level reached, when this match went up one. */
+  levelUp: number | null;
+}): string {
+  const right = m.history.filter((h) => h.right).length;
+  const score = `${fmt(m.score)} т.`;
+  const headline =
+    m.players === 1
+      ? `🎯 ${right}/${m.total} в „${m.category ?? m.modeName}“ · ${score}`
+      : m.won
+        ? m.royale
+          ? `👑 Оцелях до края в ${m.modeName} · ${score}`
+          : m.teams
+            ? `🤝 Отборна победа в ${m.modeName} · ${score}`
+            : `🏆 Победа в ${m.modeName} · ${score}`
+        : // Second of two (or the other team) needs no saying: the score does the talking.
+          m.teams
+          ? `🤝 ${m.modeName} · ${score}`
+          : m.players === 2
+            ? `⚔️ ${m.modeName} · ${score}`
+            : `${ordinal(m.place)} място от ${m.players} в ${m.modeName} · ${score}`;
+  const lines = [`⚡ ${BRAND.name}`, headline];
+  if (m.history.length) lines.push(squares(m.history));
+  if (m.levelUp) lines.push(`⬆️ Ниво ${m.levelUp}`);
+  lines.push(`Можеш ли повече? ${BRAND.domain}`);
   return lines.join('\n');
 }
 

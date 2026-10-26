@@ -4,6 +4,7 @@ import {
   type GameStartPayload,
   isQueueMode,
   type ModeId,
+  POWERUPS,
   type PowerupId,
   START_RATING,
   type TeamId,
@@ -45,8 +46,14 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       title: row.title,
       team: null,
     },
-    // Runs everyone compares (the daily, challenge links) are a level playing field: no jokers.
-    powerups: mode === 'daily' || mode === 'challenge' ? [] : (unlockedIds('powerup', ctx) as PowerupId[]),
+    // Runs everyone compares (the daily, challenge links): no jokers. Ranked queues: all five for everyone, so a ranked
+    // result isn't decided by who has played longer. Solo and rooms: the ones the level has unlocked, one at a time.
+    powerups:
+      mode === 'daily' || mode === 'challenge'
+        ? []
+        : isQueueMode(mode)
+          ? POWERUPS.map((p) => p.id)
+          : (unlockedIds('powerup', ctx) as PowerupId[]),
     emotes: unlockedIds('emote', ctx),
   };
 }

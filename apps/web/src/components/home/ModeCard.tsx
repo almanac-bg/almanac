@@ -8,6 +8,7 @@ import {
   type QueueModeId,
   RANK_TIERS,
   rankFor,
+  SCORING,
   SEASON_MIN_GAMES,
   SEASON_REWARD_XP,
   START_RATING,
@@ -19,6 +20,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
 import { RankBadge } from '../Avatar';
+import { SCORING_LINE } from '../game/scoring';
 import { Button, buttonClass, Modal } from '../ui';
 
 export function ModeCard({
@@ -193,6 +195,10 @@ export function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boo
             </li>
           ))}
         </ul>
+        <p>
+          <span className="font-semibold text-fg">Точките в мача:</span> {SCORING_LINE} „Двойно или нищо“ удвоява
+          точките за въпроса (грешка струва {SCORING.doubleStake}), а „Втори шанс“ дава половината.
+        </p>
         <p className="text-fg-3">
           Сезонът трае месец. В края му получаваш XP за най-високия ранг, достигнат в режим с поне {SEASON_MIN_GAMES}{' '}
           мача (наградата за всеки ранг е показана по-горе). В новия сезон рейтингът започва по-близо до {START_RATING}.

@@ -58,7 +58,7 @@ export function QueueOverlay() {
               {mode.name} · {mode.short}
             </div>
             <h2 id={titleId} className="mt-4 font-display text-2xl font-bold sm:text-3xl">
-              Търсим съперници…
+              Търсим играчи…
             </h2>
             {/* The clock ticks every second: not read out (the seats and the bots below are). */}
             <p aria-hidden className="mt-2 font-mono text-lg text-fg-2 tabular-nums">
@@ -89,7 +89,7 @@ export function QueueOverlay() {
               {botsIn !== null && queue.found < queue.needed && (
                 <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
                   <Bot aria-hidden className="size-3.5" />
-                  {botsIn > 0 ? `Ботове попълват празните места след ${botsIn} с` : 'Ботовете влизат…'}
+                  {botsIn > 0 ? `След ${botsIn} с местата се попълват с ботове на твоето ниво` : 'Ботовете влизат…'}
                 </p>
               )}
             </div>

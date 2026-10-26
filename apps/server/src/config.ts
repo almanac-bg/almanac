@@ -1,13 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  BRAND,
-  DEFAULT_OPEN_QUEUES,
-  isQueueMode,
-  type OperatorInfo,
-  QUEUE_MODES,
-  type QueueModeId,
-} from '@quiz/shared';
+import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 import { z } from 'zod';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
@@ -131,6 +124,3 @@ export const config = {
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */
   gameTimeScale: env.GAME_TIME_SCALE ?? 1,
 };
-
-/** Who runs the site, as the legal pages show it: from /api/legal, or in the page the server sends. */
-export const operatorInfo: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl, release: config.release };

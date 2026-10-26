@@ -1,6 +1,7 @@
 import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
+import { friendIds } from './friends';
 import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, seededRng } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
@@ -19,6 +20,23 @@ function dailySet(day: string): PreparedQuestion[] {
   );
   run('INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)', day, JSON.stringify(questions));
   return JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day)!.questions);
+}
+
+/**
+ * A question was just hidden (a moderator found it wrong): if it's in the day's set and no account has started the
+ * daily yet, the set is drawn again without it. Once someone has played, the set stands — the board compares the same
+ * ten questions for everyone. Guests don't count: they play questions of their own.
+ */
+export function redrawDailyWithout(questionId: string, day = dayKey()): boolean {
+  const set = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
+  if (!set || !(JSON.parse(set.questions) as PreparedQuestion[]).some((q) => q.id === questionId)) return false;
+  const started = one(
+    'SELECT 1 AS x FROM daily_results r JOIN users u ON u.id = r.user_id WHERE r.day = ? AND u.is_guest = 0 LIMIT 1',
+    day,
+  );
+  if (started) return false;
+  run('DELETE FROM daily_sets WHERE day = ?', day);
+  return true;
 }
 
 /**
@@ -146,6 +164,19 @@ export function liveDailyStreak(
   return daysBetween(u.last_daily_day, today) - 1 <= u.streak_shields ? u.daily_streak : 0;
 }
 
+/** The day among friends: you and your friends who finished it, ranked like the board (score, then time). */
+function friendsToday(day: string, userId: number) {
+  const ids = [userId, ...friendIds(userId)];
+  const rows = all<UserRow & { score: number; correct: number }>(
+    `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND d.user_id IN (${ids.map(() => '?').join(', ')})
+     ORDER BY d.score DESC, d.time_ms ASC`,
+    day,
+    ...ids,
+  );
+  return rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct }));
+}
+
 export function dailyInfo(userId: number): DailyInfo {
   const day = dayKey();
   const mine = one<{
@@ -172,5 +203,6 @@ export function dailyInfo(userId: number): DailyInfo {
     played: played && { score: played.score, correct: played.correct, rank: played.rank },
     total: rankOf(day, 0, 0, true).total,
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),
+    friends: guest ? [] : friendsToday(day, userId),
   };
 }

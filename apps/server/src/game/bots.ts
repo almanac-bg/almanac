@@ -1,4 +1,4 @@
-import { AVATARS, FRAMES, type GamePlayer, START_RATING, TITLES } from '@quiz/shared';
+import { AVATARS, FRAMES, type GamePlayer, type Requirement, START_RATING, TITLES } from '@quiz/shared';
 import { shuffle } from '../questions';
 
 export interface BotBrain {
@@ -38,11 +38,16 @@ const NAMES = [
   'Пиксел',
 ];
 
-const STARTER_AVATARS = AVATARS.filter((a) => 'level' in a.req && a.req.level <= 9);
-const STARTER_FRAMES = FRAMES.filter((f) => 'level' in f.req && f.req.level <= 9);
-const STARTER_TITLES = TITLES.filter((t) => 'level' in t.req && t.req.level <= 8);
-
 const pick = <T>(items: T[]) => items[Math.floor(Math.random() * items.length)];
+
+/**
+ * Something a player of this level could wear (unlocked by level, not by an achievement or a season): a level-2 bot in
+ * a level-9 frame gave itself away.
+ */
+function wearable<T extends { id: string; req: Requirement }>(items: readonly T[], level: number): string {
+  const open = items.filter((item) => 'level' in item.req && item.req.level <= level);
+  return pick(open.length ? open : items.filter((item) => 'level' in item.req && item.req.level <= 1)).id;
+}
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 let botSeq = 0;
@@ -67,18 +72,19 @@ export function makeBots(
   return Array.from({ length: count }, (_, i) => {
     const rating = Math.round(clamp(around.rating + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
     const skill = rating - START_RATING;
+    const level = clamp(Math.round(around.level + jitter(3)), 1, 60);
     return {
       player: {
         id: `b${++botSeq}`,
         userId: null,
         name: names[i % names.length],
-        level: clamp(Math.round(around.level + jitter(3)), 1, 60),
+        level,
         isBot: true,
         isGuest: false,
         rating,
-        avatar: pick(STARTER_AVATARS).id,
-        frame: pick(STARTER_FRAMES).id,
-        title: pick(STARTER_TITLES).id,
+        avatar: wearable(AVATARS, level),
+        frame: wearable(FRAMES, level),
+        title: wearable(TITLES, level),
         team: null,
       },
       brain: {

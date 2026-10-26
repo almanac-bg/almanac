@@ -5,6 +5,7 @@ import {
   type QuestionReportGroup,
   type QuestionReportReason,
 } from '@quiz/shared';
+import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
 import { type Question, questionById, reloadQuestionBank } from './questions';
 
@@ -95,7 +96,10 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
       questionId,
     );
   });
-  if (action === 'hide') reloadQuestionBank();
+  if (action === 'hide') {
+    reloadQuestionBank();
+    redrawDailyWithout(questionId);
+  }
   return { ok: true };
 }
 

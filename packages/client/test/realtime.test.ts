@@ -35,7 +35,10 @@ class FakeSocket extends EventEmitter {
   }
   timeout() {
     return {
-      emitWithAck: async (event: string, ...args: unknown[]) => (this.sent.push([event, ...args]), { ok: true }),
+      emitWithAck: async (event: string, ...args: unknown[]) => {
+        this.sent.push([event, ...args]);
+        return { ok: true };
+      },
     };
   }
   deliver(event: string, ...args: unknown[]) {

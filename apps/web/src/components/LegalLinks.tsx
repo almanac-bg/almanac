@@ -1,6 +1,6 @@
 import { BRAND } from '@quiz/shared';
 import { Link } from 'react-router';
-import { useOperator } from '../lib/operator';
+import { useSite } from '../lib/site';
 
 /** Small print where an account is made: under 14 (Bulgaria's age of consent online) the terms ask for a parent's. */
 export const MINORS_NOTICE =
@@ -9,7 +9,7 @@ export const MINORS_NOTICE =
 /** Footer links to the legal pages (kept apart from the pages themselves, which load on demand). */
 export function LegalLinks({ className = '' }: { className?: string }) {
   // The source code, once published: free software, and the AGPL asks a hosted copy to offer it.
-  const op = useOperator();
+  const op = useSite();
   // The exact version that's running, as the AGPL asks (the repository's front page may be ahead of it).
   const source = op?.sourceUrl?.startsWith('https://')
     ? op.release

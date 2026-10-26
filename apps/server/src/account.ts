@@ -12,6 +12,7 @@ import { verifyPassword } from './auth';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
 import { incomingRequests } from './friends';
+import { unreadNotifications } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { reloadQuestionBank } from './questions';
 import { questsInfo } from './quests';
@@ -75,6 +76,7 @@ export function getMe(userId: number): MeUser | null {
     streakReminders: row.streak_reminders === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
+    unreadNotifications: unreadNotifications(userId),
     email: row.email,
     emailBounced: row.email_bounced_at !== null,
     pendingEmail: row.pending_email,
@@ -122,6 +124,9 @@ export function exportAccount(userId: number) {
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
     challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
     challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),
+    notifications: rows(
+      'SELECT icon, text, link, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY id',
+    ),
     matches: rows(
       `SELECT m.mode, m.ranked, m.room_code, m.player_count, m.question_count, m.started_at, m.ended_at, mp.*
        FROM match_players mp JOIN matches m ON m.id = mp.match_id WHERE mp.user_id = ? ORDER BY m.ended_at`,

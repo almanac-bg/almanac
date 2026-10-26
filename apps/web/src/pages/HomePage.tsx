@@ -29,6 +29,9 @@ export function HomePage() {
   const level = levelProgress(me.xp).level;
   // Brand-new players get pointed at the gentlest way in (one pointer: two would leave them choosing again).
   const newcomer = level === 1;
+  // The first levels meet the daily first, beside who they are: it works with nobody else online and it's the same ten
+  // questions for all of Bulgaria. Friends come further down (there's nobody to add yet).
+  const starter = level <= 2;
   // Writing questions opens at level 3; until then the card would only hold a disabled button.
   const community = level >= SUBMISSION_RULES.minLevel || me.isAdmin;
   // Only the ranked queues the server has open (a closed one would only refuse the player).
@@ -65,6 +68,7 @@ export function HomePage() {
           From tablets up (md) the same pieces form a grid with the modes across the middle and "today" under them. */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2 md:gap-x-4 md:gap-y-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <ProfileCard className="md:col-start-1 md:row-start-1" />
+        {starter && <DailyCard className="md:col-start-2 md:row-start-1" />}
 
         <section aria-labelledby="modes-title" className="md:col-span-2 md:row-start-2">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
@@ -103,10 +107,10 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard className="md:col-start-1 md:row-start-3" />
+        {!starter && <DailyCard className="md:col-start-1 md:row-start-3" />}
         <QuestsCard className="md:col-start-2 md:row-start-3" />
         <ChallengeCard className={clsx('md:col-start-1 md:row-start-4', !community && 'md:col-span-2')} />
-        <FriendsCard className="md:col-start-2 md:row-start-1" />
+        <FriendsCard className={starter ? 'md:col-start-1 md:row-start-3' : 'md:col-start-2 md:row-start-1'} />
         {community && <CommunityCard className="md:col-start-2 md:row-start-4" />}
       </div>
 

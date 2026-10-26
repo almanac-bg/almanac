@@ -1,7 +1,7 @@
 import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client';
-import { MODES, STREAK_SHIELDS, TIME_ZONE } from '@quiz/shared';
+import { type LeaderboardEntry, MODES, STREAK_SHIELDS, TIME_ZONE } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2 } from 'lucide-react';
+import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useLoad } from '../../lib/load';
@@ -128,6 +128,7 @@ export function DailyCard({ className }: { className?: string }) {
                 Играй днешното <ArrowRight className="size-5" />
               </Button>
             )}
+            {info && !failed && <AmongFriends friends={info.friends} meId={me.id} />}
             {info && !failed && !info.attempted && (
               <p className="mt-3 text-xs text-fg-3 tabular-nums">Изтича след {countdown(info.endsAt - now)}</p>
             )}
@@ -163,6 +164,11 @@ export function DailyCard({ className }: { className?: string }) {
                   </li>
                 ))}
               </ol>
+            ) : me.isGuest ? (
+              // A guest who just played would otherwise read "nobody has played today" beside their own score.
+              <p className="py-4 text-center text-sm text-fg-3">
+                Класацията на деня е за играчи с профил. Запази прогреса и играеш общите въпроси още днес.
+              </p>
             ) : (
               <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
             )}
@@ -219,5 +225,24 @@ function StreakShields({ shields, streak }: { shields: number; streak: number })
         </span>
       </p>
     </>
+  );
+}
+
+/** The day among friends, in a line: who just passed you, that you lead, or who leads while you haven't played. */
+function AmongFriends({ friends, meId }: { friends: LeaderboardEntry[]; meId: number }) {
+  const mine = friends.find((e) => e.user.id === meId);
+  const others = friends.filter((e) => e.user.id !== meId);
+  if (!others.length) return null;
+  const ahead = mine && mine.rank > 1 ? friends[mine.rank - 2] : null;
+  const line = ahead
+    ? `${ahead.user.username} те изпревари днес · ${fmt(ahead.value)} т.`
+    : mine
+      ? 'Водиш сред приятелите си днес'
+      : `${others[0].user.username} води сред приятелите ти · ${fmt(others[0].value)} т.`;
+  return (
+    <p className="mt-3 flex items-center gap-1.5 text-sm text-fg-2">
+      <Users aria-hidden className="size-4 shrink-0 text-amber-300" />
+      <span className="min-w-0">{line}</span>
+    </p>
   );
 }

@@ -1,7 +1,19 @@
 import { useStore } from '@quiz/client';
 import { BRAND, levelProgress } from '@quiz/shared';
 import clsx from 'clsx';
-import { ChartColumn, Gamepad2, Save, Settings, Shirt, Trophy, User, Users, Volume2, VolumeX } from 'lucide-react';
+import {
+  Bell,
+  ChartColumn,
+  Gamepad2,
+  Save,
+  Settings,
+  Shirt,
+  Trophy,
+  User,
+  Users,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useMuted } from '../lib/sound';
@@ -103,6 +115,26 @@ function GuestButton({ connected }: { connected: boolean }) {
   );
 }
 
+/** The bell: what happened while you were away (a link played, a question approved), with how much is new. */
+function NotificationsButton({ unread }: { unread: number }) {
+  const label = unread ? `Известия (${unread} нови)` : 'Известия';
+  return (
+    <NavLink
+      to="/notifications"
+      aria-label={label}
+      title={label}
+      className={({ isActive }) => clsx(ICON_BUTTON, 'relative', isActive && 'bg-white/10 text-fg')}
+    >
+      <Bell className="size-4.5" />
+      {unread > 0 && (
+        <span aria-hidden className="absolute top-1 right-1">
+          <RequestBadge count={unread} />
+        </span>
+      )}
+    </NavLink>
+  );
+}
+
 export function NavBar() {
   const me = useStore((s) => s.me)!;
   const connected = useStore((s) => s.connected);
@@ -141,15 +173,18 @@ export function NavBar() {
           <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
             {/* A lost connection also shows on your avatar (a pulsing dot, plus the words under your name where there's
                 room); ConnectionBanner says it in words and to screen readers. */}
+            {/* Phones have room for four buttons: with an account the bell takes the sound's place (the match screen and
+                Settings have the switch). */}
             <button
               type="button"
               onClick={() => setMuted(!muted)}
               aria-label={muted ? 'Включи звука' : 'Изключи звука'}
               title={muted ? 'Включи звука' : 'Изключи звука'}
-              className={ICON_BUTTON}
+              className={clsx(ICON_BUTTON, !me.isGuest && 'max-sm:hidden')}
             >
               {muted ? <VolumeX className="size-4.5" /> : <Volume2 className="size-4.5" />}
             </button>
+            {!me.isGuest && <NotificationsButton unread={me.unreadNotifications} />}
             {me.isGuest && <GuestButton connected={connected} />}
             <NavLink
               to="/profile"

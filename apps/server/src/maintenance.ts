@@ -10,6 +10,7 @@ import { all, db, run } from './db';
 import { purgeGuests } from './guests';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
+import { NOTIFICATION_MAX_AGE_MS } from './notifications';
 import { reloadQuestionBank } from './questions';
 import { count } from './stats';
 import type { UserRow } from './users';
@@ -38,6 +39,7 @@ export function purgeExpired(now = Date.now()) {
        SELECT 1 FROM email_tokens t WHERE t.user_id = users.id AND t.purpose = 'verify')`,
   );
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
+  run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
   purgeGuests(now);
 }

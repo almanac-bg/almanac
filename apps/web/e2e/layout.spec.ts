@@ -122,7 +122,9 @@ test('without JavaScript the landing page and the legal pages are there in full'
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /^АЛМАНАХ — онлайн куиз битки/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Играй като гост', exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Онлайн викторина срещу истински хора', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Онлайн викторина с приятели и цяла България', exact: true }),
+  ).toBeVisible();
   // A plain link without the app: the browser loads the next page, which comes drawn too.
   await page.getByRole('link', { name: 'Политика за поверителност', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();

@@ -11,7 +11,7 @@ import {
 import { z } from 'zod';
 import { grantXp } from './account';
 import { all, one, run, tx } from './db';
-import { notifyUser } from './notify';
+import { notify } from './notifications';
 import { questionBank, reloadQuestionBank } from './questions';
 import { getUser, toPublicUser, type UserRow } from './users';
 
@@ -182,9 +182,10 @@ export function approveSubmission(
     grantXp(row.user_id, SUBMISSION_RULES.approvedXp);
   });
   reloadQuestionBank();
-  notifyUser(row.user_id, 'notice', {
-    kind: 'info',
-    message: `Въпросът ти „${truncate(final.q)}“ е одобрен! +${SUBMISSION_RULES.approvedXp} XP`,
+  notify(row.user_id, {
+    icon: '✅',
+    text: `Въпросът ти „${truncate(final.q)}“ е одобрен и вече е в играта! +${SUBMISSION_RULES.approvedXp} XP`,
+    link: '/submit',
   });
   return { ok: true };
 }
@@ -204,7 +205,7 @@ export function rejectSubmission(
     adminId,
     id,
   );
-  notifyUser(row.user_id, 'notice', { kind: 'info', message: `Въпросът ти „${truncate(row.q)}“ не беше одобрен.` });
+  notify(row.user_id, { icon: '📝', text: `Въпросът ти „${truncate(row.q)}“ не беше одобрен.`, link: '/submit' });
   return { ok: true };
 }
 

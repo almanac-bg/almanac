@@ -134,7 +134,7 @@ export function AchievementsPage() {
                       />
                     </>
                   ) : (
-                    <p className="text-xs text-fg-3">Изпълни го в мач</p>
+                    <p className="text-xs text-fg-3">{hint(a.id)}</p>
                   )}
                 </div>
               </Card>
@@ -151,4 +151,11 @@ export function AchievementsPage() {
       </p>
     </div>
   );
+}
+
+/** Where an achievement without a count gets earned: most in a single match, a few over a season or a ladder. */
+function hint(id: string) {
+  if (id.startsWith('season_')) return 'Отключва се в края на сезона';
+  if (id.startsWith('rank_')) return 'Отключва се с рейтинга в класиран режим';
+  return 'Изпълни го в мач';
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { BRAND, type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
+import { BRAND, PUBLIC_PAGES, routeKind, type SiteInfo } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -181,8 +181,10 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
 
   const landing = await get('/');
   assert.equal(landing.root, '<div id="root" data-painted="signed-out">');
-  assert.match(landing.html, /Онлайн викторина срещу истински хора/);
+  assert.match(landing.html, /Онлайн викторина с приятели и цяла България/);
   assert.match(landing.html, /Играй като гост/);
+  // The proof line, from the bank the server has (300 test questions).
+  assert.match(landing.html, /Над 300 въпроса в 10 категории/);
   // Nothing drawn invisible, waiting for an entrance animation that only the browser would play.
   assert.doesNotMatch(landing.html, /opacity:0/);
   assert.match(landing.vary ?? '', /cookie/i);
@@ -213,8 +215,8 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   // Every page carries who runs the site, for the footer and the legal pages; the game's own screens aren't drawn.
   const settings = await get('/settings');
   assert.equal(settings.root, '<div id="root">');
-  const operator = /<script type="application\/json" id="operator">([^<]*)<\/script>/.exec(settings.html)?.[1];
-  assert.equal((JSON.parse(operator ?? 'null') as OperatorInfo | null)?.name, 'Тест Тестов');
+  const operator = /<script type="application\/json" id="site">([^<]*)<\/script>/.exec(settings.html)?.[1];
+  assert.equal((JSON.parse(operator ?? 'null') as SiteInfo | null)?.name, 'Тест Тестов');
 });
 
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {
@@ -278,12 +280,14 @@ test('the lobby names the web build the server hosts, so tabs of an older one ca
   assert.ok(build && page.includes(`<meta name="app-build" content="${build}" />`), `build ${build}`);
 });
 
-test('who runs the site comes from the configuration, not the code (and the footer can link the source)', async () => {
-  const legal = (await (await fetch(`${srv.url}/api/legal`)).json()) as OperatorInfo;
+test('what the site says about itself: who runs it (configuration, not code), its source, how many questions', async () => {
+  const legal = (await (await fetch(`${srv.url}/api/legal`)).json()) as SiteInfo;
   assert.equal(legal.name, 'Тест Тестов');
   assert.equal(legal.address, 'ул. Примерна 1, София');
   assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
   assert.equal(legal.backups, 'Примерни бекъпи');
   assert.equal(legal.inbox, null, 'unset: the policy leaves the line out');
+  // The test bank has 300 questions: the landing's "над 300 въпроса", rounded down to the hundred.
+  assert.equal(legal.questions, 300);
 });

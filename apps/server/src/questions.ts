@@ -110,6 +110,12 @@ export function seededRng(seed: string): Rng {
 }
 
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
+/**
+ * How far a question may wander from its difficulty's place in the match: neighbours trade places at the seams (an
+ * easy one after a medium, a medium after a hard), while easy and hard never swap. In lockstep, the first medium was
+ * always question 5 (where "Двойно или нищо" always went) and Royale's first knockout was always decided on easy ones.
+ */
+const RAMP_BLUR = 1.25;
 
 /**
  * Picks `count` questions: ones none of the players has seen first, then the ones seen longest ago, with a 40/40/20
@@ -148,8 +154,9 @@ export function pickQuestions(
   take(false, false);
 
   return picked
-    .sort((a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty])
-    .map((q) => {
+    .map((q) => ({ q, place: DIFFICULTY_ORDER[q.difficulty] + rng() * RAMP_BLUR }))
+    .sort((a, b) => a.place - b.place)
+    .map(({ q }) => {
       const order = shuffle([0, 1, 2, 3], rng);
       return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
     });

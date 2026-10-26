@@ -1,7 +1,7 @@
 import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
 import { categoryById, isQueueMode, MODES, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Skull, Swords } from 'lucide-react';
+import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -21,6 +21,7 @@ import {
 } from '../components/results/ResultCards';
 import { ChallengeStanding, Podium, TeamResult } from '../components/results/Standings';
 import { Button, Card } from '../components/ui';
+import { matchShareText, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
 export function Results({ game }: { game: LiveGame }) {
@@ -117,6 +118,22 @@ export function Results({ game }: { game: LiveGame }) {
   }
 
   const dailyBoard = () => navigate('/leaderboard?board=daily');
+  const share = () =>
+    shareText(
+      matchShareText({
+        modeName: MODES[end.mode].name,
+        category: solo ? (categoryById(game.start.category)?.name ?? null) : null,
+        place: mine.placement,
+        players: end.standings.length,
+        won,
+        teams: !!teamScores,
+        royale: end.mode === 'royale',
+        score: mine.score,
+        history: game.history,
+        total: game.start.totalQuestions,
+        levelUp: rewards && rewards.levelAfter > rewards.levelBefore ? rewards.levelAfter : null,
+      }),
+    );
   const linkBoard = (id: string) => navigate(`/c/${id}`);
 
   const category = categoryById(game.start.category);
@@ -125,7 +142,7 @@ export function Results({ game }: { game: LiveGame }) {
     : daily
       ? perfect
         ? 'Перфектен ден!'
-        : 'Денят е изигран'
+        : 'Днешното е изиграно'
       : link
         ? link.total <= 1
           ? mine.score > 0
@@ -137,7 +154,7 @@ export function Results({ game }: { game: LiveGame }) {
         : single
           ? perfect
             ? 'Перфектно!'
-            : 'Край на мача'
+            : 'Готово!'
           : teamScores
             ? won
               ? 'Победа!'
@@ -302,6 +319,13 @@ export function Results({ game }: { game: LiveGame }) {
                   <RotateCcw className="size-5" /> Играй пак
                 </>
               )}
+            </Button>
+          )}
+          {/* The daily and a challenge link share from their own cards (with the board and the link). */}
+          {!daily && !challenge && !end.noContest && (
+            <Button size="lg" variant="secondary" onClick={share} aria-label="Сподели резултата">
+              <Share2 className="size-5" />
+              <span className="max-sm:hidden">Сподели</span>
             </Button>
           )}
           {!(challenge && guest) && (

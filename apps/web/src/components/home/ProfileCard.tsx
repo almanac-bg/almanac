@@ -59,14 +59,15 @@ export function ProfileCard({ className }: { className?: string }) {
       >
         {me.dailyBonusAvailable && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
-            <Gift className="size-3.5" /> Днешният бонус +100 XP те чака
+            <Gift aria-hidden className="size-3.5" /> Първият мач за деня носи +100 XP
           </span>
         )}
         {next && <UpNext unlock={next} />}
         <SeasonChip ratings={me.ratings} className="max-sm:hidden" />
       </div>
-      {/* Guests: right under the level it's about — all of this lives on this device until the account is saved. */}
-      <GuestNudge className="relative mt-4 sm:mt-5" />
+      {/* Guests: right under the level it's about — all of this lives on this device until the account is saved. Once
+          there's progress worth keeping (level 2: a match or two in), not before the first question. */}
+      {progress.level >= 2 && <GuestNudge className="relative mt-4 sm:mt-5" />}
     </Card>
   );
 }

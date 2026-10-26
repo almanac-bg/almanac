@@ -375,6 +375,21 @@ const MIGRATIONS: (string | (() => void))[] = [
   `
   UPDATE users SET last_seen_at = created_at WHERE last_seen_at IS NULL;
   `,
+
+  // v14: notes kept for a player until they've seen them (a challenge link played, a question approved…): a toast
+  // reached them only if they were on the page at that moment. The text is written when it happens.
+  `
+  CREATE TABLE notifications (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    icon TEXT NOT NULL,
+    text TEXT NOT NULL,
+    link TEXT,
+    created_at INTEGER NOT NULL,
+    read_at INTEGER
+  );
+  CREATE INDEX notifications_user ON notifications(user_id, id);
+  `,
 ];
 
 /** The schema version this code brings a database to. */

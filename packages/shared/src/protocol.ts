@@ -45,6 +45,8 @@ export interface MeUser extends PublicUser {
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
+  /** Notes (AppNotification) the player hasn't seen yet: the count on the bell. */
+  unreadNotifications: number;
   /** Verified address (used for password resets). */
   email: string | null;
   /** Mail to the verified address bounced or was marked as spam (the reminders were switched off). */
@@ -313,6 +315,8 @@ export interface ServerToClientEvents {
   achievements: (ids: string[]) => void;
   /** Your account changed server-side (e.g. renamed by a moderator); refetch /me. */
   'account:update': () => void;
+  /** A note kept until it's seen (see AppNotification), with how many are now unseen. */
+  notification: (p: { item: AppNotification; unread: number }) => void;
   notice: (p: { kind: 'info' | 'error'; message: string }) => void;
   /** The server is restarting for an update: running matches finish, no new ones start until it's back. */
   'server:draining': (p: { message: string }) => void;
@@ -408,6 +412,8 @@ export interface LeaderboardResponse {
   me: LeaderboardEntry | null;
   /** Ranked boards are per season. */
   season: { id: string; name: string; endsAt: number } | null;
+  /** The daily board: today's results of you and your friends, ranked among yourselves. */
+  friends?: LeaderboardEntry[];
 }
 
 export interface DailyInfo {
@@ -420,6 +426,8 @@ export interface DailyInfo {
   played: { score: number; correct: number; rank: number | null } | null;
   total: number;
   entries: LeaderboardEntry[];
+  /** Today's results of you and your friends, ranked among yourselves (empty for a guest, who has no friends here). */
+  friends: LeaderboardEntry[];
 }
 
 export interface SeasonInfo {
@@ -567,13 +575,27 @@ export interface MyChallenge {
 }
 
 /** Admin → Статистика: daily counters (newest day first) and totals. */
+/** A note kept for a player until they've seen it: something that happened while they may have been away. */
+export interface AppNotification {
+  id: number;
+  icon: string;
+  text: string;
+  /** Where it leads (a challenge link's page, the questions you submitted…). */
+  link: string | null;
+  createdAt: number;
+  read: boolean;
+}
+
 export interface LaunchStats {
   days: { day: string; values: Partial<Record<string, number>> }[];
   totals: { accounts: number; guests: number; matches: number };
 }
 
-/** Who runs this site, for the privacy policy and terms (set by the operator in the server's configuration). */
-export interface OperatorInfo {
+/**
+ * What every page knows about the site: who runs it (the legal pages, the footer), where its source is, and how many
+ * questions it has (the landing page). The server puts it in each page it sends; /api/legal has it too.
+ */
+export interface SiteInfo {
   name: string | null;
   address: string | null;
   email: string;
@@ -587,4 +609,6 @@ export interface OperatorInfo {
   sourceUrl: string | null;
   /** The commit this server runs (the source offer links that exact version). */
   release: string | null;
+  /** Questions in play, rounded down to the hundred ("над 1 900 въпроса"). */
+  questions: number;
 }

@@ -21,6 +21,7 @@ import { advanceQuests } from '../quests';
 import { getRating, recordRating } from '../seasons';
 import { count, countActive } from '../stats';
 import { DELETED_NAME, getUser } from '../users';
+import { BOT_MAX_RATING } from './bots';
 import type { Game, Participant } from './Game';
 
 const XP = {
@@ -38,6 +39,18 @@ const XP = {
 /** Elo step against people; bots move ratings less (their strength is an estimate). */
 const RATING_K = 40;
 const RATING_K_BOTS = 24;
+/** Where games against bots start to count for less. */
+const BOT_K_FADES_FROM = 1000;
+
+/**
+ * How far a game against bots moves a rating: the full step up to 1000, then less and less, nothing from the bots' own
+ * ceiling (1600) up — a strong player kept beating bots there and climbed without limit. The top of the ladder is for
+ * beating people; bots can't push anyone up it, or drag them down.
+ */
+export function botK(rating: number) {
+  const share = (BOT_MAX_RATING - rating) / (BOT_MAX_RATING - BOT_K_FADES_FROM);
+  return RATING_K_BOTS * Math.min(1, Math.max(0, share));
+}
 
 /** Rating changes by player id; who played a ranked match without one, and why. */
 interface Ratings {
@@ -151,6 +164,9 @@ function rewardHuman(
     return o.id !== s.id && (!setup.roomCode || !them.isBot) && (!setup.teams || them.team !== p.player.team);
   });
   const beaten = rivals.filter((o) => o.placement > s.placement).length;
+  // A private room with nobody else in it is practice: winning there doesn't count as a win (counters, quests,
+  // achievements), or one bot in a five-question room would hand them out.
+  const realWin = won && (!setup.roomCode || rivals.length > 0);
 
   // ── XP ──
   const lines: XpLine[] = [];
@@ -209,7 +225,7 @@ function rewardHuman(
       ...advanceQuests(userId, {
         mode: setup.mode,
         multiplayer,
-        won,
+        won: realWin,
         correct: p.correct,
         hardCorrect: p.correctByDifficulty.hard,
         bestStreak: p.bestStreak,
@@ -232,7 +248,7 @@ function rewardHuman(
      WHERE id = ?`,
     before.games_played + counted,
     before.mp_games + (multiplayer ? counted : 0),
-    before.wins + (won ? 1 : 0),
+    before.wins + (realWin ? 1 : 0),
     before.questions_answered + p.faced,
     before.correct_answers + p.correct,
     Math.max(before.best_streak, p.bestStreak),
@@ -272,10 +288,12 @@ function rewardHuman(
   const runnerUp = setup.teams ? null : standings.find((x) => x.placement === 2);
   const match: MatchContext = {
     mode: setup.mode,
-    won,
+    won: realWin,
     left: !counts,
     completed: !game.endedByWalkout,
     teams: setup.teams,
+    elimination: setup.elimination,
+    fastestHardCorrectMs: p.fastestHardCorrectMs,
     questions: game.questions.length,
     faced: p.faced,
     correct: p.correct,
@@ -383,7 +401,7 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
       }
       const expected = 1 / (1 + 10 ** ((ratingOf(game, other.id) - ratingOf(game, me.id)) / 400));
       const actual = me.placement < other.placement ? 1 : me.placement > other.placement ? 0 : 0.5;
-      sum += (them.isBot ? RATING_K_BOTS : RATING_K) * (actual - expected);
+      sum += (them.isBot ? botK(ratingOf(game, me.id)) : RATING_K) * (actual - expected);
       rated++;
     }
     if (rated === 0 && skipped) ratings.unrated.set(me.id, skipped);
@@ -418,7 +436,7 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
       continue;
     }
     const expected = 1 / (1 + 10 ** ((avg(1 - p.player.team) - avg(p.player.team)) / 400));
-    const k = standings.some((o) => game.participants.get(o.id)!.player.isBot) ? RATING_K_BOTS : RATING_K;
+    const k = standings.some((o) => game.participants.get(o.id)!.player.isBot) ? botK(ratingOf(game, s.id)) : RATING_K;
     ratings.deltas.set(s.id, k * ((s.placement === 1 ? 1 : 0) - expected));
   }
   return ratings;

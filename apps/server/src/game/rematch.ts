@@ -1,5 +1,7 @@
 import { isQueueMode, type QueueModeId, type RematchState } from '@quiz/shared';
 import { guarded } from '../guard';
+import { notify } from '../notifications';
+import { getUser } from '../users';
 import type { Game } from './Game';
 import type { IO } from './io';
 import type { Matchmaker } from './matchmaking';
@@ -80,7 +82,25 @@ export class Rematches {
     clearTimeout(offer.timer);
     this.offers.delete(offer.gameId);
     // Only worth telling when someone had asked: otherwise nobody is waiting on it.
-    if (cancelled && offer.ready.size > 0) this.broadcast(offer, true);
+    if (cancelled && offer.ready.size > 0) {
+      this.broadcast(offer, true);
+      this.tellTheAway(offer);
+    }
+  }
+
+  /** Whoever had already gone (closed the app) learns later that someone wanted another round with them. */
+  private tellTheAway(offer: Offer) {
+    const askers = [...offer.ready].map((id) => getUser(offer.players.get(id)!)?.username).filter((n) => !!n);
+    if (!askers.length) return;
+    const who = askers.length === 1 ? askers[0] : `${askers[0]} и още ${askers.length - 1}`;
+    for (const [playerId, userId] of offer.players) {
+      if (offer.ready.has(playerId) || this.isOnline(userId)) continue;
+      notify(userId, {
+        icon: '🔁',
+        text: `${who} ${askers.length === 1 ? 'поиска' : 'поискаха'} реванш, но теб вече те нямаше.`,
+        link: askers.length === 1 ? `/profile/${encodeURIComponent(askers[0]!)}` : null,
+      });
+    }
   }
 
   private broadcast(offer: Offer, cancelled: boolean) {

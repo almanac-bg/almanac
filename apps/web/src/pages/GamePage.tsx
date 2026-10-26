@@ -117,7 +117,9 @@ function Arena({ game }: { game: LiveGame }) {
           <p className="text-balance text-rose-200">💀 Отпадна — гледаш като зрител</p>
           {freeToGo && (
             <>
-              <p className="col-span-2 text-xs text-fg-2">Можеш да излезеш — мястото ти се запазва.</p>
+              <p className="col-span-2 text-xs text-fg-2">
+                Можеш да излезеш — мястото ти се запазва, а наградите идват в края на мача.
+              </p>
               {/* Knocked out, leaving is no forfeit (the place stands, the rewards come at the end): no "are you sure". */}
               <Button size="sm" variant="secondary" className="col-start-2 row-start-1" onClick={leave}>
                 <DoorOpen className="size-4" /> Излез
