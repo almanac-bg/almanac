@@ -31,6 +31,16 @@ export function Feed({ game }: { game: LiveGame }) {
   );
 }
 
+/**
+ * People other than you still playing (bots don't count, nor the knocked out or gone). With none, the server doesn't
+ * keep anyone waiting for the bots' final: it decides it at once and the results come, so there's nothing to watch.
+ */
+export function othersStillIn(game: LiveGame) {
+  return game.standings.filter(
+    (s) => s.id !== game.start.youId && !game.players[s.id]?.isBot && s.eliminatedAt === null && !s.left,
+  ).length;
+}
+
 /** Streaks worth a moment of their own (the chip in the reveal counts every one). */
 const STREAK_MILESTONES = new Set([3, 5, 7, 10, 15, 20]);
 
@@ -122,9 +132,11 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
                 </p>
                 <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
                 {me && alive > 0 && (
-                  <p className="mt-5 rounded-full border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-fg">
-                    {alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще
-                    спечели 👀
+                  // Within the screen on a phone (it can take two lines there).
+                  <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">
+                    {othersStillIn(game) === 0
+                      ? 'Останаха само ботове — финалът им се решава веднага.'
+                      : `${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели 👀`}
                   </p>
                 )}
               </motion.div>

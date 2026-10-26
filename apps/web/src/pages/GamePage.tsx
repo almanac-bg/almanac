@@ -10,7 +10,7 @@ import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
 import { EmoteBar } from '../components/game/EmoteBar';
 import { Intro } from '../components/game/Intro';
 import { useJokerGuide } from '../components/game/Jokers';
-import { EliminationBanner, Feed, StreakBurst } from '../components/game/Moments';
+import { EliminationBanner, Feed, othersStillIn, StreakBurst } from '../components/game/Moments';
 import { QuestionView } from '../components/game/QuestionView';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
@@ -55,6 +55,9 @@ function Arena({ game }: { game: LiveGame }) {
   const meEliminated = game.eliminated.includes(game.start.youId);
   // In a private room leaving the match leaves the room too, so that's no place to suggest it.
   const freeToGo = meEliminated && !game.start.roomCode;
+  // Knocked out with only bots left: the server plays their final out at once, so the bar says the result is coming
+  // rather than inviting you to stay and watch.
+  const watching = meEliminated && othersStillIn(game) > 0;
   const leave = () => leaveMatchScreen(actions.leaveGame);
 
   // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
@@ -111,11 +114,15 @@ function Arena({ game }: { game: LiveGame }) {
         <div
           className={clsx(
             'fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto grid w-fit max-w-[calc(100vw-1.5rem)] items-center gap-x-3 gap-y-0.5 rounded-2xl border border-rose-400/30 bg-ink-2/90 py-2 pl-4 text-sm backdrop-blur sm:bottom-20',
-            freeToGo ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
+            freeToGo && watching ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
           )}
         >
-          <p className="text-balance text-rose-200">💀 Отпадна — гледаш като зрител</p>
-          {freeToGo && (
+          {watching ? (
+            <p className="text-balance text-rose-200">💀 Отпадна — гледаш като зрител</p>
+          ) : (
+            <p className="text-balance text-rose-200">💀 Отпадна. Останаха само ботове — резултатът идва след миг.</p>
+          )}
+          {freeToGo && watching && (
             <>
               <p className="col-span-2 text-xs text-fg-2">
                 Можеш да излезеш — мястото ти се запазва, а наградите идват в края на мача.
