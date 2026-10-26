@@ -1,4 +1,5 @@
 import { api, setState, toast, useStore } from '@quiz/client';
+import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import { Eye, EyeOff, Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { credentialsProblem } from '../lib/credentials';
@@ -91,8 +92,8 @@ export function ClaimAccountModal({
               aria-invalid={!!error && invalid === 'password'}
               aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
               required
-              minLength={6}
-              placeholder="поне 6 символа"
+              minLength={PASSWORD_MIN_LENGTH}
+              placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
               className={`${INPUT} pr-12`}
             />
             <button

@@ -1,10 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import { z } from 'zod';
 import { hashPassword, hashToken as hashSessionToken, verifyPassword } from './auth';
+import { isCommonPassword } from './commonPasswords';
 import { config } from './config';
 import { one, run, tx } from './db';
 import { emailChangedMail, type Mail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
 import { disconnectOtherSessions, disconnectUser } from './notify';
+import { throttled } from './throttle';
 import { emailKey, getUser, getUserByEmail, getUserByLogin } from './users';
 
 type Purpose = 'verify' | 'reset';
@@ -13,7 +16,11 @@ const TTL: Record<Purpose, number> = { verify: 24 * 60 * 60_000, reset: 60 * 60_
 export type Result<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 export const EmailSchema = z.email('Невалиден имейл.').max(254);
-export const PasswordSchema = z.string().min(6, 'Паролата трябва да е поне 6 символа.').max(200);
+export const PasswordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`)
+  .max(200)
+  .refine((p) => !isCommonPassword(p), 'Тази парола е сред най-често използваните — избери по-необичайна.');
 
 // Only a hash is stored, so a leaked database can't be used to reset passwords.
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -60,6 +67,14 @@ export function requestEmailChange(userId: number, email: string): Result {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const user = getUser(userId)!;
   if (user.email_key === emailKey(parsed.data)) return { ok: false, error: 'Това вече е твоят имейл.' };
+  // Whoever types an address, it's the mailbox's owner who gets the mail: a few a day per address (sign-up, a saved
+  // guest and Settings all come through here), and a ceiling for all of them, so nobody can mail a stranger in the
+  // site's name again and again.
+  if (
+    throttled(`email-to:${emailKey(parsed.data)}`, 3, 24 * 60 * 60_000) ||
+    throttled('verify-mail:all', 300, 60 * 60_000)
+  )
+    return { ok: false, error: 'Твърде много писма до този адрес. Опитай отново утре.' };
   run('UPDATE users SET pending_email = ? WHERE id = ?', parsed.data, userId);
   const token = issueToken(userId, 'verify', parsed.data);
   sendMail(verifyEmailMail(parsed.data, user.username, link('/verify-email', token)));

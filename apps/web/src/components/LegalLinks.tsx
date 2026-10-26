@@ -9,7 +9,13 @@ export const MINORS_NOTICE =
 /** Footer links to the legal pages (kept apart from the pages themselves, which load on demand). */
 export function LegalLinks({ className = '' }: { className?: string }) {
   // The source code, once published: free software, and the AGPL asks a hosted copy to offer it.
-  const sourceUrl = useOperator()?.sourceUrl;
+  const op = useOperator();
+  // The exact version that's running, as the AGPL asks (the repository's front page may be ahead of it).
+  const source = op?.sourceUrl?.startsWith('https://')
+    ? op.release
+      ? `${op.sourceUrl}/tree/${encodeURIComponent(op.release)}`
+      : op.sourceUrl
+    : null;
   return (
     <nav className={`flex flex-wrap items-center gap-x-4 text-xs text-fg-3 ${className}`}>
       <Link to="/terms" className="inline-flex min-h-11 items-center hover:text-fg-2">
@@ -18,13 +24,8 @@ export function LegalLinks({ className = '' }: { className?: string }) {
       <Link to="/privacy" className="inline-flex min-h-11 items-center hover:text-fg-2">
         Политика за поверителност
       </Link>
-      {sourceUrl && (
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noopener"
-          className="inline-flex min-h-11 items-center hover:text-fg-2"
-        >
+      {source && (
+        <a href={source} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center hover:text-fg-2">
           Изходен код
         </a>
       )}

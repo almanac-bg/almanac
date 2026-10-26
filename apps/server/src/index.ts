@@ -61,6 +61,10 @@ app.post('/api/monitoring', express.text({ type: () => true, limit: '256kb' }), 
   res.status(typeof req.body === 'string' && forwardEnvelope(req.body) ? 200 : 400).end();
 });
 app.use('/api', api);
+// An address under /api that isn't one: JSON like every other answer there, not Express's HTML page.
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Няма такъв адрес.' });
+});
 // Anything a route throws: a short JSON answer, never Express's HTML page or a stack trace.
 app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ServerBusyError) {
@@ -293,7 +297,7 @@ const server = http.createServer(app);
 // becomes a 502. So idle connections stay open longer than the proxy's.
 server.keepAliveTimeout = 125_000;
 server.headersTimeout = 126_000;
-const realtime = createRealtime(server);
+const realtime = createRealtime(server, app.get('trust proxy fn'));
 startMaintenance();
 
 server.listen(config.port, () => {

@@ -1,7 +1,7 @@
 // End-to-end: a real server, real sockets, two players (A is the first account, so admin) and bots.
 // Sections run in order and share state, like a play session.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
@@ -98,6 +98,49 @@ test('auth', T, async () => {
   });
   foreign.close();
   assert.ok(rejected, 'sockets from a foreign origin are rejected');
+});
+
+test(
+  'passwords: 8 characters or more, not the name, not a common one; older hashes are redone at sign-in',
+  T,
+  async () => {
+    const signUp = (username: string, password: string, email?: string) =>
+      api.send('POST', '/api/auth/register', '', { username, password, email });
+    const short = await signUp('kratka_p', 'sedem77');
+    assert.equal(short.status, 400);
+    assert.match(short.body.error, /поне 8 символа/);
+    assert.match((await signUp('obshta_p', 'password1')).body.error, /най-често използваните/);
+    assert.match((await signUp('ednakvi1', 'ednakvi1')).body.error, /същата като името/);
+
+    // An account from before the cost went up: N = 2^14, written as scrypt$salt$hash.
+    const old = await register(srv.url, 'star_hash');
+    const salt = randomBytes(16);
+    const legacy = `scrypt$${salt.toString('base64')}$${scryptSync('secret123', salt, 64).toString('base64')}`;
+    srv.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(legacy, old.user.id);
+    const login = await api.send('POST', '/api/auth/login', '', { username: 'star_hash', password: 'secret123' });
+    assert.equal(login.status, 200, 'the old hash still verifies');
+    const stored = srv.db.prepare('SELECT password_hash AS h FROM users WHERE id = ?').get(old.user.id) as {
+      h: string;
+    };
+    assert.match(stored.h, /^scrypt\$N=65536,r=8,p=1\$/, 'and is redone at the current cost');
+    assert.equal(
+      (await api.send('POST', '/api/auth/login', '', { username: 'star_hash', password: 'secret123' })).status,
+      200,
+    );
+  },
+);
+
+test('an address gets a few verification mails a day, whoever types it in', T, async () => {
+  const before = srv.mails().filter((m) => m.to === 'someone@example.test').length;
+  for (let i = 0; i < 5; i++) await register(srv.url, `pismo_${i}`, 'someone@example.test');
+  const sent = srv.mails().filter((m) => m.to === 'someone@example.test').length - before;
+  assert.equal(sent, 3, 'three, then nothing until tomorrow (the sign-ups themselves still work)');
+});
+
+test('an unknown /api address answers JSON, like the rest of the API', T, async () => {
+  const res = await fetch(`${srv.url}/api/no-such-route`);
+  assert.equal(res.status, 404);
+  assert.match(res.headers.get('content-type') ?? '', /json/);
 });
 
 test('solo', T, async () => {

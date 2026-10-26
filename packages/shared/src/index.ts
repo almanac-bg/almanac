@@ -1,3 +1,4 @@
+export * from './accounts';
 export * from './achievements';
 export * from './brand';
 export * from './categories';

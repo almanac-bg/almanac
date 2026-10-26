@@ -10,6 +10,7 @@ import {
   type PowerupId,
   type Presence,
 } from '@quiz/shared';
+import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
@@ -25,7 +26,7 @@ import { guarded } from './guard';
 import { ACCOUNT_ONLY } from './guests';
 import { reportError } from './monitoring';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
-import { eventBucket, throttled } from './throttle';
+import { eventBucket, network, throttled } from './throttle';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
@@ -43,6 +44,11 @@ const obj = (x: unknown): Record<string, unknown> =>
   x !== null && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {};
 
 const MAX_SOCKETS_PER_USER = 10;
+/**
+ * Every per-account limit is really per guest, and a guest is one click away, so one network gets a ceiling too: high,
+ * because a mobile operator puts thousands of phones behind one IPv4 address.
+ */
+const MAX_SOCKETS_PER_NETWORK = 300;
 
 /** Shown while the server restarts for an update. */
 const DRAINING = 'Обновяваме играта — нови мачове може да започнат след минута-две.';
@@ -57,7 +63,8 @@ export interface Realtime {
   drain: (maxMs: number) => Promise<void>;
 }
 
-export function createRealtime(httpServer: HttpServer): Realtime {
+/** `trustProxy`: Express's compiled "trust proxy" rule, so a socket's address is worked out exactly like `req.ip`. */
+export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string, i: number) => boolean): Realtime {
   const io: IO = new Server(httpServer, {
     serveClient: false,
     // Every client message is tiny; the 1 MB default only invites abuse.
@@ -69,6 +76,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     },
   });
   const openSockets = new Map<number, number>();
+  const socketsByNetwork = new Map<string, number>();
   const games = new GameRegistry(io);
   // Someone online and free to join a queue (not in a match, a queue or a room): a reason to wait for a person.
   const idleOnline = () => {
@@ -120,6 +128,9 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     if (!token || !userId || !getUser(userId)) return next(new Error('unauthorized'));
     // A handful of tabs is normal; dozens of sockets for one account is not.
     if ((openSockets.get(userId) ?? 0) >= MAX_SOCKETS_PER_USER) return next(new Error('too-many-connections'));
+    const net = network(proxyaddr(socket.request, trustProxy));
+    if ((socketsByNetwork.get(net) ?? 0) >= MAX_SOCKETS_PER_NETWORK) return next(new Error('too-many-connections'));
+    socket.data.network = net;
     socket.data.userId = userId;
     socket.data.session = hashToken(token);
     next();
@@ -127,6 +138,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
 
   io.on('connection', (socket) => {
     const { userId, session } = socket.data;
+    socketsByNetwork.set(socket.data.network, (socketsByNetwork.get(socket.data.network) ?? 0) + 1);
     socket.join([`user:${userId}`, `session:${session}`]);
     // Bursts are fine (answer + joker + emote); a stream of events is dropped — with an answer for any that wait for
     // one, so the page says "too fast" rather than "no connection".
@@ -307,8 +319,11 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     on('room:join', (code, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      // Codes are short enough to type; this keeps them too slow to guess.
-      if (throttled(`room-join:${userId}`, 20, 10 * 60_000)) {
+      // Codes are short enough to type; this keeps them too slow to guess (per player, and per network: guests are free).
+      if (
+        throttled(`room-join:${userId}`, 20, 10 * 60_000) ||
+        throttled(`room-join-net:${socket.data.network}`, 120, 10 * 60_000)
+      ) {
         return reply(ack, { ok: false, error: 'Твърде много опити да влезеш в стая. Изчакай няколко минути.' });
       }
       moveOn();
@@ -370,6 +385,9 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     });
 
     socket.on('disconnect', () => {
+      const onNetwork = (socketsByNetwork.get(socket.data.network) ?? 1) - 1;
+      if (onNetwork > 0) socketsByNetwork.set(socket.data.network, onNetwork);
+      else socketsByNetwork.delete(socket.data.network);
       const remaining = (openSockets.get(userId) ?? 1) - 1;
       if (remaining > 0) {
         openSockets.set(userId, remaining);

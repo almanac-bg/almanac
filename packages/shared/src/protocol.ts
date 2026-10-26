@@ -581,4 +581,6 @@ export interface OperatorInfo {
   inbox: string | null;
   /** Where this site's source code is published (offered in the footer, as the AGPL asks of hosted copies). */
   sourceUrl: string | null;
+  /** The commit this server runs (the source offer links that exact version). */
+  release: string | null;
 }

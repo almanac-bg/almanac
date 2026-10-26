@@ -1,4 +1,5 @@
 import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
+import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   Check,
@@ -105,7 +106,8 @@ export function ResetPasswordPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (password.length < 6) return setError('Паролата трябва да е поне 6 символа.');
+    if (password.length < PASSWORD_MIN_LENGTH)
+      return setError(`Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`);
     if (password !== confirm) return setError('Паролите не съвпадат.');
     setBusy(true);
     setError(null);
@@ -134,7 +136,7 @@ export function ResetPasswordPage() {
             value={password}
             onChange={setPassword}
             autoComplete="new-password"
-            placeholder="поне 6 символа"
+            placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
           />
           <PasswordField label="Повтори паролата" value={confirm} onChange={setConfirm} autoComplete="new-password" />
           {error && (
@@ -460,11 +462,14 @@ function SoundSettings() {
 function ReminderSettings() {
   const me = useStore((s) => s.me)!;
   const [busy, setBusy] = useState(false);
+  // The reminders are the one thing that rests on consent, and under 14 that's a parent's: asked where it's given.
+  const [confirming, setConfirming] = useState(false);
   const on = me.streakReminders;
   // Switching off always works; switching on needs somewhere to send the email.
   const blocked = !on && !me.email;
 
   async function toggle() {
+    setConfirming(false);
     setBusy(true);
     try {
       const { user } = await api.setReminders(!on);
@@ -499,10 +504,27 @@ function ReminderSettings() {
         </>
       }
       on={on}
-      onToggle={toggle}
+      onToggle={() => (on ? toggle() : setConfirming(true))}
       disabled={blocked}
       busy={busy}
     >
+      <Modal open={confirming} onClose={() => setConfirming(false)} title="Напомняне за серията">
+        <p className="text-sm text-fg-2">
+          Ще ти пишем вечерта, когато днешното предизвикателство още чака — най-много веднъж на ден. Спираш го по всяко
+          време оттук или от линка в писмото.
+        </p>
+        <p className="mt-3 text-sm text-fg">
+          Потвърждаваш, че си над 14 години или имаш съгласие на родител или настойник.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirming(false)}>
+            Отказ
+          </Button>
+          <Button onClick={toggle}>
+            <Flame className="size-4" /> Потвърждавам, включи
+          </Button>
+        </div>
+      </Modal>
       {blocked && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
           <MailWarning aria-hidden className="size-5 shrink-0 text-amber-300" />
@@ -790,7 +812,8 @@ function PasswordSettings() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (next.length < 6) return setError('Новата парола трябва да е поне 6 символа.');
+    if (next.length < PASSWORD_MIN_LENGTH)
+      return setError(`Новата парола трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`);
     setBusy(true);
     setError(null);
     try {
@@ -818,7 +841,7 @@ function PasswordSettings() {
           value={next}
           onChange={setNext}
           autoComplete="new-password"
-          placeholder="поне 6 символа"
+          placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
         />
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">

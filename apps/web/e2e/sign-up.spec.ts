@@ -22,7 +22,7 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
   await name.fill('abc');
   await password.fill('123');
   await submit.click();
-  await expect(error).toHaveText('Паролата трябва да е поне 6 символа.');
+  await expect(error).toHaveText('Паролата трябва да е поне 8 символа.');
   await expect(password).toHaveAttribute('aria-invalid', 'true');
   await expect(name).toHaveAttribute('aria-invalid', 'false');
 

@@ -1,5 +1,14 @@
 import { api, fmt, setState } from '@quiz/client';
-import { BRAND, CATEGORIES, type ChallengePreview, isQueueMode, MODES, type ModeId, RANK_TIERS } from '@quiz/shared';
+import {
+  BRAND,
+  CATEGORIES,
+  type ChallengePreview,
+  isQueueMode,
+  MODES,
+  type ModeId,
+  PASSWORD_MIN_LENGTH,
+  RANK_TIERS,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import {
   ArrowLeft,
@@ -299,8 +308,8 @@ export function AuthPage() {
                           aria-invalid={!!error && invalid === 'password'}
                           aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
                           required
-                          minLength={6}
-                          placeholder={mode === 'register' ? 'поне 6 символа' : '••••••••'}
+                          minLength={PASSWORD_MIN_LENGTH}
+                          placeholder={mode === 'register' ? `поне ${PASSWORD_MIN_LENGTH} символа` : '••••••••'}
                           className={`${INPUT} pr-12`}
                         />
                         <button

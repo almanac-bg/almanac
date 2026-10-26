@@ -35,6 +35,12 @@ function webBuild(webDist: string): string | null {
   }
 }
 
+/** A link for the page (the footer offers it): https only, so a typo can't put a `javascript:` URL there. */
+function httpsUrl(raw: string | undefined): string | null {
+  const url = raw ? URL.parse(raw) : null;
+  return url?.protocol === 'https:' ? url.href.replace(/\/$/, '') : null;
+}
+
 /** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). */
 function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
@@ -94,7 +100,7 @@ export const config = {
     inbox: process.env.INBOX_PROVIDER || null,
   },
   /** Where this site's source code is published; linked in the footer (the AGPL asks hosted copies to offer it). */
-  sourceUrl: process.env.SOURCE_URL || null,
+  sourceUrl: httpsUrl(process.env.SOURCE_URL),
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
   /** Tags error reports with the deployed version (e.g. the git commit). */
@@ -104,4 +110,4 @@ export const config = {
 };
 
 /** Who runs the site, as the legal pages show it: from /api/legal, or in the page the server sends. */
-export const operatorInfo: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl };
+export const operatorInfo: OperatorInfo = { ...config.operator, sourceUrl: config.sourceUrl, release: config.release };

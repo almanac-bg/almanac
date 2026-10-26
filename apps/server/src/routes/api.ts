@@ -23,6 +23,7 @@ import {
   destroySession,
   hashPassword,
   hashToken,
+  needsRehash,
   requireAuth,
   sessionTokenFromCookieHeader,
   setSessionCookie,
@@ -80,15 +81,21 @@ import {
 
 export const api = Router();
 
-const Credentials = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(3, 'Името трябва да е поне 3 символа.')
-    .max(20, 'Името може да е най-много 20 символа.')
-    .regex(/^[\p{L}\p{N}_.-]+$/u, 'Само букви, цифри, точка, тире и долна черта.'),
-  password: PasswordSchema,
-});
+const Credentials = z
+  .object({
+    username: z
+      .string()
+      .trim()
+      .min(3, 'Името трябва да е поне 3 символа.')
+      .max(20, 'Името може да е най-много 20 символа.')
+      .regex(/^[\p{L}\p{N}_.-]+$/u, 'Само букви, цифри, точка, тире и долна черта.'),
+    password: PasswordSchema,
+  })
+  // The first thing anyone tries.
+  .refine((c) => c.password.toLowerCase() !== c.username.toLowerCase(), {
+    path: ['password'],
+    message: 'Паролата не може да е същата като името.',
+  });
 
 const Registration = Credentials.extend({ email: z.union([z.literal(''), EmailSchema]).optional() });
 
@@ -210,6 +217,10 @@ api.post('/auth/login', async (req, res) => {
   if (ban) {
     res.status(403).json({ error: ban });
     return;
+  }
+  // A hash from before the current cost: redone now, while the password is at hand.
+  if (needsRehash(user.password_hash)) {
+    run('UPDATE users SET password_hash = ? WHERE id = ?', await hashPassword(creds.password), user.id);
   }
   setSessionCookie(res, createSession(user.id));
   res.json({ user: getMe(user.id) });
@@ -342,10 +353,8 @@ async function confirmPassword(res: Response, password: string): Promise<boolean
 api.post('/account/email', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ email: z.string().max(254), password: z.string().max(200).optional() }), req, res);
   if (!body) return;
-  if (
-    throttled(`email:${res.locals.userId}`, 5, 60 * 60_000) ||
-    throttled(`email-to:${emailKey(body.email)}`, 3, 24 * 60 * 60_000)
-  ) {
+  // (How often one address gets mail is limited where every verification mail is sent: requestEmailChange.)
+  if (throttled(`email:${res.locals.userId}`, 5, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
@@ -511,13 +520,15 @@ api.post('/client-errors', (req, res) => {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: it strips control characters on purpose (log forging)
     const line = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
     const { kind, message, url, stack } = body.data;
+    // Only the path, and not whose profile or which room: the log keeps no names or codes.
+    const where = (url ?? '?').split(/[?#]/)[0].replace(/\/(profile|join)\/[^/]+/g, '/$1/*');
     const trace = stack
       ? `\n${stack
           .split('\n')
           .map((l) => `    | ${line(l)}`)
           .join('\n')}`
       : '';
-    console.error(`🧯 Browser ${kind} at ${line(url ?? '?')}: ${line(message)}${trace}`);
+    console.error(`🧯 Browser ${kind} at ${line(where)}: ${line(message)}${trace}`);
   }
   res.status(204).end();
 });

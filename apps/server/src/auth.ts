@@ -5,7 +5,40 @@ import type { NextFunction, Request, Response } from 'express';
 import { config } from './config';
 import { one, run } from './db';
 
-const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
+const scrypt = promisify(scryptCb) as (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  options: ScryptParams & { maxmem: number },
+) => Promise<Buffer>;
+
+interface ScryptParams {
+  N: number;
+  r: number;
+  p: number;
+}
+/**
+ * The cost of new password hashes: N = 2^16 (64 MiB, about 180 ms on the server), within what OWASP recommends. Each
+ * hash says its own parameters, so older ones (N = 2^14, written as `scrypt$salt$hash`) still verify, and are redone
+ * at the current cost on the next sign-in (needsRehash).
+ */
+const SCRYPT: ScryptParams = { N: 2 ** 16, r: 8, p: 1 };
+const LEGACY: ScryptParams = { N: 2 ** 14, r: 8, p: 1 };
+const paramsText = ({ N, r, p }: ScryptParams) => `N=${N},r=${r},p=${p}`;
+// scrypt needs 128·N·r bytes; Node refuses anything over 32 MiB unless told.
+const maxmem = ({ N, r }: ScryptParams) => 128 * N * r + 16 * 1024 * 1024;
+
+function parseHash(stored: string): { params: ScryptParams; salt: string; hash: string } | null {
+  const parts = stored.split('$');
+  if (parts[0] !== 'scrypt') return null;
+  if (parts.length === 3) return { params: LEGACY, salt: parts[1], hash: parts[2] };
+  const m = /^N=(\d+),r=(\d+),p=(\d+)$/.exec(parts[1] ?? '');
+  if (parts.length !== 4 || !m) return null;
+  const params = { N: Number(m[1]), r: Number(m[2]), p: Number(m[3]) };
+  // Only ever our own hashes, but a typo in one must not be able to ask for gigabytes.
+  if (params.N > 2 ** 20 || params.r > 32 || params.p > 16) return null;
+  return { params, salt: parts[2], hash: parts[3] };
+}
 
 export const SESSION_COOKIE = 'quiz_session';
 const SESSION_MS = config.sessionDays * 24 * 60 * 60 * 1000;
@@ -38,23 +71,31 @@ async function withHashingSlot<T>(fn: () => Promise<T>): Promise<T> {
 export function hashPassword(password: string): Promise<string> {
   return withHashingSlot(async () => {
     const salt = randomBytes(16);
-    const hash = await scrypt(password, salt, 64);
-    return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
+    const hash = await scrypt(password, salt, 64, { ...SCRYPT, maxmem: maxmem(SCRYPT) });
+    return `scrypt$${paramsText(SCRYPT)}$${salt.toString('base64')}$${hash.toString('base64')}`;
   });
 }
 
 export function verifyPassword(password: string, stored: string): Promise<boolean> {
   return withHashingSlot(async () => {
-    const [scheme, salt, hash] = stored.split('$');
-    if (scheme !== 'scrypt' || !salt || !hash) return false;
-    const expected = Buffer.from(hash, 'base64');
-    const actual = await scrypt(password, Buffer.from(salt, 'base64'), expected.length);
+    const parsed = parseHash(stored);
+    if (!parsed) return false;
+    const expected = Buffer.from(parsed.hash, 'base64');
+    const actual = await scrypt(password, Buffer.from(parsed.salt, 'base64'), expected.length, {
+      ...parsed.params,
+      maxmem: maxmem(parsed.params),
+    });
     return timingSafeEqual(actual, expected);
   });
 }
 
+/** A hash from an older, cheaper setting: worth redoing while the password is at hand (a successful sign-in). */
+export function needsRehash(stored: string): boolean {
+  return !stored.startsWith(`scrypt$${paramsText(SCRYPT)}$`);
+}
+
 /** Checked when the login doesn't exist, so a wrong username takes as long as a wrong password (no account probing). */
-export const DUMMY_PASSWORD_HASH = `scrypt$${randomBytes(16).toString('base64')}$${randomBytes(64).toString('base64')}`;
+export const DUMMY_PASSWORD_HASH = `scrypt$${paramsText(SCRYPT)}$${randomBytes(16).toString('base64')}$${randomBytes(64).toString('base64')}`;
 
 /** Sessions are stored hashed: a leaked database or backup holds no usable logins. */
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');
