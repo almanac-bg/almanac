@@ -155,6 +155,9 @@ export interface RevealPayload {
   standings: Standing[];
   eliminated: string[];
   nextInMs: number;
+  /** "Знаеше ли?" behind this question's answer, if it has one: sent with the reveal, never before (it could give the
+   * answer away). */
+  fact: string | null;
 }
 
 export interface GameStartPayload {
@@ -347,6 +350,9 @@ export interface ClientToServerEvents {
   'game:powerup': (p: { index: number; powerup: PowerupId }) => void;
   'game:react': (emote: string) => void;
   'game:leave': () => void;
+  /** A run played alone: stop on this question's fact, to read it. The next question waits for game:resume. */
+  'game:hold': (p: { index: number }, ack: Ack) => void;
+  'game:resume': () => void;
 }
 
 // ─── REST ────────────────────────────────────────────────────────────────────
@@ -504,6 +510,7 @@ export const QUESTION_REPORT_REASONS = [
   { id: 'ambiguous', label: 'Повече от един отговор е верен' },
   { id: 'outdated', label: 'Информацията е остаряла' },
   { id: 'typo', label: 'Правописна или езикова грешка' },
+  { id: 'fact', label: 'Грешка в „Знаеше ли?“' },
   { id: 'other', label: 'Друго' },
 ] as const;
 
@@ -520,6 +527,9 @@ export interface QuestionInfo {
   author: string | null;
   /** Hidden from new matches by a moderator. */
   hidden: boolean;
+  /** Its "Знаеше ли?" and where that can be checked (moderators judge reports about it). */
+  fact: string | null;
+  factSource: string | null;
 }
 
 /** Open reports about one question, for the moderation queue. */

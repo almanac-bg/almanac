@@ -96,6 +96,9 @@ export default defineConfig({
       OPERATOR_NAME: 'Тест Тестов',
       OPERATOR_ADDRESS: 'ул. Примерна 1, София',
       DRAIN_SECONDS: '0',
+      // The public sample bank, as in CI, even where the private one is checked out: the same questions everywhere
+      // (every Geography question there has a "Знаеше ли?" fact, which facts.spec relies on).
+      QUESTIONS_PATH: path.join(root, 'apps/server/src/data/questions.sample.json'),
       // Nothing from the developer's shell: only Дуел and Роял open, no real email or error reports.
       PUBLIC_QUEUES: '',
       SMTP_URL: '',

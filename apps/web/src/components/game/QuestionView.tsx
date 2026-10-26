@@ -1,12 +1,12 @@
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow } from '@quiz/client';
 import { answerPoints, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Flame, Skull, Users, WifiOff, X } from 'lucide-react';
+import { ArrowRight, Check, Flame, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
-import { Spinner } from '../ui';
+import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
 import { ActiveJokers, type JokerGuide, PowerupBar } from './Jokers';
 
@@ -145,7 +145,65 @@ export function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers
           )}
         </AnimatePresence>
       </div>
+      {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
+      {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
     </motion.section>
+  );
+}
+
+/**
+ * "Знаеше ли?" under the result, in a run played alone. The run goes on at its usual pace; "Спри, за да прочета" holds
+ * the next question until "Продължи" (nobody else is waiting), so reading is the player's choice, never a delay.
+ */
+function FactNote({ index, fact }: { index: number; fact: string }) {
+  const [state, setState] = useState<'shown' | 'asking' | 'holding'>('shown');
+  const ref = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
+
+  // On a short screen the note comes in below the fold, where "Спри" can't be reached in the few seconds of the
+  // reveal: the page scrolls just enough to show it, and goes back to where it was when the question leaves.
+  useEffect(() => {
+    const before = window.scrollY;
+    const timer = setTimeout(
+      () => ref.current?.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }),
+      400,
+    );
+    return () => {
+      clearTimeout(timer);
+      if (window.scrollY !== before) window.scrollTo({ top: before });
+    };
+  }, [reduceMotion]);
+
+  async function hold() {
+    setState('asking');
+    // Too late (the next question was already on its way): it simply comes, and this note goes with the question.
+    setState((await actions.holdOnFact(index)) ? 'holding' : 'shown');
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
+    >
+      <p className="text-sm text-fg-2 text-pretty sm:text-[15px]">
+        <span className="font-bold text-amber-200">💡 Знаеше ли? </span>
+        {fact}
+      </p>
+      <div className="mt-2 flex justify-end">
+        {state === 'holding' ? (
+          <Button size="sm" onClick={actions.resumeAfterFact}>
+            Продължи <ArrowRight aria-hidden className="size-4" />
+          </Button>
+        ) : (
+          <Button size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
+            Спри, за да прочета
+          </Button>
+        )}
+      </div>
+    </motion.div>
   );
 }
 

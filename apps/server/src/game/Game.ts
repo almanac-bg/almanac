@@ -45,6 +45,8 @@ const ABANDON_MS = 30_000;
 const ALONE_ABANDON_MS = 10 * 60_000;
 /** A run that waited for its player goes on this long after they're back, so the next question doesn't ambush them. */
 const RESUME_MS = 2_500;
+/** A run alone can stop on a fact to read it; it goes on by itself after this long. */
+const FACT_HOLD_MS = 2 * 60_000;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
@@ -154,6 +156,11 @@ export class Game {
   readonly alone: boolean;
   /** A run played alone, paused before its next question until its player is back. */
   held = false;
+  /** A run played alone whose player stopped on the fact (each stop gets a number, so an old timer can't end a new one). */
+  private reading = 0;
+  private readingSeq = 0;
+  /** The reveal ended while they were reading: the next question comes when they go on. */
+  private waitingForReader = false;
 
   private questionStartedAt = 0;
   private timers = new Set<NodeJS.Timeout>();
@@ -289,6 +296,28 @@ export class Game {
     }
   }
 
+  /**
+   * "Спри, за да прочета": in a run played alone, the player stops on the question's fact to read it. Only during the reveal of the
+   * question on screen (nobody else is waiting); the next question then waits for resume(), or FACT_HOLD_MS.
+   */
+  hold(playerId: string, index: number): boolean {
+    if (!this.alone || this.phase !== 'reveal' || index !== this.index || this.reading) return false;
+    if (!this.participants.has(playerId) || !this.questions[this.index]?.fact) return false;
+    const seq = ++this.readingSeq;
+    this.reading = seq;
+    this.later(FACT_HOLD_MS, () => this.resume(playerId, seq));
+    return true;
+  }
+
+  /** On with the run after a fact (or after FACT_HOLD_MS: `seq` says which stop the timer was for). */
+  resume(playerId: string, seq = this.reading) {
+    if (!this.reading || seq !== this.reading || !this.participants.has(playerId)) return;
+    this.reading = 0;
+    if (!this.waitingForReader) return;
+    this.waitingForReader = false;
+    this.advance();
+  }
+
   react(playerId: string, emote: string) {
     const p = this.participants.get(playerId);
     if (!p || this.phase === 'ended' || !p.emotes.has(emote)) return;
@@ -316,6 +345,14 @@ export class Game {
     if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
     p.connected = connected;
     p.disconnectedAt = connected ? null : Date.now();
+    // Someone who dropped isn't reading: the disconnect hold takes over (and a fresh tab knows nothing of the stop).
+    if (!connected && this.reading) {
+      this.reading = 0;
+      if (this.waitingForReader) {
+        this.waitingForReader = false;
+        this.advance();
+      }
+    }
     this.toGame('game:presence', { playerId, connected, left: false });
     if (connected && this.abandonTimer) {
       clearTimeout(this.abandonTimer);
@@ -377,6 +414,10 @@ export class Game {
    * is decided at once rather than keeping the knocked-out waiting minutes for their result.
    */
   private advance() {
+    if (this.reading) {
+      this.waitingForReader = true;
+      return;
+    }
     if (this.alone && !this.humans[0]?.connected) {
       if (this.hooks.draining()) return this.stop();
       this.held = true;
@@ -498,6 +539,7 @@ export class Game {
       standings: this.standings(),
       eliminated,
       nextInMs,
+      fact: q.fact ?? null,
     });
     this.botReactions(results);
     this.later(nextInMs, () => this.advance());

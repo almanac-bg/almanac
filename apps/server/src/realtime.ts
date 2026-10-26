@@ -26,6 +26,7 @@ import { guarded } from './guard';
 import { ACCOUNT_ONLY } from './guests';
 import { reportError } from './monitoring';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
+import { count } from './stats';
 import { eventBucket, network, throttled } from './throttle';
 import { getUser, publicUser } from './users';
 
@@ -377,6 +378,19 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const { index, powerup } = obj(p);
       if (game && POWERUP_IDS.includes(powerup as PowerupId))
         game.usePowerup(game.playerIdFor(userId), int(index), powerup as PowerupId);
+    });
+
+    // "Знаеше ли?": a run played alone stops on the fact until the player goes on (counted: is it worth writing them?).
+    on('game:hold', (p, ack) => {
+      const game = games.forUser(userId);
+      const held = !!game?.hold(game.playerIdFor(userId), int(obj(p).index));
+      if (held) count('fact_holds');
+      reply(ack, held ? { ok: true } : { ok: false, error: 'Въпросът вече продължи.' });
+    });
+
+    on('game:resume', () => {
+      const game = games.forUser(userId);
+      if (game) game.resume(game.playerIdFor(userId));
     });
 
     on('game:react', (emote) => {

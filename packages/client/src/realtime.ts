@@ -269,6 +269,7 @@ function bind(s: GameSocket) {
                 correct: reveal.correct,
                 choice: mine?.choice ?? null,
                 right: !!mine?.correct,
+                fact: reveal.fact ?? null,
               },
             ],
       };
@@ -507,6 +508,12 @@ export const actions = {
     if (g.usedPowerups.includes(powerup) || g.powerupThisQuestion) return;
     if (!sendMove('game:powerup', { index: g.question.index, powerup })) offlineToast('Жокерът не е изигран.');
   },
+  /**
+   * Stop on the revealed question's fact to read it (a run played alone): the next question waits for resumeAfterFact.
+   * Resolves to whether the server took it (it may have moved on already).
+   */
+  holdOnFact: async (index: number) => (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok,
+  resumeAfterFact: () => getSocket().emit('game:resume'),
   /** Emotes are for the moment: one that can't go out now is dropped. */
   react: (emote: string) => void sendMove('game:react', emote),
   /** Unlike a move, a leave made offline should still land after the reconnect, so this one may queue. */

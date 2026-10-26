@@ -10,6 +10,7 @@ import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
 import { FriendsProvider } from '../components/results/FriendButton';
+import { LearnedToday } from '../components/results/LearnedToday';
 import { RematchStrip, useRematch } from '../components/results/Rematch';
 import {
   AchievementsCard,
@@ -285,6 +286,7 @@ export function Results({ game }: { game: LiveGame }) {
           : undefined}
       </GuestNudge>
 
+      <LearnedToday items={game.history} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
       {/* Phones: the next step stays in reach at the bottom while the rewards and the review scroll by — and so does a

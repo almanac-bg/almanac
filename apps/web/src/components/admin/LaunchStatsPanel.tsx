@@ -76,7 +76,7 @@ export function LaunchStatsPanel() {
       <Card className="overflow-hidden">
         <div className="relative">
           <div ref={table} className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm tabular-nums">
+            <table className="w-full min-w-[700px] text-sm tabular-nums">
               <caption className="sr-only">Статистика по дни</caption>
               <thead className="text-left text-xs tracking-wide text-fg-3 uppercase">
                 <tr className="border-b border-line">
@@ -89,6 +89,7 @@ export function LaunchStatsPanel() {
                     'Мачове',
                     'Предизвик.',
                     'Дневно',
+                    'Факти',
                     'Ден 2',
                     'Ден 8',
                   ].map((h) => (
@@ -117,6 +118,8 @@ export function LaunchStatsPanel() {
                       {fmt(v(d, 'challenges'))} / {fmt(v(d, 'challenge_runs'))}
                     </td>
                     <td className="px-4 py-2.5">{fmt(v(d, 'daily_runs'))}</td>
+                    {/* Stops to read a "Знаеше ли?" (Solo, the daily): whether the facts are worth writing. */}
+                    <td className="px-4 py-2.5">{fmt(v(d, 'fact_holds'))}</td>
                     {/* Returns are only known once the day after (or the week after) has come. */}
                     <td className="px-4 py-2.5 text-fg-2">{i >= 1 ? pct(v(d, 'returned_d1'), newPlayers(d)) : '—'}</td>
                     <td className="px-4 py-2.5 text-fg-2">{i >= 7 ? pct(v(d, 'returned_d7'), newPlayers(d)) : '—'}</td>

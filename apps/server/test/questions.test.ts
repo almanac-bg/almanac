@@ -13,6 +13,8 @@ interface Q {
   q: string;
   options: string[];
   answer: number;
+  fact?: string;
+  factSource?: string;
 }
 
 const BANKS = [
@@ -111,6 +113,31 @@ for (const { name, file, perCategory, perDifficulty } of BANKS) {
     );
     const share = extreme.length / numeric.length;
     assert.ok(share >= 0.35, `only ${extreme.length} of ${numeric.length} numeric answers are the smallest or largest`);
+  });
+
+  test(`${name}: every "Знаеше ли?" fact is short, sourced, and gives no other question away`, () => {
+    const words = (s: string) =>
+      new Set(
+        normalize(s)
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter((w) => w.length >= 5),
+      );
+    for (const q of bank) {
+      if (q.fact === undefined) continue;
+      const where = `${q.id}: ${q.fact}`;
+      assert.ok(q.fact.trim().length >= 20 && q.fact.length <= 200, `${where} — length (20–200)`);
+      assert.match(q.fact, /[.!?…“"]$/, `${where} — a finished sentence`);
+      assert.ok(q.factSource && new URL(q.factSource).protocol === 'https:', `${where} — needs an https source`);
+      // Shown after its own question, but a later one in the same match may be about the same thing.
+      const factWords = words(q.fact);
+      for (const other of bank) {
+        if (other === q) continue;
+        const answer = normalize(other.options[other.answer]);
+        if (answer.length < 4 || !normalize(q.fact).includes(answer)) continue;
+        const shared = [...words(other.q)].filter((w) => factWords.has(w));
+        assert.ok(shared.length < 2, `${where} — gives away ${other.id} (${other.q} → ${answer}; shares ${shared})`);
+      }
+    }
   });
 
   test(`${name}: correct answers are spread across positions`, () => {

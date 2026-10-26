@@ -39,6 +39,8 @@ export interface ReviewItem {
   /** Your pick; null if you didn't answer (or were already out). */
   choice: number | null;
   right: boolean;
+  /** "Знаеше ли?" behind the answer, when the question has one. */
+  fact: string | null;
 }
 
 export interface LiveGame {

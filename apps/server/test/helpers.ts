@@ -27,7 +27,8 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * 30 questions per category (12 easy / 12 medium / 6 hard). The correct option is marked with ✓,
- * so tests can answer right or wrong on purpose even though the server shuffles options.
+ * so tests can answer right or wrong on purpose even though the server shuffles options. Every other one has a
+ * "Знаеше ли?" fact.
  */
 export function writeFixtureQuestions(file: string) {
   const questions = CATEGORY_IDS.flatMap((category) =>
@@ -40,6 +41,7 @@ export function writeFixtureQuestions(file: string) {
         q: `Тестов въпрос ${category} #${i}?`,
         options: [0, 1, 2, 3].map((k) => (k === answer ? `Верен ✓ ${i}` : `Грешен ${k} ${i}`)),
         answer,
+        ...(i % 2 === 0 && { fact: `Факт за ${category} #${i}.`, factSource: 'https://example.test/fact' }),
       };
     }),
   );

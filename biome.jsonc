@@ -9,7 +9,9 @@
       "!**/package-lock.json",
       // The question banks keep one question per line (easy to review and to diff).
       "!apps/server/src/data/*.json",
-      "!apps/web/public"
+      "!apps/web/public",
+      // Claude Code skills open with YAML front matter, which the Markdown formatter doesn't know.
+      "!.claude/skills/**/*.md"
     ]
   },
   "formatter": {

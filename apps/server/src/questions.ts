@@ -5,14 +5,23 @@ import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';
 
-const QuestionSchema = z.object({
-  id: z.string().min(1),
-  category: z.enum(CATEGORY_IDS as [CategoryId, ...CategoryId[]]),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
-  q: z.string().min(1),
-  options: z.array(z.string().min(1)).length(4),
-  answer: z.number().int().min(0).max(3),
-});
+/** The longest "Знаеше ли?" fact: one or two sentences, readable at a glance. */
+export const FACT_MAX = 200;
+
+const QuestionSchema = z
+  .object({
+    id: z.string().min(1),
+    category: z.enum(CATEGORY_IDS as [CategoryId, ...CategoryId[]]),
+    difficulty: z.enum(['easy', 'medium', 'hard']),
+    q: z.string().min(1),
+    options: z.array(z.string().min(1)).length(4),
+    answer: z.number().int().min(0).max(3),
+    /** "Знаеше ли?": something worth knowing behind the answer, shown once it's revealed. */
+    fact: z.string().min(1).max(FACT_MAX).optional(),
+    /** Where the fact can be checked (for whoever reviews the bank; players never see it). */
+    factSource: z.url({ protocol: /^https$/ }).optional(),
+  })
+  .refine((q) => !q.fact || q.factSource, { message: 'a fact needs its source (factSource)', path: ['factSource'] });
 
 export type Question = z.infer<typeof QuestionSchema> & {
   /** Username of the player who submitted it (community questions only). */

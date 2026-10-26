@@ -17,6 +17,8 @@ export type Metric =
   | 'challenge_runs'
   | 'daily_runs'
   | 'reminders'
+  /** A player stopped on a "Знаеше ли?" fact to read it. */
+  | 'fact_holds'
   | `matches:${string}`
   /** Delivery reports from the mail provider, by kind (bounces, spam complaints…). */
   | `email_events:${string}`;

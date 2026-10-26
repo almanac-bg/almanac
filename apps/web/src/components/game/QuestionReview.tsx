@@ -103,6 +103,12 @@ function ReviewRow({
               : `Ти: ${LETTERS[item.choice]}) ${item.options[item.choice]}`}
           </p>
         )}
+        {item.fact && (
+          <p className="mt-2 text-sm text-fg-2 text-pretty">
+            <span className="font-semibold text-amber-200">💡 </span>
+            {item.fact}
+          </p>
+        )}
       </div>
       {onReport && (
         <button
@@ -161,7 +167,8 @@ function ReportQuestion({
     <Modal open={!!item} onClose={close} title="Сигнализирай за грешка">
       {item && <p className="mb-4 rounded-2xl bg-white/5 p-3 text-sm text-fg-2">{item.q}</p>}
       <div className="space-y-2">
-        {QUESTION_REPORT_REASONS.map((r) => (
+        {/* The fact is a reason only where there is one. */}
+        {QUESTION_REPORT_REASONS.filter((r) => r.id !== 'fact' || item?.fact).map((r) => (
           <label
             key={r.id}
             className={clsx(

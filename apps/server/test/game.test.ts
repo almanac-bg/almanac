@@ -343,3 +343,65 @@ test('bots bet "Двойно или нищо" when they know, never on an easy q
   const result = g.reveals().find((r) => r.index === played[0].question.index)!.results.b1;
   assert.ok(result.correct && result.doubled && result.points >= 1000, 'the bet paid double');
 });
+
+test('the fact goes out with the reveal, never with the question (it could give the answer away)', () => {
+  const g = setup({ humans: [1] });
+  for (let i = 0; i < 4; i++) {
+    g.right(1);
+    advance(5_000);
+  }
+  const questions = g.events.filter((e) => e.event === 'game:question').map((e) => e.payload as QuestionPayload);
+  assert.ok(questions.length > 0);
+  for (const q of questions) assert.equal('fact' in q, false, `question ${q.index}`);
+  for (const r of g.reveals()) assert.equal(r.fact, g.game.questions[r.index].fact ?? null);
+  assert.ok(
+    g.reveals().some((r) => r.fact),
+    'some of these questions have one',
+  );
+});
+
+test('playing alone, the player can stop on a fact: the next question waits for "Продължи", or two minutes', () => {
+  const g = setup({ humans: [1] });
+  const onFact = () => {
+    // On to a question that has a fact, and its reveal.
+    for (let i = 0; i < 20 && !g.game.questions[g.game.index].fact; i++) {
+      g.right(1);
+      advance(5_000);
+    }
+    g.right(1);
+    advance(700);
+    assert.equal(g.game.phase, 'reveal');
+  };
+
+  onFact();
+  const index = g.game.index;
+  assert.equal(g.game.hold('u1', index + 1), false, 'only the question on screen');
+  assert.equal(g.game.hold('u1', index), true);
+  advance(10_000);
+  assert.equal(g.game.phase, 'reveal', 'well past the usual reveal, still reading');
+  assert.equal(g.game.index, index);
+  g.game.resume('u1');
+  advance(50);
+  assert.equal(g.game.phase, 'question');
+  assert.equal(g.game.index, index + 1);
+
+  onFact();
+  assert.equal(g.game.hold('u1', g.game.index), true);
+  const stoppedAt = g.game.index;
+  advance(2 * 60_000 + 100);
+  assert.equal(g.game.index, stoppedAt + 1, 'after two minutes it goes on by itself');
+});
+
+test('with other people in the match, nobody can stop it to read', () => {
+  const g = setup({ humans: [1, 2] });
+  for (let i = 0; i < 20 && !g.game.questions[g.game.index].fact; i++) {
+    g.right(1);
+    g.right(2);
+    advance(5_000);
+  }
+  g.right(1);
+  g.right(2);
+  advance(700);
+  assert.equal(g.game.phase, 'reveal');
+  assert.equal(g.game.hold('u1', g.game.index), false);
+});

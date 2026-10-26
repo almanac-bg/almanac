@@ -79,6 +79,25 @@ function QuestionCard({ question, children }: { question: QuestionInfo; children
           </li>
         ))}
       </ol>
+      {question.fact && (
+        <p className="mt-3 rounded-xl bg-amber-400/[0.07] px-3 py-2 text-sm text-fg-2">
+          <span className="font-semibold text-amber-200">💡 </span>
+          {question.fact}
+          {question.factSource && (
+            <>
+              {' '}
+              <a
+                href={question.factSource}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-violet-300 underline"
+              >
+                източник
+              </a>
+            </>
+          )}
+        </p>
+      )}
       {children}
     </>
   );

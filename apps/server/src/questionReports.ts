@@ -24,6 +24,8 @@ function info(q: Question): QuestionInfo {
     answer: q.answer,
     author: q.author ?? null,
     hidden: isHidden(q.id),
+    fact: q.fact ?? null,
+    factSource: q.factSource ?? null,
   };
 }
 
