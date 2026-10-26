@@ -8,17 +8,38 @@ import {
   QUEUE_MODES,
   type QueueModeId,
 } from '@quiz/shared';
+import { z } from 'zod';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
 
-function seconds(raw: string | undefined, fallback: number): number {
-  const n = Number(raw ?? fallback);
-  return (Number.isFinite(n) && n >= 0 ? n : fallback) * 1000;
-}
+// The settings that are numbers. A blank one counts as unset (docker compose passes `VAR=` for those it doesn't set).
+const unsetIfBlank = (v: unknown) => (v === '' ? undefined : v);
+const number = (min: number, max: number) => z.preprocess(unsetIfBlank, z.coerce.number().min(min).max(max).optional());
+const Numbers = z.object({
+  PORT: z.preprocess(unsetIfBlank, z.coerce.number().int().min(1).max(65_535).optional()),
+  BOT_FILL_SECONDS: z.preprocess(
+    unsetIfBlank,
+    z.union([z.literal('off'), z.coerce.number().min(0).max(600)]).optional(),
+  ),
+  BOT_FILL_BUSY_SECONDS: number(0, 600),
+  BACKUP_KEEP_DAYS: number(1, 3650),
+  DRAIN_SECONDS: number(0, 3600),
+  GAME_TIME_SCALE: number(0.01, 10),
+});
 
-function botFillMs(): number | null {
-  return process.env.BOT_FILL_SECONDS === 'off' ? null : seconds(process.env.BOT_FILL_SECONDS, 8);
+/**
+ * A typo here (GAME_TIME_SCALE=0,15, PORT=abc) used to become NaN — matches that end in milliseconds, a random port,
+ * backups kept forever. Now the server doesn't start, and says which setting is wrong.
+ */
+function numbers() {
+  const parsed = Numbers.safeParse(process.env);
+  if (parsed.success) return parsed.data;
+  const problems = parsed.error.issues.map((issue) => `${issue.path.join('.')} (${issue.message})`).join(', ');
+  throw new Error(`Invalid setting: ${problems}. Fix it in .env (see .env.example).`);
 }
+const env = numbers();
+
+const botFillMs = env.BOT_FILL_SECONDS === 'off' ? null : (env.BOT_FILL_SECONDS ?? 8) * 1000;
 
 const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
 const webDist = path.resolve(serverRoot, '../web/dist');
@@ -56,7 +77,7 @@ function openQueues(): QueueModeId[] {
 export const config = {
   /** When this process started: a one-attempt run (daily, challenge link) begun before it died with the old process. */
   bootedAt: Date.now(),
-  port: Number(process.env.PORT ?? 3001),
+  port: env.PORT ?? 3001,
   production: process.env.NODE_ENV === 'production',
   dbPath,
   webDist,
@@ -64,16 +85,16 @@ export const config = {
   /** Which build of the web app this server hosts: open tabs of an older one reload (see LobbyStats.build). */
   webBuild: webBuild(webDist),
   /** How long a quick-match queue waits for humans before bots fill the empty seats. */
-  botFillMs: botFillMs(),
+  botFillMs,
   /** …and how long while someone else is online and free to join: then a person is worth waiting a little for. */
-  botFillBusyMs: Math.max(botFillMs() ?? 0, seconds(process.env.BOT_FILL_BUSY_SECONDS, 20)),
+  botFillBusyMs: Math.max(botFillMs ?? 0, (env.BOT_FILL_BUSY_SECONDS ?? 20) * 1000),
   /** Ranked queues players can join; the others stay closed until there are enough people for them. */
   openQueues: openQueues(),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
   /** Daily database snapshots ("off" disables). Defaults to a backups folder next to the database. */
   backupDir:
     process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),
-  backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS ?? 14),
+  backupKeepDays: env.BACKUP_KEEP_DAYS ?? 14,
   /** Express "trust proxy" setting: which proxies may set X-Forwarded-For. */
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',
   sessionDays: 30,
@@ -90,7 +111,7 @@ export const config = {
    * On shutdown, how long running matches may play out before the process exits. A 15-question Royale takes about
    * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
    */
-  drainMs: Number(process.env.DRAIN_SECONDS ?? (process.env.NODE_ENV === 'production' ? 330 : 0)) * 1000,
+  drainMs: (env.DRAIN_SECONDS ?? (process.env.NODE_ENV === 'production' ? 330 : 0)) * 1000,
   /** Who runs this site: shown in the privacy policy and terms. Personal details live here, not in the code. */
   operator: {
     name: process.env.OPERATOR_NAME || null,
@@ -108,7 +129,7 @@ export const config = {
   /** Tags error reports with the deployed version (e.g. the git commit). */
   release: process.env.APP_RELEASE || null,
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */
-  gameTimeScale: Number(process.env.GAME_TIME_SCALE ?? 1),
+  gameTimeScale: env.GAME_TIME_SCALE ?? 1,
 };
 
 /** Who runs the site, as the legal pages show it: from /api/legal, or in the page the server sends. */

@@ -338,7 +338,7 @@ const server = http.createServer(app);
 server.keepAliveTimeout = 125_000;
 server.headersTimeout = 126_000;
 const realtime = createRealtime(server, app.get('trust proxy fn'));
-startMaintenance();
+const stopMaintenance = startMaintenance();
 
 server.listen(config.port, () => {
   console.log(`⚡ ${BRAND.name} server on http://localhost:${config.port}`);
@@ -356,6 +356,8 @@ async function shutdown(signal: string) {
   if (live && config.drainMs) console.log(`⏳ ${signal}: letting ${live} live match(es) finish before stopping…`);
   await realtime.drain(config.drainMs);
   realtime.io.close();
+  // A backup being copied finishes first: closing the database under it would only fail it.
+  await stopMaintenance();
   server.close(() => {
     db.close();
     process.exit(0);

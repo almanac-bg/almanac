@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node runs the tests; the client itself is typed for the browser.
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
+    "types": ["node"]
+  },
+  "include": [".", "../src"]
+}

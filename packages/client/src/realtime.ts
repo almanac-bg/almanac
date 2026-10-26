@@ -55,9 +55,12 @@ let resyncTimer: ReturnType<typeof setTimeout> | undefined;
 let staleQuestionTimer: ReturnType<typeof setTimeout> | undefined;
 /** The match you walked out of: if the server still sends it (the leave crossed a reconnect), leave it again. */
 let leftGameId: string | null = null;
+/** Turned away for having too many connections open: said once, until a connection goes through. */
+let crowded = false;
 
 function bind(s: GameSocket) {
   s.on('connect', () => {
+    crowded = false;
     const { game } = getState();
     setState({ connected: true, queue: null, room: null, maintenance: null });
     if (game && game.phase !== 'ended') {
@@ -87,6 +90,21 @@ function bind(s: GameSocket) {
   });
   s.on('connect_error', (err) => {
     if (err.message === 'unauthorized') setState({ me: null });
+    // The server's cap on open tabs. Socket.IO doesn't retry a refusal like this on its own: say why, and try again in a
+    // while (a tab may have been closed by then).
+    if (err.message === 'too-many-connections') {
+      if (!crowded)
+        toast(
+          {
+            kind: 'error',
+            title: 'Играта е отворена в твърде много раздели.',
+            body: 'Затвори излишните — свързваме се отново след малко.',
+          },
+          9000,
+        );
+      crowded = true;
+      setTimeout(() => s.connect(), 10_000);
+    }
   });
 
   s.on('lobby:stats', (lobby) => setState({ lobby }));

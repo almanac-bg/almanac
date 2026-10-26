@@ -238,6 +238,8 @@ type PayloadOf<E extends ServerEvent> = Parameters<ServerToClientEvents[E]>[0];
 type LooseSocket = {
   emit: (event: string, ...args: unknown[]) => unknown;
   once: (event: string, listener: (payload: never) => void) => unknown;
+  on: (event: string, listener: (payload: never) => void) => unknown;
+  off: (event: string, listener: (payload: never) => void) => unknown;
 };
 
 /** Emits and resolves with the server's ack. */
@@ -253,6 +255,44 @@ export const next = <E extends ServerEvent>(s: Client, event: E, ms = 5000) =>
       resolve(payload);
     });
   });
+
+/** The next occurrence of an event that `match` accepts, or a rejection after `ms`. */
+export const nextWhere = <E extends ServerEvent>(
+  s: Client,
+  event: E,
+  match: (payload: PayloadOf<E>) => boolean,
+  ms = 5000,
+) =>
+  new Promise<PayloadOf<E>>((resolve, reject) => {
+    const socket = s as unknown as LooseSocket;
+    const listener = (payload: PayloadOf<E>) => {
+      if (!match(payload)) return;
+      clearTimeout(t);
+      socket.off(event, listener);
+      resolve(payload);
+    };
+    const t = setTimeout(() => {
+      socket.off(event, listener);
+      reject(new Error(`timeout waiting for ${event}`));
+    }, ms);
+    socket.on(event, listener);
+  });
+
+/**
+ * Retries `check` until it passes, then returns; after `ms`, fails with its last error. For state that arrives in its
+ * own time (a broadcast, a presence change): a fixed sleep is either too short on a slow runner or wasted time.
+ */
+export async function eventually(check: () => void | Promise<void>, ms = 3000) {
+  const until = Date.now() + ms;
+  for (;;) {
+    try {
+      return await check();
+    } catch (err) {
+      if (Date.now() > until) throw err;
+    }
+    await sleep(10);
+  }
+}
 
 export interface PlayLog {
   questions: QuestionPayload[];

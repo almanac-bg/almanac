@@ -155,9 +155,6 @@ export function resolveSession(token: string | null): { userId: number; renewed:
   return { userId: session.user_id, renewed };
 }
 
-export const userIdFromCookieHeader = (header: string | undefined) =>
-  resolveSession(sessionTokenFromCookieHeader(header))?.userId ?? null;
-
 /** The signed-in user of a request. When the session slides forward, the cookie is renewed too (else browsers drop it). */
 export function userIdFromRequest(req: Request, res: Response): number | null {
   const token = sessionTokenFromCookieHeader(req.headers.cookie);

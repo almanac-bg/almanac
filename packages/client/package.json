@@ -9,6 +9,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts"
+  },
   "dependencies": {
     "@quiz/shared": "*"
   },

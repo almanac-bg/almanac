@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { seasonKey } from '@quiz/shared';
 import { config } from './config';
+import { guarded } from './guard';
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
@@ -376,6 +377,9 @@ const MIGRATIONS: (string | (() => void))[] = [
   `,
 ];
 
+/** The schema version this code brings a database to. */
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
 /**
  * A copy of the database as it was before this code's migrations (into the backups folder): migrations only go
  * forward, so this is the way back to the previous version should a deploy go wrong. Taken once per schema version —
@@ -437,6 +441,17 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 let txDepth = 0;
+/** What waits for the outermost transaction to commit; dropped if it rolls back. */
+let onCommit: (() => void)[] = [];
+
+/**
+ * Runs `fn` once what's being written is in for good: at once outside a transaction, after the COMMIT inside one. For
+ * telling people (a notice, a live update): nobody should hear about a result that was then rolled back.
+ */
+export function afterCommit(fn: () => void) {
+  if (txDepth === 0) fn();
+  else onCommit.push(fn);
+}
 
 /**
  * Runs `fn` in a transaction. Nested calls join the outer transaction, so an inner failure that an outer caller catches
@@ -446,15 +461,21 @@ export function tx<T>(fn: () => T): T {
   if (txDepth > 0) return fn();
   db.exec('BEGIN');
   txDepth++;
+  let committed = false;
   try {
     const result = fn();
     db.exec('COMMIT');
+    committed = true;
     return result;
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
   } finally {
     txDepth--;
+    const waiting = onCommit;
+    onCommit = [];
+    // The data is in either way: a failing notice must not read to the caller as a failed write.
+    if (committed) for (const run of waiting) guarded('after a commit', run)();
   }
 }
 

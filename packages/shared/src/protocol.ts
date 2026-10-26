@@ -81,6 +81,8 @@ export interface GamePlayer extends Loadout {
   name: string;
   level: number;
   isBot: boolean;
+  /** Playing on a guest account (no name of their own yet: not someone to add as a friend). */
+  isGuest: boolean;
   rating: number | null;
   team: TeamId | null;
 }

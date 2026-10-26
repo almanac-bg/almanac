@@ -1,4 +1,5 @@
 import type { Presence, ServerToClientEvents } from '@quiz/shared';
+import { afterCommit } from './db';
 import type { IO } from './game/io';
 import { guarded } from './guard';
 
@@ -36,12 +37,13 @@ export function notifyUser<E extends keyof ServerToClientEvents>(
   event: E,
   ...args: Parameters<ServerToClientEvents[E]>
 ) {
-  io?.to(`user:${userId}`).emit(event, ...args);
+  // Sent from inside a transaction (a match's rewards, an approved question), it waits for the commit.
+  afterCommit(() => io?.to(`user:${userId}`).emit(event, ...args));
 }
 
 /** Drops every live connection of a user (e.g. after a password reset logs them out everywhere). */
 export function disconnectUser(userId: number) {
-  io?.in(`user:${userId}`).disconnectSockets(true);
+  afterCommit(() => io?.in(`user:${userId}`).disconnectSockets(true));
 }
 
 /** Drops the live connections of one login session (its tabs), after logout. `session` is the token's hash. */

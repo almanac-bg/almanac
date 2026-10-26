@@ -280,8 +280,6 @@ export const FREEZE_MS = 3000;
 /** Extra milliseconds from "Още време". */
 export const TIME_BONUS_MS = 5000;
 
-export const DEFAULT_LOADOUT = { avatar: 'fox', frame: 'classic', title: 'rookie' } as const;
-
 export type UnlockKind = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
 
 export interface UnlockRef {

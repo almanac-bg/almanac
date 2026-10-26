@@ -146,11 +146,15 @@ export async function snapshot(now = Date.now(), dir = config.backupDir): Promis
   return file;
 }
 
+/** Runs the upkeep every 15 minutes. Returns a stop that resolves once a run in progress (a backup copy) is done. */
 export function startMaintenance() {
-  let running = false;
-  const tick = async () => {
-    if (running) return;
-    running = true;
+  let running: Promise<void> | null = null;
+  const tick = () => {
+    running ??= work().finally(() => {
+      running = null;
+    });
+  };
+  const work = async () => {
     try {
       // A write every 15 minutes even when nobody plays: the daily backup check compares this stamp in the restored
       // copy with the live one, so a replica that stopped is caught (deploy/backup-check.sh).
@@ -170,10 +174,13 @@ export function startMaintenance() {
       }
     } catch (err) {
       void reportError(err, 'maintenance');
-    } finally {
-      running = false;
     }
   };
-  setTimeout(tick, 10_000).unref();
-  setInterval(tick, 15 * 60_000).unref();
+  const first = setTimeout(tick, 10_000).unref();
+  const every = setInterval(tick, 15 * 60_000).unref();
+  return async () => {
+    clearTimeout(first);
+    clearInterval(every);
+    await running;
+  };
 }

@@ -74,6 +74,7 @@ export function makeBots(
         name: names[i % names.length],
         level: clamp(Math.round(around.level + jitter(3)), 1, 60),
         isBot: true,
+        isGuest: false,
         rating,
         avatar: pick(STARTER_AVATARS).id,
         frame: pick(STARTER_FRAMES).id,

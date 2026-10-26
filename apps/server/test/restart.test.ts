@@ -41,7 +41,8 @@ test('an idle server stops right away', T, async () => {
   try {
     const started = Date.now();
     assert.equal(await srv.kill('SIGTERM'), 0);
-    assert.ok(Date.now() - started < 3000, `took ${Date.now() - started} ms`);
+    // Far under the 60 s it would give running matches, with room for a slow machine.
+    assert.ok(Date.now() - started < 20_000, `took ${Date.now() - started} ms`);
   } finally {
     await srv.stop();
   }

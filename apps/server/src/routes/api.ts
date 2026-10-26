@@ -519,7 +519,7 @@ api.post('/account/delete', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-/** Crashes in players' browsers land in the server log (there's no other way to hear about them). */
+/** Crashes in players' browsers, into the server log: with Sentry off, or before its SDK has loaded in the page. */
 api.post('/client-errors', (req, res) => {
   const body = z
     .object({
@@ -570,8 +570,6 @@ api.get('/achievements', requireAuth, (_req, res) => {
   res.json({ achievements: achievementProgress(res.locals.userId) });
 });
 
-// ─── Daily & seasons ─────────────────────────────────────────────────────────
-
 // ─── Challenge links ─────────────────────────────────────────────────────────
 
 const challengeId = (req: Request) => String(req.params.id).slice(0, 16);
@@ -602,6 +600,8 @@ api.get('/challenges/:id', requireAuth, (req, res) => {
   }
   res.json(info);
 });
+
+// ─── Daily & seasons ─────────────────────────────────────────────────────────
 
 api.get('/daily', requireAuth, (_req, res) => {
   res.json(dailyInfo(res.locals.userId));

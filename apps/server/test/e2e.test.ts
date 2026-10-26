@@ -14,10 +14,12 @@ import {
   connected,
   cookieFrom,
   emitAck,
+  eventually,
   guest,
   http,
   newLog,
   next,
+  nextWhere,
   register,
   rightOption,
   sleep,
@@ -194,8 +196,9 @@ test('ranked duel with a mid-game reconnect', T, async () => {
   assert.ok((await emitAck(sa, 'queue:join', 'duel')).ok);
   assert.ok((await emitAck(sb, 'queue:join', 'duel')).ok);
   await bFirstQuestion;
+  const bGone = nextWhere(sa, 'game:presence', (p) => p.playerId === `u${B.user.id}` && !p.connected);
   sb.disconnect();
-  await sleep(150);
+  await bGone;
   sb = connect(srv.url, B.cookie);
   const synced = next(sb, 'game:start');
   const pb = autoPlay(sb, 'wrong');
@@ -235,11 +238,11 @@ test('private room', T, async () => {
   assert.ok(created.ok);
   assert.match(created.code, /^\d{5}$/);
   assert.ok((await emitAck(sb, 'room:join', created.code)).ok);
+  sb.emit('room:bot', 'add'); // not the host → ignored
+  // Handled after the bot request (a socket's events go in order), so that one has been turned down by now.
   assert.equal((await emitAck(sb, 'room:join', '00000')).ok, false, 'unknown codes are rejected');
   sa.emit('room:bot', 'add');
-  sb.emit('room:bot', 'add'); // not the host → ignored
-  await sleep(150);
-  assert.equal(states.at(-1)!.players.length, 3, '2 humans + 1 bot');
+  await eventually(() => assert.equal(states.at(-1)!.players.length, 3, '2 humans + 1 bot'));
   assert.equal((await emitAck(sb, 'room:start')).ok, false, "non-hosts can't start");
   const pa = autoPlay(sa, 'wrong');
   const pb = autoPlay(sb, 'right');
@@ -249,11 +252,9 @@ test('private room', T, async () => {
   assert.equal(sbStart!.category, 'music');
   assert.equal(eb.rewards!.rating, null, 'private rooms are unranked');
   assert.ok(ea.rewards!.achievements.includes('host'));
-  await sleep(100);
-  assert.equal(states.at(-1)!.inGame, false, 'room returns to the lobby');
+  await eventually(() => assert.equal(states.at(-1)!.inGame, false, 'room returns to the lobby'));
   sa.emit('room:leave');
-  await sleep(100);
-  assert.equal(states.at(-1)!.hostId, `u${B.user.id}`, 'host passes on when the host leaves');
+  await eventually(() => assert.equal(states.at(-1)!.hostId, `u${B.user.id}`, 'host passes on when the host leaves'));
   sb.emit('room:leave');
   sb.off('room:state', onState);
 });
@@ -263,8 +264,9 @@ test('forfeit frees the player', T, async () => {
   await emitAck(sb, 'solo:start', { category: 'mixed' });
   await q;
   sb.emit('game:leave');
-  await sleep(200);
-  assert.ok((await emitAck(sb, 'queue:join', 'duel')).ok, 'can queue again after leaving');
+  await eventually(async () =>
+    assert.ok((await emitAck(sb, 'queue:join', 'duel')).ok, 'can queue again after leaving'),
+  );
   sb.emit('queue:leave');
 });
 
@@ -350,8 +352,9 @@ test('guests play right away, stay off the boards, and keep everything when they
   await connected(sg);
   const play = autoPlay(sg, 'right');
   assert.ok((await emitAck(sg, 'solo:start', { category: 'mixed' })).ok);
-  const { end } = await play;
+  const { start, end } = await play;
   assert.ok(end.rewards!.xpGained > 0, 'guests earn XP like anyone');
+  assert.equal(start?.players[0].isGuest, true, 'the match knows a guest (the results offer no "add friend")');
 
   assert.equal(
     (await api.send('POST', '/api/friends', G.cookie, { username: A.user.username })).status,
@@ -600,6 +603,13 @@ test('a guest plays a daily of their own, off the board; saving the profile open
   sg.close();
 });
 
+/** A and B (friends by now) see each other out of any room: the next test starts clean. */
+const bothOutOfRooms = () =>
+  eventually(async () => {
+    const presence = async (cookie: string) => (await api.get('/api/friends', cookie)).body.friends[0].presence;
+    assert.deepEqual([await presence(A.cookie), await presence(B.cookie)], ['online', 'online']);
+  });
+
 test('friends, invites and challenges', T, async () => {
   const update = next(sb, 'friends:update');
   const req = await api.send('POST', '/api/friends', A.cookie, { username: B.user.username.toUpperCase() });
@@ -645,7 +655,7 @@ test('friends, invites and challenges', T, async () => {
   assert.equal((await api.get('/api/friends', B.cookie)).body.friends[0].presence, 'room');
   sa.emit('room:leave');
   sb.emit('room:leave');
-  await sleep(100);
+  await bothOutOfRooms();
 });
 
 test('team room', T, async () => {
@@ -658,15 +668,16 @@ test('team room', T, async () => {
   sa.emit('room:settings', { teams: true, elimination: true });
   sa.emit('room:bot', 'add');
   sa.emit('room:bot', 'add');
-  await sleep(150);
+  await eventually(() => assert.equal(states.at(-1)!.players.length, 4));
   let st = states.at(-1)!;
   assert.ok(st.settings.teams && !st.settings.elimination, 'teams switch eliminations off');
   const teamOf = (id: string) => st.players.find((p) => p.id === id)!.team;
   assert.notEqual(teamOf(`u${A.user.id}`), teamOf(`u${B.user.id}`), 'A and B start on different teams');
   sa.emit('room:team', `u${B.user.id}`);
-  await sleep(100);
-  st = states.at(-1)!;
-  assert.equal(teamOf(`u${A.user.id}`), teamOf(`u${B.user.id}`), 'the host moved B');
+  await eventually(() => {
+    st = states.at(-1)!;
+    assert.equal(teamOf(`u${A.user.id}`), teamOf(`u${B.user.id}`), 'the host moved B');
+  });
   const pa = autoPlay(sa, 'right');
   const pb = autoPlay(sb, 'right');
   assert.ok((await emitAck(sa, 'room:start')).ok);
@@ -679,7 +690,7 @@ test('team room', T, async () => {
   sa.off('room:state', onState);
   sa.emit('room:leave');
   sb.emit('room:leave');
-  await sleep(100);
+  await bothOutOfRooms();
 });
 
 test('ranked 2 на 2 queue', T, async () => {

@@ -9,7 +9,7 @@ import { after, mock, test } from 'node:test';
 // Server modules open the database on import — point them at a throwaway one first.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-database-'));
 process.env.DB_PATH = path.join(tmp, 'database.db');
-const { all, run } = await import('../src/db');
+const { afterCommit, all, run, tx } = await import('../src/db');
 const { markSeen, RECENT_LIMIT, recentFor } = await import('../src/questions');
 const { installationSecret } = await import('../src/settings');
 
@@ -106,4 +106,30 @@ test("an installation's secrets are random, made once and kept", () => {
   assert.ok(seed.length >= 40);
   assert.equal(installationSecret('daily-seed'), seed, 'the same every time');
   assert.notEqual(installationSecret('another'), seed);
+});
+
+test('what waits for a commit runs after it, once, and not at all after a rollback', () => {
+  const heard: string[] = [];
+  afterCommit(() => heard.push('outside a transaction: at once'));
+  tx(() => {
+    run("INSERT INTO settings (key, value) VALUES ('after-commit', 'kept')");
+    tx(() => afterCommit(() => heard.push('nested: after the outer commit')));
+    afterCommit(() => heard.push('after the commit'));
+    assert.deepEqual(heard, ['outside a transaction: at once'], 'nothing yet: the write could still roll back');
+  });
+  assert.throws(() =>
+    tx(() => {
+      afterCommit(() => heard.push('rolled back: never'));
+      throw new Error('a later step failed');
+    }),
+  );
+  // A failing listener doesn't turn a committed write into an error.
+  tx(() => afterCommit(() => assert.fail('a broken notice')));
+  tx(() => afterCommit(() => heard.push('the next one is unaffected')));
+  assert.deepEqual(heard, [
+    'outside a transaction: at once',
+    'nested: after the outer commit',
+    'after the commit',
+    'the next one is unaffected',
+  ]);
 });

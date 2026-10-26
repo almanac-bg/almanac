@@ -609,7 +609,7 @@ function DataSettings() {
         .
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href="/api/account/export" download="almanac-data.json" className={buttonClass({ variant: 'secondary' })}>
+        <a href={api.exportUrl()} download="almanac-data.json" className={buttonClass({ variant: 'secondary' })}>
           <Download className="size-4" /> Изтегли данните си
         </a>
         <Button

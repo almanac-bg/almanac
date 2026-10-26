@@ -29,7 +29,6 @@ function parseDsn(raw: string | null): Dsn | null {
 }
 
 const dsn = parseDsn(config.sentryDsn);
-export const monitoringEnabled = dsn !== null;
 /** The public DSN for the browser SDK (DSNs are meant to be public; they only allow sending events). */
 export const publicDsn = dsn?.raw ?? null;
 

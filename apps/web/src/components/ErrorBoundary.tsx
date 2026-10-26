@@ -1,10 +1,9 @@
-import { reportError } from '@quiz/client';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { captureError } from '../lib/monitoring';
+import { reportCrash } from '../lib/monitoring';
 import { Background } from './Background';
 import { Button, Card } from './ui';
 
-/** A crash anywhere in the app shows a way out instead of a blank page, and lands in the server log. */
+/** A crash anywhere in the app shows a way out instead of a blank page, and is reported (lib/monitoring.ts). */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {
   state = { crashed: false };
 
@@ -13,8 +12,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { crashed:
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    reportError('render', error, info.componentStack ?? undefined);
-    captureError(error);
+    reportCrash('render', error, info.componentStack ?? undefined);
   }
 
   render() {

@@ -15,7 +15,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node22',
+  target: 'node24',
   sourcemap: true,
   // ws probes these optional native speedups inside try/catch.
   external: ['bufferutil', 'utf-8-validate'],

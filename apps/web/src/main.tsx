@@ -1,10 +1,10 @@
-import { ApiError, configureClient, type Effect, reportError, setState } from '@quiz/client';
+import { ApiError, configureClient, type Effect, setState } from '@quiz/client';
 import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { startMonitoring } from './lib/monitoring';
+import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
 import { buzz, sfx } from './lib/sound';
@@ -45,12 +45,10 @@ configureClient({
 // (shown to the player already) aren't ours to report.
 window.addEventListener('error', (event) => {
   if (event.filename && !event.filename.startsWith(window.location.origin)) return;
-  // "Script error." is a muted error from code on another origin: no details, nothing to act on.
-  if (event.message === 'Script error.' || /ResizeObserver loop/.test(event.message)) return;
-  reportError('error', event.error ?? event.message);
+  reportCrash('error', event.error ?? event.message);
 });
 window.addEventListener('unhandledrejection', (event) => {
-  if (!(event.reason instanceof ApiError)) reportError('rejection', event.reason);
+  if (!(event.reason instanceof ApiError)) reportCrash('rejection', event.reason);
 });
 
 // A tab opened before a deploy may ask for page code that no longer exists: reload once to get the new version.

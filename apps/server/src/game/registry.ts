@@ -38,6 +38,7 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       name: row.username,
       level: ctx.level,
       isBot: false,
+      isGuest: !!row.is_guest,
       rating: isQueueMode(mode) ? Math.round(getRating(userId, mode)) : null,
       avatar: row.avatar,
       frame: row.frame,

@@ -6,9 +6,6 @@ import { createContext, type ReactNode, useContext, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { Spinner } from '../ui';
 
-/** Guest accounts are named like this; they can't be added until they save the account. */
-const GUEST_NAME = /^Гост_\d+$/;
-
 interface Friends {
   data: FriendsResponse | null;
   /** The list failed to load: offer the button anyway (the server answers "already friends" if so). */
@@ -18,9 +15,8 @@ interface Friends {
 
 const FriendsContext = createContext<Friends | null>(null);
 
-/** Someone you could add from the results: a human other than you, with a real account. */
-const addable = (p: GamePlayer, youId: string) =>
-  p.id !== youId && !p.isBot && p.userId !== null && !GUEST_NAME.test(p.name);
+/** Someone you could add from the results: a human other than you, with a real account (a guest saves theirs first). */
+const addable = (p: GamePlayer, youId: string) => p.id !== youId && !p.isBot && !p.isGuest && p.userId !== null;
 
 function relation(data: FriendsResponse, userId: number): Friendship {
   if (data.friends.some((f) => f.user.id === userId)) return 'friends';

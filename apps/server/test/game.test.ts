@@ -29,6 +29,7 @@ const player = (id: string, userId: number | null): GamePlayer => ({
   name: id,
   level: 1,
   isBot: userId === null,
+  isGuest: false,
   rating: 1000,
   avatar: 'fox',
   frame: 'classic',
