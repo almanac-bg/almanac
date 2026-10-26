@@ -153,6 +153,12 @@ export function startMaintenance() {
     if (running) return;
     running = true;
     try {
+      // A write every 15 minutes even when nobody plays: the daily backup check compares this stamp in the restored
+      // copy with the live one, so a replica that stopped is caught (deploy/backup-check.sh).
+      run(
+        "INSERT INTO settings (key, value) VALUES ('alive_at', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+        String(Date.now()),
+      );
       purgeExpired();
       const inactive = retireInactiveAccounts();
       if (inactive.warned || inactive.erased)

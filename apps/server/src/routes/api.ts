@@ -13,7 +13,7 @@ import {
   seasonKey,
   seasonName,
 } from '@quiz/shared';
-import { type NextFunction, type Request, type Response, Router } from 'express';
+import express, { type NextFunction, type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
@@ -44,9 +44,11 @@ import {
   resetPassword,
   verifyEmailToken,
 } from '../emailAuth';
+import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
+import { reportError } from '../monitoring';
 import { disconnectSession, sendFriendsUpdate } from '../notify';
 import {
   hiddenQuestions,
@@ -314,6 +316,18 @@ api.post('/auth/logout', (req, res) => {
 /** For the privacy policy, terms and footer (works signed out). */
 api.get('/legal', (_req, res) => {
   res.json(operatorInfo);
+});
+
+/** Delivery reports from the mail provider (see emailEvents.ts); SNS posts them as text/plain. */
+api.post('/email-events/:secret', express.text({ type: () => true, limit: '64kb' }), (req, res, next) => {
+  if (!emailEventsSecretMatches(req.params.secret)) return next();
+  handleEmailEvent(req.body).then(
+    () => res.status(204).end(),
+    (err) => {
+      void reportError(err, 'email events');
+      res.status(204).end();
+    },
+  );
 });
 
 /** Signed-out visitors get `{ user: null }` rather than a 401, so the first page load stays quiet. */

@@ -32,6 +32,8 @@ export interface UserRow {
   email: string | null;
   email_key: string | null;
   pending_email: string | null;
+  /** When the mail provider reported the verified address as undeliverable; cleared when an address is verified. */
+  email_bounced_at: number | null;
   banned_until: number | null;
   ban_reason: string | null;
   /** Created by "Играй като гост": no password until claimed with a name and password. */

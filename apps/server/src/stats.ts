@@ -17,7 +17,9 @@ export type Metric =
   | 'challenge_runs'
   | 'daily_runs'
   | 'reminders'
-  | `matches:${string}`;
+  | `matches:${string}`
+  /** Delivery reports from the mail provider, by kind (bounces, spam complaints…). */
+  | `email_events:${string}`;
 
 export function count(metric: Metric, by = 1, day = dayKey()) {
   if (by <= 0) return;

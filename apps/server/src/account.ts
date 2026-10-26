@@ -76,6 +76,7 @@ export function getMe(userId: number): MeUser | null {
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     email: row.email,
+    emailBounced: row.email_bounced_at !== null,
     pendingEmail: row.pending_email,
   };
 }

@@ -99,6 +99,7 @@ npm run dev
 | `TRUST_PROXY`                        | `loopback`                                 | Express `trust proxy`: на кои reverse proxy сървъри да се вярва                                                     |
 | `APP_URL`                            | `http://localhost:5173`                    | Публичният адрес (origin) в линковете в имейлите                                                                    |
 | `SMTP_URL`                           |                                            | Напр. `smtp://user:pass@host:587`. Без него → имейлите се печатат в конзолата                                       |
+| `EMAIL_EVENTS_SECRET`                |                                            | Тайната в адреса за отчети от Scaleway (`/api/email-events/<тайна>`). Без нея → изключено                           |
 | `MAIL_FROM`                          | `АЛМАНАХ <no-reply@almanac.bg>`            | Адрес на подателя                                                                                                   |
 | `GAME_TIME_SCALE`                    | `1`                                        | Умножава всички таймери в играта. Само за автоматични тестове                                                       |
 | `BACKUP_DIR`                         | `backups` до базата данни                  | Дневни копия на базата; `off` ги изключва                                                                           |
@@ -291,9 +292,24 @@ S3-съвместимо object storage. Нищо не го обвързва с �
 навсякъде, включително при регистратора на домейна. Пази копие на SSH ключа за сървъра (напр. в password manager-а).
 
 1. **Създай сървъра:** Ubuntu 24.04 или по-нов, с вход през SSH ключ (без вход с парола). Във firewall-а на доставчика разреши
-   TCP 22 (в идеалния случай само от твоя IP адрес), 80 и 443 и UDP 443 (HTTP/3). Включи автоматичните обновления за
-   сигурност: `apt install unattended-upgrades`. Те не рестартират сървъра сами: след обновяване на ядрото
-   (`/var/run/reboot-required`) рестартирай в тих час — рестартът прекъсва текущите мачове.
+   TCP 22 (в идеалния случай само от твоя IP адрес), 80 и 443 и UDP 443 (HTTP/3). Включи бекъпите на сървъра при
+   доставчика (Hetzner Backups, 20% от цената): единственото копие, което някой, проникнал в сървъра, не може да изтрие.
+   После автоматичните обновления за сигурност — с рестарт в тих час, когато ги изисква ново ядро, и Docker, който при
+   рестарт изчаква текущите мачове да се доиграят:
+
+   ```bash
+   apt install unattended-upgrades
+   cat > /etc/apt/apt.conf.d/52almanac-reboot <<'APT'
+   Unattended-Upgrade::Automatic-Reboot "true";
+   Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+   Unattended-Upgrade::Automatic-Reboot-Time "01:30";
+   APT
+   mkdir -p /etc/systemd/system/docker.service.d
+   printf '[Service]\nTimeoutStopSec=400\n' > /etc/systemd/system/docker.service.d/almanac-stop-timeout.conf
+   printf 'X11Forwarding no\n' > /etc/ssh/sshd_config.d/60-almanac.conf && sshd -t && systemctl reload ssh
+   ```
+
+   (01:30 UTC е 03:30–04:30 софийско време. `deploy/check.sh` вдига тревога, ако рестарт чака повече от три дни.)
 2. **DNS в Cloudflare** (безплатният план): добави домейна, смени nameserver-ите му при регистратора с двата, които
    Cloudflare дава, и добави записите — всички **DNS only** (сивият облак: HTTPS прави Caddy, а приложението трябва
    да вижда истинските адреси на играчите):
@@ -307,7 +323,10 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    | CAA  | `@`   | `0 issue "letsencrypt.org"`                           |
    | CAA  | `@`   | `0 issue "sectigo.com"` (резервният издател на Caddy) |
 
-   Когато домейнът стане Active, включи DNSSEC (DNS → Settings) и добави DS записа при регистратора.
+   Добави и `CAA` `@` `0 iodef "mailto:postmaster@almanac.bg"` (къде издателите съобщават за отказана заявка) и
+   **изключи Universal SSL** (SSL/TLS → Edge Certificates): докато записите са DNS only, той не върши нищо, а щом в
+   зоната има CAA записи, Cloudflare тихо добавя свои за още шест издатели. Когато домейнът стане Active, включи
+   DNSSEC (DNS → Settings) и добави DS записа при регистратора.
 3. **Създай bucket за бекъпите в Cloudflare R2** (изисква начин на плащане; до 10 GB и милион записа на месец са
    безплатни — при пълна натовареност всяка секунда от денонощието това са най-много няколко евро на месец): bucket
    `almanac-backups` с **Jurisdiction: European Union**, после R2 → API Tokens → токен с **Object Read & Write**
@@ -330,7 +349,7 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    git clone https://github.com/almanac-bg/almanac.git almanac && cd almanac
    git clone git@github.com:almanac-bg/almanac-questions.git private
    cp .env.example .env        # попълни DOMAIN, OPERATOR_*, BACKUP_*, HOSTING_PROVIDER
-   APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build
+   deploy/deploy.sh
    ```
 
    Първият билд тегли пакетите от npm и иска около 0,6 GB памет. **Запази `.env` в password manager** веднага: в него
@@ -357,15 +376,17 @@ S3-съвместимо object storage. Нищо не го обвързва с �
     `https://almanac.bg/api/health` на всеки 3 минути (той пада и при пълен диск: под 256 MB свободни `/api/health`
     отговаря с 503) и два „heartbeat“ монитора — дневен и седмичен. Скриптовете в `deploy/` проверяват на сървъра
     онова, което отвън не се вижда, и при успех сигнализират своя heartbeat; ако сигналът спре да идва, получаваш
-    известие:
+    известие. Неуспешна проверка казва и защо: пингва `<URL>/fail` с причината, така че тревогата идва веднага.
     - `deploy/check.sh` (всеки ден): TLS сертификатът се подновява (валиден още поне 14 дни), дискът не е пълен,
-      всички контейнери работят;
-    - `deploy/backup-check.sh` (всяка седмица): възстановява бекъпа до живата база и проверява, че копието е цяло.
+      всички контейнери работят, рестарт за обновления не чака от дни;
+    - `deploy/backup-check.sh` (всеки ден): възстановява бекъпа до живата база и проверява, че копието е цяло и
+      **актуално** — приложението записва часа в базата на всеки 15 минути, затова копие, изостанало с повече от
+      час, значи, че репликацията е спряла (изтекъл ключ, пълен bucket).
 
     ```bash
     cat > /etc/cron.d/almanac <<'CRON'
     0 6 * * * root /root/almanac/deploy/check.sh <URL на дневния heartbeat> >> /var/log/almanac-check.log 2>&1
-    0 5 * * 1 root /root/almanac/deploy/backup-check.sh <URL на седмичния heartbeat> >> /var/log/almanac-check.log 2>&1
+    0 5 * * * root /root/almanac/deploy/backup-check.sh <URL на втория heartbeat> >> /var/log/almanac-check.log 2>&1
     CRON
     ```
 
@@ -382,26 +403,33 @@ S3-съвместимо object storage. Нищо не го обвързва с �
 3. **SPF е един запис за целия домейн**, затова обедини двата: `v=spf1 include:_spf.mx.cloudflare.net
    include:_spf.tem.scaleway.com ~all` (провери в Scaleway дали показва точно този `include`). Ако Scaleway поиска и
    свой MX, остави този на Cloudflare: писмата до теб минават през него.
+4. **Отчети за недоставени писма** (по желание, но препоръчително): адрес, от който писмата се връщат или който ги
+   маркира като спам, вече не получава напомняния, а в Настройки пише защо. Сложи в `.env`
+   `EMAIL_EVENTS_SECRET=$(openssl rand -hex 24)`. В Scaleway: Topics and Events → тема (fr-par) → абонамент от тип
+   HTTPS към `https://almanac.bg/api/email-events/<секрета>` (приложението само потвърждава абонамента); после
+   Transactional Email → Webhooks → нов webhook за домейна с тази тема и събитията `email_dropped`,
+   `email_mailbox_not_found`, `email_spam` и `email_blocklisted`.
 
 Използвай порт **587**: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и 465 на нови сървъри.
 
 **Обновяване:** в тих час, защото опашките са затворени, докато текущите мачове се доиграят:
 
 ```bash
-date -u +%Y-%m-%dT%H:%M:%SZ     # запиши часа: при нужда Litestream връща базата точно до него
-git pull && git -C private pull
-APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d --build && docker image prune -f
+deploy/deploy.sh
 ```
 
-(`APP_RELEASE` казва на отчетите за грешки от коя версия идват; `docker image prune` трие стария образ, за да не се
-пълни дискът.) Новата версия се билдва, докато старата продължава да работи. После старата спира плавно: играчите в
+Скриптът изписва часа (при нужда Litestream връща базата точно до него), дърпа двете хранилища, обновява базовите
+образи (Node, Caddy, Litestream — с точни версии, които Dependabot предлага да вдигнеш), пази работещия досега образ
+като `almanac:previous` за бързо връщане и чисти старите образи и слоевете от билдовете. Новата версия се билдва,
+докато старата продължава да работи. После старата спира плавно: играчите в
 опашката научават, че идва обновяване, нови мачове не започват, а текущите се доиграват (до ~5½ минути,
 `DRAIN_SECONDS`; още незавършените тогава приключват с точките дотук). През тези няколко секунди, докато приложението
 не работи, Caddy показва страница, която се презарежда сама, браузърите на играчите се свързват отново автоматично, а
 отворените табове зареждат новата версия, щом играчът не е в мач.
 
-**Връщане към предишна версия**, ако обновяването се обърка: `git checkout <предишния tag или commit>` и същата команда
-за деплой. Ако новата версия е мигрирала базата, старата отказва да тръгне с нея („Database is at schema vN…“):
+**Връщане към предишна версия**, ако обновяването се обърка: `deploy/rollback.sh` пуска предишния образ за секунди, без
+билд (кодът в git остава, където е: поправи напред или `git checkout <commit>` преди следващия деплой). Ако новата
+версия е мигрирала базата, старата отказва да тръгне с нея („Database is at schema vN…“):
 преди миграции приложението записва копие на базата в `/data/backups/quiz-vN-before-vM.db` — върни него, както
 дневно копие (по-долу), или възстанови от Litestream до записания час (`restore -timestamp <часа>`).
 
@@ -416,23 +444,31 @@ df -h /                                    # място на диска
 
 **Бекъпи:** на три нива.
 1. **Litestream (непрекъснато, извън сървъра):** всяка промяна стига до object storage за секунди; може да се
-   възстанови всеки момент от последните 7 дни.
+   възстанови всеки момент от последните 14 дни. Всеки ден `deploy/backup-check.sh` проверява, че копието е актуално.
 2. **Дневни копия (автоматично, на сървъра):** след 04:00 софийско време приложението записва консистентно копие на
    базата в `/data/backups/quiz-YYYY-MM-DD.db` и пази последните 14 (`BACKUP_KEEP_DAYS`). Удобни са за бързо
    поправяне на грешка; намират се на същия диск.
-3. **Бекъпите на сървъра от доставчика** (ако ги предлага): дневни образи на целия сървър, пазени извън машината.
+3. **Бекъпите на сървъра от доставчика** (Hetzner Backups): дневни образи на целия сървър, пазени извън машината и
+   изтриваеми само от профила при доставчика.
 
 Проверка, че Litestream има бекъп (възстановява го до живата база, без да я пипа, и проверява копието):
 `deploy/backup-check.sh`.
 
-Възстановяване от Litestream на нов сървър (стъпки 1–5 с **същия `.env`**, но без `docker compose up`):
+**Сървърът е изгубен** (около 45 минути, ако `.env` и SSH ключът са в password manager-а; веднъж в годината мини
+по списъка на тренировка):
+1. Нов сървър (стъпка 1: firewall, обновления, бекъпи) — или възстанови образ от Hetzner Backups и прескочи до 6.
+2. Deploy key за частната банка (стъпка 4) и двете хранилища (стъпка 5) — **същият `.env`** от password manager-а.
+3. Базата от Litestream (без `deploy/deploy.sh` преди това):
 
-```bash
-docker compose build app
-docker compose run --rm --no-deps --entrypoint true app      # създава празния volume за данните
-docker compose run --rm --no-deps litestream restore -o /data/quiz.db /data/quiz.db
-APP_RELEASE=$(git rev-parse --short HEAD) docker compose up -d
-```
+   ```bash
+   docker compose build app
+   docker compose run --rm --no-deps --entrypoint true app      # създава празния volume за данните
+   docker compose run --rm --no-deps litestream restore -o /data/quiz.db /data/quiz.db
+   deploy/deploy.sh
+   ```
+4. В Cloudflare смени A и AAAA записите (`@` и `www`) с адресите на новия сървър.
+5. Изчакай сертификата: `curl -I https://almanac.bg` (Caddy го взема сам за минута-две след DNS промяната).
+6. Cron-ът от стъпка 10 и проверка, че двата heartbeat-а в Better Stack светят зелено на следващия ден.
 
 (За момент преди грешка добави `-timestamp 2026-10-25T14:00:00Z` към `restore`.)
 
@@ -489,6 +525,7 @@ Issues и pull request-и са добре дошли: виж [CONTRIBUTING.md](C
 
 `scripts/github-setup.sh almanac-bg/almanac` настройва хранилището в GitHub (може спокойно да се пуска повторно):
 описание, уебсайт и topics, issues и discussions, squash merge, Dependabot alerts и security updates, private
-vulnerability reporting, secret scanning, етикети и защитен `main`. Някои от тези настройки съществуват само за
+vulnerability reporting, secret scanning, етикети, защитен `main` (pull request се слива само със зелен CI;
+администраторът може да push-ва направо) и само actions от GitHub и проверени автори, закачени за commit. Някои от тези настройки съществуват само за
 публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично. Изображението за social
 preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.

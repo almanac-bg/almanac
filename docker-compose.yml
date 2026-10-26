@@ -20,6 +20,10 @@ services:
     cap_drop: [ALL]
     read_only: true
     tmpfs: [/tmp]
+    # A leak or a runaway hits this ceiling and the app restarts, instead of the kernel picking a victim (sshd,
+    # dockerd) on a full machine. It idles at ~120 MB; password hashing needs 64 MB per check, four at a time.
+    mem_limit: 1g
+    pids_limit: 512
     environment:
       COOKIE_SECURE: "true"
       # Caddy reaches the app through the Docker bridge (a private address); only it may set X-Forwarded-For.
@@ -40,6 +44,7 @@ services:
       APP_URL: https://${DOMAIN:-almanac.bg}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      EMAIL_EVENTS_SECRET: ${EMAIL_EVENTS_SECRET:-}
     volumes:
       - data:/data
     # Only reachable from the server itself (Caddy); never from the internet.
@@ -50,11 +55,14 @@ services:
   # sees every visitor's real address, IPv6 included (through Docker's port mapping, IPv6 visitors can all appear as
   # one internal address — and then share one rate limit).
   caddy:
-    image: caddy:2-alpine
+    # An exact version: Dependabot proposes the next one (a floating tag is never pulled again by itself).
+    image: caddy:2.11.7-alpine
     restart: unless-stopped
     logging: *logging
     network_mode: host
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 512
     depends_on:
       - app
     environment:
@@ -72,6 +80,8 @@ services:
     restart: unless-stopped
     logging: *logging
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 128
     # The app's user (node in the Node image): a database Litestream restores, and everything it keeps next to it,
     # must be the app's to write. The app comes first, so the data volume is created as the app's.
     user: "1000:1000"

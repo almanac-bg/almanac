@@ -1,11 +1,14 @@
 #!/bin/sh
 # Daily: what an uptime check from outside can't see — the HTTPS certificate is being renewed, the disk has room,
-# every container runs. With a heartbeat URL as the argument, a run where all is well pings it, so a missing ping is
-# the alert (see README → Внедряване, step 10). Run from cron as root.
+# every container runs, no reboot has been waiting for days. With a heartbeat URL as the argument, a good run pings
+# it; a failed one says why on the heartbeat's /fail (an alert at once, with the reason), and a run that never
+# happens is a missing ping (see README → Внедряване, step 10). Run from cron as root.
 set -eu
 cd "$(dirname "$0")/.."
+heartbeat=${1:-}
 fail() {
   echo "$(date -u +%FT%TZ) check failed: $*"
+  [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 --data-raw "$*" "$heartbeat/fail" >/dev/null || true
   exit 1
 }
 
@@ -27,5 +30,11 @@ for service in $services; do
 done
 docker compose exec -T app wget -qO- http://127.0.0.1:3001/api/health >/dev/null || fail "the app's health check fails"
 
-[ -z "${1:-}" ] || curl -fsS -m 10 --retry 3 "$1" >/dev/null
+# Security updates reboot the server by themselves at night (README → step 1); one still waiting means that broke.
+if [ -f /var/run/reboot-required ]; then
+  waiting=$((($(date +%s) - $(stat -c %Y /var/run/reboot-required)) / 86400))
+  [ "$waiting" -lt 3 ] || fail "a reboot for updates has been waiting $waiting days: $(tr '\n' ' ' </var/run/reboot-required.pkgs 2>/dev/null)"
+fi
+
+[ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null
 echo "$(date -u +%FT%TZ) check ok"

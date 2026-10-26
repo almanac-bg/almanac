@@ -6,6 +6,8 @@
 - с бутона **„Report a vulnerability“** в GitHub (раздел Security на това хранилище) или
 - по имейл на адреса за контакт в политиката за поверителност на играта ([almanac.bg/privacy](https://almanac.bg/privacy)).
 
+Същите два канала са и в [almanac.bg/.well-known/security.txt](https://almanac.bg/.well-known/security.txt).
+
 Моля, не отваряй публичен issue и не тествай върху профилите на други играчи. Опиши какво намери и как да се
 възпроизведе; ще отговорим до няколко дни и ще посочим приноса ти, ако искаш.
 

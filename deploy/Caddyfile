@@ -1,12 +1,25 @@
-www.{$DOMAIN} {
+{
+	# The certificate authorities' contact for this site (expiry notices; ZeroSSL, Caddy's second CA, needs one).
+	email postmaster@{$DOMAIN}
+	servers {
+		# Slow clients that never finish sending their headers don't hold connections open.
+		timeouts {
+			read_header 10s
+		}
+	}
+}
+
+# Every other address goes straight to https://{$DOMAIN} in one step (not http → https://www → apex).
+http://{$DOMAIN}, http://www.{$DOMAIN}, www.{$DOMAIN} {
+	header -Server
 	redir https://{$DOMAIN}{uri} permanent
 }
 
 {$DOMAIN} {
 	encode zstd gzip
 	header {
-		# Browsers remember to use HTTPS only (one year).
-		Strict-Transport-Security "max-age=31536000"
+		# Browsers remember to use HTTPS only (two years), here and on any subdomain.
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		-Server
 	}
 	# The app's port is published on the server's loopback only (Caddy runs on the host network).

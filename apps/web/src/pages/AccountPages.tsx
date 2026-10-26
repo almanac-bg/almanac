@@ -729,6 +729,15 @@ function EmailSettings() {
           )}
         </div>
       )}
+      {me.email && me.emailBounced && (
+        <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <MailWarning aria-hidden className="mt-0.5 size-4 shrink-0 text-amber-300" />
+          <span>
+            Писмата ни до този адрес не стигат (връщат се или са отбелязани като спам), затова спряхме напомнянията.
+            Провери адреса или добави друг.
+          </span>
+        </p>
+      )}
       {me.email && removing && (
         <form noValidate onSubmit={remove} className="mt-3 flex flex-wrap gap-2">
           <input

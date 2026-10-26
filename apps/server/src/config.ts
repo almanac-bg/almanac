@@ -82,6 +82,8 @@ export const config = {
   /** e.g. smtp://user:pass@smtp-relay.brevo.com:587 — without it, emails are printed to the console. */
   smtpUrl: process.env.SMTP_URL || null,
   mailFrom: process.env.MAIL_FROM || `${BRAND.name} <no-reply@${BRAND.domain}>`,
+  /** The secret in the address Scaleway posts delivery reports to (/api/email-events/<secret>); unset, it's off. */
+  emailEventsSecret: process.env.EMAIL_EVENTS_SECRET || null,
   /** Tests: write every outgoing email as a JSON file into this directory. */
   mailOutbox: process.env.MAIL_OUTBOX || null,
   /**

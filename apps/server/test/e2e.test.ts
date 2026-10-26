@@ -39,7 +39,7 @@ let sharedDaily: string[] = [];
 const setXp = (userId: number, xp: number) => srv.db.prepare('UPDATE users SET xp = ? WHERE id = ?').run(xp, userId);
 
 before(async () => {
-  srv = await startServer();
+  srv = await startServer({ EMAIL_EVENTS_SECRET: 'events-secret-for-tests' });
   api = http(srv.url);
   A = await register(srv.url, 'Иван_тест');
   B = await register(srv.url, 'maria_test');
@@ -135,6 +135,30 @@ test('an address gets a few verification mails a day, whoever types it in', T, a
   for (let i = 0; i < 5; i++) await register(srv.url, `pismo_${i}`, 'someone@example.test');
   const sent = srv.mails().filter((m) => m.to === 'someone@example.test').length - before;
   assert.equal(sent, 3, 'three, then nothing until tomorrow (the sign-ups themselves still work)');
+});
+
+test('the mail provider reports a bounce: no more reminders, and Settings says why', T, async () => {
+  const P = await register(srv.url, 'vrashtane');
+  srv.db
+    .prepare(
+      "UPDATE users SET email = 'gone@example.test', email_key = 'gone@example.test', streak_reminders = 1 WHERE id = ?",
+    )
+    .run(P.user.id);
+  // SNS-style, as Scaleway Topics and Events posts it: the event is a JSON string in `Message`, sent as text/plain.
+  const report = (secret: string) =>
+    fetch(`${srv.url}/api/email-events/${secret}`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain; charset=UTF-8' },
+      body: JSON.stringify({
+        Type: 'Notification',
+        Message: JSON.stringify({ type: 'email_dropped', email_to: 'gone@example.test' }),
+      }),
+    });
+  assert.equal((await report('wrong-secret')).status, 404, 'only with the secret');
+  assert.equal((await api.get('/api/me', P.cookie)).body.user.emailBounced, false);
+  assert.equal((await report('events-secret-for-tests')).status, 204);
+  const me = (await api.get('/api/me', P.cookie)).body.user;
+  assert.deepEqual([me.emailBounced, me.streakReminders], [true, false]);
 });
 
 test('an unknown /api address answers JSON, like the rest of the API', T, async () => {

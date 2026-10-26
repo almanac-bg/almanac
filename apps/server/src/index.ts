@@ -81,6 +81,22 @@ app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction)
   res.status(500).json({ error: 'Нещо се обърка. Опитай пак.' });
 });
 
+// RFC 9116: where to report a security problem (the repository's SECURITY.md says how it's handled).
+app.get('/.well-known/security.txt', (_req, res) => {
+  // Valid for a year from now: the standard wants an expiry, and this file is never stale.
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
+  const lines = [
+    // The contact address (it reaches the operator), and GitHub's private vulnerability reports.
+    `Contact: mailto:${config.operator.email}`,
+    ...(config.sourceUrl ? [`Contact: ${config.sourceUrl}/security/advisories/new`] : []),
+    `Expires: ${expires}`,
+    'Preferred-Languages: bg, en',
+    `Canonical: ${config.appUrl}/.well-known/security.txt`,
+    ...(config.sourceUrl ? [`Policy: ${config.sourceUrl}/security/policy`] : []),
+  ];
+  res.type('text/plain').send(`${lines.join('\n')}\n`);
+});
+
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {
   const indexHtml = path.join(config.webDist, 'index.html');

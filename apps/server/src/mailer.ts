@@ -24,7 +24,12 @@ if (!transport && config.production) {
  * quietly), never surfaced to the requester. Logs and reports never contain addresses or links (they hold live
  * tokens) — except in development without SMTP, where the console stands in for the inbox.
  */
-export function sendMail(mail: Mail) {
+/** Replies to no-reply@ go nowhere (only the contact addresses take mail): every mail says where to write instead. */
+const noReply = () =>
+  `Писмото е изпратено автоматично и на него не може да се отговори. Пиши ни на ${config.operator.email}.`;
+
+export function sendMail(message: Mail) {
+  const mail = { ...message, text: `${message.text}\n\n—\n${noReply()}` };
   if (config.mailOutbox) {
     fs.mkdirSync(config.mailOutbox, { recursive: true });
     const name = `${Date.now()}-${randomBytes(3).toString('hex')}.json`;
@@ -54,7 +59,7 @@ function layout(title: string, intro: string, button: string, link: string, outr
 <tr><td style="padding-top:12px;font-size:15px;line-height:1.6;color:#d4d0ea">${intro}</td></tr>
 <tr><td style="padding:28px 0"><a href="${link}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 26px;border-radius:14px">${escapeHtml(button)}</a></td></tr>
 <tr><td style="font-size:13px;line-height:1.6;color:#8f89b2">${outro}<br><br>Ако бутонът не работи, отвори този линк:<br><a href="${link}" style="color:#a78bfa;word-break:break-all">${link}</a></td></tr>
-</table><p style="font-size:12px;color:#6b6590">${BRAND.domain}</p></td></tr></table></body></html>`;
+</table><p style="font-size:12px;line-height:1.6;color:#6b6590">${BRAND.domain} · ${escapeHtml(noReply())}</p></td></tr></table></body></html>`;
 }
 
 export function verifyEmailMail(to: string, username: string, link: string): Mail {
@@ -140,10 +145,10 @@ export function streakReminderMail(
   return {
     to,
     subject: `🔥 Серията ти от ${streak} дни изтича довечера`,
-    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, две минути:\n${config.appUrl}/\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
+    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, около три минути:\n${config.appUrl}/\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
     html: layout(
       `Здравей, ${username}!`,
-      escapeHtml(`${lead}${shield} Десет въпроса, две минути.`),
+      escapeHtml(`${lead}${shield} Десет въпроса, около три минути.`),
       'Играй днешното',
       `${config.appUrl}/`,
       `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#a78bfa">Спри напомнянията</a>.`,

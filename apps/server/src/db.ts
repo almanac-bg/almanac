@@ -364,6 +364,11 @@ const MIGRATIONS: (string | (() => void))[] = [
     (SELECT MAX(expires_at) - 2592000000 FROM sessions WHERE sessions.user_id = users.id), 0));
   CREATE INDEX users_last_seen ON users(last_seen_at) WHERE is_guest = 0;
   `,
+
+  // v12: when our mail provider last reported the verified address as undeliverable (bounce, spam complaint).
+  `
+  ALTER TABLE users ADD COLUMN email_bounced_at INTEGER;
+  `,
 ];
 
 /**

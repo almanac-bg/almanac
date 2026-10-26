@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch makes the run before it pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to a commit (a tag can be moved to other code); Dependabot updates the commit and the comment.
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,8 +28,8 @@ jobs:
         node: [24, 26]
     name: test (Node ${{ matrix.node }})
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -38,7 +45,7 @@ jobs:
       # layouts. See apps/web/playwright.config.ts.
       - run: npm run test:browser -w @quiz/web
       # What went wrong, to look at: the HTML report, with screenshots and the retry's trace.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report-node${{ matrix.node }}
@@ -52,12 +59,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The production compose file must parse (anchors, profiles, env interpolation)…
       - run: DOMAIN=example.test docker compose config --quiet
       # …and Caddy must accept its config: a mistake there takes HTTPS down.
+      # (The same Caddy version the compose file runs.)
       - run: >-
-          docker run --rm -e DOMAIN=example.test -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+          docker run --rm -e DOMAIN=example.test -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          "$(sed -n 's/.*image: \(caddy:.*\)/\1/p' docker-compose.yml)"
           caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - run: docker build -t almanac .
       # Boot the image and wait for the health check to pass.

@@ -57,20 +57,41 @@ label dependencies 0366d6 "Обновяване на зависимости (Dep
 label "good first issue" 7057ff "Малка, ясна задача за начало"
 
 echo "Branch protection"
-# main can't be deleted or force-pushed (history is never rewritten); pushing and merging stay as they are.
-if gh api "repos/$repo/rulesets" -q '.[].name' 2>/dev/null | grep -qx "Protect main"; then
-  ok "main is protected (rule already there)"
-else
-  try "main can't be deleted or force-pushed" gh api -X POST "repos/$repo/rulesets" --input - <<'JSON'
+# main can't be deleted or force-pushed (history is never rewritten), and a pull request merges only once CI passed
+# (Dependabot's auto-merge included). Admins bypass the checks, so a maintainer can still push straight to main.
+ruleset=$(cat <<'JSON'
 {
   "name": "Protect main",
   "target": "branch",
   "enforcement": "active",
   "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
-  "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}]
+  "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {"type": "required_status_checks", "parameters": {
+      "strict_required_status_checks_policy": false,
+      "do_not_enforce_on_create": false,
+      "required_status_checks": [{"context": "test (Node 24)"}, {"context": "test (Node 26)"}, {"context": "docker"}]
+    }}
+  ]
 }
 JSON
+)
+existing=$(gh api "repos/$repo/rulesets" -q '.[] | select(.name == "Protect main") | .id' 2>/dev/null)
+if [ -n "$existing" ]; then
+  try "main is protected and needs green CI" gh api -X PUT "repos/$repo/rulesets/$existing" --input - <<<"$ruleset"
+else
+  try "main is protected and needs green CI" gh api -X POST "repos/$repo/rulesets" --input - <<<"$ruleset"
 fi
+
+echo "Actions"
+# Only GitHub's own and verified creators' actions, each pinned to a commit (a tag can be moved); Dependabot keeps the
+# commits current.
+try "only GitHub-owned and verified actions, pinned to a commit" gh api -X PUT "repos/$repo/actions/permissions" \
+  --input - <<<'{"enabled": true, "allowed_actions": "selected", "sha_pinning_required": true}'
+try "which ones" gh api -X PUT "repos/$repo/actions/permissions/selected-actions" \
+  --input - <<<'{"github_owned_allowed": true, "verified_allowed": true, "patterns_allowed": []}'
 
 echo
 echo "By hand (GitHub has no API for it): Settings → General → Social preview → upload .github/social-preview.png"

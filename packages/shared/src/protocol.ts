@@ -47,6 +47,8 @@ export interface MeUser extends PublicUser {
   friendRequests: number;
   /** Verified address (used for password resets). */
   email: string | null;
+  /** Mail to the verified address bounced or was marked as spam (the reminders were switched off). */
+  emailBounced: boolean;
   /** Address waiting for its verification link to be clicked. */
   pendingEmail: string | null;
 }

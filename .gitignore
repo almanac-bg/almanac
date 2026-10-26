@@ -16,3 +16,7 @@ blob-report/
 
 # The real question bank: a clone of the private almanac-questions repository (see README → Adding questions).
 /private/
+
+# On the server: which commit runs and which ran before it (deploy/deploy.sh, deploy/rollback.sh).
+/.release
+/.release-previous

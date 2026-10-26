@@ -83,7 +83,10 @@ export function requestEmailChange(userId: number, email: string): Result {
 
 export function removeEmail(userId: number) {
   const user = getUser(userId)!;
-  run('UPDATE users SET email = NULL, email_key = NULL, pending_email = NULL WHERE id = ?', userId);
+  run(
+    'UPDATE users SET email = NULL, email_key = NULL, pending_email = NULL, email_bounced_at = NULL WHERE id = ?',
+    userId,
+  );
   run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'", userId);
   if (user.email) sendMail(emailChangedMail(user.email, user.username, true));
 }
@@ -97,7 +100,7 @@ export function verifyEmailToken(token: string): Result<{ userId: number }> {
       return { result: { ok: false, error: 'Този имейл вече е свързан с друг профил.' } };
     const before = getUser(t.userId)!;
     run(
-      'UPDATE users SET email = ?, email_key = ?, pending_email = NULL WHERE id = ?',
+      'UPDATE users SET email = ?, email_key = ?, pending_email = NULL, email_bounced_at = NULL WHERE id = ?',
       t.email,
       emailKey(t.email),
       t.userId,
