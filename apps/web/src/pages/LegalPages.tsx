@@ -41,8 +41,14 @@ function Detail({ value }: { value: string | null | undefined }) {
 
 function ContactEmail() {
   const email = useSite()?.email;
-  // An address and nothing else goes into the link.
-  return email && /^[^\s@<>"']+@[^\s@<>"']+$/.test(email) ? <a href={`mailto:${email}`}>{email}</a> : (email ?? '…');
+  // An address and nothing else goes into the link, each side of the "@" URL-encoded (a plain address comes out as it
+  // went in, and nothing in it can turn into something else).
+  const address = email?.match(/^([^\s@<>"']+)@([^\s@<>"']+)$/);
+  return address ? (
+    <a href={`mailto:${encodeURIComponent(address[1])}@${encodeURIComponent(address[2])}`}>{email}</a>
+  ) : (
+    (email ?? '…')
+  );
 }
 
 function Operator() {
