@@ -130,7 +130,8 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Смени името", so focus moves to it
               autoFocus
               required
-              className="field h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+              // The height of the small buttons beside it (taller on touch screens, like them).
+              className="field h-9 min-w-0 flex-1 rounded-xl px-3 text-sm pointer-coarse:h-11"
             />
             <Button size="sm" type="submit" loading={busy}>
               Смени

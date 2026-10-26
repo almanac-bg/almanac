@@ -737,10 +737,10 @@ function EmailSettings() {
             aria-label="Парола за потвърждение"
             className={`${INPUT} min-w-0 sm:flex-1`}
           />
-          <Button type="submit" variant="danger" loading={busy === 'remove'}>
+          <Button type="submit" variant="danger" size="field" loading={busy === 'remove'}>
             Премахни имейла
           </Button>
-          <Button type="button" variant="ghost" onClick={() => setRemoving(false)}>
+          <Button type="button" variant="ghost" size="field" onClick={() => setRemoving(false)}>
             Отказ
           </Button>
         </form>
@@ -792,7 +792,7 @@ function EmailSettings() {
           aria-label="Парола за потвърждение"
           className={`${INPUT} min-w-0 sm:flex-1`}
         />
-        <Button type="submit" variant="secondary" size="lg" className="w-full sm:w-auto" loading={busy === 'save'}>
+        <Button type="submit" variant="secondary" size="field" className="w-full sm:w-auto" loading={busy === 'save'}>
           {me.email ? 'Смени' : 'Добави'}
         </Button>
       </form>

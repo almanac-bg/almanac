@@ -5,7 +5,7 @@ import { type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject, us
 import { createPortal } from 'react-dom';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'accent';
-type Size = 'sm' | 'md' | 'lg';
+type Size = 'sm' | 'md' | 'lg' | 'field';
 
 const VARIANTS: Record<Variant, string> = {
   // Starts at purple-600: white on the lighter #a855f7 was under 4:1 where long labels begin.
@@ -26,6 +26,8 @@ const SIZES: Record<Size, string> = {
   sm: 'h-9 pointer-coarse:h-11 px-3.5 text-sm rounded-2xl gap-1.5',
   md: 'h-11 px-5 text-[15px] rounded-2xl gap-2',
   lg: 'h-14 px-7 text-base rounded-2xl gap-2.5',
+  /** Beside a text field (INPUT): the same height, so the row reads as one line. */
+  field: 'h-12 px-5 text-[15px] rounded-2xl gap-2',
 };
 
 /** A button's look, for a link that should look like one (a <Button> inside a link would be a second tab stop). */

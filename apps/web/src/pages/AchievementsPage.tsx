@@ -85,7 +85,7 @@ export function AchievementsPage() {
               transition={{ delay: Math.min(i * 0.02, 0.4) }}
             >
               <Card
-                className={clsx('relative h-full overflow-hidden p-5', !done && 'opacity-75')}
+                className={clsx('relative flex h-full flex-col overflow-hidden p-5', !done && 'opacity-75')}
                 style={done ? { borderColor: `${rarity.color}55` } : undefined}
               >
                 {done && (
@@ -117,7 +117,8 @@ export function AchievementsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="relative mt-4">
+                {/* At the bottom of the card, so a row of cards (as tall as its tallest) lines up its dates and bars. */}
+                <div className="relative mt-auto pt-4">
                   {done ? (
                     <p className="text-xs font-semibold text-emerald-300">✓ Отключено на {longDate(p!.unlockedAt!)}</p>
                   ) : a.goal !== undefined && p?.progress != null ? (

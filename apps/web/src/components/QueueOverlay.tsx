@@ -1,4 +1,4 @@
-import { actions, useNow, useStore } from '@quiz/client';
+import { actions, plural, useNow, useStore } from '@quiz/client';
 import { avatarEmoji, MODES } from '@quiz/shared';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -89,7 +89,10 @@ export function QueueOverlay() {
               {botsIn !== null && queue.found < queue.needed && (
                 <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
                   <Bot aria-hidden className="size-3.5" />
-                  {botsIn > 0 ? `След ${botsIn} с местата се попълват с ботове на твоето ниво` : 'Ботовете влизат…'}
+                  {/* "секунди" in full: "След 6 с … с ботове" read as two of the same word. */}
+                  {botsIn > 0
+                    ? `След ${plural(botsIn, 'секунда', 'секунди')} местата се попълват с ботове на твоето ниво`
+                    : 'Ботовете влизат…'}
                 </p>
               )}
             </div>

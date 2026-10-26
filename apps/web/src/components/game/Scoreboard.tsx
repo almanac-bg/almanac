@@ -69,8 +69,9 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
   const reactions = game.reactions.filter((r) => r.playerId === s.id);
 
   return (
+    // Animated when the order changes, not the size (a size animation squeezes the row, which reads as a flicker).
     <motion.li
-      layout
+      layout="position"
       transition={{ type: 'spring', stiffness: 500, damping: 40 }}
       className={clsx(
         'relative flex items-center gap-3 rounded-2xl px-2 py-2',
@@ -94,27 +95,35 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
         <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
       </div>
       <div className="text-right">
-        <div className={clsx('font-bold tabular-nums', out && 'text-fg-3')}>
+        {/* One line's height whatever it holds (a score, "напусна", the skull): a knockout doesn't move the board. */}
+        <div className={clsx('flex h-6 items-center justify-end font-bold tabular-nums', out && 'text-fg-3')}>
           {s.left ? (
             'напусна'
           ) : s.eliminatedAt !== null ? (
-            <Skull className="ml-auto size-4 text-rose-300" />
+            <Skull aria-hidden className="size-4 text-rose-300" />
           ) : (
             fmt(score)
           )}
         </div>
-        <AnimatePresence>
-          {result && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className={clsx('text-xs font-bold tabular-nums', result.correct ? 'text-emerald-300' : 'text-rose-300')}
-            >
-              {result.correct ? `+${fmt(result.points)}` : result.points < 0 ? `−${fmt(-result.points)}` : '✗'}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Room for the question's points even before they're in: every row keeps its height through the reveal, so
+            the board doesn't grow and shrink (eight rows jumping, twice a question). */}
+        <div className="h-4">
+          <AnimatePresence>
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={clsx(
+                  'text-xs leading-4 font-bold tabular-nums',
+                  result.correct ? 'text-emerald-300' : 'text-rose-300',
+                )}
+              >
+                {result.correct ? `+${fmt(result.points)}` : result.points < 0 ? `−${fmt(-result.points)}` : '✗'}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
       <Reactions reactions={reactions} />
     </motion.li>
