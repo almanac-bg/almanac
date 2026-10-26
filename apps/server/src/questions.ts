@@ -182,8 +182,12 @@ export function reorderOptions(questions: PreparedQuestion[], seed: string): Pre
   });
 }
 
-/** How many of a player's most recent questions are remembered (most of the bank); older ones count as new again. */
-export const RECENT_LIMIT = 1500;
+/**
+ * How many of a player's most recent questions are remembered: more than the whole bank (heading for 5000), so a player
+ * who has seen everything gets the ones seen longest ago first. A forgotten question would count as new again and jump
+ * the queue. Only the heaviest players ever get near it.
+ */
+export const RECENT_LIMIT = 6000;
 
 /** Remembers a match's questions for each player, keeping only the newest RECENT_LIMIT. */
 export function markSeen(userId: number, questionIds: string[]) {

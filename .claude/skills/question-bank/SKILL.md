@@ -19,9 +19,10 @@ from it. Every batch is verified independently before it goes in.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
   spread, fact length/source/giveaways). README → „Добавяне на въпроси“ documents the format.
-- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `facts` (usage at its top). Use
-  it to write the banks: it keeps the one-question-per-line layout, so a diff is one line per changed question. For a
-  one-off fix, editing that question's line directly is fine.
+- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `facts`, `similar` (usage at its
+  top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one line per changed
+  question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a one-off fix,
+  editing that question's line directly is fine.
 
 Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`.
 
@@ -30,15 +31,17 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
 1. **Find the gaps.** `bank.mjs stats` shows each category by difficulty and the next free id. The content
    priorities (memory: roadmap) are events after 2018, the Balkan neighbours, women authors, sport after 2017, fewer
    "най-…" superlatives in nature. Grep the bank for the topic first: no near-duplicates.
-2. **Write them** to a scratch JSON array (ids from `stats`; never reuse a removed question's id, since reports and
-   stats refer to ids):
+2. **Write them** to a scratch JSON array, without ids (`add` gives each the next free one and never reuses a
+   removed question's id, since reports and stats refer to ids). Each with an `answerSource` for the checker (`add`
+   doesn't take it: strip it first):
    - Bulgarian, for Bulgarian players. Difficulty for them: easy = most adults know it, medium = a well-read person,
      hard = an enthusiast. Text addressing the player is gender-neutral (CONTRIBUTING → Стил).
    - Question 10–150 characters, ending in "?"; four distinct options of at most 45 characters; exactly one
      defensibly right answer, the others plausible and of the same kind and form (all cities, all years; no odd one
      out like the only multi-word option or the only one in quotes).
    - Nothing in the wording that gives the answer away („Партенонът в Атина“ → Атина), and nothing that answers
-     another question: Микс serves every category in one match. Grep the bank for the answer and the key words.
+     another question: Микс serves every category in one match. Grep the bank for the answer and the key words, and
+     run `bank.mjs similar draft.json`: it lists bank questions (and other drafts) that look like the same question.
    - Numbers: the right one is the smallest or the largest of the four about half the time (the test fails below
      35%); vary `answer` across 0–3.
    - Nothing that goes stale ("the current", "the latest", records that may fall) unless it's pinned to a date
@@ -50,7 +53,11 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
    it to check each against reliable sources: the marked answer is right, no other option is also right, nothing is
    outdated, the wording has one reading. It reports OK / FIX / DROP with evidence. Apply its fixes; drop what it
    can't confirm.
-4. **Add and test.** `bank.mjs add new.json`, then `cd apps/server && node --import tsx --test test/questions.test.ts`.
+4. **Add and test.** `bank.mjs similar new.json` once more over the whole batch, `bank.mjs add new.json`, then
+   `cd apps/server && node --import tsx --test test/questions.test.ts`.
+   For hundreds of questions at once (with the owner's go-ahead for a multi-agent workflow): plan topics per category
+   so batches don't overlap, then per batch of 20 one writer and one independent checker, then merge, dedupe and test
+   — as stage 1 (2026-10) did.
 5. **Commit and push in `private/`** (`git -C private …`, the usual commit trailer). Production gets the change on
    the next deploy; deploying is outward-facing, so ask the owner unless they already said to ship it.
 6. **Tell the owner** what went in: a short list (question → answer, and the fact if any), so they can read it.
