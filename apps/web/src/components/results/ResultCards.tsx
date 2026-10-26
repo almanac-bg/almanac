@@ -1,0 +1,298 @@
+import { fmt, plural, type ReviewItem, unlockPreview } from '@quiz/client';
+import {
+  achievementById,
+  levelFromXp,
+  levelProgress,
+  type MatchRewards,
+  RARITIES,
+  RATED_GAMES_PER_PAIR,
+  rankFor,
+  type UnratedReason,
+} from '@quiz/shared';
+import clsx from 'clsx';
+import { Share2 } from 'lucide-react';
+import { animate, motion } from 'motion/react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
+import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
+import { sfx } from '../../lib/sound';
+import { LevelBadge, RankBadge } from '../Avatar';
+import { Button, Card } from '../ui';
+import { burst } from './confetti';
+
+/** The day's standing and streak. The way to the full board is the main button in the action bar below. */
+export function DailyCard({
+  daily,
+  history,
+  total,
+}: {
+  daily: NonNullable<MatchRewards['daily']>;
+  history: ReviewItem[];
+  total: number;
+}) {
+  const text = dailyShareText(history, total, daily.streak);
+  useEffect(() => rememberDailyShare(text), [text]);
+  return (
+    <Card className="relative overflow-hidden p-6">
+      <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
+      {daily.rank === null ? (
+        // A guest's daily has questions of its own, so it has no place on the board.
+        <>
+          <h2 className="relative t-card">Денят е твой</h2>
+          <p className="relative mt-2 text-sm text-fg-2">
+            Като гост играеш свои 10 въпроса за деня. Запази профила си и ще изиграеш общите — тези, по които се класира
+            цяла България.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2 className="relative t-card">Твоето място днес</h2>
+          <div className="relative mt-3 flex items-baseline gap-2">
+            <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
+            <span className="text-fg-2">от {fmt(daily.total)} днес</span>
+          </div>
+        </>
+      )}
+      {daily.streak > 0 && (
+        <p className="relative mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-bold text-orange-300">
+          🔥 Серия {plural(daily.streak, 'ден', 'дни')}
+        </p>
+      )}
+      {daily.shieldsUsed > 0 && (
+        <p className="relative mt-3 flex items-start gap-2.5 rounded-2xl border border-sky-300/20 bg-sky-400/10 px-3.5 py-2.5 text-sm text-sky-100">
+          <span aria-hidden className="text-lg leading-5">
+            🛡️
+          </span>
+          {daily.shieldsUsed === 1
+            ? 'Щит спаси серията ти: пропуснатият ден не я прекъсна.'
+            : `${daily.shieldsUsed} щита спасиха серията ти: пропуснатите дни не я прекъснаха.`}
+        </p>
+      )}
+      {daily.shieldEarned && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.1, type: 'spring', stiffness: 260, damping: 18 }}
+          className="relative mt-3 flex items-center gap-3 rounded-2xl border border-sky-300/35 bg-[linear-gradient(110deg,rgb(56_189_248/0.22),rgb(167_139_250/0.14))] px-3.5 py-3"
+        >
+          <span aria-hidden className="text-3xl leading-none drop-shadow-[0_0_14px_rgb(56_189_248/0.7)]">
+            🛡️
+          </span>
+          <p className="text-sm text-sky-50">
+            <b className="font-display">Имаш нов щит!</b> Ако пропуснеш ден, той ще запази серията.
+          </p>
+        </motion.div>
+      )}
+      {daily.rank !== null && (
+        <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
+      )}
+      <div className="relative mt-4">
+        <Button size="sm" onClick={() => shareText(text)}>
+          <Share2 className="size-4" /> Сподели резултата
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
+  const [xp, setXp] = useState(rewards.xpBefore);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+
+  useEffect(() => {
+    let lastLevel = levelFromXp(rewards.xpBefore);
+    const controls = animate(rewards.xpBefore, rewards.xpAfter, {
+      duration: Math.min(3, 1 + rewards.xpGained / 600),
+      delay: 0.8,
+      ease: [0.2, 0.6, 0.3, 1],
+      onUpdate: (v) => {
+        setXp(v);
+        const l = levelFromXp(v);
+        if (l > lastLevel) {
+          lastLevel = l;
+          setLevelUp(l);
+          sfx.levelUp();
+          burst(0.7);
+        }
+      },
+    });
+    return () => controls.stop();
+  }, [rewards]);
+
+  const p = levelProgress(Math.round(xp));
+  return (
+    <Card className="relative overflow-hidden p-6">
+      <div className="absolute -top-16 -left-10 size-48 rounded-full bg-violet-600/25 blur-3xl" />
+      <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="t-card">Награди</h2>
+        <span className="font-display text-2xl font-black text-violet-300 sm:text-3xl">
+          +{fmt(rewards.xpGained)} XP
+        </span>
+      </div>
+
+      <div className="relative mt-5">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="flex items-center gap-2 font-semibold">
+            <motion.span key={p.level} initial={{ scale: 1.8 }} animate={{ scale: 1 }}>
+              <LevelBadge level={p.level} className="text-sm" />
+            </motion.span>
+            Ниво {p.level}
+          </span>
+          <span className="text-fg-3 tabular-nums">
+            {fmt(p.into)} / {fmt(p.needed)}
+          </span>
+        </div>
+        <div className="h-3 overflow-hidden rounded-full bg-white/8">
+          <div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#e879f9,#22d3ee)] shadow-[0_0_16px_rgb(168_85_247/0.8)]"
+            style={{ width: `${p.pct * 100}%` }}
+          />
+        </div>
+        {levelUp && (
+          <motion.div
+            key={levelUp}
+            initial={{ opacity: 0, scale: 0.5, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="mt-4 rounded-2xl bg-[linear-gradient(110deg,rgb(168_85_247/0.25),rgb(34_211_238/0.2))] p-3 text-center font-display font-bold"
+          >
+            ⬆️ Ново ниво {levelUp}!
+          </motion.div>
+        )}
+      </div>
+
+      <ul className="relative mt-5 space-y-1.5 text-sm">
+        {rewards.breakdown.map((line, i) => (
+          <motion.li
+            key={line.label}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 + i * 0.08 }}
+            className="flex justify-between gap-4 border-b border-line/60 pb-1.5 last:border-0"
+          >
+            <span className="min-w-0 text-fg-2">{line.label}</span>
+            <span className="shrink-0 font-semibold tabular-nums">+{fmt(line.amount)}</span>
+          </motion.li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export function AchievementsCard({ ids }: { ids: string[] }) {
+  useEffect(() => {
+    const t = setTimeout(sfx.achievement, 1200);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <Card className="p-6">
+      <h2 className="t-card">Нови постижения</h2>
+      <div className="mt-4 space-y-2.5">
+        {ids.map((id, i) => {
+          const a = achievementById(id)!;
+          const rarity = RARITIES[a.rarity];
+          return (
+            <motion.div
+              key={id}
+              initial={{ opacity: 0, rotateX: -90 }}
+              animate={{ opacity: 1, rotateX: 0 }}
+              transition={{ delay: 1 + i * 0.18, type: 'spring', stiffness: 200, damping: 18 }}
+              className="flex items-center gap-3 rounded-2xl border p-3"
+              style={{
+                borderColor: `${rarity.color}55`,
+                background: `linear-gradient(110deg, ${rarity.color}1f, transparent 70%)`,
+              }}
+            >
+              <span className="grid size-11 place-items-center rounded-xl bg-black/30 text-2xl">{a.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{a.name}</div>
+                <div className="text-xs text-fg-3">{a.description}</div>
+              </div>
+              <div className="shrink-0 text-right text-xs">
+                <div className="font-bold" style={{ color: rarity.color }}>
+                  {rarity.name}
+                </div>
+                <div className="text-fg-3">+{a.xp} XP</div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
+  return (
+    <Card className="p-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-4">
+        <h2 className="t-card">Отключено</h2>
+        <Link
+          to="/locker"
+          className="focus-ring -my-2.5 inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-violet-300 hover:text-violet-200"
+        >
+          Към колекцията →
+        </Link>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {rewards.unlocks.map((u, i) => {
+          const { icon, name } = unlockPreview(u);
+          return (
+            <motion.span
+              key={`${u.kind}:${u.id}`}
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 1.2 + i * 0.06 }}
+              className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm"
+            >
+              <span className="text-lg leading-none">{icon}</span>
+              {name}
+            </motion.span>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/** A ranked match that left the rating as it was, and why (instead of a puzzling "+0"). */
+export function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_contest'>; guest: boolean }) {
+  return (
+    <Card className="p-6">
+      <h2 className="t-card">Рейтинг</h2>
+      <p className="mt-2 text-sm text-fg-2">
+        {reason === 'pair'
+          ? `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`
+          : reason === 'cut'
+            ? 'Мачът приключи по-рано заради нас (обновяване или грешка), затова не променя рейтинга.'
+            : guest
+              ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
+              : 'Мачовете срещу гости са без рейтинг.'}
+      </p>
+    </Card>
+  );
+}
+
+export function RatingCard({ rating }: { rating: { before: number; after: number } }) {
+  const delta = rating.after - rating.before;
+  const promoted = rankFor(rating.after).id !== rankFor(rating.before).id && delta > 0;
+  return (
+    <Card className="flex items-center justify-between gap-4 p-6">
+      <div>
+        <h2 className="t-card">Рейтинг</h2>
+        <div className="mt-2 flex items-center gap-2">
+          <RankBadge rating={rating.after} />
+          {promoted && <span className="text-sm font-bold text-amber-300">Нов ранг!</span>}
+        </div>
+      </div>
+      <span
+        className={clsx(
+          'font-display text-3xl font-black tabular-nums',
+          delta >= 0 ? 'text-emerald-300' : 'text-rose-300',
+        )}
+      >
+        {delta >= 0 ? '+' : ''}
+        {delta}
+      </span>
+    </Card>
+  );
+}
