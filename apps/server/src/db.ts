@@ -369,6 +369,11 @@ const MIGRATIONS: (string | (() => void))[] = [
   `
   ALTER TABLE users ADD COLUMN email_bounced_at INTEGER;
   `,
+
+  // v13: every account has a last-seen time (a session always sets it), so retiring unused accounts can use its index.
+  `
+  UPDATE users SET last_seen_at = created_at WHERE last_seen_at IS NULL;
+  `,
 ];
 
 /**

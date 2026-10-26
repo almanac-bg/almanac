@@ -53,6 +53,18 @@ const plan = (sql: string, ...params: (string | number)[]) =>
 test('hot queries use indexes', () => {
   const cases: [string, string, (string | number)[], RegExp][] = [
     ['level leaderboard', 'SELECT * FROM users ORDER BY xp DESC, id ASC LIMIT 50', [], /users_xp/],
+    [
+      'unused accounts to warn (maintenance)',
+      'SELECT * FROM users WHERE is_guest = 0 AND is_admin = 0 AND email IS NOT NULL AND inactivity_warned_at IS NULL AND last_seen_at < ? LIMIT ?',
+      [0, 20],
+      /SEARCH users USING INDEX users_last_seen/,
+    ],
+    [
+      'unused accounts to delete (maintenance)',
+      'SELECT id FROM users WHERE is_guest = 0 AND is_admin = 0 AND last_seen_at < ? AND (email IS NULL OR inactivity_warned_at < ?) LIMIT ?',
+      [0, 0, 20],
+      /SEARCH users USING INDEX users_last_seen/,
+    ],
     ['your level rank', 'SELECT COUNT(*) + 1 AS n FROM users WHERE xp > ?', [100], /users_xp/],
     [
       'season leaderboard',

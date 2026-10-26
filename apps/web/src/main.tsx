@@ -1,16 +1,12 @@
-// Self-hosted fonts: no requests to Google (privacy) and no extra DNS/TLS round-trips.
-import '@fontsource-variable/onest';
-import '@fontsource-variable/unbounded';
 import { ApiError, configureClient, type Effect, reportError, setState } from '@quiz/client';
 import { StrictMode } from 'react';
-import { flushSync } from 'react-dom';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { startMonitoring } from './lib/monitoring';
-import { paintedSignedOut } from './lib/painted';
+import { isPainted, paintedSignedOut } from './lib/painted';
+import { upgradeReturning } from './lib/returning';
 import { sfx } from './lib/sound';
 import { preloadPage } from './pages/lazy';
 import './styles.css';
@@ -55,26 +51,29 @@ window.addEventListener('vite:preloadError', (event) => {
 
 startMonitoring();
 
+// Installed or not: without a connection, a page shows "Няма връзка" instead of the browser's error (public/sw.js).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
 // The landing page the server drew for a visitor without a session (lib/painted.ts): no need to ask who's signed in
 // before showing it. (The app still asks, in the background.)
 if (paintedSignedOut) setState({ authChecked: true, me: null });
+upgradeReturning();
 
-const root = createRoot(document.getElementById('root')!);
-// The page's code first (the legal pages load on demand), then the whole app in one synchronous render: a page the
-// server drew is swapped for the same page with no frame of "loading" in between.
+const container = document.getElementById('root')!;
+const app = (
+  <StrictMode>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
+  </StrictMode>
+);
+// A page the server drew is hydrated, not drawn again: it stays on screen as it is and becomes interactive (a tap
+// that comes before that is replayed). Its code first, for the legal pages, which load on demand.
+const drawn = isPainted();
 preloadPage(window.location.pathname)
   .catch(() => {})
-  .then(() =>
-    flushSync(() =>
-      root.render(
-        <StrictMode>
-          <ErrorBoundary>
-            <BrowserRouter>
-              <ReloadForUpdate />
-              <App />
-            </BrowserRouter>
-          </ErrorBoundary>
-        </StrictMode>,
-      ),
-    ),
-  );
+  .then(() => (drawn ? hydrateRoot(container, app) : createRoot(container).render(app)));

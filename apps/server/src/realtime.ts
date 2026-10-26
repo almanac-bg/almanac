@@ -117,8 +117,17 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     modes: config.openQueues,
     build: config.webBuild,
   });
+  // Every 3 s, but only when something changed: a quiet lobby (and every phone in a match) isn't woken for nothing. A new
+  // connection gets the figures at once (below).
+  let lastStats = '';
   setInterval(
-    guarded('lobby stats', () => io.emit('lobby:stats', stats())),
+    guarded('lobby stats', () => {
+      const now = stats();
+      const key = JSON.stringify(now);
+      if (key === lastStats) return;
+      lastStats = key;
+      io.emit('lobby:stats', now);
+    }),
     3000,
   ).unref();
 

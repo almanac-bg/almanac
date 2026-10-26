@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
-import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
+import { Card, PageSpinner, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -32,11 +32,7 @@ export function AchievementsPage() {
 
   if (!items && error) return <LoadError title="Постиженията не се заредиха" error={error} onRetry={retry} />;
   if (!items) {
-    return (
-      <div className="grid place-items-center py-24">
-        <Spinner className="size-8 text-violet-400" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const byId = new Map(items.map((i) => [i.id, i]));

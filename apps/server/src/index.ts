@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BRAND, type OperatorInfo, PUBLIC_PAGES, routeKind } from '@quiz/shared';
+import { BRAND, type OperatorInfo, PUBLIC_PAGES, pageTitle, routeKind } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
@@ -145,11 +145,21 @@ if (fs.existsSync(config.webDist)) {
         index: true,
         data: route === '/' ? siteData() : undefined,
       });
-      const app = drawn.get(route);
-      return [route, { html, painted: app ? withApp(html, app, route === '/' ? 'signed-out' : '') : html }];
+      const pictured = drawn.get(route);
+      const mark = route === '/' ? 'signed-out' : '';
+      return [
+        route,
+        {
+          html,
+          painted: pictured ? withApp(html, pictured.app, mark) : html,
+          returning: pictured?.returning ? withApp(html, pictured.returning, mark, true) : null,
+        },
+      ];
     }),
   );
   const appPage = withHead(page, { index: false });
+  // An address that isn't one says so in the tab too, before the app does.
+  const notFoundPage = withHead(page, { title: pageTitle('Страницата не съществува'), index: false });
   app.use((req, res, next) => {
     if (!forPage(req)) return next();
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
@@ -168,17 +178,20 @@ if (fs.existsSync(config.webDist)) {
     }
     const pub = publicPages.get(req.path);
     if (pub) {
-      // The landing page is drawn for a visitor without a session; with one, the app opens the lobby instead.
-      const session = req.path === '/' && sessionTokenFromCookieHeader(req.headers.cookie) !== null;
+      // The landing page is drawn for a visitor without a session (in the version for a device that has signed in
+      // before, if it says so); with a session, the app opens the lobby instead.
       if (req.path === '/') res.vary('Cookie');
-      res.type('html').send(session ? pub.html : pub.painted);
+      const cookie = req.headers.cookie;
+      const session = req.path === '/' && sessionTokenFromCookieHeader(cookie) !== null;
+      const returning = !!pub.returning && /(?:^|;\s*)quiz_returning=1(?:;|$)/.test(cookie ?? '');
+      res.type('html').send(session ? pub.html : returning ? pub.returning! : pub.painted);
       return;
     }
     // A screen of the game (its own title comes with it), or an address that isn't one: the app shows "not found".
     res
       .status(kind === 'app' ? 200 : 404)
       .type('html')
-      .send(appPage);
+      .send(kind === 'app' ? appPage : notFoundPage);
   });
 }
 
@@ -187,19 +200,26 @@ function jsonInHtml(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-type Paint = (url: string, operator: OperatorInfo) => Promise<string>;
+type Paint = (url: string, operator: OperatorInfo, version?: { returning: boolean }) => Promise<string>;
+/** A public page drawn: the landing page in its two versions (new device, or one that has signed in before). */
+type Drawn = Map<string, { app: string; returning?: string }>;
 
 /**
  * The public pages already drawn, by the web app's own renderer (apps/web/src/paint.tsx): once, at startup. Search
  * engines and first visits get the page itself instead of a loading screen. Without the renderer (development) or
  * if it fails, the plain page, which the app draws in the browser.
  */
-async function paintPages(): Promise<Map<string, string>> {
-  const drawn = new Map<string, string>();
+async function paintPages(): Promise<Drawn> {
+  const drawn: Drawn = new Map();
   if (!fs.existsSync(config.webPaint)) return drawn;
   try {
     const { paint } = (await import(pathToFileURL(config.webPaint).href)) as { paint: Paint };
-    for (const route of Object.keys(PUBLIC_PAGES)) drawn.set(route, await paint(route, operatorInfo));
+    for (const route of Object.keys(PUBLIC_PAGES)) {
+      drawn.set(route, {
+        app: await paint(route, operatorInfo),
+        returning: route === '/' ? await paint(route, operatorInfo, { returning: true }) : undefined,
+      });
+    }
   } catch (err) {
     console.error('🖌️  Drawing the public pages failed: they go out plain.', err);
     void reportError(err, 'drawing the public pages');
@@ -207,11 +227,15 @@ async function paintPages(): Promise<Map<string, string>> {
   return drawn;
 }
 
-/** The page with the app drawn into it; `painted` says what the server knew ("signed-out", see lib/painted.ts). */
-function withApp(html: string, app: string, painted: 'signed-out' | ''): string {
+/**
+ * The page with the app drawn into it, and what the server knew on the root element for the app to hydrate it
+ * (lib/painted.ts): `signed-out` on the landing page, and which version of it this is.
+ */
+function withApp(html: string, app: string, painted: 'signed-out' | '', returning = false): string {
+  const known = `data-painted="${painted}"${returning ? ' data-returning="1"' : ''}`;
   // A function, not a string: "$" in the page's text must not read as a replacement pattern.
   return html.replace(/<div id="root"><!--app-->[\s\S]*?<!--\/app--><\/div>/, () => {
-    return `<div id="root" data-painted="${painted}">${app}</div>`;
+    return `<div id="root" ${known}>${app}</div>`;
   });
 }
 

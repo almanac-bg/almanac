@@ -2,8 +2,11 @@ import { getState, useStore } from '@quiz/client';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
-/** The build this page's code came from (stamped in by vite.config.ts; missing in development). */
-const build = document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content;
+/** The build this page's code came from (stamped in by vite.config.ts; missing in development and on the server). */
+const build =
+  typeof document === 'undefined'
+    ? undefined
+    : document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content;
 
 const idle = () => {
   const { game, room, queue } = getState();

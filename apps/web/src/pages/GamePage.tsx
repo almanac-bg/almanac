@@ -760,7 +760,9 @@ function AnswerButton({
             ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
             : state === 'wrong'
               ? 'border-rose-400/70 bg-rose-500/20'
-              : 'glass hover:bg-white/[0.08]',
+              : // Not .glass: no backdrop blur on buttons that move with every question and reveal (a moving blurred
+                // backdrop is re-blurred each frame on a phone's GPU); the page behind is soft already.
+                'border-line bg-white/[0.045] hover:bg-white/[0.08]',
           // Your own pick, once the answer is out: a ring in the result's colour (the pick's accent outline is gone).
           revealed && selected && (correct ? 'ring-2 ring-emerald-200/70' : 'ring-2 ring-rose-200/70'),
           removed && 'line-through',

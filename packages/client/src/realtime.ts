@@ -34,7 +34,13 @@ const nameOf = (g: LiveGame, playerId: string) => g.players[playerId]?.name ?? '
 /** The realtime connection, created on first use from the client config. */
 export function getSocket(): GameSocket {
   if (!socket) {
-    socket = io(clientConfig().baseUrl || undefined, { autoConnect: false });
+    // WebSocket first: starting with HTTP long-polling costs four round trips before the lobby is live (about half a
+    // second on a phone). Polling stays the fallback where a WebSocket is blocked.
+    socket = io(clientConfig().baseUrl || undefined, {
+      autoConnect: false,
+      transports: ['websocket', 'polling'],
+      tryAllTransports: true,
+    });
     bind(socket);
   }
   return socket;

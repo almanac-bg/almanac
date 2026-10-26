@@ -67,6 +67,19 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
+/**
+ * A whole page waiting for its data: it holds most of the screen, so what loads fills the space instead of pushing the
+ * footer down (a jump under the thumb, and what Google counts as layout shift).
+ */
+export function PageSpinner() {
+  return (
+    <div role="status" className="grid min-h-[70dvh] place-items-center">
+      <Spinner className="size-8 text-violet-400" />
+      <span className="sr-only">Зареждане…</span>
+    </div>
+  );
+}
+
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div {...rest} className={clsx('glass rounded-3xl', className)}>

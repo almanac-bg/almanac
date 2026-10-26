@@ -27,7 +27,7 @@ export function emailEventsSecretMatches(secret: string): boolean {
 /** The subscription is confirmed by visiting the link in it: only one on Scaleway's own servers. */
 function scalewayUrl(raw: unknown): string | null {
   const url = typeof raw === 'string' ? URL.parse(raw) : null;
-  if (!url || url.protocol !== 'https:') return null;
+  if (url?.protocol !== 'https:') return null;
   return url.hostname.endsWith('.scaleway.com') || url.hostname.endsWith('.scw.cloud') ? url.href : null;
 }
 

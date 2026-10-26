@@ -189,6 +189,11 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   const lobby = await get('/', session);
   assert.equal(lobby.root, '<div id="root">');
   assert.doesNotMatch(lobby.html, /Онлайн викторина/);
+  // A device that has signed in before gets that version drawn (the form on "Вход"), so nothing flips as it hydrates.
+  const back = await get('/', 'quiz_returning=1');
+  assert.equal(back.root, '<div id="root" data-painted="signed-out" data-returning="1">');
+  assert.match(back.html, /Здравей отново!/);
+  assert.match(landing.html, /Създай профил/);
 
   // The legal pages read the same for everyone, and name who runs the site in the text itself.
   for (const cookie of [undefined, session]) {

@@ -21,7 +21,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
-import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { Button, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
@@ -44,11 +44,7 @@ export function ProfilePage() {
   if (!data && error?.status === 404) return <EmptyState icon="🕵️" title={error.message} />;
   if (!data && error) return <LoadError title="Профилът не се зареди" error={error} onRetry={retry} />;
   if (!data) {
-    return (
-      <div className="grid place-items-center py-24">
-        <Spinner className="size-8 text-violet-400" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const { user, overview: o } = data;

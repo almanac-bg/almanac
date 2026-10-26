@@ -1,4 +1,4 @@
-import { type ComponentType, lazy } from 'react';
+import { type ComponentType, createElement, lazy, useState } from 'react';
 
 /**
  * Pages beyond the first screen load on demand, so visitors download the sign-in page or the lobby first.
@@ -34,14 +34,15 @@ function load(loader: Loader): Promise<Module> {
 }
 
 function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeof loaders)[L]>>) {
-  const pick = (mod: Module) => ({ default: mod[name as string] });
-  return lazy(() => {
-    const mod = ready.get(loader);
-    // A thenable that settles on the spot: React then renders the page straight away instead of suspending.
-    // biome-ignore lint/suspicious/noThenProperty: that thenable is the point
-    if (mod) return { then: (resolve: (m: { default: ComponentType }) => void) => resolve(pick(mod)) } as never;
-    return load(loader).then(pick);
-  });
+  const Lazy = lazy(() => load(loader).then((mod) => ({ default: mod[name as string] })));
+  // biome-ignore lint/correctness/noComponentHookFactories: made once per page when this module loads, never in a render, so each page's component stays the same
+  function Page(props: object) {
+    // Decided once per mount: a page whose code is here already renders at once (no "loading" in between, and a page
+    // the server drew hydrates as it is); otherwise it loads. Never switched while mounted, which would remount it.
+    const [Component] = useState<ComponentType>(() => ready.get(loader)?.[name as string] ?? Lazy);
+    return createElement(Component, props);
+  }
+  return Page;
 }
 
 export const AchievementsPage = page('achievements', 'AchievementsPage');
@@ -61,9 +62,13 @@ export const TermsPage = page('legal', 'TermsPage');
 export const UnsubscribePage = page('unsubscribe', 'UnsubscribePage');
 export const VerifyEmailPage = page('account', 'VerifyEmailPage');
 
-/** Warms the browser's module cache with every page (each loads once; later imports reuse it). */
-export function prefetchPages() {
-  for (const loader of Object.keys(loaders) as Loader[]) void load(loader).catch(() => {});
+/** Rarely opened, or only by moderators: loaded when asked for, not in the background. */
+const ON_REQUEST: Loader[] = ['legal', 'unsubscribe', 'admin'];
+
+/** Warms the browser's module cache with the pages a player moves between (each loads once; later imports reuse it). */
+export function prefetchPages({ admin }: { admin: boolean }) {
+  for (const loader of Object.keys(loaders) as Loader[])
+    if (!ON_REQUEST.includes(loader) || (admin && loader === 'admin')) void load(loader).catch(() => {});
 }
 
 /**

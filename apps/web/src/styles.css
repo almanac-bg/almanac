@@ -1,6 +1,25 @@
 @import 'tailwindcss';
 
 /*
+ * Self-hosted fonts (no requests to Google, no extra DNS/TLS round-trips), one file per family cut to the characters
+ * and weights the game uses (scripts/subset-fonts.mjs; SIL Open Font License, in src/fonts). Both are preloaded.
+ */
+@font-face {
+  font-family: 'Onest Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('./fonts/onest.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Unbounded Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 900;
+  src: url('./fonts/unbounded.woff2') format('woff2');
+}
+
+/*
  * Screens too short for the match at full size (an iPhone SE/8 at 667 px, a 360×640 Android): it tightens so all four
  * answers and the jokers fit without scrolling. `flat`: a phone held sideways.
  */

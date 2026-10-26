@@ -45,6 +45,36 @@ const manifest = JSON.stringify({
   background_color: '#07060d',
   theme_color: '#07060d',
   categories: ['games', 'education', 'entertainment'],
+  // A long press on the installed app's icon.
+  shortcuts: [
+    { name: 'Класации', url: '/leaderboard', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+    { name: 'Профил', url: '/profile', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+    { name: 'Приятели', url: '/friends', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+  ],
+  // Shown in the install dialog (Android, desktop Chrome) instead of a bare prompt.
+  screenshots: [
+    {
+      src: '/screenshots/lobby-phone.webp',
+      sizes: '1080x1920',
+      type: 'image/webp',
+      form_factor: 'narrow',
+      label: 'Избери битка',
+    },
+    {
+      src: '/screenshots/match-phone.webp',
+      sizes: '1080x1920',
+      type: 'image/webp',
+      form_factor: 'narrow',
+      label: 'Роял за 8',
+    },
+    {
+      src: '/screenshots/landing-wide.webp',
+      sizes: '1920x1080',
+      type: 'image/webp',
+      form_factor: 'wide',
+      label: 'АЛМАНАХ',
+    },
+  ],
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -92,16 +122,14 @@ export default defineConfig({
       },
     },
     {
-      // The page is in Bulgarian: the Cyrillic cuts of both fonts are needed for the first screen, but the browser
-      // only finds them after the CSS has loaded. Fetched early, the text doesn't flash in a fallback font.
+      // Both fonts are needed for the first screen, but the browser only finds them after the CSS has loaded. Fetched
+      // early, the text doesn't flash in a fallback font.
       name: 'preload-fonts',
       transformIndexHtml: {
         order: 'post',
         handler(html, ctx) {
           if (!ctx.bundle) return html;
-          const fonts = Object.keys(ctx.bundle).filter((f) =>
-            /^assets\/(onest|unbounded)-cyrillic-wght-normal-[\w-]+\.woff2$/.test(f),
-          );
+          const fonts = Object.keys(ctx.bundle).filter((f) => /^assets\/(onest|unbounded)-[\w-]+\.woff2$/.test(f));
           const links = fonts.map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin />`);
           return html.replace('</head>', `${links.join('\n    ')}\n  </head>`);
         },

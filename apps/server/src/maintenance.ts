@@ -56,10 +56,9 @@ const INACTIVE_BATCH = 20;
  * Returns how many were warned and deleted.
  */
 export function retireInactiveAccounts(now = Date.now()): { warned: number; erased: number } {
-  const lastSeen = 'COALESCE(last_seen_at, created_at)';
   const warn = all<UserRow>(
     `SELECT * FROM users WHERE is_guest = 0 AND is_admin = 0 AND email IS NOT NULL AND inactivity_warned_at IS NULL
-     AND ${lastSeen} < ? LIMIT ?`,
+     AND last_seen_at < ? LIMIT ?`,
     now - INACTIVE_MS + INACTIVE_WARNING_MS,
     INACTIVE_BATCH,
   );
@@ -68,7 +67,7 @@ export function retireInactiveAccounts(now = Date.now()): { warned: number; eras
     sendMail(inactiveAccountMail(u.email!, u.username, now + INACTIVE_WARNING_MS));
   }
   const erase = all<{ id: number }>(
-    `SELECT id FROM users WHERE is_guest = 0 AND is_admin = 0 AND ${lastSeen} < ?
+    `SELECT id FROM users WHERE is_guest = 0 AND is_admin = 0 AND last_seen_at < ?
      AND (email IS NULL OR inactivity_warned_at < ?) LIMIT ?`,
     now - INACTIVE_MS,
     now - INACTIVE_WARNING_MS,

@@ -8,7 +8,7 @@ import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
-import { Button, Card, EmptyState, Modal, SectionTitle, Spinner } from '../components/ui';
+import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -83,11 +83,7 @@ function Friends() {
 
   if (!data && error) return <LoadError title="Приятелите не се заредиха" error={error} onRetry={retry} />;
   if (!data) {
-    return (
-      <div className="grid place-items-center py-24">
-        <Spinner className="size-8 text-violet-400" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const online = data.friends.filter((f) => f.presence !== 'offline').length;

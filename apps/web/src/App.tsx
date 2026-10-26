@@ -10,11 +10,12 @@ import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { NavBar } from './components/NavBar';
 import { QueueOverlay } from './components/QueueOverlay';
+import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
-import { Spinner } from './components/ui';
+import { PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
-import { onServer } from './lib/painted';
+import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
 import { markReturning } from './lib/returning';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
@@ -64,6 +65,8 @@ export function App() {
     // This device has an account now: next time the sign-in page opens on "Вход".
     if (account) markReturning();
   }, [account]);
+  // The page the server drew is the app's own now.
+  useEffect(paintingDone, []);
 
   useEffect(() => {
     // A sign-in made while this was on its way (the drawn landing page is live at once) is newer: keep it.
@@ -92,11 +95,12 @@ export function App() {
   // Signed in: fetch the other pages in the background once the lobby is up, so a match can open instantly.
   useEffect(() => {
     if (!userId) return;
-    const timer = setTimeout(prefetchPages, 1500);
+    const timer = setTimeout(() => prefetchPages({ admin: !!getState().me?.isAdmin }), 1500);
     return () => clearTimeout(timer);
   }, [userId]);
 
-  if (!authChecked && !onServer && !LEGAL_PATHS.includes(pathname)) {
+  // The server (and a page it drew for a visitor without a session) already knows: nobody to wait for.
+  if (!authChecked && !onServer && !paintedSignedOut && !LEGAL_PATHS.includes(pathname)) {
     return (
       <div className="grid min-h-dvh place-items-center">
         <Background />
@@ -128,6 +132,8 @@ export function App() {
       ) : (
         <AuthPage />
       )}
+      {/* Renders nothing; inside the app (not beside it in main.tsx) so the tree is the one the server draws. */}
+      <ReloadForUpdate />
     </MotionConfig>
   );
 }
@@ -181,11 +187,7 @@ function SignedIn() {
 
 /** While a page's code arrives (only on a first visit before the background prefetch finishes). */
 function PageLoading() {
-  return (
-    <div className="grid place-items-center py-24">
-      <Spinner className="size-8 text-violet-400" />
-    </div>
-  );
+  return <PageSpinner />;
 }
 
 /** Invite links: /join/12345 drops you straight into the room. */
@@ -207,9 +209,5 @@ function JoinRoute() {
     });
   }, [connected, code, navigate]);
 
-  return (
-    <div className="grid place-items-center py-24">
-      <Spinner className="size-8 text-violet-400" />
-    </div>
-  );
+  return <PageSpinner />;
 }
