@@ -1,4 +1,4 @@
-import { api, timeAgo, toast } from '@quiz/client';
+import { api, errorMessage, timeAgo, toast } from '@quiz/client';
 import { type ModerationAction, REPORT_REASONS, type ReportGroup } from '@quiz/shared';
 import { Ban, Check, Flag, PenLine } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -73,7 +73,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
       toast({ kind: 'success', title: message });
       onResolved(r.groups);
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(e) });
     } finally {
       setBusy(false);
     }
@@ -130,7 +130,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Смени името", so focus moves to it
               autoFocus
               required
-              className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-black/30 px-3 text-sm outline-none focus:border-violet-400/60"
+              className="field h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
             />
             <Button size="sm" type="submit" loading={busy}>
               Смени
@@ -159,7 +159,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               onChange={(e) => setReason(e.target.value)}
               placeholder="Причина (играчът ще я види при вход)"
               maxLength={200}
-              className="h-10 w-full rounded-xl border border-line bg-black/30 px-3 text-sm outline-none focus:border-violet-400/60"
+              className="field h-10 w-full rounded-xl px-3 text-sm"
             />
             <div className="flex gap-2">
               <Button size="sm" variant="danger" type="submit" loading={busy}>

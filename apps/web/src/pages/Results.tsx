@@ -176,7 +176,10 @@ export function Results({ game }: { game: LiveGame }) {
               : 'Загуба'
             : won
               ? 'Победа!'
-              : `${ordinal(mine.placement)} място`;
+              : // Second of two is a loss, and says so (the rating below says it anyway).
+                end.standings.length === 2
+                ? 'Загуба'
+                : `${ordinal(mine.placement)} място`;
   // A long word ("Перфектно!", "поставена!") is wider than a small phone at the usual size: such headlines scale with
   // the screen instead (10vw always leaves room for ten letters).
   const longWord = headline.split(' ').some((w) => w.length > 7);
@@ -197,7 +200,12 @@ export function Results({ game }: { game: LiveGame }) {
           transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.1 }}
           className={clsx(
             'mt-3 font-display leading-none font-black outline-none',
-            longWord ? 'text-[clamp(1.75rem,8.5vw,4.5rem)]' : 'text-[clamp(2.25rem,7vw,4.5rem)]',
+            // A match nobody finished isn't a moment to celebrate: a quieter size for it.
+            end.noContest
+              ? 'text-[clamp(1.75rem,6vw,3rem)]'
+              : longWord
+                ? 'text-[clamp(1.75rem,8.5vw,4.5rem)]'
+                : 'text-[clamp(2.25rem,7vw,4.5rem)]',
             'text-balance',
             won
               ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'

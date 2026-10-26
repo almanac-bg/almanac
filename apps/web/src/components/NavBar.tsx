@@ -76,7 +76,7 @@ function GuestButton({ connected }: { connected: boolean }) {
           <Avatar avatar={me.avatar} frame={me.frame} size={36} />
           <span
             aria-hidden
-            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[9px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
+            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[10px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
           >
             Гост
           </span>
@@ -117,7 +117,7 @@ export function NavBar() {
             <Logo />
           </Link>
 
-          <nav className="ml-4 hidden items-center gap-1 md:flex">
+          <nav aria-label="Основна навигация" className="ml-4 hidden items-center gap-1 md:flex">
             {LINKS.filter((l) => l.header).map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
@@ -139,13 +139,8 @@ export function NavBar() {
           </nav>
 
           <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
-            {/* A lost connection shows on your avatar (a pulsing dot, plus the words under your name where there's room):
-                a pill of its own would push the header off-screen on phones and past its edge on laptops. */}
-            {!connected && (
-              <span role="status" className="sr-only">
-                Няма връзка — свързване…
-              </span>
-            )}
+            {/* A lost connection also shows on your avatar (a pulsing dot, plus the words under your name where there's
+                room); ConnectionBanner says it in words and to screen readers. */}
             <button
               type="button"
               onClick={() => setMuted(!muted)}
@@ -200,7 +195,10 @@ export function NavBar() {
       </header>
 
       {/* Mobile tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+      <nav
+        aria-label="Раздели"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      >
         <div className="grid grid-cols-5">
           {LINKS.filter((l) => l.mobile).map(({ to, label, icon: Icon, end }) => (
             <NavLink

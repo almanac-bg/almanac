@@ -7,7 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
-import { sfx } from './lib/sound';
+import { buzz, sfx } from './lib/sound';
 import { preloadPage } from './pages/lazy';
 import './styles.css';
 
@@ -18,12 +18,28 @@ const SOUNDS: Partial<Record<Effect, () => void>> = {
   powerup: sfx.powerup,
   freeze: sfx.freeze,
   eliminated: sfx.eliminated,
+  knockedOut: sfx.eliminated,
   achievement: sfx.achievement,
   invite: sfx.achievement,
 };
 
+/** Felt, not heard: a tap for your pick, a double pulse for right, a thud for wrong, a long one for being knocked out. */
+const HAPTICS: Partial<Record<Effect, number | number[]>> = {
+  lock: 12,
+  correct: [18, 50, 18],
+  wrong: 90,
+  freeze: [30, 40, 30, 40, 30],
+  knockedOut: [180, 70, 260],
+};
+
 // Same-origin API, httpOnly session cookie.
-configureClient({ baseUrl: '', effect: (name) => SOUNDS[name]?.() });
+configureClient({
+  baseUrl: '',
+  effect: (name) => {
+    SOUNDS[name]?.();
+    buzz(HAPTICS[name]);
+  },
+});
 
 // Script errors and failed promises outside React's reach. Browser extensions' errors and expected API failures
 // (shown to the player already) aren't ours to report.

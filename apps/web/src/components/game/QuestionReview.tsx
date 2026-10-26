@@ -1,4 +1,4 @@
-import { api, type ReviewItem, toast, useStore } from '@quiz/client';
+import { api, errorMessage, type ReviewItem, toast, useStore } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, X } from 'lucide-react';
@@ -151,7 +151,7 @@ function ReportQuestion({
       toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще прегледа въпроса.' });
       close();
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -185,7 +185,7 @@ function ReportQuestion({
         onChange={(e) => setDetails(e.target.value.slice(0, 500))}
         placeholder="Какъв е верният отговор или какво не е наред? (по желание)"
         rows={3}
-        className="mt-4 w-full rounded-2xl border border-line bg-black/30 p-3 text-sm outline-none focus:border-violet-400/60"
+        className="field mt-4 w-full rounded-2xl p-3 text-sm"
       />
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="ghost" onClick={close}>

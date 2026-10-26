@@ -1,4 +1,4 @@
-import { api, disconnectRealtime, refreshMe, setState, toast, useStore } from '@quiz/client';
+import { api, disconnectRealtime, errorMessage, refreshMe, setState, toast, useStore } from '@quiz/client';
 import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
@@ -24,14 +24,11 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
-import { Logo } from '../components/NavBar';
-import { Button, buttonClass, Card, Modal, Spinner } from '../components/ui';
+import { EmailLinkPage } from '../components/EmailLinkPage';
+import { Button, buttonClass, Card, INPUT, Modal, Spinner } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 import { usePageTitle } from '../lib/title';
-
-const INPUT =
-  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40';
 
 /** A labelled password input with a show/hide toggle (the label names the input alone, not the toggle). */
 function PasswordField({
@@ -79,16 +76,6 @@ function PasswordField({
 }
 
 /** Standalone screen used by the email links (works signed in or out). */
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto flex min-h-[70dvh] max-w-md flex-col justify-center px-4 py-10">
-      <Link to="/" className="mb-6 self-center text-3xl">
-        <Logo />
-      </Link>
-      <Card className="bg-ink-2/70 p-6 sm:p-8">{children}</Card>
-    </div>
-  );
-}
 
 // ─── /reset-password?token=… ─────────────────────────────────────────────────
 // The forms here say `noValidate`: the browser's own bubbles speak the device's language (often English); the checks
@@ -117,14 +104,14 @@ export function ResetPasswordPage() {
       toast({ kind: 'success', title: 'Паролата е сменена. Здравей отново!' });
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Centered>
+    <EmailLinkPage>
       <KeyRound className="size-8 text-violet-300" />
       <h1 className="mt-3 t-section">Нова парола</h1>
       {!token ? (
@@ -150,7 +137,7 @@ export function ResetPasswordPage() {
           <p className="text-xs text-fg-3">Всички други устройства ще бъдат отписани.</p>
         </form>
       )}
-    </Centered>
+    </EmailLinkPage>
   );
 }
 
@@ -174,11 +161,11 @@ export function VerifyEmailPage() {
         setLocal('done');
         void refreshMe();
       })
-      .catch((err) => setLocal({ error: err instanceof Error ? err.message : 'Нещо се обърка.' }));
+      .catch((err) => setLocal({ error: errorMessage(err) }));
   }, [token]);
 
   return (
-    <Centered>
+    <EmailLinkPage>
       {state === 'working' ? (
         <div className="grid place-items-center gap-3 py-6 text-fg-2">
           <Spinner className="size-8 text-violet-400" />
@@ -203,7 +190,7 @@ export function VerifyEmailPage() {
           </Link>
         </div>
       )}
-    </Centered>
+    </EmailLinkPage>
   );
 }
 
@@ -485,7 +472,7 @@ function ReminderSettings() {
           : { kind: 'info', title: 'Напомнянето е изключено' },
       );
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -602,7 +589,7 @@ function DataSettings() {
       navigate('/', { replace: true });
       toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -685,7 +672,7 @@ function EmailSettings() {
       setPassword('');
       toast({ kind: 'success', icon: '✉️', title: 'Изпратихме линк за потвърждение', body: address });
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(err) });
     } finally {
       setBusy(null);
     }
@@ -701,7 +688,7 @@ function EmailSettings() {
       setRemoving(false);
       toast({ kind: 'info', title: 'Имейлът е премахнат' });
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(err) });
     } finally {
       setBusy(null);
     }
@@ -760,7 +747,7 @@ function EmailSettings() {
       )}
       {me.pendingEmail && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm">
-          <span className="min-w-0 flex-1">
+          <span className="min-w-0 flex-1 basis-56">
             Чака потвърждение: <b>{me.pendingEmail}</b>
             <span className="block text-xs text-fg-3">Отвори линка от писмото (провери и папката за спам).</span>
           </span>
@@ -831,7 +818,7 @@ function PasswordSettings() {
       setNext('');
       toast({ kind: 'success', title: 'Паролата е сменена', body: 'Другите устройства са отписани.' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }

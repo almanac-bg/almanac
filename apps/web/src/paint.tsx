@@ -14,11 +14,14 @@ import { drawAs } from './lib/painted';
 export async function paint(url: string, operator: OperatorInfo, version = { returning: false }): Promise<string> {
   setOperator(operator);
   drawAs(version);
-  // Waits for the pages that load on demand (the legal ones), unlike a plain render to string.
+  // Waits for the pages that load on demand (the legal ones), unlike a plain render to string. Nothing outlined: React
+  // otherwise sends a page section over ~12 KB as a spinner plus a script that swaps it in, and without scripts (a
+  // search engine, a slow phone) the spinner would be all there is.
   const { prelude } = await prerender(
     <StaticRouter location={url}>
       <App />
     </StaticRouter>,
+    { progressiveChunkSize: Number.POSITIVE_INFINITY },
   );
   return new Response(prelude).text();
 }

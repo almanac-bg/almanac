@@ -72,7 +72,6 @@ export function HomePage() {
   const me = useStore((s) => s.me)!;
   const lobby = useStore((s) => s.lobby);
   const room = useStore((s) => s.room);
-  const navigate = useNavigate();
   const [soloOpen, setSoloOpen] = useState(false);
   const [rankInfo, setRankInfo] = useState<{ mode: QueueModeId; open: boolean } | null>(null);
   const level = levelProgress(me.xp).level;
@@ -91,21 +90,21 @@ export function HomePage() {
   return (
     <div className="space-y-6">
       {room && (
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => navigate('/room')}
-          className="glass focus-ring flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-fuchsia-400/30 px-5 py-3 text-left"
-        >
-          <DoorOpen className="size-5 text-fuchsia-300" />
-          <span className="text-sm">
-            Ти си в стая <b className="font-mono tracking-widest">{room.code}</b>
-          </span>
-          <span className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-fuchsia-300">
-            Към стаята <ArrowRight className="size-4" />
-          </span>
-        </motion.button>
+        // A link (it goes somewhere), like the bar of a match in progress.
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <Link
+            to="/room"
+            className="glass focus-ring flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-fuchsia-400/30 px-5 py-3 text-left"
+          >
+            <DoorOpen aria-hidden className="size-5 text-fuchsia-300" />
+            <span className="text-sm">
+              Ти си в стая <b className="font-mono tracking-widest">{room.code}</b>
+            </span>
+            <span className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-fuchsia-300">
+              Към стаята <ArrowRight aria-hidden className="size-4" />
+            </span>
+          </Link>
+        </motion.div>
       )}
 
       <EmailNudge />
@@ -475,7 +474,7 @@ function FriendsCard({ className }: { className?: string }) {
             inputMode="numeric"
             placeholder="Код на стая"
             aria-label="Код на стая"
-            className="h-11 min-w-0 flex-1 rounded-2xl border border-line bg-black/30 px-4 font-mono text-lg tracking-[0.3em] outline-none placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-fg-3 focus:border-fuchsia-400/60"
+            className="field h-11 min-w-0 flex-1 rounded-2xl px-4 font-mono text-lg tracking-[0.3em] placeholder:font-sans placeholder:text-sm placeholder:tracking-normal"
           />
           <Button type="submit" variant="secondary" disabled={code.length !== 5} loading={busy === 'join'}>
             Влез

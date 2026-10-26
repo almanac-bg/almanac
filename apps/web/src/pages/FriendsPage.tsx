@@ -1,5 +1,5 @@
-import { actions, api, timeAgo, toast, useStore } from '@quiz/client';
-import { type FriendEntry, type FriendsResponse, type Presence, titleName } from '@quiz/shared';
+import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
+import { type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, DoorOpen, Save, Swords, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -8,19 +8,10 @@ import { Link, useNavigate } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
+import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
-
-const PRESENCE: Record<Presence, { label: string; color: string }> = {
-  online: { label: 'Онлайн', color: '#34d399' },
-  queue: { label: 'Търси мач', color: '#fbbf24' },
-  room: { label: 'В стая', color: '#e879f9' },
-  game: { label: 'В мач', color: '#a78bfa' },
-  offline: { label: 'Офлайн', color: '#64748b' },
-};
-
-const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Нещо се обърка.');
 
 export function FriendsPage() {
   usePageTitle('Приятели');
@@ -239,7 +230,7 @@ function AddFriendForm({ onAdded }: { onAdded: (d: FriendsResponse) => void }) {
         placeholder="Потребителско име"
         aria-label="Потребителско име на приятел"
         maxLength={20}
-        className="h-11 min-w-0 flex-1 rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 sm:w-64"
+        className="field h-11 min-w-0 flex-1 rounded-2xl px-4 text-[15px] sm:w-64"
       />
       <Button type="submit" loading={busy} disabled={!username.trim()}>
         <UserPlus className="size-4" /> Добави

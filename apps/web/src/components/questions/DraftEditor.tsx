@@ -1,8 +1,9 @@
 import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMISSION_RULES } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
+import { LETTERS, OPTION_COLORS } from '../game/answers';
 import { Segmented } from '../ui';
-import { type DraftErrors, LETTERS, OPTION_COLORS } from './draft';
+import type { DraftErrors } from './draft';
 
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
   { value: 'easy', label: 'Лесен' },
@@ -35,7 +36,7 @@ export function DraftEditor({
           <select
             value={draft.category}
             onChange={(e) => set({ category: e.target.value as CategoryId })}
-            className="h-11 w-full rounded-2xl border border-line bg-black/30 px-3 text-sm outline-none focus:border-violet-400/60"
+            className="field h-11 w-full rounded-2xl px-3 text-sm"
           >
             {CATEGORIES.map((c) => (
               <option key={c.id} value={c.id} className="bg-ink-2">
@@ -80,10 +81,8 @@ export function DraftEditor({
             rows={compact ? 2 : 3}
             maxLength={qMax + 20}
             placeholder="напр. Кой е най-високият връх на Балканския полуостров?"
-            className={clsx(
-              'w-full resize-none rounded-2xl border bg-black/30 px-4 py-3 pb-7 text-[15px] outline-none placeholder:text-fg-3 focus:bg-black/40',
-              errors.q ? 'border-rose-400/60' : 'border-line focus:border-violet-400/60',
-            )}
+            aria-invalid={!!errors.q}
+            className="field w-full resize-none rounded-2xl px-4 py-3 pb-7 text-[15px] aria-invalid:border-rose-400/60"
           />
           <span
             className={clsx(
@@ -106,8 +105,8 @@ export function DraftEditor({
                 // biome-ignore lint/suspicious/noArrayIndexKey: answer slots; a text key remounts the input as you type
                 key={i}
                 className={clsx(
-                  'relative flex items-center gap-2 overflow-hidden rounded-2xl border bg-black/25 py-1.5 pr-1.5 pl-3 transition-colors',
-                  correct ? 'border-emerald-400/70 bg-emerald-500/10' : 'border-line focus-within:border-violet-400/50',
+                  'field-box relative flex items-center gap-2 overflow-hidden rounded-2xl py-1.5 pr-1.5 pl-3',
+                  correct && 'border-emerald-400/70 bg-emerald-500/10',
                 )}
               >
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: correct ? '#34d399' : color }} />

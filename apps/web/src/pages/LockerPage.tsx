@@ -1,4 +1,4 @@
-import { api, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
+import { api, errorMessage, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 import {
   AVATARS,
   EMOTES,
@@ -38,7 +38,7 @@ export function LockerPage() {
       setState({ me: user });
     } catch (e) {
       setState({ me });
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно запазване.' });
+      toast({ kind: 'error', title: errorMessage(e, 'Неуспешно запазване.') });
     } finally {
       setSaving(null);
     }
@@ -53,8 +53,8 @@ export function LockerPage() {
   };
   const label = (t: Tab, name: string) => (
     <>
-      {name}{' '}
-      <span className="text-fg-3">
+      {name} {/* Brighter on the chosen tab: muted grey on its lighter fill was under 4.5:1. */}
+      <span className="text-fg-3 in-aria-pressed:text-fg-2">
         {counts[t][0]}/{counts[t][1]}
       </span>
     </>

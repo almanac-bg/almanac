@@ -12,8 +12,13 @@ export function Invites() {
   const invites = useStore((s) => s.invites);
   const inGame = useStore((s) => !!s.game && s.game.phase !== 'ended');
   if (inGame) return null;
+  // A screen reader hears an invite as it arrives (who, and what for); the countdown is hidden from it, or it would
+  // be read out every second.
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-20 z-[55] flex flex-col items-center gap-3 px-4">
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 top-20 z-[55] flex flex-col items-center gap-3 px-4"
+    >
       <AnimatePresence>
         {invites.map((i) => (
           <InviteCard key={i.id} invite={i} />
@@ -48,6 +53,7 @@ function InviteCard({ invite }: { invite: Invite }) {
       className="glass pointer-events-auto relative w-full max-w-md overflow-hidden rounded-3xl bg-ink-2/90 p-4 shadow-2xl"
     >
       <div
+        aria-hidden
         className="absolute inset-x-0 top-0 h-0.5 origin-left bg-[linear-gradient(90deg,#e879f9,#22d3ee)] transition-transform duration-1000 ease-linear"
         style={{ transform: `scaleX(${left / 60})` }}
       />
@@ -55,7 +61,7 @@ function InviteCard({ invite }: { invite: Invite }) {
         <Avatar avatar={invite.from.avatar} frame={invite.from.frame} size={48} />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 t-eyebrow text-fuchsia-300">
-            {challenge ? <Swords className="size-3.5" /> : <Users className="size-3.5" />}
+            {challenge ? <Swords aria-hidden className="size-3.5" /> : <Users aria-hidden className="size-3.5" />}
             {challenge ? 'Предизвикателство' : 'Покана'}
           </p>
           <p className="truncate text-sm">
@@ -68,7 +74,8 @@ function InviteCard({ invite }: { invite: Invite }) {
           Откажи
         </Button>
         <Button size="sm" onClick={accept} loading={busy}>
-          {challenge ? 'Приеми' : 'Влез'} · {left} с
+          {challenge ? 'Приеми' : 'Влез'}
+          <span aria-hidden>· {left} с</span>
         </Button>
       </div>
     </motion.div>

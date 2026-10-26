@@ -1,4 +1,4 @@
-import { api, fmt, setState } from '@quiz/client';
+import { api, errorMessage, fmt, setState } from '@quiz/client';
 import {
   BRAND,
   CATEGORIES,
@@ -28,7 +28,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../components/Avatar';
 import { LegalLinks, MINORS_NOTICE } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
-import { Button, Card, Segmented, Spinner } from '../components/ui';
+import { Button, Card, Field, INPUT, Segmented, Spinner } from '../components/ui';
 import { credentialsProblem } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isPainted, paintedReturning } from '../lib/painted';
@@ -48,11 +48,6 @@ const ABOUT_MODES: ModeId[] = ['duel', 'royale', 'daily', 'challenge', 'solo', '
 
 /** On phones autofocus would pop the keyboard and scroll past the logo. */
 const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-
-const INPUT =
-  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40 aria-invalid:border-rose-400/60';
-
-const errorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Нещо се обърка.');
 
 /** Where a new guest lands: the challenge page with "accept" pressed already, or the lobby. */
 type GuestLanding = { to: string; state?: { accept: true } } | null;
@@ -771,18 +766,6 @@ function ForgotPassword({ initial, onBack }: { initial: string; onBack: () => vo
           </Button>
         </form>
       )}
-    </div>
-  );
-}
-
-/** A label above its input, tied to it by id: wrapping both would add the show-password toggle to the input's name. */
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

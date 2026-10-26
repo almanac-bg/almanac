@@ -1,6 +1,10 @@
 import { dismissToast, useStore } from '@quiz/client';
 import clsx from 'clsx';
+import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+
+/** How far a toast has to be swiped to go. */
+const SWIPE_PX = 80;
 
 /** Notifications. Screen readers hear them too: errors interrupt, everything else waits its turn. */
 export function Toasts() {
@@ -12,11 +16,15 @@ export function Toasts() {
     >
       <AnimatePresence>
         {toasts.map((t) => (
-          // Not a button: toasts leave on their own, a tap just clears one early.
+          // Not a button: toasts leave on their own, a tap (or a swipe, on a phone) just clears one early.
           <motion.div
             layout
             key={t.id}
             onClick={() => dismissToast(t.id)}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
+            onDragEnd={(_, { offset }) => Math.abs(offset.x) > SWIPE_PX && dismissToast(t.id)}
             role={t.kind === 'error' ? 'alert' : undefined}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -30,10 +38,11 @@ export function Toasts() {
             <span className="text-xl leading-none" aria-hidden>
               {t.icon ?? (t.kind === 'error' ? '⚠️' : t.kind === 'success' ? '✨' : 'ℹ️')}
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">{t.title}</span>
               {t.body && <span className="mt-0.5 block text-xs text-fg-2">{t.body}</span>}
             </span>
+            <X aria-hidden className="size-4 shrink-0 text-fg-3" />
           </motion.div>
         ))}
       </AnimatePresence>

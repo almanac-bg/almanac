@@ -203,6 +203,12 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   }
   const terms = await get('/terms');
   assert.equal(terms.root, '<div id="root" data-painted="">');
+  // Whole as sent: no section left as a spinner for a script to swap in (React does that to a big one unless told not
+  // to, and without scripts the spinner would be the page).
+  for (const page of [landing, back, terms, await get('/privacy')]) {
+    assert.doesNotMatch(page.html, /<!--\$\?-->|<template id="B:/);
+    assert.match(page.html, /<main>/);
+  }
 
   // Every page carries who runs the site, for the footer and the legal pages; the game's own screens aren't drawn.
   const settings = await get('/settings');

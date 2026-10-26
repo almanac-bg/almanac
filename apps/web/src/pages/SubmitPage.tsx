@@ -1,4 +1,4 @@
-import { api, plural, timeAgo, toast, useStore } from '@quiz/client';
+import { api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/client';
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
 import { Lock, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -83,7 +83,7 @@ function SubmitForm({ onSent }: { onSent: () => void }) {
       setShowErrors(false);
       onSent();
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Неуспешно изпращане.' });
+      toast({ kind: 'error', title: errorMessage(err, 'Неуспешно изпращане.') });
     } finally {
       setBusy(false);
     }

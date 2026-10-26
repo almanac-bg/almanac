@@ -106,7 +106,7 @@ export function AchievementsPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-semibold">{a.name}</h3>
+                      <h2 className="font-semibold">{a.name}</h2>
                       <span className="text-xs font-bold" style={{ color: rarity.color }}>
                         {rarity.name}
                       </span>

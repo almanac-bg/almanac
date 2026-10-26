@@ -1,22 +1,12 @@
-import { api, refreshMe, useStore } from '@quiz/client';
+import { api, errorMessage, refreshMe, useStore } from '@quiz/client';
 import { BellOff, CheckCircle2, XCircle } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Logo } from '../components/NavBar';
-import { Button, Card } from '../components/ui';
+import { EmailLinkPage } from '../components/EmailLinkPage';
+import { Button } from '../components/ui';
 import { usePageTitle } from '../lib/title';
 
 /** Standalone screen for the email link (works signed in or out), like the other email-link pages. */
-function Centered({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto flex min-h-[70dvh] max-w-md flex-col justify-center px-4 py-10">
-      <Link to="/" className="mb-6 self-center text-3xl">
-        <Logo />
-      </Link>
-      <Card className="bg-ink-2/70 p-6 sm:p-8">{children}</Card>
-    </div>
-  );
-}
 
 // ─── /unsubscribe?u=…&k=… ────────────────────────────────────────────────────
 
@@ -39,7 +29,7 @@ export function UnsubscribePage() {
       setLocal('done');
       if (signedIn) void refreshMe(); // the switch in Settings shows it straight away
     } catch (err) {
-      setLocal({ error: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      setLocal({ error: errorMessage(err) });
     }
   }
 
@@ -54,7 +44,7 @@ export function UnsubscribePage() {
 
   if (!u || !k) {
     return (
-      <Centered>
+      <EmailLinkPage>
         <div className="text-center">
           <XCircle className="mx-auto size-12 text-rose-400" />
           <h1 className="mt-3 t-section">Линкът е непълен</h1>
@@ -63,13 +53,13 @@ export function UnsubscribePage() {
           </p>
           {home}
         </div>
-      </Centered>
+      </EmailLinkPage>
     );
   }
 
   if (state === 'done') {
     return (
-      <Centered>
+      <EmailLinkPage>
         <div role="status" className="text-center">
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
           <h1 className="mt-3 t-section">Напомнянията са спрени</h1>
@@ -79,12 +69,12 @@ export function UnsubscribePage() {
           </p>
           {home}
         </div>
-      </Centered>
+      </EmailLinkPage>
     );
   }
 
   return (
-    <Centered>
+    <EmailLinkPage>
       <BellOff className="size-8 text-violet-300" />
       <h1 className="mt-3 t-section">Напомняния за серията</h1>
       <p className="mt-2 text-sm text-fg-2">
@@ -105,6 +95,6 @@ export function UnsubscribePage() {
       >
         Не, остави ги
       </Link>
-    </Centered>
+    </EmailLinkPage>
   );
 }

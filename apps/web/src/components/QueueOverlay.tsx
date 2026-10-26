@@ -2,9 +2,10 @@ import { actions, useNow, useStore } from '@quiz/client';
 import { avatarEmoji, MODES } from '@quiz/shared';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useId, useRef } from 'react';
 import { accentFill } from '../lib/accent';
 import { Avatar } from './Avatar';
-import { Button } from './ui';
+import { Button, useDialog } from './ui';
 
 export function QueueOverlay() {
   const queue = useStore((s) => s.queue);
@@ -15,11 +16,20 @@ export function QueueOverlay() {
   const mode = queue ? MODES[queue.mode] : null;
   const elapsed = Math.max(0, Math.floor((now - since) / 1000));
   const botsIn = queue?.botFillMs != null ? Math.ceil(queue.botFillMs / 1000) : null;
+  // A dialog while it's up: focus on "Откажи", Escape cancels the search, the lobby behind is out of reach.
+  const box = useRef<HTMLDivElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  useDialog(!!queue, actions.leaveQueue, box, cancel);
 
   return (
     <AnimatePresence>
       {queue && mode && (
         <motion.div
+          ref={box}
+          role="dialog"
+          aria-modal
+          aria-labelledby={titleId}
           className="fixed inset-0 z-50 grid place-items-center bg-ink/80 p-6 backdrop-blur-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -47,8 +57,11 @@ export function QueueOverlay() {
             >
               {mode.name} · {mode.short}
             </div>
-            <h2 className="mt-4 font-display text-2xl font-bold sm:text-3xl">Търсим съперници…</h2>
-            <p className="mt-2 font-mono text-lg text-fg-2 tabular-nums">
+            <h2 id={titleId} className="mt-4 font-display text-2xl font-bold sm:text-3xl">
+              Търсим съперници…
+            </h2>
+            {/* The clock ticks every second: not read out (the seats and the bots below are). */}
+            <p aria-hidden className="mt-2 font-mono text-lg text-fg-2 tabular-nums">
               {String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}
             </p>
 
@@ -68,18 +81,21 @@ export function QueueOverlay() {
                 </motion.span>
               ))}
             </div>
-            <p className="mt-3 text-sm text-fg-3">
-              {queue.found} от {queue.needed} играчи
-            </p>
-            {botsIn !== null && queue.found < queue.needed && (
-              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
-                <Bot className="size-3.5" />
-                {botsIn > 0 ? `Ботове попълват празните места след ${botsIn} с` : 'Ботовете влизат…'}
+            {/* Changes only when the server sends news (a seat filled), so it's read out then and stays quiet otherwise. */}
+            <div aria-live="polite" className="flex flex-col items-center">
+              <p className="mt-3 text-sm text-fg-3">
+                {queue.found} от {queue.needed} играчи
               </p>
-            )}
+              {botsIn !== null && queue.found < queue.needed && (
+                <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
+                  <Bot aria-hidden className="size-3.5" />
+                  {botsIn > 0 ? `Ботове попълват празните места след ${botsIn} с` : 'Ботовете влизат…'}
+                </p>
+              )}
+            </div>
 
-            <Button variant="secondary" className="mt-8" onClick={actions.leaveQueue}>
-              <X className="size-4" /> Откажи
+            <Button ref={cancel} variant="secondary" className="mt-8" onClick={actions.leaveQueue}>
+              <X aria-hidden className="size-4" /> Откажи
             </Button>
           </div>
         </motion.div>

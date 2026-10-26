@@ -1,15 +1,16 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'accent';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
+  // Starts at purple-600: white on the lighter #a855f7 was under 4:1 where long labels begin.
   primary:
-    'text-white bg-[linear-gradient(110deg,#a855f7,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110',
+    'text-white bg-[linear-gradient(110deg,#9333ea,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110',
   secondary: 'glass text-fg hover:bg-white/10',
   ghost: 'text-fg-2 hover:text-fg hover:bg-white/5',
   // rose-600, darker on hover: white on rose-500 is under 4:1.
@@ -45,7 +46,12 @@ export function Button({
   children,
   loading,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  ref?: Ref<HTMLButtonElement>;
+}) {
   return (
     <button
       {...rest}
@@ -119,12 +125,79 @@ export function Pill({
   );
 }
 
+/** A text field's look; the `field` class (styles.css) carries the border, the fill and the focus ring. */
+export const INPUT = 'field h-12 w-full rounded-2xl px-4 text-[15px] aria-invalid:border-rose-400/60';
+
+/** A label above its input, tied to it by id: wrapping both would add the show-password toggle to the input's name. */
+export function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
+  return (
+    <div>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * A dialog that behaves like one: focus moves into it and stays there (Tab cycles inside), goes back where it was on
- * close, the page behind doesn't scroll, and it's named by its title (or `label` when it has none).
+ * What makes a box a dialog: while open, focus moves into it (to `initial`, or the box itself) and stays there (Tab
+ * cycles inside), Escape closes it, the page behind doesn't scroll, and on close focus goes back where it was.
+ */
+export function useDialog(
+  open: boolean,
+  onClose: () => void,
+  box: RefObject<HTMLElement | null>,
+  initial?: RefObject<HTMLElement | null>,
+) {
+  // Kept in a ref: callers pass inline functions, and re-running the effect would yank focus while someone types.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the refs are stable; `open` is the trigger
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    (initial?.current ?? box.current)?.focus({ preventScroll: true });
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return close.current();
+      const root = box.current;
+      if (e.key !== 'Tab' || !root) return;
+      const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      if (!items.length) return e.preventDefault();
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!root.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && (active === first || active === root)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [open]);
+}
+
+/**
+ * A dialog that behaves like one (useDialog), named by its title (or `label` when it has none).
  */
 export function Modal({
   open,
@@ -147,46 +220,7 @@ export function Modal({
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  // Kept in a ref: callers pass inline functions, and re-running the effect would yank focus while someone types.
-  const close = useRef(onClose);
-  useEffect(() => {
-    close.current = onClose;
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog.current?.focus({ preventScroll: true });
-    const { overflow } = document.body.style;
-    document.body.style.overflow = 'hidden';
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return close.current();
-      const box = dialog.current;
-      if (e.key !== 'Tab' || !box) return;
-      const items = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
-      if (!items.length) return e.preventDefault();
-      const first = items[0];
-      const last = items[items.length - 1];
-      const active = document.activeElement;
-      if (!box.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      } else if (e.shiftKey && (active === first || active === box)) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
-    };
-  }, [open]);
+  useDialog(open, onClose, dialog);
 
   // Portal to <body>: a glass ancestor's backdrop-filter would otherwise trap `position: fixed` inside it.
   return createPortal(
@@ -255,6 +289,7 @@ export function Segmented<T extends string | number>({
           key={String(o.value)}
           type="button"
           disabled={disabled}
+          aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
           className={clsx(
             'focus-ring relative h-9 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default pointer-coarse:min-h-11 pointer-coarse:min-w-11',
@@ -289,11 +324,25 @@ export function ProgressBar({ value, className, gradient }: { value: number; cla
   );
 }
 
-export function EmptyState({ icon, title, body }: { icon: string; title: string; body?: string }) {
+/** Nothing to show. `page`: it's all there is on the page, so its title is the page's heading. */
+export function EmptyState({
+  icon,
+  title,
+  body,
+  page,
+}: {
+  icon: string;
+  title: string;
+  body?: string;
+  page?: boolean;
+}) {
+  const Title = page ? 'h1' : 'p';
   return (
     <div className="grid place-items-center gap-2 py-12 text-center">
-      <span className="text-5xl">{icon}</span>
-      <p className="font-display font-bold">{title}</p>
+      <span aria-hidden className="text-5xl">
+        {icon}
+      </span>
+      <Title className="font-display font-bold">{title}</Title>
       {body && <p className="max-w-sm text-sm text-fg-3">{body}</p>}
     </div>
   );

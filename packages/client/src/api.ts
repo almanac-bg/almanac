@@ -40,6 +40,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * What to tell the player about a failure: the server's own words for a failed request (they're written for players,
+ * in Bulgarian), the fallback for anything else (a bug's message is in English and means nothing to them).
+ */
+export function errorMessage(err: unknown, fallback = 'Нещо се обърка.') {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {

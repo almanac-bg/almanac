@@ -1,4 +1,4 @@
-import { api, type LiveGame, toast, useStore } from '@quiz/client';
+import { api, errorMessage, type LiveGame, toast, useStore } from '@quiz/client';
 import type { Friendship, FriendsResponse, GamePlayer } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, UserCheck, UserPlus } from 'lucide-react';
@@ -84,7 +84,7 @@ export function FriendButton({
           : { kind: 'success', title: 'Поканата е изпратена', body: `${player.name} ще я види в „Приятели“.` },
       );
     } catch (err) {
-      toast({ kind: 'error', title: err instanceof Error ? err.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(err) });
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,15 @@
-import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow, useStore } from '@quiz/client';
-import { categoryById, emoteById, type GamePlayer, MODES, type Standing, TEAMS, type TeamId } from '@quiz/shared';
+import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, plural, useNow, useStore } from '@quiz/client';
+import {
+  answerPoints,
+  categoryById,
+  emoteById,
+  type GamePlayer,
+  MODES,
+  type QuestionPayload,
+  type Standing,
+  TEAMS,
+  type TeamId,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, DoorOpen, Flame, Skull, Users, Volume2, VolumeX, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -9,12 +19,11 @@ import { Avatar, LevelBadge, PlayerTag, RankBadge } from '../components/Avatar';
 import { MatchAnnouncer } from '../components/game/Announcer';
 import { LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
-import { ConnectionBanner } from '../components/game/ConnectionBanner';
 import { ActiveJokers, type JokerGuide, PowerupBar, useJokerGuide } from '../components/game/Jokers';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from '../components/game/teams';
 import { Button, Modal, Spinner } from '../components/ui';
 import { accentFill } from '../lib/accent';
-import { useCountUp } from '../lib/hooks';
+import { useCountUp, useSideScroll } from '../lib/hooks';
 import { useMediaQuery } from '../lib/media';
 import { sfx, useMuted } from '../lib/sound';
 import { usePageTitle } from '../lib/title';
@@ -66,7 +75,6 @@ function Arena({ game }: { game: LiveGame }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar game={game} onLeave={() => setLeaving(true)} />
-      <ConnectionBanner />
       {!single && <MobileStrip game={game} />}
 
       <div
@@ -74,6 +82,8 @@ function Arena({ game }: { game: LiveGame }) {
           // Wider screens: the match sits a little lower than the very top, rather than pinned under the bar.
           'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 pb-28 short:pt-2 sm:px-6 md:pt-[6vh] flat:pt-2',
           !single && 'lg:grid-cols-[minmax(0,1fr)_320px]',
+          // Room for the spectator bar under the last answer.
+          meEliminated && 'max-sm:pb-40',
         )}
       >
         <div className="relative min-w-0">
@@ -103,6 +113,7 @@ function Arena({ game }: { game: LiveGame }) {
         )}
       </div>
 
+      <StreakBurst game={game} />
       <EliminationBanner game={game} />
       <MatchAnnouncer game={game} />
       {meEliminated && game.phase !== 'countdown' && (
@@ -279,9 +290,9 @@ function Intro({ game }: { game: LiveGame }) {
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
             {game.start.mode === 'daily' ? '📅' : category?.icon}
           </motion.span>
-          <h2 className="mt-4 font-display text-3xl font-bold">
+          <h1 className="mt-4 font-display text-3xl font-bold">
             {game.start.mode === 'daily' ? 'Въпросите на деня' : category?.name}
-          </h2>
+          </h1>
           <p className="mt-2 text-fg-3">
             {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
             {game.start.mode === 'daily' && ' · без жокери'}
@@ -498,11 +509,12 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
             <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
+            {!reveal && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
-            <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance flat:text-[1.05rem]">
+            <h1 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]">
               {q.q}
-            </h2>
+            </h1>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
           </div>
         </div>
@@ -636,6 +648,37 @@ function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
   );
 }
 
+/**
+ * What a right answer would score if you picked it now: the speed bonus draining in front of you makes every question
+ * a race. Once you've picked, it stops at what your pick can earn.
+ */
+function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
+  const picked = game.myChoice !== null;
+  const now = useNow(100, !picked);
+  // A pick from before a reconnect: when it was made isn't known here.
+  if (game.myChoice === -1) return null;
+  const streak = (game.standings.find((s) => s.id === game.start.youId)?.streak ?? 0) + 1;
+  const openedAt = game.deadline - q.durationMs - game.extraMs;
+  const points = answerPoints({
+    timeMs: Math.max(0, now - openedAt),
+    limitMs: q.durationMs,
+    streak,
+    doubled: game.doubled,
+    retried: game.retryPrompt,
+  });
+  return (
+    <p
+      aria-hidden
+      className={clsx(
+        'mt-1 text-center font-display text-xs font-bold text-amber-300 tabular-nums transition-opacity sm:text-sm',
+        picked && 'opacity-60',
+      )}
+    >
+      +{fmt(points)}
+    </p>
+  );
+}
+
 function TimerRing({ deadline, duration, stopped }: { deadline: number; duration: number; stopped: boolean }) {
   const now = useNow(100, !stopped);
   const [frozen, setFrozen] = useState<number | null>(null);
@@ -725,14 +768,15 @@ function AnswerButton({
         : 'idle';
 
   // What the colors and icons say, for screen readers.
-  const name = [`${LETTERS[index]}) ${text}`];
-  if (removed) name.push('премахнат');
-  if (state === 'correct') name.push(selected ? 'верен отговор, твоят избор' : 'верен отговор');
-  else if (wrongPick) name.push('твоят избор, грешен');
-  else if (selected) name.push('твоят избор');
-  if (pickers.length) name.push(`избран от ${pickers.map((p) => p.name).join(', ')}`);
+  const status: string[] = [];
+  if (removed) status.push('премахнат');
+  if (state === 'correct') status.push(selected ? 'верен отговор, твоят избор' : 'верен отговор');
+  else if (wrongPick) status.push('твоят избор, грешен');
+  else if (selected) status.push('твоят избор');
+  if (pickers.length) status.push(`избран от ${pickers.map((p) => p.name).join(', ')}`);
 
-  const liftable = !disabled && !locked && !removed;
+  const inert = disabled || locked || removed;
+  const liftable = !inert;
   return (
     // The hover lift is on the button, the hover itself on this wrapper that stays put: lifting the button can't move
     // it out from under a resting pointer (which made it flicker between raised and lowered).
@@ -741,9 +785,9 @@ function AnswerButton({
         type="button"
         layout
         data-answer={index}
-        aria-label={name.join(' — ')}
-        disabled={disabled || locked || removed}
-        onClick={() => actions.answer(index)}
+        // Not `disabled`: that would drop keyboard focus from the answer you just picked (to the top of the page).
+        aria-disabled={inert || undefined}
+        onClick={() => !inert && actions.answer(index)}
         initial={{ opacity: 0, y: 14 }}
         animate={{
           opacity: removed ? 0.25 : state === 'dim' ? 0.45 : 1,
@@ -754,7 +798,7 @@ function AnswerButton({
         transition={{ delay: revealed ? 0 : 0.05 * index, duration: state === 'wrong' ? 0.45 : 0.3 }}
         whileTap={liftable ? { scale: 0.97 } : undefined}
         className={clsx(
-          'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 short:max-sm:min-h-12 short:max-sm:py-2 tiny:max-sm:min-h-11 tiny:max-sm:py-1.5 sm:min-h-[5.5rem] sm:gap-4 sm:p-5 flat:min-h-10 flat:p-2',
+          'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 short:max-sm:min-h-12 short:max-sm:py-2 tiny:max-sm:min-h-11 tiny:max-sm:py-1.5 sm:min-h-[5.5rem] sm:gap-4 sm:p-5 large:min-h-28 flat:min-h-10 flat:p-2',
           liftable && 'group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
           state === 'correct'
             ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
@@ -762,22 +806,23 @@ function AnswerButton({
               ? 'border-rose-400/70 bg-rose-500/20'
               : // Not .glass: no backdrop blur on buttons that move with every question and reveal (a moving blurred
                 // backdrop is re-blurred each frame on a phone's GPU); the page behind is soft already.
-                'border-line bg-white/[0.045] hover:bg-white/[0.08]',
+                state === 'selected'
+                ? 'border-(--pick) bg-white/[0.045] shadow-[0_0_0_1px_var(--pick),0_0_36px_-8px_var(--pick)]'
+                : 'border-line bg-white/[0.045] hover:bg-white/[0.08]',
           // Your own pick, once the answer is out: a ring in the result's colour (the pick's accent outline is gone).
           revealed && selected && (correct ? 'ring-2 ring-emerald-200/70' : 'ring-2 ring-rose-200/70'),
           removed && 'line-through',
         )}
-        style={
-          state === 'selected'
-            ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 0 36px -8px ${color}` }
-            : undefined
-        }
+        // The pick's colour as a variable for the classes above: an inline style that comes and goes would stay put
+        // (Motion keeps what it once had), and the pick's glow would outlast the reveal.
+        style={{ '--pick': color } as React.CSSProperties}
       >
         <span
           className="absolute inset-y-0 left-0 w-1 transition-all group-hover:w-1.5"
           style={{ background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : color }}
         />
         <span
+          aria-hidden
           className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold short:max-sm:size-8 flat:size-8"
           style={{
             background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
@@ -792,9 +837,13 @@ function AnswerButton({
             LETTERS[index]
           )}
         </span>
-        <span className="flex-1 text-[15px] font-semibold sm:text-base">{text}</span>
+        <span className="flex-1 text-[15px] font-semibold sm:text-base large:text-lg">
+          <span className="sr-only">{LETTERS[index]}) </span>
+          {text}
+          {status.length > 0 && <span className="sr-only"> — {status.join(' — ')}</span>}
+        </span>
         {pickers.length > 0 && (
-          <span className="flex -space-x-2">
+          <span aria-hidden className="flex -space-x-2">
             {pickers.slice(0, 4).map((p) => (
               <motion.span key={p.id} initial={{ scale: 0 }} animate={{ scale: 1 }} title={p.name}>
                 <Avatar avatar={p.avatar} frame={p.frame} size={26} />
@@ -994,6 +1043,7 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
 function MobileStrip({ game }: { game: LiveGame }) {
   const teams = game.start.teams;
   const short = useMediaQuery('(max-height: 740px)');
+  const strip = useSideScroll<HTMLUListElement>();
   // Team games: group teammates together so the colors read as two blocks.
   const order = teams
     ? [...game.standings].sort((a, b) => (game.players[a.id]?.team ?? 0) - (game.players[b.id]?.team ?? 0))
@@ -1006,7 +1056,17 @@ function MobileStrip({ game }: { game: LiveGame }) {
           <TeamScoreBar totals={teamTotals(game.standings, game.players)} myTeam={myTeamOf(game)} compact />
         </div>
       )}
-      <ul className="flex gap-3 overflow-x-auto px-4 py-3 short:py-2 tiny:py-1.5" aria-label="Класиране">
+      {/* Eight players don't all fit on a small phone: the row fades where more of it is hidden, and scrolls from the
+          keyboard too. */}
+      <ul
+        ref={strip.ref}
+        aria-label="Класиране"
+        tabIndex={strip.scrolls ? 0 : undefined}
+        className={clsx(
+          'focus-ring flex gap-3 overflow-x-auto px-4 py-3 short:py-2 tiny:py-1.5',
+          strip.more && '[mask-image:linear-gradient(90deg,#000_85%,transparent)]',
+        )}
+      >
         {order.map((s) => {
           const p = game.players[s.id];
           const me = s.id === game.start.youId;
@@ -1060,7 +1120,7 @@ function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
     <span
       aria-hidden
       className={clsx(
-        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[9px] leading-none font-extrabold tracking-wide',
+        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[10px] leading-none font-extrabold tracking-wide',
         me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
       )}
     >
@@ -1162,19 +1222,68 @@ function Feed({ game }: { game: LiveGame }) {
   );
 }
 
+/** Streaks worth a moment of their own (the chip in the reveal counts every one). */
+const STREAK_MILESTONES = new Set([3, 5, 7, 10, 15, 20]);
+
+/** "🔥 Серия 5!" across the screen at the reveal, gone before an elimination takes the stage (at 0.9 s). */
+function StreakBurst({ game }: { game: LiveGame }) {
+  const reveal = game.phase === 'reveal' ? game.reveal : null;
+  const mine = reveal?.results[game.start.youId];
+  const streak = mine?.correct && STREAK_MILESTONES.has(mine.streak) ? mine.streak : null;
+  const quick = !!reveal?.eliminated.length;
+  const [shown, setShown] = useState<number | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the reveal; `streak` and `quick` come with it
+  useEffect(() => {
+    if (streak === null) return setShown(null);
+    setShown(streak);
+    const hide = setTimeout(() => setShown(null), quick ? 850 : 1400);
+    return () => clearTimeout(hide);
+  }, [reveal?.index, streak]);
+
+  return (
+    <AnimatePresence>
+      {shown !== null && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-[38%] z-40 flex justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div className="absolute inset-x-0 top-1/2 h-28 -translate-y-1/2 bg-[linear-gradient(90deg,transparent,rgb(249_115_22/0.35),transparent)] blur-xl" />
+          {/* On a solid pill: it lands on the question or the answers, and text over text reads as neither. */}
+          <motion.p
+            initial={{ scale: 0.6 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 14 }}
+            className="relative rounded-full border border-orange-400/50 bg-ink-2/95 px-6 py-3 font-display text-3xl font-black text-orange-200 shadow-[0_0_48px_-6px_rgb(249_115_22/0.75)] sm:px-8 sm:text-4xl"
+          >
+            🔥 Серия {shown}!
+          </motion.p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function EliminationBanner({ game }: { game: LiveGame }) {
   const ids = game.phase === 'reveal' ? (game.reveal?.eliminated ?? []) : [];
   const [shown, setShown] = useState<string[]>([]);
+  const meOut = ids.includes(game.start.youId);
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the ids, as `ids` is a new array every render
   useEffect(() => {
-    if (!ids.length) return;
+    // The reveal is over (the next question is up): whatever was on screen goes with it.
+    if (!ids.length) return setShown([]);
     const show = setTimeout(() => setShown(ids), 900);
-    const hide = setTimeout(() => setShown([]), 3600);
+    // Your own knockout stays a little longer: it's the moment you become a spectator.
+    const hide = setTimeout(() => setShown([]), meOut ? 4700 : 3600);
     return () => {
       clearTimeout(show);
       clearTimeout(hide);
     };
   }, [ids.join()]);
+  // Who's still in once this reveal is through (the standings already count it).
+  const alive = game.standings.filter((s) => s.eliminatedAt === null && !s.left).length;
 
   return (
     <AnimatePresence>
@@ -1203,6 +1312,12 @@ function EliminationBanner({ game }: { game: LiveGame }) {
                   {me ? 'Отпадна!' : `${p.name} отпада!`}
                 </p>
                 <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
+                {me && alive > 0 && (
+                  <p className="mt-5 rounded-full border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-fg">
+                    {alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще
+                    спечели 👀
+                  </p>
+                )}
               </motion.div>
             );
           })}

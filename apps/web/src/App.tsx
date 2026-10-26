@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef } from 'react';
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
+import { ConnectionBanner } from './components/ConnectionBanner';
 import { Invites } from './components/Invites';
 import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
@@ -114,23 +115,28 @@ export function App() {
     <MotionConfig reducedMotion="user">
       <Background />
       <Toasts />
-      {PUBLIC_PATHS.includes(pathname) ? (
-        <Suspense fallback={<PageLoading />}>
-          <Routes>
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/unsubscribe" element={<UnsubscribePage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-          </Routes>
-        </Suspense>
-      ) : me ? (
+      {me && !PUBLIC_PATHS.includes(pathname) ? (
         <SignedIn />
-      ) : routeKind(pathname) === 'unknown' ? (
-        // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
-        <NotFoundPage standalone />
       ) : (
-        <AuthPage />
+        // The page itself (SignedIn has its header and tab bar around its own <main>).
+        <main>
+          {PUBLIC_PATHS.includes(pathname) ? (
+            <Suspense fallback={<PageLoading />}>
+              <Routes>
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/unsubscribe" element={<UnsubscribePage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+              </Routes>
+            </Suspense>
+          ) : routeKind(pathname) === 'unknown' ? (
+            // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
+            <NotFoundPage standalone />
+          ) : (
+            <AuthPage />
+          )}
+        </main>
       )}
       {/* Renders nothing; inside the app (not beside it in main.tsx) so the tree is the one the server draws. */}
       <ReloadForUpdate />
@@ -142,6 +148,7 @@ function SignedIn() {
   const location = useLocation();
   const navigate = useNavigate();
   const gameId = useStore((s) => s.game?.start.gameId);
+  const maintenance = useStore((s) => !!s.maintenance);
   const inGame = location.pathname === '/game';
 
   // Jump into a match the moment one starts (queue pop, room start, reconnect).
@@ -179,6 +186,7 @@ function SignedIn() {
         {!inGame && <LegalLinks className="mt-16 justify-center" />}
       </main>
       {!inGame && <QueueOverlay />}
+      <ConnectionBanner explained={!inGame && maintenance} />
       <Invites />
       <SeasonRecap />
     </>

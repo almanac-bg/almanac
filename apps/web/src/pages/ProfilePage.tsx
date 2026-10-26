@@ -1,4 +1,17 @@
-import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
+import {
+  actions,
+  api,
+  errorMessage,
+  fmt,
+  longDate,
+  ordinal,
+  pct,
+  plural,
+  seconds,
+  timeAgo,
+  toast,
+  useStore,
+} from '@quiz/client';
 import {
   achievementById,
   CATEGORIES,
@@ -41,7 +54,7 @@ export function ProfilePage() {
   // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
   const { data, error, retry, setData } = useLoad(() => api.profile(username), username, `${me.xp}:${friendsVersion}`);
 
-  if (!data && error?.status === 404) return <EmptyState icon="🕵️" title={error.message} />;
+  if (!data && error?.status === 404) return <EmptyState page icon="🕵️" title={error.message} />;
   if (!data && error) return <LoadError title="Профилът не се зареди" error={error} onRetry={retry} />;
   if (!data) {
     return <PageSpinner />;
@@ -253,60 +266,82 @@ export function ProfilePage() {
           {data.recent.length === 0 ? (
             <EmptyState icon="🎮" title="Няма изиграни мачове" />
           ) : (
-            <table className="w-full min-w-[560px] text-sm">
-              <thead>
-                <tr className="text-left text-xs tracking-wide text-fg-3 uppercase">
-                  <th className="px-5 py-3 font-semibold">Режим</th>
-                  <th className="px-3 py-3 font-semibold">Място</th>
-                  <th className="px-3 py-3 text-right font-semibold">Точки</th>
-                  <th className="px-3 py-3 text-right font-semibold">Верни</th>
-                  <th className="px-3 py-3 text-right font-semibold">XP</th>
-                  <th className="px-3 py-3 text-right font-semibold">Рейтинг</th>
-                  <th className="px-5 py-3 text-right font-semibold">Кога</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
+            <>
+              {/* Phones: one match per row, the numbers under it, instead of a table to scroll sideways. */}
+              <ul className="divide-y divide-line sm:hidden">
                 {data.recent.map((r) => (
-                  <tr key={r.matchId} className="hover:bg-white/[0.03]">
-                    <td className="px-5 py-3 font-semibold">{MODES[r.mode].name}</td>
-                    <td className="px-3 py-3">
-                      {r.players === 1 ? (
-                        <span className="text-fg-3">—</span>
-                      ) : (
-                        <span className={clsx(r.placement === 1 && 'font-bold text-amber-300')}>
-                          {r.placement === 1 ? '🏆 ' : ''}
-                          {r.placement}/{r.players}
-                        </span>
+                  <li key={r.matchId} className="px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-semibold">{MODES[r.mode].name}</span>
+                      <span className="shrink-0 text-xs text-fg-3">{timeAgo(r.endedAt)}</span>
+                    </div>
+                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-fg-2 tabular-nums">
+                      {r.players > 1 && <Placement match={r} />}
+                      <span>{fmt(r.score)} т.</span>
+                      <span>
+                        {r.correct}/{r.questions} верни
+                      </span>
+                      <span className="text-violet-300">+{fmt(r.xp)} XP</span>
+                      {r.ratingDelta !== null && (
+                        <span className={ratingClass(r.ratingDelta)}>{signed(r.ratingDelta)} рейтинг</span>
                       )}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{fmt(r.score)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">
-                      {r.correct}/{r.questions}
-                    </td>
-                    <td className="px-3 py-3 text-right text-violet-300 tabular-nums">+{fmt(r.xp)}</td>
-                    <td
-                      className={clsx(
-                        'px-3 py-3 text-right tabular-nums',
-                        r.ratingDelta === null
-                          ? 'text-fg-3'
-                          : r.ratingDelta >= 0
-                            ? 'text-emerald-300'
-                            : 'text-rose-300',
-                      )}
-                    >
-                      {r.ratingDelta === null ? '—' : `${r.ratingDelta >= 0 ? '+' : ''}${r.ratingDelta}`}
-                    </td>
-                    <td className="px-5 py-3 text-right text-fg-3">{timeAgo(r.endedAt)}</td>
-                  </tr>
+                    </p>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+              <table className="hidden w-full min-w-[560px] text-sm sm:table">
+                <thead>
+                  <tr className="text-left text-xs tracking-wide text-fg-3 uppercase">
+                    <th className="px-5 py-3 font-semibold">Режим</th>
+                    <th className="px-3 py-3 font-semibold">Място</th>
+                    <th className="px-3 py-3 text-right font-semibold">Точки</th>
+                    <th className="px-3 py-3 text-right font-semibold">Верни</th>
+                    <th className="px-3 py-3 text-right font-semibold">XP</th>
+                    <th className="px-3 py-3 text-right font-semibold">Рейтинг</th>
+                    <th className="px-5 py-3 text-right font-semibold">Кога</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {data.recent.map((r) => (
+                    <tr key={r.matchId} className="hover:bg-white/[0.03]">
+                      <td className="px-5 py-3 font-semibold">{MODES[r.mode].name}</td>
+                      <td className="px-3 py-3">
+                        {r.players === 1 ? <span className="text-fg-3">—</span> : <Placement match={r} />}
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">{fmt(r.score)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {r.correct}/{r.questions}
+                      </td>
+                      <td className="px-3 py-3 text-right text-violet-300 tabular-nums">+{fmt(r.xp)}</td>
+                      <td className={clsx('px-3 py-3 text-right tabular-nums', ratingClass(r.ratingDelta))}>
+                        {r.ratingDelta === null ? '—' : signed(r.ratingDelta)}
+                      </td>
+                      <td className="px-5 py-3 text-right text-fg-3">{timeAgo(r.endedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </Card>
       </section>
     </div>
   );
 }
+
+function Placement({ match }: { match: ProfileStats['recent'][number] }) {
+  const won = match.placement === 1;
+  return (
+    <span className={clsx(won && 'font-bold text-amber-300')}>
+      {won ? '🏆 ' : ''}
+      {match.placement}/{match.players}
+    </span>
+  );
+}
+
+const signed = (n: number) => `${n >= 0 ? '+' : ''}${n}`;
+const ratingClass = (delta: number | null) =>
+  delta === null ? 'text-fg-3' : delta >= 0 ? 'text-emerald-300' : 'text-rose-300';
 
 /** Add / accept / challenge, depending on how the viewer relates to this player. */
 function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange: (p: ProfileStats) => void }) {
@@ -321,7 +356,7 @@ function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange:
       if (success) toast({ kind: 'success', title: success });
       onChange(await api.profile(user.username));
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(e) });
     } finally {
       setBusy(false);
     }
@@ -384,7 +419,7 @@ function ReportButton({ username }: { username: string }) {
       setReason(null);
       setDetails('');
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(e) });
     } finally {
       setBusy(false);
     }
@@ -427,7 +462,7 @@ function ReportButton({ username }: { username: string }) {
           onChange={(e) => setDetails(e.target.value.slice(0, 500))}
           placeholder="Подробности (по желание)"
           rows={3}
-          className="mt-4 w-full rounded-2xl border border-line bg-black/30 p-3 text-sm outline-none focus:border-violet-400/60"
+          className="field mt-4 w-full rounded-2xl p-3 text-sm"
         />
         <p className="mt-2 text-xs text-fg-3">Докладите са анонимни за докладвания играч.</p>
         <div className="mt-5 flex justify-end gap-2">

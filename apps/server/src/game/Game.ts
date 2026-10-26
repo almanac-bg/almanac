@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   type AnswerRejection,
+  answerPoints,
   type CategoryChoice,
   type CategoryId,
   type Difficulty,
@@ -450,10 +451,7 @@ export class Game {
         cat.correctMs += timeMs;
         p.bestStreak = Math.max(p.bestStreak, p.streak);
         p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
-        // Speed is measured against the regular clock: "Още време" buys time, not speed points.
-        const speed = Math.round(SCORING.speed * Math.max(0, 1 - timeMs / this.setup.timeMs));
-        const streakBonus = Math.min((p.streak - 1) * SCORING.streakStep, SCORING.streakMax);
-        points = Math.round((SCORING.base + speed + streakBonus) * (p.doubled ? 2 : 1) * (retried ? 0.5 : 1));
+        points = answerPoints({ timeMs, limitMs: this.setup.timeMs, streak: p.streak, doubled: p.doubled, retried });
       } else {
         p.streak = 0;
         // "Двойно или нищо" is a bet: a miss costs points (never below zero).

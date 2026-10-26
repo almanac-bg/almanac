@@ -1,15 +1,15 @@
-import { api, DIFFICULTY_LABEL, type QuestionReports, timeAgo, toast } from '@quiz/client';
+import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionInfo, type QuestionReportGroup } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, EyeOff, Flag, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
+import { LETTERS } from '../game/answers';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
 
 const reasonLabel = (id: string) => QUESTION_REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
-const LETTERS = ['А', 'Б', 'В', 'Г'];
 
 /** Questions players flagged as wrong, the most reported first; hiding one takes it out of new matches at once. */
 export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
@@ -103,7 +103,7 @@ function QuestionReportCard({
       });
       onResolved(r);
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(e) });
     } finally {
       setBusy(null);
     }
@@ -174,7 +174,7 @@ function HiddenQuestions({
       onChange(await api.unhideQuestion(id));
       toast({ kind: 'success', title: 'Въпросът отново се появява в мачовете' });
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Нещо се обърка.' });
+      toast({ kind: 'error', title: errorMessage(e) });
     } finally {
       setBusy(null);
     }

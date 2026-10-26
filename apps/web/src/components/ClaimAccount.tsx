@@ -1,14 +1,11 @@
-import { api, setState, toast, useStore } from '@quiz/client';
+import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
 import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import { Eye, EyeOff, Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { credentialsProblem } from '../lib/credentials';
 import { markReturning } from '../lib/returning';
 import { MINORS_NOTICE } from './LegalLinks';
-import { Button, Modal } from './ui';
-
-const INPUT =
-  'h-12 w-full rounded-2xl border border-line bg-black/30 px-4 text-[15px] outline-none placeholder:text-fg-3 focus:border-violet-400/60 focus:bg-black/40 aria-invalid:border-rose-400/60';
+import { Button, Field, INPUT, Modal } from './ui';
 
 /**
  * A guest picks a name and password (and maybe an email): the same account from then on, with all its XP, streak and
@@ -54,7 +51,7 @@ export function ClaimAccountModal({
       );
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Нещо се обърка.');
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -147,18 +144,6 @@ export function GuestNudge({ className = '', children }: { className?: string; c
         <Save className="size-4" /> Запази прогреса
       </Button>
       <ClaimAccountModal open={open} onClose={() => setOpen(false)} />
-    </div>
-  );
-}
-
-/** A label above its input, tied to it by id: wrapping both would add the show-password toggle to the input's name. */
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

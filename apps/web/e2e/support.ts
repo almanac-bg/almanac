@@ -74,7 +74,7 @@ export async function me(page: Page): Promise<Me> {
 /** The lobby, ready to play: rendered, and the realtime connection is up (matches start over it). */
 export async function expectLobby(page: Page) {
   await expect(page.getByRole('heading', { name: 'Избери битка', exact: true })).toBeVisible();
-  await expect(page.getByText('Няма връзка — свързване…')).toHaveCount(0);
+  await expect(page.locator('[data-connection="up"]')).toHaveCount(1);
 }
 
 /**

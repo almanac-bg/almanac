@@ -10,7 +10,7 @@ export interface LoadFailure {
 const failure = (err: unknown): LoadFailure =>
   err instanceof ApiError
     ? { message: err.message, status: err.status }
-    : { message: err instanceof Error ? err.message : 'Нещо се обърка. Опитай пак.', status: -1 };
+    : { message: 'Нещо се обърка. Опитай пак.', status: -1 };
 
 /**
  * Data for a page or card that keeps a failed load as an error, instead of a spinner that never ends.

@@ -37,6 +37,19 @@ export function useMuted(): [boolean, (value: boolean) => void] {
   return [value, setMuted];
 }
 
+/**
+ * A buzz on phones that have it (Android; iOS ignores it). It follows the sound switch: whoever silenced the game
+ * wants it quiet in the hand too.
+ */
+export function buzz(pattern: number | number[] | undefined) {
+  if (muted || pattern === undefined) return;
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* not allowed here (an iframe, no user gesture yet) */
+  }
+}
+
 function audio(): AudioContext | null {
   if (muted) return null;
   try {

@@ -259,7 +259,8 @@ function bind(s: GameSocket) {
     if (!g) return;
     const mine = reveal.results[g.start.youId];
     if (mine) effect(mine.correct ? 'correct' : 'wrong');
-    if (reveal.eliminated.length) setTimeout(() => effect('eliminated'), 900);
+    if (reveal.eliminated.length)
+      setTimeout(() => effect(reveal.eliminated.includes(g.start.youId) ? 'knockedOut' : 'eliminated'), 900);
   });
 
   s.on('game:powerup', ({ playerId, powerup, removed, targetId, extraMs }) => {

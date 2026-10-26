@@ -1,11 +1,13 @@
-/** Moments the shared game logic signals; the website plays a sound for each. */
+/** Moments the shared game logic signals; the website plays a sound (and, on phones, a buzz) for them. */
 export type Effect =
   | 'lock'
   | 'correct'
   | 'wrong'
   | 'powerup'
   | 'freeze'
+  /** Someone else was knocked out ('knockedOut': you were). */
   | 'eliminated'
+  | 'knockedOut'
   | 'achievement'
   | 'invite'
   | 'reaction';

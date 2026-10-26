@@ -1,15 +1,16 @@
 import { api, fmt, pct, useStore } from '@quiz/client';
-import { type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
+import { BRAND, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
 import clsx from 'clsx';
-import { CalendarDays, Trophy } from 'lucide-react';
+import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
-import { Card, EmptyState, Segmented, Spinner } from '../components/ui';
+import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
+import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 
 export function LeaderboardPage() {
@@ -143,9 +144,39 @@ export function LeaderboardPage() {
                 : 'Изиграй мач в този режим, за да влезеш в класацията.'}
             </p>
           )}
+          {data.entries.length <= 3 && <BringFriends />}
         </>
       )}
     </div>
+  );
+}
+
+/** A board of three ends at the podium: the next step is more people on it. */
+function BringFriends() {
+  return (
+    <Card className="flex flex-col items-center gap-4 p-6 text-center sm:p-8">
+      <div>
+        <p className="font-display font-bold">Класацията тепърва се пълни</p>
+        <p className="mt-1 text-sm text-fg-2">
+          Доведи приятели — тук ще ги виждаш до себе си, а в дуел ще разберете кой знае повече.
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button
+          onClick={() =>
+            shareText(
+              `Ела да играем ${BRAND.name} — ${BRAND.tagline.toLowerCase()}: https://${BRAND.domain}`,
+              'Линкът е копиран',
+            )
+          }
+        >
+          <Share2 aria-hidden className="size-4" /> Покани приятели
+        </Button>
+        <Link to="/friends" className={buttonClass({ variant: 'secondary' })}>
+          <Users aria-hidden className="size-4" /> Приятели
+        </Link>
+      </div>
+    </Card>
   );
 }
 

@@ -28,6 +28,23 @@ export const SCORING = {
   doubleStake: 500,
 } as const;
 
+/**
+ * What a correct answer scores: the base, the speed bonus for the time left on the regular clock ("Още време" buys
+ * time, not speed points) and the streak bonus, doubled by "Двойно или нищо", halved for a "Втори шанс" pick.
+ * `streak` counts this answer.
+ */
+export function answerPoints(a: {
+  timeMs: number;
+  limitMs: number;
+  streak: number;
+  doubled: boolean;
+  retried: boolean;
+}) {
+  const speed = Math.round(SCORING.speed * Math.max(0, 1 - a.timeMs / a.limitMs));
+  const streakBonus = Math.min((a.streak - 1) * SCORING.streakStep, SCORING.streakMax);
+  return Math.round((SCORING.base + speed + streakBonus) * (a.doubled ? 2 : 1) * (a.retried ? 0.5 : 1));
+}
+
 export const START_RATING = 1000;
 
 /** Win-trading guard: the same two people only move each other's rating this many times a day. */

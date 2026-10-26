@@ -6,9 +6,6 @@ export const SUBMISSION_STATUS: Record<SubmissionStatus, { label: string; classN
   rejected: { label: 'Отхвърлен', className: 'bg-rose-500/15 text-rose-300' },
 };
 
-export const OPTION_COLORS = ['#a78bfa', '#22d3ee', '#fbbf24', '#f472b6'];
-export const LETTERS = ['А', 'Б', 'В', 'Г'];
-
 /** `answer: -1` means "not marked yet". */
 export const emptyDraft = (): QuestionDraft => ({
   category: 'general',

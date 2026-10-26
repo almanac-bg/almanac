@@ -1,4 +1,4 @@
-import { api, longDate, timeAgo, toast, useStore } from '@quiz/client';
+import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@quiz/client';
 import type { QuestionDraft, Submission, SubmissionStatus } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -195,7 +195,7 @@ function PendingCard({
       });
       onReviewed(submission.id, res.pending);
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно одобрение.' });
+      toast({ kind: 'error', title: errorMessage(e, 'Неуспешно одобрение.') });
       setBusy(null);
     }
   }
@@ -207,7 +207,7 @@ function PendingCard({
       toast({ kind: 'info', title: 'Въпросът е отхвърлен' });
       onReviewed(submission.id, res.pending);
     } catch (e) {
-      toast({ kind: 'error', title: e instanceof Error ? e.message : 'Неуспешно отхвърляне.' });
+      toast({ kind: 'error', title: errorMessage(e, 'Неуспешно отхвърляне.') });
       setBusy(null);
     }
   }
@@ -237,7 +237,7 @@ function PendingCard({
               // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Откажи", so focus moves to it
               autoFocus
               placeholder="Причина (по желание) — авторът ще я види"
-              className="h-10 w-full rounded-xl border border-line bg-black/30 px-3 text-sm outline-none placeholder:text-fg-3 focus:border-rose-400/60"
+              className="field h-10 w-full rounded-xl px-3 text-sm"
             />
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>

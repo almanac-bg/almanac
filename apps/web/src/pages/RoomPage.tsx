@@ -4,7 +4,6 @@ import {
   CATEGORIES,
   type CategoryChoice,
   MIXED_CATEGORY,
-  type Presence,
   ROOM_LIMITS,
   type RoomPlayer,
   type RoomSettings,
@@ -36,6 +35,7 @@ import { Avatar, PlayerTag } from '../components/Avatar';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
+import { PRESENCE } from '../components/presence';
 import { Button, Card, Modal, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
@@ -118,7 +118,7 @@ export function RoomPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="t-eyebrow text-fuchsia-300">Частна стая</p>
+          <h1 className="t-eyebrow text-fuchsia-300">Частна стая</h1>
           <button
             type="button"
             onClick={copy}
@@ -241,10 +241,11 @@ export function RoomPage() {
 
           <Setting label="Категория">
             <select
+              aria-label="Категория"
               disabled={!isHost}
               value={s.category}
               onChange={(e) => update({ category: e.target.value as CategoryChoice })}
-              className="h-11 w-full rounded-2xl border border-line bg-black/30 px-3 text-sm outline-none focus:border-violet-400/60 disabled:opacity-70"
+              className="field h-11 w-full rounded-2xl px-3 text-sm disabled:opacity-70"
             >
               {[MIXED_CATEGORY, ...CATEGORIES].map((c) => (
                 <option key={c.id} value={c.id} className="bg-ink-2">
@@ -332,12 +333,13 @@ export function RoomPage() {
   );
 }
 
+/** A setting's name over its control; a fieldset, so the choices inside it are announced with the name. */
 function Setting({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold tracking-wide text-fg-2 uppercase">{label}</p>
+    <fieldset className="min-w-0">
+      <legend className="mb-2 text-xs font-semibold tracking-wide text-fg-2 uppercase">{label}</legend>
       {children}
-    </div>
+    </fieldset>
   );
 }
 
@@ -415,7 +417,7 @@ function PlayerCard({
       {/* Bots are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would squeeze it out. */}
       <Avatar avatar={p.avatar} frame={p.frame} size={44}>
         {p.isBot && (
-          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[9px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[10px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
             БОТ
           </span>
         )}
@@ -560,22 +562,6 @@ function TeamColumns({
 
 // ─── Invite friends ────────────────────────────────────────────────────────
 
-const PRESENCE_LABEL: Record<Presence, string> = {
-  online: 'Онлайн',
-  queue: 'Търси мач',
-  room: 'В стая',
-  game: 'В мач',
-  offline: 'Офлайн',
-};
-
-const PRESENCE_DOT: Record<Presence, string> = {
-  online: 'bg-emerald-400',
-  queue: 'bg-amber-300',
-  room: 'bg-fuchsia-400',
-  game: 'bg-sky-400',
-  offline: 'bg-white/20',
-};
-
 function InviteFriends({ room }: { room: RoomState }) {
   const version = useStore((s) => s.friendsVersion);
   const { data, error, retry } = useLoad(() => api.friends(), '', version);
@@ -651,8 +637,12 @@ function InviteFriends({ room }: { room: RoomState }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{f.user.username}</div>
                   <div className="flex items-center gap-1.5 text-xs text-fg-3">
-                    <span className={clsx('size-1.5 rounded-full', PRESENCE_DOT[f.presence])} />
-                    {PRESENCE_LABEL[f.presence]}
+                    <span
+                      aria-hidden
+                      className="size-1.5 rounded-full"
+                      style={{ background: PRESENCE[f.presence].color }}
+                    />
+                    {PRESENCE[f.presence].label}
                   </div>
                 </div>
                 {inRoom ? (

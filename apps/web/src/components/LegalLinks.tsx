@@ -17,7 +17,10 @@ export function LegalLinks({ className = '' }: { className?: string }) {
       : op.sourceUrl
     : null;
   return (
-    <nav className={`flex flex-wrap items-center gap-x-4 text-xs text-fg-3 ${className}`}>
+    <nav
+      aria-label="Правна информация"
+      className={`flex flex-wrap items-center gap-x-4 text-xs text-fg-3 ${className}`}
+    >
       <Link to="/terms" className="inline-flex min-h-11 items-center hover:text-fg-2">
         Условия за ползване
       </Link>

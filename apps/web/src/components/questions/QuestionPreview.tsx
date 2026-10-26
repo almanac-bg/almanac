@@ -2,7 +2,7 @@ import { DIFFICULTY_LABEL } from '@quiz/client';
 import { categoryById, type QuestionDraft } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { LETTERS, OPTION_COLORS } from './draft';
+import { LETTERS, OPTION_COLORS } from '../game/answers';
 
 /** Read-only question card styled like the in-game one, with the correct answer highlighted. */
 export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; compact?: boolean }) {
