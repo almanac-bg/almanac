@@ -34,6 +34,20 @@ const PREFIX: Record<string, string> = {
   literature: 'lit',
   nature: 'nat',
 };
+/** "1 492", "30,48", "88 мили в час" → the number and what follows it; null when an option isn't a number. */
+function asNumber(option: string): { value: number; unit: string } | null {
+  const m = /^\s*(?:около\s+)?([−-]?\d[\d\s\u00a0\u202f.,]*)\s*(.*)$/u.exec(option);
+  if (!m) return null;
+  let digits = m[1].replace(/[\s\u00a0\u202f]/g, '');
+  const [, decimals] = digits.split(',');
+  digits =
+    decimals !== undefined && decimals.length !== 3 && !digits.includes('.')
+      ? digits.replace(',', '.')
+      : digits.replace(/,/g, '');
+  const value = Number(digits.replace('−', '-'));
+  return Number.isFinite(value) ? { value, unit: m[2].trim() } : null;
+}
+
 const normalize = (s: string) =>
   s
     .toLowerCase()
@@ -80,6 +94,23 @@ for (const { name, file, perCategory, perDifficulty } of BANKS) {
         );
       }
     }
+  });
+
+  // A player who learns that the right number is never the smallest or the largest of four halves every numeric
+  // question; in a fair bank about half the right numbers are one or the other.
+  test(`${name}: a numeric answer isn't always one of the middle values`, () => {
+    const numeric = bank.flatMap((q) => {
+      const parsed = q.options.map(asNumber);
+      if (parsed.some((p) => p === null) || new Set(parsed.map((p) => p!.unit)).size > 1) return [];
+      const values = parsed.map((p) => p!.value);
+      return new Set(values).size === 4 ? [{ q, values }] : [];
+    });
+    if (numeric.length < 20) return;
+    const extreme = numeric.filter(({ q, values }) =>
+      [Math.min(...values), Math.max(...values)].includes(values[q.answer]),
+    );
+    const share = extreme.length / numeric.length;
+    assert.ok(share >= 0.35, `only ${extreme.length} of ${numeric.length} numeric answers are the smallest or largest`);
   });
 
   test(`${name}: correct answers are spread across positions`, () => {
