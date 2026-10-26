@@ -73,8 +73,9 @@ export function Results({ game }: { game: LiveGame }) {
   // A challenge link is played alone, but it has a board: first place over others is a win too.
   const link = rewards?.challenge ?? null;
   const won = (!single && mine.placement === 1 && !end.noContest) || (!!link && link.rank === 1 && link.total > 1);
-  // Everyone else walked out (after the match got going, or it would be no contest).
-  const byWalkout = won && !teamScores && end.standings.every((s) => s.id === youId || s.left);
+  // Everyone else walked out (after the match got going, or it would be no contest). A link is played alone: its win
+  // is a place on the board, never a walkout.
+  const byWalkout = won && !single && !teamScores && end.standings.every((s) => s.id === youId || s.left);
   const rivals = end.standings.length > 2 ? 'Съперниците напуснаха' : 'Съперникът напусна';
   const perfect = mine.correct === game.start.totalQuestions;
   // A no contest says so in the headline; the other reasons a rating stayed put get a card.
@@ -595,11 +596,24 @@ function DailyCard({
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
-      <h2 className="relative t-card">Твоето място днес</h2>
-      <div className="relative mt-3 flex items-baseline gap-2">
-        <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
-        <span className="text-fg-2">от {fmt(daily.total)} днес</span>
-      </div>
+      {daily.rank === null ? (
+        // A guest's daily has questions of its own, so it has no place on the board.
+        <>
+          <h2 className="relative t-card">Денят е твой</h2>
+          <p className="relative mt-2 text-sm text-fg-2">
+            Като гост играеш свои 10 въпроса за деня. Запази профила си и ще изиграеш общите — тези, по които се класира
+            цяла България.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2 className="relative t-card">Твоето място днес</h2>
+          <div className="relative mt-3 flex items-baseline gap-2">
+            <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
+            <span className="text-fg-2">от {fmt(daily.total)} днес</span>
+          </div>
+        </>
+      )}
       {daily.streak > 0 && (
         <p className="relative mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-bold text-orange-300">
           🔥 Серия {plural(daily.streak, 'ден', 'дни')}
@@ -630,7 +644,9 @@ function DailyCard({
           </p>
         </motion.div>
       )}
-      <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
+      {daily.rank !== null && (
+        <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
+      )}
       <div className="relative mt-4">
         <Button size="sm" onClick={() => shareText(text)}>
           <Share2 className="size-4" /> Сподели резултата
@@ -807,9 +823,11 @@ function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_con
       <p className="mt-2 text-sm text-fg-2">
         {reason === 'pair'
           ? `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`
-          : guest
-            ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
-            : 'Мачовете срещу гости са без рейтинг.'}
+          : reason === 'cut'
+            ? 'Мачът приключи по-рано заради нас (обновяване или грешка), затова не променя рейтинга.'
+            : guest
+              ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
+              : 'Мачовете срещу гости са без рейтинг.'}
       </p>
     </Card>
   );

@@ -139,7 +139,8 @@ function rewardHuman(
   // walks out at once is a win every few seconds).
   const noContest = !left && game.noContest;
   const counts = !left && !noContest;
-  const won = multiplayer && s.placement === 1 && counts;
+  // A match we cut short pays for what was played, but nobody won it.
+  const won = multiplayer && s.placement === 1 && counts && !game.cutShort;
   const solo = setup.mode === 'solo';
   const daily = setup.dailyDay !== null;
   const challenge = setup.challengeId !== null;
@@ -312,7 +313,10 @@ function rewardHuman(
 
 const ratingOf = (game: Game, id: string) => game.participants.get(id)!.player.rating ?? START_RATING;
 
-/** Pairs of people who already played each other RATED_GAMES_PER_PAIR rated matches in the last 24 hours. */
+/**
+ * Pairs of people who already played each other RATED_GAMES_PER_PAIR rated matches in the last 24 hours. Rated for both
+ * of them: a walkout before the match got going moves only the one who left, and that's no game between them.
+ */
 function overplayedPairs(game: Game): Set<string> {
   const ids = game.humans.map((h) => h.player.userId).filter((id): id is number => id !== null);
   const pairs = new Set<string>();
@@ -323,7 +327,7 @@ function overplayedPairs(game: Game): Set<string> {
      JOIN match_players b ON b.match_id = a.match_id AND b.user_id > a.user_id
      JOIN matches m ON m.id = a.match_id
      WHERE a.user_id IN (${ids.map(() => '?').join(',')}) AND b.user_id IN (${ids.map(() => '?').join(',')})
-       AND m.ranked = 1 AND m.ended_at > ? AND m.id != ? AND a.rating_delta IS NOT NULL
+       AND m.ranked = 1 AND m.ended_at > ? AND m.id != ? AND a.rating_delta IS NOT NULL AND b.rating_delta IS NOT NULL
      GROUP BY a.user_id, b.user_id`,
     ...ids,
     ...ids,
@@ -356,6 +360,11 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
     if (myUserId === null) continue;
     if (game.noContest && !game.forfeited(mine)) {
       ratings.unrated.set(me.id, 'no_contest');
+      continue;
+    }
+    // We ended it, not the players: only a walkout before that still costs.
+    if (game.cutShort && !game.forfeited(mine)) {
+      ratings.unrated.set(me.id, 'cut');
       continue;
     }
     let sum = 0;
@@ -392,9 +401,11 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
   const humans = standings.filter((s) => game.participants.get(s.id)!.player.userId !== null);
   const reason: UnratedReason | null = game.noContest
     ? 'no_contest'
-    : humans.length > 1 && guestsIn(game).size > 0
-      ? 'guest'
-      : null;
+    : game.cutShort
+      ? 'cut'
+      : humans.length > 1 && guestsIn(game).size > 0
+        ? 'guest'
+        : null;
   const avg = (team: number) => {
     const members = standings.filter((s) => game.participants.get(s.id)!.player.team === team);
     return members.reduce((sum, s) => sum + ratingOf(game, s.id), 0) / Math.max(1, members.length);
@@ -402,7 +413,7 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
   for (const s of humans) {
     const p = game.participants.get(s.id)!;
     if (p.player.team === null) continue;
-    if (reason && !(reason === 'no_contest' && game.forfeited(p))) {
+    if (reason && !((reason === 'no_contest' || reason === 'cut') && game.forfeited(p))) {
       ratings.unrated.set(s.id, reason);
       continue;
     }

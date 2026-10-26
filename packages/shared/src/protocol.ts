@@ -112,7 +112,24 @@ export interface QuestionPayload {
   elimination: boolean;
   /** Ids of players who already locked in (for reconnects). */
   answered: string[];
+  /**
+   * Only when a (re)connecting client is brought up to speed: where you stand on this question. `remainingMs` then
+   * already counts your "Още време"; `frozenMs` is what's left of a freeze on you.
+   */
+  mine?: {
+    choice: number | null;
+    removed: number[];
+    doubled: boolean;
+    retryArmed: boolean;
+    retryPrompt: boolean;
+    extraMs: number;
+    frozenMs: number;
+    powerupThisQuestion: boolean;
+  };
 }
+
+/** Why the server didn't take an answer the client sent: too late, an option a joker removed, or while frozen. */
+export type AnswerRejection = 'late' | 'removed' | 'frozen';
 
 export interface PlayerResult {
   choice: number | null;
@@ -183,16 +200,18 @@ export interface MatchRewards {
   /** Why a ranked match left the rating as it was (`rating` is null then). */
   unrated: UnratedReason | null;
   /** `shieldsUsed`: missed days a streak shield covered; `shieldEarned`: this run completed a week. */
-  daily: { rank: number; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
+  // `rank` is null for a guest: their run has questions of its own (see the server's guestDailyQuestions).
+  daily: { rank: number | null; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
   /** A challenge-link run: where it placed among everyone who played that link. */
   challenge: { id: string; rank: number; total: number } | null;
 }
 
 /**
  * `pair`: these two already played their rated games today (the win-trading guard). `guest`: guests play people
- * unrated. `no_contest`: the other side walked out before the match got going.
+ * unrated. `no_contest`: the other side walked out before the match got going. `cut`: we ended the match early (an
+ * update that couldn't wait, or a fault on our side).
  */
-export type UnratedReason = 'pair' | 'guest' | 'no_contest';
+export type UnratedReason = 'pair' | 'guest' | 'no_contest' | 'cut';
 
 export interface FinalStanding extends Standing {
   placement: number;
@@ -274,11 +293,15 @@ export interface ServerToClientEvents {
   'game:question': (p: QuestionPayload) => void;
   'game:answered': (p: { playerId: string }) => void;
   'game:retry': (p: { wrong: number }) => void;
+  /** An answer you sent wasn't taken (the client showed it as locked in). */
+  'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
   'game:powerup': (p: PowerupEvent) => void;
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
   'game:end': (p: GameEndPayload) => void;
+  /** A one-attempt run we cut short: no result, and the attempt can be played again. */
+  'game:aborted': (p: { gameId: string; message: string }) => void;
   /** Something about your friends changed (refetch the list); `requests` is your pending friend-request count. */
   'friends:update': (p: { requests: number }) => void;
   invite: (i: Invite) => void;
@@ -389,7 +412,8 @@ export interface DailyInfo {
   streak: number;
   /** Started today but not finished (a dropped attempt counts). */
   attempted: boolean;
-  played: { score: number; correct: number; rank: number } | null;
+  /** `rank` is null for a guest, whose run has questions of its own and isn't on the board. */
+  played: { score: number; correct: number; rank: number | null } | null;
   total: number;
   entries: LeaderboardEntry[];
 }

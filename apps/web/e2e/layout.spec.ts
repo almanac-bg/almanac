@@ -5,6 +5,7 @@ import {
   type Page,
   playMatch,
   signUp,
+  startAsGuest,
   startSolo,
   test,
   uniqueName,
@@ -127,4 +128,26 @@ test('without JavaScript the landing page and the legal pages are there in full'
   await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
   await expect(page.getByText('Тест Тестов', { exact: true })).toBeVisible();
   await context.close();
+});
+
+// The whole question on one screen: on a 375×667 phone (iPhone SE/8), a 320×568 one and a phone held sideways, the four answers and
+// the clock are all in view without scrolling — scrolling for "Г" costs the speed bonus.
+test('the question, its four answers and the clock fit a small phone and a phone held sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await startAsGuest(page);
+  await startSolo(page, 'Микс');
+  for (const size of [
+    { width: 375, height: 667 },
+    { width: 320, height: 568 },
+    { width: 740, height: 360 },
+  ]) {
+    await page.setViewportSize(size);
+    const last = page.locator('button[data-answer="3"]');
+    await expect(last).toBeVisible({ timeout: 15_000 });
+    for (const element of [last, page.getByRole('timer')]) {
+      const box = await element.boundingBox();
+      expect(box, `${size.width}×${size.height}`).not.toBeNull();
+      expect(box!.y + box!.height, `bottom at ${size.width}×${size.height}`).toBeLessThanOrEqual(size.height);
+    }
+  }
 });

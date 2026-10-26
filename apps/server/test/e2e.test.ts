@@ -34,6 +34,8 @@ let A: Account;
 let B: Account;
 let sa: Client;
 let sb: Client;
+/** Today's shared daily questions, as the first player of the day saw them. */
+let sharedDaily: string[] = [];
 const setXp = (userId: number, xp: number) => srv.db.prepare('UPDATE users SET xp = ? WHERE id = ?').run(xp, userId);
 
 before(async () => {
@@ -199,11 +201,32 @@ test('forfeit frees the player', T, async () => {
   sb.emit('queue:leave');
 });
 
-test('a match that ends while the player is offline shows its result on return', T, async () => {
+test('a run played alone waits for its player, and picks up where it was when they are back', T, async () => {
   const matches = () => (srv.db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number }).n;
   const before = matches();
   const question = next(sb, 'game:question');
   assert.ok((await emitAck(sb, 'solo:start', { category: 'mixed' })).ok);
+  const first = await question;
+  sb.disconnect();
+  await sleep(2_000); // longer than a whole match would wait for someone who dropped
+  assert.equal(matches(), before, 'not played out without them');
+
+  sb = connect(srv.url, B.cookie);
+  const start = next(sb, 'game:start');
+  const resumed = next(sb, 'game:question');
+  await connected(sb);
+  assert.equal((await start).startsInMs, 0, 'the same run, brought up to speed');
+  assert.ok((await resumed).index <= first.index + 1, 'no questions lost while away');
+  const left = next(sb, 'game:end', 3000).catch(() => null);
+  sb.emit('game:leave');
+  await left;
+});
+
+test('a match that ends while the player is offline shows its result on return', T, async () => {
+  const matches = () => (srv.db.prepare('SELECT COUNT(*) AS n FROM matches').get() as { n: number }).n;
+  const before = matches();
+  const question = next(sb, 'game:question');
+  assert.ok((await emitAck(sb, 'queue:join', 'duel')).ok); // a bot takes the other seat
   await question;
   sb.disconnect();
   for (let i = 0; i < 200 && matches() === before; i++) await sleep(100); // the match runs out without them
@@ -441,6 +464,7 @@ test('daily challenge', T, async () => {
   const play = autoPlay(sa, 'right', log);
   assert.ok((await emitAck(sa, 'daily:start')).ok);
   const { start, end } = await play;
+  sharedDaily = log.questions.map((q) => q.id);
   assert.equal(start!.mode, 'daily');
   assert.equal(start!.powerups.length, 0, 'no jokers in the daily');
   assert.equal(end.rewards!.daily!.rank, 1);
@@ -471,6 +495,42 @@ test('daily challenge', T, async () => {
   const board = await api.get('/api/leaderboard/daily', B.cookie);
   assert.equal(board.body.entries[0].user.id, A.user.id);
   assert.equal(board.body.me.rank, 2);
+});
+
+test('a guest plays a daily of their own, off the board; saving the profile opens the shared one', T, async () => {
+  const G = await guest(srv.url);
+  const sg = connect(srv.url, G.cookie);
+  await connected(sg);
+  const log = newLog();
+  const play = autoPlay(sg, 'right', log);
+  assert.ok((await emitAck(sg, 'daily:start')).ok);
+  const { end } = await play;
+  // A throwaway guest must not be a way to read the day's answers before playing for the board.
+  assert.notDeepEqual(
+    log.questions.map((q) => q.id),
+    sharedDaily,
+    'questions of its own',
+  );
+  assert.equal(end.rewards!.daily!.rank, null, 'no place on the board');
+  assert.equal((await api.get('/api/daily', G.cookie)).body.played.rank, null);
+  assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'still one run a day');
+
+  const saved = await api.send('POST', '/api/account/claim', G.cookie, {
+    username: `saver${Math.floor(Math.random() * 1e6)}`,
+    password: 'secret123',
+  });
+  assert.equal(saved.status, 200);
+  const logShared = newLog();
+  const again = autoPlay(sg, 'wrong', logShared);
+  assert.ok((await emitAck(sg, 'daily:start')).ok, 'with a profile, the shared daily is open');
+  const { end: shared } = await again;
+  assert.deepEqual(
+    logShared.questions.map((q) => q.id),
+    sharedDaily,
+    'the shared questions',
+  );
+  assert.equal(typeof shared.rewards!.daily!.rank, 'number', 'and a place on the board');
+  sg.close();
 });
 
 test('friends, invites and challenges', T, async () => {

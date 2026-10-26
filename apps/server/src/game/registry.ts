@@ -84,6 +84,14 @@ export interface NewGame {
   bots: Bot[];
 }
 
+/** A daily or challenge-link run that ended without a result: its one attempt is the player's again. */
+function releaseAttempts(game: Game) {
+  for (const h of game.humans) {
+    if (game.setup.dailyDay) releaseDailyAttempt(h.player.userId!, game.setup.dailyDay);
+    if (game.setup.challengeId) releaseChallengeAttempt(game.setup.challengeId, h.player.userId!);
+  }
+}
+
 /** How long a result waits for a player who was offline when their match ended. */
 const MISSED_RESULT_MS = 15 * 60_000;
 
@@ -93,6 +101,7 @@ export class GameRegistry {
   private missed = new Map<number, { start: GameStartPayload; end: GameEndPayload; until: number }>();
   private closedListeners: ((game: Game) => void)[] = [];
   private idleWaiters: (() => void)[] = [];
+  private draining = false;
 
   constructor(private io: IO) {}
 
@@ -111,6 +120,15 @@ export class GameRegistry {
 
   get activeGames() {
     return this.games.size;
+  }
+
+  /**
+   * The server is about to stop: runs waiting for an absent player end now (their attempt kept) instead of holding the
+   * restart up until the drain times out; from here on a run whose player drops ends the same way.
+   */
+  startDraining() {
+    this.draining = true;
+    for (const game of [...this.games.values()]) if (game.held) game.stop();
   }
 
   /** Ends every match still running (the server is stopping); returns how many there were. */
@@ -171,13 +189,12 @@ export class GameRegistry {
             return finalizeMatch(g, standings);
           } catch (err) {
             // Nothing of the match was saved: a daily or challenge-link run must not cost the player their one try.
-            for (const h of g.humans) {
-              if (g.setup.dailyDay) releaseDailyAttempt(h.player.userId!, g.setup.dailyDay);
-              if (g.setup.challengeId) releaseChallengeAttempt(g.setup.challengeId, h.player.userId!);
-            }
+            releaseAttempts(g);
             throw err;
           }
         },
+        release: releaseAttempts,
+        draining: () => this.draining,
         undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
         onClosed: (g) => this.close(g),
       },

@@ -62,8 +62,9 @@ test('a challenge link brings a signed-out friend in to beat the score', async (
   const guest = await me(friend);
   expect(guest.isGuest).toBe(true);
 
-  // Their place among everyone who played the link.
+  // Their place among everyone who played the link — a link is played alone, so nobody "walked out".
   await expect(friend.getByText('от 2 играчи')).toBeVisible();
+  await expect(friend.getByText(/напусна/)).toHaveCount(0);
   await expect(friend.getByRole('heading', { level: 1 })).toHaveText(/^(Първо място!|2-ро място)$/);
 
   // The link's board lists both, for either of them.

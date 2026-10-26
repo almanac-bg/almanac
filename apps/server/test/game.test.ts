@@ -47,13 +47,17 @@ function setup(opts: {
   bots?: ReturnType<typeof bot>[];
   elimination?: boolean;
   powerups?: PowerupId[];
+  /** A daily run (one attempt). */
+  daily?: boolean;
 }) {
   const events: { to: string; event: string; payload: unknown }[] = [];
   let standings: FinalStanding[] | null = null;
   const missed: number[] = [];
+  let released = 0;
+  let draining = false;
   const game = new Game(
     {
-      mode: 'custom',
+      mode: opts.daily ? 'daily' : 'custom',
       ranked: false,
       roomCode: null,
       hostUserId: null,
@@ -61,7 +65,7 @@ function setup(opts: {
       category: 'mixed',
       elimination: opts.elimination ?? false,
       teams: false,
-      dailyDay: null,
+      dailyDay: opts.daily ? '2026-10-26' : null,
       challengeId: null,
       questions: pickQuestions(10, 'mixed', new Map()),
       humans: opts.humans.map((id) => ({ player: player(`u${id}`, id), powerups: opts.powerups ?? [], emotes: [] })),
@@ -78,6 +82,10 @@ function setup(opts: {
         return new Map();
       },
       undelivered: (userId) => missed.push(userId),
+      release: () => {
+        released++;
+      },
+      draining: () => draining,
       onClosed: () => {},
     },
   );
@@ -88,6 +96,11 @@ function setup(opts: {
     game,
     events,
     missed,
+    released: () => released,
+    finalized: () => standings !== null,
+    drain: () => {
+      draining = true;
+    },
     placement: (id: string) => standings?.find((s) => s.id === id)?.placement,
     right: (userId: number) => game.answer(`u${userId}`, game.index, q().answer),
     wrong: (userId: number) => game.answer(`u${userId}`, game.index, (q().answer + 1) % 4),
@@ -129,14 +142,15 @@ test('whoever walks out first ranks last, and the last one standing wins at once
   assert.deepEqual(['u3', 'u2', 'u1'].map(g.placement), [1, 2, 3], 'leading before walking out does not help');
 });
 
-test('a dropped connection gets a few seconds before the question closes without them', () => {
-  const g = setup({ humans: [1] });
+test('in a match, a dropped connection gets a few seconds before the question closes without them', () => {
+  // The bot answers 2.5 s into each question.
+  const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
   g.game.setConnected('u1', false);
   advance(2_000);
   assert.equal(g.game.phase, 'question', 'a refresh does not cost the question');
   g.game.setConnected('u1', true);
   g.right(1);
-  advance(700);
+  advance(1_200);
   assert.equal(g.reveals()[0].results.u1.correct, true);
 
   advance(5_000); // next question
@@ -144,7 +158,80 @@ test('a dropped connection gets a few seconds before the question closes without
   advance(5_000);
   assert.equal(g.game.phase, 'question');
   advance(1_000);
-  assert.equal(g.game.phase, 'reveal', 'gone for good: no waiting out the whole clock');
+  assert.equal(g.game.phase, 'reveal', "gone for good: the others don't wait out the whole clock");
+});
+
+test('a run played alone waits for its player: no early close, and it holds before the next question', () => {
+  const g = setup({ humans: [1], daily: true });
+  g.right(1);
+  advance(1_000); // answered: revealed at once
+  g.game.setConnected('u1', false);
+  advance(4_500); // the reveal is over, but the next question doesn't open without them
+  assert.equal(g.game.index, 0);
+  assert.equal(g.game.held, true);
+  advance(60_000);
+  assert.equal(g.game.index, 0, 'still waiting a minute later');
+  g.game.setConnected('u1', true);
+  advance(2_600); // a moment to find the screen again
+  assert.deepEqual([g.game.phase, g.game.index], ['question', 1]);
+
+  // Gone mid-question: the clock keeps running (no time to look the answer up), but nothing closes early.
+  g.game.setConnected('u1', false);
+  advance(6_000);
+  assert.equal(g.game.phase, 'question', 'not closed after the 5 s a match would give');
+  advance(TIME);
+  assert.equal(g.game.phase, 'reveal', 'the clock still runs out');
+  assert.equal(g.reveals()[1].results.u1.choice, null);
+});
+
+test('a run alone ends with what was played after ten minutes away; when the server stops it keeps the attempt', () => {
+  const away = setup({ humans: [1], daily: true });
+  away.right(1);
+  away.game.setConnected('u1', false);
+  advance(9 * 60_000);
+  assert.notEqual(away.game.phase, 'ended');
+  advance(61_000);
+  assert.equal(away.game.phase, 'ended');
+  assert.equal(away.finalized(), true, 'the result is saved: one correct answer');
+  assert.equal(away.released(), 0);
+
+  mock.timers.reset();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 2_000_000 });
+  const cut = setup({ humans: [1], daily: true });
+  cut.right(1);
+  cut.game.setConnected('u1', false);
+  cut.drain(); // an update: nobody waits for the absent player
+  advance(5_000);
+  assert.equal(cut.game.phase, 'ended');
+  assert.equal(cut.finalized(), false, 'no result for a run we cut');
+  assert.equal(cut.released(), 1, 'the attempt is theirs again');
+  assert.ok(cut.events.some((e) => e.to === 'u1' && e.event === 'game:aborted'));
+});
+
+test("once every person is knocked out, the bots' final is decided at once (and quietly)", () => {
+  // Four players, eliminations after questions 3 and 8; u1 never answers, so goes out first.
+  const g = setup({
+    humans: [1],
+    bots: [bot('b1', 'strong'), bot('b2', 'strong'), bot('b3', 'strong')],
+    elimination: true,
+  });
+  advance(3 * (TIME + 5_000));
+  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 3);
+  const questionsBefore = g.events.filter((e) => e.event === 'game:question').length;
+  advance(6_100); // the elimination reveal
+  assert.equal(g.game.phase, 'ended', 'no minutes of bots-only questions');
+  assert.equal(g.game.participants.get('b1')!.faced, 10, 'the rest was played out');
+  assert.equal(g.events.filter((e) => e.event === 'game:question').length, questionsBefore, 'nothing flashed by');
+  assert.ok(g.placement('u1'));
+});
+
+test("an answer the server didn't take is answered with the reason", () => {
+  const g = setup({ humans: [1], daily: true });
+  advance(TIME + 500); // the clock ran out unanswered
+  assert.equal(g.game.phase, 'reveal');
+  g.game.answer('u1', 0, 2);
+  const rejected = g.events.find((e) => e.to === 'u1' && e.event === 'game:rejected');
+  assert.deepEqual(rejected?.payload, { index: 0, reason: 'late' });
 });
 
 test('when every human is gone, the match plays out without them instead of freezing the score', () => {

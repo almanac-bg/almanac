@@ -4,7 +4,9 @@ import { Ban, Check, Flag, PenLine } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { useLoad } from '../../lib/load';
 import { Avatar, LevelBadge } from '../Avatar';
+import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
 
 const reasonLabel = (id: string) => REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
@@ -17,24 +19,19 @@ const BAN_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
-  const [groups, setGroups] = useState<ReportGroup[] | null>(null);
+  const { data, error, retry, setData } = useLoad(() => api.adminReports());
+  const groups: ReportGroup[] | null = data?.groups ?? null;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once; `onOpen` is recreated on every parent render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `onOpen` is recreated on every parent render
   useEffect(() => {
-    api
-      .adminReports()
-      .then((r) => {
-        setGroups(r.groups);
-        onOpen(r.groups.length);
-      })
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, []);
+    if (groups) onOpen(groups.length);
+  }, [groups]);
 
   function resolved(next: ReportGroup[]) {
-    setGroups(next);
-    onOpen(next.length);
+    if (data) setData({ ...data, groups: next });
   }
 
+  if (error && !groups) return <LoadError title="Докладите не се заредиха" error={error} onRetry={retry} />;
   if (!groups) {
     return (
       <div className="grid place-items-center py-24">

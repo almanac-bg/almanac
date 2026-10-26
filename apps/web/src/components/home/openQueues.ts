@@ -1,5 +1,5 @@
 import { useStore } from '@quiz/client';
-import { DEFAULT_OPEN_QUEUES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
+import { ACHIEVEMENTS, DEFAULT_OPEN_QUEUES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 import { useMemo } from 'react';
 
 /**
@@ -12,4 +12,12 @@ export function useOpenQueues(): QueueModeId[] {
     const open = key.split(',');
     return QUEUE_MODES.filter((m) => open.includes(m));
   }, [key]);
+}
+
+/**
+ * The achievements on offer: one only a closed ranked queue can award isn't — unless it was earned while that queue was
+ * open. The profile and the achievements page count the same set.
+ */
+export function availableAchievements(open: QueueModeId[], earned: (id: string) => boolean) {
+  return ACHIEVEMENTS.filter((a) => !a.queue || open.includes(a.queue) || earned(a.id));
 }

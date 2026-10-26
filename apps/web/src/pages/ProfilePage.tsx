@@ -1,6 +1,5 @@
 import { actions, api, fmt, longDate, ordinal, pct, plural, seconds, timeAgo, toast, useStore } from '@quiz/client';
 import {
-  ACHIEVEMENTS,
   achievementById,
   CATEGORIES,
   isQueueMode,
@@ -20,6 +19,7 @@ import { Check, Flag, Swords, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -37,7 +37,7 @@ export function ProfilePage() {
   usePageTitle(username === me.username ? 'Профил' : username);
   const roomy = useMediaQuery('(min-width: 640px)');
   const friendsVersion = useStore((s) => s.friendsVersion);
-  const openQueues = useStore((s) => s.lobby?.modes);
+  const openQueues = useOpenQueues();
   // A new name loads afresh; new XP or a friendship change refreshes the one on screen.
   const { data, error, retry, setData } = useLoad(() => api.profile(username), username, `${me.xp}:${friendsVersion}`);
 
@@ -56,9 +56,7 @@ export function ProfilePage() {
   const isMe = user.id === me.id;
   const played = MODE_ORDER.filter((id) => data.modes.some((m) => m.mode === id));
   // Only what can be played today: a ranked queue that hasn't opened yet would read as a to-do nobody can do.
-  const unplayed = MODE_ORDER.filter(
-    (id) => !played.includes(id) && (!isQueueMode(id) || (openQueues ?? []).includes(id)),
-  );
+  const unplayed = MODE_ORDER.filter((id) => !played.includes(id) && (!isQueueMode(id) || openQueues.includes(id)));
 
   return (
     <div className="space-y-8">
@@ -74,7 +72,8 @@ export function ProfilePage() {
               {user.username}
             </h1>
             <p className="mt-1 text-sm text-fg-3">
-              Играе от {longDate(user.createdAt)} · {data.achievements.length}/{ACHIEVEMENTS.length} постижения
+              Играе от {longDate(user.createdAt)} · {data.achievements.length}/
+              {availableAchievements(openQueues, (id) => data.achievements.some((a) => a.id === id)).length} постижения
             </p>
           </div>
           <div className="col-span-2 max-w-md sm:col-span-1 sm:col-start-2 sm:self-start">

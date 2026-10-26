@@ -2,19 +2,23 @@ import { api, plural, timeAgo, toast, useStore } from '@quiz/client';
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
 import { Lock, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
+import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
 export function SubmitPage() {
   usePageTitle('Предложи въпрос');
   const me = useStore((s) => s.me)!;
   const unlocked = me.level >= SUBMISSION_RULES.minLevel;
+  // Each question sent: "Моите предложения" below loads again.
+  const [sent, setSent] = useState(0);
 
   return (
     <div className="space-y-8">
@@ -31,11 +35,11 @@ export function SubmitPage() {
           Въпросите влизат в играта с името на автора — запази профила си с име и парола, за да предлагаш.
         </GuestNudge>
       ) : unlocked ? (
-        <SubmitForm />
+        <SubmitForm onSent={() => setSent((n) => n + 1)} />
       ) : (
         <LockedCard level={me.level} />
       )}
-      {unlocked && !me.isGuest && <MySubmissions />}
+      {unlocked && !me.isGuest && <MySubmissions refresh={sent} />}
     </div>
   );
 }
@@ -59,7 +63,7 @@ function LockedCard({ level }: { level: number }) {
   );
 }
 
-function SubmitForm() {
+function SubmitForm({ onSent }: { onSent: () => void }) {
   const [draft, setDraft] = useState<QuestionDraft>(emptyDraft);
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,8 +81,7 @@ function SubmitForm() {
       toast({ kind: 'success', title: 'Благодарим! Въпросът чака одобрение.', icon: '✍️' });
       setDraft(emptyDraft());
       setShowErrors(false);
-      // Tells the "Моите предложения" list below to refresh.
-      window.dispatchEvent(new CustomEvent('quiz:submitted'));
+      onSent();
     } catch (err) {
       toast({ kind: 'error', title: err instanceof Error ? err.message : 'Неуспешно изпращане.' });
     } finally {
@@ -108,19 +111,9 @@ function SubmitForm() {
   );
 }
 
-function MySubmissions() {
-  const [items, setItems] = useState<Submission[] | null>(null);
-
-  useEffect(() => {
-    const load = () =>
-      api
-        .mySubmissions()
-        .then((r) => setItems(r.submissions))
-        .catch((e) => toast({ kind: 'error', title: e.message }));
-    void load();
-    window.addEventListener('quiz:submitted', load);
-    return () => window.removeEventListener('quiz:submitted', load);
-  }, []);
+function MySubmissions({ refresh }: { refresh: number }) {
+  const { data, error, retry } = useLoad(() => api.mySubmissions(), '', refresh);
+  const items: Submission[] | null = data?.submissions ?? null;
 
   const approved = items?.filter((s) => s.status === 'approved').length ?? 0;
 
@@ -129,7 +122,9 @@ function MySubmissions() {
       <SectionTitle aside={items && items.length > 0 && <span className="text-sm text-fg-3">{approved} одобрени</span>}>
         Моите предложения
       </SectionTitle>
-      {!items ? (
+      {error && !items ? (
+        <LoadError title="Предложенията ти не се заредиха" error={error} onRetry={retry} />
+      ) : !items ? (
         <div className="grid place-items-center py-12">
           <Spinner className="size-6 text-violet-400" />
         </div>

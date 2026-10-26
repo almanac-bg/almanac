@@ -707,10 +707,17 @@ function DailyCard({ className }: { className?: string }) {
                   <div className="text-xs text-fg-3">Твоят резултат</div>
                   <div className="text-2xl font-bold">
                     {fmt(info.played.score)}{' '}
-                    <span className="text-base font-semibold text-amber-300">
-                      #{info.played.rank} <span className="text-fg-3">от {info.total}</span>
-                    </span>
+                    {info.played.rank !== null && (
+                      <span className="text-base font-semibold text-amber-300">
+                        #{info.played.rank} <span className="text-fg-3">от {info.total}</span>
+                      </span>
+                    )}
                   </div>
+                  {info.played.rank === null && (
+                    <p className="mt-1 max-w-64 text-xs text-fg-3">
+                      Като гост играеш свои въпроси. С профил — общите и класацията.
+                    </p>
+                  )}
                 </div>
                 <div className="ml-auto flex gap-2">
                   {savedShare && (

@@ -1,7 +1,7 @@
 import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
-import { type PreparedQuestion, pickQuestions, reorderOptions, seededRng } from './questions';
+import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, seededRng } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
 import { getUser, toPublicUser, type UserRow } from './users';
@@ -27,6 +27,20 @@ function dailySet(day: string): PreparedQuestion[] {
  */
 export function dailyQuestions(day: string, userId: number): PreparedQuestion[] {
   return reorderOptions(dailySet(day), `daily:${day}:${userId}`);
+}
+
+/**
+ * A guest's run of the day: ten questions of its own rather than the shared set. A guest costs one click, so with the
+ * shared set anyone could read the day's answers off a throwaway guest and then top the board with their real profile.
+ * Guests aren't on the board anyway; saving the profile opens the shared set to them (forgetGuestDaily).
+ */
+export function guestDailyQuestions(userId: number): PreparedQuestion[] {
+  return pickQuestions(MODES.daily.questions, 'mixed', recentFor([userId]));
+}
+
+/** A guest just saved their profile: today's guest run (its own questions) makes way for the shared set and the board. */
+export function forgetGuestDaily(userId: number) {
+  run('DELETE FROM daily_results WHERE user_id = ? AND day = ?', userId, dayKey());
 }
 
 /**
@@ -62,8 +76,14 @@ export function releaseDailyAttempt(userId: number, day: string) {
   run('DELETE FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NULL', userId, day);
 }
 
-/** Place on the day's board. Guests aren't listed on it, but a guest still sees where they'd stand. */
-function rankOf(day: string, score: number, timeMs: number, guest = false) {
+/** Place on the day's board, and how many are on it. A guest's run has questions of its own: no place for it. */
+function rankOf(day: string, score: number, timeMs: number, guest = false): { rank: number | null; total: number } {
+  const listed = one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0`,
+    day,
+  )!.n;
+  if (guest) return { rank: null, total: listed };
   const better = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
      WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0
@@ -73,13 +93,7 @@ function rankOf(day: string, score: number, timeMs: number, guest = false) {
     score,
     timeMs,
   )!.n;
-  const listed = one<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0`,
-    day,
-  )!.n;
-  const total = listed + (guest ? 1 : 0);
-  return { rank: better + 1, total };
+  return { rank: better + 1, total: listed };
 }
 
 /** Saves the result and advances the player's day streak. */
@@ -156,7 +170,7 @@ export function dailyInfo(userId: number): DailyInfo {
     streak: liveDailyStreak(me),
     attempted: !!mine,
     played: played && { score: played.score, correct: played.correct, rank: played.rank },
-    total: rankOf(day, 0, 0, guest && !!mine?.finished_at).total,
+    total: rankOf(day, 0, 0, true).total,
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),
   };
 }

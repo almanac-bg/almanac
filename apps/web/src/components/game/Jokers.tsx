@@ -123,7 +123,14 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
       <div className="flex flex-wrap items-center gap-2">
         <ActiveJokers game={game} />
       </div>
-      <div className={clsx('flex flex-wrap gap-2 transition-opacity', offline && 'opacity-50')}>
+      {/* Phones (and phones held sideways): one row of icons, so the jokers sit on the same screen as the answers. The
+          names are in each button's label and tooltip, and in the guide behind "?". */}
+      <div
+        className={clsx(
+          'flex flex-wrap gap-2 transition-opacity max-sm:flex-nowrap max-sm:gap-1.5 flat:flex-nowrap flat:gap-1.5',
+          offline && 'opacity-50',
+        )}
+      >
         {jokers.map((p) => {
           const blocked = blockedBy(p);
           const used = game.usedPowerups.includes(p.id);
@@ -136,7 +143,7 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
               title={blocked ? `${p.name} — ${blocked}` : p.description}
               aria-label={`${p.name}: ${p.description}${blocked ? ` (${blocked})` : ''}`}
               className={clsx(
-                'focus-ring inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all',
+                'focus-ring inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:min-w-10 max-sm:max-w-14 max-sm:flex-1 max-sm:justify-center max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
                 used
                   ? 'border-line text-fg-3 line-through opacity-50'
                   : blocked
@@ -146,10 +153,10 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
                       : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
               )}
             >
-              <span className="text-base leading-none" aria-hidden>
+              <span className="text-base leading-none max-sm:text-lg flat:text-lg" aria-hidden>
                 {p.icon}
               </span>
-              {p.name}
+              <span className="max-sm:hidden flat:hidden">{p.name}</span>
             </button>
           );
         })}
@@ -161,7 +168,7 @@ export function PowerupBar({ game, guide, offline }: { game: LiveGame; guide: Jo
           aria-label="Какво правят жокерите?"
           title="Какво правят жокерите?"
           className={clsx(
-            'focus-ring grid size-11 place-items-center rounded-xl border transition-colors',
+            'focus-ring grid size-11 shrink-0 place-items-center rounded-xl border transition-colors',
             guide.open ? 'border-white/25 bg-white/10 text-fg' : 'border-line text-fg-3 hover:bg-white/5 hover:text-fg',
           )}
         >

@@ -58,9 +58,9 @@ const player = (userId: number): GamePlayer => ({
 
 /**
  * A ranked duel: `winner` answers right, the other wrong, and the other walks out after `leaveAfter` questions
- * (0: during the countdown; null: never).
+ * (0: during the countdown; null: never). `cutAfter`: the server stops the match after that many questions.
  */
-function duel(winner: number, other: number, leaveAfter: number | null) {
+function duel(winner: number, other: number, leaveAfter: number | null, cutAfter: number | null = null) {
   const ends = new Map<number, GameEndPayload>();
   const game = new Game(
     {
@@ -85,7 +85,7 @@ function duel(winner: number, other: number, leaveAfter: number | null) {
       },
       toGameExcept: () => {},
     } satisfies GameEmitter,
-    { finalize: finalizeMatch, undelivered: () => {}, onClosed: () => {} },
+    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
   );
   game.start();
   if (leaveAfter === 0) game.leave(`u${other}`);
@@ -93,6 +93,10 @@ function duel(winner: number, other: number, leaveAfter: number | null) {
   for (let i = 0; game.phase !== 'ended'; i++) {
     if (i === leaveAfter) {
       game.leave(`u${other}`);
+      break;
+    }
+    if (i === cutAfter) {
+      game.stop();
       break;
     }
     const q = game.questions[game.index];
@@ -147,6 +151,21 @@ test('a walkout later in the match is a win, paid for the part that was played',
   assert.equal(getUser(a)!.wins, 1);
 });
 
+test('a match we cut short (an update that could not wait) pays for what was played, unrated and with no winner', () => {
+  const [a, b] = [account(), account()];
+  const { end, deltaOf } = duel(a, b, null, 5);
+  assert.equal(end.noContest, false);
+  assert.equal(end.rewards!.rating, null);
+  assert.equal(end.rewards!.unrated, 'cut');
+  assert.deepEqual([deltaOf(a), deltaOf(b)], [null, null]);
+  assert.ok(!labels(end).includes('Победа'), labels(end).join(', '));
+  assert.ok(
+    labels(end).some((l) => l.startsWith('Верни отговори')),
+    'the answers still count',
+  );
+  assert.equal(getUser(a)!.wins, 0);
+});
+
 test('guests play people unrated, and both sides are told why', () => {
   const a = account();
   const g = createGuest();
@@ -167,6 +186,16 @@ test(`the same two people move each other's rating ${RATED_GAMES_PER_PAIR} times
   const capped = duel(a, b, 3).end.rewards!;
   assert.equal(capped.rating, null);
   assert.equal(capped.unrated, 'pair');
+});
+
+test('a walkout during the countdown is no game between the two for that limit, whoever walked out', () => {
+  // The leaver has the lower account number: their row is the one with a rating change.
+  const [low, high] = [account(), account()];
+  duel(high, low, 0);
+  for (let i = 0; i < RATED_GAMES_PER_PAIR; i++) {
+    assert.notEqual(duel(high, low, 3).end.rewards!.rating, null, `game ${i + 1} is rated`);
+  }
+  assert.equal(duel(high, low, 3).end.rewards!.unrated, 'pair');
 });
 
 test('a guest never draws a quest only an account can finish', () => {

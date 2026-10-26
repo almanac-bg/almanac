@@ -31,7 +31,7 @@ import {
 } from '../auth';
 import { challengeInfo, challengePreview, myChallenges } from '../challenges';
 import { config, operatorInfo } from '../config';
-import { dailyInfo, liveDailyStreak } from '../daily';
+import { dailyInfo, forgetGuestDaily, liveDailyStreak } from '../daily';
 import { all, isUniqueViolation, one, run, tx } from '../db';
 import {
   changePassword,
@@ -439,6 +439,8 @@ api.post('/account/claim', requireAuth, async (req, res) => {
     return;
   }
   if (creds.email) requestEmailChange(me.id, creds.email);
+  // Today's daily as a guest had questions of its own; with a profile, the shared ones (and the board) are open.
+  forgetGuestDaily(me.id);
   count('claims');
   res.json({ user: getMe(me.id) });
 });
@@ -876,9 +878,11 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
     return {
       board,
       entries: info.entries,
-      me: info.played
-        ? { rank: info.played.rank, user: toPublicUser(me), value: info.played.score, correct: info.played.correct }
-        : null,
+      // A guest's run had questions of its own: no place on this board.
+      me:
+        info.played && info.played.rank !== null
+          ? { rank: info.played.rank, user: toPublicUser(me), value: info.played.score, correct: info.played.correct }
+          : null,
       season: null,
     };
   }

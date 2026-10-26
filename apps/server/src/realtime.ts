@@ -14,7 +14,7 @@ import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
 import { config } from './config';
-import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
+import { claimDailyAttempt, dailyQuestions, guestDailyQuestions, releaseDailyAttempt } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
@@ -248,7 +248,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
           category: 'mixed',
           elimination: false,
           dailyDay: claim.day,
-          questions: dailyQuestions(claim.day, userId),
+          questions: guest() ? guestDailyQuestions(userId) : dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
         });
@@ -389,6 +389,7 @@ export function createRealtime(httpServer: HttpServer): Realtime {
     activeGames: () => games.activeGames,
     async drain(maxMs) {
       draining = true;
+      games.startDraining();
       for (const userId of matchmaker.clear()) notifyUser(userId, 'notice', { kind: 'info', message: DRAINING });
       io.emit('server:draining', { message: DRAINING });
       await games.idle(maxMs);

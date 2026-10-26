@@ -1,4 +1,4 @@
-import { actions, api, connectRealtime, disconnectRealtime, setState, toast, useStore } from '@quiz/client';
+import { actions, api, connectRealtime, disconnectRealtime, getState, setState, toast, useStore } from '@quiz/client';
 import { routeKind } from '@quiz/shared';
 import { MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef } from 'react';
@@ -66,10 +66,15 @@ export function App() {
   }, [account]);
 
   useEffect(() => {
+    // A sign-in made while this was on its way (the drawn landing page is live at once) is newer: keep it.
+    const before = getState().me;
+    const settle = (user: typeof before) => {
+      if (getState().me === before) setState({ me: user });
+    };
     api
       .me()
-      .then(({ user }) => setState({ me: user }))
-      .catch(() => setState({ me: null }))
+      .then(({ user }) => settle(user))
+      .catch(() => settle(null))
       .finally(() => setState({ authChecked: true }));
   }, []);
 

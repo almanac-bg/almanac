@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  type AnswerRejection,
   type CategoryChoice,
   type CategoryId,
   type Difficulty,
@@ -36,6 +37,13 @@ const REVEAL_MS = 4_000;
 const ELIMINATION_EXTRA_MS = 2_000;
 /** If every human has been disconnected this long, the rest of the match plays out without them. */
 const ABANDON_MS = 30_000;
+/**
+ * A run played alone (solo, the daily, a challenge link) has nobody waiting on it: it waits this long for its player to
+ * come back before it ends with what was played.
+ */
+const ALONE_ABANDON_MS = 10 * 60_000;
+/** A run that waited for its player goes on this long after they're back, so the next question doesn't ambush them. */
+const RESUME_MS = 2_500;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
@@ -54,6 +62,10 @@ export interface GameEmitter {
 export interface GameHooks {
   /** Persist results; returns per-user rewards. */
   finalize(game: Game, standings: FinalStanding[]): Map<number, MatchRewards>;
+  /** A one-attempt run ended without a result (cut short by us): the attempt is the player's again. */
+  release(game: Game): void;
+  /** The server is about to stop: a run waiting for an absent player shouldn't hold it up. */
+  draining(): boolean;
   /** The match ended while this player was offline: they get the result when they're back. */
   undelivered(userId: number, start: GameStartPayload, end: GameEndPayload): void;
   onClosed(game: Game): void;
@@ -131,12 +143,20 @@ export class Game {
   played = 0;
   /** Ended before the last question because only one side was left in it. */
   endedByWalkout = false;
+  /** Ended by us, not by the game: the server stopping, or a bug in this match. */
+  cutShort = false;
+  /** Nobody else in it (solo, the daily, a challenge link): no one is waiting on its player. */
+  readonly alone: boolean;
+  /** A run played alone, paused before its next question until its player is back. */
+  held = false;
 
   private questionStartedAt = 0;
   private timers = new Set<NodeJS.Timeout>();
   private questionTimer: NodeJS.Timeout | null = null;
   private abandonTimer: NodeJS.Timeout | null = null;
   private leaves = 0;
+  /** Playing the rest out at once with nobody watching: nothing goes out to the match's room. */
+  private quiet = false;
 
   constructor(
     readonly setup: GameSetup,
@@ -152,6 +172,7 @@ export class Game {
       this.participants.set(h.player.id, this.newParticipant(h.player, null, powerups, h.emotes));
     }
     for (const b of setup.bots) this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [], []));
+    this.alone = solo;
     this.schedule =
       setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
   }
@@ -171,25 +192,31 @@ export class Game {
   start() {
     for (const p of this.humans)
       this.emit.toUser(p.player.userId!, 'game:start', this.startPayload(p.player.id, COUNTDOWN_MS));
-    this.later(COUNTDOWN_MS, () => this.nextQuestion());
+    this.later(COUNTDOWN_MS, () => this.advance());
   }
 
   // ─── Player actions ──────────────────────────────────────────────────────
 
   answer(playerId: string, index: number, choice: number) {
     const p = this.participants.get(playerId);
-    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p) || p.answer) return;
-    if (!Number.isInteger(choice) || choice < 0 || choice > 3 || p.removed.includes(choice)) return;
+    if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+    // The client drew the pick as locked in: say why it wasn't taken, so it can unlock it and tell the player.
+    const reject = (reason: AnswerRejection) => {
+      if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
+    };
+    if (this.phase !== 'question' || index !== this.index) return reject('late');
+    if (!Number.isInteger(choice) || choice < 0 || choice > 3) return;
+    if (p.removed.includes(choice)) return reject('removed');
     const now = Date.now();
     if (p.frozenUntil > now) {
       // Bots wait the freeze out; humans' clients keep the buttons disabled.
       if (p.brain)
         this.later((p.frozenUntil - now) / config.gameTimeScale + 300, () => this.answer(playerId, index, choice));
-      return;
+      return reject('frozen');
     }
     const limit = this.setup.timeMs + p.extraMs;
     const elapsed = this.elapsed();
-    if (elapsed > limit + GRACE_MS) return;
+    if (elapsed > limit + GRACE_MS) return reject('late');
 
     const q = this.questions[this.index];
     if (p.retryArmed && p.firstWrong === null && choice !== q.answer) {
@@ -200,7 +227,7 @@ export class Game {
       return;
     }
     p.answer = { choice, timeMs: Math.min(elapsed, limit), retried: p.firstWrong !== null };
-    this.emit.toGame('game:answered', { playerId });
+    this.toGame('game:answered', { playerId });
     this.maybeRevealEarly();
   }
 
@@ -224,7 +251,7 @@ export class Game {
       target.frozenUntil = Date.now() + FREEZE_MS * config.gameTimeScale;
       p.freezesUsed++;
       this.consume(p, powerup);
-      this.emit.toGame('game:powerup', { playerId, powerup, targetId: target.player.id });
+      this.toGame('game:powerup', { playerId, powerup, targetId: target.player.id });
       return;
     }
 
@@ -237,11 +264,11 @@ export class Game {
         break;
       case 'double':
         p.doubled = true;
-        this.emit.toGame('game:powerup', { playerId, powerup });
+        this.toGame('game:powerup', { playerId, powerup });
         break;
       case 'retry':
         p.retryArmed = true;
-        this.emit.toGame('game:powerup', { playerId, powerup });
+        this.toGame('game:powerup', { playerId, powerup });
         break;
       case 'time':
         p.extraMs = TIME_BONUS_MS;
@@ -258,7 +285,7 @@ export class Game {
     const now = Date.now();
     if (now - p.lastReactionAt < REACTION_COOLDOWN_MS) return;
     p.lastReactionAt = now;
-    this.emit.toGame('game:reaction', { playerId, emote });
+    this.toGame('game:reaction', { playerId, emote });
   }
 
   leave(playerId: string) {
@@ -267,7 +294,7 @@ export class Game {
     p.left = true;
     p.leftOrder = ++this.leaves;
     p.connected = false;
-    this.emit.toGame('game:presence', { playerId, connected: false, left: true });
+    this.toGame('game:presence', { playerId, connected: false, left: true });
     if (this.decided()) this.endedByWalkout = true;
     if (this.humans.every((h) => h.left) || this.decided()) return this.end();
     this.maybeRevealEarly();
@@ -279,10 +306,14 @@ export class Game {
     if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
     p.connected = connected;
     p.disconnectedAt = connected ? null : Date.now();
-    this.emit.toGame('game:presence', { playerId, connected, left: false });
+    this.toGame('game:presence', { playerId, connected, left: false });
     if (connected && this.abandonTimer) {
       clearTimeout(this.abandonTimer);
       this.abandonTimer = null;
+    }
+    if (connected && this.held) {
+      this.held = false;
+      this.later(RESUME_MS, () => this.advance());
     }
     if (!connected) {
       this.later(DISCONNECT_GRACE_MS + 50, () => this.maybeRevealEarly());
@@ -290,20 +321,60 @@ export class Game {
     }
   }
 
-  /** Payloads that bring a (re)connecting client up to speed. */
+  /**
+   * Payloads that bring a (re)connecting client up to speed, including where this player stands on the open question
+   * (their pick, jokers, extra time, a freeze): a fresh tab has none of it.
+   */
   syncFor(playerId: string): { start: GameStartPayload; question: QuestionPayload | null } {
+    const p = this.participants.get(playerId)!;
+    const now = Date.now();
     return {
       start: this.startPayload(playerId, 0),
-      question: this.phase === 'question' ? this.questionPayload() : null,
+      question:
+        this.phase === 'question'
+          ? {
+              ...this.questionPayload(),
+              remainingMs: Math.max(0, this.setup.timeMs + p.extraMs - this.elapsed()),
+              mine: {
+                choice: p.answer?.choice ?? null,
+                removed: p.removed,
+                doubled: p.doubled,
+                retryArmed: p.retryArmed,
+                retryPrompt: p.firstWrong !== null && !p.answer,
+                extraMs: p.extraMs,
+                frozenMs: Math.max(0, (p.frozenUntil - now) / config.gameTimeScale),
+                powerupThisQuestion: p.powerupThisQuestion,
+              },
+            }
+          : null,
     };
   }
 
-  /** The server is stopping and can't wait any longer: the match ends here, and the scores so far count. */
+  /**
+   * The server is stopping and can't wait any longer: the match ends here, and the scores so far count (unrated: we cut
+   * it, not the players). A run played alone gets its attempt back instead.
+   */
   stop() {
+    this.cutShort = true;
     this.guard(() => this.end());
   }
 
   // ─── Flow ────────────────────────────────────────────────────────────────
+
+  /**
+   * On to the next question, unless nobody is left to play it. A run played alone waits for its player (a locked phone
+   * or a tunnel shouldn't cost the day's one attempt); and once every person in a match is knocked out, the bots' final
+   * is decided at once rather than keeping the knocked-out waiting minutes for their result.
+   */
+  private advance() {
+    if (this.alone && !this.humans[0]?.connected) {
+      if (this.hooks.draining()) return this.stop();
+      this.held = true;
+      return;
+    }
+    if (this.participants.size > 1 && !this.humans.some((h) => this.isActive(h))) return this.finishUnattended(true);
+    this.nextQuestion();
+  }
 
   private nextQuestion() {
     this.index++;
@@ -320,7 +391,7 @@ export class Game {
       p.retryArmed = false;
       p.firstWrong = null;
     }
-    this.emit.toGame('game:question', this.questionPayload());
+    this.toGame('game:question', this.questionPayload());
     this.scheduleBots();
     this.questionTimer = this.later(this.setup.timeMs + GRACE_MS, () => this.reveal());
   }
@@ -338,8 +409,9 @@ export class Game {
     const now = Date.now();
     const reconnecting = (p: Participant) =>
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
+    // Alone, the clock is the only limit: nobody else is waiting for the question to close.
     const waitingOn = [...this.participants.values()].filter(
-      (p) => this.isActive(p) && (p.connected || p.brain || reconnecting(p)),
+      (p) => this.isActive(p) && (this.alone || p.connected || p.brain || reconnecting(p)),
     );
     if (waitingOn.some((p) => !p.answer)) return;
     if (this.questionTimer) clearTimeout(this.questionTimer);
@@ -411,7 +483,7 @@ export class Game {
     }
 
     const nextInMs = REVEAL_MS + (eliminated.length ? ELIMINATION_EXTRA_MS : 0);
-    this.emit.toGame('game:reveal', {
+    this.toGame('game:reveal', {
       index: this.index,
       correct: q.answer,
       results,
@@ -420,7 +492,7 @@ export class Game {
       nextInMs,
     });
     this.botReactions(results);
-    this.later(nextInMs, () => this.nextQuestion());
+    this.later(nextInMs, () => this.advance());
   }
 
   private end() {
@@ -428,6 +500,23 @@ export class Game {
     this.phase = 'ended';
     this.clearTimers();
     if (this.abandonTimer) clearTimeout(this.abandonTimer);
+
+    // A one-attempt run we cut short has no fair result: nothing is saved and the attempt is the player's again.
+    if (this.cutShort && (this.setup.dailyDay || this.setup.challengeId)) {
+      try {
+        this.hooks.release(this);
+      } catch (err) {
+        void reportError(err, 'release attempt', { extra: { match: this.id } });
+      }
+      for (const p of this.humans) {
+        if (p.left) continue;
+        this.emit.toUser(p.player.userId!, 'game:aborted', {
+          gameId: this.id,
+          message: 'Мачът прекъсна при нас — опитът ти не е изгубен. Изиграй го отново след малко.',
+        });
+      }
+      return this.hooks.onClosed(this);
+    }
 
     const teamScores = this.setup.teams ? this.teamScores() : null;
     const standings = this.finalStandings(teamScores);
@@ -523,11 +612,13 @@ export class Game {
   }
 
   /**
-   * Every human has been gone a while: the rest of the match plays out at once, exactly as if they had stayed and not
-   * answered — so dropping the connection can't lock in a lead.
+   * Every human has been gone a while (or is knocked out): the rest of the match plays out at once, exactly as if they
+   * had stayed and not answered — so dropping the connection can't lock in a lead. `quiet`: the knocked-out are still
+   * watching; they get the result, not a flurry of questions.
    */
-  private finishUnattended() {
+  private finishUnattended(quiet = false) {
     this.abandonTimer = null;
+    this.quiet = quiet;
     while (this.phase !== 'ended') {
       if (this.phase !== 'question') {
         this.nextQuestion();
@@ -548,7 +639,7 @@ export class Game {
       if (!p.brain || !result || Math.random() > 0.12) continue;
       const pool = result.correct ? BOT_EMOTES.good : BOT_EMOTES.bad;
       const emote = pool[Math.floor(Math.random() * pool.length)];
-      this.later(300 + Math.random() * 1500, () => this.emit.toGame('game:reaction', { playerId: p.player.id, emote }));
+      this.later(300 + Math.random() * 1500, () => this.toGame('game:reaction', { playerId: p.player.id, emote }));
     }
   }
 
@@ -689,8 +780,14 @@ export class Game {
   private checkAbandoned() {
     const anyoneHere = this.humans.some((h) => !h.left && h.connected);
     if (anyoneHere || this.abandonTimer) return;
+    const wait = this.alone ? ALONE_ABANDON_MS : ABANDON_MS;
     // Not one of `timers` (every reveal clears those), but on the same game clock.
-    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), ABANDON_MS * config.gameTimeScale);
+    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), wait * config.gameTimeScale);
+  }
+
+  /** Everything the match's room hears goes through here (and nothing while it's being played out unwatched). */
+  private toGame<E extends keyof Events>(event: E, ...args: Args<E>) {
+    if (!this.quiet) this.emit.toGame(event, ...args);
   }
 
   private later(ms: number, fn: () => void): NodeJS.Timeout {
@@ -711,6 +808,7 @@ export class Game {
       fn();
     } catch (err) {
       void reportError(err, 'match', { extra: { match: this.id, mode: this.setup.mode } });
+      this.cutShort = true;
       try {
         if (this.phase !== 'ended') return this.end();
       } catch (endErr) {

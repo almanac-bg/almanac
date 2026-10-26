@@ -8,10 +8,12 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { LaunchStatsPanel } from '../components/admin/LaunchStatsPanel';
 import { QuestionReportsQueue } from '../components/admin/QuestionReportsQueue';
 import { ReportsQueue } from '../components/admin/ReportsQueue';
+import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
+import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
 const toDraft = (s: Submission): QuestionDraft => ({
@@ -81,26 +83,17 @@ export function AdminPage() {
 
 function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
   const [status, setStatus] = useState<SubmissionStatus>('pending');
-  const [items, setItems] = useState<Submission[] | null>(null);
-  const [pending, setPending] = useState<number | null>(null);
+  const { data, error, retry, setData } = useLoad(() => api.adminSubmissions(status), status);
+  const items: Submission[] | null = data?.submissions ?? null;
+  const pending = data?.pending ?? null;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reloads on `status`; `onPending` is recreated every render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `onPending` is recreated on every parent render
   useEffect(() => {
-    setItems(null);
-    api
-      .adminSubmissions(status)
-      .then((r) => {
-        setItems(r.submissions);
-        setPending(r.pending);
-        onPending(r.pending);
-      })
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, [status]);
+    if (pending !== null) onPending(pending);
+  }, [pending]);
 
   function reviewed(id: number, pendingNow: number) {
-    setItems((list) => list?.filter((s) => s.id !== id) ?? null);
-    setPending(pendingNow);
-    onPending(pendingNow);
+    if (data) setData({ ...data, submissions: data.submissions.filter((s) => s.id !== id), pending: pendingNow });
   }
 
   return (
@@ -121,7 +114,9 @@ function QuestionsQueue({ onPending }: { onPending: (n: number) => void }) {
         />
       </div>
 
-      {!items ? (
+      {error && !items ? (
+        <LoadError title="Въпросите не се заредиха" error={error} onRetry={retry} />
+      ) : !items ? (
         <div className="grid place-items-center py-24">
           <Spinner className="size-8 text-violet-400" />
         </div>

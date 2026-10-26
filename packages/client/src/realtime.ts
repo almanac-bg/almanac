@@ -1,5 +1,6 @@
 import {
   type AckResult,
+  type AnswerRejection,
   achievementById,
   type CategoryChoice,
   type ClientToServerEvents,
@@ -21,6 +22,13 @@ export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: GameSocket | null = null;
 let seq = 0;
+
+/** What the player is told when the server didn't take an answer the screen showed as locked in. */
+const REJECTED: Record<AnswerRejection, string> = {
+  late: 'Отговорът ти пристигна след края на времето.',
+  removed: 'Този отговор е премахнат от „50/50“ — избери друг.',
+  frozen: 'Замразен си — изчакай да се размразиш.',
+};
 const nameOf = (g: LiveGame, playerId: string) => g.players[playerId]?.name ?? 'Някой';
 
 /** The realtime connection, created on first use from the client config. */
@@ -140,9 +148,38 @@ function bind(s: GameSocket) {
     clearTimeout(staleQuestionTimer);
     const g = getState().game;
     if (!g) return;
-    // The question on screen again: a resync after a reconnect. The server still holds your jokers and pick for it
-    // but doesn't re-send them, so keep ours.
     const same = g.question?.index === question.index && g.phase === 'question' ? g : null;
+    // A resync after a reconnect says where you stand on the question (a fresh tab knows nothing of it): the server's
+    // word goes, including the extra time already in `remainingMs`.
+    const mine = question.mine;
+    if (mine) {
+      if (same && same.myChoice !== null && mine.choice === null && question.remainingMs > 0) {
+        toast({
+          kind: 'error',
+          title: 'Отговорът ти не стигна до сървъра.',
+          body: 'Избери отново — времето още тече.',
+        });
+      }
+      const now = Date.now();
+      patchGame(() => ({
+        phase: 'question',
+        question,
+        deadline: now + question.remainingMs,
+        extraMs: mine.extraMs,
+        answered: question.answered,
+        myChoice: mine.choice,
+        removed: mine.removed,
+        doubled: mine.doubled,
+        powerupThisQuestion: mine.powerupThisQuestion,
+        retryArmed: mine.retryArmed,
+        retryPrompt: mine.retryPrompt,
+        frozenUntil: mine.frozenMs > 0 ? now + mine.frozenMs : 0,
+        frozenBy: mine.frozenMs > 0 ? (same?.frozenBy ?? null) : null,
+        reveal: null,
+        resyncing: false,
+      }));
+      return;
+    }
     const lockedIn = question.answered.includes(g.start.youId);
     const extraMs = same?.extraMs ?? 0;
     if (same && same.myChoice !== null && !lockedIn && question.remainingMs + extraMs > 0) {
@@ -168,6 +205,14 @@ function bind(s: GameSocket) {
   });
 
   s.on('game:answered', ({ playerId }) => patchGame((g) => ({ answered: [...g.answered, playerId] })));
+
+  // The screen showed the pick as locked in; it wasn't taken. Unlock it (if the question is still open) and say why.
+  s.on('game:rejected', ({ index, reason }) => {
+    const g = getState().game;
+    if (!g?.question || g.question.index !== index) return;
+    if (g.phase === 'question') patchGame(() => ({ myChoice: null }));
+    toast({ kind: 'error', title: REJECTED[reason] });
+  });
 
   s.on('game:retry', ({ wrong }) => {
     effect('wrong');
@@ -256,6 +301,14 @@ function bind(s: GameSocket) {
     const g = getState().game;
     if (!g || g.start.gameId !== end.gameId) return;
     patchGame(() => ({ phase: 'ended', end, standings: end.standings }));
+    void refreshMe();
+  });
+
+  // A one-attempt run we cut short: no result to show, and the attempt can be played again.
+  s.on('game:aborted', ({ gameId, message }) => {
+    if (getState().game?.start.gameId !== gameId) return;
+    setState({ game: null });
+    toast({ kind: 'info', title: message });
     void refreshMe();
   });
 

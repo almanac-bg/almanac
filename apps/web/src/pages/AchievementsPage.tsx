@@ -1,11 +1,11 @@
 import { api, fmt, longDate } from '@quiz/client';
-import { ACHIEVEMENTS, type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
+import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
 import clsx from 'clsx';
 import { Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { useOpenQueues } from '../components/home/openQueues';
+import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, ProgressBar, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -40,8 +40,7 @@ export function AchievementsPage() {
   }
 
   const byId = new Map(items.map((i) => [i.id, i]));
-  // One that only a closed ranked queue can award isn't on offer — unless it was earned while that queue was open.
-  const available = ACHIEVEMENTS.filter((a) => !a.queue || open.includes(a.queue) || !!byId.get(a.id)?.unlockedAt);
+  const available = availableAchievements(open, (id) => !!byId.get(id)?.unlockedAt);
   const unlocked = available.filter((a) => byId.get(a.id)?.unlockedAt).length;
   const list = available
     .filter((a) => {

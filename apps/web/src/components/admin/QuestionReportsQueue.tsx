@@ -4,6 +4,8 @@ import clsx from 'clsx';
 import { Check, EyeOff, Flag, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { useLoad } from '../../lib/load';
+import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
 
 const reasonLabel = (id: string) => QUESTION_REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
@@ -11,24 +13,18 @@ const LETTERS = ['А', 'Б', 'В', 'Г'];
 
 /** Questions players flagged as wrong, the most reported first; hiding one takes it out of new matches at once. */
 export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
-  const [data, setData] = useState<QuestionReports | null>(null);
+  const { data, error, retry, setData } = useLoad(() => api.adminQuestionReports());
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once; `onOpen` is recreated on every parent render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `onOpen` is recreated on every parent render
   useEffect(() => {
-    api
-      .adminQuestionReports()
-      .then((r) => {
-        setData(r);
-        onOpen(r.groups.length);
-      })
-      .catch((e) => toast({ kind: 'error', title: e.message }));
-  }, []);
+    if (data) onOpen(data.groups.length);
+  }, [data]);
 
   function update(next: QuestionReports) {
     setData(next);
-    onOpen(next.groups.length);
   }
 
+  if (error && !data) return <LoadError title="Сигналите не се заредиха" error={error} onRetry={retry} />;
   if (!data) {
     return (
       <div className="grid place-items-center py-24">

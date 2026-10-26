@@ -72,7 +72,7 @@ function Arena({ game }: { game: LiveGame }) {
       <div
         className={clsx(
           // Wider screens: the match sits a little lower than the very top, rather than pinned under the bar.
-          'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 pb-28 sm:px-6 md:pt-[6vh]',
+          'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 pb-28 short:pt-2 sm:px-6 md:pt-[6vh] flat:pt-2',
           !single && 'lg:grid-cols-[minmax(0,1fr)_320px]',
         )}
       >
@@ -161,7 +161,7 @@ function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void }) {
   const q = game.question;
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6 flat:h-12">
         <button
           type="button"
           onClick={onLeave}
@@ -488,7 +488,7 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
         )}
       </div>
 
-      <div className="glass relative mt-4 overflow-hidden rounded-3xl p-6 sm:p-8">
+      <div className="glass relative mt-4 overflow-hidden rounded-3xl p-6 short:mt-3 short:max-sm:p-4 tiny:mt-2 tiny:max-sm:p-3 sm:p-8 flat:mt-2 flat:p-3">
         <div
           className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 blur-3xl"
           style={{ background: cat.color }}
@@ -500,7 +500,7 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
             <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
           </div>
           <div className="sm:flex-1">
-            <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto sm:text-balance">
+            <h2 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance flat:text-[1.05rem]">
               {q.q}
             </h2>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
@@ -526,8 +526,8 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
         )}
       </AnimatePresence>
 
-      <div className="relative mt-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <div className="relative mt-4 short:mt-3 tiny:mt-2 flat:mt-2">
+        <div className="grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5">
           {q.options.map((text, i) => (
             <AnswerButton
               // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
@@ -547,7 +547,7 @@ function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: Joker
         <AnimatePresence>{frozen && <FreezeOverlay game={game} now={now} />}</AnimatePresence>
       </div>
 
-      <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3">
+      <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
         <AnimatePresence mode="wait">
           {reveal && mine ? (
             <RevealSummary key="sum" result={mine} />
@@ -661,7 +661,7 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
       role="timer"
       aria-label={`Оставащо време: ${secs} ${secs === 1 ? 'секунда' : 'секунди'}`}
       className={clsx(
-        'relative grid size-14 shrink-0 place-items-center sm:size-20',
+        'relative grid size-14 shrink-0 place-items-center short:max-sm:size-12 sm:size-20 flat:size-12',
         secs <= 3 && !stopped && 'motion-safe:animate-pulse',
       )}
     >
@@ -754,7 +754,7 @@ function AnswerButton({
         transition={{ delay: revealed ? 0 : 0.05 * index, duration: state === 'wrong' ? 0.45 : 0.3 }}
         whileTap={liftable ? { scale: 0.97 } : undefined}
         className={clsx(
-          'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 sm:min-h-[5.5rem] sm:gap-4 sm:p-5',
+          'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 short:max-sm:min-h-12 short:max-sm:py-2 tiny:max-sm:min-h-11 tiny:max-sm:py-1.5 sm:min-h-[5.5rem] sm:gap-4 sm:p-5 flat:min-h-10 flat:p-2',
           liftable && 'group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
           state === 'correct'
             ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
@@ -776,7 +776,7 @@ function AnswerButton({
           style={{ background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : color }}
         />
         <span
-          className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold"
+          className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold short:max-sm:size-8 flat:size-8"
           style={{
             background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
             color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
@@ -991,18 +991,20 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
 
 function MobileStrip({ game }: { game: LiveGame }) {
   const teams = game.start.teams;
+  const short = useMediaQuery('(max-height: 740px)');
   // Team games: group teammates together so the colors read as two blocks.
   const order = teams
     ? [...game.standings].sort((a, b) => (game.players[a.id]?.team ?? 0) - (game.players[b.id]?.team ?? 0))
     : game.standings;
   return (
-    <div className="border-b border-line lg:hidden">
+    // Sideways on a phone there's no room for it: the score is in the top bar, the standings come with each reveal.
+    <div className="border-b border-line lg:hidden flat:hidden">
       {teams && (
         <div className="px-4 pt-3 sm:hidden">
           <TeamScoreBar totals={teamTotals(game.standings, game.players)} myTeam={myTeamOf(game)} compact />
         </div>
       )}
-      <ul className="flex gap-3 overflow-x-auto px-4 py-3" aria-label="Класиране">
+      <ul className="flex gap-3 overflow-x-auto px-4 py-3 short:py-2 tiny:py-1.5" aria-label="Класиране">
         {order.map((s) => {
           const p = game.players[s.id];
           const me = s.id === game.start.youId;
@@ -1026,7 +1028,7 @@ function MobileStrip({ game }: { game: LiveGame }) {
                 style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined}
                 aria-hidden
               >
-                <Avatar avatar={p.avatar} frame={p.frame} size={40} dim={out}>
+                <Avatar avatar={p.avatar} frame={p.frame} size={short ? 32 : 40} dim={out}>
                   {answered && (
                     <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />
                   )}
@@ -1100,9 +1102,11 @@ function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
       {emoteById(id)?.emoji}
     </motion.button>
   ));
+  // Phones (and phones held sideways, where a bar along the bottom would sit on the jokers): a button that opens the
+  // tray in the page. Wider screens: a bar along the bottom.
   return (
     <>
-      <div className="mx-auto mt-3 flex max-w-3xl flex-wrap items-center justify-end gap-2 sm:hidden">
+      <div className="mx-auto mt-3 flex max-w-3xl flex-wrap items-center justify-end gap-2 sm:hidden flat:flex">
         {open && (
           <div
             id={trayId}
@@ -1122,7 +1126,7 @@ function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boolean }) {
           {open ? <X className="size-5" /> : <span className="text-2xl">😀</span>}
         </button>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 hidden pb-[env(safe-area-inset-bottom)] sm:block">
+      <div className="fixed inset-x-0 bottom-0 z-30 hidden pb-[env(safe-area-inset-bottom)] sm:block flat:hidden">
         <div className="mx-auto mb-3 flex w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl">
           {buttons}
         </div>
