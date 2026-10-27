@@ -234,18 +234,33 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
         </Link>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        {rewards.unlocks.map((u, i) => {
-          const { icon, name } = unlockPreview(u);
+        {/* Козове first: they change how the next match is played, the rest is how it looks. */}
+        {[
+          ...rewards.unlocks.filter((u) => u.kind === 'powerup'),
+          ...rewards.unlocks.filter((u) => u.kind !== 'powerup'),
+        ].map((u, i) => {
+          const { icon, name, detail } = unlockPreview(u);
           return (
             <motion.span
               key={`${u.kind}:${u.id}`}
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 1.2 + i * 0.06 }}
-              className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm"
+              className={clsx(
+                'inline-flex gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm',
+                // A new коз: what it does, read here and not under the clock in the next match.
+                detail ? 'w-full items-start' : 'items-center',
+              )}
             >
               <span className="text-lg leading-none">{icon}</span>
-              {name}
+              {detail ? (
+                <span>
+                  <span className="font-semibold">{name}</span>
+                  <span className="mt-0.5 block text-xs text-fg-2">{detail}</span>
+                </span>
+              ) : (
+                name
+              )}
             </motion.span>
           );
         })}

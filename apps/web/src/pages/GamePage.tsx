@@ -1,5 +1,5 @@
 import { actions, type LiveGame, useStore } from '@quiz/client';
-import { MODES } from '@quiz/shared';
+import { MODES, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { DoorOpen } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -9,8 +9,8 @@ import { MatchAnnouncer } from '../components/game/Announcer';
 import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
 import { EmoteBar } from '../components/game/EmoteBar';
 import { Intro } from '../components/game/Intro';
-import { useJokerGuide } from '../components/game/Jokers';
 import { EliminationBanner, Feed, othersStillIn, StreakBurst } from '../components/game/Moments';
+import { POWERUP_KEYS } from '../components/game/Powerups';
 import { QuestionView } from '../components/game/QuestionView';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
@@ -27,20 +27,31 @@ export function GamePage() {
 }
 
 const ANSWER_KEYS = ['1', '2', '3', '4'];
+/** By the key's place (as the top row's digits, for layouts whose digits need Shift). */
+const ANSWER_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
+const POWERUP_BY_CODE = new Map<string, PowerupId>(
+  Object.entries(POWERUP_KEYS).map(([id, key]) => [`Key${key}`, id as PowerupId]),
+);
 
-/** 1–4 answer — but not behind a dialog, and not while typing somewhere. */
-function useAnswerKeys(paused: boolean) {
+/**
+ * 1–4 answer, Q–T play a коз — but not behind a dialog, and not while typing somewhere. A коз key presses its button,
+ * so it does exactly what a click would, and nothing when the button can't be pressed.
+ */
+function useMatchKeys(paused: boolean) {
   const pausedNow = useRef(paused);
   useEffect(() => {
     pausedNow.current = paused;
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const choice = ANSWER_KEYS.indexOf(e.key);
-      if (choice < 0 || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const byKey = ANSWER_KEYS.indexOf(e.key);
+      const choice = byKey >= 0 ? byKey : ANSWER_CODES.indexOf(e.code);
+      const powerup = POWERUP_BY_CODE.get(e.code);
+      if ((choice < 0 && !powerup) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (pausedNow.current || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
-      actions.answer(choice);
+      if (choice >= 0) actions.answer(choice);
+      else document.querySelector<HTMLButtonElement>(`[data-powerup="${powerup}"]:not(:disabled)`)?.click();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -50,7 +61,6 @@ function useAnswerKeys(paused: boolean) {
 function Arena({ game }: { game: LiveGame }) {
   const [leaving, setLeaving] = useState(false);
   const offline = !useStore((s) => s.connected);
-  const jokers = useJokerGuide(game.start.powerups);
   const single = game.start.players.length === 1;
   const meEliminated = game.eliminated.includes(game.start.youId);
   // In a private room leaving the match leaves the room too, so that's no place to suggest it.
@@ -62,7 +72,7 @@ function Arena({ game }: { game: LiveGame }) {
 
   // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
   useBackGuard(() => setLeaving((open) => !open));
-  useAnswerKeys(leaving);
+  useMatchKeys(leaving);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -83,7 +93,7 @@ function Arena({ game }: { game: LiveGame }) {
             {game.phase === 'countdown' ? (
               <Intro key="intro" game={game} />
             ) : game.question ? (
-              <QuestionView key={`q${game.question.index}`} game={game} jokers={jokers} offline={offline} />
+              <QuestionView key={`q${game.question.index}`} game={game} offline={offline} />
             ) : (
               <motion.div
                 key="wait"

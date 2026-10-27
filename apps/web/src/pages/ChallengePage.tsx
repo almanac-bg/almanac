@@ -139,7 +139,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
                 {title}
               </h1>
               <p className="mt-1 text-sm text-fg-3">
-                {MODE.questions} въпроса · {MODE.timeMs / 1000} секунди за всеки · един опит · без жокери
+                {MODE.questions} въпроса · {MODE.timeMs / 1000} секунди за всеки · един опит · без козове
               </p>
             </div>
           </div>

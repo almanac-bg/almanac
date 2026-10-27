@@ -778,23 +778,25 @@ test('jokers', T, async () => {
     const answer = (choice: number, ms: number) =>
       setTimeout(() => sa.emit('game:answer', { index: q.index, choice }), ms);
     if (q.index === 0) {
-      sa.emit('game:powerup', { index: 0, powerup: 'freeze' });
-      sa.emit('game:powerup', { index: 0, powerup: 'double' }); // second joker on the same question → ignored
-      answer(right, 60);
+      // Right after answering (at the test speed the question closes moments after both have): "Леден удар" hits the
+      // next question.
+      setTimeout(() => {
+        sa.emit('game:answer', { index: 0, choice: right });
+        sa.emit('game:powerup', { index: 0, powerup: 'freeze' });
+      }, 10);
     } else if (q.index === 1) {
       sa.emit('game:powerup', { index: 1, powerup: 'retry' });
       answer((right + 1) % 4, 40);
       answer(right, 120);
     } else if (q.index === 2) {
       sa.emit('game:powerup', { index: 2, powerup: 'time' });
+      sa.emit('game:powerup', { index: 2, powerup: 'double' }); // a second one on the same question → ignored
       answer(right, 40);
     } else {
       answer(right, 30);
     }
   });
-  const bFrozen = new Promise<boolean>((res) =>
-    sb.on('game:powerup', (e) => e.powerup === 'freeze' && e.targetId === `u${B.user.id}` && res(true)),
-  );
+  const bFrozen = new Promise<{ by: string; ms: number }>((res) => sb.on('game:frozen', res));
   sb.on('game:question', (q) =>
     setTimeout(() => sb.emit('game:answer', { index: q.index, choice: rightOption(q) }), 20),
   );
@@ -804,7 +806,7 @@ test('jokers', T, async () => {
   await emitAck(sb, 'queue:join', 'duel');
   await Promise.all([aEnd, bEnd]);
   for (const ev of ['game:start', 'game:retry', 'game:powerup', 'game:question', 'game:reveal'] as const) sa.off(ev);
-  sb.off('game:question').off('game:powerup');
+  sb.off('game:question').off('game:frozen');
 
   const me = `u${A.user.id}`;
   const them = `u${B.user.id}`;
@@ -812,10 +814,12 @@ test('jokers', T, async () => {
     ['freeze', 'time', 'retry'].every((p) => start!.powerups.includes(p as never)),
     'level 20 has all jokers',
   );
-  assert.ok(await Promise.race([bFrozen, sleep(10).then(() => false)]), 'the target is told it got frozen');
+  const frozen = await Promise.race([bFrozen, sleep(10).then(() => null)]);
+  assert.equal(frozen?.by, me, 'the target is told who froze it, as the next question opens');
   assert.equal(frozeTarget, them, 'freeze targets the opponent');
-  assert.equal(reveals[0].results[them].choice, null, 'a frozen player cannot answer');
-  assert.equal(reveals[0].results[me].doubled, false, 'one joker per question');
+  assert.notEqual(reveals[0].results[them].choice, null, 'the question it was played on is not affected');
+  assert.equal(reveals[1].results[them].choice, null, 'the next one opens frozen: its quick answer is refused');
+  assert.equal(reveals[2].results[me].doubled, false, 'one коз per question');
   assert.ok(retry, 'Втори шанс reports the first miss');
   assert.ok(reveals[1].results[me].correct && reveals[1].results[me].retried, 'the second pick counts (half points)');
   assert.equal(timeBonus, 5000, 'Още време adds 5 s');

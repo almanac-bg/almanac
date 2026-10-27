@@ -4,7 +4,6 @@ import {
   achievementById,
   type CategoryChoice,
   type ClientToServerEvents,
-  FREEZE_MS,
   type GameStartPayload,
   type Invite,
   type PowerupId,
@@ -300,16 +299,24 @@ function bind(s: GameSocket) {
         extraMs: x.extraMs + (extraMs ?? 0),
       }));
     }
-    if (targetId === you) {
-      effect('freeze');
-      patchGame(() => ({ frozenUntil: Date.now() + FREEZE_MS + 150, frozenBy: playerId }));
-    }
+    // "Леден удар" takes hold when the next question opens (see game:frozen); now it's only news.
     if (powerup === 'freeze' && targetId) {
       const by = playerId === you ? 'Ти' : nameOf(g, playerId);
-      pushFeed(targetId === you ? `${by} те замрази!` : `${by} замрази ${nameOf(g, targetId)}!`, '❄️');
+      pushFeed(
+        targetId === you
+          ? `${by} те замрази за следващия въпрос!`
+          : `${by} замрази ${nameOf(g, targetId)} за следващия въпрос!`,
+        '❄️',
+      );
     } else if (playerId !== you) {
       pushFeed(`${nameOf(g, playerId)} използва „${def?.name ?? powerup}“`, def?.icon ?? '🃏');
     }
+  });
+
+  s.on('game:frozen', ({ by, ms }) => {
+    if (!getState().game) return;
+    effect('freeze');
+    patchGame(() => ({ frozenUntil: Date.now() + ms + 150, frozenBy: by }));
   });
 
   s.on('game:reaction', ({ playerId, emote }) => {
@@ -504,9 +511,11 @@ export const actions = {
   },
   powerup: (powerup: PowerupId) => {
     const g = getState().game;
-    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null) return;
+    if (!g?.question || g.phase !== 'question' || g.resyncing) return;
+    // Only "Леден удар" (it hits the next question) can follow your answer.
+    if (g.myChoice !== null && powerup !== 'freeze') return;
     if (g.usedPowerups.includes(powerup) || g.powerupThisQuestion) return;
-    if (!sendMove('game:powerup', { index: g.question.index, powerup })) offlineToast('Жокерът не е изигран.');
+    if (!sendMove('game:powerup', { index: g.question.index, powerup })) offlineToast('Козът не е изигран.');
   },
   /**
    * Stop on the revealed question's fact to read it (a run played alone): the next question waits for resumeAfterFact.

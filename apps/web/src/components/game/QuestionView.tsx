@@ -9,10 +9,10 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
-import { ActiveJokers, type JokerGuide, PowerupBar } from './Jokers';
+import { ActivePowerups, FreezeAfterAnswer, KeyHint, PowerupBar } from './Powerups';
 
 /** A question on screen: the clock, the points it's worth, the answers, your pick and how it went. */
-export function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers: JokerGuide; offline: boolean }) {
+export function QuestionView({ game, offline }: { game: LiveGame; offline: boolean }) {
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   const cat = categoryById(q.category)!;
@@ -139,10 +139,11 @@ export function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers
               className="flex flex-wrap items-center gap-2"
             >
               <LockStatus game={game} offline={offline} />
-              <ActiveJokers game={game} />
+              <ActivePowerups game={game} />
+              <FreezeAfterAnswer game={game} offline={offline} />
             </motion.div>
           ) : (
-            active && <PowerupBar key="pw" game={game} guide={jokers} offline={offline} />
+            active && <PowerupBar key="pw" game={game} offline={offline} />
           )}
         </AnimatePresence>
       </div>
@@ -241,7 +242,10 @@ function LockStatus({ game, offline }: { game: LiveGame; offline: boolean }) {
   );
 }
 
-/** Frosted panel over the answers while "Леден удар" holds you. */
+/**
+ * Ice over the answers while "Леден удар" holds you: out of sight, not only out of reach (seen through frost, they'd be
+ * read and picked the moment it lifts — no time lost at all).
+ */
 function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
   const by = game.frozenBy ? game.players[game.frozenBy]?.name : null;
   const left = Math.max(0, Math.ceil((game.frozenUntil - now) / 1000));
@@ -252,10 +256,10 @@ function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.25 }}
-      className="absolute -inset-1.5 z-10 grid place-items-center overflow-hidden rounded-3xl border border-cyan-200/40 bg-cyan-300/10 backdrop-blur-[6px]"
+      className="absolute -inset-1.5 z-10 grid place-items-center overflow-hidden rounded-3xl border border-cyan-200/40 bg-[#0d2a3a]"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 20% 20%, rgb(207 250 254 / 0.25), transparent 40%), radial-gradient(circle at 80% 70%, rgb(165 243 252 / 0.2), transparent 45%), linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 60%)',
+          'radial-gradient(circle at 20% 20%, rgb(207 250 254 / 0.22), transparent 40%), radial-gradient(circle at 80% 70%, rgb(165 243 252 / 0.18), transparent 45%), linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 60%)',
         boxShadow: 'inset 0 0 60px rgb(165 243 252 / 0.25)',
       }}
     >
@@ -412,6 +416,7 @@ function AnswerButton({
         type="button"
         layout
         data-answer={index}
+        aria-keyshortcuts={String(index + 1)}
         // Not `disabled`: that would drop keyboard focus from the answer you just picked (to the top of the page).
         aria-disabled={inert || undefined}
         onClick={() => !inert && actions.answer(index)}
@@ -469,6 +474,8 @@ function AnswerButton({
           {keepTogether(text)}
           {status.length > 0 && <span className="sr-only"> — {status.join(' — ')}</span>}
         </span>
+        {/* Kept in place (only hidden) once the answer is in, so the text beside it doesn't reflow. */}
+        <KeyHint className={clsx('shrink-0 self-start', state !== 'idle' && 'invisible')}>{String(index + 1)}</KeyHint>
         {pickers.length > 0 && (
           <span aria-hidden className="flex -space-x-2">
             {pickers.slice(0, 4).map((p) => (

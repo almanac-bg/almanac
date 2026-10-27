@@ -187,7 +187,7 @@ export interface PowerupEvent {
   powerup: PowerupId;
   /** 50/50: options removed (sent only to the user). */
   removed?: number[];
-  /** Леден удар: who got frozen. */
+  /** Леден удар: who gets frozen (at the start of the next question). */
   targetId?: string;
   /** Още време: extra milliseconds for the user. */
   extraMs?: number;
@@ -308,6 +308,8 @@ export interface ServerToClientEvents {
   'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
   'game:powerup': (p: PowerupEvent) => void;
+  /** To a player "Леден удар" hit, right after the question: its answers are covered for `ms`. */
+  'game:frozen': (p: { by: string; ms: number }) => void;
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
   'game:end': (p: GameEndPayload) => void;

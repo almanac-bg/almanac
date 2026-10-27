@@ -274,6 +274,46 @@ test('"Двойно или нищо" is for medium and hard questions, and costs
   assert.equal(fresh.reveals().at(-1)!.results.u2.points, 0, 'nothing to lose yet');
 });
 
+test('"Леден удар" covers the leader\'s answers at the start of the next question; it can follow your answer, not the last question', () => {
+  const g = setup({ humans: [1, 2], powerups: ['freeze'] });
+  const p = (id: string) => g.game.participants.get(id)!;
+  g.right(2); // u2 leads after the first question
+  g.wrong(1);
+  advance(5_000);
+
+  g.right(1);
+  g.game.usePowerup('u1', g.game.index, 'freeze'); // after answering: it hits the next question, not this one
+  const played = g.events.find((e) => e.event === 'game:powerup')?.payload as { targetId?: string } | undefined;
+  assert.equal(played?.targetId, 'u2', 'the leader');
+  g.right(2);
+  assert.ok(p('u2').answer, 'this question is not affected');
+  advance(5_000);
+
+  const told = g.events.find((e) => e.event === 'game:frozen' && e.to === 'u2')?.payload as
+    | { by: string; ms: number }
+    | undefined;
+  assert.equal(told?.by, 'u1', 'the frozen player learns who it was, as the question opens');
+  assert.ok(told && told.ms > 0);
+  g.right(2);
+  assert.equal(p('u2').answer, null, 'no answer while the ice holds');
+  advance(told!.ms + 50);
+  g.right(2);
+  assert.ok(p('u2').answer, 'then the question is open as usual');
+
+  const last = setup({ humans: [1, 2], powerups: ['freeze'] });
+  while (last.game.index < last.game.questions.length - 1) {
+    last.right(1);
+    last.right(2);
+    advance(5_000);
+  }
+  last.game.usePowerup('u1', last.game.index, 'freeze');
+  assert.equal(last.game.participants.get('u1')!.usedPowerups.has('freeze'), false, 'no next question: not spent');
+  assert.ok(
+    last.events.some((e) => e.event === 'notice' && e.to === 'u1'),
+    'and the player is told why',
+  );
+});
+
 test('ties: an unanswered question counts the whole clock', () => {
   const g = setup({ humans: [1, 2] });
   advance(1_000);

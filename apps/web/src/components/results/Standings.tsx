@@ -42,7 +42,7 @@ export function ChallengeStanding({
           <>
             <h2 className="relative t-card">Сега прати линка</h2>
             <p className="relative mx-auto mt-2 max-w-sm text-sm text-fg-2">
-              Всеки, който го отвори, играе същите {questions} въпроса веднъж, без жокери. Линкът важи 7 дни.
+              Всеки, който го отвори, играе същите {questions} въпроса веднъж, без козове. Линкът важи 7 дни.
             </p>
           </>
         ) : (

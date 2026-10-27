@@ -197,7 +197,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'power_player',
     name: 'Тактически ум',
-    description: 'Използвай 25 жокера.',
+    description: 'Изиграй 25 коза.',
     icon: '🃏',
     rarity: 'common',
     xp: 100,

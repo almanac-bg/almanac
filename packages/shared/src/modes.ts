@@ -44,7 +44,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     elimination: false,
     teams: false,
     tagline: 'Едни и същи 10 въпроса за всички. Един опит.',
-    description: 'Без жокери. Класирането се нулира в полунощ.',
+    description: 'Без козове. Класирането се нулира в полунощ.',
     accent: ['#fde047', '#f97316'],
   },
   challenge: {
@@ -57,7 +57,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     elimination: false,
     teams: false,
     tagline: 'Твоите 10 въпроса. Кой ще те бие?',
-    description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без жокери.',
+    description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без козове.',
     accent: ['#a5b4fc', '#8b5cf6'],
   },
   duel: {

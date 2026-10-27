@@ -53,7 +53,7 @@ export function ChallengeCard({ className }: { className?: string }) {
           </div>
           <h2 className="mt-2 t-card">Предизвикай приятел</h2>
           <p className="mt-1 max-w-md text-sm text-fg-3">
-            {MODES.challenge.questions} въпроса, без жокери. Изиграй ги и прати линка: всеки, който го отвори, играе
+            {MODES.challenge.questions} въпроса, без козове. Изиграй ги и прати линка: всеки, който го отвори, играе
             същите въпроси веднъж. Линкът важи 7 дни.{guest && ' Създават ги играчите с профил.'}
           </p>
           <div className="mt-auto pt-5">

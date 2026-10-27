@@ -247,21 +247,14 @@ export const EMOTES: EmoteDef[] = [
   { id: 'handshake', emoji: '🤝', req: { achievement: 'team_win' } },
 ];
 
+/** In the order they unlock: the bar fills from the left as a player levels up (and the keys run Q to T). */
 export const POWERUPS: PowerupDef[] = [
   { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.', req: { level: 2 } },
-  {
-    id: 'double',
-    name: 'Двойно или нищо',
-    icon: '💰',
-    description: 'Удвоява точките за среден или труден въпрос, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
-    req: { level: 6 },
-    notOnEasy: true,
-  },
   {
     id: 'freeze',
     name: 'Леден удар',
     icon: '❄️',
-    description: 'Замразява водещия съперник за 3 секунди — не може да отговаря.',
+    description: 'Замразява водещия съперник в началото на следващия въпрос: 4 секунди не вижда отговорите.',
     req: { level: 3 },
     multiplayerOnly: true,
   },
@@ -273,12 +266,20 @@ export const POWERUPS: PowerupDef[] = [
     req: { level: 4 },
   },
   { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 5 } },
+  {
+    id: 'double',
+    name: 'Двойно или нищо',
+    icon: '💰',
+    description: 'Удвоява точките за среден или труден въпрос, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
+    req: { level: 6 },
+    notOnEasy: true,
+  },
 ];
 
 export const powerupById = (id: string) => POWERUPS.find((p) => p.id === id);
 
-/** Milliseconds a "Леден удар" locks its target out. */
-export const FREEZE_MS = 3000;
+/** Milliseconds a "Леден удар" covers its target's answers at the start of the next question. */
+export const FREEZE_MS = 4000;
 /** Extra milliseconds from "Още време". */
 export const TIME_BONUS_MS = 5000;
 

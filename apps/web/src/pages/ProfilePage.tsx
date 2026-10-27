@@ -146,7 +146,7 @@ export function ProfilePage() {
           />
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
           <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
-          <Stat label="Използвани жокери" value={fmt(o.powerupsUsed)} />
+          <Stat label="Изиграни козове" value={fmt(o.powerupsUsed)} />
           <Stat label="Дневна серия" value={`📅 ${o.dailyStreak}`} hint={`Най-дълга: ${o.bestDailyStreak}`} />
           <Stat label="Одобрени въпроси" value={`✍️ ${o.questionsApproved}`} />
         </div>

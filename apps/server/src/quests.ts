@@ -145,7 +145,8 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
     ...CATEGORIES.map((c) => ({ level: SEASONED, def: categoryQuest(c) })),
     {
       below: SEASONED,
-      def: { id: 'joker1', icon: '🃏', text: 'Използвай жокер в мач', goal: 1, xp: 50, count: (e) => e.jokers },
+      // Level 1 has козове only in ranked matches (all five, for everyone): the text says where.
+      def: { id: 'joker1', icon: '🃏', text: 'Изиграй коз в класиран мач', goal: 1, xp: 50, count: (e) => e.jokers },
     },
     {
       queue: 'royale',
@@ -160,7 +161,7 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
     },
     {
       level: 2,
-      def: { id: 'jokers3', icon: '🃏', text: 'Използвай 3 жокера', goal: 3, xp: 60, count: (e) => e.jokers },
+      def: { id: 'jokers3', icon: '🃏', text: 'Изиграй 3 коза', goal: 3, xp: 60, count: (e) => e.jokers },
     },
     {
       account: true,

@@ -15,6 +15,7 @@ import { Check, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
+import { KeyHint, POWERUP_KEYS } from '../components/game/Powerups';
 import { Card, Segmented } from '../components/ui';
 import { usePageTitle } from '../lib/title';
 
@@ -90,7 +91,7 @@ export function LockerPage() {
                 { value: 'frame', label: label('frame', 'Рамки') },
                 { value: 'title', label: label('title', 'Титли') },
                 { value: 'emote', label: label('emote', 'Емоции') },
-                { value: 'powerup', label: label('powerup', 'Жокери') },
+                { value: 'powerup', label: label('powerup', 'Козове') },
               ]}
             />
           </div>
@@ -178,26 +179,40 @@ export function LockerPage() {
             </>
           )}
           {tab === 'powerup' && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {POWERUPS.map((p) => {
-                const open = unlocked(p.req);
-                return (
-                  <Card key={p.id} className={clsx('p-5', !open && 'opacity-60')}>
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl">🃏</span>
-                      <div>
-                        <div className="font-display font-bold">{p.name}</div>
-                        <div className="text-xs text-fg-3">
-                          {open ? 'Отключен · веднъж на мач' : requirementLabel(p.req)}
+            <>
+              {/* The one place to read them at leisure: the match itself has no time for it. */}
+              <p className="mb-4 max-w-2xl text-sm text-fg-2">
+                В класираните режими всеки играе с всичките пет, за да не решава мача кой играе от по-отдавна. Сам и в
+                стаите — с отключените от нивото ти. Всеки коз е по веднъж на мач и по един на въпрос.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {POWERUPS.map((p) => {
+                  const open = unlocked(p.req);
+                  return (
+                    <Card key={p.id} className={clsx('p-5', !open && 'opacity-60')}>
+                      <div className="flex items-center gap-3">
+                        <span
+                          aria-hidden
+                          className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl"
+                        >
+                          {p.icon}
+                        </span>
+                        <div>
+                          <div className="font-display font-bold">{p.name}</div>
+                          <div className="text-xs text-fg-3">{open ? 'Отключен' : requirementLabel(p.req)}</div>
                         </div>
+                        {open ? (
+                          <KeyHint className="ml-auto">{POWERUP_KEYS[p.id]}</KeyHint>
+                        ) : (
+                          <Lock className="ml-auto size-4 text-fg-3" />
+                        )}
                       </div>
-                      {!open && <Lock className="ml-auto size-4 text-fg-3" />}
-                    </div>
-                    <p className="mt-3 text-sm text-fg-2">{p.description}</p>
-                  </Card>
-                );
-              })}
-            </div>
+                      <p className="mt-3 text-sm text-fg-2">{p.description}</p>
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -7,14 +7,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
+import { PowerupNotesLine, useNewPowerups } from './Powerups';
 import { PlayerMark } from './Scoreboard';
 import { SCORING_LINE, takeScoringHint } from './scoring';
 import { myTeamOf, teamColor } from './teams';
 
 /** Before the first question: the countdown, and who plays whom. */
 export function Intro({ game }: { game: LiveGame }) {
-  // Once per match (the countdown screen mounts once): the first few matches spell out how points are counted.
-  const [scoring] = useState(takeScoringHint);
+  // Козове this player meets for the first time: named here, where nothing is ticking yet.
+  const fresh = useNewPowerups(game.start.powerups);
+  // Once per match (the countdown screen mounts once): the first few matches spell out how points are counted. One
+  // note at a time, so the countdown stays on a small phone's screen: new козове first, the scoring waits a match.
+  const [scoring] = useState(() => !fresh.length && takeScoringHint());
   const now = useNow(100);
   const left = Math.max(0, Math.ceil((game.countdownEndsAt - now) / 1000));
   const lastLeft = useRef(left);
@@ -50,7 +54,7 @@ export function Intro({ game }: { game: LiveGame }) {
           </h1>
           <p className="mt-2 text-fg-3">
             {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
-            {game.start.mode === 'daily' && ' · без жокери'}
+            {game.start.mode === 'daily' && ' · без козове'}
           </p>
         </div>
       ) : game.start.teams ? (
@@ -79,6 +83,7 @@ export function Intro({ game }: { game: LiveGame }) {
         </div>
       )}
       {scoring && <p className="mt-6 max-w-sm text-sm text-balance text-fg-2">{SCORING_LINE}</p>}
+      <PowerupNotesLine powerups={fresh} className="mt-6 max-w-md" />
       {game.start.eliminationSchedule.length > 0 && (
         <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
           <Skull className="size-4" /> Последният отпада след въпроси {game.start.eliminationSchedule.join(', ')}

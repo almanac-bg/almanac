@@ -128,6 +128,8 @@ export interface Participant {
   removed: number[];
   powerupThisQuestion: boolean;
   frozenUntil: number;
+  /** "Леден удар" waiting for the next question: who played it. */
+  frozenNext: string | null;
   extraMs: number;
   retryArmed: boolean;
   firstWrong: number | null;
@@ -246,22 +248,28 @@ export class Game {
 
   usePowerup(playerId: string, index: number, powerup: PowerupId) {
     const p = this.participants.get(playerId);
-    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p) || p.answer) return;
+    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p)) return;
+    // "Леден удар" hits the next question, so it can still be played once you've answered this one.
+    if (p.answer && powerup !== 'freeze') return;
     if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
     const userId = p.player.userId!;
     const q = this.questions[this.index];
     if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
     if (powerup === 'freeze') {
-      const target = this.freezeTarget(p);
-      if (!target) {
+      if (this.index >= this.questions.length - 1) {
         this.emit.toUser(userId, 'notice', {
           kind: 'info',
-          message: 'Няма кого да замразиш — съперниците вече отговориха.',
+          message: 'Това е последният въпрос — няма следващ, който да замразиш.',
         });
         return;
       }
-      target.frozenUntil = Date.now() + FREEZE_MS * config.gameTimeScale;
+      const target = this.freezeTarget(p);
+      if (!target) {
+        this.emit.toUser(userId, 'notice', { kind: 'info', message: 'Няма кого да замразиш.' });
+        return;
+      }
+      target.frozenNext = playerId;
       p.freezesUsed++;
       this.consume(p, powerup);
       this.toGame('game:powerup', { playerId, powerup, targetId: target.player.id });
@@ -432,17 +440,23 @@ export class Game {
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
     this.questionStartedAt = Date.now();
+    const frozen: [Participant, string][] = [];
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
       p.removed = [];
       p.powerupThisQuestion = false;
-      p.frozenUntil = 0;
+      // A "Леден удар" played on the last question takes hold now: the answers stay covered for the first seconds.
+      p.frozenUntil = p.frozenNext ? this.questionStartedAt + FREEZE_MS * config.gameTimeScale : 0;
+      if (p.frozenNext) frozen.push([p, p.frozenNext]);
+      p.frozenNext = null;
       p.extraMs = 0;
       p.retryArmed = false;
       p.firstWrong = null;
     }
     this.toGame('game:question', this.questionPayload());
+    for (const [p, by] of frozen)
+      if (!p.brain) this.emit.toUser(p.player.userId!, 'game:frozen', { by, ms: FREEZE_MS * config.gameTimeScale });
     this.scheduleBots();
     this.questionTimer = this.later(this.setup.timeMs + GRACE_MS, () => this.reveal());
   }
@@ -760,17 +774,11 @@ export class Game {
     p.powerupThisQuestion = true;
   }
 
-  /** The best-placed opponent who hasn't answered yet and isn't already frozen. */
+  /** The best-placed opponent nobody has frozen for the next question yet. */
   private freezeTarget(by: Participant): Participant | null {
-    const now = Date.now();
     return (
       this.ranked().find(
-        (o) =>
-          o !== by &&
-          this.isActive(o) &&
-          !o.answer &&
-          o.frozenUntil <= now &&
-          (!this.setup.teams || o.player.team !== by.player.team),
+        (o) => o !== by && this.isActive(o) && !o.frozenNext && (!this.setup.teams || o.player.team !== by.player.team),
       ) ?? null
     );
   }
@@ -948,6 +956,7 @@ export class Game {
       removed: [],
       powerupThisQuestion: false,
       frozenUntil: 0,
+      frozenNext: null,
       extraMs: 0,
       retryArmed: false,
       firstWrong: null,

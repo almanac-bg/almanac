@@ -13,7 +13,8 @@ import {
   type UnlockRef,
 } from '@quiz/shared';
 
-export function unlockPreview(u: UnlockRef): { icon: string; name: string } {
+/** How an unlock is shown; a коз also says what it does (`detail`): it's played under the clock, no time to wonder. */
+export function unlockPreview(u: UnlockRef): { icon: string; name: string; detail?: string } {
   switch (u.kind) {
     case 'avatar': {
       const a = AVATARS.find((x) => x.id === u.id)!;
@@ -27,7 +28,7 @@ export function unlockPreview(u: UnlockRef): { icon: string; name: string } {
       return { icon: EMOTES.find((x) => x.id === u.id)!.emoji, name: 'Нова емоция' };
     case 'powerup': {
       const p = POWERUPS.find((x) => x.id === u.id)!;
-      return { icon: p.icon, name: `Жокер „${p.name}“` };
+      return { icon: p.icon, name: `Коз „${p.name}“`, detail: p.description };
     }
   }
 }
