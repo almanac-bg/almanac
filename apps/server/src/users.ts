@@ -27,7 +27,6 @@ export interface UserRow {
   daily_streak: number;
   best_daily_streak: number;
   last_daily_day: string | null;
-  freezes: number;
   /** Verified address only; an unverified one waits in `pending_email`. */
   email: string | null;
   email_key: string | null;

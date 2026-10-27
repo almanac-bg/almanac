@@ -16,7 +16,6 @@ const SOUNDS: Partial<Record<Effect, () => void>> = {
   correct: sfx.correct,
   wrong: sfx.wrong,
   powerup: sfx.powerup,
-  freeze: sfx.freeze,
   eliminated: sfx.eliminated,
   knockedOut: sfx.eliminated,
   achievement: sfx.achievement,
@@ -28,7 +27,6 @@ const HAPTICS: Partial<Record<Effect, number | number[]>> = {
   lock: 12,
   correct: [18, 50, 18],
   wrong: 90,
-  freeze: [30, 40, 30, 40, 30],
   knockedOut: [180, 70, 260],
 };
 

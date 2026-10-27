@@ -26,7 +26,6 @@ let seq = 0;
 const REJECTED: Record<AnswerRejection, string> = {
   late: 'Отговорът ти пристигна след края на времето.',
   removed: 'Този отговор е премахнат от „50/50“ — избери друг.',
-  frozen: 'Замразен си — изчакай да се размразиш.',
 };
 const nameOf = (g: LiveGame, playerId: string) => g.players[playerId]?.name ?? 'Някой';
 
@@ -154,8 +153,6 @@ function bind(s: GameSocket) {
         powerupThisQuestion: false,
         retryArmed: false,
         retryPrompt: false,
-        frozenUntil: 0,
-        frozenBy: null,
         reveal: null,
         resyncing: false,
         eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
@@ -196,8 +193,6 @@ function bind(s: GameSocket) {
         powerupThisQuestion: mine.powerupThisQuestion,
         retryArmed: mine.retryArmed,
         retryPrompt: mine.retryPrompt,
-        frozenUntil: mine.frozenMs > 0 ? now + mine.frozenMs : 0,
-        frozenBy: mine.frozenMs > 0 ? (same?.frozenBy ?? null) : null,
         reveal: null,
         resyncing: false,
       }));
@@ -220,8 +215,6 @@ function bind(s: GameSocket) {
       powerupThisQuestion: same?.powerupThisQuestion ?? false,
       retryArmed: same?.retryArmed ?? false,
       retryPrompt: !lockedIn && !!same?.retryPrompt,
-      frozenUntil: same?.frozenUntil ?? 0,
-      frozenBy: same?.frozenBy ?? null,
       reveal: null,
       resyncing: false,
     }));
@@ -281,7 +274,7 @@ function bind(s: GameSocket) {
       setTimeout(() => effect(reveal.eliminated.includes(g.start.youId) ? 'knockedOut' : 'eliminated'), 900);
   });
 
-  s.on('game:powerup', ({ playerId, powerup, removed, targetId, extraMs }) => {
+  s.on('game:powerup', ({ playerId, powerup, removed, extraMs }) => {
     const g = getState().game;
     if (!g) return;
     const def = powerupById(powerup);
@@ -299,24 +292,7 @@ function bind(s: GameSocket) {
         extraMs: x.extraMs + (extraMs ?? 0),
       }));
     }
-    // "Леден удар" takes hold when the next question opens (see game:frozen); now it's only news.
-    if (powerup === 'freeze' && targetId) {
-      const by = playerId === you ? 'Ти' : nameOf(g, playerId);
-      pushFeed(
-        targetId === you
-          ? `${by} те замрази за следващия въпрос!`
-          : `${by} замрази ${nameOf(g, targetId)} за следващия въпрос!`,
-        '❄️',
-      );
-    } else if (playerId !== you) {
-      pushFeed(`${nameOf(g, playerId)} използва „${def?.name ?? powerup}“`, def?.icon ?? '🃏');
-    }
-  });
-
-  s.on('game:frozen', ({ by, ms }) => {
-    if (!getState().game) return;
-    effect('freeze');
-    patchGame(() => ({ frozenUntil: Date.now() + ms + 150, frozenBy: by }));
+    if (playerId !== you) pushFeed(`${nameOf(g, playerId)} използва „${def?.name ?? powerup}“`, def?.icon ?? '🃏');
   });
 
   s.on('game:reaction', ({ playerId, emote }) => {
@@ -504,16 +480,13 @@ export const actions = {
     const g = getState().game;
     if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice))
       return;
-    if (g.frozenUntil > Date.now()) return;
     if (!sendMove('game:answer', { index: g.question.index, choice })) return offlineToast('Отговорът не е изпратен.');
     effect('lock');
     patchGame(() => ({ myChoice: choice, retryPrompt: false }));
   },
   powerup: (powerup: PowerupId) => {
     const g = getState().game;
-    if (!g?.question || g.phase !== 'question' || g.resyncing) return;
-    // Only "Леден удар" (it hits the next question) can follow your answer.
-    if (g.myChoice !== null && powerup !== 'freeze') return;
+    if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null) return;
     if (g.usedPowerups.includes(powerup) || g.powerupThisQuestion) return;
     if (!sendMove('game:powerup', { index: g.question.index, powerup })) offlineToast('Козът не е изигран.');
   },

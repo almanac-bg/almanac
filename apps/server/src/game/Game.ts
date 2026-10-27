@@ -7,7 +7,6 @@ import {
   type Difficulty,
   eliminationSchedule,
   type FinalStanding,
-  FREEZE_MS,
   type GameEndPayload,
   type GamePlayer,
   type GameStartPayload,
@@ -120,16 +119,12 @@ export interface Participant {
   disconnectedAt: number | null;
   /** Was strictly last at the halfway point (for the comeback achievement). */
   lastAtHalfway: boolean;
-  freezesUsed: number;
   lastReactionAt: number;
   // Per-question state, reset by nextQuestion():
   answer: { choice: number; timeMs: number; retried: boolean } | null;
   doubled: boolean;
   removed: number[];
   powerupThisQuestion: boolean;
-  frozenUntil: number;
-  /** "Леден удар" waiting for the next question: who played it. */
-  frozenNext: string | null;
   extraMs: number;
   retryArmed: boolean;
   firstWrong: number | null;
@@ -138,14 +133,8 @@ export interface Participant {
 type Phase = 'countdown' | 'question' | 'reveal' | 'ended';
 
 const BOT_EMOTES = { good: ['fire', 'cool', 'thumbs'], bad: ['lol', 'wow', 'dead'] };
-/** The козове bots play: the two about their own answer, and "Леден удар" now and then (see botFreezes). */
-const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double', 'freeze'];
-/**
- * A bot's chance, each question it could, to play "Леден удар": one behind all match reaches for it in about one match
- * of three (1 − 0.94⁷ over a ten-question match), the way people forget a коз or save it too long. So a leader among
- * seven bots isn't frozen question after question.
- */
-const BOT_FREEZE_CHANCE = 0.06;
+/** The козове bots play: the two about their own answer, a person's typical pair. */
+const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double'];
 
 export class Game {
   readonly id = randomUUID();
@@ -184,13 +173,8 @@ export class Game {
     private hooks: GameHooks,
   ) {
     const solo = setup.humans.length + setup.bots.length === 1;
-    for (const h of setup.humans) {
-      // Targeted power-ups are pointless without an opponent.
-      const powerups = solo
-        ? h.powerups.filter((id) => !POWERUPS.find((p) => p.id === id)?.multiplayerOnly)
-        : h.powerups;
-      this.participants.set(h.player.id, this.newParticipant(h.player, null, powerups, h.emotes));
-    }
+    for (const h of setup.humans)
+      this.participants.set(h.player.id, this.newParticipant(h.player, null, h.powerups, h.emotes));
     for (const b of setup.bots)
       this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_JOKERS], []));
     this.alone = solo;
@@ -228,13 +212,6 @@ export class Game {
     if (this.phase !== 'question' || index !== this.index) return reject('late');
     if (!Number.isInteger(choice) || choice < 0 || choice > 3) return;
     if (p.removed.includes(choice)) return reject('removed');
-    const now = Date.now();
-    if (p.frozenUntil > now) {
-      // Bots wait the freeze out; humans' clients keep the buttons disabled.
-      if (p.brain)
-        this.later((p.frozenUntil - now) / config.gameTimeScale + 300, () => this.answer(playerId, index, choice));
-      return reject('frozen');
-    }
     const limit = this.setup.timeMs + p.extraMs;
     const elapsed = this.elapsed();
     if (elapsed > limit + GRACE_MS) return reject('late');
@@ -254,33 +231,11 @@ export class Game {
 
   usePowerup(playerId: string, index: number, powerup: PowerupId) {
     const p = this.participants.get(playerId);
-    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p)) return;
-    // "Леден удар" hits the next question, so it can still be played once you've answered this one.
-    if (p.answer && powerup !== 'freeze') return;
+    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p) || p.answer) return;
     if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
     const userId = p.player.userId!;
     const q = this.questions[this.index];
     if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
-
-    if (powerup === 'freeze') {
-      if (this.index >= this.questions.length - 1) {
-        this.emit.toUser(userId, 'notice', {
-          kind: 'info',
-          message: 'Това е последният въпрос — няма следващ, който да замразиш.',
-        });
-        return;
-      }
-      const target = this.freezeTarget(p);
-      if (!target) {
-        this.emit.toUser(userId, 'notice', { kind: 'info', message: 'Няма кого да замразиш.' });
-        return;
-      }
-      target.frozenNext = playerId;
-      p.freezesUsed++;
-      this.consume(p, powerup);
-      this.toGame('game:powerup', { playerId, powerup, targetId: target.player.id });
-      return;
-    }
 
     this.consume(p, powerup);
     switch (powerup) {
@@ -384,11 +339,10 @@ export class Game {
 
   /**
    * Payloads that bring a (re)connecting client up to speed, including where this player stands on the open question
-   * (their pick, jokers, extra time, a freeze): a fresh tab has none of it.
+   * (their pick, козове, extra time): a fresh tab has none of it.
    */
   syncFor(playerId: string): { start: GameStartPayload; question: QuestionPayload | null } {
     const p = this.participants.get(playerId)!;
-    const now = Date.now();
     return {
       start: this.startPayload(playerId, 0),
       question:
@@ -403,7 +357,6 @@ export class Game {
                 retryArmed: p.retryArmed,
                 retryPrompt: p.firstWrong !== null && !p.answer,
                 extraMs: p.extraMs,
-                frozenMs: Math.max(0, (p.frozenUntil - now) / config.gameTimeScale),
                 powerupThisQuestion: p.powerupThisQuestion,
               },
             }
@@ -446,23 +399,16 @@ export class Game {
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
     this.questionStartedAt = Date.now();
-    const frozen: [Participant, string][] = [];
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
       p.removed = [];
       p.powerupThisQuestion = false;
-      // A "Леден удар" played on the last question takes hold now: the answers stay covered for the first seconds.
-      p.frozenUntil = p.frozenNext ? this.questionStartedAt + FREEZE_MS * config.gameTimeScale : 0;
-      if (p.frozenNext) frozen.push([p, p.frozenNext]);
-      p.frozenNext = null;
       p.extraMs = 0;
       p.retryArmed = false;
       p.firstWrong = null;
     }
     this.toGame('game:question', this.questionPayload());
-    for (const [p, by] of frozen)
-      if (!p.brain) this.emit.toUser(p.player.userId!, 'game:frozen', { by, ms: FREEZE_MS * config.gameTimeScale });
     this.scheduleBots();
     this.questionTimer = this.later(this.setup.timeMs + GRACE_MS, () => this.reveal());
   }
@@ -685,19 +631,6 @@ export class Game {
     return { knows, afterMs: Math.max(900, fraction * this.setup.timeMs), joker };
   }
 
-  /**
-   * Whether a bot plays "Леден удар" now, as a person would: from the third question (once there's a leader to speak
-   * of), never on the last, only when the one it would hit is ahead of it — and not every time it could.
-   */
-  private botFreezes(p: Participant): boolean {
-    if (!p.powerups.includes('freeze') || p.usedPowerups.has('freeze') || p.powerupThisQuestion) return false;
-    if (this.index < 2 || this.index >= this.questions.length - 1) return false;
-    const target = this.freezeTarget(p);
-    if (!target) return false;
-    const order = this.ranked();
-    return order.indexOf(target) < order.indexOf(p) && Math.random() < BOT_FREEZE_CHANCE;
-  }
-
   /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
   private botChoice(p: Participant, knows: boolean): number {
     const q = this.questions[this.index];
@@ -715,11 +648,7 @@ export class Game {
       if (!move) continue;
       const { joker } = move;
       if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
-      this.later(move.afterMs, () => {
-        // With the answer, not after it: the last answer in closes the question at once.
-        if (index === this.index && this.botFreezes(p)) this.usePowerup(p.player.id, index, 'freeze');
-        this.answer(p.player.id, index, this.botChoice(p, move.knows));
-      });
+      this.later(move.afterMs, () => this.answer(p.player.id, index, this.botChoice(p, move.knows)));
     }
   }
 
@@ -795,15 +724,6 @@ export class Game {
   private consume(p: Participant, powerup: PowerupId) {
     p.usedPowerups.add(powerup);
     p.powerupThisQuestion = true;
-  }
-
-  /** The best-placed opponent nobody has frozen for the next question yet. */
-  private freezeTarget(by: Participant): Participant | null {
-    return (
-      this.ranked().find(
-        (o) => o !== by && this.isActive(o) && !o.frozenNext && (!this.setup.teams || o.player.team !== by.player.team),
-      ) ?? null
-    );
   }
 
   /**
@@ -972,14 +892,11 @@ export class Game {
       connected: true,
       disconnectedAt: null,
       lastAtHalfway: false,
-      freezesUsed: 0,
       lastReactionAt: 0,
       answer: null,
       doubled: false,
       removed: [],
       powerupThisQuestion: false,
-      frozenUntil: 0,
-      frozenNext: null,
       extraMs: 0,
       retryArmed: false,
       firstWrong: null,

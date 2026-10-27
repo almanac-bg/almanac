@@ -325,15 +325,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 5,
   },
   {
-    id: 'freezer',
-    name: 'Ледена епоха',
-    description: 'Замрази 10 съперници с „Леден удар“.',
-    icon: '🧊',
-    rarity: 'rare',
-    xp: 200,
-    goal: 10,
-  },
-  {
     id: 'author_1',
     name: 'Първо перо',
     description: 'Получи одобрение за свой въпрос.',

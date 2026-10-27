@@ -115,10 +115,6 @@ export const sfx = {
   levelUp: () => {
     for (const [i, f] of [784, 988, 1175, 1568, 1976].entries()) tone(f, i * 0.07, 0.3, 'sine', 0.08);
   },
-  freeze: () => {
-    for (const [i, f] of [2093, 1760, 1568, 1319].entries()) tone(f, i * 0.05, 0.35, 'sine', 0.05);
-    tone(110, 0, 0.5, 'triangle', 0.06, 80);
-  },
   achievement: () => {
     tone(1047, 0, 0.18, 'sine', 0.08);
     tone(1568, 0.1, 0.4, 'sine', 0.08);

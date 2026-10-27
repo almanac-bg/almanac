@@ -182,34 +182,25 @@ export function LockerPage() {
             <>
               {/* The one place to read them at leisure: the match itself has no time for it. */}
               <p className="mb-4 max-w-2xl text-sm text-fg-2">
-                Всеки играе с всичките пет от първия си мач, освен в дневното предизвикателство и в линковете с
+                Всеки играе с всичките четири от първия си мач, освен в дневното предизвикателство и в линковете с
                 предизвикателство, където всички играят едно и също. Всеки коз е по веднъж на мач и по един на въпрос.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {POWERUPS.map((p) => {
-                  const where = [
-                    p.multiplayerOnly ? 'Само в мач с други' : 'Сам и с други',
-                    p.notOnEasy && 'на среден и труден въпрос',
-                  ];
-                  return (
-                    <Card key={p.id} className="p-5">
-                      <div className="flex items-center gap-3">
-                        <span
-                          aria-hidden
-                          className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl"
-                        >
-                          {p.icon}
-                        </span>
-                        <div>
-                          <div className="font-display font-bold">{p.name}</div>
-                          <div className="text-xs text-fg-3">{where.filter(Boolean).join(', ')}</div>
-                        </div>
-                        <KeyHint className="ml-auto self-start">{POWERUP_KEYS[p.id]}</KeyHint>
-                      </div>
-                      <p className="mt-3 text-sm text-fg-2">{p.description}</p>
-                    </Card>
-                  );
-                })}
+                {POWERUPS.map((p) => (
+                  <Card key={p.id} className="p-5">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden
+                        className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl"
+                      >
+                        {p.icon}
+                      </span>
+                      <div className="font-display font-bold">{p.name}</div>
+                      <KeyHint className="ml-auto">{POWERUP_KEYS[p.id]}</KeyHint>
+                    </div>
+                    <p className="mt-3 text-sm text-fg-2">{p.description}</p>
+                  </Card>
+                ))}
               </div>
             </>
           )}

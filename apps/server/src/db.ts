@@ -116,7 +116,7 @@ const MIGRATIONS: (string | (() => void))[] = [
       ALTER TABLE users ADD COLUMN daily_streak INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE users ADD COLUMN best_daily_streak INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE users ADD COLUMN last_daily_day TEXT;
-      ALTER TABLE users ADD COLUMN freezes INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN freezes INTEGER NOT NULL DEFAULT 0; -- "Леден удар" uses; unused since it went
       ALTER TABLE match_players ADD COLUMN team INTEGER;
 
       CREATE TABLE season_ratings (

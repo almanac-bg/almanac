@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  achievementById,
   type CategoryId,
   isQueueMode,
   type LeaderboardBoard,
@@ -891,7 +892,10 @@ function profileStats(u: UserRow, viewerId: number): ProfileStats {
     achievements: all<{ achievement_id: string; unlocked_at: number }>(
       'SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ? ORDER BY unlocked_at DESC',
       u.id,
-    ).map((a) => ({ id: a.achievement_id, unlockedAt: a.unlocked_at })),
+    )
+      // One that was retired since (it went with "Леден удар") stays in the table, not on the profile.
+      .filter((a) => achievementById(a.achievement_id))
+      .map((a) => ({ id: a.achievement_id, unlockedAt: a.unlocked_at })),
     seasons: seasonHistory(u.id).map(({ season, tier }) => ({ season, tier })),
   };
 }

@@ -244,7 +244,7 @@ function rewardHuman(
   run(
     `UPDATE users SET games_played = ?, mp_games = ?, wins = ?, questions_answered = ?, correct_answers = ?,
        best_streak = ?, fastest_correct_ms = ?, total_correct_ms = ?, powerups_used = ?, best_solo_score = ?,
-       hosted_games = ?, last_daily_bonus = ?, freezes = ?, xp = xp + ?
+       hosted_games = ?, last_daily_bonus = ?, xp = xp + ?
      WHERE id = ?`,
     before.games_played + counted,
     before.mp_games + (multiplayer ? counted : 0),
@@ -258,7 +258,6 @@ function rewardHuman(
     solo && counts ? Math.max(before.best_solo_score, s.score) : before.best_solo_score,
     before.hosted_games + (setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0),
     claimDaily ? today : before.last_daily_bonus,
-    before.freezes + p.freezesUsed,
     lines.reduce((sum, l) => sum + l.amount, 0),
     userId,
   );

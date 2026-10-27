@@ -241,11 +241,11 @@ test('games against bots move a rating less and less above 1000, and not at all 
   assert.equal(botK(1900), 0, 'no climbing (or sliding) on bots at the top');
 });
 
-test('everyone has all five козове from the first match, except in the runs everyone compares', () => {
+test('everyone has all the козове from the first match, except in the runs everyone compares', () => {
   const newcomer = account();
   const all = POWERUPS.map((p) => p.id);
   assert.deepEqual(buildHuman(newcomer, 'duel').powerups, all, 'ranked');
-  assert.deepEqual(buildHuman(newcomer, 'solo').powerups, all, 'alone (the game drops "Леден удар" there)');
+  assert.deepEqual(buildHuman(newcomer, 'solo').powerups, all, 'alone');
   assert.deepEqual(buildHuman(newcomer, 'custom').powerups, all, 'a private room');
   assert.deepEqual(buildHuman(newcomer, 'daily').powerups, [], 'not the daily');
   assert.deepEqual(buildHuman(newcomer, 'challenge').powerups, [], 'nor a challenge link');

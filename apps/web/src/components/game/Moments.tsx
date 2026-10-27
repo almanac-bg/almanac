@@ -1,5 +1,4 @@
 import { type LiveGame, plural } from '@quiz/client';
-import clsx from 'clsx';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Avatar } from '../Avatar';
@@ -16,12 +15,7 @@ export function Feed({ game }: { game: LiveGame }) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
-            className={clsx(
-              'rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur',
-              f.icon === '❄️'
-                ? 'border-cyan-200/30 bg-cyan-400/15 text-cyan-100'
-                : 'border-amber-300/20 bg-amber-400/10 text-amber-200',
-            )}
+            className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
           >
             {f.icon} {f.text}
           </motion.span>

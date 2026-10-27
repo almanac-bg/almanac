@@ -38,15 +38,13 @@ export interface EmoteDef {
   req: Requirement;
 }
 
-export type PowerupId = 'fifty' | 'double' | 'freeze' | 'retry' | 'time';
+export type PowerupId = 'fifty' | 'double' | 'retry' | 'time';
 
 export interface PowerupDef {
   id: PowerupId;
   name: string;
   icon: string;
   description: string;
-  /** Needs an opponent to target. */
-  multiplayerOnly?: boolean;
   /** Not on an easy question: a bet on one is no bet (and every match opens with easy ones). */
   notOnEasy?: boolean;
 }
@@ -242,23 +240,16 @@ export const EMOTES: EmoteDef[] = [
   { id: 'praise', emoji: '🙌', req: { level: 44 } },
   { id: 'trophy', emoji: '🏆', req: { achievement: 'first_win' } },
   { id: 'huff', emoji: '😤', req: { achievement: 'photo_finish' } },
-  { id: 'ice', emoji: '🥶', req: { achievement: 'freezer' } },
+  { id: 'ice', emoji: '🥶', req: { achievement: 'flawless_duel' } },
   { id: 'handshake', emoji: '🤝', req: { achievement: 'team_win' } },
 ];
 
 /**
- * Everyone has all five from the first match, wherever козове are played (not the daily, not challenge links: runs
- * everyone compares). Bar order, left to right, and the keys Q to T.
+ * Everyone has all four from the first match, wherever козове are played (not the daily, not challenge links: runs
+ * everyone compares). Bar order, left to right, and the keys Q to R.
  */
 export const POWERUPS: PowerupDef[] = [
   { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.' },
-  {
-    id: 'freeze',
-    name: 'Леден удар',
-    icon: '❄️',
-    description: 'Замразява водещия съперник в началото на следващия въпрос: 4 секунди не вижда отговорите.',
-    multiplayerOnly: true,
-  },
   {
     id: 'retry',
     name: 'Втори шанс',
@@ -277,8 +268,6 @@ export const POWERUPS: PowerupDef[] = [
 
 export const powerupById = (id: string) => POWERUPS.find((p) => p.id === id);
 
-/** Milliseconds a "Леден удар" covers its target's answers at the start of the next question. */
-export const FREEZE_MS = 4000;
 /** Extra milliseconds from "Още време". */
 export const TIME_BONUS_MS = 5000;
 

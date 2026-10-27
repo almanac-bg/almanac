@@ -3,13 +3,12 @@ import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { myTeamOf } from './teams';
 
 /**
  * A key per коз, where there's a keyboard: left to right as in the bar, under 1–4 for the answers. Matched by the key's
  * place (`KeyboardEvent.code`), so a Bulgarian layout plays the same keys.
  */
-export const POWERUP_KEYS: Record<PowerupId, string> = { fifty: 'Q', freeze: 'W', retry: 'E', time: 'R', double: 'T' };
+export const POWERUP_KEYS: Record<PowerupId, string> = { fifty: 'Q', retry: 'W', time: 'E', double: 'R' };
 
 /** A key's letter on screen: only for a mouse and a keyboard (a touch screen has no keys to press). */
 export function KeyHint({ children, className }: { children: string; className?: string }) {
@@ -121,26 +120,11 @@ export function PowerupNotesLine({ powerups, className }: { powerups: PowerupDef
 
 // ─── The bar ───────────────────────────────────────────────────────────────
 
-/** Is there an opponent still in the match (someone "Леден удар" can hit)? */
-function hasFreezeTarget(game: LiveGame): boolean {
-  const youId = game.start.youId;
-  const myTeam = myTeamOf(game);
-  return game.start.players.some((p) => {
-    if (p.id === youId || game.eliminated.includes(p.id)) return false;
-    if (game.standings.find((s) => s.id === p.id)?.left) return false;
-    return !game.start.teams || p.team !== myTeam;
-  });
-}
-
 /** Why a коз can't be played right now, if it can't (the server has the final word). */
 function blockedBy(game: LiveGame, p: PowerupDef): string | null {
   if (game.usedPowerups.includes(p.id)) return 'вече е изигран';
   if (game.powerupThisQuestion) return 'само един коз на въпрос';
   if (p.notOnEasy && game.question?.difficulty === 'easy') return 'само на среден и труден въпрос';
-  if (p.id === 'freeze') {
-    if (game.question && game.question.index >= game.start.totalQuestions - 1) return 'няма следващ въпрос';
-    if (!hasFreezeTarget(game)) return 'няма кого да замразиш';
-  }
   return null;
 }
 
@@ -167,12 +151,9 @@ export function ActivePowerups({ game }: { game: LiveGame }) {
   );
 }
 
-const FREEZE_LOOK =
-  'border-cyan-300/40 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20 hover:shadow-[0_0_20px_-6px_rgb(34_211_238/0.9)]';
-
 /**
- * The козове, while the question is open. Nothing to read here: what they do was said before the match (and on the
- * results that unlocked them); here a tap, or a key.
+ * The козове, while the question is open. Nothing to read here: what they do was said before the match (and is in
+ * "Колекция"); here a tap, or a key.
  */
 export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean }) {
   if (game.start.powerups.length === 0) return null;
@@ -215,9 +196,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
                   ? 'border-line text-fg-3 line-through opacity-50'
                   : blocked
                     ? 'border-line text-fg-3 opacity-60'
-                    : p.id === 'freeze'
-                      ? FREEZE_LOOK
-                      : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
+                    : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
               )}
             >
               <span className="text-base leading-none max-sm:text-lg flat:text-lg" aria-hidden>
@@ -234,31 +213,5 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
         })}
       </div>
     </motion.div>
-  );
-}
-
-/** "Леден удар" once you've answered: it hits the next question, so the choice can wait until your answer is in. */
-export function FreezeAfterAnswer({ game, offline }: { game: LiveGame; offline: boolean }) {
-  const freeze = POWERUPS.find((p) => p.id === 'freeze')!;
-  if (!game.start.powerups.includes('freeze') || blockedBy(game, freeze)) return null;
-  return (
-    <motion.button
-      type="button"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      data-powerup="freeze"
-      disabled={offline}
-      onClick={() => actions.powerup('freeze')}
-      title={`${freeze.name} (${POWERUP_KEYS.freeze}): ${freeze.description}`}
-      aria-label={`${freeze.name}: ${freeze.description}`}
-      aria-keyshortcuts={POWERUP_KEYS.freeze}
-      className={clsx(
-        'focus-ring relative inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition-all disabled:opacity-50',
-        FREEZE_LOOK,
-      )}
-    >
-      <span aria-hidden>{freeze.icon}</span> {freeze.name}
-      <KeyHint className="absolute -top-2 -right-1.5 bg-ink-2 leading-4">{POWERUP_KEYS.freeze}</KeyHint>
-    </motion.button>
   );
 }

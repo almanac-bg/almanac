@@ -9,7 +9,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
-import { ActivePowerups, FreezeAfterAnswer, KeyHint, PowerupBar } from './Powerups';
+import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
 
 /** A question on screen: the clock, the points it's worth, the answers, your pick and how it went. */
 export function QuestionView({ game, offline }: { game: LiveGame; offline: boolean }) {
@@ -20,10 +20,6 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const active = !game.eliminated.includes(youId) && !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
   const reduceMotion = useReducedMotion();
-
-  // Re-render while frozen so the overlay counts down and lifts on time.
-  const now = useNow(200, game.frozenUntil > Date.now());
-  const frozen = active && game.frozenUntil > now;
 
   // Who picked what, shown under each option at reveal.
   const pickers = useMemo(() => {
@@ -117,14 +113,13 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
               selected={game.myChoice === i}
               locked={game.myChoice !== null}
               removed={game.removed.includes(i)}
-              disabled={!active || frozen || offline}
+              disabled={!active || offline}
               offline={(offline || game.resyncing) && !reveal}
               correct={reveal ? reveal.correct === i : null}
               pickers={pickers[i] ?? []}
             />
           ))}
         </div>
-        <AnimatePresence>{frozen && <FreezeOverlay game={game} now={now} />}</AnimatePresence>
       </div>
 
       <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
@@ -140,7 +135,6 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             >
               <LockStatus game={game} offline={offline} />
               <ActivePowerups game={game} />
-              <FreezeAfterAnswer game={game} offline={offline} />
             </motion.div>
           ) : (
             active && <PowerupBar key="pw" game={game} offline={offline} />
@@ -239,42 +233,6 @@ function LockStatus({ game, offline }: { game: LiveGame; offline: boolean }) {
         </span>
       )}
     </p>
-  );
-}
-
-/**
- * Ice over the answers while "Леден удар" holds you: out of sight, not only out of reach (seen through frost, they'd be
- * read and picked the moment it lifts — no time lost at all).
- */
-function FreezeOverlay({ game, now }: { game: LiveGame; now: number }) {
-  const by = game.frozenBy ? game.players[game.frozenBy]?.name : null;
-  const left = Math.max(0, Math.ceil((game.frozenUntil - now) / 1000));
-  const reduceMotion = useReducedMotion();
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 1.04 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25 }}
-      className="absolute -inset-1.5 z-10 grid place-items-center overflow-hidden rounded-3xl border border-cyan-200/40 bg-[#0d2a3a]"
-      style={{
-        backgroundImage:
-          'radial-gradient(circle at 20% 20%, rgb(207 250 254 / 0.22), transparent 40%), radial-gradient(circle at 80% 70%, rgb(165 243 252 / 0.18), transparent 45%), linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 60%)',
-        boxShadow: 'inset 0 0 60px rgb(165 243 252 / 0.25)',
-      }}
-    >
-      <div className="flex flex-col items-center text-center">
-        <motion.span
-          animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="text-5xl drop-shadow-[0_0_18px_rgb(165_243_252/0.9)]"
-        >
-          ❄️
-        </motion.span>
-        <p className="mt-2 font-display text-xl font-bold text-cyan-50">{by ? `${by} те замрази!` : 'Замразиха те!'}</p>
-        <p className="mt-1 font-display text-3xl font-black text-cyan-200 tabular-nums">{left}</p>
-      </div>
-    </motion.div>
   );
 }
 

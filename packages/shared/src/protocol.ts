@@ -122,7 +122,7 @@ export interface QuestionPayload {
   answered: string[];
   /**
    * Only when a (re)connecting client is brought up to speed: where you stand on this question. `remainingMs` then
-   * already counts your "Още време"; `frozenMs` is what's left of a freeze on you.
+   * already counts your "Още време".
    */
   mine?: {
     choice: number | null;
@@ -131,13 +131,12 @@ export interface QuestionPayload {
     retryArmed: boolean;
     retryPrompt: boolean;
     extraMs: number;
-    frozenMs: number;
     powerupThisQuestion: boolean;
   };
 }
 
-/** Why the server didn't take an answer the client sent: too late, an option a joker removed, or while frozen. */
-export type AnswerRejection = 'late' | 'removed' | 'frozen';
+/** Why the server didn't take an answer the client sent: too late, or an option a коз removed. */
+export type AnswerRejection = 'late' | 'removed';
 
 export interface PlayerResult {
   choice: number | null;
@@ -187,8 +186,6 @@ export interface PowerupEvent {
   powerup: PowerupId;
   /** 50/50: options removed (sent only to the user). */
   removed?: number[];
-  /** Леден удар: who gets frozen (at the start of the next question). */
-  targetId?: string;
   /** Още време: extra milliseconds for the user. */
   extraMs?: number;
 }
@@ -308,8 +305,6 @@ export interface ServerToClientEvents {
   'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
   'game:powerup': (p: PowerupEvent) => void;
-  /** To a player "Леден удар" hit, right after the question: its answers are covered for `ms`. */
-  'game:frozen': (p: { by: string; ms: number }) => void;
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
   'game:end': (p: GameEndPayload) => void;

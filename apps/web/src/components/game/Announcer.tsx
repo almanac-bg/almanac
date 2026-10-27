@@ -1,5 +1,4 @@
 import type { LiveGame } from '@quiz/client';
-import { FREEZE_MS } from '@quiz/shared';
 import { useEffect, useState } from 'react';
 import { LETTERS } from './answers';
 
@@ -46,11 +45,6 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
   useEffect(() => {
     if (game.retryPrompt) setMessage('Грешно, но имаш още един опит — за половин точки.');
   }, [game.retryPrompt]);
-
-  const frozenBy = game.frozenBy ? (game.players[game.frozenBy]?.name ?? 'Съперник') : null;
-  useEffect(() => {
-    if (frozenBy && game.frozenUntil > Date.now()) setMessage(`${frozenBy} те замрази за ${FREEZE_MS / 1000} секунди.`);
-  }, [frozenBy, game.frozenUntil]);
 
   return (
     <p className="sr-only" aria-live="polite" aria-atomic="true">

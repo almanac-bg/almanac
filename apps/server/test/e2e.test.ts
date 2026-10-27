@@ -188,11 +188,7 @@ test('solo', T, async () => {
   const ramp = log.questions.map((q) => q.difficulty[0]).join('');
   assert.doesNotMatch(ramp, /h.*e/, `harder towards the end, never an easy one after a hard one (${ramp})`);
   assert.equal(end.standings[0].correct, 10);
-  assert.deepEqual(
-    [...start!.powerups].sort(),
-    ['double', 'fifty', 'retry', 'time'],
-    'every коз from the first match, but "Леден удар" (nobody to hit alone)',
-  );
+  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry', 'time'], 'every коз from the first match');
   const ids = end.rewards!.achievements;
   assert.ok(ids.includes('first_game') && ids.includes('perfect'), `first_game + perfect (${ids})`);
   assert.ok(
@@ -765,13 +761,14 @@ test('козове', T, async () => {
   const reveals: RevealPayload[] = [];
   let start: GameStartPayload | null = null;
   let retry: { wrong: number } | null = null;
-  let frozeTarget: string | undefined;
+  let removed: number[] | undefined;
+  let firstRight = -1;
   let timeBonus: number | undefined;
   sa.on('game:start', (s) => (start = s));
   sa.on('game:retry', (r) => (retry = r));
   sa.on('game:powerup', (e: PowerupEvent) => {
     if (e.powerup === 'time' && e.playerId === `u${A.user.id}`) timeBonus = e.extraMs;
-    if (e.powerup === 'freeze') frozeTarget = e.targetId;
+    if (e.powerup === 'fifty' && e.playerId === `u${A.user.id}`) removed = e.removed;
   });
   sa.on('game:reveal', (r) => reveals.push(r));
   sa.on('game:question', (q: QuestionPayload) => {
@@ -779,12 +776,9 @@ test('козове', T, async () => {
     const answer = (choice: number, ms: number) =>
       setTimeout(() => sa.emit('game:answer', { index: q.index, choice }), ms);
     if (q.index === 0) {
-      // Right after answering (at the test speed the question closes moments after both have): "Леден удар" hits the
-      // next question.
-      setTimeout(() => {
-        sa.emit('game:answer', { index: 0, choice: right });
-        sa.emit('game:powerup', { index: 0, powerup: 'freeze' });
-      }, 10);
+      firstRight = right;
+      sa.emit('game:powerup', { index: 0, powerup: 'fifty' });
+      answer(right, 40);
     } else if (q.index === 1) {
       sa.emit('game:powerup', { index: 1, powerup: 'retry' });
       answer((right + 1) % 4, 40);
@@ -797,7 +791,6 @@ test('козове', T, async () => {
       answer(right, 30);
     }
   });
-  const bFrozen = new Promise<{ by: string; ms: number }>((res) => sb.on('game:frozen', res));
   sb.on('game:question', (q) =>
     setTimeout(() => sb.emit('game:answer', { index: q.index, choice: rightOption(q) }), 20),
   );
@@ -807,19 +800,13 @@ test('козове', T, async () => {
   await emitAck(sb, 'queue:join', 'duel');
   await Promise.all([aEnd, bEnd]);
   for (const ev of ['game:start', 'game:retry', 'game:powerup', 'game:question', 'game:reveal'] as const) sa.off(ev);
-  sb.off('game:question').off('game:frozen');
+  sb.off('game:question');
 
   const me = `u${A.user.id}`;
-  const them = `u${B.user.id}`;
-  assert.ok(
-    ['freeze', 'time', 'retry'].every((p) => start!.powerups.includes(p as never)),
-    'all козове',
-  );
-  const frozen = await Promise.race([bFrozen, sleep(10).then(() => null)]);
-  assert.equal(frozen?.by, me, 'the target is told who froze it, as the next question opens');
-  assert.equal(frozeTarget, them, 'freeze targets the opponent');
-  assert.notEqual(reveals[0].results[them].choice, null, 'the question it was played on is not affected');
-  assert.equal(reveals[1].results[them].choice, null, 'the next one opens frozen: its quick answer is refused');
+  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry', 'time'], 'all козове');
+  assert.equal(removed?.length, 2, '50/50 takes two answers away');
+  assert.ok(!removed!.includes(firstRight), 'never the right one');
+  assert.ok(reveals[0].results[me].correct, 'and the right one is still there to pick');
   assert.equal(reveals[2].results[me].doubled, false, 'one коз per question');
   assert.ok(retry, 'Втори шанс reports the first miss');
   assert.ok(reveals[1].results[me].correct && reveals[1].results[me].retried, 'the second pick counts (half points)');

@@ -46,8 +46,8 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       title: row.title,
       team: null,
     },
-    // Runs everyone compares (the daily, challenge links): no козове. Everywhere else all five for everyone, from the
-    // first match: a result isn't decided by who has played longer (the game drops what a match alone can't use).
+    // Runs everyone compares (the daily, challenge links): no козове. Everywhere else all of them for everyone, from
+    // the first match: a result isn't decided by who has played longer.
     powerups: mode === 'daily' || mode === 'challenge' ? [] : POWERUPS.map((p) => p.id),
     emotes: unlockedIds('emote', ctx),
   };

@@ -34,7 +34,6 @@ export interface Aggregate {
   dailyCompleted: number;
   bestDailyStreak: number;
   friends: number;
-  freezes: number;
   approvedQuestions: number;
   bestSeasonTier: number;
 }
@@ -105,7 +104,6 @@ const RULES: Record<string, Rule> = {
   daily_streak_100: { progress: (a) => a.bestDailyStreak },
   daily_perfect: { earned: (_, m) => !!m && !m.left && m.mode === 'daily' && m.correct === m.questions },
   friends_5: { progress: (a) => a.friends },
-  freezer: { progress: (a) => a.freezes },
   author_1: { progress: (a) => a.approvedQuestions },
   author_10: { progress: (a) => a.approvedQuestions },
   season_gold: { earned: (a) => a.bestSeasonTier >= tierIndex('gold') },
@@ -161,7 +159,6 @@ export function loadAggregate(userId: number): Aggregate {
       userId,
       userId,
     ),
-    freezes: u.freezes,
     approvedQuestions: count('SELECT COUNT(*) AS n FROM questions WHERE author_id = ?', userId),
     bestSeasonTier: bestSeasonTier(userId),
   };

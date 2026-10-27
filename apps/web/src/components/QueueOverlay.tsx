@@ -125,7 +125,7 @@ function Searching({
         <X aria-hidden className="size-4" /> Откажи
       </Button>
 
-      {/* Ranked matches give everyone all five козове: a newcomer meets them here, with seconds to spare (under
+      {/* Ranked matches give everyone all the козове: a newcomer meets them here, with seconds to spare (under
           "Откажи", which stays in reach). */}
       <PowerupNotes powerups={fresh} className="mt-8 w-full" />
     </div>

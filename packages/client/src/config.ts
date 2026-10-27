@@ -4,7 +4,6 @@ export type Effect =
   | 'correct'
   | 'wrong'
   | 'powerup'
-  | 'freeze'
   /** Someone else was knocked out ('knockedOut': you were). */
   | 'eliminated'
   | 'knockedOut'

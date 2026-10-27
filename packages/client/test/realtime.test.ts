@@ -187,7 +187,6 @@ test('after a reconnect the question stays locked until the server says it is st
         retryArmed: false,
         retryPrompt: false,
         extraMs: 0,
-        frozenMs: 0,
         powerupThisQuestion: false,
       },
     }),

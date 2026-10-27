@@ -66,10 +66,6 @@ export interface LiveGame {
   retryArmed: boolean;
   /** The first pick was wrong and a second one is allowed. */
   retryPrompt: boolean;
-  /** Local timestamp until which you're frozen by "Леден удар". */
-  frozenUntil: number;
-  /** Who froze you, for the overlay. */
-  frozenBy: string | null;
   reveal: RevealPayload | null;
   /** Just reconnected: until the server re-sends the question on screen, it may already be closed. */
   resyncing: boolean;
