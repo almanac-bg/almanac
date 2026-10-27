@@ -12,7 +12,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-game-'));
 process.env.DB_PATH = path.join(tmp, 'game.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
-const { Game } = await import('../src/game/Game');
+const { Game, gameClock } = await import('../src/game/Game');
+// The match's clock follows the mocked Date (mock.timers can't mock performance.now).
+gameClock.now = () => Date.now();
 const { pickQuestions } = await import('../src/questions');
 const { BOT_MAX_RATING, makeBots } = await import('../src/game/bots');
 

@@ -16,8 +16,19 @@ db.exec(
   'PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;',
 );
 
-/** Append-only. Each entry runs once, tracked via PRAGMA user_version. */
-const MIGRATIONS: (string | (() => void))[] = [
+type Step = string | (() => void);
+
+/**
+ * Append-only. Each entry runs once, tracked via PRAGMA user_version.
+ *
+ * A step counts as breaking unless it's marked compatible(): code from before it can't run on what it leaves (a
+ * dropped or renamed column, a value that now means something else), so that code refuses the database — going back
+ * to it means restoring the copy from before the migration. A compatible step (a new table, a new column the older code
+ * simply doesn't use) lets the release before it run on the database as it is (see schemaFloor), so a rollback is
+ * the image alone. Make steps compatible whenever possible; what an older release leaves out meanwhile is filled in
+ * by repair() on the next start.
+ */
+const MIGRATIONS: (Step | { compatible: Step })[] = [
   `
   CREATE TABLE users (
     id INTEGER PRIMARY KEY,
@@ -393,20 +404,32 @@ const MIGRATIONS: (string | (() => void))[] = [
   `,
 
   // v15: how each name looks (names.ts), so a new name can't pass for someone else's with a Cyrillic letter that looks
-  // Latin. Not unique: names taken before this may already look alike.
-  () => {
-    db.exec('ALTER TABLE users ADD COLUMN username_shape TEXT; CREATE INDEX users_shape ON users(username_shape);');
-    const update = db.prepare('UPDATE users SET username_shape = ? WHERE id = ?');
-    for (const { id, username } of db.prepare('SELECT id, username FROM users').all() as {
-      id: number;
-      username: string;
-    }[])
-      update.run(nameShape(username), id);
+  // Latin. Not unique: names taken before this may already look alike. Filled in by repair().
+  {
+    compatible: 'ALTER TABLE users ADD COLUMN username_shape TEXT; CREATE INDEX users_shape ON users(username_shape);',
   },
 ];
 
 /** The schema version this code brings a database to. */
 export const SCHEMA_VERSION = MIGRATIONS.length;
+
+/**
+ * The oldest code (by the schema version it knows) that can run on this database: the version the last breaking step
+ * brought it to. Kept in `settings`; null on a database from before it was kept (or before `settings` existed).
+ */
+export function schemaFloor(): number | null {
+  const kept = db.prepare("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get()
+    ? (db.prepare("SELECT value FROM settings WHERE key = 'schema_floor'").get() as { value: string } | undefined)
+    : undefined;
+  return kept ? Number(kept.value) : null;
+}
+
+function setSchemaFloor(floor: number) {
+  if (!db.prepare("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get()) return;
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES ('schema_floor', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  ).run(String(floor));
+}
 
 /**
  * A copy of the database as it was before this code's migrations (into the backups folder): migrations only go
@@ -424,21 +447,55 @@ function copyBeforeMigrating(from: number) {
 
 function migrate() {
   const { user_version: current } = db.prepare('PRAGMA user_version').get() as { user_version: number };
-  // A database from newer code would silently skip this code's future migrations — refuse it instead.
+  // A database from newer code: this is a rollback. Fine while every step since this code's version is compatible;
+  // otherwise refuse it (running on it could garble what the newer code wrote).
   if (current > MIGRATIONS.length) {
-    throw new Error(
-      `Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`,
+    const floor = schemaFloor();
+    if (floor === null || floor > MIGRATIONS.length) {
+      throw new Error(
+        `Database is at schema v${current}, but this code only knows v${MIGRATIONS.length}. Use a newer build or another DB_PATH.`,
+      );
+    }
+    console.warn(
+      `⏪ Database is at schema v${current}, newer than this code (v${MIGRATIONS.length}): every step since is compatible, so it runs on it.`,
     );
+    return;
   }
   if (current > 0 && current < MIGRATIONS.length) copyBeforeMigrating(current);
+  // On a database from before the floor was kept, no older code is known to be able to run on it.
+  let floor = schemaFloor() ?? current;
   for (let v = current; v < MIGRATIONS.length; v++) {
+    const entry = MIGRATIONS[v];
+    const compatible = typeof entry === 'object';
+    const step = compatible ? entry.compatible : entry;
+    if (!compatible) floor = v + 1;
+    // The floor goes in with the step: older code must never see this version with a floor from before it.
     tx(() => {
-      const step = MIGRATIONS[v];
       if (typeof step === 'string') db.exec(step);
       else step();
       db.exec(`PRAGMA user_version = ${v + 1}`);
+      setSchemaFloor(floor);
     });
   }
+  // A database already up to date, from before the floor was kept.
+  if (schemaFloor() === null) setSchemaFloor(floor);
+}
+
+/**
+ * Fills in what a release from before a compatible step left out while it ran on this database: values this code
+ * derives and the older one didn't know to write. Runs at every start; each looks its rows up by index, so it costs
+ * nothing when there's nothing to do.
+ */
+function repair() {
+  const unshaped = db.prepare('SELECT id, username FROM users WHERE username_shape IS NULL').all() as {
+    id: number;
+    username: string;
+  }[];
+  if (!unshaped.length) return;
+  const update = db.prepare('UPDATE users SET username_shape = ? WHERE id = ?');
+  tx(() => {
+    for (const { id, username } of unshaped) update.run(nameShape(username), id);
+  });
 }
 
 const statements = new Map<string, ReturnType<DatabaseSync['prepare']>>();
@@ -482,11 +539,12 @@ export function afterCommit(fn: () => void) {
 }
 
 /**
- * Runs `fn` in a transaction. Nested calls join the outer transaction, so an inner failure that an outer caller catches
- * still commits the outer work done so far.
+ * Runs `fn` in a transaction. A nested call is a savepoint within it: if it fails, what it wrote (and what it left to
+ * run after the commit) is undone, and an outer caller that catches the error still commits its own work — never half
+ * of the inner step's.
  */
 export function tx<T>(fn: () => T): T {
-  if (txDepth > 0) return fn();
+  if (txDepth > 0) return savepoint(fn);
   db.exec('BEGIN');
   txDepth++;
   let committed = false;
@@ -507,4 +565,24 @@ export function tx<T>(fn: () => T): T {
   }
 }
 
+function savepoint<T>(fn: () => T): T {
+  const name = `step${txDepth}`;
+  const waiting = onCommit.length;
+  db.exec(`SAVEPOINT ${name}`);
+  txDepth++;
+  try {
+    const result = fn();
+    db.exec(`RELEASE ${name}`);
+    return result;
+  } catch (err) {
+    db.exec(`ROLLBACK TO ${name}`);
+    db.exec(`RELEASE ${name}`);
+    onCommit.length = waiting;
+    throw err;
+  } finally {
+    txDepth--;
+  }
+}
+
 migrate();
+repair();

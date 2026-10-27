@@ -108,6 +108,24 @@ test("an installation's secrets are random, made once and kept", () => {
   assert.notEqual(installationSecret('another'), seed);
 });
 
+test('a nested step that fails is undone on its own; the work around it still commits', () => {
+  const heard: string[] = [];
+  tx(() => {
+    run("INSERT INTO settings (key, value) VALUES ('around', 'kept')");
+    assert.throws(() =>
+      tx(() => {
+        run("INSERT INTO settings (key, value) VALUES ('inner', 'half done')");
+        afterCommit(() => heard.push('the failed step: never'));
+        throw new Error('the inner step failed');
+      }),
+    );
+    afterCommit(() => heard.push('the work around it'));
+  });
+  const keys = all<{ key: string }>("SELECT key FROM settings WHERE key IN ('around', 'inner')").map((r) => r.key);
+  assert.deepEqual(keys, ['around']);
+  assert.deepEqual(heard, ['the work around it']);
+});
+
 test('what waits for a commit runs after it, once, and not at all after a rollback', () => {
   const heard: string[] = [];
   afterCommit(() => heard.push('outside a transaction: at once'));

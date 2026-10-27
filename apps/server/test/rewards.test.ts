@@ -22,7 +22,9 @@ process.env.DB_PATH = path.join(tmp, 'rewards.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 process.env.BACKUP_DIR = 'off';
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
-const { Game } = await import('../src/game/Game');
+const { Game, gameClock } = await import('../src/game/Game');
+// The match's clock follows the mocked Date (mock.timers can't mock performance.now).
+gameClock.now = () => Date.now();
 const { botK, finalizeMatch } = await import('../src/game/rewards');
 const { buildHuman } = await import('../src/game/registry');
 const { pickQuestions } = await import('../src/questions');

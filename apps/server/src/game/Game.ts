@@ -52,6 +52,13 @@ const REACTION_COOLDOWN_MS = 700;
 /** A match the other side walks out of before this many questions were played counts for nobody who stayed. */
 const NO_CONTEST_QUESTIONS = 3;
 
+/**
+ * The clock for durations in a match (how long a question has been open, a reconnect's grace, a reaction's cooldown):
+ * monotonic, so the server's wall clock being set right mid-question can't hand out or take away time. Tests that mock
+ * `Date` point it there.
+ */
+export const gameClock = { now: () => performance.now() };
+
 type Events = ServerToClientEvents;
 type Args<E extends keyof Events> = Parameters<Events[E]>;
 
@@ -290,7 +297,7 @@ export class Game {
   react(playerId: string, emote: string) {
     const p = this.participants.get(playerId);
     if (!p || this.phase === 'ended' || !p.emotes.has(emote)) return;
-    const now = Date.now();
+    const now = gameClock.now();
     if (now - p.lastReactionAt < REACTION_COOLDOWN_MS) return;
     p.lastReactionAt = now;
     this.toGame('game:reaction', { playerId, emote });
@@ -313,7 +320,7 @@ export class Game {
     const p = this.participants.get(playerId);
     if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
     p.connected = connected;
-    p.disconnectedAt = connected ? null : Date.now();
+    p.disconnectedAt = connected ? null : gameClock.now();
     // Someone who dropped isn't reading: the disconnect hold takes over (and a fresh tab knows nothing of the stop).
     if (!connected && this.reading) {
       this.reading = 0;
@@ -398,7 +405,7 @@ export class Game {
     this.index++;
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
-    this.questionStartedAt = Date.now();
+    this.questionStartedAt = gameClock.now();
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
@@ -423,7 +430,7 @@ export class Game {
 
   private maybeRevealEarly() {
     if (this.phase !== 'question') return;
-    const now = Date.now();
+    const now = gameClock.now();
     const reconnecting = (p: Participant) =>
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
     // Alone, the clock is the only limit: nobody else is waiting for the question to close.
@@ -718,7 +725,7 @@ export class Game {
 
   /** Milliseconds since the question opened, in game time. */
   private elapsed() {
-    return (Date.now() - this.questionStartedAt) / config.gameTimeScale;
+    return (gameClock.now() - this.questionStartedAt) / config.gameTimeScale;
   }
 
   private consume(p: Participant, powerup: PowerupId) {
@@ -892,7 +899,7 @@ export class Game {
       connected: true,
       disconnectedAt: null,
       lastAtHalfway: false,
-      lastReactionAt: 0,
+      lastReactionAt: -Infinity,
       answer: null,
       doubled: false,
       removed: [],

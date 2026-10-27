@@ -20,7 +20,7 @@ old.close();
 // The server's database module migrates the file it opens, on import.
 process.env.DB_PATH = file;
 process.env.BACKUP_DIR = path.join(tmp, 'backups');
-const { all, one, SCHEMA_VERSION } = await import('../src/db');
+const { all, one, SCHEMA_VERSION, schemaFloor } = await import('../src/db');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -77,6 +77,52 @@ test('the database as it was is kept beside the backups before migrating', () =>
     );
   } finally {
     saved.close();
+  }
+});
+
+test('the database knows the oldest code that can run on it: the one its last breaking step needs', () => {
+  // Every step up to v14 counts as breaking (they're from before steps were marked); v15 is compatible.
+  assert.equal(schemaFloor(), 14);
+});
+
+test('a rollback runs on a database whose newer steps were all compatible, and not past a breaking one', () => {
+  const file = path.join(tmp, 'rollback.db');
+  const boot = () =>
+    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
+      encoding: 'utf8',
+    });
+  assert.equal(boot().status, 0, 'a new database');
+  const db = new DatabaseSync(file);
+  try {
+    // As if a newer release had added a compatible step, and the one before it then ran here again and signed someone
+    // up — without the name's shape, which it didn't know about.
+    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION + 1}`);
+    db.exec(
+      "INSERT INTO users (username, username_key, password_hash, created_at) VALUES ('\u041dristo', 'x', 'x', 0)",
+    );
+    const rollback = boot();
+    assert.equal(rollback.status, 0, rollback.stderr);
+    assert.match(rollback.stderr, /every step since is compatible/);
+    assert.equal(
+      (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version,
+      SCHEMA_VERSION + 1,
+    );
+    assert.equal(
+      (db.prepare("SELECT username_shape FROM users WHERE username_key = 'x'").get() as { username_shape: string })
+        .username_shape,
+      'Hristo',
+      'what the older release left out is filled in on the next start',
+    );
+
+    // A breaking step since: the floor is past this code.
+    db.prepare("UPDATE settings SET value = ? WHERE key = 'schema_floor'").run(String(SCHEMA_VERSION + 1));
+    const refused = boot();
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /this code only knows/);
+  } finally {
+    db.close();
   }
 });
 
