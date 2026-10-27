@@ -19,8 +19,8 @@ from it. Every batch is verified independently before it goes in.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
   spread, fact length/source/giveaways). README → „Добавяне на въпроси“ documents the format.
-- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `facts`, `similar`, `giveaways`,
-  `collect` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
+- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `fill`, `facts`, `similar`,
+  `giveaways`, `collect` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
   line per changed question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a
   one-off fix, editing that question's line directly is fine.
 - Agents doing this work never send personal data anywhere: no names or email addresses in User-Agent headers,
@@ -74,6 +74,9 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
       new questions, and each one where a new question names an old one's answer (or the reverse); reword or drop.
       Then `add <out>.json`, the bank test, a commit per merge. A checker may move a question's difficulty, so look at
       `stats` again after merging and let the next batch close what's left.
+   To land exactly on balance (as the 2026-10 balance run did), give each brief's `mix` one spare per difficulty it
+   needs, and use `fill <out>.tids.json` instead of `add`: it adds exactly what each category and difficulty lacks and
+   leaves the rest in `<out>.spares.json` — keep those, checked, in `private/plans/` for the next run.
 5. **Commit and push in `private/`** (`git -C private …`, the usual commit trailer). Production gets the change on
    the next deploy; deploying is outward-facing, so ask the owner unless they already said to ship it.
 6. **Tell the owner** what went in: a short list (question → answer, and the fact if any), so they can read it.

@@ -1,8 +1,8 @@
 export const meta = {
   name: 'question-batches',
-  description: 'Write 20 questions with facts per batch, then check each one independently against sources',
+  description: 'Write a batch of questions with facts per brief, then check each one independently against sources',
   phases: [
-    { title: 'Write', detail: 'one writer per batch: 20 questions, facts and sources, researched' },
+    { title: 'Write', detail: 'one writer per batch: questions, facts and sources, researched' },
     { title: 'Check', detail: 'a separate fact-checker per batch: OK / FIX / DROP with evidence' },
   ],
 }
@@ -53,7 +53,7 @@ Read .claude/skills/question-bank/SKILL.md first: "Adding questions" and "Writin
 
 Your batch brief is the object with "slug": "${slug}" in ${args.dir}/batches.json: its category, title, scope, an "avoid" list (questions already in the bank near this scope: do NOT ask them again, nor the same fact reworded) and "siblings" (batches other writers are doing in the same category right now: stay out of their ground).
 
-Write exactly 20 questions, with the difficulty mix in your brief's "mix" (8 easy, 8 medium, 4 hard if it has none; it comes from the bank's balance rule, so keep to it). For Bulgarian players: easy = most adults know it, medium = a well-read person, hard = an enthusiast. Each one with:
+Write exactly as many questions as your brief's "mix" adds up to, at those difficulties (without a "mix": 20 — 8 easy, 8 medium, 4 hard). The mix comes from the bank's balance rule, so keep to it. For Bulgarian players: easy = most adults know it, medium = a well-read person, hard = an enthusiast. Each one with:
 - q, options (4), answer (index of the right option), difficulty, category "${categoryOf(slug)}";
 - answerSource: an https page that confirms the marked answer;
 - fact: a „Знаеше ли?“ fact (20–200 characters, ends with a period) that adds something true and surprising about the answer, and factSource: an https page that supports every claim in it.
@@ -64,7 +64,7 @@ and replace anything it shows that asks the same thing (the same answer from a d
 
 Vary the position of the right answer (about five each at 0, 1, 2, 3). For questions with four numbers, make the right one the smallest or the largest about half the time.
 
-Write the 20 as a JSON array to ${args.dir}/${slug}/draft.json (create the folder), each object:
+Write them as a JSON array to ${args.dir}/${slug}/draft.json (create the folder), each object:
 {"tid":"${slug}-01","category":"${categoryOf(slug)}","difficulty":"easy","q":"…?","options":["…","…","…","…"],"answer":0,"fact":"….","factSource":"https://…","answerSource":"https://…"}
 Edit no other file (never private/questions.json). Return the summary.`,
     { label: `write:${slug}`, phase: 'Write', schema: WRITTEN, agentType: 'general-purpose' },
@@ -76,7 +76,7 @@ const check = (written, slug) =>
 
 Read .claude/skills/question-bank/SKILL.md first (its rules for questions and facts are the standard). Today is ${args.today}.
 
-Input: ${args.dir}/${slug}/draft.json — 20 questions in category ${categoryOf(slug)}, each with answerSource, fact and factSource. Check EVERY question. Never send personal data in any request: no names or email addresses in User-Agent headers, queries or URLs (use a generic User-Agent such as "almanac-question-check").
+Input: ${args.dir}/${slug}/draft.json — the draft's questions in category ${categoryOf(slug)}, each with answerSource, fact and factSource. Check EVERY question. Never send personal data in any request: no names or email addresses in User-Agent headers, queries or URLs (use a generic User-Agent such as "almanac-question-check").
 
 1. The marked answer is right (fetch answerSource; if it doesn't settle it, find a reliable source that does). No other option is also right or defensible. Nothing is outdated as of today. The question has one reading.
 2. The fact: fetch factSource and check every claim — names, dates, numbers, and qualifiers like "only", "first", "largest", "still". It must say no more than the source; it must add something beyond the answer; 20–200 characters, ending with a period.

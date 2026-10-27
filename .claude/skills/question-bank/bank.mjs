@@ -12,6 +12,8 @@
 //                                                                       the bank and within the file (to judge, not proof)
 //   node .claude/skills/question-bank/bank.mjs giveaways [file.json] [bank]  questions whose text names another one's
 //                                                                       answer (with a file: pairs involving its questions)
+//   node .claude/skills/question-bank/bank.mjs fill <file.json> [bank]   adds exactly what balance lacks from checked
+//                                                                       candidates; the rest → <file>.spares.json
 //   node .claude/skills/question-bank/bank.mjs collect <dir> <out> [slug...]  a workflow's checked batches
 //                                                                       (<dir>/<slug>/verified.json) → <out>.json for `add`
 //
@@ -106,26 +108,57 @@ const stems = (text) =>
       .filter((w) => !COMMON.has(w)),
   );
 
+/** Each category's counts, and what it lacks to be balanced: every category the same size, split as a match draws
+ * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over. */
+function balance(questions) {
+  const rows = Object.entries(PREFIX).map(([category, prefix]) => {
+    const qs = questions.filter((q) => q.category === category);
+    const count = Object.fromEntries(DIFFICULTIES.map((d) => [d, qs.filter((q) => q.difficulty === d).length]));
+    const next = String(Math.max(0, ...qs.map((q) => number(q.id))) + 1).padStart(3, '0');
+    return { category, total: qs.length, count, facts: qs.filter((q) => q.fact).length, next: `${prefix}-${next}` };
+  });
+  const size =
+    Math.ceil(
+      Math.max(...rows.flatMap((r) => [r.total, ...DIFFICULTIES.map((d) => r.count[d] / SHARE[d])])) / 5 - 1e-9,
+    ) * 5;
+  const target = { easy: size * SHARE.easy, medium: size * SHARE.medium, hard: size * SHARE.hard };
+  for (const r of rows)
+    r.short = Object.fromEntries(DIFFICULTIES.map((d) => [d, Math.max(0, Math.round(target[d] - r.count[d]))]));
+  return { rows, size, target };
+}
+
+/** Appends new questions: checked fields, the next free id where there is none, facts tidied, the bank's key order. */
+function append(bank, added) {
+  const taken = new Set(bank.questions.map((q) => q.id));
+  // Never a removed question's id (reports and stats refer to ids): new ones continue after the highest.
+  const next = {};
+  for (const q of bank.questions) next[q.category] = Math.max(next[q.category] ?? 0, number(q.id));
+  for (const q of added) {
+    const missing = ['category', 'difficulty', 'q', 'options', 'answer'].filter((k) => q[k] === undefined);
+    if (missing.length) fail(`${q.id ?? q.q ?? JSON.stringify(q).slice(0, 60)}: missing ${missing.join(', ')}`);
+    if (!PREFIX[q.category]) fail(`${q.q}: unknown category ${q.category}`);
+    const unknown = Object.keys(q).filter((k) => !KEYS.includes(k));
+    if (unknown.length) fail(`${q.id ?? q.q}: unknown fields ${unknown.join(', ')}`);
+    if (q.id === undefined) {
+      next[q.category] = (next[q.category] ?? 0) + 1;
+      q.id = `${PREFIX[q.category]}-${String(next[q.category]).padStart(3, '0')}`;
+    }
+    if (!q.id.startsWith(`${PREFIX[q.category]}-`)) fail(`${q.id}: the id doesn't match the category ${q.category}`);
+    if (taken.has(q.id)) fail(`${q.id} is taken (leave the id out to get the next free one)`);
+    if (q.fact) q.fact = tidyFact(q.fact);
+    taken.add(q.id);
+    bank.questions.push(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
+  }
+}
+
 const [command, ...args] = process.argv.slice(2);
 switch (command) {
   case 'stats': {
     const { questions, where } = load(args[0]);
     console.log(`${where}: ${questions.length} questions, ${questions.filter((q) => q.fact).length} with a fact`);
-    const rows = Object.entries(PREFIX).map(([category, prefix]) => {
-      const qs = questions.filter((q) => q.category === category);
-      const count = Object.fromEntries(DIFFICULTIES.map((d) => [d, qs.filter((q) => q.difficulty === d).length]));
-      const next = String(Math.max(0, ...qs.map((q) => number(q.id))) + 1).padStart(3, '0');
-      return { category, total: qs.length, count, facts: qs.filter((q) => q.fact).length, next: `${prefix}-${next}` };
-    });
-    // Balanced = every category the same size, split as a match draws (SHARE), reached by adding only: the smallest
-    // such size that no category or difficulty is already over.
-    const size =
-      Math.ceil(
-        Math.max(...rows.flatMap((r) => [r.total, ...DIFFICULTIES.map((d) => r.count[d] / SHARE[d])])) / 5 - 1e-9,
-      ) * 5;
-    const target = { easy: size * SHARE.easy, medium: size * SHARE.medium, hard: size * SHARE.hard };
+    const { rows, size, target } = balance(questions);
     for (const r of rows) {
-      const short = DIFFICULTIES.map((d) => [d, Math.round(target[d] - r.count[d])]).filter(([, n]) => n > 0);
+      const short = DIFFICULTIES.map((d) => [d, r.short[d]]).filter(([, n]) => n > 0);
       console.log(
         `${r.category.padEnd(11)} ${String(r.total).padStart(4)}  easy ${r.count.easy} · medium ${r.count.medium} · hard ${r.count.hard}  facts ${r.facts}  next ${r.next}${short.length ? `  to balance: ${short.map(([d, n]) => `+${n} ${d}`).join(', ')}` : ''}`,
       );
@@ -149,28 +182,38 @@ switch (command) {
   case 'add': {
     const added = readJson(args[0]);
     const bank = load(args[1]);
-    const taken = new Set(bank.questions.map((q) => q.id));
-    // Never a removed question's id (reports and stats refer to ids): new ones continue after the highest.
-    const next = {};
-    for (const q of bank.questions) next[q.category] = Math.max(next[q.category] ?? 0, number(q.id));
-    for (const q of added) {
-      const missing = ['category', 'difficulty', 'q', 'options', 'answer'].filter((k) => q[k] === undefined);
-      if (missing.length) fail(`${q.id ?? q.q ?? JSON.stringify(q).slice(0, 60)}: missing ${missing.join(', ')}`);
-      if (!PREFIX[q.category]) fail(`${q.q}: unknown category ${q.category}`);
-      const unknown = Object.keys(q).filter((k) => !KEYS.includes(k));
-      if (unknown.length) fail(`${q.id ?? q.q}: unknown fields ${unknown.join(', ')}`);
-      if (q.id === undefined) {
-        next[q.category] = (next[q.category] ?? 0) + 1;
-        q.id = `${PREFIX[q.category]}-${String(next[q.category]).padStart(3, '0')}`;
-      }
-      if (!q.id.startsWith(`${PREFIX[q.category]}-`)) fail(`${q.id}: the id doesn't match the category ${q.category}`);
-      if (taken.has(q.id)) fail(`${q.id} is taken (leave the id out to get the next free one)`);
-      if (q.fact) q.fact = tidyFact(q.fact);
-      taken.add(q.id);
-      bank.questions.push(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
-    }
+    append(bank, added);
     bank.save();
     console.log(`${bank.where}: added ${added.length}; now ${bank.questions.length}`);
+    break;
+  }
+  case 'fill': {
+    // Checked candidates (e.g. collect's .tids.json, written with a spare or two per difficulty) → exactly what each
+    // category and difficulty lacks for balance, in the file's order; the rest wait in <file>.spares.json.
+    const candidates = readJson(args[0]);
+    const bank = load(args[1]);
+    const { rows } = balance(bank.questions);
+    const lacking = Object.fromEntries(rows.map((r) => [r.category, { ...r.short }]));
+    const picked = [];
+    const spares = [];
+    for (const q of candidates) {
+      const left = lacking[q.category];
+      if (left && left[q.difficulty] > 0) {
+        left[q.difficulty]--;
+        picked.push(Object.fromEntries(Object.entries(q).filter(([k]) => k !== 'tid')));
+      } else spares.push(q);
+    }
+    append(bank, picked);
+    bank.save();
+    const spareFile = args[0].replace(/(\.tids)?\.json$/, '.spares.json');
+    fs.writeFileSync(spareFile, JSON.stringify(spares, null, 1));
+    const still = Object.entries(lacking).flatMap(([c, l]) =>
+      DIFFICULTIES.filter((d) => l[d] > 0).map((d) => `${c} +${l[d]} ${d}`),
+    );
+    console.log(
+      `${bank.where}: added ${picked.length}; now ${bank.questions.length}. ${spares.length} spares → ${spareFile}`,
+    );
+    console.log(still.length ? `still lacking: ${still.join(', ')}` : 'balanced');
     break;
   }
   case 'facts': {
@@ -302,5 +345,5 @@ switch (command) {
     break;
   }
   default:
-    fail('commands: stats · show · add · facts · similar · giveaways · collect (see the top of this file)');
+    fail('commands: stats · show · add · fill · facts · similar · giveaways · collect (see the top of this file)');
 }
