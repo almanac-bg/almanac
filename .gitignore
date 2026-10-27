@@ -17,6 +17,9 @@ blob-report/
 # The real question bank: a clone of the private almanac-questions repository (see README → Adding questions).
 /private/
 
+# Claude Code settings for this checkout only (e.g. permission to deploy): personal, never in the public repo.
+.claude/settings.local.json
+
 # On the server: which commit runs and which ran before it (deploy/deploy.sh, deploy/rollback.sh).
 /.release
 /.release-previous
