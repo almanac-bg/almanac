@@ -10,6 +10,10 @@
 //   node .claude/skills/question-bank/bank.mjs facts <file.json> [bank] sets fact + factSource ([{id, fact, factSource}])
 //   node .claude/skills/question-bank/bank.mjs similar <file.json> [bank]  near-duplicates of the file's questions, in
 //                                                                       the bank and within the file (to judge, not proof)
+//   node .claude/skills/question-bank/bank.mjs giveaways [file.json] [bank]  questions whose text names another one's
+//                                                                       answer (with a file: pairs involving its questions)
+//   node .claude/skills/question-bank/bank.mjs collect <dir> <out> [slug...]  a workflow's checked batches
+//                                                                       (<dir>/<slug>/verified.json) → <out>.json for `add`
 //
 // bank: "private" (private/questions.json, the default) or "sample" (apps/server/src/data/questions.sample.json).
 import fs from 'node:fs';
@@ -30,6 +34,9 @@ const PREFIX = {
   nature: 'nat',
 };
 const KEYS = ['id', 'category', 'difficulty', 'q', 'options', 'answer', 'fact', 'factSource'];
+const DIFFICULTIES = ['easy', 'medium', 'hard'];
+/** The mix every match draws (pickQuestions in apps/server/src/questions.ts): the bank keeps the same split. */
+const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 };
 
 function fail(message) {
   console.error(`bank: ${message}`);
@@ -85,6 +92,7 @@ const COMMON = new Set([
   'годин',
   'чийто',
   'чиято',
+  'бълга',
 ]);
 
 /** Rough word stems (the first five letters of each word of five or more): enough to spot the same question reworded. */
@@ -103,15 +111,29 @@ switch (command) {
   case 'stats': {
     const { questions, where } = load(args[0]);
     console.log(`${where}: ${questions.length} questions, ${questions.filter((q) => q.fact).length} with a fact`);
-    for (const [category, prefix] of Object.entries(PREFIX)) {
+    const rows = Object.entries(PREFIX).map(([category, prefix]) => {
       const qs = questions.filter((q) => q.category === category);
-      const by = (d) => qs.filter((q) => q.difficulty === d).length;
+      const count = Object.fromEntries(DIFFICULTIES.map((d) => [d, qs.filter((q) => q.difficulty === d).length]));
       const next = String(Math.max(0, ...qs.map((q) => number(q.id))) + 1).padStart(3, '0');
-      const facts = qs.filter((q) => q.fact).length;
+      return { category, total: qs.length, count, facts: qs.filter((q) => q.fact).length, next: `${prefix}-${next}` };
+    });
+    // Balanced = every category the same size, split as a match draws (SHARE), reached by adding only: the smallest
+    // such size that no category or difficulty is already over.
+    const size =
+      Math.ceil(
+        Math.max(...rows.flatMap((r) => [r.total, ...DIFFICULTIES.map((d) => r.count[d] / SHARE[d])])) / 5 - 1e-9,
+      ) * 5;
+    const target = { easy: size * SHARE.easy, medium: size * SHARE.medium, hard: size * SHARE.hard };
+    for (const r of rows) {
+      const short = DIFFICULTIES.map((d) => [d, Math.round(target[d] - r.count[d])]).filter(([, n]) => n > 0);
       console.log(
-        `${category.padEnd(11)} ${String(qs.length).padStart(4)}  easy ${by('easy')} · medium ${by('medium')} · hard ${by('hard')}  facts ${facts}  next ${prefix}-${next}`,
+        `${r.category.padEnd(11)} ${String(r.total).padStart(4)}  easy ${r.count.easy} · medium ${r.count.medium} · hard ${r.count.hard}  facts ${r.facts}  next ${r.next}${short.length ? `  to balance: ${short.map(([d, n]) => `+${n} ${d}`).join(', ')}` : ''}`,
       );
     }
+    const missing = rows.reduce((sum, r) => sum + size - r.total, 0);
+    console.log(
+      `balanced: ${size} per category (${target.easy}/${target.medium}/${target.hard}), ${missing ? `${missing} questions to add` : 'reached'}`,
+    );
     break;
   }
   case 'show': {
@@ -202,8 +224,83 @@ switch (command) {
     console.log(found ? `${found} pairs to judge` : 'nothing similar');
     break;
   }
-  default:
-    fail(
-      'commands: stats [bank] · show <id>... [--bank b] · add <file.json> [bank] · facts <file.json> [bank] · similar <file.json> [bank]',
+  case 'giveaways': {
+    // In one match (Микс takes every category), a question whose text names another's answer, on the same subject,
+    // gives it away. The same answer alone isn't enough ("България" is in hundreds), hence the shared key words.
+    const extra = args[0]?.endsWith('.json') ? readJson(args[0]) : [];
+    const { questions } = load(args[0]?.endsWith('.json') ? args[1] : args[0]);
+    const all = [...questions, ...extra.map((q, i) => ({ ...q, id: q.id ?? q.tid ?? `#${i + 1}` }))];
+    const mine = new Set(extra.length ? all.slice(questions.length) : all);
+    const norm = (s) =>
+      ` ${s
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .trim()} `;
+    const texts = all.map((q) => ({ q, text: norm(q.q), words: stems(q.q) }));
+    let found = 0;
+    for (const a of all) {
+      const answer = norm(a.options[a.answer]);
+      if (answer.trim().length < 4) continue;
+      const words = stems(a.q);
+      for (const b of texts) {
+        if (b.q === a || !b.text.includes(answer) || !(mine.has(a) || mine.has(b.q))) continue;
+        const shared = [...words].filter((w) => b.words.has(w));
+        if (shared.length < 2) continue;
+        found++;
+        console.log(`${b.q.id} names the answer of ${a.id} («${a.options[a.answer]}»)`);
+        console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}`);
+      }
+    }
+    console.log(found ? `${found} pairs to judge` : 'no giveaways');
+    break;
+  }
+  case 'collect': {
+    // A workflow's batches, as the checker left them: OK and FIX go in, DROP doesn't; anything malformed is listed.
+    const [dir, out, ...only] = args;
+    if (!dir || !out) fail('collect <dir> <out> [slug...]');
+    const slugs = only.length
+      ? only
+      : fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, 'verified.json')));
+    const kept = [];
+    for (const slug of slugs) {
+      const items = readJson(path.join(dir, slug, 'verified.json'));
+      const tally = { OK: 0, FIX: 0, DROP: 0 };
+      for (const item of items) {
+        tally[item.verdict] = (tally[item.verdict] ?? 0) + 1;
+        if (item.verdict !== 'OK' && item.verdict !== 'FIX') continue;
+        const q = Object.fromEntries(KEYS.filter((k) => k !== 'id' && item[k] != null).map((k) => [k, item[k]]));
+        const bad = [
+          !PREFIX[q.category] && 'category',
+          !DIFFICULTIES.includes(q.difficulty) && 'difficulty',
+          !(q.q?.trim().length >= 10 && q.q.length <= 150 && /[?“]$/.test(q.q)) && 'question',
+          !(q.options?.length === 4 && q.options.every((o) => o.trim() && o.length <= 45)) && 'options',
+          !(Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3) && 'answer',
+          q.fact && !(q.fact.trim().length >= 20 && q.fact.length <= 200 && /[.!?…“"]$/.test(q.fact)) && 'fact',
+          q.fact && !q.factSource?.startsWith('https://') && 'factSource',
+        ].filter(Boolean);
+        if (bad.length) console.log(`  left out ${item.tid}: ${bad.join(', ')}`);
+        else kept.push({ tid: item.tid, ...q });
+      }
+      console.log(`${slug.padEnd(34)} OK ${tally.OK}  FIX ${tally.FIX}  DROP ${tally.DROP}`);
+    }
+    // Options are shuffled in every match anyway; spreading the stored positions keeps the bank's position test honest.
+    kept.forEach((q, i) => {
+      const shift = (q.answer - (i % 4) + 4) % 4;
+      q.options = [...q.options.slice(shift), ...q.options.slice(0, shift)];
+      q.answer = i % 4;
+    });
+    fs.writeFileSync(`${out}.tids.json`, JSON.stringify(kept, null, 1));
+    fs.writeFileSync(
+      `${out}.json`,
+      JSON.stringify(
+        kept.map(({ tid, ...q }) => q),
+        null,
+        1,
+      ),
     );
+    console.log(`${kept.length} kept → ${out}.json (with tids: ${out}.tids.json, for similar and giveaways)`);
+    break;
+  }
+  default:
+    fail('commands: stats · show · add · facts · similar · giveaways · collect (see the top of this file)');
 }

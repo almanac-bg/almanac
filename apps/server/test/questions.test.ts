@@ -19,8 +19,14 @@ interface Q {
 
 const BANKS = [
   // Just enough to play every mode while developing.
-  { name: 'public sample', file: '../src/data/questions.sample.json', perCategory: 12, perDifficulty: 2 },
-  { name: 'private bank', file: '../../../private/questions.json', perCategory: 30, perDifficulty: 6 },
+  {
+    name: 'public sample',
+    file: '../src/data/questions.sample.json',
+    perCategory: 12,
+    perDifficulty: 2,
+    balanced: false,
+  },
+  { name: 'private bank', file: '../../../private/questions.json', perCategory: 30, perDifficulty: 6, balanced: true },
 ]
   .map((b) => ({ ...b, file: path.join(import.meta.dirname, b.file) }))
   .filter((b) => fs.existsSync(b.file));
@@ -56,7 +62,10 @@ const normalize = (s: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 
-for (const { name, file, perCategory, perDifficulty } of BANKS) {
+/** The mix every match draws (pickQuestions): a bank with the same split wears its difficulties out evenly. */
+const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 } as const;
+
+for (const { name, file, perCategory, perDifficulty, balanced } of BANKS) {
   const bank: Q[] = JSON.parse(fs.readFileSync(file, 'utf8'));
 
   test(`${name}: every question is well-formed`, () => {
@@ -82,6 +91,23 @@ for (const { name, file, perCategory, perDifficulty } of BANKS) {
       const key = normalize(q.q);
       assert.ok(!texts.has(key), `duplicate question: ${q.id} and ${texts.get(key)}`);
       texts.set(key, q.id);
+    }
+  });
+
+  // The goal is every category the same size, each split 40/40/20 like a match (new batches fill the gaps that
+  // `bank.mjs stats` shows); this keeps the drift small. Not for the sample: 12 questions a category is too few.
+  test(`${name}: categories and difficulties stay balanced`, { skip: !balanced }, () => {
+    const sizes = new Map(CATEGORY_IDS.map((c) => [c, bank.filter((q) => q.category === c).length]));
+    const largest = Math.max(...sizes.values());
+    for (const [category, size] of sizes) {
+      assert.ok(size >= largest * 0.9, `${category} has ${size} questions, the largest category ${largest}`);
+      for (const [difficulty, share] of Object.entries(SHARE)) {
+        const n = bank.filter((q) => q.category === category && q.difficulty === difficulty).length;
+        assert.ok(
+          Math.abs(n / size - share) <= 0.05,
+          `${category}: ${n} of ${size} ${difficulty} (aim ${share * 100}%)`,
+        );
+      }
     }
   });
 

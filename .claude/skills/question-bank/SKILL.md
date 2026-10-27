@@ -19,18 +19,25 @@ from it. Every batch is verified independently before it goes in.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
   spread, fact length/source/giveaways). README → „Добавяне на въпроси“ documents the format.
-- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `facts`, `similar` (usage at its
-  top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one line per changed
-  question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a one-off fix,
-  editing that question's line directly is fine.
+- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `facts`, `similar`, `giveaways`,
+  `collect` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
+  line per changed question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a
+  one-off fix, editing that question's line directly is fine.
+- Agents doing this work never send personal data anywhere: no names or email addresses in User-Agent headers,
+  search queries or URLs (in stage 1 one writer put the owner's email in a Wikipedia API User-Agent).
 
 Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`.
 
 ## Adding questions
 
-1. **Find the gaps.** `bank.mjs stats` shows each category by difficulty and the next free id. The content
-   priorities (memory: roadmap) are events after 2018, the Balkan neighbours, women authors, sport after 2017, fewer
-   "най-…" superlatives in nature. Grep the bank for the topic first: no near-duplicates.
+1. **Find the gaps.** `bank.mjs stats` shows each category by difficulty, the next free id and what it takes to
+   balance the bank. **Balance is a rule** (the owner's decision): every category the same size, and in every category
+   the split a match draws — 40% easy, 40% medium, 20% hard (`pickQuestions`). Equal thirds would wear out the easy and
+   medium questions twice as fast as the hard ones. So a new batch's categories and difficulties come from the
+   "to balance" numbers, biggest gaps first, not from a fixed 8/8/4; never add to a category that is ahead while
+   another is behind. The bank test keeps the drift small; the goal is exact. The content priorities (memory:
+   roadmap) are events after 2018, the Balkan neighbours, women authors, sport after 2017, fewer "най-…"
+   superlatives in nature. Grep the bank for the topic first: no near-duplicates.
 2. **Write them** to a scratch JSON array, without ids (`add` gives each the next free one and never reuses a
    removed question's id, since reports and stats refer to ids). Each with an `answerSource` for the checker (`add`
    doesn't take it: strip it first):
@@ -55,9 +62,18 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
    can't confirm.
 4. **Add and test.** `bank.mjs similar new.json` once more over the whole batch, `bank.mjs add new.json`, then
    `cd apps/server && node --import tsx --test test/questions.test.ts`.
-   For hundreds of questions at once (with the owner's go-ahead for a multi-agent workflow): plan topics per category
-   so batches don't overlap, then per batch of 20 one writer and one independent checker, then merge, dedupe and test
-   — as stage 1 (2026-10) did.
+   For hundreds of questions at once (only with the owner's go-ahead for a multi-agent workflow: about 170k tokens
+   per agent, two agents per batch of 20), as stage 1 (2026-10) did:
+   1. `workflows/plan.js` (args `{batches: {category: n}}`, sized from the "to balance" numbers): non-overlapping
+      topic briefs per category, each with its difficulty mix. Briefs planned but never written wait in
+      `private/plans/`. Save the briefs to a work folder as `batches.json`, with each one's `siblings`.
+   2. `workflows/batches.js` (args `{dir, today, slugs, checkOnly}`): per brief a writer (`draft.json`), then a
+      separate checker (`verified.json`). Keep the Mac awake: a sleeping machine kills the agents. A batch whose
+      check died can go in `checkOnly` next time.
+   3. `bank.mjs collect <dir> <out>`, then `similar` and `giveaways` on `<out>.tids.json`: judge every pair between
+      new questions, and each one where a new question names an old one's answer (or the reverse); reword or drop.
+      Then `add <out>.json`, the bank test, a commit per merge. A checker may move a question's difficulty, so look at
+      `stats` again after merging and let the next batch close what's left.
 5. **Commit and push in `private/`** (`git -C private …`, the usual commit trailer). Production gets the change on
    the next deploy; deploying is outward-facing, so ask the owner unless they already said to ship it.
 6. **Tell the owner** what went in: a short list (question → answer, and the fact if any), so they can read it.

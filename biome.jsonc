@@ -11,7 +11,9 @@
       "!apps/server/src/data/*.json",
       "!apps/web/public",
       // Claude Code skills open with YAML front matter, which the Markdown formatter doesn't know.
-      "!.claude/skills/**/*.md"
+      "!.claude/skills/**/*.md",
+      // Workflow scripts run in Claude Code's workflow runtime (a top-level `return`), not as modules.
+      "!.claude/skills/**/workflows/*.js"
     ]
   },
   "formatter": {
