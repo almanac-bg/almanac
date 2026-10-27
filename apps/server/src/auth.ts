@@ -1,4 +1,5 @@
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { availableParallelism } from 'node:os';
 import { promisify } from 'node:util';
 import { parseCookie, stringifySetCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
@@ -47,11 +48,19 @@ const SESSION_MS = config.sessionDays * 24 * 60 * 60 * 1000;
 export class ServerBusyError extends Error {}
 
 /**
- * Password hashing is deliberately slow (and runs on the small libuv thread pool that file serving shares), so only a
- * few run at once: a flood of login attempts queues up instead of starving everything else, and past a point is refused.
+ * Password hashing is deliberately slow, so only a few hashes run at once: a flood of login attempts queues up instead
+ * of starving everything else, and past about three seconds of queue is refused. They run on libuv's thread pool, which
+ * also reads the files the site serves and looks up addresses (mail, error reports): two of its threads always stay
+ * free for those, and one CPU core for the game itself.
  */
-const MAX_HASHING = 4;
-const MAX_WAITING = 64;
+export function hashingLimits(poolSize: number, cores: number): { slots: number; waiting: number } {
+  const slots = Math.max(1, Math.min(4, poolSize - 2, cores - 1));
+  return { slots, waiting: slots * 16 };
+}
+const { slots: MAX_HASHING, waiting: MAX_WAITING } = hashingLimits(
+  Number(process.env.UV_THREADPOOL_SIZE) || 4, // libuv's default
+  availableParallelism(),
+);
 let hashing = 0;
 const waiting: (() => void)[] = [];
 

@@ -12,9 +12,12 @@ RUN npm run build
 
 # ── Runtime: plain Node, no node_modules (the server bundle is self-contained) ──
 FROM node:26.12.1-alpine
+# UV_THREADPOOL_SIZE: password hashing shares libuv's threads with file reads and DNS lookups; 8 instead of the
+# default 4 leaves them room while hashes run (see hashingLimits in apps/server/src/auth.ts).
 ENV NODE_ENV=production \
     PORT=3001 \
-    DB_PATH=/data/quiz.db
+    DB_PATH=/data/quiz.db \
+    UV_THREADPOOL_SIZE=8
 WORKDIR /app
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist

@@ -201,11 +201,12 @@ api.post('/auth/register', async (req, res) => {
 api.post('/auth/login', async (req, res) => {
   const creds = parse(Login, req, res);
   if (!creds) return;
-  // Per IP and account, per IP across accounts (password spraying), and per account across IPs (distributed guessing).
+  // Per IP across accounts (password spraying), per IP and account, and per account across IPs (distributed guessing).
+  // The network comes first: names are the sender's to choose, so a network over its limit adds no keys for new ones.
   const account = usernameKey(creds.username);
   if (
-    throttled(`login:${network(req.ip)}:${account}`) ||
     throttled(`login-ip:${network(req.ip)}`, 100, 15 * 60_000) ||
+    throttled(`login:${network(req.ip)}:${account}`) ||
     throttled(`login-account:${account}`, 30, 15 * 60_000)
   ) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
@@ -294,7 +295,7 @@ api.post('/auth/guest', (req, res) => {
   }
   // A mobile operator puts thousands of phones behind one address, and a challenge link shared in a group chat sends
   // them in together: the per-network cap is high, and a cap on all new guests is the brake on abuse.
-  if (throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) || throttled('guest:all', 5_000, 60 * 60_000)) {
+  if (throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) || throttled('guest-all', 5_000, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много нови гости от тази мрежа. Опитай по-късно или си направи профил.' });
     return;
   }

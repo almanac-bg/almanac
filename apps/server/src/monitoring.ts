@@ -147,8 +147,8 @@ export function forwardEnvelope(body: string): boolean {
     return false;
   }
   if (header.dsn !== dsn.raw) return false;
-  if (throttled('monitoring:browser', BROWSER_PER_MINUTE, 60_000)) return true;
-  if (throttled('monitoring:browser-day', BROWSER_PER_DAY, 24 * 60 * 60_000)) return true;
+  if (throttled('monitoring-browser', BROWSER_PER_MINUTE, 60_000)) return true;
+  if (throttled('monitoring-browser-day', BROWSER_PER_DAY, 24 * 60 * 60_000)) return true;
   void send(dsn.url, body);
   return true;
 }

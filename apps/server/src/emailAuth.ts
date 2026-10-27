@@ -72,7 +72,7 @@ export function requestEmailChange(userId: number, email: string): Result {
   // site's name again and again.
   if (
     throttled(`email-to:${emailKey(parsed.data)}`, 3, 24 * 60 * 60_000) ||
-    throttled('verify-mail:all', 300, 60 * 60_000)
+    throttled('verify-mail-all', 300, 60 * 60_000)
   )
     return { ok: false, error: 'Твърде много писма до този адрес. Опитай отново утре.' };
   run('UPDATE users SET pending_email = ? WHERE id = ?', parsed.data, userId);
