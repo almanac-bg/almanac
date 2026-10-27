@@ -45,7 +45,6 @@ let sa: Client;
 let sb: Client;
 /** Today's shared daily questions, as the first player of the day saw them. */
 let sharedDaily: string[] = [];
-const setXp = (userId: number, xp: number) => srv.db.prepare('UPDATE users SET xp = ? WHERE id = ?').run(xp, userId);
 
 before(async () => {
   srv = await startServer({ EMAIL_EVENTS_SECRET: 'events-secret-for-tests' });
@@ -189,7 +188,11 @@ test('solo', T, async () => {
   const ramp = log.questions.map((q) => q.difficulty[0]).join('');
   assert.doesNotMatch(ramp, /h.*e/, `harder towards the end, never an easy one after a hard one (${ramp})`);
   assert.equal(end.standings[0].correct, 10);
-  assert.equal(start?.powerups.length, 0, 'no jokers at level 1');
+  assert.deepEqual(
+    [...start!.powerups].sort(),
+    ['double', 'fifty', 'retry', 'time'],
+    'every коз from the first match, but "Леден удар" (nobody to hit alone)',
+  );
   const ids = end.rewards!.achievements;
   assert.ok(ids.includes('first_game') && ids.includes('perfect'), `first_game + perfect (${ids})`);
   assert.ok(
@@ -414,7 +417,7 @@ test(
     assert.ok(created.ok, JSON.stringify(created));
     const { id } = created;
     const { start, end } = await play;
-    assert.equal(start!.powerups.length, 0, 'no jokers');
+    assert.equal(start!.powerups.length, 0, 'no козове');
     assert.deepEqual(end.rewards!.challenge, { id, rank: 1, total: 1 });
 
     const preview = await api.get(`/api/challenges/${id}/preview`);
@@ -559,7 +562,7 @@ test('daily challenge', T, async () => {
   const { start, end } = await play;
   sharedDaily = log.questions.map((q) => q.id);
   assert.equal(start!.mode, 'daily');
-  assert.equal(start!.powerups.length, 0, 'no jokers in the daily');
+  assert.equal(start!.powerups.length, 0, 'no козове in the daily');
   assert.equal(end.rewards!.daily!.rank, 1);
   assert.ok(end.rewards!.achievements.includes('daily_first') && end.rewards!.achievements.includes('daily_perfect'));
   assert.equal((await emitAck(sa, 'daily:start')).ok, false, 'one attempt per day');
@@ -758,9 +761,7 @@ test('ranked 2 на 2 queue', T, async () => {
   assert.equal(end.rewards!.achievements.includes('team_win'), won);
 });
 
-test('jokers', T, async () => {
-  setXp(A.user.id, 20_000); // level 20: every joker
-  setXp(B.user.id, 20_000);
+test('козове', T, async () => {
   const reveals: RevealPayload[] = [];
   let start: GameStartPayload | null = null;
   let retry: { wrong: number } | null = null;
@@ -812,7 +813,7 @@ test('jokers', T, async () => {
   const them = `u${B.user.id}`;
   assert.ok(
     ['freeze', 'time', 'retry'].every((p) => start!.powerups.includes(p as never)),
-    'level 20 has all jokers',
+    'all козове',
   );
   const frozen = await Promise.race([bFrozen, sleep(10).then(() => null)]);
   assert.equal(frozen?.by, me, 'the target is told who froze it, as the next question opens');

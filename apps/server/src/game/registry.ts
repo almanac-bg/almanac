@@ -46,14 +46,9 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       title: row.title,
       team: null,
     },
-    // Runs everyone compares (the daily, challenge links): no jokers. Ranked queues: all five for everyone, so a ranked
-    // result isn't decided by who has played longer. Solo and rooms: the ones the level has unlocked, one at a time.
-    powerups:
-      mode === 'daily' || mode === 'challenge'
-        ? []
-        : isQueueMode(mode)
-          ? POWERUPS.map((p) => p.id)
-          : (unlockedIds('powerup', ctx) as PowerupId[]),
+    // Runs everyone compares (the daily, challenge links): no козове. Everywhere else all five for everyone, from the
+    // first match: a result isn't decided by who has played longer (the game drops what a match alone can't use).
+    powerups: mode === 'daily' || mode === 'challenge' ? [] : POWERUPS.map((p) => p.id),
     emotes: unlockedIds('emote', ctx),
   };
 }

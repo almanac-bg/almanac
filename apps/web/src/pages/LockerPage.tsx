@@ -45,14 +45,14 @@ export function LockerPage() {
     }
   }
 
-  const counts: Record<Tab, [number, number]> = {
+  // Козове aren't collected: everyone has them all, so their tab has no count.
+  const counts: Record<Exclude<Tab, 'powerup'>, [number, number]> = {
     avatar: [AVATARS.filter((a) => unlocked(a.req)).length, AVATARS.length],
     frame: [FRAMES.filter((a) => unlocked(a.req)).length, FRAMES.length],
     title: [TITLES.filter((a) => unlocked(a.req)).length, TITLES.length],
     emote: [EMOTES.filter((a) => unlocked(a.req)).length, EMOTES.length],
-    powerup: [POWERUPS.filter((a) => unlocked(a.req)).length, POWERUPS.length],
   };
-  const label = (t: Tab, name: string) => (
+  const label = (t: Exclude<Tab, 'powerup'>, name: string) => (
     <>
       {name} {/* Brighter on the chosen tab: muted grey on its lighter fill was under 4.5:1. */}
       <span className="text-fg-3 in-aria-pressed:text-fg-2">
@@ -91,7 +91,7 @@ export function LockerPage() {
                 { value: 'frame', label: label('frame', 'Рамки') },
                 { value: 'title', label: label('title', 'Титли') },
                 { value: 'emote', label: label('emote', 'Емоции') },
-                { value: 'powerup', label: label('powerup', 'Козове') },
+                { value: 'powerup', label: 'Козове' },
               ]}
             />
           </div>
@@ -182,14 +182,17 @@ export function LockerPage() {
             <>
               {/* The one place to read them at leisure: the match itself has no time for it. */}
               <p className="mb-4 max-w-2xl text-sm text-fg-2">
-                В класираните режими всеки играе с всичките пет, за да не решава мача кой играе от по-отдавна. Сам и в
-                стаите — с отключените от нивото ти. Всеки коз е по веднъж на мач и по един на въпрос.
+                Всеки играе с всичките пет от първия си мач, освен в дневното предизвикателство и в линковете с
+                предизвикателство, където всички играят едно и също. Всеки коз е по веднъж на мач и по един на въпрос.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {POWERUPS.map((p) => {
-                  const open = unlocked(p.req);
+                  const where = [
+                    p.multiplayerOnly ? 'Само в мач с други' : 'Сам и с други',
+                    p.notOnEasy && 'на среден и труден въпрос',
+                  ];
                   return (
-                    <Card key={p.id} className={clsx('p-5', !open && 'opacity-60')}>
+                    <Card key={p.id} className="p-5">
                       <div className="flex items-center gap-3">
                         <span
                           aria-hidden
@@ -199,13 +202,9 @@ export function LockerPage() {
                         </span>
                         <div>
                           <div className="font-display font-bold">{p.name}</div>
-                          <div className="text-xs text-fg-3">{open ? 'Отключен' : requirementLabel(p.req)}</div>
+                          <div className="text-xs text-fg-3">{where.filter(Boolean).join(', ')}</div>
                         </div>
-                        {open ? (
-                          <KeyHint className="ml-auto">{POWERUP_KEYS[p.id]}</KeyHint>
-                        ) : (
-                          <Lock className="ml-auto size-4 text-fg-3" />
-                        )}
+                        <KeyHint className="ml-auto self-start">{POWERUP_KEYS[p.id]}</KeyHint>
                       </div>
                       <p className="mt-3 text-sm text-fg-2">{p.description}</p>
                     </Card>

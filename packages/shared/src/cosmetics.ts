@@ -45,7 +45,6 @@ export interface PowerupDef {
   name: string;
   icon: string;
   description: string;
-  req: Requirement;
   /** Needs an opponent to target. */
   multiplayerOnly?: boolean;
   /** Not on an easy question: a bet on one is no bet (and every match opens with easy ones). */
@@ -247,15 +246,17 @@ export const EMOTES: EmoteDef[] = [
   { id: 'handshake', emoji: '🤝', req: { achievement: 'team_win' } },
 ];
 
-/** In the order they unlock: the bar fills from the left as a player levels up (and the keys run Q to T). */
+/**
+ * Everyone has all five from the first match, wherever козове are played (not the daily, not challenge links: runs
+ * everyone compares). Bar order, left to right, and the keys Q to T.
+ */
 export const POWERUPS: PowerupDef[] = [
-  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.', req: { level: 2 } },
+  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.' },
   {
     id: 'freeze',
     name: 'Леден удар',
     icon: '❄️',
     description: 'Замразява водещия съперник в началото на следващия въпрос: 4 секунди не вижда отговорите.',
-    req: { level: 3 },
     multiplayerOnly: true,
   },
   {
@@ -263,15 +264,13 @@ export const POWERUPS: PowerupDef[] = [
     name: 'Втори шанс',
     icon: '🔁',
     description: 'Ако сгрешиш, имаш още един опит (за половин точки).',
-    req: { level: 4 },
   },
-  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.', req: { level: 5 } },
+  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.' },
   {
     id: 'double',
     name: 'Двойно или нищо',
     icon: '💰',
     description: 'Удвоява точките за среден или труден въпрос, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
-    req: { level: 6 },
     notOnEasy: true,
   },
 ];
@@ -283,7 +282,7 @@ export const FREEZE_MS = 4000;
 /** Extra milliseconds from "Още време". */
 export const TIME_BONUS_MS = 5000;
 
-export type UnlockKind = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
+export type UnlockKind = 'avatar' | 'frame' | 'title' | 'emote';
 
 export interface UnlockRef {
   kind: UnlockKind;
@@ -295,7 +294,6 @@ const CATALOG: Record<UnlockKind, { id: string; req: Requirement }[]> = {
   frame: FRAMES,
   title: TITLES,
   emote: EMOTES,
-  powerup: POWERUPS,
 };
 
 export const tierIndex = (tier: RankTierId) => RANK_TIERS.findIndex((t) => t.id === tier);

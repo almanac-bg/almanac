@@ -384,6 +384,37 @@ test('bots bet "Двойно или нищо" when they know, never on an easy q
   assert.ok(result.correct && result.doubled && result.points >= 1000, 'the bet paid double');
 });
 
+test('bots play "Леден удар" now and then, on someone ahead of them, from the third question, never on the last', () => {
+  // Luck pinned under the bot's chance: whenever it may, it does. The human answers at once, right, and leads until the
+  // bot's "Двойно или нищо" puts it ahead (after that it has nobody ahead to hit).
+  mock.method(Math, 'random', () => 0.05);
+  const g = setup({ humans: [1], bots: [bot('b1', 'weak')] });
+  const human = g.game.participants.get('u1')!;
+  for (let i = 0; g.game.phase !== 'ended' && i < 3000; i++) {
+    if (g.game.phase === 'question' && !human.answer) g.right(1); // turned away while frozen; tried again
+    advance(100);
+  }
+  assert.equal(g.game.phase, 'ended');
+  const freezes = botJokers(g, 'b1').filter((j) => j.powerup === 'freeze');
+  assert.equal(freezes.length, 1, 'once a match');
+  const [freeze] = freezes;
+  assert.ok(freeze.question.index >= 2 && freeze.question.index < 9, `on question ${freeze.question.index + 1}`);
+  assert.equal((freeze.payload as { targetId?: string }).targetId, 'u1', 'on the one ahead of it');
+  const frozen = g.events.find((e) => e.event === 'game:frozen' && e.to === 'u1');
+  assert.deepEqual(frozen?.payload, { by: 'b1', ms: 4000 }, 'the human is told, as the next question opens');
+
+  // Ahead all match (the human always wrong), it has nobody to catch: same luck, no freeze.
+  const ahead = setup({ humans: [1], bots: [bot('b3', 'strong')] });
+  playOut(ahead);
+  assert.equal(botJokers(ahead, 'b3').filter((j) => j.powerup === 'freeze').length, 0);
+
+  // At ordinary luck it holds back: no match goes by with a freeze on every leader.
+  mock.method(Math, 'random', () => 0.5);
+  const calm = setup({ humans: [1], bots: [bot('b2', 'weak')] });
+  playOut(calm);
+  assert.equal(botJokers(calm, 'b2').filter((j) => j.powerup === 'freeze').length, 0);
+});
+
 test('the fact goes out with the reveal, never with the question (it could give the answer away)', () => {
   const g = setup({ humans: [1] });
   for (let i = 0; i < 4; i++) {

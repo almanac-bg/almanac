@@ -241,14 +241,14 @@ test('games against bots move a rating less and less above 1000, and not at all 
   assert.equal(botK(1900), 0, 'no climbing (or sliding) on bots at the top');
 });
 
-test('in the ranked queues everyone has all five jokers; in solo and rooms, the ones their level has unlocked', () => {
+test('everyone has all five козове from the first match, except in the runs everyone compares', () => {
   const newcomer = account();
-  assert.deepEqual(
-    buildHuman(newcomer, 'duel').powerups,
-    POWERUPS.map((p) => p.id),
-  );
-  assert.deepEqual(buildHuman(newcomer, 'solo').powerups, [], 'level 1 has none of its own yet');
-  assert.deepEqual(buildHuman(newcomer, 'daily').powerups, [], 'and the daily has none for anyone');
+  const all = POWERUPS.map((p) => p.id);
+  assert.deepEqual(buildHuman(newcomer, 'duel').powerups, all, 'ranked');
+  assert.deepEqual(buildHuman(newcomer, 'solo').powerups, all, 'alone (the game drops "Леден удар" there)');
+  assert.deepEqual(buildHuman(newcomer, 'custom').powerups, all, 'a private room');
+  assert.deepEqual(buildHuman(newcomer, 'daily').powerups, [], 'not the daily');
+  assert.deepEqual(buildHuman(newcomer, 'challenge').powerups, [], 'nor a challenge link');
 });
 
 test('a private room with nobody else in it is practice: winning there is no win', () => {

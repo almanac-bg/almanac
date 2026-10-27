@@ -138,8 +138,14 @@ export interface Participant {
 type Phase = 'countdown' | 'question' | 'reveal' | 'ended';
 
 const BOT_EMOTES = { good: ['fire', 'cool', 'thumbs'], bad: ['lol', 'wow', 'dead'] };
-/** The jokers bots play: the two about their own answer, none aimed at a person. */
-const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double'];
+/** The козове bots play: the two about their own answer, and "Леден удар" now and then (see botFreezes). */
+const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double', 'freeze'];
+/**
+ * A bot's chance, each question it could, to play "Леден удар": one behind all match reaches for it in about one match
+ * of three (1 − 0.94⁷ over a ten-question match), the way people forget a коз or save it too long. So a leader among
+ * seven bots isn't frozen question after question.
+ */
+const BOT_FREEZE_CHANCE = 0.06;
 
 export class Game {
   readonly id = randomUUID();
@@ -679,6 +685,19 @@ export class Game {
     return { knows, afterMs: Math.max(900, fraction * this.setup.timeMs), joker };
   }
 
+  /**
+   * Whether a bot plays "Леден удар" now, as a person would: from the third question (once there's a leader to speak
+   * of), never on the last, only when the one it would hit is ahead of it — and not every time it could.
+   */
+  private botFreezes(p: Participant): boolean {
+    if (!p.powerups.includes('freeze') || p.usedPowerups.has('freeze') || p.powerupThisQuestion) return false;
+    if (this.index < 2 || this.index >= this.questions.length - 1) return false;
+    const target = this.freezeTarget(p);
+    if (!target) return false;
+    const order = this.ranked();
+    return order.indexOf(target) < order.indexOf(p) && Math.random() < BOT_FREEZE_CHANCE;
+  }
+
   /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
   private botChoice(p: Participant, knows: boolean): number {
     const q = this.questions[this.index];
@@ -696,7 +715,11 @@ export class Game {
       if (!move) continue;
       const { joker } = move;
       if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
-      this.later(move.afterMs, () => this.answer(p.player.id, index, this.botChoice(p, move.knows)));
+      this.later(move.afterMs, () => {
+        // With the answer, not after it: the last answer in closes the question at once.
+        if (index === this.index && this.botFreezes(p)) this.usePowerup(p.player.id, index, 'freeze');
+        this.answer(p.player.id, index, this.botChoice(p, move.knows));
+      });
     }
   }
 

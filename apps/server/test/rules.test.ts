@@ -86,8 +86,8 @@ test('unlock requirements', () => {
     { level: 3, achievements: new Set(), seasonTier: 1 },
   );
   assert.ok(
-    gained.some((u) => u.kind === 'powerup' && u.id === 'freeze'),
-    'Леден удар at level 3',
+    gained.some((u) => u.kind === 'avatar' && u.id === 'tiger'),
+    'the tiger at level 3',
   );
   assert.ok(
     gained.some((u) => u.kind === 'frame' && u.id === 'season_silver'),
