@@ -67,6 +67,7 @@ services:
       - app
     environment:
       DOMAIN: ${DOMAIN:-almanac.bg}
+      HSTS_PRELOAD: ${HSTS_PRELOAD:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

@@ -18,8 +18,9 @@ http://{$DOMAIN}, http://www.{$DOMAIN}, www.{$DOMAIN} {
 {$DOMAIN} {
 	encode zstd gzip
 	header {
-		# Browsers remember to use HTTPS only (two years), here and on any subdomain.
-		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		# Browsers remember to use HTTPS only (two years), here and on any subdomain. HSTS_PRELOAD="; preload" in .env
+		# adds the directive the browsers' preload list asks for (almanac.bg is on it: HTTPS even on a first visit).
+		Strict-Transport-Security "max-age=63072000; includeSubDomains{$HSTS_PRELOAD}"
 		-Server
 	}
 	# The app's port is published on the server's loopback only (Caddy runs on the host network).
