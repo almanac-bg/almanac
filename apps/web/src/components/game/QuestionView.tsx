@@ -333,7 +333,8 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
         secs <= 3 && !stopped && 'motion-safe:animate-pulse',
       )}
     >
-      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90" aria-hidden>
+      {/* overflow-visible: the ring's glow reaches past the drawing's box, and a clipped glow shows up as a square. */}
+      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90 overflow-visible" aria-hidden>
         <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="5" />
         <circle
           cx="32"

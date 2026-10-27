@@ -36,7 +36,7 @@ export function DraftEditor({
           <select
             value={draft.category}
             onChange={(e) => set({ category: e.target.value as CategoryId })}
-            className="field h-11 w-full rounded-2xl px-3 text-sm"
+            className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm"
           >
             {CATEGORIES.map((c) => (
               <option key={c.id} value={c.id} className="bg-ink-2">

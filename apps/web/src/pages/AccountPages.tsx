@@ -25,7 +25,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
-import { Button, buttonClass, Card, INPUT, Modal, Spinner } from '../components/ui';
+import { Button, buttonClass, Card, INPUT, Modal, Spinner, SwitchTrack } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 import { usePageTitle } from '../lib/title';
@@ -407,20 +407,7 @@ function SwitchCard({
             disabled ? 'cursor-not-allowed opacity-45' : busy && 'cursor-progress',
           )}
         >
-          <span
-            aria-hidden
-            className={clsx(
-              'relative h-7 w-12 rounded-full border transition-colors',
-              on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-white/10',
-            )}
-          >
-            <span
-              className={clsx(
-                'absolute top-0.5 left-0.5 size-5.5 rounded-full bg-white shadow transition-transform',
-                on && 'translate-x-5',
-              )}
-            />
-          </span>
+          <SwitchTrack on={on} />
         </button>
       </div>
       {children}

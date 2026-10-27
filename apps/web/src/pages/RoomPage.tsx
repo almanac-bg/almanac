@@ -29,14 +29,14 @@ import {
   Users,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { PRESENCE } from '../components/presence';
-import { Button, Card, Modal, Segmented, Spinner } from '../components/ui';
+import { Button, Card, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -245,7 +245,7 @@ export function RoomPage() {
               disabled={!isHost}
               value={s.category}
               onChange={(e) => update({ category: e.target.value as CategoryChoice })}
-              className="field h-11 w-full rounded-2xl px-3 text-sm disabled:opacity-70"
+              className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm disabled:opacity-70"
             >
               {[MIXED_CATEGORY, ...CATEGORIES].map((c) => (
                 <option key={c.id} value={c.id} className="bg-ink-2">
@@ -262,7 +262,7 @@ export function RoomPage() {
             icon={<Users className="size-4 text-sky-300" />}
             title="Отбори"
             hint="2 отбора, точките се събират"
-            accent="accent-sky-400"
+            tone="border-sky-400/60 bg-sky-500/70"
           />
 
           <Toggle
@@ -272,7 +272,7 @@ export function RoomPage() {
             icon={<Skull className="size-4 text-rose-300" />}
             title="Елиминации"
             hint={s.teams ? 'Не важи при отборен мач' : 'Последният отпада на всеки няколко въпроса'}
-            accent="accent-rose-400"
+            tone="border-rose-400/60 bg-rose-500/70"
           />
 
           {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
@@ -343,6 +343,7 @@ function Setting({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+/** A room setting the host switches on or off: the whole row is the switch, named by its title. */
 function Toggle({
   checked,
   disabled,
@@ -350,7 +351,7 @@ function Toggle({
   icon,
   title,
   hint,
-  accent,
+  tone,
 }: {
   checked: boolean;
   disabled: boolean;
@@ -358,29 +359,34 @@ function Toggle({
   icon: React.ReactNode;
   title: string;
   hint: string;
-  accent: string;
+  /** The switch's colours when on. */
+  tone: string;
 }) {
+  const id = useId();
   return (
-    <label
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={`${id}-title`}
+      aria-describedby={`${id}-hint`}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
       className={clsx(
-        'flex items-center gap-3 rounded-2xl border border-line p-3',
-        !disabled && 'cursor-pointer hover:bg-white/5',
+        'focus-ring flex w-full items-center gap-3 rounded-2xl border border-line p-3 text-left',
+        disabled ? 'cursor-not-allowed' : 'hover:bg-white/5',
         disabled && !checked && 'opacity-60',
       )}
     >
-      <input
-        type="checkbox"
-        disabled={disabled}
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className={clsx('size-4', accent)}
-      />
       {icon}
-      <span className="text-sm">
-        <b>{title}</b>
-        <span className="block text-xs text-fg-3">{hint}</span>
+      <span className="min-w-0 flex-1 text-sm">
+        <b id={`${id}-title`}>{title}</b>
+        <span id={`${id}-hint`} className="block text-xs text-fg-3">
+          {hint}
+        </span>
       </span>
-    </label>
+      <SwitchTrack on={checked} onClass={tone} />
+    </button>
   );
 }
 

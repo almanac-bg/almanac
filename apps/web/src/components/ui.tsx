@@ -96,6 +96,36 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
   );
 }
 
+/**
+ * How an on/off switch looks: a track and a thumb. The control around it is the button with role="switch" (its own
+ * label, its own target size), so every switch in the app looks the same and the browser's checkbox never shows.
+ */
+export function SwitchTrack({
+  on,
+  onClass = 'border-violet-400/60 bg-violet-500/70',
+}: {
+  on: boolean;
+  /** The track's colours when on (full class names, so Tailwind sees them). */
+  onClass?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        'relative h-7 w-12 shrink-0 rounded-full border transition-colors',
+        on ? onClass : 'border-line bg-white/10',
+      )}
+    >
+      <span
+        className={clsx(
+          'absolute top-0.5 left-0.5 size-5.5 rounded-full bg-white shadow transition-transform',
+          on && 'translate-x-5',
+        )}
+      />
+    </span>
+  );
+}
+
 export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="mb-4 flex items-end justify-between gap-4">
