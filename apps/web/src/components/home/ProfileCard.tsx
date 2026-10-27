@@ -16,6 +16,7 @@ import { Link } from 'react-router';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { GuestNudge } from '../ClaimAccount';
+import { FitName } from '../FitName';
 import { Card, ProgressBar } from '../ui';
 
 export function ProfileCard({ className }: { className?: string }) {
@@ -24,20 +25,23 @@ export function ProfileCard({ className }: { className?: string }) {
   const next = upcomingUnlocks(progress.level, 1)[0];
   const roomy = useMediaQuery('(min-width: 640px)');
   return (
-    <Card className={clsx('relative overflow-hidden p-4 sm:p-7', className)}>
+    <Card className={clsx('relative flex flex-col overflow-hidden p-4 sm:p-7', className)}>
       <div className="absolute -top-24 -right-16 size-64 rounded-full bg-violet-600/30 blur-3xl" />
       <div className="relative flex items-center gap-4 sm:gap-5">
         <Avatar avatar={me.avatar} frame={me.frame} size={roomy ? 84 : 56} />
         <div className="min-w-0">
           <p className="text-sm text-fg-3">Здравей,</p>
-          {/* Names run to 20 characters: wrap them (even mid-word) onto a second line rather than cut them off. */}
-          {/* Half the width on tablets: a size down there, so a name doesn't break mid-word. */}
-          <h1 className="line-clamp-2 font-display text-xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-3xl md:text-2xl lg:text-3xl">
-            {me.username}
-          </h1>
+          {/* Names run to 20 characters: a size down before a second line (see FitName). Half the width on tablets. */}
+          <FitName
+            name={me.username}
+            className="font-display text-xl leading-tight font-bold sm:text-3xl md:text-2xl lg:text-3xl"
+          />
           <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
         </div>
       </div>
+      {/* Beside the taller daily card (wide screens) the extra height goes here: the level and the chips sit at the
+          bottom instead of leaving an empty band under them. */}
+      <div className="flex-1" />
       <div className="relative mt-4 sm:mt-6">
         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2 font-semibold">

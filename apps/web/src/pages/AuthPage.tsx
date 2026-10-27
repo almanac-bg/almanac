@@ -382,7 +382,8 @@ export function AuthPage() {
               initial={drawn ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 + i * 0.1 }}
-              className="glass flex items-center gap-3.5 rounded-2xl p-3.5 sm:block sm:p-4 md:flex lg:block"
+              // Nearly opaque, like the card above: the floating emoji would otherwise show through over the text.
+              className="glass flex items-center gap-3.5 rounded-2xl bg-ink-2/90 p-3.5 sm:block sm:p-4 md:flex lg:block"
             >
               <div aria-hidden className="text-2xl">
                 {f.icon}

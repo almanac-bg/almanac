@@ -32,9 +32,9 @@ export function FriendsCard({ className }: { className?: string }) {
   }
 
   return (
-    <Card className={clsx('relative overflow-hidden p-5 sm:p-7', className)}>
+    <Card className={clsx('relative flex flex-col overflow-hidden p-5 sm:p-7', className)}>
       <div className="absolute -bottom-20 -left-10 size-56 rounded-full bg-fuchsia-600/20 blur-3xl" />
-      <div className="relative">
+      <div className="relative flex flex-1 flex-col">
         <div className="flex items-center gap-2 text-fuchsia-300">
           <Users className="size-5" />
           <span className="t-eyebrow">С приятели</span>
@@ -45,6 +45,8 @@ export function FriendsCard({ className }: { className?: string }) {
             ? 'До 8 играчи. Имаш код от приятел? Въведи го и влизаш в стаята.'
             : 'До 8 играчи, твои правила. Сподели кода и започвай.'}
         </p>
+        {/* Beside a taller card (wide screens) the extra height goes here, so the actions sit at the bottom. */}
+        <div className="flex-1" />
         {!guest && (
           <Button variant="secondary" className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
             <Plus className="size-4" /> Създай стая

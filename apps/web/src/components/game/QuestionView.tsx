@@ -5,6 +5,7 @@ import { ArrowRight, Check, Flame, Skull, Users, WifiOff, X } from 'lucide-react
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
+import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
@@ -80,7 +81,7 @@ export function QuestionView({ game, jokers, offline }: { game: LiveGame; jokers
           </div>
           <div className="sm:flex-1">
             <h1 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]">
-              {q.q}
+              {keepTogether(q.q)}
             </h1>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
           </div>
@@ -465,7 +466,7 @@ function AnswerButton({
         </span>
         <span className="flex-1 text-[15px] font-semibold sm:text-base large:text-lg">
           <span className="sr-only">{LETTERS[index]}) </span>
-          {text}
+          {keepTogether(text)}
           {status.length > 0 && <span className="sr-only"> — {status.join(' — ')}</span>}
         </span>
         {pickers.length > 0 && (

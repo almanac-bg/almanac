@@ -1,4 +1,5 @@
 import type { ReviewItem } from '@quiz/client';
+import { keepTogether } from '../../lib/typography';
 import { Card } from '../ui';
 
 /** How many facts the results show up front (the rest are in the review below). */
@@ -19,7 +20,8 @@ export function LearnedToday({ items }: { items: ReviewItem[] }) {
         {shown.map((item) => (
           <li key={item.id}>
             <p className="text-xs text-fg-3">
-              {item.q} — <span className="font-semibold text-emerald-300">{item.options[item.correct]}</span>
+              {keepTogether(item.q)} —{' '}
+              <span className="font-semibold text-emerald-300">{keepTogether(item.options[item.correct])}</span>
             </p>
             <p className="mt-1 text-[15px] text-fg text-pretty">{item.fact}</p>
           </li>

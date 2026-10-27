@@ -51,8 +51,12 @@ export function CommunityCard({ className }: { className?: string }) {
             <PenLine className="size-4" /> Напиши въпрос
           </Button>
         )}
+        {/* An admin below the level sees the card for moderation: say why there's nothing to write with yet. */}
+        {locked && (
+          <p className="w-full text-xs text-fg-3">Писането се отключва на ниво {SUBMISSION_RULES.minLevel}.</p>
+        )}
         {me.isAdmin && (
-          <Button variant="ghost" onClick={() => navigate(adminTab)}>
+          <Button variant={locked ? 'secondary' : 'ghost'} onClick={() => navigate(adminTab)}>
             <ShieldCheck className="size-4" /> Модерация
             {pending ? (
               <span className="rounded-full bg-amber-400 px-1.5 text-xs font-bold text-amber-950">{pending}</span>

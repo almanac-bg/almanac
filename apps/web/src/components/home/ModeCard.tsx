@@ -95,10 +95,12 @@ export function ModeCard({
             </span>
           )}
           {rating !== undefined && onRankInfo && (
+            // -ml-1.5 takes back the padding (there for the hover and the 44 px target): the text lines up with the
+            // chips when the row wraps, and the gap before it matches the others when it doesn't.
             <button
               type="button"
               onClick={onRankInfo}
-              className="focus-ring relative z-10 -my-2.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
+              className="focus-ring relative z-10 -my-2.5 -ml-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
             >
               <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
               <RankBadge rating={rating} compact />

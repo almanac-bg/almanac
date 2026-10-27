@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Check, ChevronDown, Flag, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
+import { keepTogether } from '../../lib/typography';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
 
@@ -92,15 +93,15 @@ function ReviewRow({
         <p className="text-xs text-fg-3">
           {item.index + 1}. {category?.icon} {category?.name}
         </p>
-        <p className="mt-0.5 font-semibold">{item.q}</p>
+        <p className="mt-0.5 font-semibold">{keepTogether(item.q)}</p>
         <p className="mt-1.5 text-sm text-emerald-300">
-          ✓ {LETTERS[item.correct]}) {item.options[item.correct]}
+          ✓ {LETTERS[item.correct]}) {keepTogether(item.options[item.correct])}
         </p>
         {!item.right && (
           <p className="text-sm text-rose-300/90">
             {item.choice === null || item.choice < 0
               ? 'Без отговор'
-              : `Ти: ${LETTERS[item.choice]}) ${item.options[item.choice]}`}
+              : `Ти: ${LETTERS[item.choice]}) ${keepTogether(item.options[item.choice])}`}
           </p>
         )}
         {item.fact && (
@@ -165,7 +166,7 @@ function ReportQuestion({
 
   return (
     <Modal open={!!item} onClose={close} title="Сигнализирай за грешка">
-      {item && <p className="mb-4 rounded-2xl bg-white/5 p-3 text-sm text-fg-2">{item.q}</p>}
+      {item && <p className="mb-4 rounded-2xl bg-white/5 p-3 text-sm text-fg-2">{keepTogether(item.q)}</p>}
       <div className="space-y-2">
         {/* The fact is a reason only where there is one. */}
         {QUESTION_REPORT_REASONS.filter((r) => r.id !== 'fact' || item?.fact).map((r) => (

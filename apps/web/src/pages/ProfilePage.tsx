@@ -32,6 +32,7 @@ import { Check, Flag, Swords, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { FitName } from '../components/FitName';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
@@ -77,9 +78,7 @@ export function ProfilePage() {
           <Avatar avatar={user.avatar} frame={user.frame} size={roomy ? 112 : 72} className="sm:row-span-2" />
           <div className="min-w-0 sm:self-end">
             <p className="text-sm font-semibold text-violet-300">{titleName(user.title)}</p>
-            <h1 className="line-clamp-2 font-display text-2xl leading-tight font-bold [overflow-wrap:anywhere] sm:text-4xl">
-              {user.username}
-            </h1>
+            <FitName name={user.username} className="font-display text-2xl leading-tight font-bold sm:text-4xl" />
             <p className="mt-1 text-sm text-fg-3">
               Играе от {longDate(user.createdAt)} · {data.achievements.length}/
               {availableAchievements(openQueues, (id) => data.achievements.some((a) => a.id === id)).length} постижения
@@ -226,7 +225,10 @@ export function ProfilePage() {
         <SectionTitle
           aside={
             isMe && (
-              <Link to="/achievements" className="text-sm font-semibold text-violet-300 hover:text-violet-200">
+              <Link
+                to="/achievements"
+                className="text-sm font-semibold whitespace-nowrap text-violet-300 hover:text-violet-200"
+              >
                 Всички →
               </Link>
             )
@@ -523,7 +525,8 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
               <span className="truncate">{r.name}</span>
             </span>
             <span role="cell" className="relative h-2.5">
-              <span className="absolute inset-y-0 left-0 w-full border-l border-white/15" />
+              {/* The baseline the bar grows from; with no answers it would stand alone, a tick that reads as a glitch. */}
+              {r.answered > 0 && <span className="absolute inset-y-0 left-0 w-full border-l border-white/15" />}
               {r.correct > 0 && (
                 <span
                   className="absolute inset-y-0 left-0 rounded-r-[4px] transition-[width] duration-700"
