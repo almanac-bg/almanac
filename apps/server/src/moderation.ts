@@ -1,8 +1,9 @@
 import { type ModerationAction, REPORT_REASONS, type ReportGroup, type ReportReason } from '@quiz/shared';
 import { all, one, run, tx } from './db';
+import { nameShape } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { reloadQuestionBank } from './questions';
-import { GUEST_NAME, getUser, getUserByName, toPublicUser, type UserRow, usernameKey } from './users';
+import { GUEST_NAME, getUser, getUserByName, nameTaken, toPublicUser, type UserRow, usernameKey } from './users';
 
 // ─── Username filter ─────────────────────────────────────────────────────────
 
@@ -206,16 +207,18 @@ export function resolveReports(adminId: number, targetId: number, decision: Mode
       return { ok: false, error: 'Името трябва да е 3–20 букви, цифри, точка, тире или долна черта.' };
     const problem = nameProblem(name);
     if (problem) return { ok: false, error: problem };
-    const taken = getUserByName(name);
-    if (taken && taken.id !== targetId) return { ok: false, error: 'Това име вече е заето.' };
+    const taken = nameTaken(name, targetId);
+    if (taken) return { ok: false, error: taken };
   }
 
   tx(() => {
     if (decision.action === 'rename') {
+      const name = decision.username.trim();
       run(
-        'UPDATE users SET username = ?, username_key = ? WHERE id = ?',
-        decision.username.trim(),
-        usernameKey(decision.username.trim()),
+        'UPDATE users SET username = ?, username_key = ?, username_shape = ? WHERE id = ?',
+        name,
+        usernameKey(name),
+        nameShape(name),
         targetId,
       );
     } else if (decision.action === 'ban') {

@@ -5,6 +5,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { seasonKey } from '@quiz/shared';
 import { config } from './config';
 import { guarded } from './guard';
+import { nameShape } from './names';
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
@@ -390,6 +391,18 @@ const MIGRATIONS: (string | (() => void))[] = [
   );
   CREATE INDEX notifications_user ON notifications(user_id, id);
   `,
+
+  // v15: how each name looks (names.ts), so a new name can't pass for someone else's with a Cyrillic letter that looks
+  // Latin. Not unique: names taken before this may already look alike.
+  () => {
+    db.exec('ALTER TABLE users ADD COLUMN username_shape TEXT; CREATE INDEX users_shape ON users(username_shape);');
+    const update = db.prepare('UPDATE users SET username_shape = ? WHERE id = ?');
+    for (const { id, username } of db.prepare('SELECT id, username FROM users').all() as {
+      id: number;
+      username: string;
+    }[])
+      update.run(nameShape(username), id);
+  },
 ];
 
 /** The schema version this code brings a database to. */

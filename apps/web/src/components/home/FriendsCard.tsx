@@ -1,4 +1,5 @@
 import { actions, toast, useStore } from '@quiz/client';
+import { ROOM_CODE_DIGITS } from '@quiz/shared';
 import clsx from 'clsx';
 import { Lock, Plus, Users } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
@@ -23,7 +24,7 @@ export function FriendsCard({ className }: { className?: string }) {
 
   async function join(e: FormEvent) {
     e.preventDefault();
-    if (code.length !== 5) return;
+    if (code.length !== ROOM_CODE_DIGITS) return;
     setBusy('join');
     const res = await actions.joinRoom(code);
     setBusy(null);
@@ -55,13 +56,18 @@ export function FriendsCard({ className }: { className?: string }) {
         <form onSubmit={join} className={clsx('flex gap-2', guest ? 'mt-5' : 'mt-3')}>
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, ROOM_CODE_DIGITS))}
             inputMode="numeric"
             placeholder="Код на стая"
             aria-label="Код на стая"
             className="field h-11 min-w-0 flex-1 rounded-2xl px-4 font-mono text-lg tracking-[0.3em] placeholder:font-sans placeholder:text-sm placeholder:tracking-normal"
           />
-          <Button type="submit" variant="secondary" disabled={code.length !== 5} loading={busy === 'join'}>
+          <Button
+            type="submit"
+            variant="secondary"
+            disabled={code.length !== ROOM_CODE_DIGITS}
+            loading={busy === 'join'}
+          >
             Влез
           </Button>
         </form>

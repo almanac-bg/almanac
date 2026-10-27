@@ -200,7 +200,7 @@ function PageLoading() {
   return <PageSpinner />;
 }
 
-/** Invite links: /join/12345 drops you straight into the room. */
+/** Invite links: /join/123456 drops you straight into the room. */
 function JoinRoute() {
   const { code = '' } = useParams();
   const navigate = useNavigate();

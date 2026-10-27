@@ -68,6 +68,10 @@ test('auth', T, async () => {
     password: 'secret123',
   });
   assert.equal(dup.status, 409, 'duplicate username (case-insensitive, Cyrillic) is rejected');
+  // One Cyrillic "а" for the Latin "a": a different name to the database, the same one on screen.
+  const twin = await api.send('POST', '/api/auth/register', '', { username: 'm\u0430ria_test', password: 'secret123' });
+  assert.equal(twin.status, 409, 'a name that looks the same as a taken one is rejected');
+  assert.match(twin.body.error, /изглежда точно като/);
   const bad = await api.send('POST', '/api/auth/login', '', { username: A.user.username, password: 'wrongpass' });
   assert.equal(bad.status, 401, 'wrong password is rejected');
   assert.equal(
@@ -243,7 +247,7 @@ test('private room', T, async () => {
   sb.on('room:state', onState);
   const created = await emitAck(sa, 'room:create', { questions: 5, timeMs: 10000, category: 'music' });
   assert.ok(created.ok);
-  assert.match(created.code, /^\d{5}$/);
+  assert.match(created.code, /^\d{6}$/);
   assert.ok((await emitAck(sb, 'room:join', created.code)).ok);
   sb.emit('room:bot', 'add'); // not the host → ignored
   // Handled after the bot request (a socket's events go in order), so that one has been turned down by now.
@@ -354,7 +358,7 @@ test('malformed socket messages are refused and never crash the server', T, asyn
 test('guests play right away, stay off the boards, and keep everything when they sign up', T, async () => {
   const G = await guest(srv.url);
   assert.ok(G.user.isGuest);
-  assert.match(G.user.username, /^Гост_\d{6}$/);
+  assert.match(G.user.username, /^Гост_\d{7}$/);
   const sg = connect(srv.url, G.cookie);
   await connected(sg);
   const play = autoPlay(sg, 'right');
@@ -384,6 +388,12 @@ test('guests play right away, stay off the boards, and keep everything when they
   );
 
   const xp = (await api.get('/api/me', G.cookie)).body.user.xp;
+  assert.equal(
+    (await api.send('POST', '/api/account/claim', G.cookie, { username: 'm\u0430ria_test', password: 'secret123' }))
+      .status,
+    409,
+    'nor one that looks the same as a taken name',
+  );
   const claimed = await api.send('POST', '/api/account/claim', G.cookie, {
     username: 'bivsh_gost',
     password: 'secret123',
@@ -1078,6 +1088,11 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
     (await resolve({ action: 'rename', username: 'kurva_1' })).status,
     400,
     "moderators can't pick offensive names either",
+  );
+  assert.equal(
+    (await resolve({ action: 'rename', username: 'm\u0430ria_test' })).status,
+    400,
+    'or a name that passes for another player',
   );
   assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч' })).status, 200);
   assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');

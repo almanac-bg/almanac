@@ -1,10 +1,13 @@
 import { levelFromXp, type PublicUser } from '@quiz/shared';
 import { all, one } from './db';
+import { nameShape } from './names';
 
 export interface UserRow {
   id: number;
   username: string;
   username_key: string;
+  /** How the name looks (names.ts): no new name may look the same as another account's. */
+  username_shape: string | null;
   password_hash: string;
   created_at: number;
   xp: number;
@@ -50,7 +53,7 @@ export interface UserRow {
   inactivity_warned_at: number | null;
 }
 
-/** Names guests get ("Гост_482113"); nobody can register one. */
+/** Names guests get ("Гост_4821137"); nobody can register one. */
 export const GUEST_NAME = /^(гост|gost|guest)[\s_.-]*\d*$/iu;
 
 /** Shown in other players' match history once an account is deleted. */
@@ -60,6 +63,17 @@ export const getUser = (id: number) => one<UserRow>('SELECT * FROM users WHERE i
 export const usernameKey = (username: string) => username.normalize('NFC').toLowerCase();
 export const getUserByName = (username: string) =>
   one<UserRow>('SELECT * FROM users WHERE username_key = ?', usernameKey(username));
+
+/**
+ * Why another account (not `exceptId`) stands in the way of this name: it has the name, or one that looks the same on
+ * screen (a Cyrillic "Н" for a Latin "H"…). Null when the name is free.
+ */
+export function nameTaken(username: string, exceptId = 0): string | null {
+  const same = getUserByName(username);
+  if (same && same.id !== exceptId) return 'Това име вече е заето.';
+  const twin = one('SELECT 1 AS x FROM users WHERE username_shape = ? AND id != ?', nameShape(username), exceptId);
+  return twin ? 'Това име изглежда точно като името на друг играч — избери друго.' : null;
+}
 
 export const emailKey = (email: string) => email.trim().normalize('NFC').toLowerCase();
 export const getUserByEmail = (email: string) =>

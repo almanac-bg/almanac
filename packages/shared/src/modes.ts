@@ -174,6 +174,9 @@ export const ROOM_LIMITS = {
   timeMs: [10_000, 15_000, 20_000, 30_000],
 } as const;
 
+/** Digits in a room's code: few enough to read out to a class, and with 900,000 codes too slow to guess one. */
+export const ROOM_CODE_DIGITS = 6;
+
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   maxPlayers: 8,
   questions: 10,

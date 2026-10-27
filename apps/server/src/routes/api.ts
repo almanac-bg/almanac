@@ -50,6 +50,7 @@ import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend,
 import { ACCOUNT_ONLY, createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { reportError } from '../monitoring';
+import { nameShape } from '../names';
 import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession, sendFriendsUpdate } from '../notify';
 import {
@@ -79,6 +80,7 @@ import {
   getUserByLogin,
   getUserByName,
   isAdmin,
+  nameTaken,
   toPublicUser,
   type UserRow,
   usernameKey,
@@ -167,20 +169,29 @@ api.post('/auth/register', async (req, res) => {
     res.status(400).json({ error: problem });
     return;
   }
-  if (getUserByName(creds.username)) {
-    res.status(409).json({ error: 'Това име вече е заето.' });
+  const taken = nameTaken(creds.username);
+  if (taken) {
+    res.status(409).json({ error: taken });
     return;
   }
   const hash = await hashPassword(creds.password);
+  // Someone may have taken it, or one that looks the same, while the password was hashing.
+  const takenSince = nameTaken(creds.username);
+  if (takenSince) {
+    res.status(409).json({ error: takenSince });
+    return;
+  }
   // In development the very first account runs the place. In production nobody gets admin by signing up: moderators
   // are made with the admin command line (src/cli.ts), so no name can be claimed by someone faster.
   const firstUser = !config.production && one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n === 0;
   let userId: number;
   try {
     const { lastInsertRowid } = run(
-      'INSERT INTO users (username, username_key, password_hash, created_at, is_admin) VALUES (?, ?, ?, ?, ?)',
+      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_admin)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       creds.username,
       usernameKey(creds.username),
+      nameShape(creds.username),
       hash,
       Date.now(),
       firstUser ? 1 : 0,
@@ -442,18 +453,26 @@ api.post('/account/claim', requireAuth, async (req, res) => {
     res.status(400).json({ error: problem });
     return;
   }
-  const taken = getUserByName(creds.username);
-  if (taken && taken.id !== me.id) {
-    res.status(409).json({ error: 'Това име вече е заето.' });
+  const taken = nameTaken(creds.username, me.id);
+  if (taken) {
+    res.status(409).json({ error: taken });
     return;
   }
   const hash = await hashPassword(creds.password);
+  // Someone may have taken it, or one that looks the same, while the password was hashing.
+  const takenSince = nameTaken(creds.username, me.id);
+  if (takenSince) {
+    res.status(409).json({ error: takenSince });
+    return;
+  }
   try {
     tx(() => {
       run(
-        'UPDATE users SET username = ?, username_key = ?, password_hash = ?, is_guest = 0 WHERE id = ? AND is_guest = 1',
+        `UPDATE users SET username = ?, username_key = ?, username_shape = ?, password_hash = ?, is_guest = 0
+         WHERE id = ? AND is_guest = 1`,
         creds.username,
         usernameKey(creds.username),
+        nameShape(creds.username),
         hash,
         me.id,
       );

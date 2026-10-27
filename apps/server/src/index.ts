@@ -9,7 +9,7 @@ import { challengePreview } from './challenges';
 import { config } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
-import { forwardEnvelope, publicDsn, reportError } from './monitoring';
+import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
 import { questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
@@ -340,6 +340,7 @@ server.keepAliveTimeout = 125_000;
 server.headersTimeout = 126_000;
 const realtime = createRealtime(server, app.get('trust proxy fn'));
 const stopMaintenance = startMaintenance();
+watchEventLoop();
 
 server.listen(config.port, () => {
   console.log(`⚡ ${BRAND.name} server on http://localhost:${config.port}`);

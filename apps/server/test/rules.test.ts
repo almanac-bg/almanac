@@ -30,6 +30,7 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
 const { ordinal } = await import('@quiz/shared');
 const { nameProblem } = await import('../src/moderation');
+const { nameShape } = await import('../src/names');
 
 test('elimination schedule leaves a two-player final', () => {
   assert.deepEqual(eliminationSchedule(8, 15), [3, 5, 7, 9, 11, 13]);
@@ -191,4 +192,16 @@ test('username filter: catches disguised words, spares ordinary names', () => {
   ]) {
     assert.equal(nameProblem(ok), null, `should allow "${ok}"`);
   }
+});
+
+test('names that look the same on screen have one shape; names that only share letters do not', () => {
+  const same = (a: string, b: string) => nameShape(a) === nameShape(b);
+  assert.ok(same('Hristo', '\u041dristo'), 'a Cyrillic Н for a Latin H');
+  assert.ok(same('maria', 'm\u0430ri\u0430'), 'Cyrillic а');
+  assert.ok(same('Pop', '\u03a1op'), 'a Greek Ρ');
+  assert.ok(same('lena', 'Iena'), 'a capital I is a lowercase l in a sans-serif font');
+  assert.ok(same('Zoë', 'Zoe\u0308'), 'an accent typed either way');
+  assert.ok(!same('Lena', 'Iena'), 'case stays: L and I look nothing alike');
+  assert.ok(!same('Иван', 'Ivan'), 'transliteration is a different name, not a disguise');
+  assert.ok(!same('maria', 'maria_'), 'every visible character counts');
 });

@@ -114,6 +114,7 @@ export function exportAccount(userId: number) {
   const {
     password_hash: _secret,
     username_key: _derived,
+    username_shape: _shape,
     email_key: _alsoDerived,
     reminder_key: _link,
     ...account

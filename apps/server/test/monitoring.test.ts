@@ -25,7 +25,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-monitoring-'));
 process.env.DB_PATH = path.join(tmp, 'monitoring.db');
 process.env.SENTRY_DSN = DSN;
 process.env.APP_RELEASE = 'test-release';
-const { forwardEnvelope, reportError } = await import('../src/monitoring');
+const { forwardEnvelope, reportError, watchEventLoop } = await import('../src/monitoring');
 
 after(() => {
   fake.close();
@@ -61,6 +61,36 @@ test('a server error becomes a Sentry event with its stack, place and account nu
     exception.stacktrace.frames.some((f: { filename: string }) => f.filename.endsWith('monitoring.test.ts')),
     'with frames',
   );
+});
+
+test('a stalled event loop is reported with how long it stalled; a short hold-up only goes to the log', async () => {
+  received.length = 0;
+  const [error, warn] = [console.error, console.warn];
+  const warnings: string[] = [];
+  console.error = () => {};
+  console.warn = (message: string) => warnings.push(message);
+  const stop = watchEventLoop({ everyMs: 400, logMs: 50, reportMs: 250 });
+  const block = (ms: number) => {
+    const until = performance.now() + ms;
+    while (performance.now() < until);
+  };
+  try {
+    await sleep(50);
+    block(100); // a hold-up worth a look
+    await sleep(900); // two periods: the sample may land in the one after
+    assert.equal(received.length, 0, 'no report for it');
+    assert.match(warnings.join('\n'), /held up for \d+ ms/);
+
+    block(350); // every match frozen for a third of a second
+    await sleep(900);
+    assert.equal(received.length, 1);
+    const event = lines(received[0].body)[2];
+    assert.equal(event.exception.values[0].value, 'The event loop stalled');
+    assert.ok(event.extra.worstMs >= 300, `worst ${event.extra.worstMs} ms`);
+  } finally {
+    stop();
+    [console.error, console.warn] = [error, warn];
+  }
 });
 
 test('the same error repeating is reported once, and a flood is capped', async () => {

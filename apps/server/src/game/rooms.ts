@@ -3,6 +3,7 @@ import {
   type AckResult,
   DEFAULT_ROOM_SETTINGS,
   isCategoryChoice,
+  ROOM_CODE_DIGITS,
   ROOM_LIMITS,
   type RoomSettings,
   type RoomState,
@@ -71,7 +72,7 @@ export class RoomManager {
   create(userId: number, patch: Record<string, unknown>): AckResult<{ code: string }> {
     this.leave(userId);
     let code: string;
-    do code = String(randomInt(10000, 100000));
+    do code = String(randomInt(10 ** (ROOM_CODE_DIGITS - 1), 10 ** ROOM_CODE_DIGITS));
     while (this.rooms.has(code));
     const room: Room = {
       code,

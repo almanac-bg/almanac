@@ -41,7 +41,6 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
-  purgeGuests(now);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -165,6 +164,7 @@ export function startMaintenance() {
         String(Date.now()),
       );
       purgeExpired();
+      await purgeGuests();
       const inactive = retireInactiveAccounts();
       if (inactive.warned || inactive.erased)
         console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);

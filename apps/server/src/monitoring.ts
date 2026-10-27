@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { config } from './config';
 import { throttled } from './throttle';
 
@@ -123,6 +124,34 @@ export function reportError(
   };
   const header = { event_id: eventId, sent_at: new Date(now).toISOString(), dsn: dsn.raw };
   return send(dsn.url, `${JSON.stringify(header)}\n${JSON.stringify({ type: 'event' })}\n${JSON.stringify(event)}\n`);
+}
+
+/**
+ * Watches how long the event loop is held up. Every match's timers, every socket and every database query run on it,
+ * so anything synchronous that runs long freezes every live match at once. Each period, the worst hold-up goes to the
+ * log when it's worth a look, and into an error report when matches visibly froze (always the same report, so they
+ * group, and repeats within ten minutes are held back). Returns a stop.
+ */
+export function watchEventLoop({ everyMs = 60_000, logMs = 200, reportMs = 1000 } = {}): () => void {
+  const delay = monitorEventLoopDelay({ resolution: 10 });
+  delay.enable();
+  const timer = setInterval(() => {
+    const worstMs = Math.round(delay.max / 1e6);
+    const p99Ms = Math.round(delay.percentile(99) / 1e6);
+    delay.reset();
+    if (worstMs >= reportMs) {
+      void reportError(new Error('The event loop stalled'), 'event loop', { extra: { worstMs, p99Ms } });
+    } else if (worstMs >= logMs) {
+      console.warn(
+        `🐢 The event loop was held up for ${worstMs} ms (p99 ${p99Ms} ms) in the last ${everyMs / 1000} s.`,
+      );
+    }
+  }, everyMs);
+  timer.unref();
+  return () => {
+    clearInterval(timer);
+    delay.disable();
+  };
 }
 
 /**

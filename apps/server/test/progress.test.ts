@@ -16,6 +16,7 @@ const { advanceQuests, QUEST_BONUS_XP, questsInfo } = await import('../src/quest
 const { liveDailyStreak, recordDailyResult } = await import('../src/daily');
 const { sendStreakReminders } = await import('../src/maintenance');
 const { purgeGuests } = await import('../src/guests');
+const { setRealtime } = await import('../src/notify');
 const { getUser } = await import('../src/users');
 const { count, countActive, launchStats } = await import('../src/stats');
 
@@ -113,16 +114,52 @@ test('the streak reminder goes out in the evening, once a day, with a working un
   assert.ok(mail.text.includes(`https://almanac.test/unsubscribe?u=${opted}&k=secret`));
 });
 
-test('guest accounts nobody can sign in to any more are cleared after a day', () => {
+test('guests nobody will play as again are cleared after a day; a guest who is online waits', async () => {
   const now = Date.now();
-  const stale = user({ is_guest: 1, created_at: now - 2 * DAY });
-  const active = user({ is_guest: 1, created_at: now - 2 * DAY });
+  const session = (id: number) =>
+    run('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, 0, ?)', `t${id}`, id, now + DAY);
+  const stale = user({ is_guest: 1, created_at: now - 2 * DAY, questions_answered: 10 });
+  const active = user({ is_guest: 1, created_at: now - 2 * DAY, questions_answered: 10 });
+  session(active);
+  // Made a guest (a visit, or a script making them by the thousand) and never played a question.
+  const visitor = user({ is_guest: 1, created_at: now - 2 * DAY });
+  session(visitor);
+  const online = user({ is_guest: 1, created_at: now - 2 * DAY });
+  session(online);
   const fresh = user({ is_guest: 1, created_at: now - 60_000 });
+  session(fresh);
   const member = user({ created_at: now - 2 * DAY });
-  run("INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ('t', ?, 0, ?)", active, now + DAY);
-  assert.equal(purgeGuests(now), 1);
+
+  setRealtime(
+    null as never,
+    (id) => (id === online ? 'online' : 'offline'),
+    () => [],
+    () => 0,
+    () => {},
+  );
+  try {
+    assert.equal(await purgeGuests(now), 2);
+  } finally {
+    setRealtime(
+      null as never,
+      () => 'offline',
+      () => [],
+      () => 0,
+      () => {},
+    );
+  }
   const exists = (id: number) => !!one('SELECT 1 AS x FROM users WHERE id = ?', id);
-  assert.deepEqual([stale, active, fresh, member].map(exists), [false, true, true, true]);
+  assert.deepEqual([stale, active, visitor, online, fresh, member].map(exists), [false, true, false, true, true, true]);
+  assert.equal(await purgeGuests(now), 1, 'once offline, a later run takes it');
+});
+
+test('a wave of guests is cleared a batch at a time, up to a share per run', async () => {
+  const now = Date.now();
+  const before = one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n;
+  for (let i = 0; i < 130; i++) user({ is_guest: 1, created_at: now - 2 * DAY });
+  assert.equal(await purgeGuests(now, 100), 100, 'a run stops at its share');
+  assert.equal(await purgeGuests(now), 30, 'the next takes the rest');
+  assert.equal(one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n, before);
 });
 
 test('launch statistics: daily counters, and returns counted against the day a player joined', () => {

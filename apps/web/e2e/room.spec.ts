@@ -15,9 +15,9 @@ test('a private room: a friend joins by its code, the host starts, both play and
   await expect(host).toHaveURL(/\/room$/);
   await expect(host.getByRole('heading', { name: 'Частна стая', exact: true })).toBeVisible();
   const code = (await host
-    .getByRole('button', { name: /^\d{5}/ })
+    .getByRole('button', { name: /^\d{6}/ })
     .first()
-    .textContent())!.match(/\d{5}/)![0];
+    .textContent())!.match(/\d{6}/)![0];
 
   // The friend types the code on the lobby.
   await friend.getByPlaceholder('Код на стая').fill(code);

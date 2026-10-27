@@ -58,6 +58,11 @@ test('the steps that move data did it on the rows that were there', () => {
     { id: 1, last_seen_at: 1_763_592_000_000 - 30 * DAY },
     { id: 2, last_seen_at: 1_760_500_000_000 },
   ]);
+  // v15: how each name looks, so a new one can't pass for it (Ана's А and а are Latin twins; н has none).
+  assert.deepEqual(rows('SELECT id, username_shape FROM users ORDER BY id'), [
+    { id: 1, username_shape: 'A\u043da' },
+    { id: 2, username_shape: 'boris' },
+  ]);
 });
 
 test('the database as it was is kept beside the backups before migrating', () => {

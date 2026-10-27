@@ -55,7 +55,7 @@ const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 
 type GuestLanding = { to: string; state?: { accept: true } } | null;
 
 export function AuthPage() {
-  // Signed out, every address shows this page — an invite link (/join/12345) or a challenge link (/c/abc) included.
+  // Signed out, every address shows this page — an invite link (/join/123456) or a challenge link (/c/abc) included.
   // Once signed in, the app opens the room or the challenge.
   const { pathname } = useLocation();
   const navigate = useNavigate();
