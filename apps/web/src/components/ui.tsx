@@ -98,22 +98,15 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
 
 /**
  * How an on/off switch looks: a track and a thumb. The control around it is the button with role="switch" (its own
- * label, its own target size), so every switch in the app looks the same and the browser's checkbox never shows.
+ * label, its own target size). One look and one colour everywhere: the colour says "on", not what is switched.
  */
-export function SwitchTrack({
-  on,
-  onClass = 'border-violet-400/60 bg-violet-500/70',
-}: {
-  on: boolean;
-  /** The track's colours when on (full class names, so Tailwind sees them). */
-  onClass?: string;
-}) {
+export function SwitchTrack({ on }: { on: boolean }) {
   return (
     <span
       aria-hidden
       className={clsx(
         'relative h-7 w-12 shrink-0 rounded-full border transition-colors',
-        on ? onClass : 'border-line bg-white/10',
+        on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-white/10',
       )}
     >
       <span

@@ -65,6 +65,12 @@ export function getMe(userId: number): MeUser | null {
     dailyBonusAvailable: row.last_daily_bonus !== today,
     isAdmin: isAdmin(row),
     bestSeasonTier: bestSeasonTier(userId),
+    stats: {
+      games: row.games_played,
+      wins: row.wins,
+      answered: row.questions_answered,
+      correct: row.correct_answers,
+    },
     daily: {
       day: today,
       played: !!one('SELECT 1 AS x FROM daily_results WHERE user_id = ? AND day = ?', userId, today),

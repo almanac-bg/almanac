@@ -262,7 +262,6 @@ export function RoomPage() {
             icon={<Users className="size-4 text-sky-300" />}
             title="Отбори"
             hint="2 отбора, точките се събират"
-            tone="border-sky-400/60 bg-sky-500/70"
           />
 
           <Toggle
@@ -272,7 +271,6 @@ export function RoomPage() {
             icon={<Skull className="size-4 text-rose-300" />}
             title="Елиминации"
             hint={s.teams ? 'Не важи при отборен мач' : 'Последният отпада на всеки няколко въпроса'}
-            tone="border-rose-400/60 bg-rose-500/70"
           />
 
           {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
@@ -351,7 +349,6 @@ function Toggle({
   icon,
   title,
   hint,
-  tone,
 }: {
   checked: boolean;
   disabled: boolean;
@@ -359,8 +356,6 @@ function Toggle({
   icon: React.ReactNode;
   title: string;
   hint: string;
-  /** The switch's colours when on. */
-  tone: string;
 }) {
   const id = useId();
   return (
@@ -385,7 +380,7 @@ function Toggle({
           {hint}
         </span>
       </span>
-      <SwitchTrack on={checked} onClass={tone} />
+      <SwitchTrack on={checked} />
     </button>
   );
 }

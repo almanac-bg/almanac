@@ -530,6 +530,10 @@ test('profiles, achievements, leaderboards, loadout', T, async () => {
   // of is listed but doesn't count as played.
   assert.equal(prof.body.overview.gamesPlayed, 7);
   assert.equal(prof.body.recent.length, 8);
+  // The home card's totals are the profile's.
+  const { stats } = (await api.get('/api/me', A.cookie)).body.user;
+  assert.equal(stats.games, prof.body.overview.gamesPlayed);
+  assert.ok(stats.answered > 0 && stats.correct <= stats.answered);
   const ach = await api.get('/api/achievements', A.cookie);
   assert.ok(ach.body.achievements.length >= 39);
   const duel = await api.get('/api/leaderboard/duel', A.cookie);

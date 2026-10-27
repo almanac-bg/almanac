@@ -1,6 +1,7 @@
 import { fmt, unlockPreview, useNow, useStore } from '@quiz/client';
 import {
   levelProgress,
+  type MeUser,
   type QueueModeId,
   START_RATING,
   seasonEndsAt,
@@ -39,8 +40,10 @@ export function ProfileCard({ className }: { className?: string }) {
           <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
         </div>
       </div>
-      {/* Beside the taller daily card (wide screens) the extra height goes here: the level and the chips sit at the
-          bottom instead of leaving an empty band under them. */}
+      {/* From tablets the card stands beside the taller daily card: the room is for the all-time totals (phones keep
+          the card short; the profile tab has them). */}
+      <QuickStats stats={me.stats} />
+      {/* What height is left goes here: the level and the chips sit at the bottom. */}
       <div className="flex-1" />
       <div className="relative mt-4 sm:mt-6">
         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
@@ -106,5 +109,23 @@ function SeasonChip({ ratings, className }: { ratings: Partial<Record<QueueModeI
       Сезон {seasonName(id)} · още {days} {days === 1 ? 'ден' : 'дни'}
       <RankBadge rating={best} compact />
     </Link>
+  );
+}
+
+function QuickStats({ stats }: { stats: MeUser['stats'] }) {
+  const items: [string, string][] = [
+    ['Мачове', fmt(stats.games)],
+    ['Победи', fmt(stats.wins)],
+    ['Точност', stats.answered ? `${Math.round((stats.correct / stats.answered) * 100)}%` : '—'],
+  ];
+  return (
+    <dl className="relative mt-6 hidden grid-cols-3 gap-2 md:grid">
+      {items.map(([label, value]) => (
+        <div key={label} className="min-w-0 rounded-2xl border border-line bg-white/[0.03] px-3 py-2.5">
+          <dt className="truncate text-xs text-fg-3">{label}</dt>
+          <dd className="mt-0.5 font-display text-xl font-bold tabular-nums">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

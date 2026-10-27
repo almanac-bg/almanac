@@ -35,6 +35,8 @@ export interface MeUser extends PublicUser {
   isAdmin: boolean;
   /** Best tier index ever finished a season at (-1 = none); unlocks season cosmetics. */
   bestSeasonTier: number;
+  /** All-time totals, for the home card (the profile page has the full statistics). */
+  stats: { games: number; wins: number; answered: number; correct: number };
   /** `shields`: missed days the streak can survive (earned every 7 days, at most 2). */
   daily: { day: string; played: boolean; streak: number; shields: number };
   quests: QuestsInfo;
