@@ -49,7 +49,20 @@ export function errorMessage(err: unknown, fallback = 'Нещо се обърк�
   return err instanceof ApiError ? err.message : fallback;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Asks for the password again (the app shows a form); true once the server has it. Set with onPasswordNeeded. */
+let askForPassword: (() => Promise<boolean>) | null = null;
+/** One question at a time: requests that need the password together wait for the same answer. */
+let asking: Promise<boolean> | null = null;
+
+/**
+ * What an admin changes needs the password given within the last hour: the server answers 403 with `confirm`, and
+ * `ask` gets it from the player, after which the request is tried once more.
+ */
+export function onPasswordNeeded(ask: () => Promise<boolean>) {
+  askForPassword = ask;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, again = true): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
@@ -62,6 +75,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError('Няма връзка със сървъра. Провери интернета си.', 0);
   }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 403 && data.confirm && again && askForPassword) {
+    asking ??= askForPassword().finally(() => {
+      asking = null;
+    });
+    if (await asking) return request<T>(method, path, body, false);
+  }
   if (!res.ok) throw new ApiError(data.error ?? 'Нещо се обърка. Опитай пак.', res.status);
   return data as T;
 }
@@ -74,6 +93,8 @@ export const api = {
   register: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
+  /** The password again, for what needs a recent one (see onPasswordNeeded). */
+  confirmPassword: (password: string) => request<{ ok: true }>('POST', '/auth/confirm', { password }),
   /** Play first, sign up later: a guest account on this device. */
   guest: () => request<{ user: MeUser }>('POST', '/auth/guest'),
   /** A guest picks a name and password; everything played so far stays. */

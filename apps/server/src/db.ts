@@ -408,6 +408,10 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
   {
     compatible: 'ALTER TABLE users ADD COLUMN username_shape TEXT; CREATE INDEX users_shape ON users(username_shape);',
   },
+
+  // v16: when the session last proved it knows the password (signing in, or confirming it again): what an admin
+  // changes needs a recent one. Older code leaves it empty, which only means "confirm again".
+  { compatible: 'ALTER TABLE sessions ADD COLUMN confirmed_at INTEGER;' },
 ];
 
 /** The schema version this code brings a database to. */

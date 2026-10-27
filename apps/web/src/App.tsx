@@ -10,6 +10,7 @@ import { Invites } from './components/Invites';
 import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { NavBar } from './components/NavBar';
+import { PasswordConfirm } from './components/PasswordConfirm';
 import { QueueOverlay } from './components/QueueOverlay';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { SeasonRecap } from './components/SeasonRecap';
@@ -191,6 +192,7 @@ function SignedIn() {
       <ConnectionBanner explained={!inGame && maintenance} />
       <Invites />
       <SeasonRecap />
+      <PasswordConfirm />
     </>
   );
 }

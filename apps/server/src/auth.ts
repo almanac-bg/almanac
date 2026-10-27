@@ -1,10 +1,11 @@
-import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { availableParallelism } from 'node:os';
 import { promisify } from 'node:util';
 import { parseCookie, stringifySetCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
 import { config } from './config';
 import { one, run } from './db';
+import { installationSecret } from './settings';
 
 const scrypt = promisify(scryptCb) as (
   password: string,
@@ -114,15 +115,17 @@ function seen(userId: number, now: number) {
   run('UPDATE users SET last_seen_at = ?, inactivity_warned_at = NULL WHERE id = ?', now, userId);
 }
 
-export function createSession(userId: number): string {
+/** A new session; `withPassword` when the password (or a link from the account's mailbox) was just given for it. */
+export function createSession(userId: number, withPassword = true): string {
   const token = randomBytes(32).toString('base64url');
   const now = Date.now();
   run(
-    'INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
+    'INSERT INTO sessions (token, user_id, created_at, expires_at, confirmed_at) VALUES (?, ?, ?, ?, ?)',
     hashToken(token),
     userId,
     now,
     now + SESSION_MS,
+    withPassword ? now : null,
   );
   seen(userId, now);
   return token;
@@ -142,11 +145,19 @@ export function sessionTokenFromCookieHeader(header: string | undefined): string
  * were obtained (login, password reset…). Sessions slide: one used in the second half of its life is extended
  * (`renewed`), so active players never get logged out.
  */
-export function resolveSession(token: string | null): { userId: number; renewed: boolean } | null {
+export function resolveSession(
+  token: string | null,
+): { userId: number; renewed: boolean; confirmedAt: number | null } | null {
   if (!token) return null;
   const hash = hashToken(token);
-  const session = one<{ user_id: number; expires_at: number; banned_until: number | null }>(
-    'SELECT s.user_id, s.expires_at, u.banned_until FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?',
+  const session = one<{
+    user_id: number;
+    expires_at: number;
+    confirmed_at: number | null;
+    banned_until: number | null;
+  }>(
+    `SELECT s.user_id, s.expires_at, s.confirmed_at, u.banned_until FROM sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token = ?`,
     hash,
   );
   if (!session) return null;
@@ -161,7 +172,12 @@ export function resolveSession(token: string | null): { userId: number; renewed:
     run('UPDATE sessions SET expires_at = ? WHERE token = ?', now + SESSION_MS, hash);
     seen(session.user_id, now);
   }
-  return { userId: session.user_id, renewed };
+  return { userId: session.user_id, renewed, confirmedAt: session.confirmed_at };
+}
+
+/** The password, given again: the session counts as just signed in for what needs a recent one (requireRecentPassword). */
+export function confirmSession(token: string) {
+  run('UPDATE sessions SET confirmed_at = ? WHERE token = ?', Date.now(), hashToken(token));
 }
 
 /** The signed-in user of a request. When the session slides forward, the cookie is renewed too (else browsers drop it). */
@@ -169,6 +185,7 @@ export function userIdFromRequest(req: Request, res: Response): number | null {
   const token = sessionTokenFromCookieHeader(req.headers.cookie);
   const session = resolveSession(token);
   if (session?.renewed) setSessionCookie(res, token);
+  res.locals.confirmedAt = session?.confirmedAt ?? null;
   return session?.userId ?? null;
 }
 
@@ -185,6 +202,42 @@ export function setSessionCookie(res: Response, token: string | null) {
       maxAge: token ? SESSION_MS / 1000 : 0,
     }),
   );
+}
+
+export const DEVICE_COOKIE = 'quiz_device';
+const DEVICE_MS = 365 * 24 * 60 * 60 * 1000;
+
+const deviceSignature = (userId: number, device: string) =>
+  createHmac('sha256', installationSecret('device-cookie')).update(`${userId}:${device}`).digest('base64url');
+
+/**
+ * "This device has signed in to this account before", signed with the installation's secret and sent only to the
+ * sign-in addresses (/api/auth). Wrong passwords from elsewhere can use up an account's sign-in attempts for a while; a
+ * device holding this has an allowance of its own, so nobody can lock a player out of their own account (see the login
+ * route).
+ */
+export function setDeviceCookie(res: Response, userId: number) {
+  const device = randomBytes(16).toString('base64url');
+  res.append(
+    'Set-Cookie',
+    stringifySetCookie({
+      name: DEVICE_COOKIE,
+      value: `${device}.${deviceSignature(userId, device)}`,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: config.cookieSecure,
+      path: '/api/auth',
+      maxAge: DEVICE_MS / 1000,
+    }),
+  );
+}
+
+/** The device's id, when the request carries a genuine device cookie for this account; null otherwise. */
+export function knownDevice(req: Request, userId: number): string | null {
+  const [device, signature] = (parseCookie(req.headers.cookie ?? '')[DEVICE_COOKIE] ?? '').split('.');
+  if (!device || !signature) return null;
+  const [given, expected] = [Buffer.from(signature), Buffer.from(deviceSignature(userId, device))];
+  return given.length === expected.length && timingSafeEqual(given, expected) ? device : null;
 }
 
 /** Puts the signed-in user's id in `res.locals.userId`, or answers 401. */

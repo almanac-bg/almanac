@@ -19,14 +19,17 @@ import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
 import {
+  confirmSession,
   createSession,
   DUMMY_PASSWORD_HASH,
   destroySession,
   hashPassword,
   hashToken,
+  knownDevice,
   needsRehash,
   requireAuth,
   sessionTokenFromCookieHeader,
+  setDeviceCookie,
   setSessionCookie,
   userIdFromRequest,
   verifyPassword,
@@ -152,6 +155,22 @@ function requireAdmin(_req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+/** How long a password given at sign-in, or again (POST /auth/confirm), covers what an admin changes. */
+const RECENT_PASSWORD_MS = 60 * 60_000;
+
+/**
+ * For what an admin changes (bans, names, questions): the password given within the last hour, so a session left open
+ * on a shared computer or copied from one can't do it. The app asks for the password and tries again (`confirm`).
+ */
+function requireRecentPassword(_req: Request, res: Response, next: NextFunction) {
+  const confirmedAt = res.locals.confirmedAt as number | null;
+  if (!confirmedAt || Date.now() - confirmedAt > RECENT_PASSWORD_MS) {
+    res.status(403).json({ error: 'Потвърди паролата си, за да продължиш.', confirm: true });
+    return;
+  }
+  next();
+}
+
 const idParam = (req: Request) => Number(req.params.id);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -206,24 +225,31 @@ api.post('/auth/register', async (req, res) => {
   if (creds.email) requestEmailChange(userId, creds.email);
   count('signups');
   setSessionCookie(res, createSession(userId));
+  setDeviceCookie(res, userId);
   res.status(201).json({ user: getMe(userId) });
 });
 
 api.post('/auth/login', async (req, res) => {
   const creds = parse(Login, req, res);
   if (!creds) return;
-  // Per IP across accounts (password spraying), per IP and account, and per account across IPs (distributed guessing).
-  // The network comes first: names are the sender's to choose, so a network over its limit adds no keys for new ones.
-  const account = usernameKey(creds.username);
-  if (
-    throttled(`login-ip:${network(req.ip)}`, 100, 15 * 60_000) ||
-    throttled(`login:${network(req.ip)}:${account}`) ||
-    throttled(`login-account:${account}`, 30, 15 * 60_000)
-  ) {
-    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
-    return;
-  }
+  const tooMany = () => res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+  // Per IP across accounts (password spraying) first: names are the sender's to choose, so a network over its limit
+  // adds no keys for new ones.
+  if (throttled(`login-ip:${network(req.ip)}`, 100, 15 * 60_000)) return tooMany();
   const user = getUserByLogin(creds.username);
+  // Then per IP and account, and per account across IPs (distributed guessing) — counted by the account itself, so its
+  // name and its email don't each get an allowance. A device this account signed in from before has an allowance of
+  // its own instead: guesses from everywhere else can't lock its owner out.
+  const account = user ? `#${user.id}` : usernameKey(creds.username);
+  const device = user ? knownDevice(req, user.id) : null;
+  if (
+    throttled(`login:${network(req.ip)}:${account}`) ||
+    (device
+      ? throttled(`login-device:${device}`, 30, 15 * 60_000)
+      : throttled(`login-account:${account}`, 30, 15 * 60_000))
+  ) {
+    return tooMany();
+  }
   // An unknown login still costs a password check, so timing doesn't reveal which usernames and emails exist.
   const valid = await verifyPassword(creds.password, user?.password_hash ?? DUMMY_PASSWORD_HASH);
   if (!user || !valid) {
@@ -240,6 +266,7 @@ api.post('/auth/login', async (req, res) => {
     run('UPDATE users SET password_hash = ? WHERE id = ?', await hashPassword(creds.password), user.id);
   }
   setSessionCookie(res, createSession(user.id));
+  setDeviceCookie(res, user.id);
   res.json({ user: getMe(user.id) });
 });
 
@@ -277,6 +304,7 @@ api.post('/auth/reset', async (req, res) => {
     return;
   }
   setSessionCookie(res, createSession(result.userId));
+  setDeviceCookie(res, result.userId);
   res.json({ user: getMe(result.userId) });
 });
 
@@ -312,7 +340,7 @@ api.post('/auth/guest', (req, res) => {
   }
   const userId = createGuest();
   count('guests');
-  setSessionCookie(res, createSession(userId));
+  setSessionCookie(res, createSession(userId, false));
   res.status(201).json({ user: getMe(userId) });
 });
 
@@ -323,6 +351,14 @@ api.post('/auth/logout', (req, res) => {
     disconnectSession(hashToken(token)); // the socket of every tab on this session too
   }
   setSessionCookie(res, null);
+  res.json({ ok: true });
+});
+
+/** The password, given again for what needs a recent one (requireRecentPassword). */
+api.post('/auth/confirm', requireAuth, requireAccount, async (req, res) => {
+  const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
+  if (!body || !(await confirmPassword(res, body.password))) return;
+  confirmSession(sessionTokenFromCookieHeader(req.headers.cookie)!);
   res.json({ ok: true });
 });
 
@@ -488,6 +524,7 @@ api.post('/account/claim', requireAuth, async (req, res) => {
   // Today's daily as a guest had questions of its own; with a profile, the shared ones (and the board) are open.
   forgetGuestDaily(me.id);
   count('claims');
+  setDeviceCookie(res, me.id);
   res.json({ user: getMe(me.id) });
 });
 
@@ -753,7 +790,7 @@ api.get('/admin/question-reports', requireAuth, requireAdmin, (_req, res) => {
   res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
 });
 
-api.post('/admin/question-reports/:id/resolve', requireAuth, requireAdmin, (req, res) => {
+api.post('/admin/question-reports/:id/resolve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const body = parse(z.object({ action: z.enum(['dismiss', 'hide']) }), req, res);
   if (!body) return;
   const result = resolveQuestionReports(res.locals.userId, String(req.params.id), body.action);
@@ -764,7 +801,7 @@ api.post('/admin/question-reports/:id/resolve', requireAuth, requireAdmin, (req,
   res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
 });
 
-api.post('/admin/hidden-questions/:id/unhide', requireAuth, requireAdmin, (req, res) => {
+api.post('/admin/hidden-questions/:id/unhide', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const result = unhideQuestion(String(req.params.id));
   if (!result.ok) {
     res.status(400).json({ error: result.error });
@@ -787,7 +824,7 @@ const Decision = z.discriminatedUnion('action', [
   }),
 ]);
 
-api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, (req, res) => {
+api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const decision = parse(Decision, req, res);
   if (!decision) return;
   const result = resolveReports(res.locals.userId, idParam(req), decision);
@@ -798,7 +835,7 @@ api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, (req, res) => 
   res.json({ ok: true, groups: openReports() });
 });
 
-api.post('/admin/submissions/:id/approve', requireAuth, requireAdmin, (req, res) => {
+api.post('/admin/submissions/:id/approve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const body = parse(z.object({ edits: DraftSchema.nullable().optional() }), req, res);
   if (!body) return;
   const result = approveSubmission(res.locals.userId, idParam(req), body.edits ?? null);
@@ -809,7 +846,7 @@ api.post('/admin/submissions/:id/approve', requireAuth, requireAdmin, (req, res)
   res.json({ ok: true, pending: pendingCount() });
 });
 
-api.post('/admin/submissions/:id/reject', requireAuth, requireAdmin, (req, res) => {
+api.post('/admin/submissions/:id/reject', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const body = parse(z.object({ reason: z.string().max(300).default('') }), req, res);
   if (!body) return;
   const result = rejectSubmission(res.locals.userId, idParam(req), body.reason);

@@ -17,6 +17,7 @@ import {
   type Account,
   autoPlay,
   type Client,
+  cli,
   connect,
   connected,
   cookieFrom,
@@ -141,6 +142,38 @@ test(
     );
   },
 );
+
+test("wrong passwords from everywhere can't lock a player out from a device they signed in on", T, async () => {
+  const signUp = await fetch(`${srv.url}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'zaklyuchen', password: 'secret123' }),
+  });
+  assert.equal(signUp.status, 201);
+  const device = signUp.headers
+    .getSetCookie()
+    .find((c) => c.startsWith('quiz_device='))!
+    .split(';')[0];
+  const login = (password: string, from: string, cookie = '') =>
+    fetch(`${srv.url}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': from, cookie },
+      body: JSON.stringify({ username: 'zaklyuchen', password }),
+    });
+  // Ten wrong guesses from each of four networks (the most one network gets at an account).
+  const statuses: number[] = [];
+  for (let net = 1; net <= 4; net++) {
+    const tries = await Promise.all(Array.from({ length: 10 }, () => login('wrong-password', `198.51.100.${net}`)));
+    statuses.push(...tries.map((r) => r.status));
+  }
+  assert.ok(statuses.includes(429), "the account's sign-in attempts ran out");
+  assert.equal((await login('secret123', '203.0.113.9')).status, 429, 'a device it has never signed in on waits');
+  assert.equal(
+    (await login('secret123', '203.0.113.9', device)).status,
+    200,
+    'the one its owner signed in on before does not',
+  );
+});
 
 test('an address gets a few verification mails a day, whoever types it in', T, async () => {
   const before = srv.mails().filter((m) => m.to === 'someone@example.test').length;
@@ -1109,6 +1142,32 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
     (await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' })).body.error,
     /за постоянно/,
   );
+});
+
+test('a moderator gives the password again for changes, at most an hour after giving it', T, async () => {
+  // A saved guest made a moderator: its session never had a password given for it.
+  const M = await guest(srv.url);
+  const claimed = await api.send('POST', '/api/account/claim', M.cookie, {
+    username: 'nov_moderator',
+    password: 'secret123',
+  });
+  assert.equal(claimed.status, 200);
+  assert.equal(cli(srv.dbPath, 'admin', 'add', 'nov_moderator').status, 0);
+  const reject = () => api.send('POST', '/api/admin/submissions/999999/reject', M.cookie, { reason: '' });
+
+  assert.equal((await api.get('/api/admin/summary', M.cookie)).status, 200, 'looking needs no password');
+  const asked = await reject();
+  assert.equal(asked.status, 403);
+  assert.equal(asked.body.confirm, true, 'a change asks for it');
+  assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'wrong-password' })).status, 400);
+  assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'secret123' })).status, 200);
+  assert.equal((await reject()).status, 400, 'then the change goes through (to "no such question")');
+
+  const hash = createHash('sha256')
+    .update(decodeURIComponent(M.cookie.split('=')[1]))
+    .digest('base64url');
+  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, hash);
+  assert.equal((await reject()).status, 403, 'an hour later it asks again');
 });
 
 test('data export and account deletion', T, async () => {
