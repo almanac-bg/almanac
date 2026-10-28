@@ -242,7 +242,11 @@ test('groups: an invite link, at most 200 in one and 5 per player; the owner han
   const owner = account('Учителка');
   assert.equal(groups.cleanGroupName('  10 ​„Б“   клас  '), '10 „Б“ клас');
   assert.equal(groups.cleanGroupName('x'), null);
-  assert.equal(groups.cleanGroupName('Семейство 👨\u200d👩\u200d👧\u202e'), 'Семейство 👨\u200d👩\u200d👧', 'no bidi tricks');
+  assert.equal(
+    groups.cleanGroupName('Семейство 👨\u200d👩\u200d👧\u202e'),
+    'Семейство 👨\u200d👩\u200d👧',
+    'no bidi tricks',
+  );
   const made = groups.createGroup(owner, '10 „Б“ клас');
   assert.ok(made.ok);
   const code = one<{ code: string }>('SELECT code FROM player_groups WHERE id = ?', made.id)!.code;
