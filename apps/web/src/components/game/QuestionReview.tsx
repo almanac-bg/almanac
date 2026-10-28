@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
+import { numberText, offText } from './numbers';
 
 /** The match's questions with the right answers, and a way to flag a mistake in any of them. */
 export function QuestionReview({ items }: { items: ReviewItem[] }) {
@@ -94,15 +95,28 @@ function ReviewRow({
           {item.index + 1}. {category?.icon} {category?.name}
         </p>
         <p className="mt-0.5 font-semibold">{keepTogether(item.q)}</p>
-        <p className="mt-1.5 text-sm text-emerald-300">
-          ✓ {LETTERS[item.correct]}) {keepTogether(item.options[item.correct])}
-        </p>
-        {!item.right && (
-          <p className="text-sm text-rose-300/90">
-            {item.choice === null || item.choice < 0
-              ? 'Без отговор'
-              : `Ти: ${LETTERS[item.choice]}) ${keepTogether(item.options[item.choice])}`}
-          </p>
+        {item.number ? (
+          <>
+            <p className="mt-1.5 text-sm text-emerald-300">✓ {numberText(item.number.answer, item.number)}</p>
+            <p className={clsx('text-sm', item.right ? 'text-fg-2' : 'text-rose-300/90')}>
+              {item.number.guess === null
+                ? 'Без отговор'
+                : `Ти: ${numberText(item.number.guess, item.number)} (${offText(item.number.guess, item.number.answer, item.number)})`}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1.5 text-sm text-emerald-300">
+              ✓ {LETTERS[item.correct]}) {keepTogether(item.options[item.correct])}
+            </p>
+            {!item.right && (
+              <p className="text-sm text-rose-300/90">
+                {item.choice === null || item.choice < 0
+                  ? 'Без отговор'
+                  : `Ти: ${LETTERS[item.choice]}) ${keepTogether(item.options[item.choice])}`}
+              </p>
+            )}
+          </>
         )}
         {item.fact && (
           <p className="mt-2 text-sm text-fg-2 text-pretty">

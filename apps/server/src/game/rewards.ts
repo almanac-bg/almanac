@@ -20,7 +20,7 @@ import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { advanceQuests } from '../quests';
 import { recordRun } from '../runs';
-import { getRating, recordRating } from '../seasons';
+import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
 import { ratesPeople } from '../trust';
@@ -52,10 +52,12 @@ export const ROOM_PLACEMENT_XP_PER_DAY = 600;
 const RATING_K = 40;
 const RATING_K_BOTS = 24;
 /** Where games against bots start to count for less. */
-const BOT_K_FADES_FROM = 1000;
+const BOT_K_FADES_FROM = 1450;
+/** A player's first rated games in a mode move their rating this much further: it finds their level sooner. */
+export const PROVISIONAL = { games: 10, factor: 2 } as const;
 
 /**
- * How far a game against bots moves a rating: the full step up to 1000, then less and less, nothing from the bots' own
+ * How far a game against bots moves a rating: the full step up to 1450, then less and less, nothing from the bots' own
  * ceiling (1600) up — a strong player kept beating bots there and climbed without limit. The top of the ladder is for
  * beating people; bots can't push anyone up it, or drag them down.
  */
@@ -384,6 +386,10 @@ function roomAllowance(userId: number, earned: number): number {
 
 const ratingOf = (game: Game, id: string) => game.participants.get(id)!.player.rating ?? START_RATING;
 
+/** PROVISIONAL: twice the step while a player has fewer than ten rated games in the mode. */
+const provisional = (game: Game, userId: number) =>
+  isQueueMode(game.setup.mode) && ratedGames(userId, game.setup.mode) < PROVISIONAL.games ? PROVISIONAL.factor : 1;
+
 /**
  * Pairs of people who already played each other RATED_GAMES_PER_PAIR rated matches in the last 24 hours. Rated for both
  * of them: a walkout before the match got going moves only the one who left, and that's no game between them.
@@ -480,7 +486,11 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
       rated++;
     }
     if (rated === 0 && skipped) ratings.unrated.set(me.id, skipped);
-    else ratings.deltas.set(me.id, (sum / (standings.length - 1)) * walkoutShare(game, mine));
+    else
+      ratings.deltas.set(
+        me.id,
+        (sum / (standings.length - 1)) * walkoutShare(game, mine) * provisional(game, myUserId),
+      );
   }
   return ratings;
 }
@@ -519,7 +529,10 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
     }
     const expected = 1 / (1 + 10 ** ((avg(1 - p.player.team) - avg(p.player.team)) / 400));
     const k = standings.some((o) => game.participants.get(o.id)!.player.isBot) ? botK(ratingOf(game, s.id)) : RATING_K;
-    ratings.deltas.set(s.id, k * ((s.placement === 1 ? 1 : 0) - expected) * walkoutShare(game, p));
+    ratings.deltas.set(
+      s.id,
+      k * ((s.placement === 1 ? 1 : 0) - expected) * walkoutShare(game, p) * provisional(game, p.player.userId!),
+    );
   }
   return ratings;
 }

@@ -6,14 +6,19 @@ import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import {
   answerPoints,
+  type CategoryId,
   type FinalStanding,
   type GamePlayer,
+  NUMBER,
+  type PickPayload,
   type PowerupId,
   type QuestionPayload,
   type RevealPayload,
+  type RoundPayload,
   readingMs,
 } from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
+import type { PreparedQuestion } from '../src/questions';
 import { writeFixtureQuestions } from './helpers';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-game-'));
@@ -23,7 +28,7 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
-const { pickQuestions } = await import('../src/questions');
+const { numberBank, pickQuestions, pickRounds } = await import('../src/questions');
 const { BOT_MAX_RATING, makeBots } = await import('../src/game/bots');
 
 const COUNTDOWN = 3_500;
@@ -47,10 +52,13 @@ const player = (id: string, userId: number | null): GamePlayer => ({
   team: null,
 });
 
-/** Bots that always answer right ('strong') or always wrong ('weak') once Math.random is pinned to 0.5. */
-const bot = (id: string, kind: 'strong' | 'weak') => ({
-  player: player(id, null),
-  brain: { accuracy: kind === 'strong' ? 0.92 : 0.2, pace: 0.3 },
+/**
+ * Bots that always answer right ('strong') or always wrong ('weak') once Math.random is pinned to 0.5. A weak one knows
+ * an unplayed easy question 43% of the time, a medium one 19% (expectedRight at 750 against 800 and 1000).
+ */
+const bot = (id: string, kind: 'strong' | 'weak', favourites: { strong?: CategoryId[]; rating?: number } = {}) => ({
+  player: { ...player(id, null), rating: favourites.rating ?? 1000, strong: favourites.strong ?? [] },
+  brain: { skill: kind === 'strong' ? 2000 : 750, pace: 0.3, strong: favourites.strong ?? [], weak: [] },
 });
 
 function setup(opts: {
@@ -62,7 +70,15 @@ function setup(opts: {
   daily?: boolean;
   /** Stay in the countdown (don't play up to the first question). */
   countdown?: boolean;
+  /** Its questions (else ten picked from the fixture bank). */
+  questions?: PreparedQuestion[];
+  /** Played in rounds, as a Дуел is (a plan drawn here, or this one). */
+  rounds?: true | NonNullable<ReturnType<typeof pickRounds>>;
+  /** People's ratings, by user id (1000 otherwise). */
+  ratings?: Record<number, number>;
 }) {
+  const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
+  const shown: string[][] = [];
   const events: { to: string; event: string; payload: unknown }[] = [];
   let standings: FinalStanding[] | null = null;
   const missed: number[] = [];
@@ -80,8 +96,13 @@ function setup(opts: {
       teams: false,
       dailyDay: opts.daily ? '2026-10-26' : null,
       challengeId: null,
-      questions: pickQuestions(10, 'mixed', new Map()),
-      humans: opts.humans.map((id) => ({ player: player(`u${id}`, id), powerups: opts.powerups ?? [], emotes: [] })),
+      questions: plan?.questions ?? opts.questions ?? pickQuestions(10, 'mixed', new Map()),
+      rounds: plan?.rounds ?? [],
+      humans: opts.humans.map((id) => ({
+        player: { ...player(`u${id}`, id), rating: opts.ratings?.[id] ?? 1000 },
+        powerups: opts.powerups ?? [],
+        emotes: [],
+      })),
       bots: opts.bots ?? [],
     },
     {
@@ -101,14 +122,22 @@ function setup(opts: {
       // In the order things happen: the score so far is saved before the answer goes out.
       progress: () => events.push({ to: 'hooks', event: 'progress', payload: null }),
       draining: () => draining,
+      shown: (_game, ids) => shown.push(ids),
       onClosed: () => {},
     },
   );
   game.start();
   if (!opts.countdown) advance(COUNTDOWN);
   const q = () => game.questions[game.index];
+  const answerOf = () => {
+    const now = q();
+    if (now.kind === 'number') throw new Error('a number question has no option to pick');
+    return now.answer;
+  };
   return {
     game,
+    plan,
+    shown,
     events,
     missed,
     released: () => released,
@@ -119,9 +148,11 @@ function setup(opts: {
       game.drain();
     },
     placement: (id: string) => standings?.find((s) => s.id === id)?.placement,
-    right: (userId: number) => game.answer(`u${userId}`, game.index, q().answer),
-    wrong: (userId: number) => game.answer(`u${userId}`, game.index, (q().answer + 1) % 4),
+    right: (userId: number) => game.answer(`u${userId}`, game.index, answerOf()),
+    wrong: (userId: number) => game.answer(`u${userId}`, game.index, (answerOf() + 1) % 4),
+    guess: (userId: number, value: number) => game.guess(`u${userId}`, game.index, value),
     reveals: () => events.filter((e) => e.event === 'game:reveal').map((e) => e.payload as RevealPayload),
+    of: <T>(event: string) => events.filter((e) => e.event === event).map((e) => e.payload as T),
   };
 }
 
@@ -135,13 +166,14 @@ afterEach(() => {
 });
 
 test('leaving after being knocked out keeps that place; walking out mid-game ranks last', () => {
-  // Four players, eliminations after questions 3 and 8. u1 never answers, so goes out first.
+  // Four players, eliminations after questions 4 and 8. u1 never answers, so goes out first.
   const g = setup({ humans: [1, 2], bots: [bot('b1', 'strong'), bot('b2', 'strong')], elimination: true });
-  for (let i = 0; i < 3; i++) {
+  assert.deepEqual(g.game.schedule, [4, 8]);
+  for (let i = 0; i < 4; i++) {
     g.right(2);
     advance(TIME + 5_000);
   }
-  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 3);
+  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 4);
   g.game.leave('u1');
   assert.notEqual(g.game.phase, 'ended', 'the match goes on');
   g.game.leave('u2'); // still in the game: a forfeit (and no humans are left, so it ends)
@@ -238,14 +270,14 @@ test('a run alone ends with what was played after ten minutes away, or when the 
 });
 
 test("once every person is knocked out, the bots' final is decided at once (and quietly)", () => {
-  // Four players, eliminations after questions 3 and 8; u1 never answers, so goes out first.
+  // Four players, eliminations after questions 4 and 8; u1 never answers, so goes out first.
   const g = setup({
     humans: [1],
     bots: [bot('b1', 'strong'), bot('b2', 'strong'), bot('b3', 'strong')],
     elimination: true,
   });
-  advance(3 * (TIME + 5_000));
-  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 3);
+  advance(4 * (TIME + 5_000) - 1_000);
+  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 4);
   const questionsBefore = g.events.filter((e) => e.event === 'game:question').length;
   advance(6_100); // the elimination reveal
   assert.equal(g.game.phase, 'ended', 'no minutes of bots-only questions');
@@ -311,15 +343,18 @@ test('ties: an unanswered question counts the whole clock', () => {
   assert.equal(reveal.standings[0].id, 'u1', 'trying beats sitting it out');
 });
 
-test('bots play as strong as the rating they show, never rate above the cap, and go easy on newcomers', () => {
-  const [weak] = makeBots(1, { level: 30, rating: 900 });
-  const [strong] = makeBots(1, { level: 1, rating: 2400 });
-  const [gentle] = makeBots(1, { level: 1, rating: 900 }, [], { gentle: true });
+test('bots play as strong as the rating they show, never rate above the cap, go easy on newcomers, and have favourites', () => {
+  const [weak] = makeBots(1, { level: 30, skill: 900 });
+  const [strong] = makeBots(1, { level: 1, skill: 2400 });
+  const [gentle] = makeBots(1, { level: 1, skill: 900 }, [], { gentle: true });
   assert.equal(strong.player.rating, BOT_MAX_RATING, 'past the cap, rating has to come from beating people');
-  assert.ok(strong.brain.accuracy > weak.brain.accuracy, 'strength follows rating, not level');
+  assert.equal(weak.brain.skill, weak.player.rating, 'it plays at the rating it shows (centred on the skill)');
+  assert.ok(strong.brain.skill > weak.brain.skill, 'strength follows skill, not level');
   assert.ok(strong.brain.pace < weak.brain.pace, 'stronger bots answer sooner');
-  assert.ok(gentle.brain.accuracy < weak.brain.accuracy);
+  assert.ok(gentle.brain.skill < weak.brain.skill);
   assert.ok(gentle.player.rating! < weak.player.rating!, 'and it shows: everyone in the match is rated against that');
+  assert.equal(new Set([...weak.brain.strong, ...weak.brain.weak]).size, 4, 'two strong categories, two weak');
+  assert.deepEqual(weak.player.strong, weak.brain.strong, 'the strong ones are shown');
 });
 
 /** Plays a match to the end, the human always wrong; what the bot did comes from the events. */
@@ -472,6 +507,8 @@ test('with other people in the match, nobody can stop it to read', () => {
 test('bots made up their minds when the question opened: once every person has answered, they answer at once', () => {
   // pace 0.3: the bot would answer three seconds in; the person answers after one.
   const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
+  const first = g.game.questions[0];
+  assert.ok(first.kind !== 'number');
   advance(1_000);
   g.right(1);
   advance(600 + 50);
@@ -485,7 +522,7 @@ test('bots made up their minds when the question opened: once every person has a
     answerPoints({
       timeMs: botResult.timeMs!,
       limitMs: TIME,
-      readMs: readingMs(g.game.questions[0].q),
+      readMs: readingMs(first.q, first.options),
       streak: 1,
       doubled: false,
       retried: false,
@@ -504,8 +541,11 @@ test('a bot that zoned out keeps nobody waiting once the people have answered', 
 
 test('the speed bonus waits out the reading window: no gain from tapping before the question is read', () => {
   const g = setup({ humans: [1, 2] });
-  const read = readingMs(g.game.questions[0].q);
-  assert.ok(read >= 1_000 && read <= 3_500);
+  const first = g.game.questions[0];
+  assert.ok(first.kind !== 'number');
+  const read = readingMs(first.q, first.options);
+  assert.equal(g.of<QuestionPayload>('game:question')[0].readMs, read, 'the options are read too');
+  assert.ok(read > readingMs(first.q) && read <= 4_500);
   advance(200);
   g.right(1);
   advance(read - 300);
@@ -541,4 +581,168 @@ test('a daily left in its countdown was no attempt: it is the player’s again, 
   h.game.leave('u2');
   assert.equal(h.released(), 0);
   assert.equal(h.finalized(), true);
+});
+
+// ─── Number questions ──────────────────────────────────────────────────────
+
+const yearQuestion = () => numberBank().find((q) => q.number.scale === 'linear' && q.number.answer === 1800)!;
+
+test('a number question: closer scores more, the exact number 250 on top, close enough is right; no speed bonus, no козове', () => {
+  const year = yearQuestion();
+  const g = setup({
+    humans: [1, 2, 3],
+    powerups: ['fifty', 'double'],
+    questions: [year, ...pickQuestions(9, 'mixed', new Map())],
+  });
+  const [question] = g.of<QuestionPayload>('game:question');
+  assert.equal(question.kind, 'number');
+  assert.deepEqual(question.options, []);
+  assert.deepEqual(question.number, { unit: '', min: 1000, max: 2025, step: 1, scale: 'linear' }, 'not the answer');
+  assert.equal(question.durationMs, NUMBER.timeMs, 'a longer clock: it is typed in');
+
+  g.game.usePowerup('u1', 0, 'double');
+  g.game.answer('u1', 0, 0); // no options to pick
+  g.guess(1, 1800);
+  advance(8_000);
+  g.guess(2, 1810);
+  g.guess(3, 5); // below the range: brought into it
+  advance(600 + 50);
+
+  const [reveal] = g.reveals();
+  assert.equal(reveal.correct, -1);
+  assert.equal(reveal.answerNumber, 1800);
+  const { u1, u2, u3 } = reveal.results;
+  assert.deepEqual([u1.points, u1.correct, u1.number], [1250, true, { guess: 1800, closeness: 1 }], 'spot on');
+  assert.deepEqual([u2.points, u2.correct, u2.streak], [800, true, 1], '10 years off of 50: 80%, and it counts');
+  assert.deepEqual([u3.points, u3.correct, u3.number?.guess], [0, false, 1000]);
+  assert.equal(g.game.participants.get('u1')!.usedPowerups.size, 0, 'no коз on a number');
+  assert.equal(u1.doubled, false);
+  const [logged] = g.game.participants.get('u2')!.log;
+  assert.deepEqual([logged.choice, logged.guess, logged.closeness], [null, 1810, 0.8], 'the log keeps the number');
+});
+
+test('bots give a number too: the more they know, the closer', () => {
+  const year = yearQuestion();
+  const g = setup({
+    humans: [1],
+    bots: [bot('b1', 'strong'), bot('b2', 'weak')],
+    questions: [year, ...pickQuestions(9, 'mixed', new Map())],
+  });
+  g.guess(1, 1800);
+  advance(600 + 50);
+  const { b1, b2 } = g.reveals()[0].results;
+  assert.ok(b1.number!.guess! >= 1000 && b1.number!.guess! <= 2025 && Number.isInteger(b1.number!.guess));
+  assert.ok(b1.number!.closeness > b2.number!.closeness);
+});
+
+test('a match ends on its final: the last question says so', () => {
+  const g = setup({ humans: [1], questions: [...pickQuestions(9, 'mixed', new Map()), yearQuestion()] });
+  for (let i = 0; i < 9; i++) {
+    g.right(1);
+    advance(600 + 4_000 + 100);
+  }
+  const questions = g.of<QuestionPayload>('game:question');
+  assert.deepEqual(
+    questions.map((q) => q.final),
+    [false, false, false, false, false, false, false, false, false, true],
+  );
+  assert.equal(questions[9].kind, 'number');
+});
+
+// ─── Rounds ────────────────────────────────────────────────────────────────
+
+/** Plays one question of a duel: each answers right or wrong at once, then on to the reveal's end. */
+function playQuestion(g: ReturnType<typeof setup>, results: Record<number, boolean>) {
+  for (const [id, right] of Object.entries(results)) {
+    if (g.game.questions[g.game.index].kind === 'number') g.guess(Number(id), right ? 1800 : 1000);
+    else if (right) g.right(Number(id));
+    else g.wrong(Number(id));
+  }
+  advance(600 + 4_000 + 100);
+}
+
+test('a Дуел in rounds: whoever is behind picks the next category from three, and its questions come in', () => {
+  const g = setup({ humans: [1, 2], rounds: true, ratings: { 1: 1000, 2: 1100 } });
+  const plan = g.plan!;
+  const start = g.events.find((e) => e.event === 'game:start')!.payload as { rounds: { category: unknown }[] };
+  assert.deepEqual(
+    start.rounds.map((r) => r.category === null),
+    [false, true, true],
+    'the first round is drawn, the others picked',
+  );
+  for (let i = 0; i < 3; i++) playQuestion(g, { 1: true, 2: false });
+
+  const [pick] = g.of<PickPayload>('game:pick');
+  assert.equal(g.game.phase, 'pick');
+  assert.equal(pick.pickerId, 'u2', 'the one behind picks');
+  assert.deepEqual(
+    pick.options,
+    plan.rounds[1].offers.map((o) => o.category),
+  );
+  assert.equal(g.game.syncFor('u1').pick?.pickerId, 'u2', 'a reconnect is told too');
+  g.game.pick('u1', 1, pick.options[0]);
+  g.game.pick('u2', 2, pick.options[0]);
+  g.game.pick('u2', 1, 'nature' === pick.options[0] ? 'music' : 'nature');
+  assert.equal(g.of('game:round').length, 0, 'not theirs to pick, not this round, not on offer');
+
+  g.game.pick('u2', 1, pick.options[2]);
+  const [round] = g.of<RoundPayload>('game:round');
+  assert.deepEqual([round.category, round.pickedBy], [pick.options[2], 'u2']);
+  const chosen = plan.rounds[1].offers[2].questions.map((q) => q.id);
+  assert.deepEqual(g.shown, [chosen], 'its questions are seen now, and only those');
+  advance(2_000 + 100);
+  assert.deepEqual(
+    g
+      .of<QuestionPayload>('game:question')
+      .slice(3)
+      .map((q) => q.id),
+    [chosen[0]],
+  );
+
+  // Nobody picks in time: the category is drawn.
+  playQuestion(g, { 1: true, 2: false });
+  playQuestion(g, { 1: true, 2: false });
+  playQuestion(g, { 1: true, 2: false });
+  assert.equal(g.of<PickPayload>('game:pick')[1].pickerId, 'u2');
+  advance(5_000 + 400 + 100);
+  const drawn = g.of<RoundPayload>('game:round')[1];
+  assert.equal(drawn.pickedBy, null);
+  assert.ok(plan.rounds[2].offers.some((o) => o.category === drawn.category));
+  advance(2_000 + 100);
+  for (let i = 0; i < 3; i++) playQuestion(g, { 1: true, 2: false });
+
+  const final = g.of<QuestionPayload>('game:question')[9];
+  assert.equal(final.final, true);
+  assert.equal(final.kind, 'number', 'the final is a number, from a category of its own');
+  assert.ok(!g.game.rounds.some((r) => r.category === final.category));
+  playQuestion(g, { 1: true, 2: true });
+  assert.equal(g.game.phase, 'ended');
+});
+
+test('on a tie, the lower-rated picks', () => {
+  const g = setup({ humans: [1, 2], rounds: true, ratings: { 1: 1200, 2: 1050 } });
+  for (let i = 0; i < 3; i++) playQuestion(g, { 1: false, 2: false });
+  assert.equal(g.of<PickPayload>('game:pick')[0].pickerId, 'u2');
+});
+
+test('a bot that is behind picks its strong category', () => {
+  const plan = pickRounds(new Map())!;
+  const favourite = plan.rounds[1].offers[2].category;
+  const g = setup({ humans: [1], bots: [bot('b1', 'weak', { strong: [favourite] })], rounds: plan });
+  for (let i = 0; i < 3; i++) playQuestion(g, { 1: true });
+  assert.equal(g.of<PickPayload>('game:pick')[0].pickerId, 'b1');
+  advance(2_500);
+  const [round] = g.of<RoundPayload>('game:round');
+  assert.deepEqual([round.category, round.pickedBy], [favourite, 'b1']);
+});
+
+test('a match in rounds nobody is left in plays its rounds out (drawn) too', () => {
+  const g = setup({ humans: [1, 2], rounds: true });
+  g.game.setConnected('u1', false);
+  g.game.setConnected('u2', false);
+  advance(31_000);
+  assert.equal(g.game.phase, 'ended');
+  assert.equal(g.game.played, 10);
+  assert.ok(g.game.rounds.every((r) => r.category !== null));
+  assert.equal(g.shown.length, 2, 'both picked rounds were drawn, and seen');
 });

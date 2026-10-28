@@ -9,7 +9,9 @@ export type Effect =
   | 'knockedOut'
   | 'achievement'
   | 'invite'
-  | 'reaction';
+  | 'reaction'
+  /** A round's category is decided. */
+  | 'round';
 
 export interface ClientConfig {
   /** Server origin, e.g. "https://almanac.bg". Empty = same origin. */

@@ -70,6 +70,10 @@ function fail(message) {
   process.exit(1);
 }
 
+const kindOf = (q) => q.kind ?? 'choice';
+/** A question's answer as text: its right option, or its number as Bulgarian writes it ("6,5"). */
+const answerOf = (q) => (kindOf(q) === 'number' ? String(q.number.answer).replace('.', ',') : q.options[q.answer]);
+
 const line = (q) => JSON.stringify(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
 const serialize = (questions) => `[\n${questions.map((q) => `  ${line(q)}`).join(',\n')}\n]\n`;
 
@@ -134,12 +138,16 @@ const stems = (text) =>
   );
 
 /** Each category's counts, and what it lacks to be balanced: every category the same size, split as a match draws
- * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over. */
-function balance(questions) {
+ * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over.
+ * Questions with options only: number questions are balanced on their own (numberBalance). */
+function balance(all) {
+  const questions = all.filter((q) => kindOf(q) === 'choice');
   const rows = Object.entries(PREFIX).map(([category, prefix]) => {
     const qs = questions.filter((q) => q.category === category);
     const count = Object.fromEntries(DIFFICULTIES.map((d) => [d, qs.filter((q) => q.difficulty === d).length]));
-    const next = String(Math.max(0, ...qs.map((q) => number(q.id))) + 1).padStart(3, '0');
+    const next = String(
+      Math.max(0, ...all.filter((q) => q.category === category).map((q) => number(q.id))) + 1,
+    ).padStart(3, '0');
     return { category, total: qs.length, count, facts: qs.filter((q) => q.fact).length, next: `${prefix}-${next}` };
   });
   const size =
@@ -150,6 +158,19 @@ function balance(questions) {
   for (const r of rows)
     r.short = Object.fromEntries(DIFFICULTIES.map((d) => [d, Math.max(0, Math.round(target[d] - r.count[d]))]));
   return { rows, size, target };
+}
+
+/**
+ * Number questions (a match's final, one a match): every category the same number of them; the difficulty split
+ * doesn't apply, since a final is drawn from any difficulty.
+ */
+function numberBalance(questions) {
+  const counts = Object.keys(PREFIX).map((category) => ({
+    category,
+    total: questions.filter((q) => kindOf(q) === 'number' && q.category === category).length,
+  }));
+  const size = Math.max(...counts.map((c) => c.total));
+  return { counts, size };
 }
 
 /** Appends new questions: checked fields, the next free id where there is none, facts tidied, the bank's key order. */
@@ -194,6 +215,12 @@ switch (command) {
     console.log(
       `balanced: ${size} per category (${target.easy}/${target.medium}/${target.hard}), ${missing ? `${missing} questions to add` : 'reached'}`,
     );
+    const numbers = numberBalance(questions);
+    if (numbers.size) {
+      console.log(
+        `number questions (finals): ${numbers.counts.map((c) => `${c.category} ${c.total}${c.total < numbers.size ? ` (+${numbers.size - c.total})` : ''}`).join(' · ')}`,
+      );
+    }
     break;
   }
   case 'show': {
@@ -218,6 +245,7 @@ switch (command) {
     // Checked candidates (e.g. collect's .tids.json, written with a spare or two per difficulty) → exactly what each
     // category and difficulty lacks for balance, in the file's order; the rest wait in <file>.spares.json.
     const candidates = readJson(args[0]);
+    if (candidates.some((q) => kindOf(q) !== 'choice')) fail('fill takes questions with options only');
     const bank = load(args[1]);
     const { rows } = balance(bank.questions);
     const lacking = Object.fromEntries(rows.map((r) => [r.category, { ...r.short }]));
@@ -269,8 +297,8 @@ switch (command) {
     const label = (q, i) => q.id ?? q.tid ?? `#${i + 1}`;
     const keyed = (q) => ({
       q,
-      words: stems(`${q.q} ${q.options[q.answer]}`),
-      answer: q.options[q.answer].toLowerCase(),
+      words: stems(`${q.q} ${answerOf(q)}`),
+      answer: answerOf(q).toLowerCase(),
     });
     const bank = questions.map(keyed);
     const mine = drafts.map(keyed);
@@ -286,8 +314,8 @@ switch (command) {
         // The same answer with a shared key word, or most of the words in common.
         if ((d.answer === o.answer && shared.length >= 1) || (shared.length >= 2 && overlap >= 0.6)) {
           found++;
-          console.log(`${label(d.q, i)}: ${d.q.q} → ${d.q.options[d.q.answer]}`);
-          console.log(`  ~ ${o.where}: ${o.q.q} → ${o.q.options[o.q.answer]}  (shared: ${shared.join(' ')})`);
+          console.log(`${label(d.q, i)}: ${d.q.q} → ${answerOf(d.q)}`);
+          console.log(`  ~ ${o.where}: ${o.q.q} → ${answerOf(o.q)}  (shared: ${shared.join(' ')})`);
         }
       }
     });
@@ -296,7 +324,8 @@ switch (command) {
   }
   case 'giveaways': {
     // In one match (Микс takes every category), a question whose text names another's answer, on the same subject,
-    // gives it away. The same answer alone isn't enough ("България" is in hundreds), hence the shared key words.
+    // gives it away. The same answer alone isn't enough ("България" is in hundreds), hence the shared key words. A
+    // number (a year) is given away by a fact too, shown after an earlier question, and one shared word is enough.
     const extra = args[0]?.endsWith('.json') ? readJson(args[0]) : [];
     const { questions } = load(args[0]?.endsWith('.json') ? args[1] : args[0]);
     const all = [...questions, ...extra.map((q, i) => ({ ...q, id: q.id ?? q.tid ?? `#${i + 1}` }))];
@@ -306,19 +335,27 @@ switch (command) {
         .toLowerCase()
         .replace(/[^\p{L}\p{N}]+/gu, ' ')
         .trim()} `;
-    const texts = all.map((q) => ({ q, text: norm(q.q), words: stems(q.q) }));
+    const texts = all.map((q) => ({
+      q,
+      text: norm(q.q),
+      withFact: norm(`${q.q} ${q.fact ?? ''}`),
+      words: stems(q.q),
+      factWords: stems(`${q.q} ${q.fact ?? ''}`),
+    }));
     let found = 0;
     for (const a of all) {
-      const answer = norm(a.options[a.answer]);
-      if (answer.trim().length < 4) continue;
+      const isNumber = kindOf(a) === 'number';
+      const answer = norm(answerOf(a));
+      if (answer.trim().length < (isNumber ? 2 : 4)) continue;
       const words = stems(a.q);
       for (const b of texts) {
-        if (b.q === a || !b.text.includes(answer) || !(mine.has(a) || mine.has(b.q))) continue;
-        const shared = [...words].filter((w) => b.words.has(w));
-        if (shared.length < 2) continue;
+        if (b.q === a || !(mine.has(a) || mine.has(b.q))) continue;
+        if (!(isNumber ? b.withFact : b.text).includes(answer)) continue;
+        const shared = [...words].filter((w) => (isNumber ? b.factWords : b.words).has(w));
+        if (shared.length < (isNumber ? 1 : 2)) continue;
         found++;
-        console.log(`${b.q.id} names the answer of ${a.id} («${a.options[a.answer]}»)`);
-        console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}`);
+        console.log(`${b.q.id} names the answer of ${a.id} («${answerOf(a)}»)`);
+        console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}${isNumber && b.q.fact ? ` [${b.q.fact}]` : ''}`);
       }
     }
     console.log(found ? `${found} pairs to judge` : 'no giveaways');

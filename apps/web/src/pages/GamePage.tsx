@@ -12,6 +12,7 @@ import { Intro } from '../components/game/Intro';
 import { EliminationBanner, Feed, othersStillIn, StreakBurst } from '../components/game/Moments';
 import { POWERUP_KEYS } from '../components/game/Powerups';
 import { QuestionView } from '../components/game/QuestionView';
+import { RoundPick } from '../components/game/RoundPick';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
 import { Button, Modal } from '../components/ui';
@@ -34,8 +35,9 @@ const POWERUP_BY_CODE = new Map<string, PowerupId>(
 );
 
 /**
- * 1–4 answer, Q–T play a коз — but not behind a dialog, and not while typing somewhere. A коз key presses its button,
- * so it does exactly what a click would, and nothing when the button can't be pressed.
+ * 1–4 answer (and 1–3 pick a round's category), Q–E play a коз — but not behind a dialog, and not while typing
+ * somewhere. A key presses its button, so it does exactly what a click would, and nothing when the button can't be
+ * pressed. A number question takes its digits itself (NumberAnswer).
  */
 function useMatchKeys(paused: boolean) {
   const pausedNow = useRef(paused);
@@ -94,6 +96,8 @@ function Arena({ game }: { game: LiveGame }) {
           <AnimatePresence mode="wait">
             {game.phase === 'countdown' ? (
               <Intro key="intro" game={game} />
+            ) : game.phase === 'pick' && game.pick ? (
+              <RoundPick key={`pick${game.pick.round}`} game={game} />
             ) : game.question ? (
               <QuestionView key={`q${game.question.index}`} game={game} offline={offline} />
             ) : (

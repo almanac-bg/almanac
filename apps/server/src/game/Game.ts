@@ -4,6 +4,7 @@ import {
   answerPoints,
   type CategoryChoice,
   type CategoryId,
+  closeness,
   type Difficulty,
   eliminationSchedule,
   type FinalStanding,
@@ -12,22 +13,36 @@ import {
   type GameStartPayload,
   type MatchRewards,
   type ModeId,
+  NUMBER,
+  numberPoints,
   ordinal,
+  type PickPayload,
   type PlayerResult,
   POWERUPS,
   type PowerupId,
   type QuestionPayload,
+  ROUNDS,
+  type RoundInfo,
   readingMs,
   SCORING,
   type ServerToClientEvents,
+  START_RATING,
   type Standing,
+  snapNumber,
   type TeamId,
-  TIME_BONUS_MS,
 } from '@quiz/shared';
 import { config } from '../config';
 import { reportError } from '../monitoring';
-import { bankOption, type PreparedQuestion, questionAuthor, shuffle } from '../questions';
-import type { BotBrain } from './bots';
+import {
+  bankOption,
+  type NumberQuestion,
+  type PreparedQuestion,
+  questionAuthor,
+  type RoundPlan,
+  shuffle,
+} from '../questions';
+import { expectedRight, questionRating } from '../skill';
+import { type BotBrain, FAVOURITE_LEAN } from './bots';
 
 const COUNTDOWN_MS = 3_500;
 /** Accept answers that were in flight when the clock hit zero. */
@@ -36,6 +51,10 @@ const GRACE_MS = 400;
 const EARLY_REVEAL_MS = 600;
 const REVEAL_MS = 4_000;
 const ELIMINATION_EXTRA_MS = 2_000;
+/** A round's category, picked: on screen this long before its first question. */
+const ROUND_CARD_MS = 2_000;
+/** How long a bot takes to pick a round's category, at least, plus up to as much again. */
+const BOT_PICK_MS = 1_200;
 /** If every human has been disconnected this long, the rest of the match plays out without them. */
 const ABANDON_MS = 30_000;
 /**
@@ -81,6 +100,8 @@ export interface GameHooks {
   progress(game: Game): void;
   /** The server is about to stop: a run waiting for an absent player shouldn't hold it up. */
   draining(): boolean;
+  /** A picked round's questions: now its players have seen them (the start only knew the others). */
+  shown(game: Game, questionIds: string[]): void;
   /** The match ended while this player was offline: they get the result when they're back. */
   undelivered(userId: number, start: GameStartPayload, end: GameEndPayload): void;
   onClosed(game: Game): void;
@@ -99,7 +120,10 @@ export interface GameSetup {
   dailyDay: string | null;
   /** The challenge link this run is for. */
   challengeId: string | null;
+  /** With ROUNDS, a later round's place holds its first offer until it's picked. */
   questions: PreparedQuestion[];
+  /** A match in ROUNDS (Дуел); empty otherwise. */
+  rounds: RoundPlan[];
   humans: { player: GamePlayer; powerups: PowerupId[]; emotes: string[] }[];
   bots: { player: GamePlayer; brain: BotBrain }[];
 }
@@ -138,13 +162,13 @@ export interface Participant {
   lastAtHalfway: boolean;
   lastReactionAt: number;
   // Per-question state, reset by nextQuestion():
-  answer: { choice: number; timeMs: number; retried: boolean } | null;
+  /** `value`: the number given on a number question (`choice` is −1 there). */
+  answer: { choice: number; value?: number; timeMs: number; retried: boolean } | null;
   doubled: boolean;
   removed: number[];
   powerupThisQuestion: boolean;
   /** Which коз that was (for the answer log). */
   powerupNow: PowerupId | null;
-  extraMs: number;
   retryArmed: boolean;
   firstWrong: number | null;
   /** A bot's mind for this question, made up when it opened (scheduleBots); null when it zones out. */
@@ -157,8 +181,12 @@ export interface AnswerLogEntry {
   index: number;
   category: CategoryId;
   difficulty: Difficulty;
-  /** The option picked, as the bank orders them (not as shown): null for no answer in time. */
+  /** The option picked, as the bank orders them (not as shown): null for no answer in time, or a number question. */
   choice: number | null;
+  /** On a number question: the number given (null: none in time), and how close it was (0–1). */
+  guess: number | null;
+  closeness: number | null;
+  /** A number counts as right once it's close (NUMBER.rightFrom). */
   correct: boolean;
   /** Null: no answer in time. */
   timeMs: number | null;
@@ -172,9 +200,12 @@ interface BotMove {
   knows: boolean;
   afterMs: number;
   joker: PowerupId | null;
+  /** Its number, on a number question. */
+  guess: number | null;
 }
 
-type Phase = 'countdown' | 'question' | 'reveal' | 'ended';
+/** `pick`: before a round, while its category is picked and shown. */
+type Phase = 'countdown' | 'question' | 'reveal' | 'pick' | 'ended';
 
 const BOT_EMOTES = { good: ['fire', 'cool', 'thumbs'], bad: ['lol', 'wow', 'dead'] };
 /** The козове bots play: the two about their own answer, a person's typical pair. */
@@ -185,6 +216,10 @@ export class Game {
   readonly startedAt = Date.now();
   readonly participants = new Map<string, Participant>();
   readonly schedule: number[];
+  /** The match's questions (a round's are in place once it's picked). */
+  readonly questions: PreparedQuestion[];
+  /** In a match in ROUNDS: each round's category, as far as it's decided. */
+  readonly rounds: RoundInfo[];
   phase: Phase = 'countdown';
   index = -1;
   /** Questions played to the reveal. */
@@ -204,8 +239,12 @@ export class Game {
   private waitingForReader = false;
 
   private questionStartedAt = 0;
+  /** The open question's clock: the match's, or a number's (longer: it's typed in). */
+  private limitMs = 0;
   /** The open question's reading window (readingMs): its speed bonus drains only after it. */
   private readMs = 0;
+  /** A round's category being picked: by whom, from what, since when. */
+  private picking: { round: number; pickerId: string; options: CategoryId[]; startedAt: number } | null = null;
   private timers = new Set<NodeJS.Timeout>();
   private questionTimer: NodeJS.Timeout | null = null;
   private abandonTimer: NodeJS.Timeout | null = null;
@@ -219,6 +258,8 @@ export class Game {
     private hooks: GameHooks,
   ) {
     const solo = setup.humans.length + setup.bots.length === 1;
+    this.questions = [...setup.questions];
+    this.rounds = setup.rounds.map((r) => ({ from: r.from, size: r.size, category: r.category, pickedBy: null }));
     for (const h of setup.humans)
       this.participants.set(h.player.id, this.newParticipant(h.player, null, h.powerups, h.emotes));
     for (const b of setup.bots)
@@ -226,10 +267,6 @@ export class Game {
     this.alone = solo;
     this.schedule =
       setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
-  }
-
-  get questions() {
-    return this.setup.questions;
   }
 
   get humans() {
@@ -258,13 +295,13 @@ export class Game {
         if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
       };
       if (this.phase !== 'question' || index !== this.index) return reject('late');
-      if (!Number.isInteger(choice) || choice < 0 || choice > 3) return;
+      const q = this.questions[this.index];
+      if (q.kind === 'number' || !Number.isInteger(choice) || choice < 0 || choice > 3) return;
       if (p.removed.includes(choice)) return reject('removed');
-      const limit = this.setup.timeMs + p.extraMs;
+      const limit = this.limitMs;
       const elapsed = this.elapsed();
       if (elapsed > limit + GRACE_MS) return reject('late');
 
-      const q = this.questions[this.index];
       if (p.retryArmed && p.firstWrong === null && choice !== q.answer) {
         // "Втори шанс": the first miss isn't final.
         p.firstWrong = choice;
@@ -278,6 +315,40 @@ export class Game {
     });
   }
 
+  /** The number given on a number question (brought into its range, in whole steps). */
+  guess(playerId: string, index: number, value: number) {
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      const reject = (reason: AnswerRejection) => {
+        if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
+      };
+      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      const q = this.questions[this.index];
+      if (q.kind !== 'number' || typeof value !== 'number' || !Number.isFinite(value)) return;
+      const elapsed = this.elapsed();
+      if (elapsed > this.limitMs + GRACE_MS) return reject('late');
+      p.answer = {
+        choice: -1,
+        value: snapNumber(value, q.number),
+        timeMs: Math.min(elapsed, this.limitMs),
+        retried: false,
+      };
+      this.toGame('game:answered', { playerId });
+      this.maybeRevealEarly();
+    });
+  }
+
+  /** The next round's category, from the ones on offer: only whoever was asked to pick, while they're asked. */
+  pick(playerId: string, round: number, category: CategoryId) {
+    this.guard(() => {
+      const picking = this.picking;
+      if (!picking || picking.round !== round || picking.pickerId !== playerId) return;
+      if (!picking.options.includes(category)) return;
+      this.decideRound(category, playerId);
+    });
+  }
+
   usePowerup(playerId: string, index: number, powerup: PowerupId) {
     this.guard(() => {
       const p = this.participants.get(playerId);
@@ -285,6 +356,8 @@ export class Game {
       if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
       const userId = p.player.userId!;
       const q = this.questions[this.index];
+      // A number has no options to take away and no wrong pick to retry; and the final is played bare.
+      if (q.kind === 'number') return;
       if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
       this.consume(p, powerup);
@@ -305,12 +378,6 @@ export class Game {
         case 'retry':
           p.retryArmed = true;
           this.toGame('game:powerup', { playerId, powerup });
-          break;
-        case 'time':
-          p.extraMs = TIME_BONUS_MS;
-          this.emit.toUser(userId, 'game:powerup', { playerId, powerup, extraMs: TIME_BONUS_MS });
-          this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
-          this.rescheduleQuestionTimer();
           break;
       }
     });
@@ -398,9 +465,9 @@ export class Game {
 
   /**
    * Payloads that bring a (re)connecting client up to speed, including where this player stands on the open question
-   * (their pick, козове, extra time): a fresh tab has none of it.
+   * (their pick or number, козове) or the round being picked: a fresh tab has none of it.
    */
-  syncFor(playerId: string): { start: GameStartPayload; question: QuestionPayload | null } {
+  syncFor(playerId: string): { start: GameStartPayload; question: QuestionPayload | null; pick: PickPayload | null } {
     const p = this.participants.get(playerId)!;
     return {
       start: this.startPayload(playerId, 0),
@@ -408,18 +475,18 @@ export class Game {
         this.phase === 'question'
           ? {
               ...this.questionPayload(),
-              remainingMs: Math.max(0, this.setup.timeMs + p.extraMs - this.elapsed()),
               mine: {
-                choice: p.answer?.choice ?? null,
+                choice: p.answer && p.answer.choice >= 0 ? p.answer.choice : null,
+                guess: p.answer?.value ?? null,
                 removed: p.removed,
                 doubled: p.doubled,
                 retryArmed: p.retryArmed,
                 retryPrompt: p.firstWrong !== null && !p.answer,
-                extraMs: p.extraMs,
                 powerupThisQuestion: p.powerupThisQuestion,
               },
             }
           : null,
+      pick: this.pickPayload(),
     };
   }
 
@@ -479,6 +546,8 @@ export class Game {
       return;
     }
     if (this.participants.size > 1 && !this.humans.some((h) => this.isActive(h))) return this.finishUnattended(true);
+    const round = this.roundDue();
+    if (round !== null) return this.startPick(round);
     this.nextQuestion();
   }
 
@@ -487,29 +556,98 @@ export class Game {
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
     this.questionStartedAt = gameClock.now();
-    this.readMs = readingMs(this.questions[this.index].q);
+    const q = this.questions[this.index];
+    this.limitMs = q.kind === 'number' ? Math.max(NUMBER.timeMs, this.setup.timeMs) : this.setup.timeMs;
+    this.readMs = readingMs(q.q, q.kind === 'number' ? [] : q.options);
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
       p.removed = [];
       p.powerupThisQuestion = false;
       p.powerupNow = null;
-      p.extraMs = 0;
       p.retryArmed = false;
       p.firstWrong = null;
       p.move = null;
     }
     this.toGame('game:question', this.questionPayload());
     this.scheduleBots();
-    this.questionTimer = this.later(this.setup.timeMs + GRACE_MS, () => this.reveal());
+    this.questionTimer = this.later(this.limitMs + GRACE_MS, () => this.reveal());
   }
 
-  /** "Още време" pushes the round's end out to cover the longest personal deadline. */
-  private rescheduleQuestionTimer() {
-    if (this.phase !== 'question') return;
-    const longest = Math.max(...[...this.participants.values()].map((p) => p.extraMs));
-    if (this.questionTimer) clearTimeout(this.questionTimer);
-    this.questionTimer = this.later(this.setup.timeMs + longest + GRACE_MS - this.elapsed(), () => this.reveal());
+  // ─── Rounds ──────────────────────────────────────────────────────────────
+
+  /** The round the next question opens, when its category is still to be picked. */
+  private roundDue(): number | null {
+    const round = this.rounds.findIndex((r) => r.from === this.index + 1 && r.category === null);
+    return round < 0 ? null : round;
+  }
+
+  /**
+   * Before a round: whoever is behind picks its category from the ones on offer, within ROUNDS.pickMs (a bot picks its
+   * strongest); otherwise one is drawn.
+   */
+  private startPick(round: number) {
+    this.phase = 'pick';
+    const picker = this.trailing();
+    const options = this.setup.rounds[round].offers.map((o) => o.category);
+    this.picking = { round, pickerId: picker.player.id, options, startedAt: gameClock.now() };
+    this.toGame('game:pick', this.pickPayload()!);
+    if (picker.brain) {
+      const brain = picker.brain;
+      const lean = (c: CategoryId) => (brain.strong.includes(c) ? 0 : brain.weak.includes(c) ? 2 : 1);
+      const [favourite] = shuffle(options).sort((a, b) => lean(a) - lean(b));
+      this.later(BOT_PICK_MS * (1 + Math.random()), () => this.pick(picker.player.id, round, favourite));
+    }
+    this.later(ROUNDS.pickMs + GRACE_MS, () => this.decideRound(shuffle(options)[0], null));
+  }
+
+  /** Who picks the next round: whoever is behind on points; on a tie the lower-rated, then the one with fewer right. */
+  private trailing(): Participant {
+    const rating = (p: Participant) => p.player.rating ?? START_RATING;
+    return [...this.participants.values()]
+      .filter((p) => this.isActive(p))
+      .sort((a, b) => a.score - b.score || rating(a) - rating(b) || a.correct - b.correct)[0];
+  }
+
+  /** The round being picked gets `category` (`by`: who picked it; null for a draw), and its questions come in. */
+  private decideRound(category: CategoryId, by: string | null) {
+    if (this.phase !== 'pick' || !this.picking) return;
+    const { round } = this.picking;
+    this.picking = null;
+    this.clearTimers();
+    this.settleRound(round, category, by);
+    this.toGame('game:round', { round, category, pickedBy: by, startsInMs: ROUND_CARD_MS });
+    this.later(ROUND_CARD_MS, () => this.advance());
+  }
+
+  /** Puts a round's category and its questions in place, and tells the registry they're now seen. */
+  private settleRound(round: number, category: CategoryId, by: string | null) {
+    const plan = this.setup.rounds[round];
+    const offer = plan.offers.find((o) => o.category === category) ?? plan.offers[0];
+    this.questions.splice(plan.from, plan.size, ...offer.questions);
+    this.rounds[round] = { ...this.rounds[round], category: offer.category, pickedBy: by };
+    try {
+      this.hooks.shown(
+        this,
+        offer.questions.map((q) => q.id),
+      );
+    } catch (err) {
+      void reportError(err, 'mark questions seen', { extra: { match: this.id } });
+    }
+  }
+
+  /** The questions the match is sure to play: all but those of rounds still to be picked. */
+  settledQuestions(): PreparedQuestion[] {
+    return this.questions.filter(
+      (_, i) => !this.rounds.some((r) => r.category === null && i >= r.from && i < r.from + r.size),
+    );
+  }
+
+  private pickPayload(): PickPayload | null {
+    if (this.phase !== 'pick' || !this.picking) return null;
+    const { round, pickerId, options, startedAt } = this.picking;
+    const elapsed = (gameClock.now() - startedAt) / config.gameTimeScale;
+    return { round, pickerId, options, durationMs: ROUNDS.pickMs, remainingMs: Math.max(0, ROUNDS.pickMs - elapsed) };
   }
 
   private maybeRevealEarly() {
@@ -536,45 +674,56 @@ export class Game {
     this.clearTimers();
 
     const q = this.questions[this.index];
+    const number = q.kind === 'number' ? q.number : null;
     const results: Record<string, PlayerResult> = {};
     for (const p of this.participants.values()) {
       if (!this.isActive(p)) continue;
       // A "Втори шанс" miss with no second pick stands as the answer.
-      if (!p.answer && p.firstWrong !== null)
-        p.answer = { choice: p.firstWrong, timeMs: this.setup.timeMs + p.extraMs, retried: false };
+      if (!p.answer && p.firstWrong !== null) p.answer = { choice: p.firstWrong, timeMs: this.limitMs, retried: false };
       p.faced++;
       if (p.answer) p.answered++;
       const cat = p.categories.get(q.category) ?? { answered: 0, correct: 0, correctMs: 0 };
       p.categories.set(q.category, cat);
       cat.answered++;
 
-      const correct = p.answer?.choice === q.answer;
+      const guess = number ? (p.answer?.value ?? null) : null;
+      const close = number ? (guess === null ? 0 : closeness(guess, number)) : null;
+      const correct = q.kind === 'number' ? (close ?? 0) >= NUMBER.rightFrom : p.answer?.choice === q.answer;
       let points = 0;
       // Tie-breaks compare total time, so a question left unanswered costs the whole clock.
-      p.answerMs += p.answer?.timeMs ?? this.setup.timeMs + p.extraMs;
+      p.answerMs += p.answer?.timeMs ?? this.limitMs;
       if (correct && p.answer) {
-        const { timeMs, retried } = p.answer;
+        const { timeMs } = p.answer;
         p.streak++;
         p.correct++;
         p.correctByDifficulty[q.difficulty]++;
-        p.correctMs += timeMs;
         cat.correct++;
-        cat.correctMs += timeMs;
         p.bestStreak = Math.max(p.bestStreak, p.streak);
-        p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
-        if (q.difficulty !== 'easy') p.fastestHardCorrectMs = Math.min(p.fastestHardCorrectMs ?? timeMs, timeMs);
+        // A number is about how close, not how fast: its time stays out of the fastest and average right answers.
+        if (!number) {
+          p.correctMs += timeMs;
+          cat.correctMs += timeMs;
+          p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
+          if (q.difficulty !== 'easy') p.fastestHardCorrectMs = Math.min(p.fastestHardCorrectMs ?? timeMs, timeMs);
+        }
+      } else {
+        p.streak = 0;
+      }
+      if (number) {
+        // Closer scores more, right or not; no speed bonus, no streak bonus.
+        points = guess === null ? 0 : numberPoints(guess, number);
+      } else if (correct && p.answer) {
         points = answerPoints({
-          timeMs,
-          limitMs: this.setup.timeMs,
+          timeMs: p.answer.timeMs,
+          limitMs: this.limitMs,
           readMs: this.readMs,
           streak: p.streak,
           doubled: p.doubled,
-          retried,
+          retried: p.answer.retried,
         });
-      } else {
-        p.streak = 0;
+      } else if (p.doubled && p.score > 0) {
         // "Двойно или нищо" is a bet: a miss costs points (never below zero).
-        if (p.doubled && p.score > 0) points = -Math.min(SCORING.doubleStake, p.score);
+        points = -Math.min(SCORING.doubleStake, p.score);
       }
       p.score += points;
       if (!p.brain)
@@ -583,20 +732,23 @@ export class Game {
           index: this.index,
           category: q.category,
           difficulty: q.difficulty,
-          choice: p.answer ? bankOption(q, p.answer.choice) : null,
+          choice: q.kind !== 'number' && p.answer ? bankOption(q, p.answer.choice) : null,
+          guess,
+          closeness: close,
           correct,
           timeMs: p.answer?.timeMs ?? null,
           points,
           powerup: p.powerupNow,
         });
       results[p.player.id] = {
-        choice: p.answer?.choice ?? null,
+        choice: number ? null : (p.answer?.choice ?? null),
         correct,
         points,
         timeMs: p.answer?.timeMs ?? null,
         streak: p.streak,
         doubled: p.doubled,
         retried: !!p.answer?.retried && correct,
+        ...(close !== null && { number: { guess, closeness: close } }),
       };
     }
 
@@ -623,7 +775,8 @@ export class Game {
     const nextInMs = REVEAL_MS + (eliminated.length ? ELIMINATION_EXTRA_MS : 0);
     this.toGame('game:reveal', {
       index: this.index,
-      correct: q.answer,
+      correct: q.kind === 'number' ? -1 : q.answer,
+      ...(number && { answerNumber: number.answer }),
       results,
       standings: this.standings(),
       eliminated,
@@ -731,17 +884,33 @@ export class Game {
   // ─── Bots ────────────────────────────────────────────────────────────────
 
   /**
+   * How likely a bot is to know this question's answer: as likely as a person of its skill (expectedRight against the
+   * question's measured rating), better in its strong categories and worse in its weak ones.
+   */
+  private knowChance(brain: BotBrain, q: PreparedQuestion): number {
+    const lean = brain.strong.includes(q.category)
+      ? FAVOURITE_LEAN
+      : brain.weak.includes(q.category)
+        ? -FAVOURITE_LEAN
+        : 0;
+    return clamp(expectedRight(brain.skill, questionRating(q.id, q.difficulty).rating) + lean, 0.05, 0.97);
+  }
+
+  /**
    * How a bot plays the current question: whether it knows the answer, how long it takes (game ms), and a joker it
    * plays on the way, as a person would — 50/50 when it doesn't know, "Двойно или нищо" mostly when it does (now and
-   * then on a hunch, which costs it). Null when it zones out.
+   * then on a hunch, which costs it). On a number question, its number: the more it knows, the closer. Null when it
+   * zones out.
    */
   private botMove(p: Participant): BotMove | null {
     const brain = p.brain!;
     const q = this.questions[this.index];
     if (Math.random() < 0.04) return null; // zoned out — lets the clock run down
-    const difficultyShift = { easy: 0.15, medium: 0, hard: -0.2 }[q.difficulty];
-    const knows = Math.random() < clamp(brain.accuracy + difficultyShift, 0.1, 0.97);
+    const chance = this.knowChance(brain, q);
+    const knows = Math.random() < chance;
     const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
+    const afterMs = Math.max(900, fraction * this.limitMs);
+    if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance) };
     const playable = (id: PowerupId) =>
       p.powerups.includes(id) &&
       !p.usedPowerups.has(id) &&
@@ -752,16 +921,36 @@ export class Game {
         : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
           ? 'double'
           : null;
-    return { knows, afterMs: Math.max(900, fraction * this.setup.timeMs), joker };
+    return { knows, afterMs, joker, guess: null };
+  }
+
+  /**
+   * A bot's number: off by a random amount (normally distributed) of up to about half the tolerance for a bot that
+   * barely knows, a fifth for one that surely does — on a log scale, by a factor.
+   */
+  private botGuess(q: NumberQuestion, chance: number): number {
+    const n = q.number;
+    const spread = 0.55 - 0.35 * chance;
+    const off = gaussian() * spread;
+    const raw = n.scale === 'log' ? n.answer * n.tolerance ** off : n.answer + off * n.tolerance;
+    return snapNumber(raw, n);
   }
 
   /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
   private botChoice(p: Participant, knows: boolean): number {
     const q = this.questions[this.index];
+    if (q.kind === 'number') return -1;
     if (knows) return q.answer;
     const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i));
     if (p.removed.length) return Math.random() < 0.5 ? q.answer : wrong[0];
     return wrong[Math.floor(Math.random() * wrong.length)];
+  }
+
+  /** A bot's answer as it made up its mind (botMove), with the time it took. */
+  private botAnswer(p: Participant, move: BotMove): NonNullable<Participant['answer']> {
+    return move.guess !== null
+      ? { choice: -1, value: move.guess, timeMs: move.afterMs, retried: false }
+      : { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
   }
 
   private scheduleBots() {
@@ -771,9 +960,13 @@ export class Game {
       const move = this.botMove(p);
       p.move = move;
       if (!move) continue;
-      const { joker } = move;
+      const { joker, guess } = move;
       if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
-      this.later(move.afterMs, () => this.answer(p.player.id, index, this.botChoice(p, move.knows)));
+      this.later(move.afterMs, () =>
+        guess !== null
+          ? this.guess(p.player.id, index, guess)
+          : this.answer(p.player.id, index, this.botChoice(p, move.knows)),
+      );
     }
   }
 
@@ -785,27 +978,30 @@ export class Game {
     const move = p.move;
     if (!move || p.answer) return;
     if (move.joker) this.usePowerup(p.player.id, this.index, move.joker);
-    p.answer = { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
+    p.answer = this.botAnswer(p, move);
     this.toGame('game:answered', { playerId: p.player.id });
   }
 
   /**
    * Every human has been gone a while (or is knocked out): the rest of the match plays out at once, exactly as if they
    * had stayed and not answered — so dropping the connection can't lock in a lead. `quiet`: the knocked-out are still
-   * watching; they get the result, not a flurry of questions.
+   * watching; they get the result, not a flurry of questions. A round still to be picked is drawn.
    */
   private finishUnattended(quiet = false) {
     this.abandonTimer = null;
     this.quiet = quiet;
+    this.picking = null;
     while (this.phase !== 'ended') {
       if (this.phase !== 'question') {
+        const round = this.roundDue();
+        if (round !== null) this.settleRound(round, shuffle(this.setup.rounds[round].offers)[0].category, null);
         this.nextQuestion();
         continue;
       }
       for (const p of this.participants.values()) {
         if (!p.brain || !this.isActive(p) || p.answer) continue;
         const move = this.botMove(p);
-        if (move) p.answer = { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
+        if (move) p.answer = this.botAnswer(p, move);
       }
       this.reveal();
     }
@@ -910,10 +1106,16 @@ export class Game {
       category: q.category,
       difficulty: q.difficulty,
       q: q.q,
-      options: q.options,
+      kind: q.kind === 'number' ? 'number' : 'choice',
+      options: q.kind === 'number' ? [] : q.options,
+      number:
+        q.kind === 'number'
+          ? { unit: q.number.unit, min: q.number.min, max: q.number.max, step: q.number.step, scale: q.number.scale }
+          : null,
+      final: this.index === this.questions.length - 1 && this.questions.length > 1,
       author: questionAuthor(q.id),
-      durationMs: this.setup.timeMs,
-      remainingMs: Math.max(0, this.setup.timeMs - this.elapsed()),
+      durationMs: this.limitMs,
+      remainingMs: Math.max(0, this.limitMs - this.elapsed()),
       readMs: this.readMs,
       elimination: this.schedule.includes(this.index + 1),
       answered: [...this.participants.values()].filter((p) => p.answer).map((p) => p.player.id),
@@ -938,6 +1140,7 @@ export class Game {
       usedPowerups: [...p.usedPowerups],
       emotes: [...p.emotes],
       standings: this.standings(),
+      rounds: this.rounds,
       startsInMs,
     };
   }
@@ -1039,7 +1242,6 @@ export class Game {
       removed: [],
       powerupThisQuestion: false,
       powerupNow: null,
-      extraMs: 0,
       retryArmed: false,
       firstWrong: null,
       move: null,
@@ -1049,4 +1251,9 @@ export class Game {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));
+}
+
+/** A normally distributed random number (mean 0, standard deviation 1). */
+function gaussian() {
+  return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
 }

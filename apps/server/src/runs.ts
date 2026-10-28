@@ -12,8 +12,10 @@ export interface RunAnswer {
   q: string;
   /** Its place in the match. */
   i: number;
-  /** The option picked, as the bank orders them; null for no answer in time. */
+  /** The option picked, as the bank orders them; null for no answer in time (or a number question). */
   c: number | null;
+  /** On a number question: the number given (null: none in time). */
+  g?: number | null;
   ok: 0 | 1;
   /** How long it took; null for no answer in time. */
   t: number | null;
@@ -47,6 +49,7 @@ export function recordRun(
     q: a.questionId,
     i: a.index,
     c: a.choice,
+    ...(a.closeness !== null && { g: a.guess }),
     ok: a.correct ? 1 : 0,
     t: a.timeMs,
     p: a.points,

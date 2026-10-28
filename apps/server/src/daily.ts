@@ -15,8 +15,9 @@ import { all, one, run } from './db';
 import { friendIds } from './friends';
 import { notify } from './notifications';
 import {
+  numberBank,
   type PreparedQuestion,
-  pickQuestions,
+  pickMatch,
   questionBank,
   reorderOptions,
   seededRng,
@@ -35,7 +36,8 @@ const ON_BOARD = `COALESCE(d.own_set, u.is_guest) = 0 AND ${NOT_BANNED}`;
 
 /**
  * Today's question set: drawn once a day, then frozen in the database. Questions with a "Знаеше ли?" fact come first,
- * and of those the ones played least so far: the day everyone plays shouldn't be what the regulars have seen most.
+ * and of those the ones played least so far: the day everyone plays shouldn't be what the regulars have seen most. The
+ * tenth is a number final.
  */
 function dailySet(day: string): PreparedQuestion[] {
   const existing = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
@@ -46,15 +48,15 @@ function dailySet(day: string): PreparedQuestion[] {
       r.answered,
     ]),
   );
-  // pickQuestions takes the lowest first.
-  const order = new Map(questionBank().map((q) => [q.id, (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0)]));
-  // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
-  const questions = pickQuestions(
-    MODES.daily.questions,
-    'mixed',
-    order,
-    seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
+  // The picks take the lowest first.
+  const order = new Map(
+    [...questionBank(), ...numberBank()].map((q) => [q.id, (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0)]),
   );
+  // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
+  const questions = pickMatch(MODES.daily.questions, 'mixed', order, {
+    final: MODES.daily.final,
+    rng: seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
+  });
   run(
     'INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)',
     day,

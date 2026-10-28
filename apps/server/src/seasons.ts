@@ -35,6 +35,15 @@ export function getRating(userId: number, mode: QueueModeId, season = seasonKey(
   return prev ? START_RATING + (prev.rating - START_RATING) * SEASON_CARRYOVER : START_RATING;
 }
 
+/** Rated games played in a mode, over every season (forfeits aren't counted: see recordRating). */
+export function ratedGames(userId: number, mode: QueueModeId): number {
+  return one<{ n: number }>(
+    'SELECT COALESCE(SUM(games), 0) AS n FROM season_ratings WHERE user_id = ? AND mode = ?',
+    userId,
+    mode,
+  )!.n;
+}
+
 export function getRatings(userId: number): Partial<Record<QueueModeId, number>> {
   return Object.fromEntries(QUEUE_MODES.map((m) => [m, Math.round(getRating(userId, m))]));
 }

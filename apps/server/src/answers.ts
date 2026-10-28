@@ -120,7 +120,8 @@ function questionsToCheck(): PlayCheck['questions'] {
   const out: PlayCheck['questions'] = [];
   for (const r of rows) {
     const q = questionById(r.question_id);
-    if (!q) continue;
+    // A number counts as right once it's close: its share says nothing about the label the way a pick does.
+    if (!q || q.kind === 'number') continue;
     const share = r.correct / r.answered;
     const [low, high] = EXPECTED_CORRECT[q.difficulty];
     const verdict = share < LIKELY_WRONG_BELOW ? 'wrong' : share < low ? 'harder' : share > high ? 'easier' : null;

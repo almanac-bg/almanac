@@ -10,6 +10,7 @@ import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
+import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
 
 /** A question on screen: the clock, the points it's worth, the answers, your pick and how it went. */
@@ -23,6 +24,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const active = !watching && !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
   const reduceMotion = useReducedMotion();
+  const number = q.kind === 'number';
 
   // Who picked what, shown under each option at reveal.
   const pickers = useMemo(() => {
@@ -47,6 +49,11 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       className="mx-auto max-w-3xl"
     >
       <div className="flex flex-wrap items-center gap-2">
+        {q.final && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-extrabold tracking-wide text-amber-200 uppercase">
+            🎯 Финал
+          </span>
+        )}
         <span
           className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
           style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: cat.color }}
@@ -87,8 +94,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             two-word lines beside it. Wider screens: side by side. */}
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
-            <TimerRing deadline={game.deadline} duration={q.durationMs + game.extraMs} stopped={!!reveal} />
-            {!reveal && <LivePoints game={game} q={q} />}
+            <TimerRing deadline={game.deadline} duration={q.durationMs} stopped={!!reveal} />
+            {/* A number has no speed bonus: what it's worth is how close it is. */}
+            {!reveal && !number && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
             <h1 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]">
@@ -118,30 +126,42 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       </AnimatePresence>
 
       <div className="relative mt-4 short:mt-3 tiny:mt-2 flat:mt-2">
-        <div className="grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5">
-          {q.options.map((text, i) => (
-            <AnswerButton
-              // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
-              key={i}
-              index={i}
-              text={text}
-              selected={game.myChoice === i}
-              locked={game.myChoice !== null}
-              removed={game.removed.includes(i)}
-              disabled={!active || offline}
-              watching={watching}
-              offline={(offline || game.resyncing) && !reveal}
-              correct={reveal ? reveal.correct === i : null}
-              pickers={pickers[i] ?? []}
-            />
-          ))}
-        </div>
+        {number ? (
+          reveal?.answerNumber !== undefined ? (
+            <NumberLine game={game} q={q} reveal={reveal} />
+          ) : (
+            <NumberAnswer game={game} q={q} disabled={!active || offline} />
+          )
+        ) : (
+          <div className="grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5">
+            {q.options.map((text, i) => (
+              <AnswerButton
+                // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
+                key={i}
+                index={i}
+                text={text}
+                selected={game.myChoice === i}
+                locked={game.myChoice !== null}
+                removed={game.removed.includes(i)}
+                disabled={!active || offline}
+                watching={watching}
+                offline={(offline || game.resyncing) && !reveal}
+                correct={reveal ? reveal.correct === i : null}
+                pickers={pickers[i] ?? []}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
         <AnimatePresence mode="wait">
           {reveal && mine ? (
-            <RevealSummary key="sum" result={mine} />
+            number && reveal.answerNumber !== undefined ? (
+              <NumberSummary key="sum" result={mine} q={q} answer={reveal.answerNumber} />
+            ) : (
+              <RevealSummary key="sum" result={mine} />
+            )
           ) : reveal ? null : game.myChoice !== null ? (
             <motion.div
               key="wait"
@@ -153,7 +173,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
               <ActivePowerups game={game} />
             </motion.div>
           ) : (
-            active && <PowerupBar key="pw" game={game} offline={offline} />
+            active && !number && <PowerupBar key="pw" game={game} offline={offline} />
           )}
         </AnimatePresence>
       </div>
@@ -263,7 +283,7 @@ function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
   // A pick from before a reconnect: when it was made isn't known here.
   if (game.myChoice === -1) return null;
   const streak = (game.standings.find((s) => s.id === game.start.youId)?.streak ?? 0) + 1;
-  const openedAt = game.deadline - q.durationMs - game.extraMs;
+  const openedAt = game.deadline - q.durationMs;
   const points = answerPoints({
     timeMs: Math.max(0, now - openedAt),
     limitMs: q.durationMs,

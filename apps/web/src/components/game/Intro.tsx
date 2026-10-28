@@ -82,6 +82,7 @@ export function Intro({ game }: { game: LiveGame }) {
           ))}
         </div>
       )}
+      {game.rounds.length > 0 && <RoundsPlan game={game} />}
       {scoring && <p className="mt-6 max-w-sm text-sm text-balance text-fg-2">{SCORING_LINE}</p>}
       <PowerupNotesLine powerups={fresh} className="mt-6 max-w-md" />
       {game.start.eliminationSchedule.length > 0 && (
@@ -123,6 +124,11 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
       </div>
       {p.rating !== null && <RankBadge rating={p.rating} />}
       {p.isBot && <span className="text-xs text-fg-3">БОТ</span>}
+      {p.isBot && !!p.strong?.length && (
+        <span className="text-xs text-balance text-fg-2">
+          силен в {p.strong.map((c) => `${categoryById(c)?.icon} ${categoryById(c)?.name}`).join(', ')}
+        </span>
+      )}
     </motion.div>
   );
   return (
@@ -131,6 +137,20 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
       <VsMark />
       {side(b, -1)}
     </div>
+  );
+}
+
+/** A match in rounds: the first round's category now, who picks the others, and the final. */
+function RoundsPlan({ game }: { game: LiveGame }) {
+  const first = categoryById(game.rounds[0].category ?? '');
+  return (
+    <p className="mt-6 max-w-md text-sm text-balance text-fg-2">
+      Рунд 1:{' '}
+      <span className="font-semibold text-fg">
+        {first?.icon} {first?.name}
+      </span>
+      . Категорията на следващите {game.rounds.length - 1} избира изоставащият. Накрая — финал с число.
+    </p>
   );
 }
 

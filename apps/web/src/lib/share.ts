@@ -1,5 +1,6 @@
 import { fmt, ordinal, type ReviewItem, toast } from '@quiz/client';
-import { BRAND, dayKey, dayNumber } from '@quiz/shared';
+import { BRAND, dayKey, dayNumber, isExact, type NumberInput } from '@quiz/shared';
+import { numberText } from '../components/game/numbers';
 
 const storageKey = (day: string) => `quiz:daily-share:${day}`;
 
@@ -8,6 +9,7 @@ const storageKey = (day: string) => `quiz:daily-share:${day}`;
  * number, the score, the place once the board has a crowd to place in, and the link that plays the same questions:
  *   ⚡ АЛМАНАХ №4 · 8/10
  *   🟩🟩🟥🟩⬛🟩🟩🟩🟩🟩
+ *   🎯 Финал: ±3
  *   1 240 т. · 7-мо място от 23
  *   🔥 5 дни подред
  *   https://almanac.bg/daily/x7Kp2q
@@ -25,16 +27,32 @@ export function dailyShareText(d: {
 }): string {
   const squares = Array.from({ length: d.total }, (_, i) => {
     const item = d.history.find((h) => h.index === i);
-    return !item ? '⬜' : item.right ? '🟩' : item.choice === null ? '⬛' : '🟥';
+    const unanswered = item?.number ? item.number.guess === null : item?.choice === null;
+    return !item ? '⬜' : item.right ? '🟩' : unanswered ? '⬛' : '🟥';
   }).join('');
   const correct = d.history.filter((h) => h.right).length;
   const score = [`${fmt(d.score)} т.`];
   // "1-во място от 3" says more about the day's numbers than about the player.
   if (d.place && d.place.of >= SHOW_PLACE_FROM) score.push(`${ordinal(d.place.rank)} място от ${fmt(d.place.of)}`);
-  const lines = [`⚡ ${BRAND.name} №${dayNumber(d.day)} · ${correct}/${d.total}`, squares, score.join(' · ')];
+  const lines = [`⚡ ${BRAND.name} №${dayNumber(d.day)} · ${correct}/${d.total}`, squares];
+  const final = d.history.find((h) => h.number && h.number.guess !== null)?.number;
+  if (final) lines.push(`🎯 Финал: ${finalOff(final.guess!, final.answer, final)}`);
+  lines.push(score.join(' · '));
   if (d.streak > 1) lines.push(`🔥 ${d.streak} дни подред`);
   lines.push(d.link);
   return lines.join('\n');
+}
+
+/**
+ * How close the final was, without giving its answer away: "точно", "±3 км", "×2" (how far, not in which direction).
+ */
+function finalOff(guess: number, answer: number, n: Pick<NumberInput, 'unit' | 'step' | 'scale'>): string {
+  if (isExact(guess, { answer, step: n.step })) return 'точно!';
+  if (n.scale === 'log') {
+    const factor = Math.max(guess / answer, answer / guess);
+    return `×${factor.toLocaleString('bg-BG', { maximumFractionDigits: 1 })}`;
+  }
+  return `±${numberText(Math.abs(guess - answer), n)}`;
 }
 
 /** From how many players on the day's board the share text says the place. */

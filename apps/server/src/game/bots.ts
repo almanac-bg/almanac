@@ -1,12 +1,30 @@
-import { AVATARS, FRAMES, type GamePlayer, type Requirement, START_RATING, TITLES } from '@quiz/shared';
+import {
+  AVATARS,
+  CATEGORY_IDS,
+  type CategoryId,
+  FRAMES,
+  type GamePlayer,
+  type Requirement,
+  START_RATING,
+  TITLES,
+} from '@quiz/shared';
 import { shuffle } from '../questions';
 
 export interface BotBrain {
-  /** Base chance of answering correctly on a medium question. */
-  accuracy: number;
+  /**
+   * How much it knows, on the scale questions are rated on (skill.ts): the rating it shows. It gets a question right as
+   * often as a person of that skill would (expectedRight), so it misses the questions people miss.
+   */
+  skill: number;
   /** Typical fraction of the timer used before answering. */
   pace: number;
+  /** Categories it knows better (picks first) and worse, by FAVOURITE_LEAN. */
+  strong: CategoryId[];
+  weak: CategoryId[];
 }
+
+/** How much better (or worse) a bot does in its strong (or weak) categories than its skill says. */
+export const FAVOURITE_LEAN = 0.15;
 
 export interface Bot {
   player: GamePlayer;
@@ -63,22 +81,23 @@ const GENTLE_RATING_GAP = 170;
 const jitter = (spread: number) => (Math.random() * 2 - 1) * spread;
 
 /**
- * Bots sized to the humans they play against. A bot plays as strong as the rating it shows, so Elo against bots
- * settles where the player's skill really is instead of climbing forever. Players new to multiplayer get slightly
- * kinder bots for their first few matches: rated lower, and playing to it.
+ * Bots sized to the humans they play against: centred on how much they know (`around.skill`, see skillCentre), so a
+ * match against them is close. A bot plays as strong as the rating it shows, so Elo against bots settles where the
+ * player's skill really is instead of climbing forever. Players new to multiplayer get slightly kinder bots for their
+ * first few matches: rated lower, and playing to it. Each has two strong and two weak categories.
  */
 export function makeBots(
   count: number,
-  around: { level: number; rating: number },
+  around: { level: number; skill: number },
   takenNames: string[] = [],
   opts: { gentle?: boolean } = {},
 ): Bot[] {
   const names = shuffle(NAMES.filter((n) => !takenNames.includes(n)));
   return Array.from({ length: count }, (_, i) => {
-    const centre = around.rating - (opts.gentle ? GENTLE_RATING_GAP : 0);
+    const centre = around.skill - (opts.gentle ? GENTLE_RATING_GAP : 0);
     const rating = Math.round(clamp(centre + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
-    const skill = rating - START_RATING;
     const level = clamp(Math.round(around.level + jitter(3)), 1, 60);
+    const [a, b, c, d] = shuffle(CATEGORY_IDS);
     return {
       player: {
         id: `b${++botSeq}`,
@@ -92,10 +111,13 @@ export function makeBots(
         frame: wearable(FRAMES, level),
         title: wearable(TITLES, level),
         team: null,
+        strong: [a, b],
       },
       brain: {
-        accuracy: clamp(0.5 + skill * 0.0006 + jitter(0.05), 0.3, 0.92),
-        pace: clamp(0.5 - skill * 0.0003 + jitter(0.1), 0.18, 0.75),
+        skill: rating,
+        pace: clamp(0.5 - (rating - START_RATING) * 0.0003 + jitter(0.1), 0.18, 0.75),
+        strong: [a, b],
+        weak: [c, d],
       },
     };
   });

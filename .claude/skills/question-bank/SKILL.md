@@ -81,6 +81,24 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
    the next deploy; deploying is outward-facing, so ask the owner unless they already said to ship it.
 6. **Tell the owner** what went in: a short list (question → answer, and the fact if any), so they can read it.
 
+## Number questions (match finals)
+
+`"kind": "number"`: the last question of almost every match, typed in and scored by closeness (README → „Добавяне на
+въпроси“ has the format). They're balanced on their own: the same number in every category (`bank.mjs stats` shows
+them on a line of their own; the 40/40/20 split doesn't apply, a final is drawn from any difficulty). Write them like
+any batch (`add`, not `fill`), and also:
+
+- Something worth estimating, with one accepted value: a year, a height, a distance, a count. Not a small count that
+  is simply known or not (legs, strings), and nothing sources disagree on — pin it („според измерването от 2020 г.“,
+  „към 2026 г.“, „официалната височина“) or leave it.
+- `min`/`max` wide enough to give nothing away (years: 1000–2026); `tolerance` so a well-read guess scores at least
+  half (a typical error of half the tolerance); `answer` a whole number of `step`s; `log` beyond three orders of
+  magnitude, with the tolerance as a factor. A range of 100 or less is a slider in the game.
+- No give-aways: the bank writes years into titles („Кръстникът“ (1972)) and facts, so a final about it is answered
+  before it comes. `bank.mjs giveaways new.json` lists every bank question or fact that names the number with even one
+  shared key word: most are coincidences (1992 in a football question), judge each. The bank test catches the clear
+  ones. The fact mustn't name another question's answer either (a human's 46 chromosomes beside the dog's).
+
 ## Writing "Знаеше ли?" facts
 
 The fact shows right after the answer is revealed (alone, with "Спри, за да прочета" to pause the match; for

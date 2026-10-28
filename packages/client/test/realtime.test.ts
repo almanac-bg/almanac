@@ -101,6 +101,7 @@ const start = (over: Partial<GameStartPayload> = {}): GameStartPayload => ({
   usedPowerups: [],
   emotes: [],
   standings: [standing('u1'), standing('b1')],
+  rounds: [],
   startsInMs: 3000,
   ...over,
 });
@@ -111,7 +112,10 @@ const question = (index: number, over: Partial<QuestionPayload> = {}): QuestionP
   category: 'history',
   difficulty: 'easy',
   q: `Въпрос ${index}?`,
+  kind: 'choice',
   options: ['А', 'Б', 'В', 'Г'],
+  number: null,
+  final: false,
   author: null,
   durationMs: 15_000,
   remainingMs: 15_000,
@@ -204,7 +208,7 @@ test('after a reconnect the question stays locked until the server says it is st
         doubled: false,
         retryArmed: false,
         retryPrompt: false,
-        extraMs: 0,
+        guess: null,
         powerupThisQuestion: false,
       },
     }),
@@ -282,4 +286,88 @@ test('one tab too many: the player is told once why, and it keeps trying', () =>
   } finally {
     socket.connect = FakeSocket.prototype.connect;
   }
+});
+
+test('a number goes out once, locks the question and comes back in the review with how close it was', () => {
+  inMatch();
+  const number = question(1, {
+    kind: 'number',
+    options: [],
+    number: { unit: 'г.', min: 1000, max: 2025, step: 1, scale: 'linear' },
+    final: true,
+  });
+  socket.deliver('game:question', number);
+  actions.answer(0);
+  actions.guess(1878);
+  actions.guess(1900);
+  assert.deepEqual(socket.sent, [['game:guess', { index: 1, value: 1878 }]], 'no option to pick; one number');
+  assert.deepEqual([game().myChoice, game().myGuess], [-1, 1878]);
+  socket.deliver('game:reveal', {
+    index: 1,
+    correct: -1,
+    answerNumber: 1878,
+    results: {
+      u1: {
+        choice: null,
+        correct: true,
+        points: 1250,
+        timeMs: 6000,
+        streak: 1,
+        doubled: false,
+        retried: false,
+        number: { guess: 1878, closeness: 1 },
+      },
+    },
+    standings: [standing('u1'), standing('b1')],
+    eliminated: [],
+    nextInMs: 4000,
+    fact: null,
+  });
+  assert.deepEqual(game().history.at(-1)!.number, {
+    answer: 1878,
+    unit: 'г.',
+    step: 1,
+    scale: 'linear',
+    guess: 1878,
+    closeness: 1,
+  });
+});
+
+test('a round is picked by whoever is asked, once; everyone sees what it became', () => {
+  const first = start({
+    gameId: `g${run}`,
+    rounds: [
+      { from: 0, size: 3, category: 'history', pickedBy: null },
+      { from: 3, size: 3, category: null, pickedBy: null },
+    ],
+  });
+  socket.deliver('game:start', first);
+  socket.deliver('game:pick', {
+    round: 1,
+    pickerId: 'u1',
+    options: ['music', 'sports', 'nature'],
+    durationMs: 5000,
+    remainingMs: 4000,
+  });
+  assert.equal(game().phase, 'pick');
+  assert.equal(game().pick!.endsAt, Date.now() + 4000);
+  actions.pickCategory('sports');
+  actions.pickCategory('music');
+  assert.deepEqual(socket.sent, [['game:pick', { round: 1, category: 'sports' }]]);
+  socket.deliver('game:round', { round: 1, category: 'sports', pickedBy: 'u1', startsInMs: 2000 });
+  assert.equal(game().rounds[1].category, 'sports');
+  assert.equal(game().pick!.chosen, 'sports');
+  socket.deliver('game:question', question(3));
+  assert.equal(game().pick, null);
+
+  // Someone else's pick: nothing to send.
+  socket.deliver('game:pick', {
+    round: 2,
+    pickerId: 'b1',
+    options: ['music', 'general', 'nature'],
+    durationMs: 5000,
+    remainingMs: 5000,
+  });
+  actions.pickCategory('music');
+  assert.equal(socket.sent.length, 1);
 });

@@ -45,7 +45,25 @@ export function writeFixtureQuestions(file: string) {
       };
     }),
   );
-  fs.writeFileSync(file, JSON.stringify(questions));
+  // Number questions for the finals: years, and a size on a log scale. The answer is in the text (as ✓ marks the right
+  // option), so a test can give it.
+  const numbers = CATEGORY_IDS.flatMap((category) =>
+    Array.from({ length: 3 }, (_, i) => {
+      const log = i === 2;
+      const answer = log ? 5000 : 1800 + i * 10;
+      return {
+        id: `${category}-n${i}`,
+        kind: 'number',
+        category,
+        difficulty: (['easy', 'medium', 'hard'] as const)[i],
+        q: `Тестово число ${category} #${i} (= ${answer})?`,
+        number: log
+          ? { answer, unit: 'км', min: 1, max: 1_000_000, step: 1, scale: 'log', tolerance: 3 }
+          : { answer, unit: '', min: 1000, max: 2025, step: 1, scale: 'linear', tolerance: 50 },
+      };
+    }),
+  );
+  fs.writeFileSync(file, JSON.stringify([...questions, ...numbers]));
 }
 
 function freePort(): Promise<number> {
@@ -316,9 +334,19 @@ export const cookieFrom = (r: Response) => r.headers.get('set-cookie')!.split(';
 
 export const newLog = (): PlayLog => ({ questions: [], reveals: [] });
 export const rightOption = (q: QuestionPayload) => q.options.findIndex((o) => o.includes('✓'));
+/** A fixture number question's answer (it's in the text). */
+export const rightNumber = (q: QuestionPayload) => Number(q.q.match(/\(= (\d+)\)/)![1]);
+
+/** Answers a question: the right option or number, or a wrong one (a number far off). */
+export function answer(s: Client, q: QuestionPayload, right: boolean, afterMs = 30) {
+  setTimeout(() => {
+    if (q.kind === 'number') s.emit('game:guess', { index: q.index, value: right ? rightNumber(q) : q.number!.min });
+    else s.emit('game:answer', { index: q.index, choice: right ? rightOption(q) : (rightOption(q) + 1) % 4 });
+  }, afterMs);
+}
 
 /**
- * Answers every question until the match ends: 'right' picks the ✓ option, 'wrong' another one.
+ * Answers every question until the match ends: 'right' picks the ✓ option (or gives the number), 'wrong' another one.
  * Resolves with the start and end payloads.
  */
 export function autoPlay(
@@ -331,9 +359,7 @@ export function autoPlay(
     const onStart = (p: GameStartPayload) => (start = p);
     const onQuestion = (q: QuestionPayload) => {
       log?.questions.push(q);
-      const right = rightOption(q);
-      const choice = strategy === 'right' ? right : (right + 1) % 4;
-      setTimeout(() => s.emit('game:answer', { index: q.index, choice }), 30);
+      answer(s, q, strategy === 'right');
     };
     const onReveal = (r: RevealPayload) => log?.reveals.push(r);
     const onEnd = (end: GameEndPayload) => {

@@ -12,7 +12,7 @@ import { config } from './config';
 import { cutShortError } from './daily';
 import { all, one, run } from './db';
 import { notify, unreadAbout } from './notifications';
-import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, withoutAuthors } from './questions';
+import { type PreparedQuestion, pickMatch, recentFor, reorderOptions, withoutAuthors } from './questions';
 import { count } from './stats';
 import { NOT_BANNED, toPublicUser, type UserRow } from './users';
 
@@ -32,10 +32,12 @@ type ResultRow = UserRow & { score: number; correct: number; time_ms: number };
 
 const getChallenge = (id: string) => one<ChallengeRow>('SELECT * FROM challenges WHERE id = ?', id);
 
-/** A new link with ten fresh questions for its creator (picked like any match: unseen first). */
+/** A new link with ten fresh questions for its creator (picked like any match: unseen first, a number final). */
 export function createChallenge(creatorId: number): string {
   const id = randomBytes(6).toString('base64url');
-  const questions = pickQuestions(MODES.challenge.questions, 'mixed', recentFor([creatorId]));
+  const questions = pickMatch(MODES.challenge.questions, 'mixed', recentFor([creatorId]), {
+    final: MODES.challenge.final,
+  });
   const now = Date.now();
   run(
     'INSERT INTO challenges (id, creator_id, questions, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',

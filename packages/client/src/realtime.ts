@@ -3,6 +3,7 @@ import {
   type AnswerRejection,
   achievementById,
   type CategoryChoice,
+  type CategoryId,
   type ClientToServerEvents,
   type GameStartPayload,
   type Invite,
@@ -189,9 +190,9 @@ function bind(s: GameSocket) {
         countdownEndsAt: now + start.startsInMs,
         question: null,
         deadline: now,
-        extraMs: 0,
         answered: [],
         myChoice: null,
+        myGuess: null,
         removed: [],
         doubled: false,
         usedPowerups: start.usedPowerups,
@@ -200,6 +201,8 @@ function bind(s: GameSocket) {
         retryPrompt: false,
         reveal: null,
         resyncing: false,
+        rounds: start.rounds,
+        pick: null,
         eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
         reactions: [],
         feed: [],
@@ -224,10 +227,11 @@ function bind(s: GameSocket) {
     }
     const same = g.question?.index === question.index && g.phase === 'question' ? g : null;
     // A resync after a reconnect says where you stand on the question (a fresh tab knows nothing of it): the server's
-    // word goes, including the extra time already in `remainingMs`.
+    // word goes.
     const mine = question.mine;
     if (mine) {
-      if (same && same.myChoice !== null && mine.choice === null && question.remainingMs > 0) {
+      const lost = mine.choice === null && mine.guess === null;
+      if (same && same.myChoice !== null && lost && question.remainingMs > 0) {
         toast({
           kind: 'error',
           title: 'Отговорът ти не стигна до сървъра.',
@@ -239,9 +243,9 @@ function bind(s: GameSocket) {
         phase: 'question',
         question,
         deadline: now + question.remainingMs,
-        extraMs: mine.extraMs,
         answered: question.answered,
-        myChoice: mine.choice,
+        myChoice: mine.guess !== null ? -1 : mine.choice,
+        myGuess: mine.guess,
         removed: mine.removed,
         doubled: mine.doubled,
         powerupThisQuestion: mine.powerupThisQuestion,
@@ -249,21 +253,21 @@ function bind(s: GameSocket) {
         retryPrompt: mine.retryPrompt,
         reveal: null,
         resyncing: false,
+        pick: null,
       }));
       return;
     }
     const lockedIn = question.answered.includes(g.start.youId);
-    const extraMs = same?.extraMs ?? 0;
-    if (same && same.myChoice !== null && !lockedIn && question.remainingMs + extraMs > 0) {
+    if (same && same.myChoice !== null && !lockedIn && question.remainingMs > 0) {
       toast({ kind: 'error', title: 'Отговорът ти не стигна до сървъра.', body: 'Избери отново — времето още тече.' });
     }
     patchGame(() => ({
       phase: 'question',
       question,
-      deadline: Date.now() + question.remainingMs + extraMs,
-      extraMs,
+      deadline: Date.now() + question.remainingMs,
       answered: question.answered,
       myChoice: lockedIn ? (same?.myChoice ?? -1) : null,
+      myGuess: lockedIn ? (same?.myGuess ?? null) : null,
       removed: same?.removed ?? [],
       doubled: same?.doubled ?? false,
       powerupThisQuestion: same?.powerupThisQuestion ?? false,
@@ -271,6 +275,7 @@ function bind(s: GameSocket) {
       retryPrompt: !lockedIn && !!same?.retryPrompt,
       reveal: null,
       resyncing: false,
+      pick: null,
     }));
   });
 
@@ -280,7 +285,7 @@ function bind(s: GameSocket) {
   s.on('game:rejected', ({ index, reason }) => {
     const g = getState().game;
     if (!g?.question || g.question.index !== index) return;
-    if (g.phase === 'question') patchGame(() => ({ myChoice: null }));
+    if (g.phase === 'question') patchGame(() => ({ myChoice: null, myGuess: null }));
     toast({ kind: 'error', title: REJECTED[reason] });
   });
 
@@ -314,6 +319,17 @@ function bind(s: GameSocket) {
                 difficulty: q.difficulty,
                 correct: reveal.correct,
                 choice: mine?.choice ?? null,
+                number:
+                  q.number && reveal.answerNumber !== undefined
+                    ? {
+                        answer: reveal.answerNumber,
+                        unit: q.number.unit,
+                        step: q.number.step,
+                        scale: q.number.scale,
+                        guess: mine?.number?.guess ?? null,
+                        closeness: mine?.number?.closeness ?? 0,
+                      }
+                    : null,
                 right: !!mine?.correct,
                 fact: reveal.fact ?? null,
               },
@@ -328,7 +344,25 @@ function bind(s: GameSocket) {
       setTimeout(() => effect(reveal.eliminated.includes(g.start.youId) ? 'knockedOut' : 'eliminated'), 900);
   });
 
-  s.on('game:powerup', ({ playerId, powerup, removed, extraMs }) => {
+  // A round's category is being picked: by you, or by someone you wait for.
+  s.on('game:pick', (pick) => {
+    clearTimeout(staleQuestionTimer);
+    patchGame(() => ({
+      phase: 'pick',
+      pick: { ...pick, endsAt: Date.now() + pick.remainingMs, sent: null, chosen: null },
+      resyncing: false,
+    }));
+  });
+
+  s.on('game:round', ({ round, category, pickedBy }) => {
+    patchGame((g) => ({
+      rounds: g.rounds.map((r, i) => (i === round ? { ...r, category, pickedBy } : r)),
+      pick: g.pick?.round === round ? { ...g.pick, chosen: category } : g.pick,
+    }));
+    effect('round');
+  });
+
+  s.on('game:powerup', ({ playerId, powerup, removed }) => {
     const g = getState().game;
     if (!g) return;
     const def = powerupById(powerup);
@@ -342,8 +376,6 @@ function bind(s: GameSocket) {
         removed: removed ?? x.removed,
         doubled: x.doubled || powerup === 'double',
         retryArmed: x.retryArmed || powerup === 'retry',
-        deadline: x.deadline + (extraMs ?? 0),
-        extraMs: x.extraMs + (extraMs ?? 0),
       }));
     }
     if (playerId !== you) pushFeed(`${nameOf(g, playerId)} използва „${def?.name ?? powerup}“`, def?.icon ?? '🃏');
@@ -424,6 +456,7 @@ function resync(prev: LiveGame, start: GameStartPayload) {
       players: Object.fromEntries(start.players.map((p) => [p.id, p])),
       standings: start.standings,
       usedPowerups: start.usedPowerups,
+      rounds: start.rounds,
       eliminated: start.standings.filter((x) => x.eliminatedAt !== null).map((x) => x.id),
       resyncing: true,
     },
@@ -470,7 +503,7 @@ async function ask<T extends object = object>(fn: () => Promise<AckResult<T>>): 
 
 const withTimeout = () => getSocket().timeout(8000);
 
-type MoveEvent = 'game:answer' | 'game:powerup' | 'game:react';
+type MoveEvent = 'game:answer' | 'game:guess' | 'game:pick' | 'game:powerup' | 'game:react';
 
 /**
  * Sends a game move only over a live connection. Socket.IO would buffer a move made offline and replay it after the
@@ -535,9 +568,27 @@ export const actions = {
     const g = getState().game;
     if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice))
       return;
+    if (g.question.kind === 'number') return;
     if (!sendMove('game:answer', { index: g.question.index, choice })) return offlineToast('Отговорът не е изпратен.');
     effect('lock');
     patchGame(() => ({ myChoice: choice, retryPrompt: false }));
+  },
+  /** Your number, on a number question. */
+  guess: (value: number) => {
+    const g = getState().game;
+    if (g?.question?.kind !== 'number' || g.phase !== 'question' || g.resyncing || g.myChoice !== null) return;
+    if (!sendMove('game:guess', { index: g.question.index, value })) return offlineToast('Отговорът не е изпратен.');
+    effect('lock');
+    patchGame(() => ({ myChoice: -1, myGuess: value }));
+  },
+  /** The next round's category, when you're the one picking it. */
+  pickCategory: (category: CategoryId) => {
+    const g = getState().game;
+    const pick = g?.pick;
+    if (g?.phase !== 'pick' || !pick || pick.pickerId !== g.start.youId || pick.sent || pick.chosen) return;
+    if (!sendMove('game:pick', { round: pick.round, category })) return offlineToast('Изборът не е изпратен.');
+    effect('lock');
+    patchGame((x) => ({ pick: x.pick && { ...x.pick, sent: category } }));
   },
   powerup: (powerup: PowerupId) => {
     const g = getState().game;

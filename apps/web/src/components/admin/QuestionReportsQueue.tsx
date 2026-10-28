@@ -65,7 +65,12 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
         {question.author && ` · от ${question.author}`}
       </p>
       <p className="mt-1 font-semibold">{question.q}</p>
-      <ol className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
+      {question.number && (
+        <p className="mt-3 rounded-xl bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-200">
+          🔢 {question.number.answer.toLocaleString('bg-BG')} {question.number.unit} ✓
+        </p>
+      )}
+      <ol className="mt-3 grid gap-1.5 text-sm empty:hidden sm:grid-cols-2">
         {question.options.map((o, i) => (
           <li
             // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)

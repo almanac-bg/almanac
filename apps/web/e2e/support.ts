@@ -139,11 +139,14 @@ export interface MatchSummary {
 }
 
 /**
- * Plays the match on screen to the end: every question gets an answer (the first one still open — the answers are
- * "А) …", "Б) …", "В) …", "Г) …"). Returns once the results are up.
+ * Plays the match on screen to the end: every question gets an answer — the first option still open ("А) …", "Б) …",
+ * "В) …", "Г) …"), or on a number question a number in its range, typed on the keypad or slid to — and a round's
+ * category, when this player is asked to pick one, the first on offer. Returns once the results are up.
  */
 export async function playMatch(page: Page): Promise<MatchSummary> {
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
+  const lock = page.getByRole('button', { name: 'Заключи', exact: true });
+  const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
   const results = page.getByRole('heading', { name: 'Награди', exact: true });
   const counter = page.getByText(/^Въпрос \d+ от \d+$/);
   const answered = new Set<number>();
@@ -154,21 +157,52 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
   await parkPointer();
 
   for (;;) {
-    // Between questions there's the countdown or the reveal; a 15-second question lasts 2.25 s at the test speed.
-    await expect(open.or(results).first()).toBeVisible({ timeout: 15_000 });
+    // Between questions there's the countdown, the reveal or a round's pick; a 15-second question lasts 2.25 s at the
+    // test speed.
+    await expect(open.or(lock).or(pick).or(results).first()).toBeVisible({ timeout: 15_000 });
     if (await results.isVisible()) break;
+    if (await pick.isVisible()) {
+      await page.locator('[data-answer="0"]').click({ timeout: 2_000 });
+      await expect(pick).toBeHidden({ timeout: 5_000 });
+      continue;
+    }
     const [index, of] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
     total = of;
     expect(answered.has(index), `question ${index} offered twice`).toBe(false);
-    // No longer than the question lasts: a click that waited on would land on the next question.
-    await open.first().click({ timeout: 2_500 });
-    await parkPointer();
-    // The pick shows as "твоят избор" at once and stays until the next question comes up.
-    const picked = page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ });
-    await expect(picked, `answer to question ${index} not taken`).toBeVisible({ timeout: 2_000 });
+    if (await lock.isVisible()) {
+      await giveNumber(page);
+      // Locked in: the number stays on show, with nothing left to press.
+      await expect(lock, `number for question ${index} not taken`).toBeHidden({ timeout: 2_000 });
+    } else {
+      // No longer than the question lasts: a click that waited on would land on the next question.
+      await open.first().click({ timeout: 2_500 });
+      await parkPointer();
+      // The pick shows as "твоят избор" at once and stays until the next question comes up.
+      const picked = page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ });
+      await expect(picked, `answer to question ${index} not taken`).toBeVisible({ timeout: 2_000 });
+    }
     answered.add(index);
   }
   return { answered: answered.size, total };
+}
+
+/**
+ * A number question's answer, locked in: on a slider one step up; else its range's low end, its first digit tapped on
+ * the keypad and the rest typed (the clock is short at the tests' speed), Enter to lock it.
+ */
+async function giveNumber(page: Page) {
+  const more = page.getByRole('button', { name: 'Повече', exact: true });
+  if (await more.isVisible()) {
+    await more.click();
+    await page.getByRole('button', { name: 'Заключи', exact: true }).click({ timeout: 2_000 });
+    return;
+  }
+  // "от 1000 до 2026", "от 0,1 млн. до 50 млн.": the low end's digits (and comma), without its unit.
+  const range = (await page.getByText(/^от .+ до .+$/).textContent())!;
+  const low = range.slice(3, range.indexOf(' до ')).replace(/[^\d,]/g, '');
+  await page.getByRole('button', { name: low[0], exact: true }).click();
+  await page.keyboard.type(low.slice(1));
+  await page.keyboard.press('Enter');
 }
 
 /**

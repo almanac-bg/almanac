@@ -7,12 +7,15 @@ import type {
   Invite,
   LobbyStats,
   MeUser,
+  NumberInput,
+  PickPayload,
   PowerupId,
   QuestionPayload,
   QueueStatus,
   RematchState,
   RevealPayload,
   RoomState,
+  RoundInfo,
   Standing,
 } from '@quiz/shared';
 import { create } from 'zustand';
@@ -25,7 +28,8 @@ export interface Toast {
   icon?: string;
 }
 
-export type GamePhase = 'countdown' | 'question' | 'reveal' | 'ended';
+/** `pick`: before a round, while its category is picked and shown. */
+export type GamePhase = 'countdown' | 'question' | 'reveal' | 'pick' | 'ended';
 
 /** One finished question of the match, for the review afterwards. */
 export interface ReviewItem {
@@ -35,9 +39,14 @@ export interface ReviewItem {
   options: string[];
   category: CategoryId;
   difficulty: Difficulty;
+  /** The right option; −1 on a number question. */
   correct: number;
-  /** Your pick; null if you didn't answer (or were already out). */
+  /** Your pick; null if you didn't answer (or were already out), or on a number question. */
   choice: number | null;
+  /** On a number question: its answer (with what it takes to write it), your number (null: none), how close (0–1). */
+  number:
+    | (Pick<NumberInput, 'unit' | 'step' | 'scale'> & { answer: number; guess: number | null; closeness: number })
+    | null;
   right: boolean;
   /** "Знаеше ли?" behind the answer, when the question has one. */
   fact: string | null;
@@ -50,13 +59,16 @@ export interface LiveGame {
   phase: GamePhase;
   countdownEndsAt: number;
   question: QuestionPayload | null;
-  /** Local timestamp when the current question closes for you (includes "Още време"). */
+  /** Local timestamp when the current question closes. */
   deadline: number;
-  /** Extra time "Още време" added to the current question. */
-  extraMs: number;
   answered: string[];
-  /** Your pick (-1 = locked in before a reconnect, choice unknown). It's in once `answered` includes you. */
+  /**
+   * Your pick (-1 = locked in with no option to show: before a reconnect, or a number). It's in once `answered`
+   * includes you.
+   */
   myChoice: number | null;
+  /** Your number, on a number question. */
+  myGuess: number | null;
   removed: number[];
   doubled: boolean;
   usedPowerups: PowerupId[];
@@ -69,6 +81,13 @@ export interface LiveGame {
   reveal: RevealPayload | null;
   /** Just reconnected: until the server re-sends the question on screen, it may already be closed. */
   resyncing: boolean;
+  /** In a match in rounds: each round's category, as far as it's decided. */
+  rounds: RoundInfo[];
+  /**
+   * The round being picked (`endsAt`: local time its pick closes; `sent`: your pick, on its way; `chosen`: the
+   * category, once decided).
+   */
+  pick: (PickPayload & { endsAt: number; sent: string | null; chosen: string | null }) | null;
   eliminated: string[];
   reactions: { key: number; playerId: string; emote: string }[];
   feed: { key: number; text: string; icon: string }[];

@@ -28,21 +28,22 @@ export const SCORING = {
   doubleStake: 500,
 } as const;
 
-/** The reading window: as long as it takes to read the question, at most this much of the clock. */
-export const READING = { baseMs: 400, perCharMs: 30, minMs: 1_000, maxMs: 3_500 } as const;
+/** The reading window: as long as it takes to read the question and its options, at most this much of the clock. */
+export const READING = { baseMs: 400, perCharMs: 30, minMs: 1_000, maxMs: 4_500 } as const;
 
 /**
- * How long a question takes to read (by its length): the speed bonus only starts to drain after it, so a fast reader
- * gains nothing over a slow one, and nobody gains by tapping before they've read it.
+ * How long a question takes to read, by the length of the question and its options (an answer can't be picked before
+ * the options are read): the speed bonus only starts to drain after it, so a fast reader gains nothing over a slow
+ * one, and nobody gains by tapping before they've read it.
  */
-export function readingMs(question: string): number {
-  return Math.min(READING.maxMs, Math.max(READING.minMs, READING.baseMs + question.length * READING.perCharMs));
+export function readingMs(question: string, options: readonly string[] = []): number {
+  const chars = question.length + options.reduce((sum, o) => sum + o.length, 0);
+  return Math.min(READING.maxMs, Math.max(READING.minMs, READING.baseMs + chars * READING.perCharMs));
 }
 
 /**
- * What a correct answer scores: the base, the speed bonus for the time left on the regular clock after the reading
- * window ("Още време" buys time, not speed points) and the streak bonus, doubled by "Двойно или нищо", halved for a
- * "Втори шанс" pick. `streak` counts this answer.
+ * What a correct answer scores: the base, the speed bonus for the time left on the clock after the reading window and
+ * the streak bonus, doubled by "Двойно или нищо", halved for a "Втори шанс" pick. `streak` counts this answer.
  */
 export function answerPoints(a: {
   timeMs: number;

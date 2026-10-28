@@ -189,9 +189,12 @@ export class RoomManager {
     if (action === 'add' && room.members.length + room.bots.length < room.settings.maxPlayers) {
       const humans = room.members.map((id) => buildHuman(id, 'custom'));
       const taken = [...humans.map((h) => h.player.name), ...room.bots.map((b) => b.player.name)];
-      // Room games are unrated; bots play at about the level of the room's players in duels.
-      const rating = room.members.reduce((sum, id) => sum + getRating(id, 'duel'), 0) / room.members.length;
-      const [bot] = makeBots(1, { ...averageOf(humans), rating }, taken);
+      // Room games are unrated; bots play at about the room's players' level (until it's measured, their duel rating).
+      const [bot] = makeBots(
+        1,
+        averageOf(humans, (h) => getRating(h.player.userId!, 'duel')),
+        taken,
+      );
       room.bots.push(bot);
       if (room.settings.teams) room.teams.set(bot.player.id, this.smallerTeam(room));
     } else if (action === 'remove') {

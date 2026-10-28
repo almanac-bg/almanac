@@ -15,6 +15,7 @@ interface Q {
   q: string;
   options: string[];
   answer: number;
+  number?: { answer: number; unit: string; min: number; max: number; step: number; scale: string; tolerance: number };
   fact?: string;
   factSource?: string;
 }
@@ -26,9 +27,17 @@ const BANKS = [
     file: '../src/data/questions.sample.json',
     perCategory: 12,
     perDifficulty: 2,
+    numbersPerCategory: 2,
     balanced: false,
   },
-  { name: 'private bank', file: '../../../private/questions.json', perCategory: 30, perDifficulty: 6, balanced: true },
+  {
+    name: 'private bank',
+    file: '../../../private/questions.json',
+    perCategory: 30,
+    perDifficulty: 6,
+    numbersPerCategory: 8,
+    balanced: true,
+  },
 ]
   .map((b) => ({ ...b, file: path.join(import.meta.dirname, b.file) }))
   .filter((b) => fs.existsSync(b.file));
@@ -67,10 +76,38 @@ const normalize = (s: string) =>
 /** The mix every match draws (pickQuestions): a bank with the same split wears its difficulties out evenly. */
 const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 } as const;
 
-for (const { name, file, perCategory, perDifficulty, balanced } of BANKS) {
-  // The rules here are for four-option questions; the other formats are checked by the server's schemas when it loads
-  // the bank (and get rules of their own once the game plays them).
-  const bank: Q[] = (JSON.parse(fs.readFileSync(file, 'utf8')) as Q[]).filter((q) => (q.kind ?? 'choice') === 'choice');
+/** Words every other question has: two questions sharing them aren't on the same subject (as in the bank tool). */
+const COMMON = new Set([
+  'колко',
+  'която',
+  'което',
+  'които',
+  'какво',
+  'какъв',
+  'каква',
+  'какви',
+  'годин',
+  'чийто',
+  'чиято',
+  'бълга',
+]);
+
+/** Rough word stems (the first five letters of each word of five or more), as the bank tool compares questions. */
+const stems = (s: string) =>
+  new Set(
+    normalize(s)
+      .split(' ')
+      .filter((w) => w.length >= 5 && !/^\d+$/.test(w))
+      .map((w) => w.slice(0, 5))
+      .filter((w) => !COMMON.has(w)),
+  );
+
+for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balanced } of BANKS) {
+  const everything = JSON.parse(fs.readFileSync(file, 'utf8')) as Q[];
+  // The rules below are for four-option questions; number questions (a match's final) have their own further down.
+  // The other formats are checked by the server's schemas when it loads the bank.
+  const bank: Q[] = everything.filter((q) => (q.kind ?? 'choice') === 'choice');
+  const numbers = everything.filter((q) => q.kind === 'number');
 
   test(`${name}: every question is well-formed`, () => {
     for (const q of bank) {
@@ -176,5 +213,59 @@ for (const { name, file, perCategory, perDifficulty, balanced } of BANKS) {
     for (const q of bank) counts[q.answer]++;
     for (const c of counts)
       assert.ok(c / bank.length > 0.15 && c / bank.length < 0.35, `answer distribution ${counts}`);
+  });
+
+  test(`${name}: number questions are well-formed, and none is the text of another question`, () => {
+    const texts = new Set(everything.filter((q) => q.kind !== 'number').map((q) => normalize(q.q)));
+    const ids = new Set(everything.filter((q) => q.kind !== 'number').map((q) => q.id));
+    for (const q of numbers) {
+      const n = q.number!;
+      const where = `${q.id}: ${q.q}`;
+      assert.ok(q.id.startsWith(`${PREFIX[q.category]}-`) && !ids.has(q.id), `${where} — id`);
+      ids.add(q.id);
+      assert.ok(q.q.trim().length >= 10 && q.q.length <= 150 && q.q.endsWith('?'), `${where} — question`);
+      assert.ok(!texts.has(normalize(q.q)), `${where} — the same text as another question`);
+      texts.add(normalize(q.q));
+      assert.ok(n.unit.length <= 12, `${where} — unit`);
+      // Whole steps from zero: the keypad and the "exact" bonus work in steps.
+      assert.ok(Math.abs(n.answer / n.step - Math.round(n.answer / n.step)) < 1e-6, `${where} — answer not in steps`);
+      // The range is no clue: the answer isn't the middle of a narrow one.
+      if (n.scale === 'linear')
+        assert.ok(n.max - n.min >= 3 * n.tolerance, `${where} — the range is narrow for its tolerance`);
+      // A tolerance that lets a wild guess score, or no near miss: neither is a final.
+      if (n.scale === 'linear') assert.ok(n.tolerance >= 2 * n.step, `${where} — tolerance under two steps`);
+      else assert.ok(n.tolerance <= 10, `${where} — a log tolerance over ×10`);
+      // Its number isn't in its own text.
+      assert.ok(!normalize(q.q).split(' ').includes(String(n.answer)), `${where} — the answer is in the question`);
+      if (q.fact) {
+        assert.ok(q.fact.trim().length >= 20 && q.fact.length <= 200, `${where} — fact length (20–200)`);
+        assert.ok(q.factSource && new URL(q.factSource).protocol === 'https:', `${where} — fact needs an https source`);
+      }
+    }
+  });
+
+  // A final is one question a match, drawn from any category: every category has as many (and enough of them).
+  test(`${name}: every category has its number questions`, () => {
+    const counts = CATEGORY_IDS.map((c) => numbers.filter((q) => q.category === c).length);
+    for (const [i, c] of CATEGORY_IDS.entries())
+      assert.ok(counts[i] >= numbersPerCategory, `${c} has ${counts[i]} number questions`);
+    if (balanced) assert.equal(Math.min(...counts), Math.max(...counts), `uneven: ${counts.join(' ')}`);
+  });
+
+  // A final comes last, so nothing it says gives an earlier question away; but an earlier question (or its fact,
+  // shown after it) that names the final's number on the same subject would give the final away.
+  test(`${name}: no question or fact gives a final's number away`, () => {
+    for (const q of numbers) {
+      const answer = String(q.number!.answer).replace('.', ',');
+      if (answer.length < 3) continue; // "24", "7": too common to judge by the digits
+      const words = stems(q.q);
+      for (const other of everything) {
+        if (other === q) continue;
+        const text = ` ${normalize(`${other.q} ${other.fact ?? ''}`)} `;
+        if (!text.includes(` ${normalize(answer)} `)) continue;
+        const shared = [...stems(`${other.q} ${other.fact ?? ''}`)].filter((w) => words.has(w));
+        assert.ok(shared.length < 2, `${other.id} gives away ${q.id} (${q.q} → ${answer}; shares ${shared})`);
+      }
+    }
   });
 }

@@ -5,13 +5,16 @@ import path from 'node:path';
 import { test } from 'node:test';
 import {
   answerPoints,
+  closeness,
   dayEndsAt,
   dayKey,
   eliminationSchedule,
   levelFromXp,
   levelProgress,
   meetsRequirement,
+  NUMBER,
   newlyUnlocked,
+  numberPoints,
   READING,
   rankFor,
   readingMs,
@@ -20,6 +23,7 @@ import {
   seasonTitle,
   shiftDay,
   shiftSeason,
+  snapNumber,
   sofiaMidnight,
   xpToReach,
 } from '@quiz/shared';
@@ -36,23 +40,49 @@ const { nameProblem } = await import('../src/moderation');
 const { nameShape } = await import('../src/names');
 
 test('elimination schedule leaves a two-player final', () => {
-  assert.deepEqual(eliminationSchedule(8, 15), [3, 5, 7, 9, 11, 13]);
-  assert.deepEqual(eliminationSchedule(4, 10), [3, 8]);
+  assert.deepEqual(
+    eliminationSchedule(4, 10),
+    [4, 8],
+    'the first after question 4: one unlucky opener sends nobody home',
+  );
+  assert.deepEqual(eliminationSchedule(8, 15), [4, 6, 8, 9, 11, 13], 'Роял: the final two play the last two');
+  assert.deepEqual(eliminationSchedule(8, 10), [3, 4, 5, 6, 7, 8], 'from 3 when a short match has no room otherwise');
   assert.deepEqual(eliminationSchedule(2, 10), []);
   assert.deepEqual(eliminationSchedule(8, 5), [3], 'caps eliminations when there are too few questions');
 });
 
-test('scoring: the speed bonus drains only after the reading window, which grows with the question', () => {
+test('scoring: the speed bonus drains only after the reading window, which grows with the question and its options', () => {
   assert.equal(readingMs(''), READING.minMs);
   assert.equal(readingMs('x'.repeat(500)), READING.maxMs);
+  assert.equal(READING.maxMs, 4_500);
   assert.ok(readingMs('x'.repeat(90)) > readingMs('x'.repeat(40)));
+  assert.equal(readingMs('x'.repeat(40), ['ab', 'cd', 'ef', 'gh']), readingMs('x'.repeat(48)), 'the options count');
   const at = (timeMs: number) =>
     answerPoints({ timeMs, limitMs: 15_000, readMs: 2_000, streak: 1, doubled: false, retried: false });
   assert.equal(at(300), 1000, 'tapped before reading: nothing gained…');
   assert.equal(at(2_000), 1000, '…over reading it first');
   assert.equal(at(8_500), 750, 'halfway through the rest of the clock: half the speed bonus');
   assert.equal(at(15_000), 500);
-  assert.equal(at(20_000), 500, '"Още време" buys time, not speed points');
+});
+
+test('a number scores by how close it is: nothing a tolerance off (on a log scale, a tolerance-fold), 250 more if exact', () => {
+  const year = { answer: 1878, scale: 'linear', tolerance: 30, step: 1, min: 1000, max: 2025 } as const;
+  assert.equal(numberPoints(1878, year), 1250);
+  assert.equal(numberPoints(snapNumber(1878.4, year), year), 1250, 'a guess is taken in whole steps');
+  assert.equal(numberPoints(1893, year), 500, 'half the tolerance off: half the points');
+  assert.equal(numberPoints(1908, year), 0);
+  assert.equal(numberPoints(1700, year), 0, 'never below nothing');
+  assert.ok(
+    closeness(1872, year) >= NUMBER.rightFrom && closeness(1871, year) < NUMBER.rightFrom,
+    'close enough is right',
+  );
+  const size = { answer: 5000, scale: 'log', tolerance: 3, step: 1 } as const;
+  assert.equal(closeness(15_000, size), 0, 'three times too big');
+  assert.equal(closeness(5000 / 3, size), 0, 'or too small');
+  assert.equal(numberPoints(10_000, size), numberPoints(2500, size), 'twice as big is as far off as half');
+  assert.equal(snapNumber(1877.6, year), 1878);
+  assert.equal(snapNumber(3000, year), 2025, 'kept in its range');
+  assert.equal(snapNumber(0.30000000000000004, { min: 0, max: 1, step: 0.1 }), 0.3);
 });
 
 test('level curve', () => {

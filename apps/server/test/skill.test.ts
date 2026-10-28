@@ -16,9 +16,8 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { one, run } = await import('../src/db');
 const { expectedRight, playerSkill, questionRating, recordSkill, seedSkillOnce, SKILL } = await import('../src/skill');
 const { pruneRuns, recordRun, RUN_KEEP_DAYS } = await import('../src/runs');
-const { bankProblem, pickQuestions, questionBank, questionById, reloadQuestionBank, waitingFormats } = await import(
-  '../src/questions'
-);
+const { bankProblem, numberBank, pickQuestions, questionBank, questionById, reloadQuestionBank, waitingFormats } =
+  await import('../src/questions');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -34,6 +33,8 @@ const entry = (q: Q, correct: boolean, powerup: PowerupId | null = null) => ({
   category: q.category,
   difficulty: q.difficulty,
   choice: correct ? q.answer : (q.answer + 1) % 4,
+  guess: null,
+  closeness: null,
   correct,
   timeMs: 3000,
   points: correct ? 900 : 0,
@@ -63,14 +64,44 @@ test('a hard question answered lifts the player and lowers the question; an easy
   assert.ok(playerSkill(4).rating - SKILL.start < (playerSkill(1).rating - SKILL.start) / 2);
 });
 
-test('an answer helped by 50/50 or a second try moves nothing; one with more time or a bet does', () => {
+test('an answer helped by 50/50 or a second try moves nothing; one with a bet does', () => {
   const q = byDifficulty('medium')[3];
   const before = playerSkill(2).rating;
   recordSkill(2, [entry(q, true, 'fifty'), entry(q, true, 'retry')]);
   assert.equal(playerSkill(2).rating, before);
   assert.equal(questionRating(q.id, 'medium').answers, 0);
-  recordSkill(2, [entry(q, true, 'double'), entry(byDifficulty('medium')[4], true, 'time')]);
+  recordSkill(2, [entry(q, true, 'double')]);
   assert.notEqual(playerSkill(2).rating, before);
+});
+
+test('a number counts by how close it was: near the answer, about as much as a right pick; half way, about nothing', () => {
+  const [n] = numberBank();
+  const number = (closeness: number) => ({
+    questionId: n.id,
+    index: 9,
+    category: n.category,
+    difficulty: n.difficulty,
+    choice: null,
+    guess: n.number.answer,
+    closeness,
+    correct: closeness >= 0.8,
+    timeMs: 9000,
+    points: Math.round(1000 * closeness),
+    powerup: null,
+  });
+  run(
+    `INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (5, 'e', 'e', 'x', 0), (6, 'f', 'f', 'x', 0)`,
+  );
+  recordSkill(5, [number(1)]);
+  run('DELETE FROM question_skill');
+  recordSkill(6, [number(0.5)]);
+  const expected = 1 / (1 + 10 ** ((SKILL.questionStart[n.difficulty] - SKILL.start) / 400));
+  assert.ok(playerSkill(5).rating > SKILL.start, 'spot on: up');
+  assert.equal(
+    Math.sign(playerSkill(6).rating - SKILL.start),
+    Math.sign(0.5 - expected),
+    'half way: as much as the question expected of them, more or less',
+  );
 });
 
 test('on the first start, skill is filled from the answers logged before it, once', () => {
@@ -177,11 +208,16 @@ test('the bank holds number, order and picture questions; matches play only what
   fs.writeFileSync(file, JSON.stringify(bank));
   try {
     reloadQuestionBank();
-    assert.deepEqual(waitingFormats(), { number: 1, order: 1, image: 1 });
+    assert.deepEqual(waitingFormats(), { order: 1, image: 1 });
+    assert.ok(
+      numberBank().some((q) => q.id === 'history-n1'),
+      'numbers are played (finals)',
+    );
     const ids = new Set(questionBank().map((q) => q.id));
-    assert.ok(!ids.has('history-n1') && !ids.has('history-o1') && !ids.has('geography-i1'), 'none drawn yet');
+    assert.ok(!ids.has('history-o1') && !ids.has('geography-i1'), 'orders and pictures not yet');
     assert.ok(!pickQuestions(30, 'geography', new Map()).some((q) => q.id === 'geography-i1'));
-    assert.equal(questionById('geography-i1')?.image?.license, 'PD', 'but known by id');
+    const pictured = questionById('geography-i1');
+    assert.equal(pictured?.kind !== 'number' && pictured?.image?.license, 'PD', 'but known by id');
 
     // A broken one says which, and why.
     bank.push({ ...bank.at(-3), id: 'history-n2', number: { ...bank.at(-3).number, answer: 3000 } });

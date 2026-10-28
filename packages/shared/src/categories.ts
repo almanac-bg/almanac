@@ -22,6 +22,10 @@ export function categoryById(id: string) {
   return id === 'mixed' ? MIXED_CATEGORY : CATEGORIES.find((c) => c.id === id);
 }
 
+export function isCategoryId(value: unknown): value is CategoryId {
+  return CATEGORY_IDS.includes(value as CategoryId);
+}
+
 export function isCategoryChoice(value: unknown): value is CategoryChoice {
   return value === 'mixed' || CATEGORY_IDS.includes(value as CategoryId);
 }

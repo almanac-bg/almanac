@@ -3,6 +3,7 @@ import {
   type AckResult,
   type ClientToServerEvents,
   isCategoryChoice,
+  isCategoryId,
   isQueueMode,
   type LobbyStats,
   MODES,
@@ -193,6 +194,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const sync = current.syncFor(playerId);
       socket.emit('game:start', sync.start);
       if (sync.question) socket.emit('game:question', sync.question);
+      if (sync.pick) socket.emit('game:pick', sync.pick);
     } else {
       // The match ended while they were away: show how it went (it's already saved).
       const missed = games.takeMissed(userId);
@@ -380,6 +382,18 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const game = games.forUser(userId);
       const { index, choice } = obj(p);
       if (game) game.answer(game.playerIdFor(userId), int(index), int(choice));
+    });
+
+    on('game:guess', (p) => {
+      const game = games.forUser(userId);
+      const { index, value } = obj(p);
+      if (game && typeof value === 'number') game.guess(game.playerIdFor(userId), int(index), value);
+    });
+
+    on('game:pick', (p) => {
+      const game = games.forUser(userId);
+      const { round, category } = obj(p);
+      if (game && isCategoryId(category)) game.pick(game.playerIdFor(userId), int(round), category);
     });
 
     on('game:powerup', (p) => {

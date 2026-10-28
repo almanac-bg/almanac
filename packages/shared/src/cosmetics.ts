@@ -38,7 +38,7 @@ export interface EmoteDef {
   req: Requirement;
 }
 
-export type PowerupId = 'fifty' | 'double' | 'retry' | 'time';
+export type PowerupId = 'fifty' | 'double' | 'retry';
 
 export interface PowerupDef {
   id: PowerupId;
@@ -276,8 +276,8 @@ export const EMOTES: EmoteDef[] = [
 ];
 
 /**
- * Everyone has all four from the first match, wherever козове are played (not the daily, not challenge links: runs
- * everyone compares). Bar order, left to right, and the keys Q to R.
+ * Everyone has all three from the first match, wherever козове are played (not the daily, not challenge links: runs
+ * everyone compares; not a number question). Bar order, left to right, and the keys Q to E.
  */
 export const POWERUPS: PowerupDef[] = [
   { id: 'fifty', name: '50/50', short: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.' },
@@ -288,7 +288,6 @@ export const POWERUPS: PowerupDef[] = [
     icon: '🔁',
     description: 'Ако сгрешиш, имаш още един опит (за половин точки).',
   },
-  { id: 'time', name: 'Още време', short: 'Време', icon: '⏳', description: '+5 секунди само за теб.' },
   {
     id: 'double',
     name: 'Двойно или нищо',
@@ -300,9 +299,6 @@ export const POWERUPS: PowerupDef[] = [
 ];
 
 export const powerupById = (id: string) => POWERUPS.find((p) => p.id === id);
-
-/** Extra milliseconds from "Още време". */
-export const TIME_BONUS_MS = 5000;
 
 export type UnlockKind = 'avatar' | 'frame' | 'title' | 'emote';
 

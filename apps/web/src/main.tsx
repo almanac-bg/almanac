@@ -24,6 +24,7 @@ const SOUNDS: Partial<Record<Effect, () => void>> = {
   knockedOut: sfx.eliminated,
   achievement: sfx.achievement,
   invite: sfx.achievement,
+  round: sfx.go,
 };
 
 /** Felt, not heard: a tap for your pick, a double pulse for right, a thud for wrong, a long one for being knocked out. */

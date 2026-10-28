@@ -1,6 +1,7 @@
 import type { CategoryChoice, CategoryId } from './categories';
 import type { PowerupId, UnlockRef } from './cosmetics';
 import type { ModeId, QueueModeId, RoomSettings, TeamId } from './modes';
+import type { NumberInput } from './numbers';
 import type { RankTierId } from './progression';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
@@ -89,6 +90,8 @@ export interface GamePlayer extends Loadout {
   isGuest: boolean;
   rating: number | null;
   team: TeamId | null;
+  /** A bot's favourite categories: it knows them better, and picks one when it can. */
+  strong?: CategoryId[];
 }
 
 export interface Standing {
@@ -111,7 +114,12 @@ export interface QuestionPayload {
   category: CategoryId;
   difficulty: Difficulty;
   q: string;
+  /** Four options to pick from; none on a number question (`number` says what to type in). */
+  kind: 'choice' | 'number';
   options: string[];
+  number: NumberInput | null;
+  /** The match's last question, its final (a number, when the bank has one). */
+  final: boolean;
   /** Username of the player who wrote it, for community questions. */
   author: string | null;
   durationMs: number;
@@ -122,17 +130,15 @@ export interface QuestionPayload {
   elimination: boolean;
   /** Ids of players who already locked in (for reconnects). */
   answered: string[];
-  /**
-   * Only when a (re)connecting client is brought up to speed: where you stand on this question. `remainingMs` then
-   * already counts your "Още време".
-   */
+  /** Only when a (re)connecting client is brought up to speed: where you stand on this question. */
   mine?: {
     choice: number | null;
+    /** The number you gave, on a number question. */
+    guess: number | null;
     removed: number[];
     doubled: boolean;
     retryArmed: boolean;
     retryPrompt: boolean;
-    extraMs: number;
     powerupThisQuestion: boolean;
   };
 }
@@ -149,11 +155,18 @@ export interface PlayerResult {
   doubled: boolean;
   /** Got it right on the "Втори шанс" retry. */
   retried: boolean;
+  /**
+   * On a number question: the number given (null: none in time) and how close it was, 0–1 (`correct` once it's at
+   * least NUMBER.rightFrom).
+   */
+  number?: { guess: number | null; closeness: number };
 }
 
 export interface RevealPayload {
   index: number;
+  /** The right option; −1 on a number question (`answerNumber` has the number). */
   correct: number;
+  answerNumber?: number;
   results: Record<string, PlayerResult>;
   standings: Standing[];
   eliminated: string[];
@@ -179,7 +192,37 @@ export interface GameStartPayload {
   usedPowerups: PowerupId[];
   emotes: string[];
   standings: Standing[];
+  /** A match played in rounds (ROUNDS): each one's category as far as it's known. Empty otherwise. */
+  rounds: RoundInfo[];
   /** Countdown before the first question (0 when re-syncing mid-game). */
+  startsInMs: number;
+}
+
+export interface RoundInfo {
+  /** Its first question (0-based) and how many it has. */
+  from: number;
+  size: number;
+  /** Null until it's picked. */
+  category: CategoryId | null;
+  /** Who picked it; null for a draw (the first round, or a pick nobody made in time). */
+  pickedBy: string | null;
+}
+
+/** Before a round: who picks its category, from which. */
+export interface PickPayload {
+  /** The round (an index into `rounds`). */
+  round: number;
+  pickerId: string;
+  options: CategoryId[];
+  durationMs: number;
+  remainingMs: number;
+}
+
+/** A round's category is decided; its first question follows in `startsInMs`. */
+export interface RoundPayload {
+  round: number;
+  category: CategoryId;
+  pickedBy: string | null;
   startsInMs: number;
 }
 
@@ -188,8 +231,6 @@ export interface PowerupEvent {
   powerup: PowerupId;
   /** 50/50: options removed (sent only to the user). */
   removed?: number[];
-  /** Още време: extra milliseconds for the user. */
-  extraMs?: number;
 }
 
 export interface XpLine {
@@ -320,6 +361,9 @@ export interface ServerToClientEvents {
   /** An answer you sent wasn't taken (the client showed it as locked in). */
   'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
+  /** A round's category is being picked (also re-sent to a client that reconnects meanwhile). */
+  'game:pick': (p: PickPayload) => void;
+  'game:round': (p: RoundPayload) => void;
   'game:powerup': (p: PowerupEvent) => void;
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
@@ -363,6 +407,10 @@ export interface ClientToServerEvents {
   'invite:decline': (p: { inviteId: string }) => void;
   'friends:challenge': (p: { userId: number }, ack: Ack<{ code: string }>) => void;
   'game:answer': (p: { index: number; choice: number }) => void;
+  /** The number given on a number question. */
+  'game:guess': (p: { index: number; value: number }) => void;
+  /** The next round's category, from the ones offered (only whoever was asked to pick). */
+  'game:pick': (p: { round: number; category: CategoryId }) => void;
   'game:powerup': (p: { index: number; powerup: PowerupId }) => void;
   'game:react': (emote: string) => void;
   'game:leave': () => void;
@@ -563,8 +611,10 @@ export interface QuestionInfo {
   category: CategoryId;
   difficulty: Difficulty;
   q: string;
+  /** None on a number question (and `answer` is −1: `number` has its answer). */
   options: string[];
   answer: number;
+  number: { answer: number; unit: string } | null;
   /** Username of a community question's author. */
   author: string | null;
   /** Hidden from new matches by a moderator. */

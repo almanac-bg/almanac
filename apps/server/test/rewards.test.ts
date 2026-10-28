@@ -27,7 +27,7 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
-const { botK, finalizeMatch, ROOM_PLACEMENT_XP_PER_DAY } = await import('../src/game/rewards');
+const { botK, finalizeMatch, PROVISIONAL, ROOM_PLACEMENT_XP_PER_DAY } = await import('../src/game/rewards');
 const { playCheck, SUSPICIOUS } = await import('../src/answers');
 const { recordRating } = await import('../src/seasons');
 const { buildHuman } = await import('../src/game/registry');
@@ -75,6 +75,13 @@ const player = (userId: number): GamePlayer => ({
   team: null,
 });
 
+/** The open question, which in these matches always has options. */
+function choiceAt(game: InstanceType<typeof Game>) {
+  const q = game.questions[game.index];
+  assert.ok(q.kind !== 'number');
+  return q;
+}
+
 /**
  * A ranked duel: `winner` answers right, the other wrong, and the other walks out after `leaveAfter` questions
  * (0: during the countdown; null: never). `cutAfter`: the server stops the match after that many questions.
@@ -94,6 +101,7 @@ function duel(winner: number, other: number, leaveAfter: number | null, cutAfter
       dailyDay: null,
       challengeId: null,
       questions: pickQuestions(10, 'mixed', new Map()),
+      rounds: [],
       humans: [winner, other].map((id) => ({ player: player(id), powerups: [], emotes: [] })),
       bots: [],
     },
@@ -110,6 +118,7 @@ function duel(winner: number, other: number, leaveAfter: number | null, cutAfter
       release: () => {},
       progress: () => {},
       draining: () => false,
+      shown: () => {},
       onClosed: () => {},
     },
   );
@@ -125,7 +134,7 @@ function duel(winner: number, other: number, leaveAfter: number | null, cutAfter
       game.stop();
       break;
     }
-    const q = game.questions[game.index];
+    const q = choiceAt(game);
     game.answer(`u${winner}`, game.index, q.answer);
     game.answer(`u${other}`, game.index, (q.answer + 1) % 4);
     advance(NEXT_QUESTION);
@@ -159,6 +168,7 @@ function room(host: number, other: number, { questions = 10, idle = false } = {}
       dailyDay: null,
       challengeId: null,
       questions: pickQuestions(questions, 'mixed', new Map()),
+      rounds: [],
       humans: [host, other].map((id) => ({ player: player(id), powerups: [], emotes: [] })),
       bots: [],
     },
@@ -175,13 +185,14 @@ function room(host: number, other: number, { questions = 10, idle = false } = {}
       release: () => {},
       progress: () => {},
       draining: () => false,
+      shown: () => {},
       onClosed: () => {},
     },
   );
   game.start();
   advance(COUNTDOWN);
   while (game.phase !== 'ended') {
-    const q = game.questions[game.index];
+    const q = choiceAt(game);
     game.answer(`u${host}`, game.index, q.answer);
     if (!idle) game.answer(`u${other}`, game.index, (q.answer + 1) % 4);
     advance(idle ? TIME + 4_000 + 500 : NEXT_QUESTION);
@@ -221,8 +232,9 @@ test('a walkout later in the match is a win, paid for the part that was played',
   assert.equal(end.noContest, false);
   const win = end.rewards!.breakdown.find((l) => l.label === 'Победа');
   assert.equal(win?.amount, Math.round((50 + 15) * 0.4), '4 of 10 questions');
-  // A full win between two at 1000 is +20 (K 40); four questions of ten pay 40% of it.
-  assert.equal(end.rewards!.rating!.after - end.rewards!.rating!.before, 8, 'rating for the part played, too');
+  // A full win between two at 1000 is +20 (K 40), doubled in a first rated game (PROVISIONAL); four questions of ten
+  // pay 40% of it.
+  assert.equal(end.rewards!.rating!.after - end.rewards!.rating!.before, 16, 'rating for the part played, too');
   assert.ok(!end.rewards!.achievements.includes('photo_finish'), 'no photo finish against an empty chair');
   assert.equal(getUser(a)!.wins, 1);
 });
@@ -298,10 +310,18 @@ test('a newcomer draws quests a first day can finish; the harder ones come from 
   assert.ok(!seasoned.has('correct15') && !seasoned.has('joker1'), 'and the starter ones are behind them');
 });
 
-test('games against bots move a rating less and less above 1000, and not at all from the bots’ ceiling up', () => {
+test('a rating finds its level sooner: the first ten rated games in a mode move it twice as far', () => {
+  const [a, b] = [account(), account()];
+  for (let i = 0; i < PROVISIONAL.games; i++) recordRating(a, 'duel', 1000, false);
+  const { deltaOf } = duel(a, b, null);
+  assert.equal(Math.round(deltaOf(a)!), 20, 'ten games in: the usual step');
+  assert.equal(Math.round(deltaOf(b)!), -40, 'a first game: twice');
+});
+
+test('games against bots move a rating less and less above 1450, and not at all from the bots’ ceiling up', () => {
   assert.equal(botK(800), 24);
-  assert.equal(botK(1000), 24);
-  assert.equal(botK(1300), 12);
+  assert.equal(botK(1450), 24);
+  assert.equal(botK(1525), 12);
   assert.equal(botK(1600), 0);
   assert.equal(botK(1900), 0, 'no climbing (or sliding) on bots at the top');
 });
@@ -332,9 +352,15 @@ test('a private room with nobody else in it is practice: winning there is no win
       dailyDay: null,
       challengeId: null,
       questions: pickQuestions(5, 'mixed', new Map()),
+      rounds: [],
       humans: [{ player: player(host), powerups: [], emotes: [] }],
       // Pinned luck (0.5): this bot never knows the answer.
-      bots: [{ player: { ...player(0), id: 'b1', userId: null, isBot: true }, brain: { accuracy: 0.2, pace: 0.3 } }],
+      bots: [
+        {
+          player: { ...player(0), id: 'b1', userId: null, isBot: true },
+          brain: { skill: 750, pace: 0.3, strong: [], weak: [] },
+        },
+      ],
     },
     {
       toGame: () => {},
@@ -349,13 +375,14 @@ test('a private room with nobody else in it is practice: winning there is no win
       release: () => {},
       progress: () => {},
       draining: () => false,
+      shown: () => {},
       onClosed: () => {},
     },
   );
   game.start();
   advance(COUNTDOWN);
   while (game.phase !== 'ended') {
-    game.answer(`u${host}`, game.index, game.questions[game.index].answer);
+    game.answer(`u${host}`, game.index, choiceAt(game).answer);
     advance(NEXT_QUESTION + TIME);
   }
   const [end] = ends;

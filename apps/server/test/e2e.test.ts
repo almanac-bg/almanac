@@ -17,6 +17,7 @@ import {
 } from '@quiz/shared';
 import {
   type Account,
+  answer,
   autoPlay,
   type Client,
   cli,
@@ -31,6 +32,7 @@ import {
   next,
   nextWhere,
   register,
+  rightNumber,
   rightOption,
   sleep,
   startServer,
@@ -228,10 +230,13 @@ test('solo', T, async () => {
     log.questions.every((q) => q.category === 'history'),
     'all from the chosen category',
   );
+  // The ramp is the questions with options; the final, a number, is of any difficulty.
+  const final = log.questions.pop()!;
+  assert.deepEqual([final.kind, final.final], ['number', true], 'it ends on a number');
   const ramp = log.questions.map((q) => q.difficulty[0]).join('');
   assert.doesNotMatch(ramp, /h.*e/, `harder towards the end, never an easy one after a hard one (${ramp})`);
   assert.equal(end.standings[0].correct, 10);
-  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry', 'time'], 'every коз from the first match');
+  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry'], 'every коз from the first match');
   const ids = end.rewards!.achievements;
   assert.ok(ids.includes('first_game') && ids.includes('perfect'), `first_game + perfect (${ids})`);
   assert.ok(
@@ -635,11 +640,13 @@ test('daily challenge', T, async () => {
   const kept = srv.db.prepare("SELECT answers FROM runs WHERE user_id = ? AND mode = 'daily'").get(A.user.id) as {
     answers: string;
   };
-  const answers = JSON.parse(kept.answers) as { q: string; i: number; c: number; ok: number }[];
+  const answers = JSON.parse(kept.answers) as { q: string; i: number; c: number | null; g?: number; ok: number }[];
   assert.deepEqual(
     answers.map((a) => a.i),
     [...Array(10).keys()],
   );
+  const final = answers.pop()!;
+  assert.deepEqual([final.c, final.g, final.ok], [null, rightNumber(log.questions[9]), 1], 'the final: a number');
   for (const a of answers)
     assert.equal(a.c, Number(a.q.split('-').pop()) % 4, `${a.q}: the right one, as the bank has it`);
   assert.ok(
@@ -939,37 +946,36 @@ test('козове', T, async () => {
   let retry: { wrong: number } | null = null;
   let removed: number[] | undefined;
   let firstRight = -1;
-  let timeBonus: number | undefined;
+  let finalPowerup = false;
   sa.on('game:start', (s) => (start = s));
   sa.on('game:retry', (r) => (retry = r));
   sa.on('game:powerup', (e: PowerupEvent) => {
-    if (e.powerup === 'time' && e.playerId === `u${A.user.id}`) timeBonus = e.extraMs;
     if (e.powerup === 'fifty' && e.playerId === `u${A.user.id}`) removed = e.removed;
+    if (e.playerId === `u${A.user.id}` && reveals.length === 9) finalPowerup = true;
   });
   sa.on('game:reveal', (r) => reveals.push(r));
   sa.on('game:question', (q: QuestionPayload) => {
     const right = rightOption(q);
-    const answer = (choice: number, ms: number) =>
+    const pick = (choice: number, ms: number) =>
       setTimeout(() => sa.emit('game:answer', { index: q.index, choice }), ms);
     if (q.index === 0) {
       firstRight = right;
       sa.emit('game:powerup', { index: 0, powerup: 'fifty' });
-      answer(right, 40);
-    } else if (q.index === 1) {
-      sa.emit('game:powerup', { index: 1, powerup: 'retry' });
-      answer((right + 1) % 4, 40);
-      answer(right, 120);
+      pick(right, 40);
     } else if (q.index === 2) {
-      sa.emit('game:powerup', { index: 2, powerup: 'time' });
+      // A Дуел's first round is easy, easy, medium: "Двойно или нищо" is for the medium one.
+      sa.emit('game:powerup', { index: 2, powerup: 'retry' });
       sa.emit('game:powerup', { index: 2, powerup: 'double' }); // a second one on the same question → ignored
-      answer(right, 40);
+      pick((right + 1) % 4, 40);
+      pick(right, 120);
+    } else if (q.kind === 'number') {
+      sa.emit('game:powerup', { index: q.index, powerup: 'double' }); // none on a number
+      answer(sa, q, true);
     } else {
-      answer(right, 30);
+      answer(sa, q, true);
     }
   });
-  sb.on('game:question', (q) =>
-    setTimeout(() => sb.emit('game:answer', { index: q.index, choice: rightOption(q) }), 20),
-  );
+  sb.on('game:question', (q) => answer(sb, q, true, 20));
   const aEnd = next(sa, 'game:end', 60_000);
   const bEnd = next(sb, 'game:end', 60_000);
   await emitAck(sa, 'queue:join', 'duel');
@@ -979,14 +985,15 @@ test('козове', T, async () => {
   sb.off('game:question');
 
   const me = `u${A.user.id}`;
-  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry', 'time'], 'all козове');
+  assert.deepEqual([...start!.powerups].sort(), ['double', 'fifty', 'retry'], 'all козове');
   assert.equal(removed?.length, 2, '50/50 takes two answers away');
   assert.ok(!removed!.includes(firstRight), 'never the right one');
   assert.ok(reveals[0].results[me].correct, 'and the right one is still there to pick');
   assert.equal(reveals[2].results[me].doubled, false, 'one коз per question');
   assert.ok(retry, 'Втори шанс reports the first miss');
-  assert.ok(reveals[1].results[me].correct && reveals[1].results[me].retried, 'the second pick counts (half points)');
-  assert.equal(timeBonus, 5000, 'Още време adds 5 s');
+  assert.ok(reveals[2].results[me].correct && reveals[2].results[me].retried, 'the second pick counts (half points)');
+  assert.equal(reveals[9].answerNumber !== undefined, true, 'the Дуел ends on a number');
+  assert.equal(finalPowerup, false, 'and no коз is played on it');
 });
 
 test('community questions', T, async () => {

@@ -1,4 +1,4 @@
-import type { CategoryId, Difficulty, PowerupId } from '@quiz/shared';
+import { type CategoryId, type Difficulty, type PowerupId, START_RATING } from '@quiz/shared';
 import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionById } from './questions';
@@ -18,6 +18,8 @@ export const SKILL = {
   player: { k: 32, settled: 16, after: 200 },
   /** And a question's rating: it has answers from many players, so it settles sooner and moves less. */
   question: { k: 16, settled: 4, after: 100 },
+  /** Answers a player's skill needs before bots are sized by it (three matches or so). */
+  reliableAfter: 30,
 };
 
 /** The chance that a player of skill `skill` gets a question rated `rating` right. */
@@ -40,6 +42,15 @@ export function playerSkill(userId: number, category: CategoryId | 'all' = 'all'
   );
 }
 
+/**
+ * What bots are centred on for this player (bots.ts): their measured skill once there's enough of it, else the rating
+ * they show (a newcomer's first few matches).
+ */
+export function skillCentre(userId: number, rating: number | null): number {
+  const skill = playerSkill(userId);
+  return skill.answers >= SKILL.reliableAfter ? skill.rating : (rating ?? START_RATING);
+}
+
 /** A question's rating; its label's start for one nobody has answered yet. */
 export function questionRating(questionId: string, difficulty: Difficulty) {
   return (
@@ -60,15 +71,18 @@ function savePlayer(userId: number, category: CategoryId | 'all', rating: number
   );
 }
 
-/** One answer: the question's rating and the player's skill (overall and in its category) move. */
+/**
+ * One answer: the question's rating and the player's skill (overall and in its category) move. A number counts by how
+ * close it was (`closeness`, 0–1), not just right or wrong.
+ */
 function rate(
   userId: number,
-  a: { questionId: string; difficulty: Difficulty; category: CategoryId; correct: boolean },
+  a: { questionId: string; difficulty: Difficulty; category: CategoryId; correct: boolean; closeness?: number | null },
 ) {
   const question = questionRating(a.questionId, a.difficulty);
   const overall = playerSkill(userId);
   const own = playerSkill(userId, a.category);
-  const right = a.correct ? 1 : 0;
+  const right = a.closeness ?? (a.correct ? 1 : 0);
   const surprise = right - expectedRight(overall.rating, question.rating);
   run(
     `INSERT INTO question_skill (question_id, rating, answers) VALUES (?, ?, 1)

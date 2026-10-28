@@ -7,22 +7,24 @@ import {
 } from '@quiz/shared';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
-import { type Question, questionById, reloadQuestionBank } from './questions';
+import { type PlayableQuestion, questionById, reloadQuestionBank } from './questions';
 
 type Result = { ok: true } | { ok: false; error: string };
 
 const REASONS = new Set<string>(QUESTION_REPORT_REASONS.map((r) => r.id));
 const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ?', id);
 
-export function questionInfo(q: Question): QuestionInfo {
+export function questionInfo(q: PlayableQuestion): QuestionInfo {
+  const number = q.kind === 'number' ? q.number : null;
   return {
     id: q.id,
     category: q.category,
     difficulty: q.difficulty,
     q: q.q,
-    options: q.options,
-    answer: q.answer,
-    author: q.author ?? null,
+    options: q.kind === 'number' ? [] : q.options,
+    answer: q.kind === 'number' ? -1 : q.answer,
+    number: number && { answer: number.answer, unit: number.unit },
+    author: (q.kind !== 'number' && q.author) || null,
     hidden: isHidden(q.id),
     fact: q.fact ?? null,
     factSource: q.factSource ?? null,
@@ -109,7 +111,7 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
 export function hiddenQuestions(): QuestionInfo[] {
   return all<{ question_id: string }>('SELECT question_id FROM hidden_questions ORDER BY hidden_at DESC')
     .map((r) => questionById(r.question_id))
-    .filter((q): q is Question => !!q)
+    .filter((q): q is PlayableQuestion => !!q)
     .map(questionInfo);
 }
 

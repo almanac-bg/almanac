@@ -3,6 +3,7 @@ import {
   type GamePlayer,
   type GameStartPayload,
   isQueueMode,
+  MODES,
   type ModeId,
   POWERUPS,
   type PowerupId,
@@ -15,8 +16,9 @@ import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';
 import { releaseDailyAttempt, saveDailyProgress } from '../daily';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
-import { markSeen, type PreparedQuestion, pickQuestions, recentFor } from '../questions';
+import { markSeen, type PreparedQuestion, pickMatch, pickRounds, recentFor } from '../questions';
 import { getRating } from '../seasons';
+import { skillCentre } from '../skill';
 import { getUser } from '../users';
 import type { Bot } from './bots';
 import { Game, type GameEmitter, type GameSetup } from './Game';
@@ -54,11 +56,12 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
   };
 }
 
-export function averageOf(humans: HumanEntry[]) {
+/** The humans' average level, and the skill their bots are centred on (skillCentre: `ratingFor` until it's known). */
+export function averageOf(humans: HumanEntry[], ratingFor = (h: HumanEntry) => h.player.rating) {
   const n = Math.max(1, humans.length);
   return {
     level: humans.reduce((s, h) => s + h.player.level, 0) / n,
-    rating: humans.reduce((s, h) => s + (h.player.rating ?? START_RATING), 0) / n,
+    skill: humans.reduce((s, h) => s + skillCentre(h.player.userId!, ratingFor(h)), 0) / n,
   };
 }
 
@@ -82,7 +85,7 @@ export interface NewGame {
   teams?: boolean;
   dailyDay?: string | null;
   challengeId?: string | null;
-  /** Fixed question set (daily challenge, challenge link); otherwise picked fresh. */
+  /** Fixed question set (daily challenge, challenge link); otherwise picked fresh (in ROUNDS where the mode is). */
   questions?: PreparedQuestion[];
   humans: HumanEntry[];
   bots: Bot[];
@@ -198,7 +201,14 @@ export class GameRegistry {
 
   start(opts: NewGame): Game {
     const userIds = opts.humans.map((h) => h.player.userId!);
-    const questions = opts.questions ?? pickQuestions(opts.questionCount, opts.category, recentFor(userIds));
+    const def = MODES[opts.mode];
+    const seen = opts.questions ? new Map<string, number>() : recentFor(userIds);
+    const inRounds =
+      !opts.questions && def.rounds && opts.category === 'mixed' && opts.questionCount === def.questions
+        ? pickRounds(seen)
+        : null;
+    const questions =
+      opts.questions ?? inRounds?.questions ?? pickMatch(opts.questionCount, opts.category, seen, { final: def.final });
     if (questions.length < opts.questionCount) throw new StartError('Няма достатъчно въпроси за тази категория.');
 
     const room = (id: string) => `game:${id}`;
@@ -225,6 +235,7 @@ export class GameRegistry {
         dailyDay: opts.dailyDay ?? null,
         challengeId: opts.challengeId ?? null,
         questions,
+        rounds: inRounds?.rounds ?? [],
         humans: opts.humans,
         bots: opts.bots,
       },
@@ -242,18 +253,21 @@ export class GameRegistry {
         release: releaseAttempts,
         progress: saveProgress,
         draining: () => this.draining,
+        shown: (g, questionIds) => {
+          for (const h of g.humans) markSeen(h.player.userId!, questionIds);
+        },
         undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
         onClosed: (g) => this.close(g),
       },
     );
 
     // Bookkeeping first: once the match is registered nothing may fail before it starts, or its players would be
-    // stuck "in a game" that never runs.
+    // stuck "in a game" that never runs. A round still to be picked isn't seen yet (shown() comes when it is).
     for (const userId of userIds) {
       try {
         markSeen(
           userId,
-          questions.map((q) => q.id),
+          game.settledQuestions().map((q) => q.id),
         );
       } catch (err) {
         console.error(`Could not record the questions user ${userId} saw`, err);

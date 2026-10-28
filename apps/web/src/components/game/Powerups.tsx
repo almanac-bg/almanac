@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
  * A key per коз, where there's a keyboard: left to right as in the bar, under 1–4 for the answers. Matched by the key's
  * place (`KeyboardEvent.code`), so a Bulgarian layout plays the same keys.
  */
-export const POWERUP_KEYS: Record<PowerupId, string> = { fifty: 'Q', retry: 'W', time: 'E', double: 'R' };
+export const POWERUP_KEYS: Record<PowerupId, string> = { fifty: 'Q', retry: 'W', double: 'E' };
 
 /** A key's letter on screen: only for a mouse and a keyboard (a touch screen has no keys to press). */
 export function KeyHint({ children, className }: { children: string; className?: string }) {
@@ -159,7 +159,6 @@ export function ActivePowerups({ game }: { game: LiveGame }) {
   // The bet's downside stays in view until the answer: "or nothing" is easy to miss under an icon.
   if (game.doubled) chips.push('💰 ×2 точки · грешка −500');
   if (game.retryArmed && !game.retryPrompt) chips.push('🔁 „Втори шанс“ е активен');
-  if (game.extraMs > 0) chips.push(`⏳ +${Math.round(game.extraMs / 1000)} с`);
   if (!chips.length) return null;
   return (
     <>

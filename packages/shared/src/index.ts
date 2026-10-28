@@ -4,6 +4,7 @@ export * from './brand';
 export * from './categories';
 export * from './cosmetics';
 export * from './modes';
+export * from './numbers';
 export * from './progression';
 export * from './protocol';
 export * from './routes';
