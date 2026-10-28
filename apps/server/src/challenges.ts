@@ -1,8 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import {
+  type CategoryId,
   type ChallengeEntry,
   type ChallengeInfo,
   type ChallengePreview,
+  type DuelEntry,
+  type DuelRecord,
+  type DuelStanding,
   type MatchRewards,
   MODES,
   type MyChallenge,
@@ -12,13 +16,18 @@ import { config } from './config';
 import { cutShortError } from './daily';
 import { all, one, run } from './db';
 import { notify, unreadAbout } from './notifications';
-import { type PreparedQuestion, pickMatch, recentFor, reorderOptions, withoutAuthors } from './questions';
+import { type PreparedQuestion, pickDuelSet, pickMatch, recentFor, reorderOptions, withoutAuthors } from './questions';
 import { count } from './stats';
 import { NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
 const CHALLENGE_DAYS = 7;
 const DAY = 24 * 60 * 60 * 1000;
+/**
+ * A friend duel: a challenge for one friend, who has a day to play it. Not rated (they play it at different times);
+ * a win pays as a 1-on-1 win does.
+ */
+export const DUEL = { hours: 24, winXp: 65, openPerPair: 3 } as const;
 
 interface ChallengeRow {
   id: string;
@@ -26,6 +35,8 @@ interface ChallengeRow {
   questions: string;
   created_at: number;
   expires_at: number;
+  /** A friend duel's friend. */
+  rival_id: number | null;
 }
 
 type ResultRow = UserRow & { score: number; correct: number; time_ms: number };
@@ -51,6 +62,46 @@ export function createChallenge(creatorId: number): string {
   return id;
 }
 
+/**
+ * A friend duel: questions neither has seen lately, in rounds (on `categories`, when whoever lost the last one picked
+ * them), for the creator to play now and the friend within DUEL.hours. The friend hears once the creator has played.
+ */
+export function createDuel(
+  creatorId: number,
+  rivalId: number,
+  categories: CategoryId[] = [],
+): { ok: true; id: string } | { ok: false; error: string } {
+  const open = one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM challenges c WHERE c.rival_id IS NOT NULL AND c.expires_at > ?
+       AND ((c.creator_id = ? AND c.rival_id = ?) OR (c.creator_id = ? AND c.rival_id = ?))
+       AND (SELECT COUNT(*) FROM challenge_results r WHERE r.challenge_id = c.id AND r.finished_at IS NOT NULL) < 2`,
+    Date.now(),
+    creatorId,
+    rivalId,
+    rivalId,
+    creatorId,
+  )!.n;
+  if (open >= DUEL.openPerPair) return { ok: false, error: 'Имате достатъчно неизиграни дуели — първо ги довършете.' };
+  if (categories.length && !mayPick(creatorId, rivalId)) {
+    return { ok: false, error: 'Категориите избира загубилият последния ви дуел.' };
+  }
+  const questions = pickDuelSet(recentFor([creatorId, rivalId]), categories);
+  if (!questions) return { ok: false, error: 'Няма достатъчно въпроси за тези категории.' };
+  const id = randomBytes(6).toString('base64url');
+  const now = Date.now();
+  run(
+    'INSERT INTO challenges (id, creator_id, rival_id, questions, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+    id,
+    creatorId,
+    rivalId,
+    JSON.stringify(withoutAuthors(questions)),
+    now,
+    now + DUEL.hours * 60 * 60_000,
+  );
+  count('duels');
+  return { ok: true, id };
+}
+
 /** The link's questions in this player's own option order. */
 export function challengeQuestions(id: string, userId: number): PreparedQuestion[] {
   return reorderOptions(JSON.parse(getChallenge(id)!.questions), `challenge:${id}:${userId}`);
@@ -63,7 +114,15 @@ export function challengeQuestions(id: string, userId: number): PreparedQuestion
 export function claimChallengeAttempt(id: string, userId: number): { ok: true } | { ok: false; error: string } {
   const challenge = getChallenge(id);
   if (!challenge) return { ok: false, error: 'Няма такова предизвикателство.' };
-  if (challenge.expires_at < Date.now()) return { ok: false, error: 'Това предизвикателство вече изтече.' };
+  if (challenge.rival_id !== null && userId !== challenge.rival_id && userId !== challenge.creator_id) {
+    return { ok: false, error: 'Този дуел е между двама приятели.' };
+  }
+  if (challenge.expires_at < Date.now()) {
+    return {
+      ok: false,
+      error: challenge.rival_id ? 'Времето за този дуел изтече.' : 'Това предизвикателство вече изтече.',
+    };
+  }
   const mine = one<{ started_at: number; finished_at: number | null; revealed: number }>(
     'SELECT started_at, finished_at, revealed FROM challenge_results WHERE challenge_id = ? AND user_id = ?',
     id,
@@ -196,7 +255,10 @@ const freshResults = (id: string, creatorId: number, since: number) =>
     since,
   )!.n;
 
-/** Saves a finished run (also one cut short by leaving: it was the one attempt) and tells the creator. */
+/**
+ * Saves a finished run (also one cut short by leaving: it was the one attempt) and tells the creator — or, in a friend
+ * duel, the friend: that it's their turn, or how it ended.
+ */
 export function recordChallengeResult(
   id: string,
   userId: number,
@@ -213,6 +275,8 @@ export function recordChallengeResult(
     id,
     userId,
   );
+  const challenge = getChallenge(id);
+  if (challenge?.rival_id) return { id, rank: 0, total: 0, duel: duelPlayed(challenge, userId, score) };
   const player = placeOf(id, userId);
   const rank = player?.rank ?? 0;
   const creator = getChallenge(id)?.creator_id;
@@ -237,7 +301,177 @@ export function recordChallengeResult(
       replace: true,
     });
   }
-  return { id, rank, total: boardSize(id) };
+  return { id, rank, total: boardSize(id), duel: null };
+}
+
+// ─── Friend duels ─────────────────────────────────────────────────────────
+
+interface DuelRun {
+  score: number;
+  correct: number;
+  time_ms: number;
+}
+
+const finishedRun = (id: string, userId: number | null) =>
+  userId === null
+    ? undefined
+    : one<DuelRun>(
+        'SELECT score, correct, time_ms FROM challenge_results WHERE challenge_id = ? AND user_id = ? AND finished_at IS NOT NULL',
+        id,
+        userId,
+      );
+
+/** Who won, from one side: more points; on equal points the faster; else a draw. */
+function outcomeOf(mine: DuelRun, theirs: DuelRun): 'won' | 'lost' | 'draw' {
+  if (mine.score !== theirs.score) return mine.score > theirs.score ? 'won' : 'lost';
+  if (mine.time_ms !== theirs.time_ms) return mine.time_ms < theirs.time_ms ? 'won' : 'lost';
+  return 'draw';
+}
+
+/** Both friends' runs on each of their duels both played, newest first: [mine, theirs] from `userId`'s side. */
+function playedDuels(userId: number, friendId: number) {
+  return all<{ a_score: number; a_time: number; b_score: number; b_time: number }>(
+    `SELECT a.score AS a_score, a.time_ms AS a_time, b.score AS b_score, b.time_ms AS b_time
+     FROM challenges c
+     JOIN challenge_results a ON a.challenge_id = c.id AND a.user_id = ? AND a.finished_at IS NOT NULL
+     JOIN challenge_results b ON b.challenge_id = c.id AND b.user_id = ? AND b.finished_at IS NOT NULL
+     WHERE c.rival_id IS NOT NULL AND ((c.creator_id = ? AND c.rival_id = ?) OR (c.creator_id = ? AND c.rival_id = ?))
+     ORDER BY c.created_at DESC`,
+    userId,
+    friendId,
+    userId,
+    friendId,
+    friendId,
+    userId,
+  ).map(
+    (r) =>
+      [
+        { score: r.a_score, time_ms: r.a_time, correct: 0 },
+        { score: r.b_score, time_ms: r.b_time, correct: 0 },
+      ] as const,
+  );
+}
+
+/** Two friends' duels both played, from `userId`'s side. */
+export function duelRecord(userId: number, friendId: number): DuelRecord {
+  const record = { wins: 0, losses: 0, draws: 0 };
+  for (const [mine, theirs] of playedDuels(userId, friendId)) {
+    const outcome = outcomeOf(mine, theirs);
+    if (outcome === 'won') record.wins++;
+    else if (outcome === 'lost') record.losses++;
+    else record.draws++;
+  }
+  return record;
+}
+
+/** Lost the last duel the two played: picks the next one's categories. */
+function mayPick(userId: number, friendId: number): boolean {
+  const [last] = playedDuels(userId, friendId);
+  return !!last && outcomeOf(last[0], last[1]) === 'lost';
+}
+
+const runView = (r: DuelRun | undefined) => (r ? { score: r.score, correct: r.correct, timeMs: r.time_ms } : null);
+
+/** A friend duel as one of its two sees it; null for anyone else (or when the other's account is gone). */
+function standingFor(c: ChallengeRow, viewerId: number, now = Date.now()): DuelStanding | null {
+  const friendId = viewerId === c.creator_id ? c.rival_id : viewerId === c.rival_id ? c.creator_id : null;
+  const friend = friendId === null ? undefined : one<UserRow>('SELECT * FROM users WHERE id = ?', friendId);
+  if (!friend) return null;
+  const mine = finishedRun(c.id, viewerId);
+  const theirs = finishedRun(c.id, friend.id);
+  return {
+    friend: toPublicUser(friend),
+    mine: runView(mine),
+    theirs: runView(theirs),
+    outcome: mine && theirs ? outcomeOf(mine, theirs) : null,
+    record: duelRecord(viewerId, friend.id),
+    expiresAt: c.expires_at,
+    expired: c.expires_at < now,
+    canPick: mayPick(viewerId, friend.id),
+  };
+}
+
+const NOTE_OUTCOME = { won: 'печелиш', lost: 'губиш', draw: 'равенство' } as const;
+
+/**
+ * One of a duel's two has played it. First: the friend hears it's their turn (with the score to beat). Second: the one
+ * who played first hears how it ended, and gets the win's XP if it's theirs (the second gets it with their results).
+ */
+function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStanding | null {
+  const standing = standingFor(c, userId);
+  const me = one<{ username: string }>('SELECT username FROM users WHERE id = ?', userId);
+  if (!standing || !me) return standing;
+  const link = `/c/${c.id}`;
+  const friendId = standing.friend.id;
+  if (!standing.theirs) {
+    notify(friendId, {
+      icon: '⚔️',
+      text: `${me.username} те предизвика на дуел: ${score} точки за биене. Имаш ${DUEL.hours} часа да го изиграеш.`,
+      link,
+      replace: true,
+    });
+  } else {
+    const theirs = standing.outcome === 'won' ? 'lost' : standing.outcome === 'lost' ? 'won' : 'draw';
+    if (theirs === 'won') run('UPDATE users SET xp = xp + ? WHERE id = ?', DUEL.winXp, friendId);
+    notify(friendId, {
+      icon: theirs === 'won' ? '🏆' : theirs === 'lost' ? '⚔️' : '🤝',
+      text: `${me.username} изигра дуела ви: ${standing.theirs.score} на ${score} — ${NOTE_OUTCOME[theirs]}${
+        theirs === 'won' ? ` (+${DUEL.winXp} XP)` : ''
+      }.`,
+      link,
+      replace: true,
+    });
+  }
+  return standing;
+}
+
+/** Who a friend duel is against, for its start screen: their name, and their score if they've played it. */
+export function duelOpponent(id: string, userId: number): { username: string; score: number | null } | null {
+  const c = getChallenge(id);
+  if (!c?.rival_id) return null;
+  const friendId = userId === c.creator_id ? c.rival_id : c.creator_id;
+  const friend =
+    friendId === null ? undefined : one<{ username: string }>('SELECT username FROM users WHERE id = ?', friendId);
+  return friend ? { username: friend.username, score: finishedRun(id, friendId)?.score ?? null } : null;
+}
+
+/** This player's friend duels: the open ones, and the ones of the last week, newest first. */
+export function myDuels(userId: number, now = Date.now()): DuelEntry[] {
+  const rows = all<ChallengeRow>(
+    `SELECT * FROM challenges WHERE rival_id IS NOT NULL AND (creator_id = ? OR rival_id = ?) AND created_at > ?
+     ORDER BY created_at DESC LIMIT 20`,
+    userId,
+    userId,
+    now - 7 * DAY,
+  );
+  return rows.flatMap((c) => {
+    const standing = standingFor(c, userId, now);
+    if (!standing) return [];
+    const state: DuelEntry['state'] = standing.outcome
+      ? 'done'
+      : standing.expired
+        ? 'expired'
+        : standing.mine
+          ? 'theirs'
+          : 'yours';
+    return [{ ...standing, id: c.id, createdAt: c.created_at, state }];
+  });
+}
+
+/** Duels that ran out unplayed: whoever played theirs hears so (once). Returns how many ran out. */
+export function tellExpiredDuels(now = Date.now()): number {
+  const rows = all<ChallengeRow>(
+    'SELECT * FROM challenges WHERE rival_id IS NOT NULL AND expired_told = 0 AND expires_at < ?',
+    now,
+  );
+  for (const c of rows) {
+    const rival = one<{ username: string }>('SELECT username FROM users WHERE id = ?', c.rival_id);
+    if (c.creator_id && rival && finishedRun(c.id, c.creator_id) && !finishedRun(c.id, c.rival_id)) {
+      notify(c.creator_id, { icon: '⌛', text: `${rival.username} не изигра дуела ви навреме.`, link: `/c/${c.id}` });
+    }
+    run('UPDATE challenges SET expired_told = 1 WHERE id = ?', c.id);
+  }
+  return rows.length;
 }
 
 export function challengeInfo(id: string, viewerId: number): ChallengeInfo | null {
@@ -267,8 +501,12 @@ export function challengeInfo(id: string, viewerId: number): ChallengeInfo | nul
     total: boardSize(id),
     attempted: !!one('SELECT 1 AS x FROM challenge_results WHERE challenge_id = ? AND user_id = ?', id, viewerId),
     expired: challenge.expires_at < Date.now(),
+    duelOnly: challenge.rival_id !== null,
+    duel: challenge.rival_id ? withCreator(standingFor(challenge, viewerId), challenge.creator_id) : null,
   };
 }
+
+const withCreator = (standing: DuelStanding | null, creatorId: number | null) => standing && { ...standing, creatorId };
 
 /** For a visitor who isn't signed in yet: who's challenging them, and the score to beat. */
 export function challengePreview(id: string): ChallengePreview | null {
@@ -297,7 +535,8 @@ export function challengePreview(id: string): ChallengePreview | null {
 /** The links this player made in the last month, newest first. */
 export function myChallenges(userId: number): MyChallenge[] {
   const rows = all<{ id: string; created_at: number; expires_at: number }>(
-    'SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ? AND created_at > ? ORDER BY created_at DESC LIMIT 20',
+    `SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ? AND rival_id IS NULL AND created_at > ?
+     ORDER BY created_at DESC LIMIT 20`,
     userId,
     Date.now() - 30 * DAY,
   );

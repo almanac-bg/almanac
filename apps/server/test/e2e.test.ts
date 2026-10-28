@@ -380,12 +380,18 @@ test('malformed socket messages are refused and never crash the server', T, asyn
   // `String()` / `Number()` on this throw: it once took the whole server down.
   const evil = { toString: 1, valueOf: 1 };
   const fields = { userId: evil, inviteId: evil, index: evil, choice: evil, powerup: evil, category: evil, mode: evil };
-  for (const event of ['queue:join', 'solo:start', 'room:join', 'invite:send', 'friends:challenge'] as const) {
+  for (const event of ['queue:join', 'solo:start', 'room:join', 'invite:send'] as const) {
     for (const payload of [evil, fields, [evil], null]) {
       const ack = await emitAck(sh, event, payload);
       assert.equal(ack.ok, false, `${event} refuses ${JSON.stringify(payload)}`);
     }
   }
+  for (const payload of [
+    { rival: evil },
+    { rival: A.user.id, categories: [evil, evil, evil] },
+    { id: evil, rival: evil },
+  ])
+    assert.equal((await emitAck(sh, 'challenge:start', payload)).ok, false, 'a duel with no friend in it');
   assert.ok((await emitAck(sh, 'room:create', fields)).ok, 'unknown room settings are ignored');
   for (const event of ['room:settings', 'room:bot', 'room:kick', 'room:team', 'invite:decline'] as const)
     sh.emit(event, evil as never);
@@ -479,7 +485,7 @@ test(
     const { id } = created;
     const { start, end } = await play;
     assert.equal(start!.powerups.length, 0, 'no козове');
-    assert.deepEqual(end.rewards!.challenge, { id, rank: 1, total: 1 });
+    assert.deepEqual(end.rewards!.challenge, { id, rank: 1, total: 1, duel: null });
 
     const preview = await api.get(`/api/challenges/${id}/preview`);
     assert.equal(preview.status, 200, 'the landing page works signed out');
@@ -492,7 +498,7 @@ test(
     const playB = autoPlay(sb, 'wrong', logB);
     assert.ok((await emitAck(sb, 'challenge:start', { id })).ok);
     const { end: endB } = await playB;
-    assert.deepEqual(endB.rewards!.challenge, { id, rank: 2, total: 2 });
+    assert.deepEqual(endB.rewards!.challenge, { id, rank: 2, total: 2, duel: null });
     assert.deepEqual(
       logB.questions.map((q) => q.q),
       log.questions.map((q) => q.q),
@@ -856,17 +862,70 @@ test('friends, invites and challenges', T, async () => {
   assert.match((await declined).message, /отказа/);
   sa.emit('room:leave');
 
-  const challenged = next(sb, 'invite');
-  const challenge = await emitAck(sa, 'friends:challenge', { userId: B.user.id });
-  assert.ok(challenge.ok);
-  assert.equal((await challenged).kind, 'challenge');
-  const roomState = next(sb, 'room:state');
-  assert.ok((await emitAck(sb, 'room:join', challenge.code)).ok);
-  assert.equal((await roomState)?.settings.maxPlayers, 2, 'a challenge is a 1v1 room');
-  assert.equal((await api.get('/api/friends', B.cookie)).body.friends[0].presence, 'room');
-  sa.emit('room:leave');
-  sb.emit('room:leave');
   await bothOutOfRooms();
+
+  // A friend duel: A plays now, B within a day. B hears it's their turn (with the score to beat), A how it ended.
+  const aPlays = autoPlay(sa, 'right');
+  const duel = await emitAck(sa, 'challenge:start', { rival: B.user.id });
+  assert.ok(duel.ok);
+  const { start: aStart, end: aEnd } = await aPlays;
+  assert.deepEqual(aStart!.duelWith, { username: B.user.username, score: null }, 'B has not played it yet');
+  assert.equal(aEnd.rewards!.challenge!.duel!.outcome, null);
+  const aScore = aEnd.standings[0].score;
+  await eventually(async () => {
+    const [note] = (await api.get('/api/notifications', B.cookie)).body.notifications;
+    assert.equal(
+      note.text,
+      `${A.user.username} те предизвика на дуел: ${aScore} точки за биене. Имаш 24 часа да го изиграеш.`,
+    );
+    assert.equal(note.link, `/c/${duel.id}`);
+  });
+  assert.equal((await api.get('/api/duels', B.cookie)).body.duels[0].state, 'yours');
+  assert.equal((await api.get('/api/duels', A.cookie)).body.duels[0].state, 'theirs');
+  assert.equal((await api.get(`/api/challenges/${duel.id}`, B.cookie)).body.duel.theirs.score, aScore);
+
+  const xpBefore = (await api.get('/api/me', A.cookie)).body.user.xp;
+  const log = newLog();
+  const bPlays = autoPlay(sb, 'wrong', log);
+  assert.ok((await emitAck(sb, 'challenge:start', { id: duel.id })).ok);
+  const { start: bStart, end: bEnd } = await bPlays;
+  assert.deepEqual(bStart!.duelWith, { username: A.user.username, score: aScore });
+  assert.deepEqual(bStart!.powerups, [], 'no козове: the two play it at different times');
+  const lost = bEnd.rewards!.challenge!.duel!;
+  assert.equal(lost.outcome, 'lost');
+  assert.deepEqual(lost.record, { wins: 0, losses: 1, draws: 0 });
+  assert.equal(lost.canPick, true, 'the loser picks the next one');
+  // In rounds: three of a category, three, three, then the final.
+  const cats = log.questions.map((q) => q.category);
+  for (const from of [0, 3, 6]) assert.equal(new Set(cats.slice(from, from + 3)).size, 1);
+  assert.equal(log.questions[9].kind, 'number');
+  await eventually(async () => {
+    const [note] = (await api.get('/api/notifications', A.cookie)).body.notifications;
+    assert.equal(
+      note.text,
+      `${B.user.username} изигра дуела ви: ${aScore} на ${bEnd.standings[0].score} — печелиш (+65 XP).`,
+    );
+  });
+  assert.equal((await api.get('/api/me', A.cookie)).body.user.xp, xpBefore + 65, 'the win, for whoever played first');
+  const aDuels = (await api.get('/api/duels', A.cookie)).body.duels;
+  assert.deepEqual([aDuels[0].state, aDuels[0].outcome], ['done', 'won']);
+  assert.deepEqual((await api.get(`/api/profile/${encodeURIComponent(B.user.username)}`, A.cookie)).body.duels, {
+    wins: 1,
+    losses: 0,
+    draws: 0,
+  });
+
+  // The rematch: its categories are picked by whoever lost the last one, not by the winner.
+  const picked = ['history', 'music', 'sports'];
+  assert.equal((await emitAck(sa, 'challenge:start', { rival: B.user.id, categories: picked })).ok, false);
+  const rematchLog = newLog();
+  const bRematch = autoPlay(sb, 'right', rematchLog);
+  assert.ok((await emitAck(sb, 'challenge:start', { rival: A.user.id, categories: picked })).ok);
+  await bRematch;
+  assert.deepEqual(
+    [0, 3, 6].map((i) => rematchLog.questions[i].category),
+    picked,
+  );
 });
 
 test('a rematch asked for after the other had gone is waiting for them when they are back', T, async () => {
@@ -994,6 +1053,33 @@ test('козове', T, async () => {
   assert.ok(reveals[2].results[me].correct && reveals[2].results[me].retried, 'the second pick counts (half points)');
   assert.equal(reveals[9].answerNumber !== undefined, true, 'the Дуел ends on a number');
   assert.equal(finalPowerup, false, 'and no коз is played on it');
+});
+
+test("alone in a Дуел, the opponent is a recording of a real player's match when one fits", T, async () => {
+  const C = await register(srv.url, 'recorded_test');
+  // Past a newcomer's first matches (gentle bots), and about as strong as A was.
+  srv.db.prepare('UPDATE users SET mp_games = 10 WHERE id = ?').run(C.user.id);
+  const { rating } = srv.db
+    .prepare("SELECT rating FROM player_skill WHERE user_id = ? AND category = 'all'")
+    .get(A.user.id) as { rating: number };
+  srv.db
+    .prepare("INSERT INTO player_skill (user_id, category, rating, answers) VALUES (?, 'all', ?, 100)")
+    .run(C.user.id, rating);
+  const sc = connect(srv.url, C.cookie);
+  await connected(sc);
+  const play = autoPlay(sc, 'right');
+  assert.ok((await emitAck(sc, 'queue:join', 'duel')).ok);
+  const { start, end } = await play;
+  const recording = start!.players.find((p) => p.record);
+  assert.equal(recording?.name, A.user.username, "A's match, played back");
+  assert.equal(recording?.userId, null);
+  assert.ok(!start!.players.some((p) => p.isBot), 'no bot');
+  assert.ok(end.rewards!.rating, 'rated, as against a bot');
+  assert.ok(
+    srv.db.prepare('SELECT 1 FROM record_plays WHERE owner_id = ? AND player_id = ?').get(A.user.id, C.user.id),
+    'A hears about it tomorrow',
+  );
+  sc.close();
 });
 
 test('community questions', T, async () => {
@@ -1443,7 +1529,7 @@ test('website files are served with the right caching', {
   assert.equal(gone.status, 404, 'a missing build file is a 404, not the page');
 
   // A shared challenge link previews as the challenge, not the generic site.
-  const { id } = srv.db.prepare('SELECT id FROM challenges LIMIT 1').get() as { id: string };
+  const { id } = srv.db.prepare('SELECT id FROM challenges WHERE rival_id IS NULL LIMIT 1').get() as { id: string };
   const shared = await (await fetch(`${srv.url}/c/${id}`)).text();
   assert.match(shared, new RegExp(`<title>${A.user.username} те предизвиква`));
   assert.match(shared, /property="og:description" content="Резултатът за биене: \d+ точки/);

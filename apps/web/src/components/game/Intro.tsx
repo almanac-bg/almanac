@@ -1,4 +1,4 @@
-import { type LiveGame, useNow } from '@quiz/client';
+import { fmt, type LiveGame, useNow } from '@quiz/client';
 import { categoryById, type GamePlayer, MODES, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { Skull } from 'lucide-react';
@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
-import { Avatar, LevelBadge, RankBadge } from '../Avatar';
+import { Avatar, LevelBadge, machineTag, RankBadge } from '../Avatar';
 import { PowerupNotesLine, useNewPowerups } from './Powerups';
 import { PlayerMark } from './Scoreboard';
 import { SCORING_LINE, takeScoringHint } from './scoring';
@@ -43,18 +43,29 @@ export function Intro({ game }: { game: LiveGame }) {
       // The countdown is the only thing on screen: in the middle of it.
       className="flex min-h-[55dvh] flex-col items-center justify-center py-8 text-center"
     >
-      <p className="t-eyebrow text-fg-3">{mode.name}</p>
+      <p className="t-eyebrow text-fg-3">{game.start.duelWith ? 'Дуел с приятел' : mode.name}</p>
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
-            {game.start.mode === 'daily' ? '🗓️' : category?.icon}
+            {game.start.duelWith ? '⚔️' : game.start.mode === 'daily' ? '🗓️' : category?.icon}
           </motion.span>
           <h1 className="mt-4 font-display text-3xl font-bold">
-            {game.start.mode === 'daily' ? 'Въпросите на деня' : category?.name}
+            {game.start.duelWith
+              ? `Дуел с ${game.start.duelWith.username}`
+              : game.start.mode === 'daily'
+                ? 'Въпросите на деня'
+                : category?.name}
           </h1>
+          {game.start.duelWith && (
+            <p className="mt-2 font-semibold text-amber-200">
+              {game.start.duelWith.score !== null
+                ? `${fmt(game.start.duelWith.score)} точки за биене`
+                : `Играеш пръв — ${game.start.duelWith.username} има 24 часа да те бие`}
+            </p>
+          )}
           <p className="mt-2 text-fg-3">
             {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
-            {game.start.mode === 'daily' && ' · без козове'}
+            {(game.start.mode === 'daily' || game.start.mode === 'challenge') && ' · без козове'}
           </p>
         </div>
       ) : game.start.teams ? (
@@ -73,7 +84,7 @@ export function Intro({ game }: { game: LiveGame }) {
             >
               <div className="relative">
                 <Avatar avatar={p.avatar} frame={p.frame} size={64} />
-                <PlayerMark me={p.id === me.id} bot={p.isBot} />
+                <PlayerMark me={p.id === me.id} tag={machineTag(p)} />
               </div>
               <span className={clsx('max-w-20 truncate text-xs font-semibold', p.id === me.id && 'text-violet-300')}>
                 {p.name}
@@ -124,6 +135,11 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
       </div>
       {p.rating !== null && <RankBadge rating={p.rating} />}
       {p.isBot && <span className="text-xs text-fg-3">БОТ</span>}
+      {p.record && (
+        <span className="text-xs text-balance text-fg-3">
+          ЗАПИС · мач от {new Date(p.record.playedAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' })}
+        </span>
+      )}
       {p.isBot && !!p.strong?.length && (
         <span className="text-xs text-balance text-fg-2">
           силен в {p.strong.map((c) => `${categoryById(c)?.icon} ${categoryById(c)?.name}`).join(', ')}

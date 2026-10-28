@@ -17,7 +17,7 @@ import {
   type RoundPayload,
   readingMs,
 } from '@quiz/shared';
-import type { GameEmitter } from '../src/game/Game';
+import type { GameEmitter, RecordScript } from '../src/game/Game';
 import type { PreparedQuestion } from '../src/questions';
 import { writeFixtureQuestions } from './helpers';
 
@@ -76,6 +76,8 @@ function setup(opts: {
   rounds?: true | NonNullable<ReturnType<typeof pickRounds>>;
   /** People's ratings, by user id (1000 otherwise). */
   ratings?: Record<number, number>;
+  /** Recordings of real players' matches to play against. */
+  records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -104,6 +106,7 @@ function setup(opts: {
         emotes: [],
       })),
       bots: opts.bots ?? [],
+      records: opts.records ?? [],
     },
     {
       toGame: (event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
@@ -745,4 +748,70 @@ test('a match in rounds nobody is left in plays its rounds out (drawn) too', () 
   assert.equal(g.game.played, 10);
   assert.ok(g.game.rounds.every((r) => r.category !== null));
   assert.equal(g.shown.length, 2, 'both picked rounds were drawn, and seen');
+});
+
+// ─── Recordings ────────────────────────────────────────────────────────────
+
+test("a recording plays its owner's answers: the same pick, at the same time, with its козове", () => {
+  const questions = [...pickQuestions(9, 'mixed', new Map()), yearQuestion()];
+  const right = (i: number) => {
+    const q = questions[i];
+    assert.ok(q.kind !== 'number');
+    return q.answer;
+  };
+  const wrong = (i: number) => (right(i) + 1) % 4;
+  const script: RecordScript = [
+    { choice: right(0), timeMs: 3_000, powerup: null, retried: false },
+    { choice: wrong(1), timeMs: 5_000, powerup: 'fifty', retried: false },
+    null,
+    ...Array.from({ length: 6 }, (_, k) => ({ choice: right(k + 3), timeMs: 2_000, powerup: null, retried: false })),
+    { value: 1810, timeMs: 9_000, powerup: null, retried: false },
+  ];
+  const record = { ...player('r7', null), name: 'Иван', record: { playedAt: 1 } };
+  const g = setup({ humans: [1], questions, records: [{ player: record, script, runId: 7, ownerId: 99 }] });
+
+  // It answers when its owner did, without waiting for anyone.
+  advance(3_000 + 50);
+  assert.ok(g.game.participants.get('r7')!.answer, 'answered at 3 s');
+  g.right(1);
+  advance(600 + 50);
+  const [first] = g.reveals();
+  assert.deepEqual(
+    [first.results.r7.choice, first.results.r7.timeMs, first.results.r7.correct],
+    [right(0), 3_000, true],
+  );
+
+  // Once the person has answered, the recording answers at once, with its own time, and its коз first: a 50/50 that
+  // leaves the option it went on to pick.
+  advance(4_000);
+  g.right(1);
+  advance(600 + 50);
+  const second = g.reveals()[1].results.r7;
+  assert.deepEqual([second.choice, second.timeMs, second.correct], [wrong(1), 5_000, false]);
+  assert.ok(!g.game.participants.get('r7')!.removed.includes(wrong(1)));
+  assert.ok(
+    g
+      .of<{ playerId: string; powerup: string }>('game:powerup')
+      .some((e) => e.playerId === 'r7' && e.powerup === 'fifty'),
+  );
+
+  // No answer recorded: none given (the clock runs out for it).
+  advance(4_000);
+  g.right(1);
+  advance(600 + 50);
+  assert.equal(g.reveals()[2].results.r7.choice, null);
+
+  // On to the final: its number.
+  for (let i = 3; i < 9; i++) {
+    advance(4_000);
+    g.right(1);
+    advance(600 + 50);
+  }
+  advance(4_000);
+  g.guess(1, 1800);
+  advance(600 + 50);
+  assert.deepEqual(g.reveals()[9].results.r7.number, { guess: 1810, closeness: 0.8 });
+  assert.equal(g.game.participants.get('r7')!.log.length, 0, "nothing of it is logged as a person's answers");
+  advance(4_000 + 100);
+  assert.equal(g.game.phase, 'ended');
 });

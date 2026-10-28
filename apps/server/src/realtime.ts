@@ -10,14 +10,22 @@ import {
   POWERUPS,
   type PowerupId,
   type Presence,
+  ROUNDS,
 } from '@quiz/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
-import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
+import {
+  challengeQuestions,
+  claimChallengeAttempt,
+  createChallenge,
+  createDuel,
+  duelOpponent,
+  releaseChallengeAttempt,
+} from './challenges';
 import { config } from './config';
 import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
-import { friendIds, incomingRequests } from './friends';
+import { areFriends, friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry, startFailure } from './game/registry';
@@ -295,13 +303,25 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     on('challenge:start', (p, ack) => {
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      let id = str(obj(p).id, 16);
+      const { id: given, rival, categories } = obj(p);
+      let id = str(given, 16);
       if (!id) {
         if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
         if (throttled(`challenge-create:${userId}`, 20, 24 * 60 * 60_000)) {
           return reply(ack, { ok: false, error: 'Стига предизвикателства за днес — изпрати тези, които вече имаш.' });
         }
-        id = createChallenge(userId);
+        if (rival !== undefined) {
+          // A friend duel: for a friend, on three categories (a rematch's, distinct) or drawn ones.
+          const rivalId = int(rival);
+          if (!areFriends(userId, rivalId)) return reply(ack, { ok: false, error: 'Дуел се играе с приятел.' });
+          const picked = Array.isArray(categories) ? categories.filter(isCategoryId) : [];
+          if (picked.length && (picked.length !== ROUNDS.count || new Set(picked).size !== picked.length)) {
+            return reply(ack, { ok: false, error: `Избери ${ROUNDS.count} различни категории.` });
+          }
+          const duel = createDuel(userId, rivalId, picked);
+          if (!duel.ok) return reply(ack, duel);
+          id = duel.id;
+        } else id = createChallenge(userId);
       }
       const claim = claimChallengeAttempt(id, userId);
       if (!claim.ok) return reply(ack, claim);
@@ -318,6 +338,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           category: 'mixed',
           elimination: false,
           challengeId: id,
+          duelWith: duelOpponent(id, userId),
           questions: challengeQuestions(id, userId),
           humans: [buildHuman(userId, 'challenge')],
           bots: [],
@@ -368,14 +389,6 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const from = rooms.declineInvite(userId, str(obj(p).inviteId, 64));
       const me = publicUser(userId);
       if (from && me) notifyUser(from, 'notice', { kind: 'info', message: `${me.username} отказа поканата.` });
-    });
-
-    on('friends:challenge', (p, ack) => {
-      if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
-      const busy = busyError();
-      if (busy) return reply(ack, { ok: false, error: busy });
-      moveOn();
-      reply(ack, rooms.challenge(userId, int(obj(p).userId)));
     });
 
     on('game:answer', (p) => {

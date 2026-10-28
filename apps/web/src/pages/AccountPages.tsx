@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import {
   Check,
   CheckCircle2,
+  Disc3,
   Download,
   Eye,
   EyeOff,
@@ -217,6 +218,7 @@ export function SettingsPage() {
         <>
           <EmailSettings />
           <ReminderSettings />
+          <RecordSettings />
         </>
       )}
       <SoundSettings />
@@ -428,6 +430,44 @@ function SoundSettings() {
         setMuted(on);
         if (!on) sfx.pop(); // a taste of what was just switched on
       }}
+    />
+  );
+}
+
+/**
+ * Others playing against recordings of your matches (when nobody's there for their Дуел): on unless switched off here.
+ * They see your name, avatar and level, as on the boards.
+ */
+function RecordSettings() {
+  const me = useStore((s) => s.me)!;
+  const [busy, setBusy] = useState(false);
+  const on = me.shareRuns;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      const { user } = await api.setShareRuns(!on);
+      setState({ me: user });
+      toast(
+        user.shareRuns
+          ? { kind: 'success', icon: '📼', title: 'Записите на мачовете ти пак играят' }
+          : { kind: 'info', title: 'Записите на мачовете ти вече не играят' },
+      );
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SwitchCard
+      icon={<Disc3 className={clsx('size-5', on ? 'text-violet-300' : 'text-fg-3')} />}
+      title="Записите на мачовете ми"
+      hint="Когато няма с кого да се играе Дуел, другите могат да играят срещу запис на твой мач — отговорите ти, както си ги дал. Виждат името, аватара и нивото ти, а на другия ден ти казваме как се е справил записът (с XP за победите му)."
+      on={on}
+      onToggle={toggle}
+      busy={busy}
     />
   );
 }

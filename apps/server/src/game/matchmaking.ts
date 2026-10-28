@@ -3,6 +3,8 @@ import { config } from '../config';
 import { guarded } from '../guard';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
+import { pickRecord } from '../records';
+import { count } from '../stats';
 import { getUser } from '../users';
 import { makeBots } from './bots';
 import type { IO } from './io';
@@ -117,6 +119,30 @@ export class Matchmaker {
     try {
       const humans = entries.map((e) => buildHuman(e.userId, mode));
       const gentle = entries.some((e) => (getUser(e.userId)?.mp_games ?? 0) < NEWCOMER_GAMES);
+      // Alone in a Дуел: a recording of a real player's match, when one fits (a newcomer's first ones stay gentle bots).
+      const record =
+        mode === 'duel' && humans.length === 1 && !gentle
+          ? pickRecord(entries[0].userId, humans[0].player.rating)
+          : null;
+      if (record) {
+        this.games.start({
+          mode,
+          ranked: true,
+          roomCode: null,
+          hostUserId: null,
+          questionCount: def.questions,
+          timeMs: def.timeMs,
+          category: 'mixed',
+          elimination: false,
+          questions: record.questions,
+          rounds: record.rounds,
+          records: [{ player: record.player, script: record.script, runId: record.runId, ownerId: record.ownerId }],
+          humans,
+          bots: [],
+        });
+        count('record_matches');
+        return;
+      }
       const bots = makeBots(
         def.players - humans.length,
         averageOf(humans),

@@ -539,6 +539,12 @@ export const actions = {
   startDaily: (via?: string) => ask(() => withTimeout().emitWithAck('daily:start', { via })),
   /** Plays a challenge link, or (no id) makes a new one and plays it first. */
   startChallenge: (id?: string) => ask<{ id: string }>(() => withTimeout().emitWithAck('challenge:start', { id })),
+  /**
+   * A duel with a friend: you play it now, they within a day. `categories`: a rematch's three rounds, when you lost the
+   * last one.
+   */
+  startDuel: (friendId: number, categories?: CategoryId[]) =>
+    ask<{ id: string }>(() => withTimeout().emitWithAck('challenge:start', { rival: friendId, categories })),
   requestRematch: (gameId: string) => getSocket().emit('rematch:request', { gameId }),
   /** Leaving the results screen: the others shouldn't wait for a rematch that won't come. */
   declineRematch: (gameId: string) => {
@@ -562,8 +568,6 @@ export const actions = {
     getSocket().emit('invite:decline', { inviteId: invite.id });
     dropInvite(invite.id);
   },
-  challenge: (userId: number) =>
-    ask<{ code: string }>(() => withTimeout().emitWithAck('friends:challenge', { userId })),
   answer: (choice: number) => {
     const g = getState().game;
     if (!g?.question || g.phase !== 'question' || g.resyncing || g.myChoice !== null || g.removed.includes(choice))

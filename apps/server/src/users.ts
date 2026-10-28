@@ -44,6 +44,8 @@ export interface UserRow {
   streak_shields: number;
   /** Opted in to an evening email when the daily streak is about to break. */
   streak_reminders: number;
+  /** Others may play against this player's recorded matches (records.ts). */
+  share_runs: number;
   /** Secret in the reminder email's unsubscribe link. */
   reminder_key: string | null;
   reminded_day: string | null;

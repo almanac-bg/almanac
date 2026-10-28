@@ -15,6 +15,10 @@ export type Metric =
   | 'returned_d7'
   | 'challenges'
   | 'challenge_runs'
+  /** Friend duels made (a challenge for one friend). */
+  | 'duels'
+  /** Дуели against a recording of a real player's match, nobody else being there. */
+  | 'record_matches'
   | 'daily_runs'
   | 'reminders'
   /** A player stopped on a "Знаеше ли?" fact to read it. */

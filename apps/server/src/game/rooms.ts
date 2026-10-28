@@ -148,7 +148,7 @@ export class RoomManager {
   }
 
   /** Invites an online friend into the room you're in. */
-  invite(fromId: number, toId: number, kind: 'room' | 'challenge' = 'room'): AckResult {
+  invite(fromId: number, toId: number): AckResult {
     const room = this.byUser.get(fromId);
     if (!room || room.game) return { ok: false, error: 'Първо влез в стая.' };
     if (!areFriends(fromId, toId)) return { ok: false, error: 'Можеш да каниш само приятели.' };
@@ -160,7 +160,7 @@ export class RoomManager {
     const id = randomUUID();
     this.invites.set(id, { from: fromId, to: toId, expiresAt: now + INVITE_TTL_MS });
     room.kicked.delete(toId); // inviting someone back lifts a kick
-    notifyUser(toId, 'invite', { id, from, roomCode: room.code, kind, expiresAt: now + INVITE_TTL_MS });
+    notifyUser(toId, 'invite', { id, from, roomCode: room.code, kind: 'room', expiresAt: now + INVITE_TTL_MS });
     return { ok: true };
   }
 
@@ -170,17 +170,6 @@ export class RoomManager {
     if (!invite || invite.to !== userId || invite.expiresAt < Date.now()) return null;
     this.invites.delete(inviteId);
     return invite.from;
-  }
-
-  /** A 1v1 private room with the friend invited straight away. */
-  challenge(fromId: number, toId: number): AckResult<{ code: string }> {
-    if (!areFriends(fromId, toId)) return { ok: false, error: 'Можеш да предизвикваш само приятели.' };
-    if (presence(toId) === 'offline') return { ok: false, error: 'Приятелят ти не е онлайн.' };
-    const created = this.create(fromId, { maxPlayers: 2 });
-    if (!created.ok) return created;
-    const sent = this.invite(fromId, toId, 'challenge');
-    if (!sent.ok) this.leave(fromId);
-    return sent.ok ? created : sent;
   }
 
   bot(userId: number, action: 'add' | 'remove') {

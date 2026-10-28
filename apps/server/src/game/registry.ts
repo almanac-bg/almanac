@@ -16,12 +16,12 @@ import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';
 import { releaseDailyAttempt, saveDailyProgress } from '../daily';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
-import { markSeen, type PreparedQuestion, pickMatch, pickRounds, recentFor } from '../questions';
+import { markSeen, type PreparedQuestion, pickMatch, pickRounds, type RoundPlan, recentFor } from '../questions';
 import { getRating } from '../seasons';
 import { skillCentre } from '../skill';
 import { getUser } from '../users';
 import type { Bot } from './bots';
-import { Game, type GameEmitter, type GameSetup } from './Game';
+import { Game, type GameEmitter, type GameSetup, type RecordScript } from './Game';
 import type { IO } from './io';
 import { finalizeMatch } from './rewards';
 
@@ -87,6 +87,12 @@ export interface NewGame {
   challengeId?: string | null;
   /** Fixed question set (daily challenge, challenge link); otherwise picked fresh (in ROUNDS where the mode is). */
   questions?: PreparedQuestion[];
+  /** The rounds of a fixed set played in rounds (a recording's Дуел). */
+  rounds?: RoundPlan[];
+  /** Recordings of real players' matches to play against (records.ts), with whose they are. */
+  records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
+  /** A friend duel: who it's against. */
+  duelWith?: GameSetup['duelWith'];
   humans: HumanEntry[];
   bots: Bot[];
 }
@@ -235,9 +241,11 @@ export class GameRegistry {
         dailyDay: opts.dailyDay ?? null,
         challengeId: opts.challengeId ?? null,
         questions,
-        rounds: inRounds?.rounds ?? [],
+        rounds: opts.rounds ?? inRounds?.rounds ?? [],
         humans: opts.humans,
         bots: opts.bots,
+        records: opts.records ?? [],
+        duelWith: opts.duelWith ?? null,
       },
       emitter,
       {

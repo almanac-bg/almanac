@@ -80,6 +80,7 @@ export function getMe(userId: number): MeUser | null {
     quests: questsInfo(userId, today),
     isGuest: row.is_guest === 1,
     streakReminders: row.streak_reminders === 1,
+    shareRuns: row.share_runs === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     unreadNotifications: unreadNotifications(userId),
@@ -135,7 +136,11 @@ export function exportAccount(userId: number) {
     ).map((r) => ({ ...r, answers: JSON.parse(String(r.answers)) })),
     skill: rows('SELECT category, rating, answers FROM player_skill WHERE user_id = ?'),
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
-    challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
+    challengesCreated: rows('SELECT id, rival_id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
+    // Friend duels others started with this player.
+    duelsReceived: rows('SELECT id, creator_id, created_at, expires_at FROM challenges WHERE rival_id = ?'),
+    // Matches others played against recordings of this player's matches (kept until a month after they were told).
+    recordingsPlayed: rows('SELECT run_id, record_won, played_at FROM record_plays WHERE owner_id = ?'),
     challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),
     answers: rows(
       `SELECT match_id, question_id, difficulty, correct, time_ms, answered_at FROM answers WHERE user_id = ?

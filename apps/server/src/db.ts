@@ -524,6 +524,34 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ) WITHOUT ROWID;
     `,
   },
+
+  // v21, opponents any time:
+  // - `users.share_runs`: whether others may play against this player's recorded matches (records.ts; Settings).
+  // - `record_plays`: each match played against a recording, for its owner's note the next day.
+  // - `challenges.rival_id`: a friend duel — a challenge for one friend, who has a day to play it — and
+  //   `expired_told`, set once its creator has heard it ran out unplayed. Older code leaves them all alone.
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN share_runs INTEGER NOT NULL DEFAULT 1;
+
+    CREATE TABLE record_plays (
+      id INTEGER PRIMARY KEY,
+      run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      player_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      record_won INTEGER NOT NULL,
+      played_at INTEGER NOT NULL,
+      told INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX record_plays_owner ON record_plays(owner_id, played_at);
+    CREATE INDEX record_plays_untold ON record_plays(played_at) WHERE told = 0;
+
+    ALTER TABLE challenges ADD COLUMN rival_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+    ALTER TABLE challenges ADD COLUMN expired_told INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX challenges_rival ON challenges(rival_id, created_at) WHERE rival_id IS NOT NULL;
+    CREATE INDEX challenges_duels_open ON challenges(expires_at) WHERE rival_id IS NOT NULL AND expired_told = 0;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

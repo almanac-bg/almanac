@@ -3,8 +3,9 @@ import { type FinalStanding, type GameEndPayload, type MatchRewards, TEAMS, type
 import clsx from 'clsx';
 import { ChartColumn, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
-import { Avatar, LevelBadge, PlayerTag } from '../Avatar';
+import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
 import { teamColor } from '../game/teams';
 import { challengeShareText } from '../home/challengeLink';
 import { Button, Card } from '../ui';
@@ -76,10 +77,10 @@ export function ChallengeStanding({
 }
 
 /** The chip PlayerTag shows for bots, for the podium (which doesn't use PlayerTag). */
-function BotTag() {
+function MachineTag({ label }: { label: string }) {
   return (
     <span className="shrink-0 rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-3">
-      БОТ
+      {label}
     </span>
   );
 }
@@ -122,13 +123,23 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                   me && 'text-violet-300',
                 )}
               >
-                <span className="truncate">{p.name}</span>
+                {p.record ? (
+                  // A recording is someone's match: their profile is a tap away.
+                  <Link
+                    to={`/profile/${encodeURIComponent(p.name)}`}
+                    className="focus-ring truncate rounded underline decoration-white/30 underline-offset-2"
+                  >
+                    {p.name}
+                  </Link>
+                ) : (
+                  <span className="truncate">{p.name}</span>
+                )}
                 <LevelBadge level={p.level} />
               </div>
               {/* The bot chip goes on the score line: next to the name it would cut the name to a few letters. */}
               <div className="flex items-center gap-1.5 text-xs text-fg-3 tabular-nums">
                 {s.left ? 'напусна' : `${fmt(s.score)} т.`}
-                {p.isBot && <BotTag />}
+                {machineTag(p) && <MachineTag label={machineTag(p)!} />}
               </div>
               <FriendButton player={p} youId={game.start.youId} compact={top.length > 2} className="mt-1.5" />
               <div
@@ -163,7 +174,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                 </span>
                 <Avatar avatar={p.avatar} frame={p.frame} size={34} dim={s.left} />
                 <div className="min-w-0 flex-1 text-sm">
-                  <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
+                  <PlayerTag name={p.name} title={p.title} level={p.level} tag={machineTag(p)} />
                 </div>
                 <FriendButton player={p} youId={game.start.youId} compact />
                 <span className="text-sm text-fg-2 tabular-nums">
@@ -233,7 +244,7 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
                     >
                       <Avatar avatar={p.avatar} frame={p.frame} size={36} dim={s.left} />
                       <div className="min-w-0 flex-1 text-sm">
-                        <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
+                        <PlayerTag name={p.name} title={p.title} level={p.level} tag={machineTag(p)} />
                       </div>
                       <FriendButton player={p} youId={game.start.youId} compact />
                       <span className="text-sm font-semibold text-fg-2 tabular-nums">

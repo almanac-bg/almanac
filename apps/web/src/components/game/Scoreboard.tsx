@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
-import { Avatar, PlayerTag } from '../Avatar';
+import { Avatar, machineTag, PlayerTag } from '../Avatar';
 import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
 
@@ -94,7 +94,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
       </Avatar>
       <div className={clsx('min-w-0 flex-1 text-sm', out && 'opacity-50')}>
         {me && <span className="sr-only">Ти: </span>}
-        <PlayerTag name={p.name} title={p.title} level={p.level} isBot={p.isBot} />
+        <PlayerTag name={p.name} title={p.title} level={p.level} tag={machineTag(p)} />
       </div>
       <div className="text-right">
         {/* One line's height whatever it holds (a score, "напусна", the skull): a knockout doesn't move the board. */}
@@ -174,7 +174,7 @@ function DuelBar({ game }: { game: LiveGame }) {
             <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />
           )}
         </Avatar>
-        <PlayerMark me={me} bot={p.isBot} />
+        <PlayerMark me={me} tag={machineTag(p)} />
         <Reactions reactions={game.reactions.filter((r) => r.playerId === s.id)} />
       </div>
       <div className="min-w-0">
@@ -189,7 +189,7 @@ function DuelBar({ game }: { game: LiveGame }) {
     <div className="border-b border-line lg:hidden flat:hidden">
       <p className="sr-only">
         Ти: {mine.score} точки, {them.name}
-        {them.isBot && ' (бот)'}: {theirs.score} точки
+        {machineTag(them) && ` (${machineTag(them)!.toLowerCase()})`}: {theirs.score} точки
       </p>
       <div
         aria-hidden
@@ -277,7 +277,7 @@ function Strip({ game }: { game: LiveGame }) {
             >
               <span className="sr-only">
                 {me ? 'Ти' : p.name}
-                {p.isBot && ' (бот)'}: {status}
+                {machineTag(p) && ` (${machineTag(p)!.toLowerCase()})`}: {status}
                 {danger === s.id && ', отпада при следващото отпадане'}
               </span>
               <div
@@ -296,7 +296,7 @@ function Strip({ game }: { game: LiveGame }) {
                     <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />
                   )}
                 </Avatar>
-                <PlayerMark me={me} bot={p.isBot} />
+                <PlayerMark me={me} tag={machineTag(p)} />
               </div>
               <span
                 className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')}
@@ -315,8 +315,9 @@ function Strip({ game }: { game: LiveGame }) {
 }
 
 /** "ТИ" / "БОТ" on an avatar's top edge: who's who without relying on color. */
-export function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
-  if (!me && !bot) return null;
+/** Over an avatar: ТИ for you, else what a player is when not a person here (БОТ, ЗАПИС). */
+export function PlayerMark({ me, tag }: { me: boolean; tag: string | null }) {
+  if (!me && !tag) return null;
   return (
     <span
       aria-hidden
@@ -325,7 +326,7 @@ export function PlayerMark({ me, bot }: { me: boolean; bot: boolean }) {
         me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
       )}
     >
-      {me ? 'ТИ' : 'БОТ'}
+      {me ? 'ТИ' : tag}
     </span>
   );
 }

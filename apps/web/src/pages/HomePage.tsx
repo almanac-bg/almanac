@@ -1,10 +1,11 @@
 import { actions, fmt, toast, useStore } from '@quiz/client';
 import { levelProgress, MODES, type QueueModeId, START_RATING, SUBMISSION_RULES } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, DoorOpen } from 'lucide-react';
+import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useDuels, usePlayDuel } from '../components/duels';
 import { ChallengeCard } from '../components/home/ChallengeCard';
 import { CommunityCard } from '../components/home/CommunityCard';
 import { DailyCard } from '../components/home/DailyCard';
@@ -14,6 +15,7 @@ import { ModeCard, RankInfo, SoloPicker } from '../components/home/ModeCard';
 import { useOpenQueues } from '../components/home/openQueues';
 import { ProfileCard } from '../components/home/ProfileCard';
 import { QuestsCard } from '../components/home/QuestsCard';
+import { Button } from '../components/ui';
 import { usePageTitle } from '../lib/title';
 
 /** Below this the "N играят в момента" count reads as an empty room rather than a busy one, so it stays hidden. */
@@ -66,6 +68,7 @@ export function HomePage() {
         </motion.div>
       )}
 
+      <DuelTurn />
       <EmailNudge />
 
       {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
@@ -138,5 +141,32 @@ function queueSpan(i: number, n: number) {
     n % 2 === 1 && last && 'sm:col-span-2',
     (n <= 2 || (n === 3 && last)) && 'lg:col-span-2',
     n === 5 && last && 'lg:col-span-3',
+  );
+}
+
+/** A friend duel waiting for you: at the top, a tap from playing it (the first of them, if there are more). */
+function DuelTurn() {
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const { data } = useDuels(!guest);
+  const { playing, play } = usePlayDuel();
+  const yours = (data?.duels ?? []).filter((d) => d.state === 'yours');
+  if (!yours.length) return null;
+  const [first] = yours;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/[0.08] px-4 py-3"
+    >
+      <Swords aria-hidden className="size-5 shrink-0 text-amber-300" />
+      <p className="min-w-0 flex-1 text-sm">
+        <b>{first.friend.username}</b> те предизвика на дуел
+        {first.theirs && <span className="text-fg-2"> · {fmt(first.theirs.score)} т. за биене</span>}
+        {yours.length > 1 && <span className="text-fg-3"> (и още {yours.length - 1})</span>}
+      </p>
+      <Button size="sm" onClick={() => play(first.id)} loading={playing === first.id}>
+        Играй
+      </Button>
+    </motion.div>
   );
 }

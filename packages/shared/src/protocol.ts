@@ -45,6 +45,8 @@ export interface MeUser extends PublicUser {
   isGuest: boolean;
   /** Opted in to the evening "your streak is about to break" email. */
   streakReminders: boolean;
+  /** Others may play against your recorded matches (a recording plays when nobody's there for a Дуел). */
+  shareRuns: boolean;
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
@@ -92,6 +94,11 @@ export interface GamePlayer extends Loadout {
   team: TeamId | null;
   /** A bot's favourite categories: it knows them better, and picks one when it can. */
   strong?: CategoryId[];
+  /**
+   * A real player's match, played back: `name` is theirs, its answers come as they gave them (records.ts). Not a person
+   * in this match (userId is null), and no bot either.
+   */
+  record?: { playedAt: number };
 }
 
 export interface Standing {
@@ -194,6 +201,8 @@ export interface GameStartPayload {
   standings: Standing[];
   /** A match played in rounds (ROUNDS): each one's category as far as it's known. Empty otherwise. */
   rounds: RoundInfo[];
+  /** A friend duel: who it's against, and their score when they've played it already (the score to beat). */
+  duelWith: { username: string; score: number | null } | null;
   /** Countdown before the first question (0 when re-syncing mid-game). */
   startsInMs: number;
 }
@@ -264,8 +273,8 @@ export interface MatchRewards {
     /** Played from someone's daily link: their result, to compare with. */
     sharer: DailySharer | null;
   } | null;
-  /** A challenge-link run: where it placed among everyone who played that link. */
-  challenge: { id: string; rank: number; total: number } | null;
+  /** A challenge-link run: where it placed among everyone who played that link; a friend duel's, how it stands. */
+  challenge: { id: string; rank: number; total: number; duel: DuelStanding | null } | null;
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
   soloBest: number | null;
 }
@@ -343,7 +352,7 @@ export interface Invite {
   id: string;
   from: PublicUser;
   roomCode: string;
-  kind: 'room' | 'challenge';
+  kind: 'room';
   expiresAt: number;
 }
 
@@ -392,7 +401,11 @@ export interface ClientToServerEvents {
   /** `via`: the code of the daily link it was opened from (/daily/<code>). */
   'daily:start': (p: { via?: string }, ack: Ack) => void;
   /** Plays a challenge link (`id`), or creates a new one and plays it first (no `id`). */
-  'challenge:start': (p: { id?: string }, ack: Ack<{ id: string }>) => void;
+  /**
+   * Plays a challenge link (`id`), or creates one and plays it first (no `id`): open to anyone, or (`rival`) a duel for
+   * one friend, who has a day to play it. `categories`: a rematch's three rounds, picked by whoever lost the last duel.
+   */
+  'challenge:start': (p: { id?: string; rival?: number; categories?: CategoryId[] }, ack: Ack<{ id: string }>) => void;
   'rematch:request': (p: { gameId: string }) => void;
   'rematch:decline': (p: { gameId: string }) => void;
   'room:create': (settings: Partial<RoomSettings>, ack: Ack<{ code: string }>) => void;
@@ -405,7 +418,6 @@ export interface ClientToServerEvents {
   'room:start': (ack: Ack) => void;
   'invite:send': (p: { userId: number }, ack: Ack) => void;
   'invite:decline': (p: { inviteId: string }) => void;
-  'friends:challenge': (p: { userId: number }, ack: Ack<{ code: string }>) => void;
   'game:answer': (p: { index: number; choice: number }) => void;
   /** The number given on a number question. */
   'game:guess': (p: { index: number; value: number }) => void;
@@ -426,6 +438,8 @@ export type Friendship = 'self' | 'none' | 'friends' | 'outgoing' | 'incoming';
 export interface ProfileStats {
   user: PublicUser & { createdAt: number };
   friendship: Friendship;
+  /** Your friend duels with them (null when you've had none, or it's your own profile). */
+  duels: DuelRecord | null;
   overview: {
     gamesPlayed: number;
     multiplayerGames: number;
@@ -681,6 +695,42 @@ export interface ChallengeInfo {
   /** You started it (one attempt each). */
   attempted: boolean;
   expired: boolean;
+  /** A friend duel: only its two may play it. */
+  duelOnly: boolean;
+  /** …and how it stands for the viewer, if they're one of them. */
+  duel: (DuelStanding & { creatorId: number | null }) | null;
+}
+
+/** Two friends' duels so far: from one side. */
+export interface DuelRecord {
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
+/** A friend duel as one of its two players sees it. */
+export interface DuelStanding {
+  friend: PublicUser;
+  /** Each side's run, once played. */
+  mine: { score: number; correct: number; timeMs: number } | null;
+  theirs: { score: number; correct: number; timeMs: number } | null;
+  /** Null until both have played (or it ran out). */
+  outcome: 'won' | 'lost' | 'draw' | null;
+  /** The two of them over all their duels. */
+  record: DuelRecord;
+  /** By when the second has to play it. */
+  expiresAt: number;
+  expired: boolean;
+  /** Lost it: may pick the next one's categories (a rematch). */
+  canPick: boolean;
+}
+
+/** A friend duel in a list (home, friends): whose turn it is, or how it ended. */
+export interface DuelEntry extends DuelStanding {
+  id: string;
+  createdAt: number;
+  /** yours: waiting for you; theirs: for them; done: both played; expired: ran out unplayed. */
+  state: 'yours' | 'theirs' | 'done' | 'expired';
 }
 
 /** What a signed-out visitor sees on a challenge link. */

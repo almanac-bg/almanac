@@ -5,6 +5,7 @@ import { Lock, Plus, Users } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ClaimAccountModal } from '../ClaimAccount';
+import { DuelRow, useDuels, usePlayDuel } from '../duels';
 import { Button, Card } from '../ui';
 
 export function FriendsCard({ className }: { className?: string }) {
@@ -13,6 +14,13 @@ export function FriendsCard({ className }: { className?: string }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [claiming, setClaiming] = useState(false);
+  // Friend duels still open: yours to play first, then the ones waiting for the friend.
+  const duels = useDuels(!guest);
+  const { playing, play } = usePlayDuel();
+  const open = (duels.data?.duels ?? [])
+    .filter((d) => d.state === 'yours' || d.state === 'theirs')
+    .sort((a, b) => Number(b.state === 'yours') - Number(a.state === 'yours'))
+    .slice(0, 3);
 
   async function create() {
     setBusy('create');
@@ -46,6 +54,16 @@ export function FriendsCard({ className }: { className?: string }) {
             ? 'До 8 играчи. Имаш код от приятел? Въведи го и влизаш в стаята.'
             : 'До 8 играчи, твои правила. Сподели кода и започвай.'}
         </p>
+        {open.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-bold text-fg-3 uppercase">Дуели</p>
+            <div className="divide-y divide-line">
+              {open.map((d) => (
+                <DuelRow key={d.id} duel={d} onPlay={() => play(d.id)} playing={playing === d.id} />
+              ))}
+            </div>
+          </div>
+        )}
         {/* Beside a taller card (wide screens) the extra height goes here, so the actions sit at the bottom. */}
         <div className="flex-1" />
         {!guest && (

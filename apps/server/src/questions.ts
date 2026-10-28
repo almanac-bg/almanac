@@ -475,6 +475,39 @@ export function pickRounds(
 }
 
 /**
+ * A friend duel's questions: ROUNDS of three, each on one category — `categories` if given (a rematch picked by whoever
+ * lost the last one), else drawn — and a final from a category of its own. Nobody picks while it's played: the two
+ * play it at different times.
+ */
+export function pickDuelSet(
+  seen: ReadonlyMap<string, number>,
+  categories: readonly CategoryId[] = [],
+  rng: Rng = Math.random,
+): PreparedQuestion[] | null {
+  const used = new Set<string>();
+  const drawn = shuffle(
+    CATEGORY_IDS.filter((c) => !categories.includes(c)),
+    rng,
+  );
+  const played: CategoryId[] = [];
+  const questions: PreparedQuestion[] = [];
+  for (let r = 0; r < ROUNDS.count; r++) {
+    let round: Question[] | null = null;
+    while (!round) {
+      const category = categories[r] ?? drawn.shift();
+      if (!category) return null;
+      round = drawFrom(category, ROUNDS.difficulty[r], seen, used, rng);
+      if (round) played.push(category);
+      else if (categories[r]) return null;
+    }
+    questions.push(...round);
+  }
+  let closing: PreparedQuestion | null = pickFinal('mixed', seen, rng, { not: played });
+  while (!closing && drawn.length) closing = drawFrom(drawn.shift()!, ['hard'], seen, used, rng)?.[0] ?? null;
+  return closing ? [...questions, closing] : null;
+}
+
+/**
  * The same questions with the options in an order of their own for this seed (e.g. a day and a player): a set everyone
  * plays stays the same, but "the answers were Б, А, Г…" gives nothing away. The seed is mixed with this server's own
  * secret: the code is public, and without it one player's order would convert into anyone else's.

@@ -1,13 +1,13 @@
 import { actions, dropInvite, toast, useNow, useStore } from '@quiz/client';
 import type { Invite } from '@quiz/shared';
-import { Swords, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 
-/** Incoming room invites and duel challenges from friends. */
+/** Incoming room invites from friends (a friend duel waits as a note instead: it's played when it suits). */
 export function Invites() {
   const invites = useStore((s) => s.invites);
   const inGame = useStore((s) => !!s.game && s.game.phase !== 'ended');
@@ -33,7 +33,6 @@ function InviteCard({ invite }: { invite: Invite }) {
   const now = useNow(1000);
   const [busy, setBusy] = useState(false);
   const left = Math.max(0, Math.ceil((invite.expiresAt - now) / 1000));
-  const challenge = invite.kind === 'challenge';
 
   async function accept() {
     setBusy(true);
@@ -61,11 +60,11 @@ function InviteCard({ invite }: { invite: Invite }) {
         <Avatar avatar={invite.from.avatar} frame={invite.from.frame} size={48} />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 t-eyebrow text-fuchsia-300">
-            {challenge ? <Swords aria-hidden className="size-3.5" /> : <Users aria-hidden className="size-3.5" />}
-            {challenge ? 'Предизвикателство' : 'Покана'}
+            <Users aria-hidden className="size-3.5" />
+            Покана
           </p>
           <p className="truncate text-sm">
-            <b>{invite.from.username}</b> {challenge ? 'те предизвиква на дуел!' : 'те кани в стая.'}
+            <b>{invite.from.username}</b> те кани в стая.
           </p>
         </div>
       </div>
@@ -74,7 +73,7 @@ function InviteCard({ invite }: { invite: Invite }) {
           Откажи
         </Button>
         <Button size="sm" onClick={accept} loading={busy}>
-          {challenge ? 'Приеми' : 'Влез'}
+          Влез
           <span aria-hidden>· {left} с</span>
         </Button>
       </div>

@@ -1,12 +1,13 @@
 import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
 import { type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, DoorOpen, Save, Swords, UserMinus, UserPlus, X } from 'lucide-react';
+import { Check, DoorOpen, Save, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
+import { DuelButton, DuelRow, useDuels, usePlayDuel } from '../components/duels';
 import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
@@ -57,6 +58,27 @@ function GuestFriends() {
   );
 }
 
+/** Your friend duels: the ones waiting for you first, then the ones waiting for them, then the week's results. */
+function DuelsSection() {
+  const { data } = useDuels();
+  const { playing, play } = usePlayDuel();
+  const duels = data?.duels ?? [];
+  if (!duels.length) return null;
+  const order = { yours: 0, theirs: 1, done: 2, expired: 3 } as const;
+  return (
+    <section>
+      <SectionTitle>Дуели</SectionTitle>
+      <Card className="divide-y divide-line px-4 py-1 sm:px-5">
+        {[...duels]
+          .sort((a, b) => order[a.state] - order[b.state] || b.createdAt - a.createdAt)
+          .map((d) => (
+            <DuelRow key={d.id} duel={d} onPlay={() => play(d.id)} playing={playing === d.id} />
+          ))}
+      </Card>
+    </section>
+  );
+}
+
 function Friends() {
   // The server bumps the version whenever the list changes (a request, a friend online…): reload, keeping the list on screen.
   const version = useStore((s) => s.friendsVersion);
@@ -97,6 +119,8 @@ function Friends() {
         </div>
         <AddFriendForm onAdded={setData} />
       </div>
+
+      <DuelsSection />
 
       {data.incoming.length > 0 && (
         <section>
@@ -259,26 +283,14 @@ function PersonLink({ entry, hint, className }: { entry: FriendEntry; hint?: str
 }
 
 function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => void }) {
-  const navigate = useNavigate();
   const room = useStore((s) => s.room);
   const inGame = useStore((s) => !!s.game && s.game.phase !== 'ended');
-  const [busy, setBusy] = useState<'challenge' | 'invite' | null>(null);
+  const [busy, setBusy] = useState<'invite' | null>(null);
   const { user, presence } = entry;
   const p = PRESENCE[presence];
-  const reachable = presence === 'online' || presence === 'room' || presence === 'queue';
   const alreadyInRoom = !!room?.players.some((pl) => pl.userId === user.id);
   const canInvite =
     !!room && !room.inGame && !inGame && presence !== 'offline' && presence !== 'game' && !alreadyInRoom;
-
-  async function challenge() {
-    setBusy('challenge');
-    const res = await actions.challenge(user.id);
-    setBusy(null);
-    if (res.ok) {
-      toast({ kind: 'success', title: `Предизвикателството е изпратено на ${user.username}` });
-      navigate('/room');
-    } else toast({ kind: 'error', title: res.error });
-  }
 
   async function invite() {
     setBusy('invite');
@@ -327,15 +339,8 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
             <DoorOpen className="size-4" /> Покани в стаята
           </Button>
         )}
-        <Button
-          size="sm"
-          onClick={challenge}
-          loading={busy === 'challenge'}
-          disabled={!reachable || inGame}
-          title={reachable ? 'Създава стая 1 на 1 и праща покана' : 'Можеш да предизвикаш само приятел, който е онлайн'}
-        >
-          <Swords className="size-4" /> Предизвикай
-        </Button>
+        {/* Online or not: you play now, they within a day. */}
+        <DuelButton size="sm" friend={user} title={`Играеш сега, ${user.username} — до 24 часа`} />
         <button
           type="button"
           onClick={onRemove}

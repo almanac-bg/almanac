@@ -1,4 +1,4 @@
-import { avatarEmoji, frameById, rankFor, titleName } from '@quiz/shared';
+import { avatarEmoji, frameById, type GamePlayer, rankFor, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 
@@ -76,24 +76,28 @@ export function RankBadge({ rating, compact }: { rating: number; compact?: boole
   );
 }
 
+/** What a player who isn't a person in the match is: a bot, or a real player's match played back. */
+export const machineTag = (p: Pick<GamePlayer, 'isBot' | 'record'>) => (p.isBot ? 'БОТ' : p.record ? 'ЗАПИС' : null);
+
 export function PlayerTag({
   name,
   title,
   level,
-  isBot,
+  tag,
 }: {
   name: string;
   title: string;
   level: number;
-  isBot?: boolean;
+  /** БОТ, ЗАПИС (machineTag). */
+  tag?: string | null;
 }) {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
         <span className="truncate font-semibold">{name}</span>
         <LevelBadge level={level} />
-        {isBot && (
-          <span className="rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-2">БОТ</span>
+        {tag && (
+          <span className="rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-2">{tag}</span>
         )}
       </div>
       <div className="truncate text-xs text-fg-3">{titleName(title)}</div>

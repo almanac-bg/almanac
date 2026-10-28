@@ -5,6 +5,7 @@ import type {
   ChallengePreview,
   DailyInfo,
   DailyPreview,
+  DuelEntry,
   FriendsResponse,
   LaunchStats,
   LeaderboardBoard,
@@ -103,6 +104,8 @@ export const api = {
   claim: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/account/claim', { username, password, email: email || undefined }),
   setReminders: (on: boolean) => request<{ user: MeUser }>('POST', '/account/reminders', { on }),
+  /** Whether others may play against your recorded matches. */
+  setShareRuns: (on: boolean) => request<{ user: MeUser }>('POST', '/account/share-runs', { on }),
   /** From the reminder email's unsubscribe link (works signed out). */
   remindersOff: (u: string, k: string) =>
     request<{ ok: true }>('POST', `/reminders/off?u=${encodeURIComponent(u)}&k=${encodeURIComponent(k)}`),
@@ -152,6 +155,8 @@ export const api = {
   /** Your link to today's questions; once you've played them. */
   dailyLink: () => request<{ code: string }>('POST', '/daily/link'),
   myChallenges: () => request<{ challenges: MyChallenge[] }>('GET', '/challenges'),
+  /** Your friend duels: the open ones (whose turn) and the week's. */
+  duels: () => request<{ duels: DuelEntry[] }>('GET', '/duels'),
   challenge: (id: string) => request<ChallengeInfo>('GET', `/challenges/${encodeURIComponent(id)}`),
   challengePreview: (id: string) => request<ChallengePreview>('GET', `/challenges/${encodeURIComponent(id)}/preview`),
   season: () => request<SeasonInfo>('GET', '/season'),

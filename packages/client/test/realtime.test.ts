@@ -102,6 +102,7 @@ const start = (over: Partial<GameStartPayload> = {}): GameStartPayload => ({
   emotes: [],
   standings: [standing('u1'), standing('b1')],
   rounds: [],
+  duelWith: null,
   startsInMs: 3000,
   ...over,
 });

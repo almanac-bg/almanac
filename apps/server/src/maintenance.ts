@@ -4,7 +4,7 @@ import { backup, DatabaseSync } from 'node:sqlite';
 import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
 import { eraseAccount } from './account';
 import { pruneAnswers } from './answers';
-import { purgeOldChallenges } from './challenges';
+import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
@@ -13,6 +13,7 @@ import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
 import { reloadQuestionBank } from './questions';
+import { pruneRecordPlays, tellRecordOwners } from './records';
 import { pruneRuns } from './runs';
 import { count } from './stats';
 import type { UserRow } from './users';
@@ -47,6 +48,7 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM daily_links WHERE day < ?', shiftDay(dayKey(now), -7));
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
+  pruneRecordPlays(now);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -181,6 +183,9 @@ export function startMaintenance() {
         console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);
       const reminded = sendStreakReminders();
       if (reminded) console.log(`🔥 Streak reminders sent: ${reminded}`);
+      const told = tellRecordOwners();
+      if (told) console.log(`📼 Owners of recordings told how they did: ${told}`);
+      tellExpiredDuels();
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

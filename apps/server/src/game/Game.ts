@@ -126,11 +126,30 @@ export interface GameSetup {
   rounds: RoundPlan[];
   humans: { player: GamePlayer; powerups: PowerupId[]; emotes: string[] }[];
   bots: { player: GamePlayer; brain: BotBrain }[];
+  /** Real players' matches, played back (records.ts): their answers as they gave them, and whose they are. */
+  records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
+  /** A friend duel: who it's against (and their score, if they've played it). */
+  duelWith?: GameStartPayload['duelWith'];
+}
+
+/** A recorded answer to each of a match's questions (null: none in time), in the match's own option order. */
+export type RecordScript = (RecordedAnswer | null)[];
+
+export interface RecordedAnswer {
+  /** The option picked (as shown in this match), or the number given. */
+  choice?: number;
+  value?: number;
+  timeMs: number;
+  powerup: PowerupId | null;
+  /** Right on "Втори шанс"'s second try. */
+  retried: boolean;
 }
 
 export interface Participant {
   player: GamePlayer;
   brain: BotBrain | null;
+  /** A recording's answers, when this is one. */
+  script: RecordScript | null;
   powerups: PowerupId[];
   usedPowerups: Set<PowerupId>;
   emotes: Set<string>;
@@ -194,6 +213,8 @@ export interface AnswerLogEntry {
   points: number;
   /** The коз played on this question, if one was. */
   powerup: PowerupId | null;
+  /** Right on "Втори шанс"'s second try (half the points). */
+  retried: boolean;
 }
 
 interface BotMove {
@@ -264,6 +285,16 @@ export class Game {
       this.participants.set(h.player.id, this.newParticipant(h.player, null, h.powerups, h.emotes));
     for (const b of setup.bots)
       this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_JOKERS], []));
+    for (const r of setup.records ?? []) {
+      const p = this.newParticipant(
+        r.player,
+        null,
+        POWERUPS.map((d) => d.id),
+        [],
+      );
+      p.script = r.script;
+      this.participants.set(r.player.id, p);
+    }
     this.alone = solo;
     this.schedule =
       setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
@@ -292,7 +323,7 @@ export class Game {
       if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
       // The client drew the pick as locked in: say why it wasn't taken, so it can unlock it and tell the player.
       const reject = (reason: AnswerRejection) => {
-        if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
+        if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
       if (this.phase !== 'question' || index !== this.index) return reject('late');
       const q = this.questions[this.index];
@@ -321,7 +352,7 @@ export class Game {
       const p = this.participants.get(playerId);
       if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
       const reject = (reason: AnswerRejection) => {
-        if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
+        if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
       if (this.phase !== 'question' || index !== this.index) return reject('late');
       const q = this.questions[this.index];
@@ -362,15 +393,21 @@ export class Game {
 
       this.consume(p, powerup);
       switch (powerup) {
-        case 'fifty':
-          p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i))).slice(0, 2);
-          // A bot has nobody to tell which ones went; the others only see that it was played.
-          if (p.brain) this.toGame('game:powerup', { playerId, powerup });
+        case 'fifty': {
+          // A recording keeps the option it went on to pick (whatever it was): its answer is already given.
+          const kept = p.script?.[this.index]?.choice;
+          p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && i !== kept && !p.removed.includes(i))).slice(
+            0,
+            2,
+          );
+          // A bot (or a recording) has nobody to tell which ones went; the others only see that it was played.
+          if (p.player.userId === null) this.toGame('game:powerup', { playerId, powerup });
           else {
             this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
             this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
           }
           break;
+        }
         case 'double':
           p.doubled = true;
           this.toGame('game:powerup', { playerId, powerup });
@@ -657,9 +694,9 @@ export class Game {
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
     // Alone, the clock is the only limit: nobody else is waiting for the question to close.
     const undecided = [...this.participants.values()].filter(
-      (p) => this.isActive(p) && !p.answer && (this.alone || p.connected || p.brain || reconnecting(p)),
+      (p) => this.isActive(p) && !p.answer && (this.alone || p.connected || machine(p) || reconnecting(p)),
     );
-    if (undecided.some((p) => !p.brain)) return;
+    if (undecided.some((p) => !machine(p))) return;
     // Only bots left: they made up their minds when the question opened, so they answer now, with the time they took,
     // instead of keeping people waiting for a bot's clock (a duel against one took half again as long as a solo run).
     for (const p of undecided) this.botAnswerNow(p);
@@ -726,7 +763,7 @@ export class Game {
         points = -Math.min(SCORING.doubleStake, p.score);
       }
       p.score += points;
-      if (!p.brain)
+      if (p.player.userId !== null)
         p.log.push({
           questionId: q.id,
           index: this.index,
@@ -739,6 +776,7 @@ export class Game {
           timeMs: p.answer?.timeMs ?? null,
           points,
           powerup: p.powerupNow,
+          retried: !!p.answer?.retried && correct,
         });
       results[p.player.id] = {
         choice: number ? null : (p.answer?.choice ?? null),
@@ -956,6 +994,7 @@ export class Game {
   private scheduleBots() {
     const index = this.index;
     for (const p of this.participants.values()) {
+      if (p.script && this.isActive(p)) this.scheduleRecorded(p, index);
       if (!p.brain || !this.isActive(p)) continue;
       const move = this.botMove(p);
       p.move = move;
@@ -970,11 +1009,38 @@ export class Game {
     }
   }
 
+  /** A recording plays this question as its owner did: the коз a little before the answer, the answer when given. */
+  private scheduleRecorded(p: Participant, index: number) {
+    const recorded = p.script![index];
+    if (!recorded) return;
+    const { powerup } = recorded;
+    if (powerup) this.later(recorded.timeMs * 0.4, () => this.usePowerup(p.player.id, index, powerup));
+    this.later(recorded.timeMs, () => this.giveRecorded(p, index));
+  }
+
+  /** A recording's answer to the open question (its коз first, if it hadn't come yet), with the time it took. */
+  private giveRecorded(p: Participant, index: number) {
+    const recorded = p.script![index];
+    if (!recorded || index !== this.index || this.phase !== 'question' || p.answer || !this.isActive(p)) return;
+    if (recorded.powerup && !p.powerupThisQuestion) this.usePowerup(p.player.id, index, recorded.powerup);
+    p.answer =
+      recorded.value !== undefined
+        ? { choice: -1, value: recorded.value, timeMs: recorded.timeMs, retried: false }
+        : { choice: recorded.choice!, timeMs: recorded.timeMs, retried: recorded.retried };
+    this.toGame('game:answered', { playerId: p.player.id });
+    this.maybeRevealEarly();
+  }
+
   /**
    * A bot answers at once, as it was going to (its коз first, if it hadn't played it yet), with the time it would have
-   * taken: its points are the same as if everyone had waited. One that zoned out stays without an answer.
+   * taken: its points are the same as if everyone had waited. One that zoned out stays without an answer. A recording
+   * gives its recorded answer.
    */
   private botAnswerNow(p: Participant) {
+    if (p.script) {
+      this.giveRecorded(p, this.index);
+      return;
+    }
     const move = p.move;
     if (!move || p.answer) return;
     if (move.joker) this.usePowerup(p.player.id, this.index, move.joker);
@@ -999,7 +1065,17 @@ export class Game {
         continue;
       }
       for (const p of this.participants.values()) {
-        if (!p.brain || !this.isActive(p) || p.answer) continue;
+        if (!this.isActive(p) || p.answer) continue;
+        if (p.script) {
+          const recorded = p.script[this.index];
+          if (recorded)
+            p.answer =
+              recorded.value !== undefined
+                ? { choice: -1, value: recorded.value, timeMs: recorded.timeMs, retried: false }
+                : { choice: recorded.choice!, timeMs: recorded.timeMs, retried: recorded.retried };
+          continue;
+        }
+        if (!p.brain) continue;
         const move = this.botMove(p);
         if (move) p.answer = this.botAnswer(p, move);
       }
@@ -1141,6 +1217,7 @@ export class Game {
       emotes: [...p.emotes],
       standings: this.standings(),
       rounds: this.rounds,
+      duelWith: this.setup.duelWith ?? null,
       startsInMs,
     };
   }
@@ -1214,6 +1291,7 @@ export class Game {
     return {
       player,
       brain,
+      script: null,
       powerups,
       usedPowerups: new Set(),
       emotes: new Set(brain ? [...BOT_EMOTES.good, ...BOT_EMOTES.bad] : emotes),
@@ -1248,6 +1326,9 @@ export class Game {
     };
   }
 }
+
+/** Not a person: a bot, or a recording played back. */
+const machine = (p: Participant) => !!(p.brain || p.script);
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));

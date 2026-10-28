@@ -15,10 +15,11 @@ import {
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
 import { recordAnswers } from '../answers';
-import { recordChallengeResult } from '../challenges';
+import { DUEL, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { advanceQuests } from '../quests';
+import { noteRecordPlay } from '../records';
 import { recordRun } from '../runs';
 import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
@@ -121,7 +122,8 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
         p.player.userId,
         p.player.name,
         p.player.avatar,
-        p.player.isBot ? 1 : 0,
+        // A recording is no person in the match either (its owner played it before).
+        p.player.isBot || p.player.record ? 1 : 0,
         s.placement,
         s.score,
         s.correct,
@@ -151,6 +153,13 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       });
       recordSkill(p.player.userId, p.log);
       rewards.set(p.player.userId, r);
+      // Played out against a recording: its owner hears how it did (not after a walkout, or a match we cut short).
+      if (!game.cutShort && !game.forfeited(p)) {
+        for (const rec of setup.records ?? []) {
+          const recordWon = standings.find((x) => x.id === rec.player.id)?.placement === 1;
+          noteRecordPlay(rec.runId, rec.ownerId, p.player.userId, recordWon);
+        }
+      }
       run('UPDATE match_players SET xp_gained = ? WHERE match_id = ? AND player_id = ?', r.xpGained, game.id, s.id);
     }
   });
@@ -258,14 +267,19 @@ function rewardHuman(
   const challengeResult = challenge
     ? recordChallengeResult(setup.challengeId!, userId, s.score, p.correct, p.answerMs)
     : null;
+  // A friend duel decided by this run: a win pays as a 1-on-1 win (the friend who played first got theirs then).
+  const duelWon = challengeResult?.duel?.outcome === 'won';
+  if (duelWon && counts)
+    lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
   // ── Daily quests ──
   if (counts) {
     lines.push(
       ...advanceQuests(userId, {
         mode: setup.mode,
-        multiplayer,
-        won: realWin,
+        // A friend duel is a match against a person, played at different times: it counts as one, and its win as a win.
+        multiplayer: multiplayer || !!challengeResult?.duel,
+        won: realWin || duelWon,
         correct: p.correct,
         hardCorrect: p.correctByDifficulty.hard,
         bestStreak: p.bestStreak,
@@ -482,7 +496,8 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
       }
       const expected = 1 / (1 + 10 ** ((ratingOf(game, other.id) - ratingOf(game, me.id)) / 400));
       const actual = me.placement < other.placement ? 1 : me.placement > other.placement ? 0 : 0.5;
-      sum += (them.isBot ? botK(ratingOf(game, me.id)) : RATING_K) * (actual - expected);
+      // A bot's strength, or a recording's (whose owner isn't here), is an estimate: the bots' step.
+      sum += (them.isBot || them.record ? botK(ratingOf(game, me.id)) : RATING_K) * (actual - expected);
       rated++;
     }
     if (rated === 0 && skipped) ratings.unrated.set(me.id, skipped);

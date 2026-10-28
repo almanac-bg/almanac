@@ -32,7 +32,7 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
           className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider whitespace-nowrap uppercase"
           style={accentFill(mode)}
         >
-          {game.start.mode === 'daily' ? 'Днес' : mode.name}
+          {game.start.mode === 'daily' ? 'Днес' : game.start.duelWith ? 'Дуел' : mode.name}
         </span>
         {game.start.teams ? (
           <div className="mx-auto hidden sm:block">

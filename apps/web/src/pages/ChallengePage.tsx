@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
+import { DuelCard } from '../components/duels';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -93,6 +94,33 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           ? `Предизвикателство в ${BRAND.name}: ${MODE.questions} въпроса. Можеш ли да биеш ${plural(score, 'точка', 'точки')}?`
           : `Предизвикателство в ${BRAND.name}: ${MODE.questions} въпроса, един опит. Колко ще събереш?`;
     void shareText(`${lead}\n${window.location.origin}/c/${info.id}`, 'Линкът е копиран');
+  }
+
+  // A friend duel: head to head, for its two; nobody else plays it.
+  if (info.duelOnly) {
+    return (
+      <div className="mx-auto max-w-md space-y-6">
+        <div className="text-center">
+          <p className="t-eyebrow text-fg-3">Дуел с приятел</p>
+          <h1 className="mt-2 t-page">{info.duel ? `Ти срещу ${info.duel.friend.username}` : 'Дуел между приятели'}</h1>
+        </div>
+        {info.duel ? (
+          <DuelCard
+            standing={info.duel}
+            me={me}
+            canPlay={!info.attempted && !expired}
+            onPlay={accept}
+            playing={starting || inGame}
+          />
+        ) : (
+          <EmptyState
+            icon="🤝"
+            title="Този дуел е между двама приятели"
+            body="Само двамата могат да го изиграят. Предизвикай свой приятел от страницата с приятели."
+          />
+        )}
+      </div>
+    );
   }
 
   // Short words only: the display font is wide, and "предизвикателство" alone overflows a phone.

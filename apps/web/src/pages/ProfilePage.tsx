@@ -1,5 +1,4 @@
 import {
-  actions,
   api,
   errorMessage,
   fmt,
@@ -28,10 +27,11 @@ import {
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Flag, Swords, UserPlus } from 'lucide-react';
+import { Check, Flag, UserPlus } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { DuelButton, recordLine } from '../components/duels';
 import { FitName } from '../components/FitName';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
@@ -347,7 +347,6 @@ const ratingClass = (delta: number | null) =>
 
 /** Add / accept / challenge, depending on how the viewer relates to this player. */
 function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange: (p: ProfileStats) => void }) {
-  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const { user, friendship } = profile;
 
@@ -364,23 +363,18 @@ function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange:
     }
   }
 
-  async function challenge() {
-    setBusy(true);
-    const res = await actions.challenge(user.id);
-    setBusy(false);
-    if (res.ok) navigate('/room');
-    else toast({ kind: 'error', title: res.error });
-  }
-
   if (friendship === 'friends') {
     return (
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1.5 text-sm font-semibold text-emerald-300">
           <Check className="size-4" /> Приятели
         </span>
-        <Button onClick={challenge} loading={busy}>
-          <Swords className="size-4" /> Предизвикай
-        </Button>
+        <DuelButton friend={user} />
+        {profile.duels && (
+          <span className="text-sm text-fg-2">
+            Дуели: <b className="text-fg tabular-nums">{recordLine(profile.duels)}</b>
+          </span>
+        )}
       </div>
     );
   }

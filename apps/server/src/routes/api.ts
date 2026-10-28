@@ -2,6 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   achievementById,
   type CategoryId,
+  type DuelRecord,
   isQueueMode,
   type LeaderboardBoard,
   type LeaderboardEntry,
@@ -35,7 +36,7 @@ import {
   userIdFromRequest,
   verifyPassword,
 } from '../auth';
-import { challengeInfo, challengePreview, myChallenges } from '../challenges';
+import { challengeInfo, challengePreview, duelRecord, myChallenges, myDuels } from '../challenges';
 import { config } from '../config';
 import { dailyInfo, dailyLink, dailyPreview, joinBoardAfterSave, liveDailyStreak } from '../daily';
 import { all, isUniqueViolation, one, run, tx } from '../db';
@@ -565,6 +566,19 @@ api.post('/account/reminders', requireAuth, requireAccount, (req, res) => {
   res.json({ user: getMe(res.locals.userId) });
 });
 
+/** Others may play against this player's recorded matches (a recording plays when nobody's there for a Дуел). */
+api.post('/account/share-runs', requireAuth, requireAccount, (req, res) => {
+  const body = parse(z.object({ on: z.boolean() }), req, res);
+  if (!body) return;
+  run('UPDATE users SET share_runs = ? WHERE id = ?', body.on ? 1 : 0, res.locals.userId);
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+/** Your friend duels: whose turn it is in the open ones, and how the week's ended. */
+api.get('/duels', requireAuth, (_req, res) => {
+  res.json({ duels: myDuels(res.locals.userId) });
+});
+
 /** The unsubscribe link in reminder emails (and the mail apps' one-click unsubscribe): no sign-in needed. */
 api.post('/reminders/off', (req, res) => {
   const { u, k } = req.query;
@@ -925,6 +939,8 @@ api.get('/leaderboard/:board', requireAuth, (req, res) => {
   res.json(leaderboard(board, res.locals.userId));
 });
 
+const someDuels = (r: DuelRecord) => (r.wins + r.losses + r.draws ? r : null);
+
 function profileStats(u: UserRow, viewerId: number): ProfileStats {
   const ratings = getRatings(u.id);
   const modes = all<{ mode: ModeId; games: number; wins: number; avg_placement: number | null }>(
@@ -956,6 +972,7 @@ function profileStats(u: UserRow, viewerId: number): ProfileStats {
   return {
     user: { ...toPublicUser(u), createdAt: u.created_at },
     friendship: friendship(viewerId, u.id),
+    duels: viewerId === u.id ? null : someDuels(duelRecord(viewerId, u.id)),
     overview: {
       gamesPlayed: u.games_played,
       multiplayerGames: u.mp_games,

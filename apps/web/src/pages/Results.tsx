@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
+import { DuelCard, RematchButton } from '../components/duels';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
@@ -31,6 +32,7 @@ export function Results({ game }: { game: LiveGame }) {
   const navigate = useNavigate();
   const room = useStore((s) => s.room);
   const guest = useStore((s) => !!s.me?.isGuest);
+  const me = useStore((s) => s.me);
   const [busy, setBusy] = useState(false);
   const youId = game.start.youId;
   const mine = end.standings.find((s) => s.id === youId)!;
@@ -41,9 +43,14 @@ export function Results({ game }: { game: LiveGame }) {
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
   const rewards = end.rewards;
-  // A challenge link is played alone, but it has a board: first place over others is a win too.
+  // A challenge link is played alone, but it has a board: first place over others is a win too. A friend duel is won
+  // once the friend has played it too.
   const link = rewards?.challenge ?? null;
-  const won = (!single && mine.placement === 1 && !end.noContest) || (!!link && link.rank === 1 && link.total > 1);
+  const duel = link?.duel ?? null;
+  const won =
+    (!single && mine.placement === 1 && !end.noContest) ||
+    (!!link && !duel && link.rank === 1 && link.total > 1) ||
+    duel?.outcome === 'won';
   // Everyone else walked out (after the match got going, or it would be no contest). A link is played alone: its win
   // is a place on the board, never a walkout.
   const byWalkout = won && !single && !teamScores && end.standings.every((s) => s.id === youId || s.left);
@@ -155,28 +162,32 @@ export function Results({ game }: { game: LiveGame }) {
       ? perfect
         ? 'Перфектен ден!'
         : 'Денят е изигран'
-      : link
-        ? link.total <= 1
-          ? mine.score > 0
-            ? 'Летвата е поставена!'
-            : 'Линкът е готов'
-          : link.rank === 1
-            ? 'Първо място!'
-            : `${ordinal(link.rank)} място`
-        : single
-          ? perfect
-            ? 'Перфектно!'
-            : 'Готово!'
-          : teamScores
-            ? won
-              ? 'Победа!'
-              : 'Загуба'
-            : won
-              ? 'Победа!'
-              : // Second of two is a loss, and says so (the rating below says it anyway).
-                end.standings.length === 2
-                ? 'Загуба'
-                : `${ordinal(mine.placement)} място`;
+      : duel
+        ? duel.outcome
+          ? { won: 'Победа!', lost: 'Загуба', draw: 'Равенство' }[duel.outcome]
+          : 'Ходът ти е изигран'
+        : link
+          ? link.total <= 1
+            ? mine.score > 0
+              ? 'Летвата е поставена!'
+              : 'Линкът е готов'
+            : link.rank === 1
+              ? 'Първо място!'
+              : `${ordinal(link.rank)} място`
+          : single
+            ? perfect
+              ? 'Перфектно!'
+              : 'Готово!'
+            : teamScores
+              ? won
+                ? 'Победа!'
+                : 'Загуба'
+              : won
+                ? 'Победа!'
+                : // Second of two is a loss, and says so (the rating below says it anyway).
+                  end.standings.length === 2
+                  ? 'Загуба'
+                  : `${ordinal(mine.placement)} място`;
   // A long word ("Перфектно!", "поставена!") is wider than a small phone at the usual size: such headlines scale with
   // the screen instead (10vw always leaves room for ten letters).
   const longWord = headline.split(' ').some((w) => w.length > 7);
@@ -186,7 +197,7 @@ export function Results({ game }: { game: LiveGame }) {
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
       <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
-          {MODES[end.mode].name}
+          {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
           {solo && category && ` · ${category.name}`}
         </p>
         <motion.h1
@@ -287,7 +298,8 @@ export function Results({ game }: { game: LiveGame }) {
           !single && !end.noContest && <Podium game={game} standings={end.standings} />
         )}
       </FriendsProvider>
-      {link && (
+      {duel && me && <DuelCard standing={duel} me={me} actions={false} className="mx-auto mt-8 max-w-md" />}
+      {link && !duel && (
         <ChallengeStanding
           challenge={link}
           score={mine.score}
@@ -357,6 +369,19 @@ export function Results({ game }: { game: LiveGame }) {
             >
               <ChartColumn className="size-5" /> Класиране за деня
             </Button>
+          ) : duel ? (
+            // A duel plays once: what follows is a rematch, once it's decided; until then, home.
+            duel.outcome || duel.expired ? (
+              <RematchButton
+                standing={duel}
+                size="lg"
+                className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
+              />
+            ) : (
+              <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none" onClick={home}>
+                <Home className="size-5" /> Към началото
+              </Button>
+            )
           ) : challenge && guest ? (
             // A link plays once and guests can't make their own: home is the way on.
             <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none" onClick={home}>
@@ -399,7 +424,7 @@ export function Results({ game }: { game: LiveGame }) {
               <span className="max-sm:hidden">Сподели</span>
             </Button>
           )}
-          {!(challenge && guest) && (
+          {!(challenge && guest) && !(duel && !duel.outcome && !duel.expired) && (
             <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
               <Home className="size-5" />
               <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>

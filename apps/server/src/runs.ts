@@ -23,6 +23,8 @@ export interface RunAnswer {
   p: number;
   /** The коз played on it. */
   k: PowerupId | null;
+  /** Right on "Втори шанс"'s second try. */
+  r?: 1;
 }
 
 /**
@@ -54,6 +56,7 @@ export function recordRun(
     t: a.timeMs,
     p: a.points,
     k: a.powerup,
+    ...(a.retried && { r: 1 as const }),
   }));
   run(
     `INSERT INTO runs (match_id, user_id, mode, category, rating, score, correct, answers, played_at)

@@ -30,6 +30,9 @@ gameClock.now = () => Date.now();
 const { botK, finalizeMatch, PROVISIONAL, ROOM_PLACEMENT_XP_PER_DAY } = await import('../src/game/rewards');
 const { playCheck, SUSPICIOUS } = await import('../src/answers');
 const { recordRating } = await import('../src/seasons');
+const getRatingOf = (userId: number) =>
+  one<{ rating: number }>("SELECT rating FROM season_ratings WHERE user_id = ? AND mode = 'duel'", userId)?.rating ??
+  null;
 const { buildHuman } = await import('../src/game/registry');
 const { pickQuestions } = await import('../src/questions');
 const { createGuest } = await import('../src/guests');
@@ -316,6 +319,75 @@ test('a rating finds its level sooner: the first ten rated games in a mode move 
   const { deltaOf } = duel(a, b, null);
   assert.equal(Math.round(deltaOf(a)!), 20, 'ten games in: the usual step');
   assert.equal(Math.round(deltaOf(b)!), -40, 'a first game: twice');
+});
+
+test("a recording moves the player's rating as a bot does, not its owner's, and its owner hears how it did", () => {
+  const me = account();
+  const owner = account();
+  const runId = Number(
+    run(
+      `INSERT INTO runs (match_id, user_id, mode, category, rating, score, correct, answers, played_at)
+       VALUES ('old', ?, 'duel', 'mixed', 1000, 0, 0, '[]', ?)`,
+      owner,
+      Date.now(),
+    ).lastInsertRowid,
+  );
+  for (let i = 0; i < PROVISIONAL.games; i++) recordRating(me, 'duel', 1000, false);
+  const ends: GameEndPayload[] = [];
+  const recording = { ...player(owner), id: `r${runId}`, userId: null, record: { playedAt: 0 } };
+  const game = new Game(
+    {
+      mode: 'duel',
+      ranked: true,
+      roomCode: null,
+      hostUserId: null,
+      timeMs: TIME,
+      category: 'mixed',
+      elimination: false,
+      teams: false,
+      dailyDay: null,
+      challengeId: null,
+      questions: pickQuestions(5, 'mixed', new Map()),
+      rounds: [],
+      humans: [{ player: player(me), powerups: [], emotes: [] }],
+      bots: [],
+      // It answered nothing in time.
+      records: [{ player: recording, script: [null, null, null, null, null], runId, ownerId: owner }],
+    },
+    {
+      toGame: () => {},
+      toUser: (_userId, event, ...args) => {
+        if (event === 'game:end') ends.push(args[0] as GameEndPayload);
+      },
+      toGameExcept: () => {},
+    } satisfies GameEmitter,
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      shown: () => {},
+      onClosed: () => {},
+    },
+  );
+  game.start();
+  advance(COUNTDOWN);
+  while (game.phase !== 'ended') {
+    game.answer(`u${me}`, game.index, choiceAt(game).answer);
+    advance(NEXT_QUESTION + TIME);
+  }
+  const [end] = ends;
+  assert.equal(end.rewards!.rating!.after - end.rewards!.rating!.before, Math.round(botK(1000) / 2), 'the bots’ step');
+  assert.equal(getRatingOf(owner), null, 'its owner played nothing now');
+  assert.deepEqual(
+    {
+      ...one<{ owner_id: number; player_id: number; record_won: number }>(
+        'SELECT owner_id, player_id, record_won FROM record_plays',
+      ),
+    },
+    { owner_id: owner, player_id: me, record_won: 0 },
+  );
 });
 
 test('games against bots move a rating less and less above 1450, and not at all from the bots’ ceiling up', () => {
