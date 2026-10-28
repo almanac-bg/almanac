@@ -12,8 +12,10 @@ import {
   unlockedIds,
 } from '@quiz/shared';
 import { unlockContext } from '../account';
+import { crowdFor } from '../answers';
 import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';
 import { releaseDailyAttempt, saveDailyProgress } from '../daily';
+import { bestMastery } from '../mastery';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
 import { markSeen, type PreparedQuestion, pickMatch, pickRounds, type RoundPlan, recentFor } from '../questions';
@@ -48,10 +50,11 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
       frame: row.frame,
       title: row.title,
       team: null,
+      mastery: bestMastery(userId),
     },
-    // Runs everyone compares (the daily, challenge links): no козове. Everywhere else all of them for everyone, from
-    // the first match: a result isn't decided by who has played longer.
-    powerups: mode === 'daily' || mode === 'challenge' ? [] : POWERUPS.map((p) => p.id),
+    // Runs everyone compares (the daily, challenge links) and „Поправителен“ (recall, unaided): no козове. Everywhere
+    // else all of them for everyone, from the first match: a result isn't decided by who has played longer.
+    powerups: mode === 'daily' || mode === 'challenge' || mode === 'review' ? [] : POWERUPS.map((p) => p.id),
     emotes: unlockedIds('emote', ctx),
   };
 }
@@ -261,6 +264,7 @@ export class GameRegistry {
         release: releaseAttempts,
         progress: saveProgress,
         draining: () => this.draining,
+        crowd: crowdFor,
         shown: (g, questionIds) => {
           for (const h of g.humans) markSeen(h.player.userId!, questionIds);
         },

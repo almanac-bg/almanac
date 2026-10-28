@@ -1,10 +1,11 @@
-import { actions, fmt, toast, useStore } from '@quiz/client';
-import { levelProgress, MODES, type QueueModeId, START_RATING, SUBMISSION_RULES } from '@quiz/shared';
+import { actions, fmt, plural, toast, useStore } from '@quiz/client';
+import { levelProgress, MODES, type QueueModeId, REVIEW, START_RATING, SUBMISSION_RULES } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useStartReview } from '../components/almanac';
 import { useDuels, usePlayDuel } from '../components/duels';
 import { ChallengeCard } from '../components/home/ChallengeCard';
 import { CommunityCard } from '../components/home/CommunityCard';
@@ -69,6 +70,7 @@ export function HomePage() {
       )}
 
       <DuelTurn />
+      <ReviewTurn />
       <EmailNudge />
 
       {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
@@ -141,6 +143,31 @@ function queueSpan(i: number, n: number) {
     n % 2 === 1 && last && 'sm:col-span-2',
     (n <= 2 || (n === 3 && last)) && 'lg:col-span-2',
     n === 5 && last && 'lg:col-span-3',
+  );
+}
+
+/** „Поправителен“ ready: the missed questions that came back, a tap from playing them. */
+function ReviewTurn() {
+  const due = useStore((s) => s.me?.almanac.due ?? 0);
+  const { busy, start } = useStartReview();
+  if (due < REVIEW.min) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.08] px-4 py-3"
+    >
+      <span aria-hidden className="text-xl leading-none">
+        📒
+      </span>
+      <p className="min-w-0 flex-1 text-sm">
+        <b>Поправителен:</b>{' '}
+        <span className="text-fg-2">{plural(due, 'сгрешен въпрос се върна', 'сгрешени въпроса се върнаха')}</span>
+      </p>
+      <Button size="sm" onClick={() => void start()} loading={busy}>
+        Играй
+      </Button>
+    </motion.div>
   );
 }
 

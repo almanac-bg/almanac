@@ -3,12 +3,12 @@ import { BRAND, levelProgress } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   Bell,
+  BookOpen,
   ChartColumn,
   Gamepad2,
   Save,
   Settings,
   Shirt,
-  Trophy,
   User,
   Users,
   Volume2,
@@ -20,13 +20,14 @@ import { useMuted } from '../lib/sound';
 import { Avatar, LevelBadge } from './Avatar';
 import { ClaimAccountModal } from './ClaimAccount';
 
-// The header doesn't list "Профил": the avatar and name next to it already lead there (and it's what makes the row fit).
+// Five a row has room for. The header doesn't list "Профил": the avatar and name next to it already lead there. On
+// phones the profile has a tab and „Колекция“ doesn't. „Постижения“ opens from the profile everywhere.
 const LINKS = [
   { to: '/', label: 'Играй', icon: Gamepad2, end: true, mobile: true, header: true },
+  { to: '/almanac', label: 'Алманах', icon: BookOpen, mobile: true, header: true },
   { to: '/friends', label: 'Приятели', icon: Users, mobile: true, header: true },
   { to: '/profile', label: 'Профил', icon: User, mobile: true, header: false },
-  { to: '/achievements', label: 'Постижения', icon: Trophy, mobile: false, header: true },
-  { to: '/locker', label: 'Колекция', icon: Shirt, mobile: true, header: true },
+  { to: '/locker', label: 'Колекция', icon: Shirt, mobile: false, header: true },
   { to: '/leaderboard', label: 'Класации', icon: ChartColumn, mobile: true, header: true },
 ];
 
@@ -194,7 +195,7 @@ export function NavBar() {
                 clsx(
                   'focus-ring relative flex shrink-0 items-center gap-2.5 rounded-2xl p-1',
                   // A guest's generated name says nothing (the "Гост" button does), so only the avatar shows.
-                  !me.isGuest && 'sm:pr-3',
+                  !me.isGuest && 'sm:pr-3 md:max-lg:pr-1',
                   // Phones reach the profile from the tab bar; for a guest the "Гост" button takes this spot.
                   me.isGuest && 'max-sm:hidden',
                   isActive ? 'bg-white/10' : 'hover:bg-white/5',
@@ -204,7 +205,8 @@ export function NavBar() {
               <span className="sr-only">Профил</span>
               <Avatar avatar={me.avatar} frame={me.frame} size={36} />
               {!connected && <OfflineDot />}
-              <div className={clsx('hidden w-28', !me.isGuest && 'sm:block')}>
+              {/* Tablets have the nav icons in the row too: the avatar alone, until there's room for the name. */}
+              <div className={clsx('hidden w-28', !me.isGuest && 'sm:block md:max-lg:hidden')}>
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold">{me.username}</span>
                   <LevelBadge level={progress.level} />

@@ -10,10 +10,12 @@ import {
   POWERUPS,
   type PowerupId,
   type Presence,
+  REVIEW,
   ROUNDS,
 } from '@quiz/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
+import { learn, reviewQuestions } from './almanac';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import {
   challengeQuestions,
@@ -350,6 +352,38 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       }
     });
 
+    on('review:start', (ack) => {
+      const busy = busyError();
+      if (busy) return reply(ack, { ok: false, error: busy });
+      const questions = reviewQuestions(userId);
+      if (!questions) {
+        return reply(ack, {
+          ok: false,
+          error: `„Поправителен“ се отваря, когато поне ${REVIEW.min} сгрешени въпроса са се върнали.`,
+        });
+      }
+      moveOn();
+      rooms.leave(userId);
+      try {
+        games.start({
+          mode: 'review',
+          ranked: false,
+          roomCode: null,
+          hostUserId: null,
+          questionCount: questions.length,
+          timeMs: MODES.review.timeMs,
+          category: 'mixed',
+          elimination: false,
+          questions,
+          humans: [buildHuman(userId, 'review')],
+          bots: [],
+        });
+        reply(ack, { ok: true });
+      } catch (err) {
+        reply(ack, { ok: false, error: startFailure(err) });
+      }
+    });
+
     on('room:create', (settings, ack) => {
       if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
       const busy = busyError();
@@ -419,8 +453,13 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     // "Знаеше ли?": a run played alone stops on the fact until the player goes on (counted: is it worth writing them?).
     on('game:hold', (p, ack) => {
       const game = games.forUser(userId);
-      const held = !!game?.hold(game.playerIdFor(userId), int(obj(p).index));
-      if (held) count('fact_holds');
+      const index = int(obj(p).index);
+      const held = !!game?.hold(game.playerIdFor(userId), index);
+      if (held) {
+        count('fact_holds');
+        // Stopped to read it: the fact is theirs (right or wrong).
+        learn(userId, [game!.questions[index].id]);
+      }
       reply(ack, held ? { ok: true } : { ok: false, error: 'Въпросът вече продължи.' });
     });
 

@@ -552,6 +552,84 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX challenges_duels_open ON challenges(expires_at) WHERE rival_id IS NOT NULL AND expired_told = 0;
     `,
   },
+
+  // v22, progress:
+  // - `learned`: „Моят алманах“ — each question a player got right, or stopped on to read its fact (almanac.ts).
+  // - `review_queue`: „Поправителен“ — each missed question and when it comes back (REVIEW).
+  // - `question_stats.pick0`…`pick3`, `unanswered`: how many picked each option (as the bank orders them), or none in
+  //   time: „X% знаят“ and the review's shares. Filled from the recorded runs so far (runs keep each pick; a number
+  //   question's carry its number, `g`, and stay out). Older code doesn't count them: the shares are of what's counted.
+  // - `mastery`: the category mastery tier each player earned (mastery.ts); `player_skill_ranked`, the skill of those
+  //   ranked in each category, to find its tiers' cut-offs.
+  // - `player_groups`, `group_members`, `group_weeks` (each finished week's winner): groups (groups.ts).
+  // Older code leaves them all alone.
+  {
+    compatible: `
+    CREATE TABLE learned (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      question_id TEXT NOT NULL,
+      learned_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, question_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX learned_recent ON learned(user_id, learned_at);
+
+    CREATE TABLE review_queue (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      question_id TEXT NOT NULL,
+      step INTEGER NOT NULL,
+      due_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, question_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX review_due ON review_queue(user_id, due_at);
+
+    ALTER TABLE question_stats ADD COLUMN pick0 INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE question_stats ADD COLUMN pick1 INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE question_stats ADD COLUMN pick2 INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE question_stats ADD COLUMN pick3 INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE question_stats ADD COLUMN unanswered INTEGER NOT NULL DEFAULT 0;
+    INSERT INTO question_stats (question_id, pick0, pick1, pick2, pick3, unanswered)
+      SELECT json_extract(a.value, '$.q') AS question_id,
+        SUM(json_extract(a.value, '$.c') IS 0), SUM(json_extract(a.value, '$.c') IS 1),
+        SUM(json_extract(a.value, '$.c') IS 2), SUM(json_extract(a.value, '$.c') IS 3),
+        SUM(json_extract(a.value, '$.c') IS NULL)
+      FROM runs, json_each(runs.answers) AS a
+      WHERE json_type(a.value, '$.g') IS NULL
+      GROUP BY question_id
+    ON CONFLICT (question_id) DO UPDATE SET pick0 = excluded.pick0, pick1 = excluded.pick1, pick2 = excluded.pick2,
+      pick3 = excluded.pick3, unanswered = excluded.unanswered;
+
+    CREATE TABLE mastery (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      tier INTEGER NOT NULL,
+      earned_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, category)
+    ) WITHOUT ROWID;
+    CREATE INDEX player_skill_ranked ON player_skill(category, rating) WHERE answers >= 30;
+
+    CREATE TABLE player_groups (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE group_members (
+      group_id INTEGER NOT NULL REFERENCES player_groups(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (group_id, user_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX group_members_user ON group_members(user_id);
+    CREATE TABLE group_weeks (
+      group_id INTEGER NOT NULL REFERENCES player_groups(id) ON DELETE CASCADE,
+      week TEXT NOT NULL,
+      winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      score INTEGER NOT NULL,
+      PRIMARY KEY (group_id, week)
+    ) WITHOUT ROWID;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import {
+  DAILY_FIELD,
+  type DailyField,
   type DailyInfo,
   type DailyPreview,
   type DailySharer,
@@ -207,6 +209,33 @@ function rankOf(day: string, score: number, timeMs: number): { rank: number; tot
   return { rank: better + 1, total: boardSize(day) };
 }
 
+/**
+ * How the day went for everyone on its board, once DAILY_FIELD.minPlayers are on it: right answers run by run, and the
+ * share of the others this run did better than (`onBoard`: it's one of them). Null until then.
+ */
+function dayField(day: string, score: number, timeMs: number, onBoard: boolean): DailyField | null {
+  const rows = all<{ correct: number; n: number }>(
+    `SELECT d.correct, COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD} GROUP BY d.correct`,
+    day,
+  );
+  const total = rows.reduce((sum, r) => sum + r.n, 0);
+  if (total < DAILY_FIELD.minPlayers) return null;
+  const histogram = Array<number>(MODES.daily.questions + 1).fill(0);
+  for (const r of rows) histogram[Math.min(Math.max(r.correct, 0), MODES.daily.questions)] += r.n;
+  const worse = one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD}
+     AND (d.score < ? OR (d.score = ? AND d.time_ms > ?))`,
+    day,
+    score,
+    score,
+    timeMs,
+  )!.n;
+  const others = onBoard ? total - 1 : total;
+  return { beaten: others > 0 ? worse / others : 0, histogram };
+}
+
 /** A sharer's result on the day, as the people they sent the link to see it. */
 function sharerResult(userId: number, day: string): DailySharer | null {
   const r = one<UserRow & { score: number; correct: number }>(
@@ -302,10 +331,12 @@ export function recordDailyResult(
     day,
   );
   if (entry?.via) tellSharer(entry.via, u, day, correct);
+  const offBoard = (entry?.own_set ?? u.is_guest) === 1;
   const rank = {
     ...rankOf(day, score, timeMs),
-    offBoard: (entry?.own_set ?? u.is_guest) === 1,
+    offBoard,
     sharer: entry?.via ? sharerResult(entry.via, day) : null,
+    field: dayField(day, score, timeMs, !offBoard),
   };
   if (u.last_daily_day === day || !played)
     return { ...rank, streak: liveDailyStreak(u, day), shieldsUsed: 0, shieldEarned: false };
@@ -391,7 +422,12 @@ export function dailyInfo(userId: number): DailyInfo {
   // Today's run as it was started; one not started yet goes by the account as it is now.
   const offBoard = mine ? (mine.own_set ?? me.is_guest) === 1 : !onDailyBoard(me, day);
   const played = mine?.finished_at
-    ? { score: mine.score!, correct: mine.correct!, rank: rankOf(day, mine.score!, mine.time_ms!).rank }
+    ? {
+        score: mine.score!,
+        correct: mine.correct!,
+        rank: rankOf(day, mine.score!, mine.time_ms!).rank,
+        field: dayField(day, mine.score!, mine.time_ms!, !offBoard),
+      }
     : null;
   return {
     day,

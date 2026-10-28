@@ -7,11 +7,13 @@ import { type ComponentType, createElement, lazy, useState } from 'react';
 const loaders = {
   account: () => import('./AccountPages'),
   achievements: () => import('./AchievementsPage'),
+  almanac: () => import('./AlmanacPage'),
   admin: () => import('./AdminPage'),
   challenge: () => import('./ChallengePage'),
   daily: () => import('./DailyPage'),
   friends: () => import('./FriendsPage'),
   game: () => import('./GamePage'),
+  groups: () => import('./GroupsPage'),
   leaderboard: () => import('./LeaderboardPage'),
   legal: () => import('./LegalPages'),
   locker: () => import('./LockerPage'),
@@ -74,10 +76,12 @@ function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeo
 
 export const AchievementsPage = page('achievements', 'AchievementsPage');
 export const AdminPage = page('admin', 'AdminPage');
+export const AlmanacPage = page('almanac', 'AlmanacPage');
 export const ChallengePage = page('challenge', 'ChallengePage');
 export const DailyPage = page('daily', 'DailyPage');
 export const FriendsPage = page('friends', 'FriendsPage');
 export const GamePage = page('game', 'GamePage');
+export const GroupsPage = page('groups', 'GroupsPage');
 export const LeaderboardPage = page('leaderboard', 'LeaderboardPage');
 export const LockerPage = page('locker', 'LockerPage');
 export const NotificationsPage = page('notifications', 'NotificationsPage');

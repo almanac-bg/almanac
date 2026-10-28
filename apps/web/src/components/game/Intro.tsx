@@ -1,5 +1,14 @@
 import { fmt, type LiveGame, useNow } from '@quiz/client';
-import { categoryById, type GamePlayer, MODES, TEAMS, type TeamId } from '@quiz/shared';
+import {
+  type CategoryMastery,
+  categoryById,
+  type GamePlayer,
+  MASTERY_TIERS,
+  MODES,
+  masteryName,
+  TEAMS,
+  type TeamId,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import { Skull } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -47,14 +56,22 @@ export function Intro({ game }: { game: LiveGame }) {
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
-            {game.start.duelWith ? '⚔️' : game.start.mode === 'daily' ? '🗓️' : category?.icon}
+            {game.start.duelWith
+              ? '⚔️'
+              : game.start.mode === 'daily'
+                ? '🗓️'
+                : game.start.mode === 'review'
+                  ? '📒'
+                  : category?.icon}
           </motion.span>
           <h1 className="mt-4 font-display text-3xl font-bold">
             {game.start.duelWith
               ? `Дуел с ${game.start.duelWith.username}`
               : game.start.mode === 'daily'
                 ? 'Въпросите на деня'
-                : category?.name}
+                : game.start.mode === 'review'
+                  ? 'Сгрешеното се връща'
+                  : category?.name}
           </h1>
           {game.start.duelWith && (
             <p className="mt-2 font-semibold text-amber-200">
@@ -65,7 +82,8 @@ export function Intro({ game }: { game: LiveGame }) {
           )}
           <p className="mt-2 text-fg-3">
             {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
-            {(game.start.mode === 'daily' || game.start.mode === 'challenge') && ' · без козове'}
+            {(game.start.mode === 'daily' || game.start.mode === 'challenge' || game.start.mode === 'review') &&
+              ' · без козове'}
           </p>
         </div>
       ) : game.start.teams ? (
@@ -89,6 +107,7 @@ export function Intro({ game }: { game: LiveGame }) {
               <span className={clsx('max-w-20 truncate text-xs font-semibold', p.id === me.id && 'text-violet-300')}>
                 {p.name}
               </span>
+              {p.mastery && <MasteryLine mastery={p.mastery} short />}
             </motion.div>
           ))}
         </div>
@@ -117,6 +136,21 @@ export function Intro({ game }: { game: LiveGame }) {
   );
 }
 
+/** A player's best category mastery: „🥇 Майстор · История“ (`short`: the two icons, where names don't fit). */
+function MasteryLine({ mastery, short }: { mastery: CategoryMastery; short?: boolean }) {
+  const icons = `${MASTERY_TIERS[mastery.tier].icon}${categoryById(mastery.category)?.icon ?? ''}`;
+  return short ? (
+    <span className="text-xs" title={masteryName(mastery)}>
+      <span aria-hidden>{icons}</span>
+      <span className="sr-only">{masteryName(mastery)}</span>
+    </span>
+  ) : (
+    <span className="text-xs text-balance text-emerald-200">
+      {MASTERY_TIERS[mastery.tier].icon} {masteryName(mastery)}
+    </span>
+  );
+}
+
 function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
   // Two 120px avatars and the "VS" between them don't fit the narrowest phones; there the name is smaller and gets the
   // level's room too (the rank under it says more about the opponent).
@@ -140,6 +174,7 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
           ЗАПИС · мач от {new Date(p.record.playedAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' })}
         </span>
       )}
+      {p.mastery && <MasteryLine mastery={p.mastery} />}
       {p.isBot && !!p.strong?.length && (
         <span className="text-xs text-balance text-fg-2">
           силен в {p.strong.map((c) => `${categoryById(c)?.icon} ${categoryById(c)?.name}`).join(', ')}

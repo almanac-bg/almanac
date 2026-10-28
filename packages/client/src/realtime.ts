@@ -332,6 +332,8 @@ function bind(s: GameSocket) {
                     : null,
                 right: !!mine?.correct,
                 fact: reveal.fact ?? null,
+                // From a server before „X% знаят“: none.
+                crowd: reveal.crowd ?? null,
               },
             ],
       };
@@ -535,6 +537,8 @@ export const actions = {
     setState({ queue: null });
   },
   startSolo: (category: CategoryChoice) => ask(() => withTimeout().emitWithAck('solo:start', { category })),
+  /** „Поправителен“: the missed questions that have come back. */
+  startReview: () => ask(() => withTimeout().emitWithAck('review:start')),
   /** `via`: the code of the daily link it was opened from. */
   startDaily: (via?: string) => ask(() => withTimeout().emitWithAck('daily:start', { via })),
   /** Plays a challenge link, or (no id) makes a new one and plays it first. */

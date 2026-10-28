@@ -245,6 +245,123 @@ test('solo', T, async () => {
   );
 });
 
+test(
+  '„Поправителен“: missed questions come back as a run of their own, and what it gets right is the player’s',
+  T,
+  async () => {
+    const P = await register(srv.url, 'povtorach');
+    const s = connect(srv.url, P.cookie);
+    await connected(s);
+    try {
+      const early = await emitAck(s, 'review:start');
+      assert.equal(early.ok, false, 'nothing missed yet');
+
+      // A solo run with every answer wrong: each question comes back in three days.
+      const missed = newLog();
+      const solo = autoPlay(s, 'wrong', missed);
+      await emitAck(s, 'solo:start', { category: 'music' });
+      assert.deepEqual((await solo).end.rewards!.almanac, { added: 0, total: 0 });
+      srv.db.prepare('UPDATE review_queue SET due_at = 0 WHERE user_id = ?').run(P.user.id);
+      assert.deepEqual((await api.get('/api/me', P.cookie)).body.user.almanac, { facts: 0, due: 10 });
+
+      const log = newLog();
+      const review = autoPlay(s, 'right', log);
+      assert.deepEqual(await emitAck(s, 'review:start'), { ok: true });
+      const { start, end } = await review;
+      assert.equal(start!.mode, 'review');
+      assert.deepEqual(start!.powerups, [], 'recall, unaided');
+      assert.deepEqual(log.questions.map((q) => q.id).sort(), missed.questions.map((q) => q.id).sort());
+      assert.ok(
+        log.questions.every((q) => !q.final),
+        'no final',
+      );
+      // In the fixture bank every other question with options has a fact.
+      const facts = log.questions.filter((q) => q.kind === 'choice' && Number(q.id.split('-')[1]) % 2 === 0).length;
+      assert.deepEqual(end.rewards!.almanac, { added: facts, total: facts });
+      assert.ok(!end.rewards!.achievements.includes('perfect'), 'no feats on known answers');
+      assert.ok(!end.rewards!.breakdown.some((l) => l.label === 'Перфектен мач'));
+      assert.ok(end.rewards!.breakdown.some((l) => l.label.startsWith('Верни отговори')));
+      // Its answers count for nobody's accuracy, and the queue moved each question on a step.
+      const profile = (await api.get('/api/profile/povtorach', P.cookie)).body;
+      assert.equal(profile.overview.correctAnswers, 0);
+      assert.equal(profile.almanac.facts, facts);
+      assert.equal(
+        (
+          srv.db.prepare('SELECT COUNT(*) AS n FROM review_queue WHERE user_id = ? AND step = 1').get(P.user.id) as {
+            n: number;
+          }
+        ).n,
+        10,
+      );
+      const almanac = (await api.get('/api/almanac', P.cookie)).body;
+      assert.equal(almanac.categories.find((c: { category: string }) => c.category === 'music').facts, facts);
+      assert.deepEqual(almanac.review, { due: 0, waiting: 10, nextDueAt: almanac.review.nextDueAt, ready: false });
+    } finally {
+      s.close();
+    }
+  },
+);
+
+test('stopping to read a fact in a run alone makes it the player’s, right answer or not', T, async () => {
+  const R = await register(srv.url, 'chitatel');
+  const s = connect(srv.url, R.cookie);
+  await connected(s);
+  try {
+    const log = newLog();
+    let held: string | null = null;
+    s.on('game:reveal', async (r) => {
+      if (held || !r.fact) return;
+      held = log.questions.find((q) => q.index === r.index)!.id;
+      assert.deepEqual(await emitAck(s, 'game:hold', { index: r.index }), { ok: true });
+      s.emit('game:resume');
+    });
+    const play = autoPlay(s, 'wrong', log);
+    await emitAck(s, 'solo:start', { category: 'nature' });
+    const { end } = await play;
+    assert.ok(held);
+    assert.deepEqual(end.rewards!.almanac, { added: 1, total: 1 });
+    const page = (await api.get('/api/almanac/nature', R.cookie)).body;
+    assert.deepEqual(
+      page.facts.map((f: { id: string }) => f.id),
+      [held],
+    );
+  } finally {
+    s.close();
+  }
+});
+
+test('groups: made by an account, joined from the invite link (a guest too), a board for members only', T, async () => {
+  const G = await guest(srv.url);
+  assert.equal(
+    (await api.send('POST', '/api/groups', G.cookie, { name: 'Гости' })).status,
+    403,
+    'an account makes one',
+  );
+  const made = await api.send('POST', '/api/groups', A.cookie, { name: '  Офис   3 ' });
+  assert.equal(made.status, 200);
+  const group = (await api.get(`/api/groups/${made.body.id}`, A.cookie)).body;
+  assert.deepEqual([group.name, group.isOwner, group.members], ['Офис 3', true, 1]);
+
+  // Anyone with the link sees what it's for, signed in or not.
+  const preview = await api.get(`/api/groups/join/${group.code}`);
+  assert.deepEqual(preview.body, { name: 'Офис 3', members: 1, owner: 'Иван_тест', memberOf: null, full: false });
+  assert.equal((await api.get(`/api/groups/${made.body.id}`, G.cookie)).status, 404, 'members only');
+  assert.deepEqual((await api.send('POST', `/api/groups/join/${group.code}`, G.cookie)).body, { id: made.body.id });
+  assert.equal((await api.get(`/api/groups/${made.body.id}`, G.cookie)).body.members, 2);
+  assert.equal((await api.get('/api/me', G.cookie)).body.user.groups, 1);
+  const [summary] = (await api.get('/api/groups', G.cookie)).body.groups;
+  assert.deepEqual([summary.name, summary.members], ['Офис 3', 2]);
+
+  // Only the one who made it renames it or removes people; anyone may leave.
+  assert.equal((await api.send('PATCH', `/api/groups/${made.body.id}`, G.cookie, { name: 'Мое' })).status, 400);
+  const renamed = await api.send('PATCH', `/api/groups/${made.body.id}`, A.cookie, { name: 'Офис 3 ☕' });
+  assert.equal(renamed.body.name, 'Офис 3 ☕');
+  assert.equal((await api.send('POST', `/api/groups/${made.body.id}/leave`, G.cookie)).status, 200);
+  assert.equal((await api.get('/api/groups', G.cookie)).body.groups.length, 0);
+  assert.equal((await api.send('DELETE', `/api/groups/${made.body.id}`, A.cookie)).status, 200);
+  assert.equal((await api.get(`/api/groups/join/${group.code}`)).status, 404);
+});
+
 test('ranked duel with a mid-game reconnect', T, async () => {
   // People rate each other once each has RATED_AFTER.games matches behind them: lent for this match, then given back,
   // so the counts the later tests check are the real ones.
@@ -688,6 +805,8 @@ test('daily challenge', T, async () => {
     shieldsUsed: 0,
     shieldEarned: false,
     sharer: null,
+    // Two played: too few to say how the day went for everyone.
+    field: null,
   });
   const info = await api.get('/api/daily', A.cookie);
   assert.equal(info.body.played.rank, 1);

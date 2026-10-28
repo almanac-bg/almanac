@@ -1,5 +1,5 @@
-import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, useNow } from '@quiz/client';
-import { answerPoints, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
+import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@quiz/client';
+import { answerPoints, type Crowd, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
@@ -176,6 +176,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             active && !number && <PowerupBar key="pw" game={game} offline={offline} />
           )}
         </AnimatePresence>
+        {reveal?.crowd && <CrowdNote crowd={reveal.crowd} number={number} />}
       </div>
       {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
       {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
@@ -236,6 +237,23 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
         )}
       </div>
     </motion.div>
+  );
+}
+
+/** „62% знаят“: how everyone who played this question before did on it (once enough have). */
+function CrowdNote({ crowd, number }: { crowd: Crowd; number: boolean }) {
+  const share = percent(crowd.known);
+  return (
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.35 }}
+      className="inline-flex items-center gap-1.5 text-sm text-fg-3"
+      title={`От ${fmt(crowd.answers)} отговора досега`}
+    >
+      <Users aria-hidden className="size-3.5" />
+      {number ? `${share} бяха близо` : crowd.known < 0.1 ? `Само ${share} знаят` : `${share} знаят`}
+    </motion.span>
   );
 }
 

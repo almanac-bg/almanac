@@ -1,9 +1,10 @@
-import { api, errorMessage, fmt, setState } from '@quiz/client';
+import { api, errorMessage, fmt, plural, setState } from '@quiz/client';
 import {
   BRAND,
   CATEGORIES,
   type ChallengePreview,
   type DailyPreview,
+  type GroupPreview,
   isQueueMode,
   MODES,
   type ModeId,
@@ -23,6 +24,7 @@ import {
   RotateCcw,
   Swords,
   TriangleAlert,
+  UsersRound,
   Zap,
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -62,7 +64,11 @@ export function AuthPage() {
   // Once signed in, the app opens the room or the challenge.
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const inviteCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
+  const roomCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
+  // A group's invite link (/groups/join/<code>): joined once signed in (or as a guest).
+  const groupCode = /^\/groups\/join\/([\w-]{1,16})\/?$/.exec(pathname)?.[1] ?? null;
+  // Either invite opens on the form, with what it's for above it.
+  const inviteCode = roomCode ?? groupCode;
   const challengeId = /^\/c\/([\w-]{1,16})\/?$/.exec(pathname)?.[1] ?? null;
   // The day's questions (/daily), or someone's link to them (/daily/<code>).
   const daily = /^\/daily(?:\/([\w-]{1,16}))?\/?$/.exec(pathname);
@@ -101,6 +107,10 @@ export function AuthPage() {
     challengeId ?? '',
   );
   const playable = !!preview.data && !preview.data.expired;
+  const group = useLoad<GroupPreview | null>(
+    () => (groupCode ? api.groupPreview(groupCode) : Promise.resolve(null)),
+    groupCode ?? '',
+  );
   const dailyPreview = useLoad<DailyPreview | null>(
     () => (daily ? api.dailyPreview(dailyCode ?? undefined) : Promise.resolve(null)),
     daily ? (dailyCode ?? '/') : '',
@@ -271,12 +281,30 @@ export function AuthPage() {
                       {challengeId ? 'Към предизвикателството' : daily ? 'Към въпросите на деня' : 'Назад'}
                     </button>
                   )}
-                  {inviteCode && (
+                  {roomCode && (
                     <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
                       <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
                       <span>
-                        Имаш покана за стая <b className="font-mono tracking-widest text-fg">{inviteCode}</b> — влез
-                        като гост или с профила си, за да се присъединиш.
+                        Имаш покана за стая <b className="font-mono tracking-widest text-fg">{roomCode}</b> — влез като
+                        гост или с профила си, за да се присъединиш.
+                      </span>
+                    </p>
+                  )}
+                  {groupCode && (
+                    <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
+                      <UsersRound aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
+                      <span>
+                        {group.data ? (
+                          <>
+                            Имаш покана за групата <b className="text-fg">„{group.data.name}“</b> (
+                            {plural(group.data.members, 'член', 'членове')}): седмична класация на въпросите на деня.
+                          </>
+                        ) : group.error ? (
+                          'Тази покана за група вече не е валидна — поискай нов линк.'
+                        ) : (
+                          'Имаш покана за група: седмична класация на въпросите на деня.'
+                        )}{' '}
+                        Влез като гост или с профила си, за да се присъединиш.
                       </span>
                     </p>
                   )}

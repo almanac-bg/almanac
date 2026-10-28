@@ -8,6 +8,7 @@ import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
+import { settleGroupWeeks } from './groups';
 import { purgeGuests } from './guests';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
@@ -186,6 +187,8 @@ export function startMaintenance() {
       const told = tellRecordOwners();
       if (told) console.log(`📼 Owners of recordings told how they did: ${told}`);
       tellExpiredDuels();
+      const weeks = settleGroupWeeks();
+      if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

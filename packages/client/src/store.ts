@@ -1,5 +1,6 @@
 import type {
   CategoryId,
+  Crowd,
   Difficulty,
   GameEndPayload,
   GamePlayer,
@@ -50,6 +51,8 @@ export interface ReviewItem {
   right: boolean;
   /** "Знаеше ли?" behind the answer, when the question has one. */
   fact: string | null;
+  /** How everyone before answered it, once enough have: „62% знаят“, and each option's share. */
+  crowd: Crowd | null;
 }
 
 export interface LiveGame {

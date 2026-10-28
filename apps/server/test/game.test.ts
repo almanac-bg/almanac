@@ -125,6 +125,7 @@ function setup(opts: {
       // In the order things happen: the score so far is saved before the answer goes out.
       progress: () => events.push({ to: 'hooks', event: 'progress', payload: null }),
       draining: () => draining,
+      crowd: () => null,
       shown: (_game, ids) => shown.push(ids),
       onClosed: () => {},
     },

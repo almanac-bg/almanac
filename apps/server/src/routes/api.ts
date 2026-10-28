@@ -19,6 +19,7 @@ import express, { type NextFunction, type Request, type Response, Router } from 
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
+import { factCount, factsInAll } from '../almanac';
 import { playCheck } from '../answers';
 import {
   confirmSession,
@@ -52,7 +53,7 @@ import {
 } from '../emailAuth';
 import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
-import { ACCOUNT_ONLY, createGuest } from '../guests';
+import { createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
 import { reportError } from '../monitoring';
 import { nameShape } from '../names';
@@ -92,8 +93,11 @@ import {
   type UserRow,
   usernameKey,
 } from '../users';
+import { idParam, parse, requireAccount } from './common';
+import { progress } from './progress';
 
 export const api = Router();
+api.use(progress);
 
 const Credentials = z
   .object({
@@ -123,31 +127,9 @@ const Login = z.object({
 const BROKEN_LINK = 'Линкът е непълен или повреден. Отвори го отново направо от писмото.';
 const Token = z.string().min(10, BROKEN_LINK).max(200, BROKEN_LINK);
 
-/**
- * The body, or a 400 with the first problem in it. Schemas give their messages in Bulgarian; anything they don't word
- * themselves gets a plain fallback rather than Zod's English.
- */
-function parse<T>(schema: z.ZodType<T>, req: Request, res: Response): T | null {
-  const parsed = schema.safeParse(req.body, { error: () => 'Невалидни данни.' });
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Невалидни данни.' });
-    return null;
-  }
-  return parsed.data;
-}
-
 function sameSecret(a: string, b: string) {
   const [x, y] = [Buffer.from(a), Buffer.from(b)];
   return x.length === y.length && timingSafeEqual(x, y);
-}
-
-/** For what needs a real account (see ACCOUNT_ONLY): guests are asked to claim theirs first. */
-function requireAccount(_req: Request, res: Response, next: NextFunction) {
-  if (getUser(res.locals.userId)?.is_guest) {
-    res.status(403).json({ error: ACCOUNT_ONLY });
-    return;
-  }
-  next();
 }
 
 function requireAdmin(_req: Request, res: Response, next: NextFunction) {
@@ -174,8 +156,6 @@ function requireRecentPassword(_req: Request, res: Response, next: NextFunction)
   }
   next();
 }
-
-const idParam = (req: Request) => Number(req.params.id);
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -995,10 +975,12 @@ function profileStats(u: UserRow, viewerId: number): ProfileStats {
       avgPlacement: m.avg_placement === null ? null : Math.round(m.avg_placement * 10) / 10,
       rating: isQueueMode(m.mode) ? (ratings[m.mode] ?? null) : null,
     })),
-    categories: all<{ category: CategoryId; answered: number; correct: number }>(
-      'SELECT category, answered, correct FROM category_stats WHERE user_id = ?',
+    categories: all<{ category: CategoryId; answered: number; correct: number; tier: number | null }>(
+      `SELECT c.category, c.answered, c.correct, m.tier FROM category_stats c
+       LEFT JOIN mastery m ON m.user_id = c.user_id AND m.category = c.category WHERE c.user_id = ?`,
       u.id,
-    ),
+    ).map((c) => ({ ...c })),
+    almanac: { facts: factCount(u.id), total: factsInAll() },
     recent: recent.map((r) => ({
       matchId: r.id,
       mode: r.mode,

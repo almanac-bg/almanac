@@ -6,6 +6,7 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar } from '../components/Avatar';
 import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
+import { DayField } from '../components/results/DayField';
 import { Button, Card, Spinner } from '../components/ui';
 import { dailyLinkUrl, offBoardLine } from '../lib/daily';
 import { useLoad } from '../lib/load';
@@ -150,6 +151,9 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                       total: info.total,
                     })}
                   </p>
+                )}
+                {info.played.field && (
+                  <DayField field={info.played.field} correct={info.played.correct} className="mt-5 max-w-sm" />
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button onClick={() => void share()}>

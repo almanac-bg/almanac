@@ -1,4 +1,5 @@
 import {
+  type CategoryMastery,
   DAILY_XP,
   dayKey,
   type FinalStanding,
@@ -14,10 +15,12 @@ import {
 } from '@quiz/shared';
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
+import { factCount, factsSince, noteMatch } from '../almanac';
 import { recordAnswers } from '../answers';
 import { DUEL, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
+import { settleMastery } from '../mastery';
 import { advanceQuests } from '../quests';
 import { noteRecordPlay } from '../records';
 import { recordRun } from '../runs';
@@ -140,18 +143,21 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       const p = game.participants.get(s.id)!;
       if (p.player.userId === null) continue;
       const r = rewardHuman(game, p, s, standings, deltas.get(s.id) ?? null, ratings.unrated.get(s.id) ?? null);
-      recordAnswers(game.id, p.player.userId, p.log);
-      recordRun({
-        matchId: game.id,
-        userId: p.player.userId,
-        mode: game.setup.mode,
-        category: game.setup.category,
-        rating: game.setup.ranked ? p.player.rating : null,
-        score: s.score,
-        correct: p.correct,
-        log: p.log,
-      });
-      recordSkill(p.player.userId, p.log);
+      // „Поправителен“ replays questions whose answers the player was shown: it says nothing about the questions, or
+      // about how anyone plays (a run of known answers isn't one to replay against, nor play to check).
+      if (setup.mode !== 'review') {
+        recordAnswers(game.id, p.player.userId, p.log);
+        recordRun({
+          matchId: game.id,
+          userId: p.player.userId,
+          mode: game.setup.mode,
+          category: game.setup.category,
+          rating: game.setup.ranked ? p.player.rating : null,
+          score: s.score,
+          correct: p.correct,
+          log: p.log,
+        });
+      }
       rewards.set(p.player.userId, r);
       // Played out against a recording: its owner hears how it did (not after a walkout, or a match we cut short).
       if (!game.cutShort && !game.forfeited(p)) {
@@ -190,6 +196,9 @@ function rewardHuman(
   // A match we cut short pays for what was played, but nobody won it.
   const won = multiplayer && s.placement === 1 && counts && !game.cutShort;
   const solo = setup.mode === 'solo';
+  // „Поправителен“: questions the player has seen answered. Its right answers pay, but it measures nobody's knowledge:
+  // no skill, accuracy, streaks, quests or match feats from it.
+  const review = setup.mode === 'review';
   const daily = setup.dailyDay !== null;
   const challenge = setup.challengeId !== null;
   // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
@@ -240,7 +249,7 @@ function rewardHuman(
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
   const full = game.questions.length;
-  if (counts && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
+  if (counts && !review && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
     lines.push({ label: 'Перфектен мач', amount: XP.perfect });
   }
   const today = dayKey();
@@ -273,7 +282,7 @@ function rewardHuman(
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
   // ── Daily quests ──
-  if (counts) {
+  if (counts && !review) {
     lines.push(
       ...advanceQuests(userId, {
         mode: setup.mode,
@@ -291,8 +300,10 @@ function rewardHuman(
 
   // ── Lifetime stats ──
   const counted = counts ? 1 : 0;
+  // What a review run knew it knew from being told: its answers stay out of the player's accuracy and records.
+  const known = review ? 0 : 1;
   const fastest =
-    p.fastestCorrectMs === null
+    p.fastestCorrectMs === null || review
       ? before.fastest_correct_ms
       : Math.min(before.fastest_correct_ms ?? Infinity, p.fastestCorrectMs);
   run(
@@ -303,11 +314,11 @@ function rewardHuman(
     before.games_played + counted,
     before.mp_games + (multiplayer ? counted : 0),
     before.wins + (realWin ? 1 : 0),
-    before.questions_answered + p.faced,
-    before.correct_answers + p.correct,
-    Math.max(before.best_streak, p.bestStreak),
+    before.questions_answered + p.faced * known,
+    before.correct_answers + p.correct * known,
+    Math.max(before.best_streak, p.bestStreak * known),
     fastest,
-    before.total_correct_ms + p.correctMs,
+    before.total_correct_ms + p.correctMs * known,
     before.powerups_used + p.usedPowerups.size,
     solo && counts ? Math.max(before.best_solo_score, s.score) : before.best_solo_score,
     before.hosted_games + (setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0),
@@ -315,7 +326,7 @@ function rewardHuman(
     lines.reduce((sum, l) => sum + l.amount, 0),
     userId,
   );
-  for (const [category, c] of p.categories) {
+  for (const [category, c] of review ? [] : p.categories) {
     run(
       `INSERT INTO category_stats (user_id, category, answered, correct, correct_ms) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (user_id, category) DO UPDATE SET answered = answered + excluded.answered,
@@ -335,6 +346,14 @@ function rewardHuman(
     recordRating(userId, setup.mode, old + ratingDelta, won, counts);
     rating = { before: Math.round(old), after: Math.round(old + ratingDelta) };
   }
+
+  // ── What the match taught: skill and mastery, „Моят алманах“, „Поправителен“ ──
+  let mastery: CategoryMastery[] = [];
+  if (!review) {
+    recordSkill(userId, p.log);
+    mastery = settleMastery(userId, p.categories.keys());
+  }
+  noteMatch(userId, p.log, review);
 
   // ── Achievements ──
   const topScore = Math.max(...standings.map((x) => x.score));
@@ -364,7 +383,8 @@ function rewardHuman(
     ),
     topScorer: s.score === topScore && s.score > 0,
   };
-  const unlocked = settleAchievements(userId, match);
+  // A review run's feats were played on known answers: only what counts over time (levels, facts) can come of it.
+  const unlocked = settleAchievements(userId, review ? null : match);
   lines.push(...unlocked.lines);
 
   const xpAfter = getUser(userId)!.xp;
@@ -382,6 +402,9 @@ function rewardHuman(
     daily: dailyResult,
     challenge: challengeResult,
     soloBest: solo && counts ? before.best_solo_score : null,
+    // Read during the match (stopped on, in a run alone) or got right in it.
+    almanac: { added: factsSince(userId, game.startedAt), total: factCount(userId) },
+    mastery,
   };
 }
 

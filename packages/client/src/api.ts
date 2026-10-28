@@ -1,12 +1,18 @@
 import type {
   AchievementProgress,
+  AlmanacCategoryPage,
+  AlmanacOverview,
   AppNotification,
+  CategoryId,
   ChallengeInfo,
   ChallengePreview,
   DailyInfo,
   DailyPreview,
   DuelEntry,
   FriendsResponse,
+  GroupInfo,
+  GroupPreview,
+  GroupSummary,
   LaunchStats,
   LeaderboardBoard,
   LeaderboardResponse,
@@ -175,4 +181,18 @@ export const api = {
     request<{ ok: true; pending: number }>('POST', `/admin/submissions/${id}/approve`, { edits }),
   rejectSubmission: (id: number, reason: string) =>
     request<{ ok: true; pending: number }>('POST', `/admin/submissions/${id}/reject`, { reason }),
+
+  almanac: () => request<AlmanacOverview>('GET', '/almanac'),
+  almanacCategory: (category: CategoryId) => request<AlmanacCategoryPage>('GET', `/almanac/${category}`),
+
+  groups: () => request<{ groups: GroupSummary[] }>('GET', '/groups'),
+  createGroup: (name: string) => request<{ id: number }>('POST', '/groups', { name }),
+  group: (id: number) => request<GroupInfo>('GET', `/groups/${id}`),
+  renameGroup: (id: number, name: string) => request<GroupInfo>('PATCH', `/groups/${id}`, { name }),
+  newGroupLink: (id: number) => request<GroupInfo>('POST', `/groups/${id}/code`),
+  removeFromGroup: (id: number, userId: number) => request<GroupInfo>('DELETE', `/groups/${id}/members/${userId}`),
+  deleteGroup: (id: number) => request<{ ok: true }>('DELETE', `/groups/${id}`),
+  leaveGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/leave`),
+  groupPreview: (code: string) => request<GroupPreview>('GET', `/groups/join/${encodeURIComponent(code)}`),
+  joinGroup: (code: string) => request<{ id: number }>('POST', `/groups/join/${encodeURIComponent(code)}`),
 };

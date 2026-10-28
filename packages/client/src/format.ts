@@ -18,6 +18,9 @@ export const seconds = (ms: number) => `${(ms / 1000).toFixed(1).replace('.', ',
 
 export const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
+/** A share, 0–1, as a percentage: 0.623 → "62%". */
+export const percent = (share: number) => `${Math.round(share * 100)}%`;
+
 export const longDate = (ts: number) =>
   new Date(ts).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' });
 

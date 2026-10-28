@@ -16,6 +16,7 @@ import {
   CATEGORIES,
   isQueueMode,
   levelProgress,
+  MASTERY_TIERS,
   MODES,
   type ModeId,
   type ProfileStats,
@@ -146,7 +147,12 @@ export function ProfilePage() {
           />
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
           <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
-          <Stat label="Изиграни козове" value={fmt(o.powerupsUsed)} />
+          <Stat
+            label="Факти в алманаха"
+            value={`📖 ${fmt(data.almanac.facts)}`}
+            hint={`от ${fmt(data.almanac.total)}`}
+            to={isMe ? '/almanac' : undefined}
+          />
           <Stat label="Дневна серия" value={`🗓️ ${o.dailyStreak}`} hint={`Най-дълга: ${o.bestDailyStreak}`} />
           <Stat label="Одобрени въпроси" value={`✍️ ${o.questionsApproved}`} />
         </div>
@@ -185,7 +191,8 @@ export function ProfilePage() {
             {played.map((id) => {
               const m = data.modes.find((x) => x.mode === id);
               const mode = MODES[id];
-              const multiplayer = id !== 'solo';
+              // Played alone (the daily too): no wins to count.
+              const multiplayer = id !== 'solo' && id !== 'daily';
               return (
                 <div key={id} className="flex items-center gap-4 px-5 py-3.5">
                   <span
@@ -474,13 +481,21 @@ function ReportButton({ username }: { username: string }) {
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="p-4 sm:p-5">
+/** A number with what it is; `to`: where its details are (your own almanac). */
+function Stat({ label, value, hint, to }: { label: string; value: string; hint?: string; to?: string }) {
+  const body = (
+    <>
       <div className="text-xs font-semibold text-fg-3">{label}</div>
       <div className="mt-1.5 text-2xl font-bold sm:text-[1.7rem]">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-fg-3">{hint}</div>}
-    </Card>
+    </>
+  );
+  return to ? (
+    <Link to={to} className="focus-ring glass block rounded-3xl p-4 transition-colors hover:bg-white/[0.06] sm:p-5">
+      {body}
+    </Link>
+  ) : (
+    <Card className="p-4 sm:p-5">{body}</Card>
   );
 }
 
@@ -492,8 +507,9 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
   const [active, setActive] = useState<string | null>(null);
   const rows = CATEGORIES.map((c) => {
     const s = categories.find((x) => x.category === c.id);
-    return { ...c, answered: s?.answered ?? 0, correct: s?.correct ?? 0 };
+    return { ...c, answered: s?.answered ?? 0, correct: s?.correct ?? 0, tier: s?.tier ?? null };
   });
+  const tiered = rows.some((r) => r.tier !== null);
   const BAR = '#a78bfa';
 
   // biome-ignore-start lint/a11y/useSemanticElements: CSS-grid rows; a <table> restyled so can lose its semantics
@@ -517,6 +533,12 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
             <span role="cell" className="flex min-w-0 items-center gap-2 text-sm text-fg-2">
               <span aria-hidden>{r.icon}</span>
               <span className="truncate">{r.name}</span>
+              {r.tier !== null && (
+                <span title={MASTERY_TIERS[r.tier].name} className="shrink-0">
+                  <span aria-hidden>{MASTERY_TIERS[r.tier].icon}</span>
+                  <span className="sr-only"> ({MASTERY_TIERS[r.tier].name})</span>
+                </span>
+              )}
             </span>
             <span role="cell" className="relative h-2.5">
               {/* The baseline the bar grows from; with no answers it would stand alone, a tick that reads as a glitch. */}
@@ -561,6 +583,16 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
         );
       })}
       <p className="pt-2 text-xs text-fg-3">Дял верни отговори от всички зададени въпроси в категорията.</p>
+      {tiered && (
+        <p className="flex flex-wrap gap-x-2 text-xs text-fg-3">
+          Майсторство:
+          {MASTERY_TIERS.map((t) => (
+            <span key={t.id} className="whitespace-nowrap">
+              <span aria-hidden>{t.icon}</span> {t.name}
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   );
   // biome-ignore-end lint/a11y/useSemanticElements: end of the grid-laid table

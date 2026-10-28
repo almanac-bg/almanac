@@ -130,11 +130,18 @@ const QUESTIONS_PATH = process.env.QUESTIONS_PATH ?? PRIVATE_BANK.find((file) =>
 let everything: Map<string, PlayableQuestion> | null = null;
 let bank: Question[] | null = null;
 let numbers: NumberQuestion[] | null = null;
+let playable: Map<string, PlayableQuestion> | null = null;
 
 /** Every question by id, hidden ones included (for moderation and reports). */
 export function questionById(id: string): PlayableQuestion | undefined {
   questionBank();
   return everything!.get(id);
+}
+
+/** A question new matches may play (not hidden, not waiting for a format the game can't play yet). */
+export function inPlay(id: string): PlayableQuestion | undefined {
+  questionBank();
+  return playable!.get(id);
 }
 
 /** An option as shown in a match, as the bank orders them (null if the question has changed since it was drawn). */
@@ -166,7 +173,7 @@ export const withoutAuthors = (questions: PreparedQuestion[]): PreparedQuestion[
  * hidden ones.
  */
 export function questionBank(): Question[] {
-  if (!bank) ({ everything, bank, numbers } = loadBank());
+  if (!bank) ({ everything, bank, numbers, playable } = loadBank());
   return bank;
 }
 
@@ -187,7 +194,7 @@ export const bankProblem = () => reloadFailure;
  */
 export function reloadQuestionBank() {
   try {
-    ({ everything, bank, numbers } = loadBank());
+    ({ everything, bank, numbers, playable } = loadBank());
     reloadFailure = null;
   } catch (err) {
     reloadFailure = err instanceof Error ? err.message : String(err);
@@ -231,7 +238,12 @@ function readBankFile(): { choice: Question[]; number: NumberQuestion[]; order: 
 let waiting = { order: 0, image: 0 };
 export const waitingFormats = () => waiting;
 
-function loadBank(): { everything: Map<string, PlayableQuestion>; bank: Question[]; numbers: NumberQuestion[] } {
+function loadBank(): {
+  everything: Map<string, PlayableQuestion>;
+  bank: Question[];
+  numbers: NumberQuestion[];
+  playable: Map<string, PlayableQuestion>;
+} {
   const file = readBankFile();
   waiting = { order: file.order.length, image: file.choice.filter((q) => q.image).length };
   const builtIn = file.choice;
@@ -270,7 +282,7 @@ function loadBank(): { everything: Map<string, PlayableQuestion>; bank: Question
       '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
     );
   }
-  return { everything, bank, numbers };
+  return { everything, bank, numbers, playable: new Map([...bank, ...numbers].map((q) => [q.id, q])) };
 }
 
 export type Rng = () => number;

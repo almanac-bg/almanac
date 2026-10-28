@@ -8,10 +8,13 @@ import {
   type UnlockContext,
 } from '@quiz/shared';
 import { settleAchievements } from './achievements';
+import { factCount, reviewQueue } from './almanac';
 import { verifyPassword } from './auth';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
 import { incomingRequests } from './friends';
+import { dropEmptyGroups, groupIdsOf } from './groups';
+import { earnedMastery } from './mastery';
 import { unreadNotifications } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { reloadQuestionBank } from './questions';
@@ -24,6 +27,7 @@ export function unlockContext(userId: number): UnlockContext {
     level: levelFromXp(getUser(userId)!.xp),
     achievements: achievementSet(userId),
     seasonTier: bestSeasonTier(userId),
+    mastery: Object.fromEntries(earnedMastery(userId).map((m) => [m.category, m.tier])),
   };
 }
 
@@ -87,6 +91,9 @@ export function getMe(userId: number): MeUser | null {
     email: row.email,
     emailBounced: row.email_bounced_at !== null,
     pendingEmail: row.pending_email,
+    mastery: earnedMastery(userId).map((m) => ({ ...m })),
+    almanac: { facts: factCount(userId), due: reviewQueue(userId).due },
+    groups: groupIdsOf(userId).length,
   };
 }
 
@@ -135,6 +142,18 @@ export function exportAccount(userId: number) {
       'SELECT match_id, mode, category, rating, score, correct, answers, played_at FROM runs WHERE user_id = ?',
     ).map((r) => ({ ...r, answers: JSON.parse(String(r.answers)) })),
     skill: rows('SELECT category, rating, answers FROM player_skill WHERE user_id = ?'),
+    // „Моят алманах“ (questions got right, or stopped on to read), „Поправителен“, category mastery.
+    learned: rows('SELECT question_id, learned_at FROM learned WHERE user_id = ? ORDER BY learned_at'),
+    reviewQueue: rows('SELECT question_id, step, due_at FROM review_queue WHERE user_id = ? ORDER BY due_at'),
+    mastery: rows('SELECT category, tier, earned_at FROM mastery WHERE user_id = ?'),
+    groups: rows(
+      `SELECT g.name, g.owner_id = m.user_id AS owner, m.joined_at FROM group_members m
+       JOIN player_groups g ON g.id = m.group_id WHERE m.user_id = ?`,
+    ),
+    groupWeeksWon: rows(
+      `SELECT g.name, w.week, w.score FROM group_weeks w JOIN player_groups g ON g.id = w.group_id
+       WHERE w.winner_id = ?`,
+    ),
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
     challengesCreated: rows('SELECT id, rival_id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
     // Friend duels others started with this player.
@@ -197,10 +216,13 @@ export async function deleteAccount(
 export function eraseAccount(userId: number) {
   removeFromPlay(userId);
   tx(() => {
+    const groups = groupIdsOf(userId);
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
     // Reports they filed stay for the record, but their words go with them.
     run('UPDATE reports SET details = NULL WHERE reporter_id = ?', userId);
     run('DELETE FROM users WHERE id = ?', userId);
+    // A group they were the last in goes with them.
+    dropEmptyGroups(groups);
   });
   disconnectUser(userId);
 }

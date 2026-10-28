@@ -64,6 +64,16 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
 }
 
+/** The Monday (a day key) of the week a day is in: weeks run Monday to Sunday, Sofia time. */
+export function weekStart(day: string): string {
+  const { y, m, d } = parseDay(day);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sunday
+  return shiftDay(day, -((weekday + 6) % 7));
+}
+
+/** When the week starting on this Monday ends: 00:00 Sofia time the next Monday. */
+export const weekEndsAt = (monday: string) => dayEndsAt(shiftDay(monday, 6));
+
 /** The first day of „Въпросите на деня“ (the day the site opened): №1. */
 export const FIRST_DAY = '2026-10-25';
 

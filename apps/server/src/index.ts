@@ -9,6 +9,7 @@ import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
 import { db } from './db';
+import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
 import { bankProblem, questionBank } from './questions';
@@ -209,6 +210,11 @@ if (fs.existsSync(config.webDist)) {
       res.type('html').send(joinPage(page, req.path, join));
       return;
     }
+    const group = /^\/groups\/join\/([^/]+)$/.exec(req.path)?.[1];
+    if (group) {
+      res.type('html').send(groupInvitePage(page, req.path, group));
+      return;
+    }
     const pub = publicPages.get(req.path);
     if (pub) {
       // The landing page is drawn for a visitor without a session (in the version for a device that has signed in
@@ -350,6 +356,17 @@ function joinPage(html: string, at: string, code: string): string {
   return withHead(html, {
     title: room ? `${room.host} те кани в стая ${code} — ${BRAND.name}` : `Покана за стая ${code} — ${BRAND.name}`,
     description: `До ${ROOM_LIMITS.maxPlayers[1]} играчи, без регистрация: влизаш с един тап.`,
+    url: `${config.appUrl}${at}`,
+    index: false,
+  });
+}
+
+/** A group's invite link (/groups/join/<code>): which group, and what it's for. */
+function groupInvitePage(html: string, at: string, code: string): string {
+  const group = groupPreview(code.slice(0, 16), null);
+  return withHead(html, {
+    title: group ? `Покана за групата „${group.name}“ — ${BRAND.name}` : `Покана за група — ${BRAND.name}`,
+    description: `Седмична класация на въпросите на деня${group ? ` · ${group.members} в групата` : ''}. Без регистрация: влизаш с един тап.`,
     url: `${config.appUrl}${at}`,
     index: false,
   });

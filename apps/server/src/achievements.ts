@@ -7,6 +7,7 @@ import {
   tierIndex,
   type XpLine,
 } from '@quiz/shared';
+import { factCount } from './almanac';
 import { all, one, run } from './db';
 import { bestSeasonTier } from './seasons';
 import { getUser } from './users';
@@ -36,6 +37,8 @@ export interface Aggregate {
   friends: number;
   approvedQuestions: number;
   bestSeasonTier: number;
+  /** Facts in „Моят алманах“. */
+  facts: number;
 }
 
 /** What happened in the match that just ended, for one player. */
@@ -91,6 +94,9 @@ const RULES: Record<string, Rule> = {
   correct_1000: { progress: (a) => a.correct },
   polymath: { progress: (a) => a.categoriesCovered },
   specialist: { progress: (a) => a.maxCategoryCorrect },
+  almanac_100: { progress: (a) => a.facts },
+  almanac_500: { progress: (a) => a.facts },
+  almanac_1000: { progress: (a) => a.facts },
   high_scorer: { progress: (a) => a.bestSoloScore },
   power_player: { progress: (a) => a.powerupsUsed },
   // Not with eliminations: whoever is last at halfway is knocked out there.
@@ -166,6 +172,7 @@ export function loadAggregate(userId: number): Aggregate {
     ),
     approvedQuestions: count('SELECT COUNT(*) AS n FROM questions WHERE author_id = ?', userId),
     bestSeasonTier: bestSeasonTier(userId),
+    facts: factCount(userId),
   };
 }
 

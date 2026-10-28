@@ -1,11 +1,15 @@
 import { fmt, plural, type ReviewItem, unlockPreview, useStore } from '@quiz/client';
 import {
   achievementById,
+  type CategoryMastery,
+  categoryById,
   type DailySharer,
   dayKey,
   levelFromXp,
   levelProgress,
+  MASTERY_TIERS,
   type MatchRewards,
+  masteryName,
   RARITIES,
   RATED_AFTER,
   RATED_GAMES_PER_PAIR,
@@ -23,6 +27,7 @@ import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
+import { DayField } from './DayField';
 
 /**
  * The day's standing (or, off the board, where the run would stand on it), the friend whose link it came from, and the
@@ -72,6 +77,9 @@ export function DailyCard({
       </div>
       {daily.offBoard && (
         <p className="relative mt-2 text-sm text-fg-2">{offBoardWhy({ guest: !!me?.isGuest, madeToday })}</p>
+      )}
+      {daily.field && (
+        <DayField field={daily.field} correct={history.filter((h) => h.right).length} className="relative mt-4" />
       )}
       {daily.sharer && (
         <AgainstSharer sharer={daily.sharer} score={score} correct={history.filter((h) => h.right).length} of={total} />
@@ -306,6 +314,39 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
           );
         })}
       </div>
+    </Card>
+  );
+}
+
+/** Category mastery this match earned: a tier in a category, and its title to wear. */
+export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
+  return (
+    <Card className="relative overflow-hidden p-6">
+      <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-emerald-400/20" />
+      <h2 className="relative t-card">Майсторство</h2>
+      <ul className="relative mt-4 space-y-3">
+        {mastery.map((m, i) => {
+          const tier = MASTERY_TIERS[m.tier];
+          const category = categoryById(m.category);
+          return (
+            <motion.li
+              key={m.category}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 1 + i * 0.1, type: 'spring', stiffness: 260, damping: 18 }}
+              className="flex items-center gap-3"
+            >
+              <span aria-hidden className="text-4xl leading-none">
+                {tier.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="font-display text-lg font-bold">{masteryName(m)}</p>
+                <p className="text-sm text-fg-2">{category?.icon} Нова степен — и титла, която можеш да носиш.</p>
+              </div>
+            </motion.li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

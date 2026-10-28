@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelButton, DuelRow, useDuels, usePlayDuel } from '../components/duels';
+import { GroupsSection } from '../components/groups';
 import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
@@ -49,6 +50,7 @@ function GuestFriends() {
           — за това не ти трябва профил.
         </p>
       </Card>
+      <GroupsSection />
       <ClaimAccountModal
         open={open}
         onClose={() => setOpen(false)}
@@ -121,6 +123,7 @@ function Friends() {
       </div>
 
       <DuelsSection />
+      <GroupsSection />
 
       {data.incoming.length > 0 && (
         <section>

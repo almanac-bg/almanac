@@ -4,6 +4,7 @@ import {
   answerPoints,
   type CategoryChoice,
   type CategoryId,
+  type Crowd,
   closeness,
   type Difficulty,
   eliminationSchedule,
@@ -100,6 +101,8 @@ export interface GameHooks {
   progress(game: Game): void;
   /** The server is about to stop: a run waiting for an absent player shouldn't hold it up. */
   draining(): boolean;
+  /** How everyone who played a question before answered it (for its reveal), once enough have. */
+  crowd(q: PreparedQuestion): Crowd | null;
   /** A picked round's questions: now its players have seen them (the start only knew the others). */
   shown(game: Game, questionIds: string[]): void;
   /** The match ended while this player was offline: they get the result when they're back. */
@@ -820,9 +823,20 @@ export class Game {
       eliminated,
       nextInMs,
       fact: q.fact ?? null,
+      crowd: this.crowdOf(q),
     });
     this.botReactions(results);
     this.later(nextInMs, () => this.advance());
+  }
+
+  /** The question's crowd shares, or none if they can't be had: a reveal never waits on them. */
+  private crowdOf(q: PreparedQuestion): Crowd | null {
+    try {
+      return this.hooks.crowd(q);
+    } catch (err) {
+      void reportError(err, 'crowd shares', { extra: { match: this.id, question: q.id } });
+      return null;
+    }
   }
 
   private end() {
@@ -1188,7 +1202,8 @@ export class Game {
         q.kind === 'number'
           ? { unit: q.number.unit, min: q.number.min, max: q.number.max, step: q.number.step, scale: q.number.scale }
           : null,
-      final: this.index === this.questions.length - 1 && this.questions.length > 1,
+      // „Поправителен“ has no final: just the questions coming back.
+      final: this.index === this.questions.length - 1 && this.questions.length > 1 && this.setup.mode !== 'review',
       author: questionAuthor(q.id),
       durationMs: this.limitMs,
       remainingMs: Math.max(0, this.limitMs - this.elapsed()),

@@ -1,13 +1,17 @@
 import { api, errorMessage, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 import {
   AVATARS,
+  CATEGORIES,
   EMOTES,
   FRAMES,
   type Loadout,
+  MASTERY_TIERS,
+  masteryTitleId,
   meetsRequirement,
   POWERUPS,
   type Requirement,
   TITLES,
+  type TitleDef,
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
@@ -131,38 +135,55 @@ export function LockerPage() {
             </Grid>
           )}
           {tab === 'title' && (
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-              {TITLES.map((t) => {
-                const open = unlocked(t.req);
-                const equipped = me.title === t.id;
-                return (
-                  <button
+            <>
+              <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                {TITLES.filter((t) => !('mastery' in t.req)).map((t) => (
+                  <TitleButton
                     key={t.id}
-                    type="button"
-                    disabled={!open || equipped}
-                    onClick={() => equip({ title: t.id })}
-                    className={clsx(
-                      'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
-                      open && !equipped && 'hover:bg-white/10',
-                      equipped && 'border-violet-400/60 bg-violet-500/15',
-                      !open && 'opacity-55',
-                    )}
-                  >
-                    <span>
-                      <span className="block font-semibold">{t.name}</span>
-                      <span className="text-xs text-fg-3">
-                        {open ? (equipped ? 'Избрана' : 'Избери') : requirementLabel(t.req)}
-                      </span>
-                    </span>
-                    {equipped ? (
-                      <Check className="size-5 text-violet-300" />
-                    ) : (
-                      !open && <Lock className="size-4 text-fg-3" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                    title={t}
+                    open={unlocked(t.req)}
+                    equipped={me.title === t.id}
+                    onEquip={() => equip({ title: t.id })}
+                  />
+                ))}
+              </div>
+              {/* A category's three tiers side by side: thirty titles in a list would bury the rest. */}
+              <section aria-labelledby="mastery-titles" className="mt-8">
+                <h2 id="mastery-titles" className="t-section">
+                  Майсторство
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-fg-3">
+                  Степен във всяка категория според това колко добре я знаеш спрямо останалите играчи (след поне 30
+                  отговора в нея). Веднъж стигната, остава твоя.
+                </p>
+                <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
+                  {CATEGORIES.map((c) => (
+                    <div key={c.id} className="glass rounded-2xl p-3">
+                      <p className="px-1 text-sm font-semibold">
+                        <span aria-hidden>{c.icon}</span> {c.name}
+                      </p>
+                      <div className="mt-2 grid grid-cols-3 gap-1.5">
+                        {MASTERY_TIERS.map((tier, i) => {
+                          const t = TITLES.find((x) => x.id === masteryTitleId({ category: c.id, tier: i }))!;
+                          return (
+                            <TitleButton
+                              key={t.id}
+                              title={t}
+                              label={tier.name}
+                              icon={tier.icon}
+                              open={unlocked(t.req)}
+                              equipped={me.title === t.id}
+                              onEquip={() => equip({ title: t.id })}
+                              compact
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
           )}
           {tab === 'emote' && (
             <>
@@ -265,5 +286,69 @@ function Item({
         )}
       </motion.button>
     </div>
+  );
+}
+
+/**
+ * A title to wear: picked with a tap once it's unlocked; until then, what it takes. `compact`: a mastery tier in its
+ * category's row (`icon` and `label` say which; the button's name says it in full).
+ */
+function TitleButton({
+  title: t,
+  label,
+  icon,
+  open,
+  equipped,
+  onEquip,
+  compact,
+}: {
+  title: TitleDef;
+  label?: string;
+  icon?: string;
+  open: boolean;
+  equipped: boolean;
+  onEquip: () => void;
+  compact?: boolean;
+}) {
+  const state = open ? (equipped ? 'Избрана' : 'Избери') : compact ? 'заключена' : requirementLabel(t.req);
+  if (compact)
+    return (
+      <button
+        type="button"
+        disabled={!open || equipped}
+        onClick={onEquip}
+        aria-label={`${t.name}: ${open ? state.toLowerCase() : requirementLabel(t.req)}`}
+        className={clsx(
+          'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-white/[0.03] px-1.5 py-2 text-center transition-colors',
+          open && !equipped && 'hover:bg-white/10',
+          equipped && 'border-violet-400/60 bg-violet-500/15',
+          !open && 'opacity-55',
+        )}
+      >
+        <span aria-hidden className="text-lg leading-6">
+          {equipped ? <Check className="mx-auto size-5 text-violet-300" /> : icon}
+        </span>
+        <span className="max-w-full truncate text-sm font-semibold">{label}</span>
+        <span className="text-[11px] text-fg-3">{state}</span>
+      </button>
+    );
+  return (
+    <button
+      type="button"
+      disabled={!open || equipped}
+      onClick={onEquip}
+      className={clsx(
+        'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
+        open && !equipped && 'hover:bg-white/10',
+        equipped && 'border-violet-400/60 bg-violet-500/15',
+        !open && 'opacity-55',
+      )}
+    >
+      <span>
+        <span className="block font-semibold">{t.name}</span>
+        <span className="text-xs text-fg-3">{state}</span>
+      </span>
+      {equipped ? <Check className="size-5 text-violet-300" /> : !open && <Lock className="size-4 text-fg-3" />}
+    </button>
   );
 }

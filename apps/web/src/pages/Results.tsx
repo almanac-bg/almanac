@@ -1,7 +1,7 @@
 import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
-import { categoryById, isQueueMode, MODES, TEAMS } from '@quiz/shared';
+import { categoryById, isQueueMode, MODES, REVIEW, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
+import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -16,6 +16,7 @@ import { RematchStrip, useRematch } from '../components/results/Rematch';
 import {
   AchievementsCard,
   DailyCard,
+  MasteryCard,
   RatingCard,
   RatingChip,
   RewardsCard,
@@ -39,6 +40,9 @@ export function Results({ game }: { game: LiveGame }) {
   const solo = end.mode === 'solo';
   const daily = end.mode === 'daily';
   const challenge = end.mode === 'challenge';
+  const review = end.mode === 'review';
+  // More missed questions back already: another „Поправителен“; else the almanac they went into.
+  const moreReview = review && (me?.almanac.due ?? 0) >= REVIEW.min;
   const single = game.start.players.length === 1;
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
@@ -66,7 +70,12 @@ export function Results({ game }: { game: LiveGame }) {
   const rewardsCard = !end.noContest || (!!rewards && rewards.xpGained > 0);
   const sideCards =
     !!rewards &&
-    (!!rewards.daily || rewards.achievements.length > 0 || rewards.unlocks.length > 0 || !!rewards.rating || !!unrated);
+    (!!rewards.daily ||
+      rewards.achievements.length > 0 ||
+      rewards.unlocks.length > 0 ||
+      !!rewards.mastery?.length ||
+      !!rewards.rating ||
+      !!unrated);
   const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
@@ -113,6 +122,17 @@ export function Results({ game }: { game: LiveGame }) {
     if (mode === 'solo') {
       setBusy(true);
       const res = await actions.startSolo(game.start.category);
+      setBusy(false);
+      if (!res.ok) toast({ kind: 'error', title: res.error });
+      return;
+    }
+    if (mode === 'review') {
+      if (!moreReview) {
+        navigate('/almanac');
+        return;
+      }
+      setBusy(true);
+      const res = await actions.startReview();
       setBusy(false);
       if (!res.ok) toast({ kind: 'error', title: res.error });
       return;
@@ -336,6 +356,7 @@ export function Results({ game }: { game: LiveGame }) {
               />
             )}
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
+            {!!rewards.mastery?.length && <MasteryCard mastery={rewards.mastery} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
             {rewards.rating && <RatingCard rating={rewards.rating} />}
             {unrated && <UnratedCard reason={unrated} guest={guest} />}
@@ -343,7 +364,7 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       </div>
 
-      <LearnedToday items={game.history} />
+      <LearnedToday items={game.history} added={rewards?.almanac?.added ?? 0} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
       {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a
@@ -404,6 +425,10 @@ export function Results({ game }: { game: LiveGame }) {
                 <>
                   Обратно в стаята <ArrowRight className="size-5" />
                 </>
+              ) : review && !moreReview ? (
+                <>
+                  <BookOpen className="size-5" /> Моят алманах
+                </>
               ) : (
                 <>
                   <RotateCcw className="size-5" /> Играй пак
@@ -411,8 +436,9 @@ export function Results({ game }: { game: LiveGame }) {
               )}
             </Button>
           )}
-          {/* The daily and a challenge link share from their own cards (with the board and the link). */}
-          {!daily && !challenge && !end.noContest && (
+          {/* The daily and a challenge link share from their own cards (with the board and the link); a review run
+              is practice on questions already shown, nothing to show off. */}
+          {!daily && !challenge && !review && !end.noContest && (
             <Button
               size="lg"
               variant="secondary"

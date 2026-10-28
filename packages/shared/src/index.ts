@@ -3,6 +3,7 @@ export * from './achievements';
 export * from './brand';
 export * from './categories';
 export * from './cosmetics';
+export * from './mastery';
 export * from './modes';
 export * from './numbers';
 export * from './progression';

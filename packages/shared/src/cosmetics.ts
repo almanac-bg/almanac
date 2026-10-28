@@ -1,13 +1,26 @@
+import type { CategoryId } from './categories';
+import { type CategoryMastery, MASTERY_TITLES } from './mastery';
 import { RANK_TIERS, type RankTierId } from './progression';
 
-/** Unlocked by reaching a level, earning an achievement, or finishing a season at a rank tier (or higher). */
-export type Requirement = { level: number } | { achievement: string } | { season: RankTierId };
+/**
+ * Unlocked by reaching a level, earning an achievement, finishing a season at a rank tier (or higher), or earning a
+ * category's mastery tier (or higher).
+ */
+export type Requirement =
+  | { level: number }
+  | { achievement: string }
+  | { season: RankTierId }
+  | { mastery: CategoryMastery };
 
-/** What a player has, for checking requirements. `seasonTier` is the best finished-season tier index (-1 = none). */
+/**
+ * What a player has, for checking requirements. `seasonTier` is the best finished-season tier index (-1 = none);
+ * `mastery`, the tier earned in each category (none: not there).
+ */
 export interface UnlockContext {
   level: number;
   achievements: ReadonlySet<string>;
   seasonTier: number;
+  mastery: Partial<Record<CategoryId, number>>;
 }
 
 export interface AvatarDef {
@@ -252,6 +265,8 @@ export const TITLES: TitleDef[] = [
   { id: 'season_gold', name: 'Златен сезон', req: { season: 'gold' } },
   { id: 'season_diamond', name: 'Диамантен ум', req: { season: 'diamond' } },
   { id: 'season_master', name: 'Сезонно майсторство', req: { season: 'master' } },
+  // „Майстор · История“: one for each category and mastery tier.
+  ...MASTERY_TITLES.map((t) => ({ id: t.id, name: t.name, req: { mastery: t.mastery } })),
 ];
 
 export const EMOTES: EmoteDef[] = [
@@ -319,6 +334,7 @@ export const tierIndex = (tier: RankTierId) => RANK_TIERS.findIndex((t) => t.id 
 export function meetsRequirement(req: Requirement, ctx: UnlockContext): boolean {
   if ('level' in req) return ctx.level >= req.level;
   if ('achievement' in req) return ctx.achievements.has(req.achievement);
+  if ('mastery' in req) return (ctx.mastery[req.mastery.category] ?? -1) >= req.mastery.tier;
   return ctx.seasonTier >= tierIndex(req.season);
 }
 

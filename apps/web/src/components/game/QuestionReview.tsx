@@ -1,4 +1,4 @@
-import { api, errorMessage, type ReviewItem, toast, useStore } from '@quiz/client';
+import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, X } from 'lucide-react';
@@ -103,7 +103,14 @@ function ReviewRow({
                 ? 'Без отговор'
                 : `Ти: ${numberText(item.number.guess, item.number)} (${offText(item.number.guess, item.number.answer, item.number)})`}
             </p>
+            {item.crowd && (
+              <p className="mt-1 text-xs text-fg-3">
+                {percent(item.crowd.known)} от всички бяха близо (от {fmt(item.crowd.answers)} отговора)
+              </p>
+            )}
           </>
+        ) : item.crowd?.picks ? (
+          <OptionShares item={item} picks={item.crowd.picks} answers={item.crowd.answers} />
         ) : (
           <>
             <p className="mt-1.5 text-sm text-emerald-300">
@@ -141,6 +148,49 @@ function ReviewRow({
         </button>
       )}
     </li>
+  );
+}
+
+/** Every option with the share of everyone who picked it: the right one, yours, and what tempted the rest. */
+function OptionShares({ item, picks, answers }: { item: ReviewItem; picks: number[]; answers: number }) {
+  const yours = item.choice !== null && item.choice >= 0 ? item.choice : null;
+  return (
+    <>
+      <ul className="mt-2 space-y-1">
+        {item.options.map((text, i) => {
+          const right = i === item.correct;
+          const mine = i === yours;
+          return (
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: the four options are fixed slots (А–Г)
+              key={i}
+              className="relative overflow-hidden rounded-lg bg-white/[0.03] px-2.5 py-1 text-sm"
+            >
+              <span
+                aria-hidden
+                className={clsx(
+                  'absolute inset-y-0 left-0 rounded-lg',
+                  right ? 'bg-emerald-500/20' : mine ? 'bg-rose-500/20' : 'bg-white/[0.06]',
+                )}
+                style={{ width: percent(picks[i]) }}
+              />
+              <span className="relative flex items-baseline justify-between gap-3">
+                <span className={clsx(right ? 'font-semibold text-emerald-300' : mine ? 'text-rose-300' : 'text-fg-2')}>
+                  {right && '✓ '}
+                  {LETTERS[i]}) {keepTogether(text)}
+                  {mine && <span className="font-semibold"> · ти</span>}
+                </span>
+                <span className="shrink-0 text-fg-3 tabular-nums">{percent(picks[i])}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-1 text-xs text-fg-3">
+        {yours === null && !item.right && <span className="text-rose-300/90">Без отговор · </span>}
+        Как отговориха всички (от {fmt(answers)} отговора)
+      </p>
+    </>
   );
 }
 

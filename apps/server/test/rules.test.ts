@@ -122,15 +122,20 @@ test('days and seasons follow Sofia time, across DST changes', () => {
 });
 
 test('unlock requirements', () => {
-  const ctx = { level: 10, achievements: new Set(['royale_win']), seasonTier: 2 };
+  const ctx = { level: 10, achievements: new Set(['royale_win']), seasonTier: 2, mastery: { history: 1 } };
   assert.ok(meetsRequirement({ level: 10 }, ctx));
   assert.ok(!meetsRequirement({ level: 11 }, ctx));
   assert.ok(meetsRequirement({ achievement: 'royale_win' }, ctx));
   assert.ok(meetsRequirement({ season: 'gold' }, ctx));
   assert.ok(!meetsRequirement({ season: 'platinum' }, ctx));
+  // A mastery tier earned covers the ones below it, in its own category only.
+  assert.ok(meetsRequirement({ mastery: { category: 'history', tier: 0 } }, ctx));
+  assert.ok(meetsRequirement({ mastery: { category: 'history', tier: 1 } }, ctx));
+  assert.ok(!meetsRequirement({ mastery: { category: 'history', tier: 2 } }, ctx));
+  assert.ok(!meetsRequirement({ mastery: { category: 'music', tier: 0 } }, ctx));
   const gained = newlyUnlocked(
-    { level: 2, achievements: new Set(), seasonTier: -1 },
-    { level: 3, achievements: new Set(), seasonTier: 1 },
+    { level: 2, achievements: new Set(), seasonTier: -1, mastery: {} },
+    { level: 3, achievements: new Set(), seasonTier: 1, mastery: { sports: 0 } },
   );
   assert.ok(
     gained.some((u) => u.kind === 'avatar' && u.id === 'tiger'),
@@ -139,6 +144,10 @@ test('unlock requirements', () => {
   assert.ok(
     gained.some((u) => u.kind === 'frame' && u.id === 'season_silver'),
     'silver season frame',
+  );
+  assert.ok(
+    gained.some((u) => u.kind === 'title' && u.id === 'sports_knower'),
+    '„Познавач · Спорт“',
   );
 });
 

@@ -1,15 +1,18 @@
 import { setImmediate as yieldToMatches } from 'node:timers/promises';
-import type { Difficulty, PlayCheck } from '@quiz/shared';
-import { all, run } from './db';
+import { CROWD, type Crowd, type Difficulty, type PlayCheck } from '@quiz/shared';
+import { all, one, run } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionInfo } from './questionReports';
-import { questionById } from './questions';
+import { bankOption, type PreparedQuestion, questionById } from './questions';
 import { getUser, toPublicUser } from './users';
 
 /** How long each person's answers are kept: enough to see a pattern, not a history of everything they ever played. */
 export const ANSWER_LOG_DAYS = 90;
 
-/** Saves a person's answers from a match, and adds them to each question's totals. Call inside the match's transaction. */
+/**
+ * Saves a person's answers from a match, and adds them to each question's totals: right or not, and on a question with
+ * options which one was picked (as the bank orders them). Call inside the match's transaction.
+ */
 export function recordAnswers(matchId: string, userId: number, log: AnswerLogEntry[], at = Date.now()) {
   for (const a of log) {
     run(
@@ -31,7 +34,45 @@ export function recordAnswers(matchId: string, userId: number, log: AnswerLogEnt
       a.correct ? 1 : 0,
       a.correct ? (a.timeMs ?? 0) : 0,
     );
+    if (a.closeness !== null) continue;
+    // Column names from a fixed list, never from the answer itself.
+    const column = a.choice === null ? 'unanswered' : PICK_COLUMNS[a.choice];
+    if (column) run(`UPDATE question_stats SET ${column} = ${column} + 1 WHERE question_id = ?`, a.questionId);
   }
+}
+
+const PICK_COLUMNS = ['pick0', 'pick1', 'pick2', 'pick3'] as const;
+
+interface StatsRow {
+  answered: number;
+  correct: number;
+  pick0: number;
+  pick1: number;
+  pick2: number;
+  pick3: number;
+  unanswered: number;
+}
+
+/**
+ * How everyone who played this question before answered it, in this match's option order: „62% знаят“ at the reveal,
+ * each option's share in the review. Null until CROWD.minAnswers have (a handful says more about who played than
+ * about the question), or for a question changed since it was drawn.
+ */
+export function crowdFor(q: PreparedQuestion): Crowd | null {
+  const r = one<StatsRow>('SELECT * FROM question_stats WHERE question_id = ?', q.id);
+  if (!r) return null;
+  // A number is right once it's close: its share is the only one there is.
+  if (q.kind === 'number')
+    return r.answered >= CROWD.minAnswers ? { known: r.correct / r.answered, picks: null, answers: r.answered } : null;
+  const bank = [r.pick0, r.pick1, r.pick2, r.pick3];
+  const answers = bank.reduce((sum, n) => sum + n, 0) + r.unanswered;
+  const right = bankOption(q, q.answer);
+  if (answers < CROWD.minAnswers || right === null) return null;
+  const picks = q.options.map((_, shown) => {
+    const i = bankOption(q, shown);
+    return i === null ? 0 : bank[i] / answers;
+  });
+  return { known: bank[right] / answers, picks, answers };
 }
 
 /** Answers dropped in one delete: a short one, so the matches going on don't wait on it. */

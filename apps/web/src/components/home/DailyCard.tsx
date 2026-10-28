@@ -17,6 +17,7 @@ import { dailyLinkUrl, offBoardLine } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
 import { Avatar } from '../Avatar';
+import { GroupStandings } from '../groups';
 import { LoadError } from '../LoadError';
 import { Button, Card, Spinner } from '../ui';
 import { countdown } from './time';
@@ -143,6 +144,7 @@ export function DailyCard({ className }: { className?: string }) {
               </Button>
             )}
             {info && !failed && <AmongFriends friends={info.friends} meId={me.id} />}
+            <GroupStandings refresh={`${me.daily.day}:${me.daily.played}`} />
             {info && !failed && info.fromMyLink.length > 0 && <FromMyLink plays={info.fromMyLink} />}
             {info && !failed && !info.attempted && (
               <p className="mt-3 text-xs text-fg-3 tabular-nums">Изтича след {countdown(info.endsAt - now)}</p>

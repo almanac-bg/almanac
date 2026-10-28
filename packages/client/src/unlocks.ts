@@ -1,9 +1,11 @@
 import {
   AVATARS,
   achievementById,
+  categoryById,
   EMOTES,
   FRAMES,
   levelFromXp,
+  MASTERY_TIERS,
   type MeUser,
   RANK_TIERS,
   type Requirement,
@@ -33,10 +35,20 @@ export function requirementLabel(req: Requirement, compact = false): string {
     const tier = RANK_TIERS.find((t) => t.id === req.season)!.name;
     return compact ? `🏅 Сезон ${tier}` : `Завърши сезон в ранг ${tier} или по-висок`;
   }
+  if ('mastery' in req) {
+    const tier = MASTERY_TIERS[req.mastery.tier];
+    const category = categoryById(req.mastery.category)?.name;
+    return compact ? `${tier.icon} ${tier.name}` : `Стани ${tier.name} в „${category}“`;
+  }
   const name = achievementById(req.achievement)?.name ?? req.achievement;
   return compact ? `🏆 ${name}` : `Постижение „${name}“`;
 }
 
 export function unlockContextOf(me: MeUser): UnlockContext {
-  return { level: levelFromXp(me.xp), achievements: new Set(me.achievements), seasonTier: me.bestSeasonTier };
+  return {
+    level: levelFromXp(me.xp),
+    achievements: new Set(me.achievements),
+    seasonTier: me.bestSeasonTier,
+    mastery: Object.fromEntries(me.mastery.map((m) => [m.category, m.tier])),
+  };
 }

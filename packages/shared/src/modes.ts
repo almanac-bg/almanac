@@ -2,7 +2,7 @@ import type { CategoryChoice } from './categories';
 import type { Difficulty } from './protocol';
 
 export type QueueModeId = 'duel' | 'teams' | 'trio' | 'squad' | 'royale';
-export type ModeId = 'solo' | 'daily' | 'challenge' | QueueModeId | 'custom';
+export type ModeId = 'solo' | 'daily' | 'challenge' | 'review' | QueueModeId | 'custom';
 
 export interface ModeDef {
   id: ModeId;
@@ -70,6 +70,21 @@ export const MODES: Record<ModeId, ModeDef> = {
     tagline: 'Твоите 10 въпроса. Кой ще те бие?',
     description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без козове.',
     accent: ['#a5b4fc', '#8b5cf6'],
+  },
+  review: {
+    id: 'review',
+    name: 'Поправителен',
+    short: 'ПОВТОРИ',
+    players: 1,
+    questions: 10,
+    timeMs: 15_000,
+    elimination: false,
+    teams: false,
+    final: false,
+    rounds: false,
+    tagline: 'Сгрешеното се връща. Този път го знаеш.',
+    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
+    accent: ['#fcd34d', '#10b981'],
   },
   duel: {
     id: 'duel',

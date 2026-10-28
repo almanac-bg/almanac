@@ -1,5 +1,6 @@
 import type { CategoryChoice, CategoryId } from './categories';
 import type { PowerupId, UnlockRef } from './cosmetics';
+import type { CategoryMastery } from './mastery';
 import type { ModeId, QueueModeId, RoomSettings, TeamId } from './modes';
 import type { NumberInput } from './numbers';
 import type { RankTierId } from './progression';
@@ -58,6 +59,12 @@ export interface MeUser extends PublicUser {
   emailBounced: boolean;
   /** Address waiting for its verification link to be clicked. */
   pendingEmail: string | null;
+  /** Category mastery earned (MASTERY_TIERS), for the titles it unlocks. */
+  mastery: CategoryMastery[];
+  /** „Моят алманах“: facts collected, and how many missed questions „Поправителен“ has ready (`due`). */
+  almanac: { facts: number; due: number };
+  /** Groups the player is in. */
+  groups: number;
 }
 
 export interface QuestInfo {
@@ -99,6 +106,8 @@ export interface GamePlayer extends Loadout {
    * in this match (userId is null), and no bot either.
    */
   record?: { playedAt: number };
+  /** Their best category mastery, for the intro („Майстор · История“). */
+  mastery?: CategoryMastery;
 }
 
 export interface Standing {
@@ -181,7 +190,23 @@ export interface RevealPayload {
   /** "Знаеше ли?" behind this question's answer, if it has one: sent with the reveal, never before (it could give the
    * answer away). */
   fact: string | null;
+  /** How everyone who played this question before answered it, once enough have (null until then). */
+  crowd: Crowd | null;
 }
+
+/** How a question's players answered it, over all matches (CROWD.minAnswers or more). */
+export interface Crowd {
+  /** Share who got it right, 0–1: „62% знаят“. */
+  known: number;
+  /** Share who picked each option, in this match's order; no answer in time is the rest. Null on a number question. */
+  picks: number[] | null;
+  answers: number;
+}
+
+export const CROWD = {
+  /** Answers a question needs before its shares are shown: fewer say more about who played than about the question. */
+  minAnswers: 30,
+} as const;
 
 export interface GameStartPayload {
   gameId: string;
@@ -272,12 +297,28 @@ export interface MatchRewards {
     shieldEarned: boolean;
     /** Played from someone's daily link: their result, to compare with. */
     sharer: DailySharer | null;
+    /** How the day went for everyone, once enough have played. */
+    field: DailyField | null;
   } | null;
   /** A challenge-link run: where it placed among everyone who played that link; a friend duel's, how it stands. */
   challenge: { id: string; rank: number; total: number; duel: DuelStanding | null } | null;
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
   soloBest: number | null;
+  /** „Моят алманах“: facts this match added, and how many there are now. */
+  almanac: { added: number; total: number };
+  /** Category mastery tiers this match earned. */
+  mastery: CategoryMastery[];
 }
+
+/** How a day's questions went for everyone on the board (once DAILY_FIELD.minPlayers have played). */
+export interface DailyField {
+  /** Share of the others on the board this run did better than, 0–1: „По-добър от 73% днес“. */
+  beaten: number;
+  /** Runs on the board by right answers: [none right, one right, … all right]. */
+  histogram: number[];
+}
+
+export const DAILY_FIELD = { minPlayers: 20 } as const;
 
 /**
  * `pair`: these two already played their rated games today (the win-trading guard). `guest`: guests play people
@@ -406,6 +447,8 @@ export interface ClientToServerEvents {
    * one friend, who has a day to play it. `categories`: a rematch's three rounds, picked by whoever lost the last duel.
    */
   'challenge:start': (p: { id?: string; rival?: number; categories?: CategoryId[] }, ack: Ack<{ id: string }>) => void;
+  /** „Поправителен“: the missed questions that are due (REVIEW). */
+  'review:start': (ack: Ack) => void;
   'rematch:request': (p: { gameId: string }) => void;
   'rematch:decline': (p: { gameId: string }) => void;
   'room:create': (settings: Partial<RoomSettings>, ack: Ack<{ code: string }>) => void;
@@ -456,7 +499,10 @@ export interface ProfileStats {
     questionsApproved: number;
   };
   modes: { mode: ModeId; games: number; wins: number; avgPlacement: number | null; rating: number | null }[];
-  categories: { category: CategoryId; answered: number; correct: number }[];
+  /** `tier`: the category mastery earned there (null: none yet). */
+  categories: { category: CategoryId; answered: number; correct: number; tier: number | null }[];
+  /** „Моят алманах“: facts collected, of how many there are. */
+  almanac: { facts: number; total: number };
   recent: {
     matchId: string;
     mode: ModeId;
@@ -521,7 +567,7 @@ export interface DailyInfo {
    */
   offBoard: boolean;
   /** Off the board, `rank` is where the run would stand on it. */
-  played: { score: number; correct: number; rank: number } | null;
+  played: { score: number; correct: number; rank: number; field: DailyField | null } | null;
   total: number;
   entries: LeaderboardEntry[];
   /** Today's results of you and your friends, ranked among yourselves (empty for a guest, who has no friends here). */
@@ -789,4 +835,110 @@ export interface SiteInfo {
   release: string | null;
   /** Questions in play, rounded down to the hundred ("над 1 900 въпроса"). */
   questions: number;
+}
+
+// ─── „Моят алманах“ ──────────────────────────────────────────────────────────
+
+/** One fact in a player's almanac: the question it's behind, its answer, and when it became theirs. */
+export interface AlmanacFact {
+  id: string;
+  category: CategoryId;
+  q: string;
+  /** The right option; null on a number question (`number` has the answer and how to write it). */
+  answer: string | null;
+  number: (Pick<NumberInput, 'unit' | 'step' | 'scale'> & { answer: number }) | null;
+  fact: string;
+  learnedAt: number;
+}
+
+/** „Поправителен“: the missed questions coming back, and when. */
+export interface ReviewQueue {
+  /** Ready to play now. */
+  due: number;
+  /** Not due yet. */
+  waiting: number;
+  /** When the next one not due yet is (null: none waiting). */
+  nextDueAt: number | null;
+  /** A run needs this many due (REVIEW.min): fewer wait for more. */
+  ready: boolean;
+}
+
+export interface AlmanacOverview {
+  facts: number;
+  /** Facts there are to collect. */
+  total: number;
+  categories: { category: CategoryId; facts: number; total: number; tier: number | null }[];
+  review: ReviewQueue;
+  /** The newest few, newest first. */
+  recent: AlmanacFact[];
+}
+
+export interface AlmanacCategoryPage {
+  category: CategoryId;
+  facts: AlmanacFact[];
+  total: number;
+  tier: number | null;
+}
+
+/**
+ * „Поправителен“: a missed question comes back `afterDays[0]` days later, then (right) `afterDays[1]`, then
+ * `afterDays[2]`; right then too, it's learned for good. Wrong at any step, it starts over. A run plays up to `size`
+ * of those due, once at least `min` are.
+ */
+export const REVIEW = { afterDays: [3, 7, 21], size: 10, min: 3 } as const;
+
+// ─── Groups ──────────────────────────────────────────────────────────────────
+
+/**
+ * A class, an office, a family: a group with an invite link and a weekly board of „Въпросите на деня“ (Monday to
+ * Sunday, Sofia time): each member's best `bestDays` daily scores that week, summed. Last week's winner wears a 👑.
+ */
+export const GROUPS = { maxMembers: 200, perPlayer: 5, bestDays: 5, name: [2, 30] } as const;
+
+/** A group as its member's home card and list show it. */
+export interface GroupSummary {
+  id: number;
+  name: string;
+  members: number;
+  /** This week's board: your place (null: no daily played yet this week), and who leads with how much. */
+  you: { rank: number; score: number } | null;
+  leader: { username: string; score: number; you: boolean } | null;
+  /** You won last week. */
+  crown: boolean;
+}
+
+export interface GroupEntry {
+  rank: number;
+  user: PublicUser;
+  score: number;
+  /** Dailies played this week (the best GROUPS.bestDays count). */
+  days: number;
+  /** Today's score, if they've played it. */
+  today: number | null;
+  /** Won last week. */
+  crown: boolean;
+}
+
+export interface GroupInfo {
+  id: number;
+  name: string;
+  /** The invite code (/groups/join/<code>). */
+  code: string;
+  owner: PublicUser | null;
+  isOwner: boolean;
+  members: number;
+  /** This week: who has played (best first), then everyone who hasn't yet. */
+  week: { start: string; endsAt: number; entries: GroupEntry[]; waiting: PublicUser[] };
+  /** Past weeks' winners, newest first. */
+  history: { week: string; winner: PublicUser | null; score: number }[];
+}
+
+/** An invite link as anyone who opens it sees it. */
+export interface GroupPreview {
+  name: string;
+  members: number;
+  owner: string | null;
+  /** The viewer is in it already (its id, to go there). */
+  memberOf: number | null;
+  full: boolean;
 }

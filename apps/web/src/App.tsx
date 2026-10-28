@@ -24,10 +24,12 @@ import { HomePage } from './pages/HomePage';
 import {
   AchievementsPage,
   AdminPage,
+  AlmanacPage,
   ChallengePage,
   DailyPage,
   FriendsPage,
   GamePage,
+  GroupsPage,
   LeaderboardPage,
   LockerPage,
   NotificationsPage,
@@ -183,6 +185,11 @@ function SignedIn() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/almanac" element={<AlmanacPage />} />
+            <Route path="/almanac/:category" element={<AlmanacPage />} />
+            <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/groups/:id" element={<GroupsPage />} />
+            <Route path="/groups/join/:code" element={<GroupsPage />} />
             <Route path="/submit" element={<SubmitPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/settings" element={<SettingsPage />} />
