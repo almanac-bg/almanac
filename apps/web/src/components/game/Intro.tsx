@@ -96,7 +96,7 @@ export function Intro({ game }: { game: LiveGame }) {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.5, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-          className="mt-10 font-display text-8xl font-black text-gradient"
+          className="mt-10 animate-shimmer font-display text-8xl font-black text-gradient"
         >
           {left > 0 ? left : 'Старт!'}
         </motion.div>

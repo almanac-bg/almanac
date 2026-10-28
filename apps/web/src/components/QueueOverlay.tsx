@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type RefObject, useId, useRef } from 'react';
 import { accentFill } from '../lib/accent';
 import { Avatar } from './Avatar';
+import { Background } from './Background';
 import { PowerupNotes, useNewPowerups } from './game/Powerups';
 import { Button, useDialog } from './ui';
 
@@ -25,11 +26,15 @@ export function QueueOverlay() {
           role="dialog"
           aria-modal
           aria-labelledby={titleId}
-          className="fixed inset-0 z-50 overflow-y-auto bg-ink/80 backdrop-blur-xl"
+          className="fixed inset-0 z-50 overflow-y-auto bg-ink"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
+          {/* Opaque, over a backdrop of its own (as faint as the lobby's glow came through), not a blur of the lobby:
+              the rings pulse every frame, and a blurred backdrop is blurred again for each one (the whole screen, a
+              CPU core with software drawing). */}
+          <Background className="opacity-20" />
           <div className="grid min-h-full place-items-center p-6">
             <Searching queue={queue} cancel={cancel} titleId={titleId} />
           </div>

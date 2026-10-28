@@ -52,8 +52,8 @@
   --animate-float: float 6s ease-in-out infinite;
   --animate-spin-slow: spin 4s linear infinite;
   --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-shimmer-once: shimmer 2.4s linear;
   --animate-pulse-ring: pulse-ring 2.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-  --animate-drift: drift 22s ease-in-out infinite alternate;
 
   @keyframes float {
     0%,
@@ -80,17 +80,6 @@
     100% {
       transform: scale(2.4);
       opacity: 0;
-    }
-  }
-  @keyframes drift {
-    0% {
-      transform: translate(0, 0) scale(1);
-    }
-    50% {
-      transform: translate(6vw, -4vh) scale(1.15);
-    }
-    100% {
-      transform: translate(-4vw, 6vh) scale(0.95);
     }
   }
 }
@@ -139,27 +128,17 @@ body {
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
+  /*
+   * Still by default. The shimmer across it (`animate-shimmer`) moves a background, which the browser repaints on the
+   * main thread every frame: for a few seconds (the countdown, one sweep of the logo), never left running on a screen
+   * people stay on. A shimmering logo in the nav bar kept the page drawing 60+ times a second forever.
+   */
   .text-gradient {
     background: linear-gradient(100deg, #f0abfc 0%, #a78bfa 35%, #22d3ee 70%, #f0abfc 100%);
     background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: var(--animate-shimmer);
-  }
-
-  .shine {
-    position: relative;
-    overflow: hidden;
-  }
-  .shine::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.18) 50%, transparent 70%);
-    background-size: 250% 100%;
-    animation: var(--animate-shimmer);
-    pointer-events: none;
   }
 
   .noise {

@@ -48,7 +48,8 @@ function RequestBadge({ count }: { count: number }) {
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={clsx('font-display font-black tracking-tight', className)}>
-      <span className="text-gradient">{BRAND.name}</span>
+      {/* One sweep when it appears, then still (see .text-gradient). */}
+      <span className="text-gradient animate-shimmer-once">{BRAND.name}</span>
       <span aria-hidden className="text-fuchsia-400">
         ⚡
       </span>

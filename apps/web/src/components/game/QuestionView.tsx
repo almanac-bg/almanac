@@ -312,8 +312,14 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
         secs <= 3 && !stopped && 'motion-safe:animate-pulse',
       )}
     >
-      {/* overflow-visible: the ring's glow reaches past the drawing's box, and a clipped glow shows up as a square. */}
-      <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90 overflow-visible" aria-hidden>
+      {/* overflow-visible: the ring's glow reaches past the drawing's box, and a clipped glow shows up as a square.
+          will-change: a layer of its own. The ring is redrawn every frame while it runs, and in the card's layer each
+          frame redrew the card's blurred glow with it. */}
+      <svg
+        viewBox="0 0 64 64"
+        className="absolute inset-0 -rotate-90 overflow-visible will-change-transform"
+        aria-hidden
+      >
         <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="5" />
         <circle
           cx="32"
