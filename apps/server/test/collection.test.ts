@@ -81,11 +81,8 @@ test('„X% знаят“: each option’s share in the match’s own order, onl
   assert.equal(crowd.known, 20 / 30);
   assert.equal(crowd.picks![shown.answer], 20 / 30, 'the right option, wherever this match shows it');
   assert.equal(crowd.picks![shown.options.indexOf(bank.options[(bank.answer + 1) % 4])], 6 / 30);
-  assert.equal(
-    crowd.picks!.reduce((a, b) => a + b),
-    29 / 30,
-    'no answer in time is the rest',
-  );
+  // Summed in whatever order this match shows the options: equal up to rounding.
+  assert.ok(Math.abs(crowd.picks!.reduce((a, b) => a + b) - 29 / 30) < 1e-12, 'no answer in time is the rest');
 
   // A number: the share that came close.
   const number = questionById('music-n0')!;
