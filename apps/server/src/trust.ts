@@ -6,10 +6,12 @@ import type { UserRow } from './users';
 // answers off, or to lose on purpose.
 
 /**
- * Plays the day's shared questions and is on the board: an account made before `day` began. A guest, or an account made
- * today, gets ten questions of its own; otherwise it could read the day's answers for the account that plays next.
+ * On the day's board: an account made before `day` began. A guest, or an account made today, plays the same questions
+ * but off the board, seeing where it would have placed. One set for everyone is what lets friends compare their day;
+ * the price, accepted, is that a throwaway can see the answers before the account that plays next. The throwaway itself
+ * never lands on the board, and play no person could manage shows in the answer log (answers.ts).
  */
-export function playsSharedDaily(user: Pick<UserRow, 'is_guest' | 'created_at'>, day = dayKey()): boolean {
+export function onDailyBoard(user: Pick<UserRow, 'is_guest' | 'created_at'>, day = dayKey()): boolean {
   return user.is_guest === 0 && dayKey(user.created_at) < day;
 }
 

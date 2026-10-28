@@ -1,11 +1,11 @@
 import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
 import { categoryById, isQueueMode, MODES, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Save, Share2, Skull, Swords } from 'lucide-react';
+import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ClaimAccountModal, GuestNudge } from '../components/ClaimAccount';
+import { GuestNudge } from '../components/ClaimAccount';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
@@ -32,7 +32,6 @@ export function Results({ game }: { game: LiveGame }) {
   const room = useStore((s) => s.room);
   const guest = useStore((s) => !!s.me?.isGuest);
   const [busy, setBusy] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const youId = game.start.youId;
   const mine = end.standings.find((s) => s.id === youId)!;
   const solo = end.mode === 'solo';
@@ -125,6 +124,12 @@ export function Results({ game }: { game: LiveGame }) {
   }
 
   const dailyBoard = () => navigate('/leaderboard?board=daily');
+  async function playDuel() {
+    actions.closeGame();
+    navigate('/');
+    const res = await actions.joinQueue('duel');
+    if (!res.ok) toast({ kind: 'error', title: res.error });
+  }
   const share = () =>
     shareText(
       matchShareText({
@@ -149,7 +154,7 @@ export function Results({ game }: { game: LiveGame }) {
     : daily
       ? perfect
         ? 'Перфектен ден!'
-        : 'Днешното е изиграно'
+        : 'Денят е изигран'
       : link
         ? link.total <= 1
           ? mine.score > 0
@@ -250,7 +255,8 @@ export function Results({ game }: { game: LiveGame }) {
                     : `Личен рекорд: ${fmt(best)}`}
               </span>
             )}
-            {rewards.xpGained > 0 && (
+            {/* A guest has it in the card that offers to keep it, right below. */}
+            {rewards.xpGained > 0 && !guest && (
               <span className="rounded-full bg-violet-500/15 px-3 py-1 text-violet-200">
                 +{fmt(rewards.xpGained)} XP
               </span>
@@ -265,6 +271,13 @@ export function Results({ game }: { game: LiveGame }) {
           </p>
         )}
       </motion.header>
+
+      {/* A guest's first results: what keeps them comes first, not after the rewards. */}
+      <GuestNudge className="mx-auto mt-6 max-w-2xl">
+        {rewards
+          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
+          : undefined}
+      </GuestNudge>
 
       {/* The standings offer "+ Приятел" beside each person you played with. */}
       <FriendsProvider game={game}>
@@ -303,7 +316,12 @@ export function Results({ game }: { game: LiveGame }) {
         {sideCards && (
           <div className="space-y-4">
             {rewards.daily && (
-              <DailyCard daily={rewards.daily} history={game.history} total={game.start.totalQuestions} guest={guest} />
+              <DailyCard
+                daily={rewards.daily}
+                history={game.history}
+                total={game.start.totalQuestions}
+                score={mine.score}
+              />
             )}
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
@@ -313,12 +331,6 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       </div>
 
-      <GuestNudge className="mt-4">
-        {rewards
-          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
-          : undefined}
-      </GuestNudge>
-
       <LearnedToday items={game.history} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
@@ -327,14 +339,14 @@ export function Results({ game }: { game: LiveGame }) {
       <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
         {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
         <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
-          {daily && guest && rewards?.daily?.rank === null ? (
-            // A guest's daily is off the board: what opens it is saving the profile.
+          {daily && rewards?.daily?.offBoard ? (
+            // A newcomer's first day (off the board until tomorrow): a duel is the next thing to try.
             <Button
               size="lg"
               className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
-              onClick={() => setClaiming(true)}
+              onClick={() => void playDuel()}
             >
-              <Save className="size-5" /> Запази профила
+              <Swords className="size-5" /> Играй Дуел
             </Button>
           ) : daily ? (
             // One attempt a day — no "play again".
@@ -395,7 +407,6 @@ export function Results({ game }: { game: LiveGame }) {
           )}
         </div>
       </div>
-      <ClaimAccountModal open={claiming} onClose={() => setClaiming(false)} />
     </div>
   );
 }

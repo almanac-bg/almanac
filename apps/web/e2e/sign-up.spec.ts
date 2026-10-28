@@ -1,10 +1,10 @@
-import { expect, test } from './support';
+import { expect, openForm, test } from './support';
 
 // The browser's own validation bubbles speak the device's language (often English): the form says what's wrong
 // itself, in Bulgarian, and marks the field.
 test('signing up with too short a name or password says why, in Bulgarian', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Регистрация', exact: true }).click();
+  await openForm(page, 'Регистрация');
   const name = page.getByLabel('Потребителско име', { exact: true });
   const password = page.getByLabel('Парола', { exact: true });
   const submit = page.getByRole('button', { name: /^Създай профил/ });

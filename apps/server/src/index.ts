@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BRAND, PUBLIC_PAGES, pageTitle, routeKind, type SiteInfo } from '@quiz/shared';
+import { BRAND, MODES, PUBLIC_PAGES, pageTitle, ROOM_LIMITS, routeKind, type SiteInfo } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
 import { config } from './config';
+import { dailyPreview } from './daily';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
@@ -176,7 +177,8 @@ if (fs.existsSync(config.webDist)) {
       ];
     }),
   );
-  const appPage = withHead(page, { index: false });
+  // A screen of the game at its own address: a link to it previews as that address, not the home page.
+  const appPage = (at: string) => withHead(page, { index: false, url: `${config.appUrl}${at}` });
   // An address that isn't one says so in the tab too, before the app does.
   const notFoundPage = withHead(page, { title: pageTitle('Страницата не съществува'), index: false });
   app.use((req, res, next) => {
@@ -188,11 +190,21 @@ if (fs.existsSync(config.webDist)) {
     const challenge = /^\/c\/([^/]+)$/.exec(req.path)?.[1];
     if (challenge) {
       // A link that never existed is a 404 (its page says so); an expired one still has a page to show.
-      const html = challengePage(appPage, challenge);
+      const html = challengePage(page, challenge);
       res
         .status(html ? 200 : 404)
         .type('html')
-        .send(html ?? appPage);
+        .send(html ?? appPage(req.path));
+      return;
+    }
+    const daily = /^\/daily(?:\/([^/]+))?$/.exec(req.path);
+    if (daily) {
+      res.type('html').send(dailyPage(page, req.path, daily[1] ?? null));
+      return;
+    }
+    const join = /^\/join\/([^/]+)$/.exec(req.path)?.[1];
+    if (join) {
+      res.type('html').send(joinPage(page, req.path, join));
       return;
     }
     const pub = publicPages.get(req.path);
@@ -210,7 +222,7 @@ if (fs.existsSync(config.webDist)) {
     res
       .status(kind === 'app' ? 200 : 404)
       .type('html')
-      .send(kind === 'app' ? appPage : notFoundPage);
+      .send(kind === 'app' ? appPage(req.path) : notFoundPage);
   });
 }
 
@@ -309,6 +321,38 @@ function withHead(
   return out.replace('</head>', `${extra.join('')}</head>`);
 }
 
+const points = (n: number) => new Intl.NumberFormat('bg-BG').format(n);
+
+/** The day's questions at /daily, or a player's link to them (/daily/<code>): what a link preview shows. */
+function dailyPage(html: string, at: string, code: string | null): string {
+  const { number, sharer } = dailyPreview(code);
+  const of = MODES.daily.questions;
+  return withHead(html, {
+    ...(sharer
+      ? {
+          title: `${sharer.user.username}: ${sharer.correct}/${of} на въпросите на деня — можеш ли повече?`,
+          description: `Същите ${of} въпроса, един опит, без регистрация. ${BRAND.name} №${number}.`,
+        }
+      : {
+          title: `Въпросите на деня №${number} — ${BRAND.name}`,
+          description: `${of} въпроса, едни и същи за цяла България. Три минути, един опит, без регистрация.`,
+        }),
+    url: `${config.appUrl}${at}`,
+    index: false,
+  });
+}
+
+/** A room's invite link (/join/<code>): who's inviting, while the room is open. */
+function joinPage(html: string, at: string, code: string): string {
+  const room = realtime.roomPreview(code);
+  return withHead(html, {
+    title: room ? `${room.host} те кани в стая ${code} — ${BRAND.name}` : `Покана за стая ${code} — ${BRAND.name}`,
+    description: `До ${ROOM_LIMITS.maxPlayers[1]} играчи, без регистрация: влизаш с един тап.`,
+    url: `${config.appUrl}${at}`,
+    index: false,
+  });
+}
+
 /**
  * A challenge link's page with its own title and preview text, so a link pasted into Messenger or Viber reads
  * "Мария те предизвиква…" with the score to beat, not the generic site description.
@@ -316,14 +360,19 @@ function withHead(
 function challengePage(html: string, id: string): string | null {
   const preview = challengePreview(id);
   if (!preview) return null;
-  const title = `${preview.creator?.username ?? 'Някой'} те предизвиква в ${BRAND.name}`;
+  const name = preview.creator?.username ?? 'Някой';
+  // Messenger and Viber often show the title alone: the score to beat goes in it.
+  const title =
+    preview.topScore !== null && !preview.expired
+      ? `${name} те предизвиква: ${points(preview.topScore)} точки за биене`
+      : `${name} те предизвиква в ${BRAND.name}`;
   const description = preview.expired
     ? 'Това предизвикателство изтече — но можеш да създадеш свое.'
     : preview.topScore !== null
       ? `Резултатът за биене: ${preview.topScore} точки. 10 въпроса, един опит — можеш ли повече?`
       : '10 въпроса, един опит. Приемаш ли?';
-  // `html` already says noindex: a challenge is for the people it's sent to, not for search results.
-  return withHead(html.replace(/<meta name="robots"[^>]*>/, ''), {
+  // A challenge is for the people it's sent to, not for search results.
+  return withHead(html, {
     title,
     description,
     url: `${config.appUrl}/c/${encodeURIComponent(preview.id)}`,

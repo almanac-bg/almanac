@@ -1,27 +1,44 @@
 import { fmt, ordinal, type ReviewItem, toast } from '@quiz/client';
-import { BRAND, dayKey } from '@quiz/shared';
+import { BRAND, dayKey, dayNumber } from '@quiz/shared';
 
 const storageKey = (day: string) => `quiz:daily-share:${day}`;
 
 /**
- * The day's result as a spoiler-free emoji line, Wordle-style:
- *   ⚡ АЛМАНАХ · 25.10.2026
- *   🟩🟩🟥🟩🟩🟥🟩🟩🟩🟩 8/10
+ * The day's result, Wordle-style: spoiler-free squares (⬛ a question left unanswered, ⬜ one never reached), the day's
+ * number, the score, the place once the board has a crowd to place in, and the link that plays the same questions:
+ *   ⚡ АЛМАНАХ №4 · 8/10
+ *   🟩🟩🟥🟩⬛🟩🟩🟩🟩🟩
+ *   1 240 т. · 7-мо място от 23
  *   🔥 5 дни подред
- *   almanac.bg
+ *   https://almanac.bg/daily/x7Kp2q
  */
-export function dailyShareText(history: ReviewItem[], total: number, streak: number, day = dayKey()): string {
-  const [y, m, d] = day.split('-');
-  const squares = Array.from({ length: total }, (_, i) => {
-    const item = history.find((h) => h.index === i);
-    return item ? (item.right ? '🟩' : '🟥') : '⬜';
+export function dailyShareText(d: {
+  history: ReviewItem[];
+  total: number;
+  day: string;
+  score: number;
+  /** On the board: its place and how many are on it; off the board, null. */
+  place: { rank: number; of: number } | null;
+  streak: number;
+  /** The player's link to the day's questions; /daily if it couldn't be had. */
+  link: string;
+}): string {
+  const squares = Array.from({ length: d.total }, (_, i) => {
+    const item = d.history.find((h) => h.index === i);
+    return !item ? '⬜' : item.right ? '🟩' : item.choice === null ? '⬛' : '🟥';
   }).join('');
-  const correct = history.filter((h) => h.right).length;
-  const lines = [`⚡ ${BRAND.name} · ${d}.${m}.${y}`, `${squares} ${correct}/${total}`];
-  if (streak > 1) lines.push(`🔥 ${streak} дни подред`);
-  lines.push(BRAND.domain);
+  const correct = d.history.filter((h) => h.right).length;
+  const score = [`${fmt(d.score)} т.`];
+  // "1-во място от 3" says more about the day's numbers than about the player.
+  if (d.place && d.place.of >= SHOW_PLACE_FROM) score.push(`${ordinal(d.place.rank)} място от ${fmt(d.place.of)}`);
+  const lines = [`⚡ ${BRAND.name} №${dayNumber(d.day)} · ${correct}/${d.total}`, squares, score.join(' · ')];
+  if (d.streak > 1) lines.push(`🔥 ${d.streak} дни подред`);
+  lines.push(d.link);
   return lines.join('\n');
 }
+
+/** From how many players on the day's board the share text says the place. */
+const SHOW_PLACE_FROM = 10;
 
 /** Right and wrong as squares, in order: what a match was like, without giving a question away. */
 const squares = (history: ReviewItem[]) => history.map((h) => (h.right ? '🟩' : '🟥')).join('');

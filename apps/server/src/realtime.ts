@@ -15,7 +15,7 @@ import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
 import { config } from './config';
-import { claimDailyAttempt, dailyQuestions, ownDailyQuestions, releaseDailyAttempt } from './daily';
+import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
@@ -57,6 +57,8 @@ const DRAINING = 'Обновяваме играта — нови мачове м
 export interface Realtime {
   io: IO;
   activeGames: () => number;
+  /** A room's host and size, for the preview of its link (/join/<code>); null if there's no such room. */
+  roomPreview: (code: string) => { host: string; players: number } | null;
   /**
    * Stops new matches and empties the queues, then resolves once running matches have finished. Any still running after
    * `maxMs` end there, with the scores so far, so nobody's match vanishes without a result.
@@ -256,10 +258,13 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       }
     });
 
-    on('daily:start', (ack) => {
+    on('daily:start', (p, maybeAck) => {
+      // A tab from before daily links sends the answer callback alone.
+      const ack = typeof p === 'function' ? (p as unknown as typeof maybeAck) : maybeAck;
+      const via = str(obj(typeof p === 'function' ? null : p).via, 16) || null;
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      const claim = claimDailyAttempt(userId);
+      const claim = claimDailyAttempt(userId, via);
       if (!claim.ok) return reply(ack, claim);
       moveOn();
       rooms.leave(userId);
@@ -274,7 +279,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           category: 'mixed',
           elimination: false,
           dailyDay: claim.day,
-          questions: claim.ownSet ? ownDailyQuestions(userId) : dailyQuestions(claim.day, userId),
+          questions: dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
         });
@@ -432,6 +437,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   return {
     io,
     activeGames: () => games.activeGames,
+    roomPreview: (code: string) => rooms.preview(code),
     async drain(maxMs) {
       draining = true;
       games.startDraining();

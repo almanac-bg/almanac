@@ -37,7 +37,7 @@ import {
 } from '../auth';
 import { challengeInfo, challengePreview, myChallenges } from '../challenges';
 import { config } from '../config';
-import { dailyInfo, forgetGuestDaily, liveDailyStreak } from '../daily';
+import { dailyInfo, dailyLink, dailyPreview, joinBoardAfterSave, liveDailyStreak } from '../daily';
 import { all, isUniqueViolation, one, run, tx } from '../db';
 import {
   changePassword,
@@ -541,8 +541,8 @@ api.post('/account/claim', requireAuth, async (req, res) => {
   setSessionCookie(res, createSession(me.id));
   if (guestSession) setTimeout(() => disconnectSession(hashToken(guestSession)), 5_000).unref();
   if (creds.email) requestEmailChange(me.id, creds.email, network(req.ip));
-  // Today's daily as a guest had questions of its own; with a profile, the shared ones (and the board) are open.
-  forgetGuestDaily(me.id);
+  // Made before today, the account is on the day's board now, with today's run if it played one.
+  joinBoardAfterSave(me.id);
   count('claims');
   setDeviceCookie(res, me.id);
   res.json({ user: getMe(me.id) });
@@ -699,6 +699,25 @@ api.get('/challenges/:id', requireAuth, (req, res) => {
 
 api.get('/daily', requireAuth, (_req, res) => {
   res.json(dailyInfo(res.locals.userId));
+});
+
+/** A daily link as anyone sees it, signed in or not (`code` optional: /daily itself). */
+api.get('/daily/preview', (req, res) => {
+  if (throttled(`daily-preview:${network(req.ip)}`, 120, 60_000)) {
+    res.status(429).json({ error: 'Твърде много заявки.' });
+    return;
+  }
+  res.json(dailyPreview(typeof req.query.code === 'string' ? req.query.code.slice(0, 16) : null));
+});
+
+/** The player's link to today's questions, to send around; made once they've played today. */
+api.post('/daily/link', requireAuth, (_req, res) => {
+  const code = dailyLink(res.locals.userId);
+  if (!code) {
+    res.status(409).json({ error: 'Изиграй днешните въпроси, за да ги пратиш на някого.' });
+    return;
+  }
+  res.json({ code });
 });
 
 api.get('/season', requireAuth, (_req, res) => {

@@ -139,18 +139,18 @@ export function streakReminderMail(
   shields: number,
   unsubscribe: { page: string; api: string },
 ): Mail {
-  const lead = `Серията ти от ${streak} дни в дневното предизвикателство изтича в полунощ.`;
+  const lead = `Серията ти от ${streak} дни на „Въпросите на деня“ прекъсва в полунощ.`;
   const shield = shields > 0 ? ' Имаш и щит за серията, но защо да го хабиш?' : '';
   const stop = 'Не искаш тези писма?';
   return {
     to,
-    subject: `🔥 Серията ти от ${streak} дни изтича довечера`,
-    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, около три минути:\n${config.appUrl}/\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
+    subject: `🔥 Серията ти от ${streak} дни прекъсва в полунощ`,
+    text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, около три минути:\n${config.appUrl}/daily\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
     html: layout(
       `Здравей, ${username}!`,
       escapeHtml(`${lead}${shield} Десет въпроса, около три минути.`),
-      'Играй днешното',
-      `${config.appUrl}/`,
+      'Играй днешните',
+      `${config.appUrl}/daily`,
       `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#a78bfa">Спри напомнянията</a>.`,
     ),
     headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },

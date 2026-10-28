@@ -1,5 +1,5 @@
 import { api, fmt, pct, useStore } from '@quiz/client';
-import { BRAND, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
+import { BRAND, dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -37,6 +37,11 @@ export function LeaderboardPage() {
   // The daily board, among friends: the same day, just you and the people you know (you're in that list yourself).
   const [scope, setScope] = useState<'all' | 'friends'>('all');
   const amongFriends = board === 'daily' && scope === 'friends';
+  // A new account plays the day's questions off the board: having just played, it isn't missing from it by mistake.
+  const dailyLine =
+    me.daily.played && dayKey(me.createdAt) === me.daily.day
+      ? 'Днешният ти резултат е само за теб: новият ти профил влиза в класацията от утре.'
+      : 'Изиграй въпросите на деня, за да влезеш в класацията. Отворена е до полунощ.';
   const entries = (amongFriends ? data?.friends : data?.entries) ?? [];
   const meEntry = amongFriends ? null : (data?.me ?? null);
   const meInList = entries.some((e) => e.user.id === me.id);
@@ -50,7 +55,7 @@ export function LeaderboardPage() {
             {board === 'level'
               ? 'Най-опитните играчи по натрупан XP.'
               : board === 'daily'
-                ? 'Резултати от днешното предизвикателство. Нулира се в полунощ.'
+                ? 'Резултатите от въпросите на деня. Нулира се в полунощ.'
                 : `Рейтинг в класирания режим „${MODES[board].name}“.`}
           </p>
           {data?.season && (
@@ -95,15 +100,11 @@ export function LeaderboardPage() {
               amongFriends
                 ? 'Никой от приятелите ти не е играл днес'
                 : board === 'daily'
-                  ? 'Още никой не е играл днес'
+                  ? 'Още никой не е в днешната класация'
                   : 'Още никой не е класиран'
             }
             body={
-              me.isGuest
-                ? GUEST_LINE
-                : board === 'daily'
-                  ? 'Изиграй дневното предизвикателство от началната страница.'
-                  : 'Изиграй класиран мач и оглави тази класация.'
+              me.isGuest ? GUEST_LINE : board === 'daily' ? dailyLine : 'Изиграй класиран мач и оглави тази класация.'
             }
           />
         </Card>
@@ -170,7 +171,7 @@ export function LeaderboardPage() {
               {me.isGuest
                 ? GUEST_LINE
                 : board === 'daily'
-                  ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.'
+                  ? dailyLine
                   : 'Изиграй мач в този режим, за да влезеш в класацията.'}
             </p>
           )}
@@ -195,7 +196,7 @@ function BringFriends() {
         <Button
           onClick={() =>
             shareText(
-              `Ела да играем ${BRAND.name} — ${BRAND.tagline.toLowerCase()}: https://${BRAND.domain}`,
+              `Ела да се мерим в ${BRAND.name} — безплатна онлайн викторина, 10 въпроса на деня за цяла България: ${window.location.origin}`,
               'Линкът е копиран',
             )
           }

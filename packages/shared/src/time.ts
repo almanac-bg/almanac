@@ -64,6 +64,12 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
 }
 
+/** The first day of „Въпросите на деня“ (the day the site opened): №1. */
+export const FIRST_DAY = '2026-10-25';
+
+/** The day's number since the first, as the share text says it: "АЛМАНАХ №4". */
+export const dayNumber = (day: string) => daysBetween(FIRST_DAY, day) + 1;
+
 export function dayEndsAt(day: string): number {
   const { y, m, d } = parseDay(day);
   return sofiaMidnight(y, m, d + 1);

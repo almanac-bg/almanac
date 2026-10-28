@@ -16,10 +16,13 @@ interface Entry {
   joinedAt: number;
 }
 
+/** The wait for bots when the player is the only one around: long enough to read who's coming, no longer. */
+const ALONE_FILL_MS = 1_500;
+
 /**
  * First-come-first-served queues per mode. Bots fill the gaps after `config.botFillMs` — or `config.botFillBusyMs`
  * while someone else who could join is online (`idleOnline`: online, not in a match or a queue): when few people
- * play, an 8-second window almost never brings two of them together.
+ * play, an 8-second window almost never brings two of them together. With nobody else around: ALONE_FILL_MS.
  */
 export class Matchmaker {
   private queues = Object.fromEntries(QUEUE_MODES.map((m) => [m, [] as Entry[]])) as Record<QueueModeId, Entry[]>;
@@ -78,8 +81,10 @@ export class Matchmaker {
   /** How long the queues wait for people before bots fill in; null with bots off. */
   private fillMs(): number | null {
     if (config.botFillMs === null) return null;
-    if (config.botFillBusyMs === config.botFillMs || QUEUE_MODES.every((m) => this.queues[m].length === 0))
-      return config.botFillMs;
+    const queued = QUEUE_MODES.reduce((n, m) => n + this.queues[m].length, 0);
+    // Nobody else is queued, and nobody online could join: waiting would only keep the one player waiting.
+    if (queued <= 1 && this.idleOnline() === 0) return Math.min(config.botFillMs, ALONE_FILL_MS);
+    if (config.botFillBusyMs === config.botFillMs || queued === 0) return config.botFillMs;
     return this.idleOnline() > 0 ? config.botFillBusyMs : config.botFillMs;
   }
 

@@ -43,6 +43,7 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
   // A day's frozen set is only read on that day (and a crash-cut run's day after it).
   run('DELETE FROM daily_sets WHERE day < ?', shiftDay(dayKey(now), -7));
+  run('DELETE FROM daily_links WHERE day < ?', shiftDay(dayKey(now), -7));
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
 }

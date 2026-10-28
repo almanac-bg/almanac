@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 import {
   type GameStartPayload,
   type PowerupEvent,
+  PUBLIC_PAGES,
   type QuestionPayload,
   RATED_AFTER,
   type RevealPayload,
@@ -646,7 +647,15 @@ test('daily challenge', T, async () => {
     log.questions.map((q) => q.options),
     'but in each player’s own order',
   );
-  assert.deepEqual(eb.rewards!.daily, { rank: 2, total: 2, streak: 1, shieldsUsed: 0, shieldEarned: false });
+  assert.deepEqual(eb.rewards!.daily, {
+    rank: 2,
+    total: 2,
+    offBoard: false,
+    streak: 1,
+    shieldsUsed: 0,
+    shieldEarned: false,
+    sharer: null,
+  });
   const info = await api.get('/api/daily', A.cookie);
   assert.equal(info.body.played.rank, 1);
   assert.equal(info.body.entries.length, 2);
@@ -657,7 +666,7 @@ test('daily challenge', T, async () => {
 });
 
 test(
-  'a guest, or an account made today, plays a daily of its own, off the board; from the next day the shared one',
+  'a guest, or an account made today, plays the same questions off the board, and sees where it would stand',
   T,
   async () => {
     const G = await guest(srv.url);
@@ -665,19 +674,25 @@ test(
     await connected(sg);
     const log = newLog();
     const play = autoPlay(sg, 'right', log);
-    assert.ok((await emitAck(sg, 'daily:start')).ok);
+    assert.ok((await emitAck(sg, 'daily:start', {})).ok);
     const { end } = await play;
-    // A throwaway guest must not be a way to read the day's answers before playing for the board.
-    assert.notDeepEqual(
+    // One set for everyone: what lets friends compare their day.
+    assert.deepEqual(
       log.questions.map((q) => q.id),
       sharedDaily,
-      'questions of its own',
+      'the day’s questions',
     );
-    assert.equal(end.rewards!.daily!.rank, null, 'no place on the board');
-    assert.equal((await api.get('/api/daily', G.cookie)).body.played.rank, null);
-    assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'still one run a day');
+    const daily = end.rewards!.daily!;
+    assert.equal(daily.offBoard, true, 'kept off the board');
+    assert.equal(daily.total, 2, 'the board has the two accounts from before today');
+    assert.ok(daily.rank >= 1 && daily.rank <= 3, 'where it would stand on it');
+    const info = (await api.get('/api/daily', G.cookie)).body;
+    assert.equal(info.offBoard, true);
+    assert.equal(info.played.rank, daily.rank);
+    assert.ok(!info.entries.some((e: { user: { id: number } }) => e.user.id === G.user.id), 'not listed');
+    assert.equal((await emitAck(sg, 'daily:start', {})).ok, false, 'still one run a day');
 
-    // Saved the same day it was made: an account made today could still be a throwaway, so the run stands.
+    // Saved the same day it was made: an account made today could still be a throwaway, so it stays off the board.
     const claim = (cookie: string) =>
       api.send('POST', '/api/account/claim', cookie, {
         username: `saver${Math.floor(Math.random() * 1e6)}`,
@@ -686,37 +701,83 @@ test(
     const saved = await claim(G.cookie);
     assert.equal(saved.status, 200);
     sg.close();
-    const sSaved = connect(srv.url, saved.cookie!);
-    await connected(sSaved);
-    assert.equal((await emitAck(sSaved, 'daily:start')).ok, false, 'saved today: today’s run stands');
-    assert.equal((await api.get('/api/daily', saved.cookie)).body.ownSet, true);
-    sSaved.close();
+    assert.equal((await api.get('/api/daily', saved.cookie)).body.offBoard, true, 'saved today: off until tomorrow');
 
-    // A guest from yesterday that saves its profile today opens the shared daily at once.
+    // A guest from yesterday that saves its profile today is on the board at once, with the run it played.
     const H = await guest(srv.url);
     srv.db.prepare('UPDATE users SET created_at = ? WHERE id = ?').run(Date.now() - RATED_AFTER.ms, H.user.id);
     const sh = connect(srv.url, H.cookie);
     await connected(sh);
-    const own = autoPlay(sh, 'right', newLog());
-    assert.ok((await emitAck(sh, 'daily:start')).ok);
-    assert.equal((await own).end.rewards!.daily!.rank, null, 'as a guest, its own');
+    const own = autoPlay(sh, 'wrong', newLog());
+    assert.ok((await emitAck(sh, 'daily:start', {})).ok);
+    assert.equal((await own).end.rewards!.daily!.offBoard, true, 'as a guest, off the board');
     const savedH = await claim(H.cookie);
     assert.equal(savedH.status, 200);
     sh.close();
-    assert.equal((await api.get('/api/daily', savedH.cookie)).body.ownSet, false);
+    const after = (await api.get('/api/daily', savedH.cookie)).body;
+    assert.equal(after.offBoard, false);
+    assert.equal(after.total, 3, 'and on it');
     const sh2 = connect(srv.url, savedH.cookie!);
     await connected(sh2);
-    const logShared = newLog();
-    const again = autoPlay(sh2, 'wrong', logShared);
-    assert.ok((await emitAck(sh2, 'daily:start')).ok, 'with a profile, the shared daily is open');
-    const { end: shared } = await again;
-    assert.deepEqual(
-      logShared.questions.map((q) => q.id),
-      sharedDaily,
-      'the shared questions',
-    );
-    assert.equal(typeof shared.rewards!.daily!.rank, 'number', 'and a place on the board');
+    assert.equal((await emitAck(sh2, 'daily:start', {})).ok, false, 'no second go at questions it has seen');
     sh2.close();
+  },
+);
+
+test(
+  "a daily link: a friend plays the same questions, compares with the sharer's day, and the sharer hears",
+  T,
+  async () => {
+    // Only once the day is played: by then the sharer knows the answers anyway.
+    const newcomer = await register(srv.url, 'oshte_ne_igral');
+    assert.equal((await api.send('POST', '/api/daily/link', newcomer.cookie)).status, 409);
+    const link = await api.send('POST', '/api/daily/link', A.cookie);
+    assert.equal(link.status, 200);
+    const { code } = link.body;
+    assert.equal((await api.send('POST', '/api/daily/link', A.cookie)).body.code, code, 'one link a day');
+
+    const preview = (await fetch(`${srv.url}/api/daily/preview?code=${code}`)).json() as Promise<{
+      sharer: { user: { username: string }; correct: number } | null;
+      number: number;
+    }>;
+    const shown = await preview;
+    assert.equal(shown.sharer?.user.username, A.user.username, 'anyone can see whose link it is');
+    assert.equal(shown.sharer?.correct, 10);
+    assert.ok(shown.number >= 1);
+    const bogus = (await (await fetch(`${srv.url}/api/daily/preview?code=nope`)).json()) as { sharer: unknown };
+    assert.equal(bogus.sharer, null);
+
+    const F = await guest(srv.url);
+    const sf = connect(srv.url, F.cookie);
+    await connected(sf);
+    const log = newLog();
+    const play = autoPlay(sf, 'wrong', log);
+    assert.ok((await emitAck(sf, 'daily:start', { via: code })).ok);
+    const { end } = await play;
+    assert.deepEqual(
+      log.questions.map((q) => q.id),
+      sharedDaily,
+      'the same questions',
+    );
+    assert.equal(end.rewards!.daily!.sharer?.user.username, A.user.username, "the sharer's day to compare with");
+    assert.equal(end.rewards!.daily!.sharer?.correct, 10);
+    sf.close();
+
+    await eventually(async () => {
+      const notes = (await api.get('/api/notifications', A.cookie)).body.notifications as {
+        text: string;
+        link: string;
+      }[];
+      assert.ok(
+        notes.some((n) => n.link === '/daily' && /по твоя линк/.test(n.text)),
+        'the sharer hears how it went',
+      );
+    });
+    const mine = (await api.get('/api/daily', A.cookie)).body;
+    assert.ok(
+      mine.fromMyLink.some((p: { user: { id: number } }) => p.user.id === F.user.id),
+      'and sees it on /daily',
+    );
   },
 );
 
@@ -1361,7 +1422,7 @@ test('website files are served with the right caching', {
   assert.match(shared, /property="og:description" content="Резултатът за биене: \d+ точки/);
   assert.match(
     await (await fetch(`${srv.url}/c/unknown-id`)).text(),
-    /<title>АЛМАНАХ — куиз битки<\/title>/,
+    new RegExp(`<title>${PUBLIC_PAGES['/'].title}</title>`),
     'unknown links get the plain page',
   );
 });

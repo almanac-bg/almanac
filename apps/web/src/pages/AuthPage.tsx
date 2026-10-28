@@ -3,6 +3,7 @@ import {
   BRAND,
   CATEGORIES,
   type ChallengePreview,
+  type DailyPreview,
   isQueueMode,
   MODES,
   type ModeId,
@@ -12,6 +13,8 @@ import {
 import clsx from 'clsx';
 import {
   ArrowLeft,
+  ArrowRight,
+  CalendarDays,
   DoorOpen,
   Eye,
   EyeOff,
@@ -51,8 +54,8 @@ const ABOUT_MODES: ModeId[] = ['daily', 'challenge', 'duel', 'royale', 'solo', '
 /** On phones autofocus would pop the keyboard and scroll past the logo. */
 const DESKTOP = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
-/** Where a new guest lands: the challenge page with "accept" pressed already, or the lobby. */
-type GuestLanding = { to: string; state?: { accept: true } } | null;
+/** Where a new guest lands: the challenge page with "accept" pressed already, the day's questions playing, or the lobby. */
+type GuestLanding = { to: string; state?: { accept: true } | { play: true } } | null;
 
 export function AuthPage() {
   // Signed out, every address shows this page — an invite link (/join/123456) or a challenge link (/c/abc) included.
@@ -61,8 +64,11 @@ export function AuthPage() {
   const navigate = useNavigate();
   const inviteCode = /^\/join\/(\d+)\/?$/.exec(pathname)?.[1] ?? null;
   const challengeId = /^\/c\/([\w-]{1,16})\/?$/.exec(pathname)?.[1] ?? null;
-  // A challenge link's page comes with its own title from the server: "Мария те предизвиква в АЛМАНАХ".
-  usePageTitle(challengeId ? undefined : null);
+  // The day's questions (/daily), or someone's link to them (/daily/<code>).
+  const daily = /^\/daily(?:\/([\w-]{1,16}))?\/?$/.exec(pathname);
+  const dailyCode = daily?.[1] ?? null;
+  // A challenge or daily link's page comes with its own title from the server: "Мария те предизвиква в АЛМАНАХ".
+  usePageTitle(challengeId || daily ? undefined : null);
   // Newcomers mostly arrive to play (or sign up); a device that has signed in before most likely wants to sign in again.
   // A page the server drew is hydrated as drawn: its first render takes the version the server chose.
   const drawn = isPainted();
@@ -75,8 +81,9 @@ export function AuthPage() {
     if (DESKTOP && returning) usernameRef.current?.focus();
   }, []);
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => (returning ? 'login' : 'register'));
-  // A challenge link opens on the challenge itself; "Имам профил — вход" swaps in the form.
-  const [formOpen, setFormOpen] = useState(!challengeId);
+  // A challenge or daily link opens on what it's for, and a new visitor on the day's questions: "Вход" swaps in the
+  // form. An invite, or a device that has signed in before, opens on the form.
+  const [formOpen, setFormOpen] = useState(() => !challengeId && !daily && (returning || !!inviteCode));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -94,6 +101,10 @@ export function AuthPage() {
     challengeId ?? '',
   );
   const playable = !!preview.data && !preview.data.expired;
+  const dailyPreview = useLoad<DailyPreview | null>(
+    () => (daily ? api.dailyPreview(dailyCode ?? undefined) : Promise.resolve(null)),
+    daily ? (dailyCode ?? '/') : '',
+  );
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -132,12 +143,20 @@ export function AuthPage() {
     }
   }
 
-  // A live challenge: the guest account opens it with "accept" pressed. A dead link: the lobby.
+  // A live challenge: the guest account opens it with "accept" pressed. A dead link: the lobby. The day's questions:
+  // playing.
   const guestLanding: GuestLanding = challengeId
     ? playable
       ? { to: pathname, state: { accept: true } }
       : { to: '/' }
-    : null;
+    : daily
+      ? { to: pathname, state: { play: true } }
+      : null;
+  const openForm = (m: 'login' | 'register') => {
+    setFormOpen(true);
+    setMode(m);
+    setError(null);
+  };
 
   const guest = (
     <GuestPlay
@@ -149,8 +168,10 @@ export function AuthPage() {
     />
   );
 
-  // The plain landing page tells more below the first screen; an invite or a challenge keeps to its card.
-  const about = !inviteCode && !challengeId;
+  // The plain landing page tells more below the first screen; an invite or a link keeps to its card.
+  const about = !inviteCode && !challengeId && !daily;
+  const linked = !!inviteCode || !!challengeId || !!daily;
+  const playDaily = () => playAsGuest({ to: '/daily', state: { play: true } });
 
   return (
     <>
@@ -167,27 +188,23 @@ export function AuthPage() {
           <span
             className={clsx(
               'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
-              (inviteCode || challengeId) && 'max-sm:hidden',
+              linked && 'max-sm:hidden',
             )}
           >
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Онлайн куиз битки
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Безплатна онлайн викторина
           </span>
           <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
             <Logo />
             {/* What the name is, for screen readers and search results: the logo alone says only "АЛМАНАХ". */}
-            <span className="sr-only"> — онлайн куиз битки в реално време</span>
+            <span className="sr-only"> — онлайн викторина с въпросите на деня</span>
           </h1>
           <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
-          <p
-            className={clsx(
-              'mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl',
-              (inviteCode || challengeId) && 'max-sm:hidden',
-            )}
-          >
-            Бързи въпроси срещу приятели и цяла България. <br className="max-sm:hidden" />
+          <p className={clsx('mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl', linked && 'max-sm:hidden')}>
+            10 въпроса на деня — едни и същи за цяла България. Три минути, една класация.{' '}
+            <br className="max-sm:hidden" />
             <span className="text-fg">Кой знае най-много?</span>
           </p>
-          <ProofLine className={clsx('mt-3', (inviteCode || challengeId) && 'max-sm:hidden')} />
+          <ProofLine className={clsx('mt-3', linked && 'max-sm:hidden')} />
         </motion.header>
 
         <motion.div
@@ -204,7 +221,23 @@ export function AuthPage() {
             />
             {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
             <Card className="relative bg-ink-2/95 p-5 sm:p-8">
-              {challengeId && !formOpen ? (
+              {daily && !formOpen ? (
+                <DailyLanding
+                  preview={dailyPreview.data}
+                  busy={guestBusy}
+                  guestError={guestError}
+                  onPlay={() => playAsGuest(guestLanding)}
+                  onSignIn={() => openForm('login')}
+                />
+              ) : !linked && !formOpen ? (
+                <NewcomerStart
+                  busy={guestBusy}
+                  error={guestError}
+                  onDaily={playDaily}
+                  onGuest={() => playAsGuest(null)}
+                  onForm={openForm}
+                />
+              ) : challengeId && !formOpen ? (
                 <ChallengeLanding
                   preview={preview.data}
                   error={preview.error}
@@ -228,13 +261,14 @@ export function AuthPage() {
                 />
               ) : (
                 <>
-                  {challengeId && (
+                  {(challengeId || daily || (!inviteCode && !returning)) && (
                     <button
                       type="button"
                       onClick={() => setFormOpen(false)}
                       className="focus-ring -mt-2.5 mb-3 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-fg-3 hover:text-fg"
                     >
-                      <ArrowLeft className="size-4" /> Към предизвикателството
+                      <ArrowLeft className="size-4" />{' '}
+                      {challengeId ? 'Към предизвикателството' : daily ? 'Към въпросите на деня' : 'Назад'}
                     </button>
                   )}
                   {inviteCode && (
@@ -246,8 +280,8 @@ export function AuthPage() {
                       </span>
                     </p>
                   )}
-                  {/* One main action per screen: playing as a guest for a new device, signing in for a known one. */}
-                  {!returning && (
+                  {/* One main action per screen: playing as a guest for an invite, signing in for a known device. */}
+                  {!returning && inviteCode && (
                     <>
                       {guest}
                       <Or>или с профил</Or>
@@ -362,7 +396,7 @@ export function AuthPage() {
                       {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
                     </Button>
                   </form>
-                  {returning && (
+                  {(returning || (!inviteCode && !challengeId && !daily)) && (
                     <>
                       <Or>или</Or>
                       {guest}
@@ -416,7 +450,17 @@ export function AuthPage() {
           ))}
         </div>
       </div>
-      {about && <AboutGame cta={returning ? null : guest} />}
+      {about && (
+        <AboutGame
+          cta={
+            returning ? null : (
+              <Button size="lg" variant="gold" className="w-full" loading={guestBusy} onClick={playDaily}>
+                Играй въпросите на деня <ArrowRight aria-hidden className="size-5" />
+              </Button>
+            )
+          }
+        />
+      )}
     </>
   );
 }
@@ -425,7 +469,7 @@ export function AuthPage() {
 function ProofLine({ className }: { className?: string }) {
   const questions = useSite()?.questions;
   // One string: the drawn page holds the sentence whole (no markers between its parts).
-  const line = `${questions ? `Над ${fmt(questions)} въпроса` : 'Въпроси'} в ${CATEGORIES.length} категории · безплатно · без реклами`;
+  const line = `${questions ? `Над ${fmt(questions)} проверени въпроса` : 'Проверени въпроси'} в ${CATEGORIES.length} категории · безплатно · без реклами`;
   return <p className={clsx('text-sm text-fg-3', className)}>{line}</p>;
 }
 
@@ -481,8 +525,8 @@ function AboutGame({ cta }: { cta: ReactNode }) {
         <div>
           <h3 className="t-card">Нива, ранг и колекция</h3>
           <p className="mt-1.5 text-sm text-fg-2">
-            Всеки мач носи XP: качваш нива, пазиш серията си с дневното предизвикателство и отключваш аватари, рамки и
-            титли. Класираните мачове местят рейтинга ти, а с него и ранга — от {RANK_TIERS[0].name} до{' '}
+            Всеки мач носи XP: качваш нива, пазиш серията си с въпросите на деня и отключваш аватари, рамки и титли.
+            Класираните мачове местят рейтинга ти, а с него и ранга — от {RANK_TIERS[0].name} до{' '}
             {RANK_TIERS.at(-1)?.name}.
           </p>
           {cta && <div className="mt-6 max-w-sm">{cta}</div>}
@@ -550,6 +594,136 @@ function GuestPlay({
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * A new visitor's first screen: the day's questions, one tap away (a guest account, and the questions are on). The
+ * lobby as a guest, or a profile, are the other ways in.
+ */
+function NewcomerStart({
+  busy,
+  error,
+  onDaily,
+  onGuest,
+  onForm,
+}: {
+  busy: boolean;
+  error: string | null;
+  onDaily: () => void;
+  onGuest: () => void;
+  onForm: (mode: 'login' | 'register') => void;
+}) {
+  const mode = MODES.daily;
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
+        <CalendarDays aria-hidden className="size-3.5" /> {mode.name}
+      </p>
+      <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+      <p className="mt-1.5 text-sm text-fg-3">Около три минути, един опит до полунощ. Без регистрация.</p>
+      <Button size="lg" variant="gold" className="mt-5 w-full" loading={busy} onClick={onDaily}>
+        Играй въпросите на деня <ArrowRight aria-hidden className="size-5" />
+      </Button>
+      {error && (
+        <p role="alert" className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+          {error}
+        </p>
+      )}
+      <Or>или</Or>
+      <Button size="lg" variant="secondary" className="w-full" disabled={busy} onClick={onGuest}>
+        <Zap aria-hidden className="size-5" /> Играй като гост
+      </Button>
+      <p className="mt-2.5 text-center text-sm text-fg-3">Дуели, Роял, Соло — прогресът се пази и без профил.</p>
+      <div className="mt-4 flex flex-wrap justify-center gap-x-1 text-sm">
+        <button
+          type="button"
+          onClick={() => onForm('login')}
+          className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 font-semibold text-violet-300 hover:text-violet-200"
+        >
+          <LogIn aria-hidden className="size-4" /> Имам профил — вход
+        </button>
+        <button
+          type="button"
+          onClick={() => onForm('register')}
+          className="focus-ring inline-flex min-h-11 items-center rounded-xl px-3 font-semibold text-violet-300 hover:text-violet-200"
+        >
+          Създай профил
+        </button>
+      </div>
+      <Consent />
+    </div>
+  );
+}
+
+/** The day's questions opened signed out (/daily), or someone's link to them: their result to beat, and one tap. */
+function DailyLanding({
+  preview,
+  busy,
+  guestError,
+  onPlay,
+  onSignIn,
+}: {
+  preview: DailyPreview | null;
+  busy: boolean;
+  guestError: string | null;
+  onPlay: () => void;
+  onSignIn: () => void;
+}) {
+  const mode = MODES.daily;
+  if (!preview) {
+    return (
+      <div className="grid place-items-center py-16">
+        <Spinner className="size-8 text-amber-300" />
+      </div>
+    );
+  }
+  const { sharer, number, players } = preview;
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
+        <CalendarDays aria-hidden className="size-3.5" /> {mode.name} №{number}
+      </p>
+      {sharer ? (
+        <>
+          <div className="mt-4 flex items-center gap-3">
+            <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={52} />
+            <div className="min-w-0">
+              {/* A long name wraps rather than losing "те кани" to an ellipsis. */}
+              <h2 className="t-section text-balance [overflow-wrap:anywhere]">{sharer.user.username} те кани</h2>
+              <p className="text-sm text-fg-2 tabular-nums">
+                {sharer.correct}/{mode.questions} · {fmt(sharer.score)} т. — можеш ли повече?
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-fg-3">Същите {mode.questions} въпроса, един опит. Без регистрация.</p>
+        </>
+      ) : (
+        <>
+          <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+          <p className="mt-1.5 text-sm text-fg-3">
+            Около три минути, един опит до полунощ. Без регистрация
+            {players > 0 ? ` · днес вече играха ${players === 1 ? '1 човек' : `${fmt(players)} души`}` : ''}.
+          </p>
+        </>
+      )}
+      <Button size="lg" variant="gold" className="mt-6 w-full" loading={busy} onClick={onPlay}>
+        Играй <ArrowRight aria-hidden className="size-5" />
+      </Button>
+      {guestError && (
+        <p role="alert" className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+          {guestError}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onSignIn}
+        className="focus-ring mx-auto mt-3 flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-violet-300 hover:text-violet-200"
+      >
+        <LogIn aria-hidden className="size-4" /> Имам профил — вход
+      </button>
+      <Consent />
     </div>
   );
 }
@@ -676,8 +850,7 @@ function ChallengeLanding({
       {expired ? (
         <>
           <p className="mt-5 text-sm text-fg-2">
-            Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и дневното предизвикателство
-            те чакат.
+            Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и въпросите на деня те чакат.
           </p>
           <Button size="lg" className="mt-5 w-full" loading={busy} onClick={onPlay}>
             <Zap aria-hidden className="size-5" /> Играй като гост

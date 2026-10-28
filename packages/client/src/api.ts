@@ -4,6 +4,7 @@ import type {
   ChallengeInfo,
   ChallengePreview,
   DailyInfo,
+  DailyPreview,
   FriendsResponse,
   LaunchStats,
   LeaderboardBoard,
@@ -145,6 +146,11 @@ export const api = {
   leaderboard: (board: LeaderboardBoard) => request<LeaderboardResponse>('GET', `/leaderboard/${board}`),
 
   daily: () => request<DailyInfo>('GET', '/daily'),
+  /** Today's questions as a link shows them (`code`: a player's link), signed in or not. */
+  dailyPreview: (code?: string) =>
+    request<DailyPreview>('GET', `/daily/preview${code ? `?code=${encodeURIComponent(code)}` : ''}`),
+  /** Your link to today's questions; once you've played them. */
+  dailyLink: () => request<{ code: string }>('POST', '/daily/link'),
   myChallenges: () => request<{ challenges: MyChallenge[] }>('GET', '/challenges'),
   challenge: (id: string) => request<ChallengeInfo>('GET', `/challenges/${encodeURIComponent(id)}`),
   challengePreview: (id: string) => request<ChallengePreview>('GET', `/challenges/${encodeURIComponent(id)}/preview`),

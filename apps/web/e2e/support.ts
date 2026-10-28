@@ -87,10 +87,24 @@ export async function startAsGuest(page: Page) {
   await expectLobby(page);
 }
 
+/**
+ * The landing page's form on that tab. A new device opens on the day's questions, with the form a tap away; one that
+ * has signed in before opens on the form.
+ */
+export async function openForm(page: Page, tab: 'Регистрация' | 'Вход') {
+  const first = page.getByRole('button', {
+    name: tab === 'Вход' ? 'Имам профил — вход' : 'Създай профил',
+    exact: true,
+  });
+  await expect(first.or(page.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
+  if (await first.isVisible()) await first.click();
+  else await page.getByRole('button', { name: tab, exact: true }).click();
+}
+
 /** Signs up through the landing page's "Регистрация" form. */
 export async function signUp(page: Page, username: string, password: string) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Регистрация', exact: true }).click();
+  await openForm(page, 'Регистрация');
   await expect(page.getByRole('heading', { name: 'Създай профил', exact: true })).toBeVisible();
   await page.getByLabel('Потребителско име', { exact: true }).fill(username);
   await page.getByLabel('Парола', { exact: true }).fill(password);
@@ -101,7 +115,7 @@ export async function signUp(page: Page, username: string, password: string) {
 /** Signs in through the landing page's "Вход" form. */
 export async function signIn(page: Page, username: string, password: string) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Вход', exact: true }).click();
+  await openForm(page, 'Вход');
   await expect(page.getByRole('heading', { name: 'Здравей отново!', exact: true })).toBeVisible();
   await page.getByLabel('Потребителско име или имейл').fill(username);
   await page.getByLabel('Парола', { exact: true }).fill(password);

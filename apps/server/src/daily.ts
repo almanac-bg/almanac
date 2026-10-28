@@ -1,34 +1,58 @@
-import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS } from '@quiz/shared';
+import { randomBytes } from 'node:crypto';
+import {
+  type DailyInfo,
+  type DailyPreview,
+  type DailySharer,
+  dayEndsAt,
+  dayKey,
+  dayNumber,
+  daysBetween,
+  MODES,
+  STREAK_SHIELDS,
+} from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { friendIds } from './friends';
+import { notify } from './notifications';
 import {
   type PreparedQuestion,
   pickQuestions,
-  recentFor,
+  questionBank,
   reorderOptions,
   seededRng,
   withoutAuthors,
 } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
-import { playsSharedDaily } from './trust';
+import { onDailyBoard } from './trust';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
-/** A run on the shared set: what the board and the friends' view compare (a run from older code: a guest's wasn't). */
-const SHARED_RUN = 'COALESCE(d.own_set, u.is_guest) = 0';
-/** On the day's board: a run on the shared set, by a player who isn't banned. */
-const ON_BOARD = `${SHARED_RUN} AND ${NOT_BANNED}`;
+/**
+ * On the day's board: a run that isn't kept off it (`own_set`: a guest's, or an account's made that day; from older
+ * code, a guest's), by a player who isn't banned.
+ */
+const ON_BOARD = `COALESCE(d.own_set, u.is_guest) = 0 AND ${NOT_BANNED}`;
 
-/** Today's question set — generated once per day from a date seed, then frozen in the database. */
+/**
+ * Today's question set: drawn once a day, then frozen in the database. Questions with a "Знаеше ли?" fact come first,
+ * and of those the ones played least so far: the day everyone plays shouldn't be what the regulars have seen most.
+ */
 function dailySet(day: string): PreparedQuestion[] {
   const existing = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (existing) return JSON.parse(existing.questions);
+  const played = new Map(
+    all<{ question_id: string; answered: number }>('SELECT question_id, answered FROM question_stats').map((r) => [
+      r.question_id,
+      r.answered,
+    ]),
+  );
+  // pickQuestions takes the lowest first.
+  const order = new Map(questionBank().map((q) => [q.id, (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0)]));
   // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
   const questions = pickQuestions(
     MODES.daily.questions,
     'mixed',
-    new Map(),
+    order,
     seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
   );
   run(
@@ -41,16 +65,13 @@ function dailySet(day: string): PreparedQuestion[] {
 
 /**
  * A question was just hidden (a moderator found it wrong): if it's in the day's set and nobody has started it yet, the
- * set is drawn again without it. Once someone has played, the set stands — the board compares the same ten questions
- * for everyone. Runs on questions of their own (guests, accounts made today) don't count.
+ * set is drawn again without it. Once anyone has played, the set stands — the board compares the same ten questions
+ * for everyone.
  */
 export function redrawDailyWithout(questionId: string, day = dayKey()): boolean {
   const set = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (!set || !(JSON.parse(set.questions) as PreparedQuestion[]).some((q) => q.id === questionId)) return false;
-  const started = one(
-    `SELECT 1 AS x FROM daily_results d JOIN users u ON u.id = d.user_id WHERE d.day = ? AND ${SHARED_RUN} LIMIT 1`,
-    day,
-  );
+  const started = one('SELECT 1 AS x FROM daily_results WHERE day = ? LIMIT 1', day);
   if (started) return false;
   run('DELETE FROM daily_sets WHERE day = ?', day);
   return true;
@@ -65,22 +86,13 @@ export function dailyQuestions(day: string, userId: number): PreparedQuestion[] 
 }
 
 /**
- * The run of a guest, or of an account made today: ten questions of its own rather than the shared set (playsSharedDaily).
- * A second account costs seconds, so with the shared set anyone could read the day's answers off a throwaway and then
- * top the board with their real profile. These runs aren't on the board; tomorrow the shared set opens to the account.
+ * A guest just saved their profile. Made before today, the account is on the day's board from now on, and so is the
+ * run it played today. Made today, that run stays off the board, and the account joins it tomorrow (onDailyBoard).
  */
-export function ownDailyQuestions(userId: number): PreparedQuestion[] {
-  return pickQuestions(MODES.daily.questions, 'mixed', recentFor([userId]));
-}
-
-/**
- * A guest just saved their profile. Made before today, the account plays the shared set now: today's guest run (its
- * own questions) makes way for it. Made today, the run stands, and the shared set opens tomorrow.
- */
-export function forgetGuestDaily(userId: number) {
+export function joinBoardAfterSave(userId: number) {
   const user = getUser(userId);
-  if (!user || !playsSharedDaily(user)) return;
-  run('DELETE FROM daily_results WHERE user_id = ? AND day = ?', userId, dayKey());
+  if (!user || !onDailyBoard(user)) return;
+  run('UPDATE daily_results SET own_set = 0 WHERE user_id = ? AND day = ?', userId, dayKey());
 }
 
 /**
@@ -90,10 +102,11 @@ export function forgetGuestDaily(userId: number) {
  */
 export function claimDailyAttempt(
   userId: number,
-): { ok: true; day: string; ownSet: boolean } | { ok: false; error: string } {
+  viaCode: string | null = null,
+): { ok: true; day: string } | { ok: false; error: string } {
   const day = dayKey();
-  const existing = one<{ started_at: number; finished_at: number | null; own_set: number | null; revealed: number }>(
-    'SELECT started_at, finished_at, own_set, revealed FROM daily_results WHERE user_id = ? AND day = ?',
+  const existing = one<{ started_at: number; finished_at: number | null; revealed: number }>(
+    'SELECT started_at, finished_at, revealed FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
@@ -103,26 +116,31 @@ export function claimDailyAttempt(
   }
   if (existing && !existing.finished_at && existing.started_at < config.bootedAt) {
     run('UPDATE daily_results SET started_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
-    return { ok: true, day, ownSet: existing.own_set === 1 };
+    return { ok: true, day };
   }
   if (existing) {
     return {
       ok: false,
       error: existing.finished_at
-        ? 'Вече изигра днешното предизвикателство. Ново има утре!'
+        ? 'Вече изигра днешните въпроси. Нови има утре!'
         : 'Днешният опит вече е започнат — имаш само един на ден.',
     };
   }
-  const ownSet = !playsSharedDaily(getUser(userId)!, day);
+  const offBoard = !onDailyBoard(getUser(userId)!, day);
+  // Opened from someone's link for today: they hear how it went (tellSharer).
+  const link = viaCode
+    ? one<{ user_id: number }>('SELECT user_id FROM daily_links WHERE code = ? AND day = ?', viaCode, day)
+    : undefined;
   run(
-    'INSERT INTO daily_results (user_id, day, started_at, own_set) VALUES (?, ?, ?, ?)',
+    'INSERT INTO daily_results (user_id, day, started_at, own_set, via) VALUES (?, ?, ?, ?, ?)',
     userId,
     day,
     Date.now(),
-    ownSet ? 1 : 0,
+    offBoard ? 1 : 0,
+    link && link.user_id !== userId ? link.user_id : null,
   );
   count('daily_runs');
-  return { ok: true, day, ownSet };
+  return { ok: true, day };
 }
 
 /** Said when a run cut short after some of its answers were revealed is asked for again. */
@@ -165,14 +183,16 @@ export function releaseDailyAttempt(userId: number, day: string) {
   run('DELETE FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NULL', userId, day);
 }
 
-/** Place on the day's board, and how many are on it. A run on questions of its own has no place on it. */
-function rankOf(day: string, score: number, timeMs: number, ownSet = false): { rank: number | null; total: number } {
-  const listed = one<{ n: number }>(
+/** How many are on the day's board. */
+const boardSize = (day: string) =>
+  one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
      WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD}`,
     day,
   )!.n;
-  if (ownSet) return { rank: null, total: listed };
+
+/** Place on the day's board, and how many are on it. For a run off the board: where it would stand on it. */
+function rankOf(day: string, score: number, timeMs: number): { rank: number; total: number } {
   const better = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
      WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD}
@@ -182,7 +202,74 @@ function rankOf(day: string, score: number, timeMs: number, ownSet = false): { r
     score,
     timeMs,
   )!.n;
-  return { rank: better + 1, total: listed };
+  return { rank: better + 1, total: boardSize(day) };
+}
+
+/** A sharer's result on the day, as the people they sent the link to see it. */
+function sharerResult(userId: number, day: string): DailySharer | null {
+  const r = one<UserRow & { score: number; correct: number }>(
+    `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.user_id = ? AND d.day = ? AND d.finished_at IS NOT NULL AND ${NOT_BANNED}`,
+    userId,
+    day,
+  );
+  return r
+    ? { user: { username: r.username, avatar: r.avatar, frame: r.frame }, score: r.score, correct: r.correct }
+    : null;
+}
+
+/** Whoever shared the link hears how it went: one note a day, saying how many have played it so far. */
+function tellSharer(sharerId: number, player: UserRow, day: string, correct: number) {
+  const of = MODES.daily.questions;
+  const theirs = one<{ correct: number }>(
+    'SELECT correct FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NOT NULL',
+    sharerId,
+    day,
+  );
+  const played = one<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM daily_results WHERE via = ? AND day = ? AND finished_at IS NOT NULL',
+    sharerId,
+    day,
+  )!.n;
+  const yours = theirs ? ` Ти: ${theirs.correct}/${of}.` : '';
+  notify(sharerId, {
+    icon: '📅',
+    text:
+      played > 1
+        ? `${played} души изиграха днешните въпроси по твоя линк (последно — ${player.username}: ${correct}/${of}).${yours}`
+        : `${player.username} изигра днешните въпроси по твоя линк: ${correct}/${of}.${yours}`,
+    link: '/daily',
+    replace: true,
+  });
+}
+
+/**
+ * The player's link to today's questions (/daily/<code>), made the first time they share it. Only once they've played
+ * today: by then they know the answers, so the link gives away nothing they couldn't tell a friend anyway.
+ */
+export function dailyLink(userId: number): string | null {
+  const day = dayKey();
+  if (!one('SELECT 1 AS x FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NOT NULL', userId, day))
+    return null;
+  const existing = one<{ code: string }>('SELECT code FROM daily_links WHERE user_id = ? AND day = ?', userId, day);
+  if (existing) return existing.code;
+  const code = randomBytes(6).toString('base64url');
+  run('INSERT INTO daily_links (code, user_id, day, created_at) VALUES (?, ?, ?, ?)', code, userId, day, Date.now());
+  return code;
+}
+
+/** Today's questions as a link shows them, signed in or not: whose link it is and how they did. */
+export function dailyPreview(code: string | null): DailyPreview {
+  const day = dayKey();
+  const link = code
+    ? one<{ user_id: number }>('SELECT user_id FROM daily_links WHERE code = ? AND day = ?', code, day)
+    : undefined;
+  return {
+    day,
+    number: dayNumber(day),
+    sharer: link ? sharerResult(link.user_id, day) : null,
+    players: boardSize(day),
+  };
 }
 
 /**
@@ -207,12 +294,17 @@ export function recordDailyResult(
     day,
   );
   const u = getUser(userId)!;
-  const ownSet = one<{ own_set: number | null }>(
-    'SELECT own_set FROM daily_results WHERE user_id = ? AND day = ?',
+  const entry = one<{ own_set: number | null; via: number | null }>(
+    'SELECT own_set, via FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
-  )?.own_set;
-  const rank = rankOf(day, score, timeMs, (ownSet ?? u.is_guest) === 1);
+  );
+  if (entry?.via) tellSharer(entry.via, u, day, correct);
+  const rank = {
+    ...rankOf(day, score, timeMs),
+    offBoard: (entry?.own_set ?? u.is_guest) === 1,
+    sharer: entry?.via ? sharerResult(entry.via, day) : null,
+  };
   if (u.last_daily_day === day || !played)
     return { ...rank, streak: liveDailyStreak(u, day), shieldsUsed: 0, shieldEarned: false };
 
@@ -263,6 +355,17 @@ function friendsToday(day: string, userId: number) {
   return rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct }));
 }
 
+/** Who played today's questions from this player's link, best first. */
+function fromLink(userId: number, day: string) {
+  return all<UserRow & { score: number; correct: number }>(
+    `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
+     WHERE d.via = ? AND d.day = ? AND d.finished_at IS NOT NULL AND ${NOT_BANNED}
+     ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
+    userId,
+    day,
+  ).map((r) => ({ user: toPublicUser(r), score: r.score, correct: r.correct }));
+}
+
 export function dailyInfo(userId: number): DailyInfo {
   const day = dayKey();
   const mine = one<{
@@ -284,19 +387,21 @@ export function dailyInfo(userId: number): DailyInfo {
   const me = getUser(userId)!;
   const guest = me.is_guest === 1;
   // Today's run as it was started; one not started yet goes by the account as it is now.
-  const ownSet = mine ? (mine.own_set ?? me.is_guest) === 1 : !playsSharedDaily(me, day);
+  const offBoard = mine ? (mine.own_set ?? me.is_guest) === 1 : !onDailyBoard(me, day);
   const played = mine?.finished_at
-    ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, ownSet) }
+    ? { score: mine.score!, correct: mine.correct!, rank: rankOf(day, mine.score!, mine.time_ms!).rank }
     : null;
   return {
     day,
+    number: dayNumber(day),
     endsAt: dayEndsAt(day),
     streak: liveDailyStreak(me),
     attempted: !!mine,
-    ownSet,
-    played: played && { score: played.score, correct: played.correct, rank: played.rank },
-    total: rankOf(day, 0, 0, true).total,
+    offBoard,
+    played,
+    total: boardSize(day),
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),
     friends: guest ? [] : friendsToday(day, userId),
+    fromMyLink: fromLink(userId, day),
   };
 }

@@ -13,7 +13,7 @@ import { areFriends } from '../friends';
 import { guarded } from '../guard';
 import { friendsChanged, notifyUser, presence } from '../notify';
 import { getRating } from '../seasons';
-import { publicUser } from '../users';
+import { getUser, publicUser } from '../users';
 import { type Bot, makeBots } from './bots';
 import type { Game } from './Game';
 import type { IO, IOSocket } from './io';
@@ -46,6 +46,13 @@ const memberId = (userId: number) => `u${userId}`;
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
+
+  /** Who a room's link comes from (its host), for the link's preview in a chat app; null if there's no such room. */
+  preview(code: string): { host: string; players: number } | null {
+    const room = this.rooms.get(code);
+    const host = room && getUser(room.hostUserId);
+    return host ? { host: host.username, players: room.members.length + room.bots.length } : null;
+  }
   private byUser = new Map<number, Room>();
   private graceTimers = new Map<number, NodeJS.Timeout>();
   /** Invites sent and not yet expired, so a "decline" can only answer a real one. */

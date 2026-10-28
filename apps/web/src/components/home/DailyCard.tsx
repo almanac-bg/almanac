@@ -1,22 +1,25 @@
 import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client';
-import { type LeaderboardEntry, MODES, STREAK_SHIELDS, TIME_ZONE } from '@quiz/shared';
+import {
+  BRAND,
+  type DailyInfo,
+  dayKey,
+  dayNumber,
+  type LeaderboardEntry,
+  MODES,
+  STREAK_SHIELDS,
+  TIME_ZONE,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ownDailyLine } from '../../lib/daily';
+import { dailyLinkUrl, offBoardLine } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
 import { Avatar } from '../Avatar';
 import { LoadError } from '../LoadError';
 import { Button, Card, Spinner } from '../ui';
 import { countdown } from './time';
-
-/**
- * "предизвикателство" is wider than a small phone's card in the display font, and browsers don't hyphenate Bulgarian:
- * a soft hyphen lets it break where Bulgarian would (and stays invisible when it fits).
- */
-const DAILY_TITLE = MODES.daily.name.replace('предизвикателство', 'предизвика\u00ADтелство');
 
 export function DailyCard({ className }: { className?: string }) {
   const me = useStore((s) => s.me)!;
@@ -26,10 +29,23 @@ export function DailyCard({ className }: { className?: string }) {
   const { data: info, error, retry } = useLoad(() => api.daily(), '', `${me.daily.day}:${me.daily.played}`);
   const [busy, setBusy] = useState(false);
   const [a, b] = MODES.daily.accent;
-  // Saved by the results screen on this device when today's challenge was played.
+  // Saved by the results screen on this device when today's questions were played (with the squares).
   const savedShare = info?.played ? savedDailyShare(me.daily.day) : null;
+  const madeToday = dayKey(me.createdAt) === me.daily.day;
 
-  // Midnight in Sofia: a new challenge is up.
+  // Played on another device: the link and the score, without the squares.
+  async function share() {
+    if (savedShare) return shareText(savedShare, 'Линкът и резултатът са копирани');
+    if (!info?.played) return;
+    const link = await dailyLinkUrl();
+    const of = MODES.daily.questions;
+    shareText(
+      `⚡ ${BRAND.name} №${info.number} · ${info.played.correct}/${of}\n${fmt(info.played.score)} т.\n${link}`,
+      'Линкът и резултатът са копирани',
+    );
+  }
+
+  // Midnight in Sofia: new questions are up.
   const expired = !!info && now >= info.endsAt;
   useEffect(() => {
     if (expired) retry();
@@ -72,7 +88,7 @@ export function DailyCard({ className }: { className?: string }) {
               className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-amber-950 uppercase"
               style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
             >
-              <CalendarDays className="size-3.5" /> Днес · {dayLabel}
+              <CalendarDays className="size-3.5" /> №{info?.number ?? dayNumber(me.daily.day)} · {dayLabel}
             </span>
             {streak > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-0.5 text-xs font-bold text-orange-300">
@@ -82,15 +98,12 @@ export function DailyCard({ className }: { className?: string }) {
             {/* Last in the row: its explanation opens as a line of its own under the chips. */}
             {(streak > 0 || me.daily.shields > 0) && <StreakShields shields={me.daily.shields} streak={streak} />}
           </div>
-          {/* The soft hyphen is for 320 px phones; wider, the long word just goes to the next line. */}
-          <h2 className="mt-3 t-card md:[hyphens:none] lg:text-2xl">{DAILY_TITLE}</h2>
-          <p className="mt-1 text-sm text-fg-2">
-            {info?.ownSet ? 'Днес — 10 въпроса само за теб. Един опит.' : MODES.daily.tagline}
-          </p>
+          <h2 className="mt-3 t-card lg:text-2xl">{MODES.daily.name}</h2>
+          <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
 
           <div className="mt-auto pt-5">
             {failed ? (
-              <LoadError compact title="Днешното предизвикателство не се зареди" error={error} onRetry={retry} />
+              <LoadError compact title="Въпросите на деня не се заредиха" error={error} onRetry={retry} />
             ) : !info ? (
               <div aria-hidden className="h-14 w-56 max-w-full animate-pulse rounded-2xl bg-white/8" />
             ) : info.played ? (
@@ -99,22 +112,22 @@ export function DailyCard({ className }: { className?: string }) {
                   <div className="text-xs text-fg-3">Твоят резултат</div>
                   <div className="text-2xl font-bold">
                     {fmt(info.played.score)}{' '}
-                    {info.played.rank !== null && (
+                    {!info.offBoard && (
                       <span className="text-base font-semibold text-amber-300">
                         #{info.played.rank} <span className="text-fg-3">от {info.total}</span>
                       </span>
                     )}
                   </div>
-                  {info.played.rank === null && (
-                    <p className="mt-1 max-w-64 text-xs text-fg-3">{ownDailyLine(me.isGuest)}</p>
+                  {info.offBoard && (
+                    <p className="mt-1 max-w-64 text-xs text-fg-3">
+                      {offBoardLine({ guest: me.isGuest, madeToday, rank: info.played.rank, total: info.total })}
+                    </p>
                   )}
                 </div>
                 <div className="ml-auto flex gap-2">
-                  {savedShare && (
-                    <Button variant="secondary" onClick={() => shareText(savedShare)} aria-label="Сподели резултата">
-                      <Share2 className="size-4" />
-                    </Button>
-                  )}
+                  <Button variant="secondary" onClick={() => void share()} aria-label="Прати днешните въпроси">
+                    <Share2 className="size-4" />
+                  </Button>
                   <Button variant="secondary" onClick={() => navigate('/leaderboard?board=daily')}>
                     Класиране <ArrowRight className="size-4" />
                   </Button>
@@ -122,17 +135,15 @@ export function DailyCard({ className }: { className?: string }) {
               </div>
             ) : info.attempted ? (
               <p className="text-sm text-fg-3">
-                Днешният опит е използван. Ново предизвикателство след {countdown(info.endsAt - now)}.
+                Днешният опит е използван. Нови въпроси след {countdown(info.endsAt - now)}.
               </p>
             ) : (
-              <>
-                <Button variant="gold" size="lg" onClick={play} loading={busy}>
-                  Играй днешното <ArrowRight className="size-5" />
-                </Button>
-                {info.ownSet && <p className="mt-2 max-w-80 text-xs text-fg-3">{ownDailyLine(me.isGuest)}</p>}
-              </>
+              <Button variant="gold" size="lg" onClick={play} loading={busy}>
+                Играй днешните <ArrowRight className="size-5" />
+              </Button>
             )}
             {info && !failed && <AmongFriends friends={info.friends} meId={me.id} />}
+            {info && !failed && info.fromMyLink.length > 0 && <FromMyLink plays={info.fromMyLink} />}
             {info && !failed && !info.attempted && (
               <p className="mt-3 text-xs text-fg-3 tabular-nums">Изтича след {countdown(info.endsAt - now)}</p>
             )}
@@ -168,13 +179,9 @@ export function DailyCard({ className }: { className?: string }) {
                   </li>
                 ))}
               </ol>
-            ) : info.ownSet ? (
-              // Off the board today: "nobody has played today" beside their own score would be wrong.
-              <p className="py-4 text-center text-sm text-fg-3">
-                {me.isGuest
-                  ? 'Класацията на деня е за играчи с профил.'
-                  : 'Класацията на деня се отваря за новия ти профил от утре.'}
-              </p>
+            ) : info.offBoard ? (
+              // Off the board today: "start the board" isn't theirs to do.
+              <p className="py-4 text-center text-sm text-fg-3">Днес още никой не е в класацията.</p>
             ) : (
               <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>
             )}
@@ -231,6 +238,20 @@ function StreakShields({ shields, streak }: { shields: number; streak: number })
         </span>
       </p>
     </>
+  );
+}
+
+/** Who played today's questions from your link: how many, and who leads. */
+function FromMyLink({ plays }: { plays: DailyInfo['fromMyLink'] }) {
+  const lead = plays[0];
+  return (
+    <p className="mt-2 flex items-center gap-1.5 text-sm text-fg-2">
+      <Share2 aria-hidden className="size-4 shrink-0 text-amber-300" />
+      <span className="min-w-0">
+        По твоя линк: {plural(plays.length, 'човек', 'души')} · води {lead.user.username} ({lead.correct}/
+        {MODES.daily.questions})
+      </span>
+    </p>
   );
 }
 

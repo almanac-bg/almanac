@@ -469,6 +469,25 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
       WHERE finished_at IS NOT NULL;
     `,
   },
+
+  // v19, one daily for everyone:
+  // - `own_set` now only keeps a run off the board (a guest's, an account's made that day): the questions are everyone's.
+  // - `daily_links`: a player's link to the day's questions (/daily/<code>), and `via`, whose link a run was opened from.
+  //   Older code leaves `via` empty and gives such runs questions of their own again: nothing breaks.
+  {
+    compatible: `
+    CREATE TABLE daily_links (
+      code TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE UNIQUE INDEX daily_links_user ON daily_links(user_id, day);
+    CREATE INDEX daily_links_day ON daily_links(day);
+    ALTER TABLE daily_results ADD COLUMN via INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    CREATE INDEX daily_results_via ON daily_results(via, day) WHERE via IS NOT NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

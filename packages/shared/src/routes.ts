@@ -9,9 +9,9 @@ import { BRAND } from './brand.ts';
 /** Pages for everyone, search engines included: each has its own title and description in the page itself. */
 export const PUBLIC_PAGES: Record<string, { title: string; description: string }> = {
   '/': {
-    title: `${BRAND.name} — онлайн куиз битки в реално време`,
+    title: `${BRAND.name} — онлайн викторина с въпросите на деня`,
     description:
-      'Безплатна онлайн викторина с приятели и цяла България: въпросите на деня, предизвикателства по линк, дуели и Роял за 8. Играй и като гост.',
+      'Безплатна онлайн викторина на български: 10 въпроса на деня за цяла България, предизвикателства по линк, дуели и Роял. Без регистрация, без реклами.',
   },
   '/privacy': {
     title: `Политика за поверителност — ${BRAND.name}`,
@@ -29,6 +29,7 @@ const APP_PATHS = [
   /^\/room$/,
   /^\/join\/[^/]+$/,
   /^\/c\/[^/]+$/,
+  /^\/daily(\/[^/]+)?$/,
   /^\/profile(\/[^/]+)?$/,
   /^\/achievements$/,
   /^\/locker$/,

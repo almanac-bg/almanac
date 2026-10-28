@@ -233,7 +233,7 @@ function rewardHuman(
     const played = p.faced * 2 >= game.questions.length;
     dailyResult = recordDailyResult(userId, setup.dailyDay!, s.score, p.correct, p.answerMs, played);
     if (!left) {
-      lines.push({ label: 'Дневно предизвикателство', amount: DAILY_XP.complete });
+      lines.push({ label: 'Въпросите на деня', amount: DAILY_XP.complete });
       const streakBonus = Math.min(dailyResult.streak, DAILY_XP.streakCap) * DAILY_XP.perStreakDay;
       if (dailyResult.streak > 1) lines.push({ label: `Дневна серия ×${dailyResult.streak}`, amount: streakBonus });
     }

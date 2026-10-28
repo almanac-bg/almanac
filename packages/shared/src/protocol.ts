@@ -210,8 +210,19 @@ export interface MatchRewards {
   /** Why a ranked match left the rating as it was (`rating` is null then). */
   unrated: UnratedReason | null;
   /** `shieldsUsed`: missed days a streak shield covered; `shieldEarned`: this run completed a week. */
-  // `rank` is null for a run on questions of its own (a guest, or an account made today: see the server's daily.ts).
-  daily: { rank: number | null; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
+  daily: {
+    /** Place among today's board; off the board, where the run would stand on it ("щеше да си 7-и от 24"). */
+    rank: number;
+    /** How many are on today's board. */
+    total: number;
+    /** A guest's run, or an account's made today: the same questions, kept off the board (see the server's trust.ts). */
+    offBoard: boolean;
+    streak: number;
+    shieldsUsed: number;
+    shieldEarned: boolean;
+    /** Played from someone's daily link: their result, to compare with. */
+    sharer: DailySharer | null;
+  } | null;
   /** A challenge-link run: where it placed among everyone who played that link. */
   challenge: { id: string; rank: number; total: number } | null;
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
@@ -334,7 +345,8 @@ export interface ClientToServerEvents {
   'queue:join': (mode: QueueModeId, ack: Ack) => void;
   'queue:leave': () => void;
   'solo:start': (opts: { category: CategoryChoice }, ack: Ack) => void;
-  'daily:start': (ack: Ack) => void;
+  /** `via`: the code of the daily link it was opened from (/daily/<code>). */
+  'daily:start': (p: { via?: string }, ack: Ack) => void;
   /** Plays a challenge link (`id`), or creates a new one and plays it first (no `id`). */
   'challenge:start': (p: { id?: string }, ack: Ack<{ id: string }>) => void;
   'rematch:request': (p: { gameId: string }) => void;
@@ -426,23 +438,44 @@ export interface LeaderboardResponse {
   friends?: LeaderboardEntry[];
 }
 
+/** Who shared a daily link, and how they did that day. */
+export interface DailySharer {
+  user: Pick<PublicUser, 'username' | 'avatar' | 'frame'>;
+  score: number;
+  correct: number;
+}
+
 export interface DailyInfo {
   day: string;
+  /** №1 is the first day (dayNumber). */
+  number: number;
   endsAt: number;
   streak: number;
   /** Started today but not finished (a dropped attempt counts). */
   attempted: boolean;
   /**
-   * Today's run is on questions of its own, not the shared set, and isn't on the board: a guest's, or an account's made
-   * today (one made to read the answers off before playing with another would have been).
+   * Today's run is off the board: a guest's, or an account's made today (one made only to read the answers off for
+   * another would have been). The questions are everyone's.
    */
-  ownSet: boolean;
-  /** `rank` is null for a run on questions of its own (`ownSet`). */
-  played: { score: number; correct: number; rank: number | null } | null;
+  offBoard: boolean;
+  /** Off the board, `rank` is where the run would stand on it. */
+  played: { score: number; correct: number; rank: number } | null;
   total: number;
   entries: LeaderboardEntry[];
   /** Today's results of you and your friends, ranked among yourselves (empty for a guest, who has no friends here). */
   friends: LeaderboardEntry[];
+  /** Who played today's questions from your link, best first. */
+  fromMyLink: { user: PublicUser; score: number; correct: number }[];
+}
+
+/** A daily link (/daily/<code>) as a visitor sees it, signed in or not. */
+export interface DailyPreview {
+  day: string;
+  number: number;
+  /** Null for /daily itself, or a link that isn't today's. */
+  sharer: DailySharer | null;
+  /** On today's board so far. */
+  players: number;
 }
 
 export interface SeasonInfo {

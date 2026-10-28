@@ -36,7 +36,7 @@ const manifest = JSON.stringify({
   name: `${BRAND.name} — ${BRAND.tagline.toLowerCase()}`,
   short_name: BRAND.name,
   description:
-    'Куиз битки в реално време: дуели, Роял за 8, дневно предизвикателство и линкове, с които предизвикваш приятели.',
+    'Онлайн викторина на български: 10 въпроса на деня за цяла България, предизвикателства по линк, дуели и Роял за 8.',
   lang: 'bg',
   id: '/',
   start_url: '/',
@@ -47,25 +47,32 @@ const manifest = JSON.stringify({
   categories: ['games', 'education', 'entertainment'],
   // A long press on the installed app's icon.
   shortcuts: [
+    { name: 'Въпросите на деня', url: '/daily', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
     { name: 'Класации', url: '/leaderboard', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
-    { name: 'Профил', url: '/profile', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
     { name: 'Приятели', url: '/friends', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
   ],
   // Shown in the install dialog (Android, desktop Chrome) instead of a bare prompt.
   screenshots: [
     {
+      src: '/screenshots/daily-phone.webp',
+      sizes: '1080x1920',
+      type: 'image/webp',
+      form_factor: 'narrow',
+      label: '10 въпроса на деня, едни и същи за цяла България',
+    },
+    {
+      src: '/screenshots/question-phone.webp',
+      sizes: '1080x1920',
+      type: 'image/webp',
+      form_factor: 'narrow',
+      label: 'Научи нещо ново след всеки отговор',
+    },
+    {
       src: '/screenshots/lobby-phone.webp',
       sizes: '1080x1920',
       type: 'image/webp',
       form_factor: 'narrow',
-      label: 'Избери битка',
-    },
-    {
-      src: '/screenshots/match-phone.webp',
-      sizes: '1080x1920',
-      type: 'image/webp',
-      form_factor: 'narrow',
-      label: 'Роял за 8',
+      label: 'Соло, дуели, Роял и стаи с приятели',
     },
     {
       src: '/screenshots/landing-wide.webp',
@@ -90,7 +97,11 @@ export default defineConfig({
     {
       name: 'brand',
       transformIndexHtml: (html) =>
-        html.replaceAll('%BRAND_NAME%', BRAND.name).replaceAll('%BRAND_DOMAIN%', BRAND.domain),
+        html
+          .replaceAll('%BRAND_NAME%', BRAND.name)
+          .replaceAll('%BRAND_DOMAIN%', BRAND.domain)
+          .replaceAll('%HOME_TITLE%', PUBLIC_PAGES['/'].title)
+          .replaceAll('%HOME_DESCRIPTION%', PUBLIC_PAGES['/'].description),
       // The web app manifest comes from the same brand settings: a file in the build, and served by the dev server.
       generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });

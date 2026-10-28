@@ -283,7 +283,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_first',
     name: 'Дневна доза',
-    description: 'Изиграй дневното предизвикателство.',
+    description: 'Изиграй въпросите на деня.',
     icon: '🗓️',
     rarity: 'common',
     xp: 75,
@@ -292,7 +292,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_7',
     name: 'Седмица подред',
-    description: 'Играй дневното предизвикателство 7 дни подред.',
+    description: 'Играй въпросите на деня 7 дни подред.',
     icon: '🗓️',
     rarity: 'rare',
     xp: 300,
@@ -301,7 +301,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_30',
     name: 'Месец подред',
-    description: 'Играй дневното предизвикателство 30 дни подред.',
+    description: 'Играй въпросите на деня 30 дни подред.',
     icon: '📆',
     rarity: 'epic',
     xp: 750,
@@ -310,7 +310,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_streak_100',
     name: 'Сто изгрева',
-    description: 'Играй дневното предизвикателство 100 дни подред.',
+    description: 'Играй въпросите на деня 100 дни подред.',
     icon: '🌅',
     rarity: 'legendary',
     xp: 2000,
@@ -319,7 +319,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'daily_perfect',
     name: 'Перфектен ден',
-    description: '10 от 10 в дневното предизвикателство.',
+    description: '10 от 10 на въпросите на деня.',
     icon: '🌞',
     rarity: 'epic',
     xp: 400,

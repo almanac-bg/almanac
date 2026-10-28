@@ -165,6 +165,30 @@ test('each public page has its own title and address; the game says noindex; a w
   assert.match(icon.headers.get('content-type') ?? '', /icon/);
 });
 
+test('a link to a screen of the game previews as that screen: the day, a room invite, its own address', {
+  skip: !built,
+}, async () => {
+  const preview = async (route: string) => {
+    const html = await (await fetch(`${srv.url}${route}`)).text();
+    return {
+      title: /<title>([^<]*)<\/title>/.exec(html)?.[1],
+      url: /<meta property="og:url" content="([^"]*)"/.exec(html)?.[1],
+      robots: /<meta name="robots" content="([^"]*)"/g.exec(html)?.[1],
+      robotsTags: html.match(/<meta name="robots"/g)?.length,
+    };
+  };
+  const leaderboard = await preview('/leaderboard');
+  assert.equal(leaderboard.url, 'https://almanac.test/leaderboard', 'not the home page');
+  const daily = await preview('/daily');
+  assert.match(daily.title ?? '', /^Въпросите на деня №\d+ — /);
+  assert.equal(daily.url, 'https://almanac.test/daily');
+  // A link that isn't (or is no longer) anyone's: the day itself.
+  assert.match((await preview('/daily/nope')).title ?? '', /^Въпросите на деня №/);
+  const join = await preview('/join/123456');
+  assert.match(join.title ?? '', /Покана за стая 123456/);
+  for (const page of [daily, join]) assert.deepEqual([page.robots, page.robotsTags], ['noindex', 1]);
+});
+
 test('search engines get the public pages in a sitemap and, on the home page only, the site name', {
   skip: !built,
 }, async () => {
@@ -208,7 +232,7 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.match(landing.html, /Онлайн викторина с приятели и цяла България/);
   assert.match(landing.html, /Играй като гост/);
   // The proof line, from the bank the server has (300 test questions).
-  assert.match(landing.html, /Над 300 въпроса в 10 категории/);
+  assert.match(landing.html, /Над 300 проверени въпроса в 10 категории/);
   // Nothing drawn invisible, waiting for an entrance animation that only the browser would play.
   assert.doesNotMatch(landing.html, /opacity:0/);
   assert.match(landing.vary ?? '', /cookie/i);

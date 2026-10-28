@@ -128,6 +128,7 @@ export function exportAccount(userId: number) {
     seasonRatings: rows('SELECT * FROM season_ratings WHERE user_id = ?'),
     seasonRewards: rows('SELECT * FROM season_rewards WHERE user_id = ?'),
     dailyResults: rows('SELECT * FROM daily_results WHERE user_id = ?'),
+    dailyLinks: rows('SELECT code, day, created_at FROM daily_links WHERE user_id = ?'),
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
     challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
     challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),

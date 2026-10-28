@@ -1,6 +1,8 @@
-import { fmt, plural, type ReviewItem, unlockPreview } from '@quiz/client';
+import { fmt, plural, type ReviewItem, unlockPreview, useStore } from '@quiz/client';
 import {
   achievementById,
+  type DailySharer,
+  dayKey,
   levelFromXp,
   levelProgress,
   type MatchRewards,
@@ -15,44 +17,64 @@ import { Share2 } from 'lucide-react';
 import { animate, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ownDailyLine } from '../../lib/daily';
+import { dailyLinkUrl, offBoardWhy } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
-import { LevelBadge, RankBadge } from '../Avatar';
+import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 
-/** The day's standing and streak. The way to the full board is the main button in the action bar below. */
+/**
+ * The day's standing (or, off the board, where the run would stand on it), the friend whose link it came from, and the
+ * streak. Sharing sends the player's own link to the same questions. The full board is the action bar's.
+ */
 export function DailyCard({
   daily,
   history,
   total,
-  guest,
+  score,
 }: {
   daily: NonNullable<MatchRewards['daily']>;
   history: ReviewItem[];
   total: number;
-  guest: boolean;
+  score: number;
 }) {
-  const text = dailyShareText(history, total, daily.streak);
-  useEffect(() => rememberDailyShare(text), [text]);
+  const me = useStore((s) => s.me);
+  const day = dayKey();
+  const [link, setLink] = useState<string | null>(null);
+  // Asked for once: the same link all day, whichever screen shares it.
+  useEffect(() => {
+    void dailyLinkUrl().then(setLink);
+  }, []);
+  const text =
+    link &&
+    dailyShareText({
+      history,
+      total,
+      day,
+      score,
+      place: daily.offBoard ? null : { rank: daily.rank, of: daily.total },
+      streak: daily.streak,
+      link,
+    });
+  useEffect(() => {
+    if (text) rememberDailyShare(text, day);
+  }, [text, day]);
+  const madeToday = !!me && dayKey(me.createdAt) === day;
+
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-amber-400/25" />
-      {daily.rank === null ? (
-        // A run on questions of its own (a guest's, a new account's) has no place on the board.
-        <>
-          <h2 className="relative t-card">Денят е твой</h2>
-          <p className="relative mt-2 text-sm text-fg-2">{ownDailyLine(guest)}</p>
-        </>
-      ) : (
-        <>
-          <h2 className="relative t-card">Твоето място днес</h2>
-          <div className="relative mt-3 flex items-baseline gap-2">
-            <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
-            <span className="text-fg-2">от {fmt(daily.total)} днес</span>
-          </div>
-        </>
+      <h2 className="relative t-card">{daily.offBoard ? 'Щеше да си днес' : 'Твоето място днес'}</h2>
+      <div className="relative mt-3 flex items-baseline gap-2">
+        <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
+        <span className="text-fg-2">от {fmt(daily.offBoard ? daily.total + 1 : daily.total)} днес</span>
+      </div>
+      {daily.offBoard && (
+        <p className="relative mt-2 text-sm text-fg-2">{offBoardWhy({ guest: !!me?.isGuest, madeToday })}</p>
+      )}
+      {daily.sharer && (
+        <AgainstSharer sharer={daily.sharer} score={score} correct={history.filter((h) => h.right).length} of={total} />
       )}
       {daily.streak > 0 && (
         <p className="relative mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-bold text-orange-300">
@@ -84,19 +106,52 @@ export function DailyCard({
           </p>
         </motion.div>
       )}
-      {daily.rank !== null && (
-        <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
-      )}
+      <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
       <div className="relative mt-4">
-        <Button size="sm" onClick={() => shareText(text)}>
-          <Share2 className="size-4" /> Сподели резултата
+        <Button size="sm" onClick={() => text && shareText(text, 'Линкът и резултатът са копирани')} disabled={!text}>
+          <Share2 className="size-4" /> Прати днешните въпроси
         </Button>
+        <p className="mt-2 text-xs text-fg-3">Който отвори линка, играе същите 10 — и ти казваме как се е справил.</p>
       </div>
     </Card>
   );
 }
 
-/** Lines shown before "още": the match itself (played, right answers, place); the rest is a tap away. */
+/** The friend whose link this was: their day against yours. */
+function AgainstSharer({
+  sharer,
+  score,
+  correct,
+  of,
+}: {
+  sharer: DailySharer;
+  score: number;
+  correct: number;
+  of: number;
+}) {
+  const me = useStore((s) => s.me);
+  const verdict = score > sharer.score ? 'Би го!' : score < sharer.score ? `${sharer.user.username} води` : 'Равни сте';
+  return (
+    <div className="relative mt-4 rounded-2xl border border-line bg-black/20 p-3.5">
+      <p className="t-eyebrow text-fg-3">По линка на {sharer.user.username}</p>
+      <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 text-sm">
+        <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={28} />
+        <span className="min-w-0 truncate font-semibold">{sharer.user.username}</span>
+        <span className="text-fg-2 tabular-nums">
+          {sharer.correct}/{of} · {fmt(sharer.score)} т.
+        </span>
+        {me ? <Avatar avatar={me.avatar} frame={me.frame} size={28} /> : <span />}
+        <span className="font-semibold text-violet-300">Ти</span>
+        <span className="text-fg-2 tabular-nums">
+          {correct}/{of} · {fmt(score)} т.
+        </span>
+      </div>
+      <p className="mt-2 font-display text-base font-bold text-amber-300">{verdict}</p>
+    </div>
+  );
+}
+
+/** Lines shown before "още": the biggest ones; the rest is a tap away. */
 const SHOWN_LINES = 3;
 
 /** XP and the level bar. `quiet`: a lost match — a level gained along the way gets its line, not confetti. */
@@ -104,8 +159,10 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
   const [xp, setXp] = useState(rewards.xpBefore);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [allLines, setAllLines] = useState(false);
-  const folded = !allLines && rewards.breakdown.length > SHOWN_LINES + 1;
-  const lines = folded ? rewards.breakdown.slice(0, SHOWN_LINES) : rewards.breakdown;
+  // Largest first: folded, the lines shown are the ones that made the total.
+  const breakdown = [...rewards.breakdown].sort((a, b) => b.amount - a.amount);
+  const folded = !allLines && breakdown.length > SHOWN_LINES + 1;
+  const lines = folded ? breakdown.slice(0, SHOWN_LINES) : breakdown;
 
   useEffect(() => {
     let lastLevel = levelFromXp(rewards.xpBefore);
@@ -188,7 +245,7 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
           onClick={() => setAllLines(true)}
           className="focus-ring relative mt-2 rounded-lg text-sm font-semibold text-violet-300 hover:underline"
         >
-          + още {rewards.breakdown.length - SHOWN_LINES} {rewards.breakdown.length - SHOWN_LINES === 1 ? 'ред' : 'реда'}
+          + още {breakdown.length - SHOWN_LINES} {breakdown.length - SHOWN_LINES === 1 ? 'ред' : 'реда'}
         </button>
       )}
     </Card>

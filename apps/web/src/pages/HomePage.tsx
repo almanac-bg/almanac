@@ -27,9 +27,12 @@ export function HomePage() {
   const [soloOpen, setSoloOpen] = useState(false);
   const [rankInfo, setRankInfo] = useState<{ mode: QueueModeId; open: boolean } | null>(null);
   const level = levelProgress(me.xp).level;
-  // Brand-new players get pointed at the gentlest way in (one pointer: two would leave them choosing again), and the
-  // modes come right after who they are, on every screen: the first Play button is on the first screen.
+  // Brand-new players get pointed at one way in (two would leave them choosing again): a duel, which the gentle bots of
+  // the first matches make a likely first win; Соло where no duel queue is open. The modes come right after who they
+  // are, on every screen: the first Play button is on the first screen.
   const newcomer = level === 1;
+  // Someone who has played before and not yet today: the day's questions first, on phones (wider screens show more).
+  const dailyFirst = !me.daily.played && me.stats.games > 0;
   // The first levels have nobody to add yet: on wide screens the profile runs across the top on its own (a short row,
   // so the modes are on the first screen too) and the friends go further down.
   const starter = level <= 2;
@@ -90,7 +93,7 @@ export function HomePage() {
                 ranked.length > 1 && 'lg:row-span-2',
               )}
               big
-              starter={newcomer}
+              starter={newcomer && !ranked.includes('duel')}
               onPlay={() => setSoloOpen(true)}
             />
             {ranked.map((id, i) => (
@@ -100,6 +103,7 @@ export function HomePage() {
                 className={queueSpan(i, ranked.length)}
                 searching={lobby?.queues[id] ?? 0}
                 rating={me.ratings[id] ?? START_RATING}
+                starter={newcomer && id === 'duel'}
                 onRankInfo={() => setRankInfo({ mode: id, open: true })}
                 onPlay={() => queue(id)}
               />
@@ -107,7 +111,7 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard className="md:col-start-1 md:row-start-3" />
+        <DailyCard className={clsx('md:col-start-1 md:row-start-3', dailyFirst && 'max-md:order-first')} />
         <QuestsCard className="md:col-start-2 md:row-start-3" />
         <ChallengeCard className={clsx('md:col-start-1 md:row-start-4', !community && !starter && 'md:col-span-2')} />
         <FriendsCard className={starter ? 'md:col-start-2 md:row-start-4' : 'md:col-start-2 md:row-start-1'} />

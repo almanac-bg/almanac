@@ -502,7 +502,8 @@ export const actions = {
     setState({ queue: null });
   },
   startSolo: (category: CategoryChoice) => ask(() => withTimeout().emitWithAck('solo:start', { category })),
-  startDaily: () => ask(() => withTimeout().emitWithAck('daily:start')),
+  /** `via`: the code of the daily link it was opened from. */
+  startDaily: (via?: string) => ask(() => withTimeout().emitWithAck('daily:start', { via })),
   /** Plays a challenge link, or (no id) makes a new one and plays it first. */
   startChallenge: (id?: string) => ask<{ id: string }>(() => withTimeout().emitWithAck('challenge:start', { id })),
   requestRematch: (gameId: string) => getSocket().emit('rematch:request', { gameId }),

@@ -120,7 +120,7 @@ test('without JavaScript the landing page and the legal pages are there in full'
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /^АЛМАНАХ — онлайн куиз битки/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^АЛМАНАХ — онлайн викторина/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Играй като гост', exact: true }).first()).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Онлайн викторина с приятели и цяла България', exact: true }),

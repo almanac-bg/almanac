@@ -50,7 +50,12 @@ test('a challenge link brings a signed-out friend in to beat the score', async (
   const friend = await newPlayer();
   await friend.goto(`/c/${id}`);
   // The page itself carries the challenge (for link previews in chat apps).
-  await expect(friend).toHaveTitle(`${creator} те предизвиква в АЛМАНАХ`);
+  // The score to beat is in the title: chat apps often show the title alone.
+  await expect(friend).toHaveTitle(
+    toBeat > 0
+      ? new RegExp(`^${creator} те предизвиква: ${[...String(toBeat)].join('\\s?')} точки за биене$`)
+      : `${creator} те предизвиква в АЛМАНАХ`,
+  );
   await expect(friend.getByRole('heading', { name: `${creator} те предизвиква`, exact: true })).toBeVisible();
   await expect(friend.getByText('Резултат за биене')).toBeVisible();
   await expect(friend.getByText(points(toBeat))).toBeVisible();

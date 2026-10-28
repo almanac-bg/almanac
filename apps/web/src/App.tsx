@@ -25,6 +25,7 @@ import {
   AchievementsPage,
   AdminPage,
   ChallengePage,
+  DailyPage,
   FriendsPage,
   GamePage,
   LeaderboardPage,
@@ -173,6 +174,8 @@ function SignedIn() {
             <Route path="/room" element={<RoomPage />} />
             <Route path="/join/:code" element={<JoinRoute />} />
             <Route path="/c/:id" element={<ChallengePage />} />
+            <Route path="/daily" element={<DailyPage />} />
+            <Route path="/daily/:code" element={<DailyPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/:username" element={<ProfilePage />} />
             <Route path="/achievements" element={<AchievementsPage />} />

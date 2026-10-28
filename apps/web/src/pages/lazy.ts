@@ -9,6 +9,7 @@ const loaders = {
   achievements: () => import('./AchievementsPage'),
   admin: () => import('./AdminPage'),
   challenge: () => import('./ChallengePage'),
+  daily: () => import('./DailyPage'),
   friends: () => import('./FriendsPage'),
   game: () => import('./GamePage'),
   leaderboard: () => import('./LeaderboardPage'),
@@ -74,6 +75,7 @@ function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeo
 export const AchievementsPage = page('achievements', 'AchievementsPage');
 export const AdminPage = page('admin', 'AdminPage');
 export const ChallengePage = page('challenge', 'ChallengePage');
+export const DailyPage = page('daily', 'DailyPage');
 export const FriendsPage = page('friends', 'FriendsPage');
 export const GamePage = page('game', 'GamePage');
 export const LeaderboardPage = page('leaderboard', 'LeaderboardPage');
