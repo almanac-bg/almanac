@@ -39,7 +39,7 @@ export function ChallengeCard({ className }: { className?: string }) {
   return (
     // Sized by its own width: beside another card it stacks, across the whole row the list moves to the side.
     <Card className={clsx('@container relative overflow-hidden p-5 sm:p-7', className)}>
-      <div aria-hidden className="absolute -bottom-20 -left-12 size-56 rounded-full bg-indigo-500/15 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-20 -left-12 size-56 rounded-full glow text-indigo-500/15" />
       <div
         className={clsx(
           'relative grid grid-cols-[minmax(0,1fr)] gap-5',

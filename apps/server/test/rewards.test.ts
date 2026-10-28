@@ -104,7 +104,14 @@ function duel(winner: number, other: number, leaveAfter: number | null, cutAfter
       },
       toGameExcept: () => {},
     } satisfies GameEmitter,
-    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      onClosed: () => {},
+    },
   );
   game.start();
   if (leaveAfter === 0) game.leave(`u${other}`);
@@ -162,7 +169,14 @@ function room(host: number, other: number, { questions = 10, idle = false } = {}
       },
       toGameExcept: () => {},
     } satisfies GameEmitter,
-    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      onClosed: () => {},
+    },
   );
   game.start();
   advance(COUNTDOWN);
@@ -329,7 +343,14 @@ test('a private room with nobody else in it is practice: winning there is no win
       },
       toGameExcept: () => {},
     } satisfies GameEmitter,
-    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      onClosed: () => {},
+    },
   );
   game.start();
   advance(COUNTDOWN);

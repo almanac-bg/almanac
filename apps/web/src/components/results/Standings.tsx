@@ -36,7 +36,7 @@ export function ChallengeStanding({
       <Card className="relative overflow-hidden p-6 text-center sm:p-7">
         <div
           aria-hidden
-          className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full bg-indigo-400/20 blur-3xl"
+          className="absolute -top-20 left-1/2 size-56 -translate-x-1/2 rounded-full glow text-indigo-400/20"
         />
         {first ? (
           <>
@@ -207,8 +207,8 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
               }}
             >
               <div
-                className="absolute -top-16 -right-10 size-48 rounded-full opacity-25 blur-3xl"
-                style={{ background: color }}
+                className="absolute -top-16 -right-10 size-48 rounded-full opacity-25 glow"
+                style={{ color: color }}
               />
               <div className="relative flex items-start justify-between gap-3">
                 <div>

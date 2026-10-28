@@ -30,8 +30,8 @@ const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, addresses
- * that were never verified once their link is gone, and answers past ANSWER_LOG_DAYS — nothing kept longer than it's
- * useful.
+ * that were never verified once their link is gone, old notifications and day sets — nothing kept longer than it's
+ * useful. (Old answers go in batches of their own: pruneAnswers.)
  */
 export function purgeExpired(now = Date.now()) {
   run('DELETE FROM sessions WHERE expires_at < ?', now);
@@ -41,9 +41,10 @@ export function purgeExpired(now = Date.now()) {
        SELECT 1 FROM email_tokens t WHERE t.user_id = users.id AND t.purpose = 'verify')`,
   );
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
+  // A day's frozen set is only read on that day (and a crash-cut run's day after it).
+  run('DELETE FROM daily_sets WHERE day < ?', shiftDay(dayKey(now), -7));
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
-  pruneAnswers(now);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -170,6 +171,7 @@ export function startMaintenance() {
         String(Date.now()),
       );
       purgeExpired();
+      await pruneAnswers();
       await purgeGuests();
       const inactive = retireInactiveAccounts();
       if (inactive.warned || inactive.erased)

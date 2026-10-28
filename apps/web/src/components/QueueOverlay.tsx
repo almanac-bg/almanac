@@ -78,10 +78,7 @@ function Searching({
             style={{ borderColor: mode.accent[0], animationDelay: `${delay}s` }}
           />
         ))}
-        <div
-          className="absolute inset-8 rounded-full opacity-40 blur-2xl"
-          style={{ background: `radial-gradient(circle, ${mode.accent[0]}, transparent 70%)` }}
-        />
+        <div className="glow absolute inset-8 rounded-full opacity-40" style={{ color: mode.accent[0] }} />
         <Avatar avatar={me.avatar} frame={me.frame} size={fresh.length ? 72 : 104} />
       </div>
 

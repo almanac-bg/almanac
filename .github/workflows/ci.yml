@@ -36,6 +36,8 @@ jobs:
       - run: npm ci
       # Formatting, lint rules and import order (Biome; `npm run format` fixes most of it).
       - run: npm run lint
+      # The server's scripts (deploy, rollback, the daily checks): the runner has ShellCheck.
+      - run: shellcheck --severity=warning deploy/*.sh scripts/*.sh
       - run: npm run typecheck
       - run: npm run build
       # Sources, then the production bundle that ships in the Docker image.

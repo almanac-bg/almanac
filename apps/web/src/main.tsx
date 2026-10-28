@@ -11,6 +11,10 @@ import { buzz, sfx } from './lib/sound';
 import { preloadPage } from './pages/lazy';
 import './styles.css';
 
+// Every page opens at the top (App scrolls there on each move). Left to the browser, a step back through history also
+// brings back the old entry's scroll: the results of a match begun from a scrolled lobby opened half-way down.
+window.history.scrollRestoration = 'manual';
+
 const SOUNDS: Partial<Record<Effect, () => void>> = {
   lock: sfx.lock,
   correct: sfx.correct,
@@ -47,18 +51,6 @@ window.addEventListener('error', (event) => {
 });
 window.addEventListener('unhandledrejection', (event) => {
   if (!(event.reason instanceof ApiError)) reportCrash('rejection', event.reason);
-});
-
-// A tab opened before a deploy may ask for page code that no longer exists: reload once to get the new version.
-window.addEventListener('vite:preloadError', (event) => {
-  try {
-    if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
-    sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
-  } catch {
-    /* storage unavailable: reload anyway */
-  }
-  event.preventDefault();
-  window.location.reload();
 });
 
 startMonitoring();

@@ -27,7 +27,7 @@ export function ProfileCard({ className }: { className?: string }) {
   const roomy = useMediaQuery('(min-width: 640px)');
   return (
     <Card className={clsx('relative flex flex-col overflow-hidden p-4 sm:p-7', className)}>
-      <div className="absolute -top-24 -right-16 size-64 rounded-full bg-violet-600/30 blur-3xl" />
+      <div className="absolute -top-24 -right-16 size-64 rounded-full glow text-violet-600/30" />
       <div className="relative flex items-center gap-4 sm:gap-5">
         <Avatar avatar={me.avatar} frame={me.frame} size={roomy ? 84 : 56} />
         <div className="min-w-0">

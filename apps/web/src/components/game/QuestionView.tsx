@@ -37,11 +37,13 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   }, [reveal, game.players, youId]);
 
   return (
+    // The clock is already running: the last question gets out of the way at once (the next one waits for it to
+    // leave), and the new one is readable within a fifth of a second, while it settles into place.
     <motion.section
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+      exit={{ opacity: 0, transition: { duration: 0.08 } }}
+      transition={{ y: { type: 'spring', stiffness: 260, damping: 26 }, opacity: { duration: 0.15 } }}
       className="mx-auto max-w-3xl"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -78,8 +80,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
 
       <div className="glass relative mt-4 overflow-hidden rounded-3xl p-6 short:mt-3 short:max-sm:p-4 tiny:mt-2 tiny:max-sm:p-3 sm:p-8 flat:mt-2 flat:p-3">
         <div
-          className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 blur-3xl"
-          style={{ background: cat.color }}
+          className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 glow"
+          style={{ color: cat.color }}
         />
         {/* Phones: the timer floats at the top right and the question wraps around it, instead of a narrow column of
             two-word lines beside it. Wider screens: side by side. */}

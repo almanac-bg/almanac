@@ -55,16 +55,18 @@ function httpsUrl(raw: string | undefined): string | null {
   return url?.protocol === 'https:' ? url.href.replace(/\/$/, '') : null;
 }
 
-/** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). */
+/** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). A typo stops the server: it would close a queue. */
 function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
   if (!raw) return DEFAULT_OPEN_QUEUES;
   if (raw === 'all') return QUEUE_MODES;
-  const modes = raw
-    .split(',')
-    .map((m) => m.trim())
-    .filter(isQueueMode);
-  return modes.length ? modes : DEFAULT_OPEN_QUEUES;
+  const names = raw.split(',').map((m) => m.trim());
+  const unknown = names.filter((m) => !isQueueMode(m));
+  if (unknown.length)
+    throw new Error(
+      `Invalid setting: PUBLIC_QUEUES has ${unknown.join(', ')}; use "all" or ${QUEUE_MODES.join(', ')}.`,
+    );
+  return names.filter(isQueueMode);
 }
 
 export const config = {
@@ -83,11 +85,15 @@ export const config = {
   botFillBusyMs: Math.max(botFillMs ?? 0, (env.BOT_FILL_BUSY_SECONDS ?? 20) * 1000),
   /** Ranked queues players can join; the others stay closed until there are enough people for them. */
   openQueues: openQueues(),
-  cookieSecure: process.env.COOKIE_SECURE === 'true',
+  // Secure cookies whenever the site is served over HTTPS, unless COOKIE_SECURE says otherwise.
+  cookieSecure: process.env.COOKIE_SECURE
+    ? process.env.COOKIE_SECURE === 'true'
+    : (process.env.APP_URL ?? '').startsWith('https:'),
   /** Daily database snapshots ("off" disables). Defaults to a backups folder next to the database. */
   backupDir:
     process.env.BACKUP_DIR === 'off' ? null : (process.env.BACKUP_DIR ?? path.join(path.dirname(dbPath), 'backups')),
-  backupKeepDays: env.BACKUP_KEEP_DAYS ?? 14,
+  // Each is a full copy on the database's own disk; older points in time are Litestream's (14 days, off the server).
+  backupKeepDays: env.BACKUP_KEEP_DAYS ?? 3,
   /** Express "trust proxy" setting: which proxies may set X-Forwarded-For. */
   trustProxy: process.env.TRUST_PROXY ?? 'loopback',
   sessionDays: 30,

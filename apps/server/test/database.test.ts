@@ -4,13 +4,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { after, mock, test } from 'node:test';
+import { writeFixtureQuestions } from './helpers';
 
 // Server modules open the database on import — point them at a throwaway one first.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-database-'));
 process.env.DB_PATH = path.join(tmp, 'database.db');
+process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
+writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { afterCommit, all, run, tx } = await import('../src/db');
-const { markSeen, RECENT_LIMIT, recentFor } = await import('../src/questions');
+const { bankProblem, markSeen, questionBank, RECENT_LIMIT, recentFor, reloadQuestionBank } = await import(
+  '../src/questions'
+);
 const { installationSecret } = await import('../src/settings');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -124,6 +130,44 @@ test('a nested step that fails is undone on its own; the work around it still co
   const keys = all<{ key: string }>("SELECT key FROM settings WHERE key IN ('around', 'inner')").map((r) => r.key);
   assert.deepEqual(keys, ['around']);
   assert.deepEqual(heard, ['the work around it']);
+});
+
+test('a transaction that reads, then writes holds up against another writer (Litestream) in between', () => {
+  const other = new DatabaseSync(process.env.DB_PATH!);
+  other.exec('PRAGMA busy_timeout = 0');
+  try {
+    let otherWrote = true;
+    tx(() => {
+      all('SELECT id FROM users');
+      // Litestream checkpoints and writes its own bookkeeping now and then: here, between our read and our write.
+      try {
+        other.exec("INSERT INTO settings (key, value) VALUES ('other-writer', '1')");
+      } catch {
+        otherWrote = false;
+      }
+      run('UPDATE users SET xp = xp + 1 WHERE id = 1');
+    });
+    assert.equal(otherWrote, false, 'the other writer waits for us, rather than us failing');
+    other.exec("INSERT INTO settings (key, value) VALUES ('other-writer', '1')");
+  } finally {
+    other.close();
+  }
+});
+
+test('a bank file that breaks on reload leaves the game on the bank it has, and health says so', () => {
+  const loaded = questionBank().length;
+  const file = process.env.QUESTIONS_PATH!;
+  const good = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, '[{ "id": "half a pull');
+  try {
+    reloadQuestionBank();
+    assert.equal(questionBank().length, loaded, 'matches still draw from the bank loaded before');
+    assert.ok(bankProblem(), '/api/health reports it');
+  } finally {
+    fs.writeFileSync(file, good);
+  }
+  reloadQuestionBank();
+  assert.equal(bankProblem(), null, 'fixed on disk, fixed in health');
 });
 
 test('what waits for a commit runs after it, once, and not at all after a rollback', () => {

@@ -2,14 +2,23 @@ import { type DailyInfo, dayEndsAt, dayKey, daysBetween, MODES, STREAK_SHIELDS }
 import { config } from './config';
 import { all, one, run } from './db';
 import { friendIds } from './friends';
-import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, seededRng } from './questions';
+import {
+  type PreparedQuestion,
+  pickQuestions,
+  recentFor,
+  reorderOptions,
+  seededRng,
+  withoutAuthors,
+} from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
 import { playsSharedDaily } from './trust';
-import { getUser, toPublicUser, type UserRow } from './users';
+import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** A run on the shared set: what the board and the friends' view compare (a run from older code: a guest's wasn't). */
 const SHARED_RUN = 'COALESCE(d.own_set, u.is_guest) = 0';
+/** On the day's board: a run on the shared set, by a player who isn't banned. */
+const ON_BOARD = `${SHARED_RUN} AND ${NOT_BANNED}`;
 
 /** Today's question set — generated once per day from a date seed, then frozen in the database. */
 function dailySet(day: string): PreparedQuestion[] {
@@ -22,7 +31,11 @@ function dailySet(day: string): PreparedQuestion[] {
     new Map(),
     seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
   );
-  run('INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)', day, JSON.stringify(questions));
+  run(
+    'INSERT OR IGNORE INTO daily_sets (day, questions) VALUES (?, ?)',
+    day,
+    JSON.stringify(withoutAuthors(questions)),
+  );
   return JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day)!.questions);
 }
 
@@ -72,17 +85,22 @@ export function forgetGuestDaily(userId: number) {
 
 /**
  * Claims today's single attempt. Starting counts — leaving or disconnecting doesn't give a retry; only a server restart
- * that cut the attempt short does.
+ * that cut the attempt short before any of its answers was revealed does. Once one was, the run ends with the score
+ * saved at its last reveal.
  */
 export function claimDailyAttempt(
   userId: number,
 ): { ok: true; day: string; ownSet: boolean } | { ok: false; error: string } {
   const day = dayKey();
-  const existing = one<{ started_at: number; finished_at: number | null; own_set: number | null }>(
-    'SELECT started_at, finished_at, own_set FROM daily_results WHERE user_id = ? AND day = ?',
+  const existing = one<{ started_at: number; finished_at: number | null; own_set: number | null; revealed: number }>(
+    'SELECT started_at, finished_at, own_set, revealed FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
+  if (existing && !existing.finished_at && existing.started_at < config.bootedAt && existing.revealed > 0) {
+    run('UPDATE daily_results SET finished_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
+    return { ok: false, error: cutShortError(existing.revealed) };
+  }
   if (existing && !existing.finished_at && existing.started_at < config.bootedAt) {
     run('UPDATE daily_results SET started_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
     return { ok: true, day, ownSet: existing.own_set === 1 };
@@ -107,8 +125,43 @@ export function claimDailyAttempt(
   return { ok: true, day, ownSet };
 }
 
-/** The run never got going (or its result couldn't be saved): the day's one attempt is the player's again. */
+/** Said when a run cut short after some of its answers were revealed is asked for again. */
+export const cutShortError = (revealed: number) =>
+  `Опитът ти прекъсна при нас след ${revealed} ${revealed === 1 ? 'въпрос' : 'въпроса'} — резултатът дотук е записан.`;
+
+/** Saved at each reveal of a daily run: what stands if the run is cut short from here on. */
+export function saveDailyProgress(
+  userId: number,
+  day: string,
+  revealed: number,
+  score: number,
+  correct: number,
+  timeMs: number,
+) {
+  run(
+    `UPDATE daily_results SET revealed = ?, score = ?, correct = ?, time_ms = ?
+     WHERE user_id = ? AND day = ? AND finished_at IS NULL`,
+    revealed,
+    score,
+    correct,
+    timeMs,
+    userId,
+    day,
+  );
+}
+
+/**
+ * A run that ended without its result (cut short by us, or the result couldn't be saved). With none of its answers
+ * revealed the day's one attempt is the player's again; once one was, the run stands with the score saved at its last
+ * reveal, since a replay would come knowing answers.
+ */
 export function releaseDailyAttempt(userId: number, day: string) {
+  run(
+    'UPDATE daily_results SET finished_at = ? WHERE user_id = ? AND day = ? AND finished_at IS NULL AND revealed > 0',
+    Date.now(),
+    userId,
+    day,
+  );
   run('DELETE FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NULL', userId, day);
 }
 
@@ -116,13 +169,13 @@ export function releaseDailyAttempt(userId: number, day: string) {
 function rankOf(day: string, score: number, timeMs: number, ownSet = false): { rank: number | null; total: number } {
   const listed = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN}`,
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD}`,
     day,
   )!.n;
   if (ownSet) return { rank: null, total: listed };
   const better = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN}
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD}
      AND (d.score > ? OR (d.score = ? AND d.time_ms < ?))`,
     day,
     score,
@@ -202,7 +255,7 @@ function friendsToday(day: string, userId: number) {
   const ids = [userId, ...friendIds(userId)];
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN} AND d.user_id IN (${ids.map(() => '?').join(', ')})
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD} AND d.user_id IN (${ids.map(() => '?').join(', ')})
      ORDER BY d.score DESC, d.time_ms ASC`,
     day,
     ...ids,
@@ -225,7 +278,7 @@ export function dailyInfo(userId: number): DailyInfo {
   );
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN} ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${ON_BOARD} ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
     day,
   );
   const me = getUser(userId)!;

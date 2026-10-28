@@ -26,7 +26,7 @@ export function QuestsCard({ className }: { className?: string }) {
 
   return (
     <Card className={clsx('relative flex flex-col overflow-hidden p-5 sm:p-7', className)}>
-      <div aria-hidden className="absolute -top-20 -right-16 size-56 rounded-full bg-sky-500/15 blur-3xl" />
+      <div aria-hidden className="absolute -top-20 -right-16 size-56 rounded-full glow text-sky-500/15" />
       <div className="relative flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sky-300">
           <ListChecks aria-hidden className="size-5" />

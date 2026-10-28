@@ -135,7 +135,18 @@ export function reportError(
 export function watchEventLoop({ everyMs = 60_000, logMs = 200, reportMs = 1000 } = {}): () => void {
   const delay = monitorEventLoopDelay({ resolution: 10 });
   delay.enable();
+  let memoryReportedAt = 0;
   const timer = setInterval(() => {
+    // Docker stops the app at 1 GB (docker-compose.yml): a leak shows here long before it's killed for it.
+    const { rss, heapUsed } = process.memoryUsage();
+    if (rss > MEMORY_LOG_BYTES) {
+      const mb = (n: number) => Math.round(n / 2 ** 20);
+      console.warn(`🧠 Memory: ${mb(rss)} MB in use (${mb(heapUsed)} MB of it JavaScript objects).`);
+      if (rss > MEMORY_REPORT_BYTES && Date.now() - memoryReportedAt > 60 * 60_000) {
+        memoryReportedAt = Date.now();
+        void reportError(new Error('Memory use is close to the limit'), 'memory', { extra: { rssMb: mb(rss) } });
+      }
+    }
     const worstMs = Math.round(delay.max / 1e6);
     const p99Ms = Math.round(delay.percentile(99) / 1e6);
     delay.reset();
@@ -153,6 +164,10 @@ export function watchEventLoop({ everyMs = 60_000, logMs = 200, reportMs = 1000 
     delay.disable();
   };
 }
+
+/** Above this the server logs its memory use every minute; above the second, it reports it (hourly at most). */
+const MEMORY_LOG_BYTES = 600 * 2 ** 20;
+const MEMORY_REPORT_BYTES = 800 * 2 ** 20;
 
 /**
  * Browser reports use the same monthly quota, and the DSN is public: anyone can post envelopes, from any number of

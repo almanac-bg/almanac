@@ -19,7 +19,7 @@ import { claimDailyAttempt, dailyQuestions, ownDailyQuestions, releaseDailyAttem
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
-import { buildHuman, GameRegistry } from './game/registry';
+import { buildHuman, GameRegistry, startFailure } from './game/registry';
 import { Rematches } from './game/rematch';
 import { RoomManager } from './game/rooms';
 import { guarded } from './guard';
@@ -252,7 +252,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
         });
         reply(ack, { ok: true });
       } catch (err) {
-        reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
+        reply(ack, { ok: false, error: startFailure(err) });
       }
     });
 
@@ -281,7 +281,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
         reply(ack, { ok: true });
       } catch (err) {
         releaseDailyAttempt(userId, claim.day);
-        reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
+        reply(ack, { ok: false, error: startFailure(err) });
       }
     });
 
@@ -318,7 +318,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
         reply(ack, { ok: true, id });
       } catch (err) {
         releaseChallengeAttempt(id, userId);
-        reply(ack, { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' });
+        reply(ack, { ok: false, error: startFailure(err) });
       }
     });
 

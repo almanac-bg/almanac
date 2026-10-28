@@ -127,7 +127,7 @@ export function LeaderboardPage() {
                       i === 0 && 'border-amber-300/40 pt-6 sm:pt-8',
                     )}
                   >
-                    {i === 0 && <div className="absolute -top-16 size-48 rounded-full bg-amber-400/25 blur-3xl" />}
+                    {i === 0 && <div className="absolute -top-16 size-48 rounded-full glow text-amber-400/25" />}
                     <span className="relative text-2xl sm:text-3xl">{['🥇', '🥈', '🥉'][i]}</span>
                     <Avatar
                       avatar={e.user.avatar}

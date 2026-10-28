@@ -9,7 +9,7 @@ import { after, test } from 'node:test';
 // Server modules open the database on import — point them at a throwaway one first.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-limits-'));
 process.env.DB_PATH = path.join(tmp, 'limits.db');
-const { RateLimiter } = await import('../src/throttle');
+const { network, RateLimiter, wideNetwork } = await import('../src/throttle');
 const { hashingLimits } = await import('../src/auth');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -63,6 +63,17 @@ test('keys under their limit make room oldest first; an ended window starts over
 
   limiter.sweep(NOW + 60 * MIN + 1);
   assert.equal(limiter.keys('forgot'), 1, 'sweeping forgets the windows that ended');
+});
+
+test('addresses are counted by their network, and by the wider network around it', () => {
+  assert.equal(network('203.0.113.7'), '203.0.113.7');
+  assert.equal(network('::ffff:203.0.113.7'), '203.0.113.7');
+  assert.equal(network('2001:db8:1:2:3:4:5:6'), '2001:db8:1:2::/64');
+  assert.equal(wideNetwork('203.0.113.7'), '203.0.113.0/24');
+  assert.equal(wideNetwork('::ffff:203.0.113.200'), '203.0.113.0/24');
+  assert.equal(wideNetwork('2001:db8:1:2:3:4:5:6'), '2001:db8:1::/48');
+  assert.equal(wideNetwork('2001:db8::1'), '2001:db8:0::/48');
+  assert.equal(wideNetwork(undefined), 'unknown');
 });
 
 test('password hashing leaves two pool threads and a CPU core free, and queues about three seconds', () => {

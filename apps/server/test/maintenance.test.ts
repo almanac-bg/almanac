@@ -18,6 +18,7 @@ const { INACTIVE_MS, INACTIVE_WARNING_MS, purgeExpired, retireInactiveAccounts, 
   '../src/maintenance'
 );
 const { getUser } = await import('../src/users');
+const { ANSWER_LOG_DAYS, pruneAnswers } = await import('../src/answers');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -44,6 +45,23 @@ test('expired sessions and old email links are purged', () => {
 
   assert.equal(count('sessions'), 1, 'only the live session stays');
   assert.equal(count('email_tokens'), 1, 'expired links are gone right away');
+});
+
+test('old answers are all pruned however many there are, a batch at a time; recent ones stay', async () => {
+  const now = Date.now();
+  const insert = (n: number, at: number) =>
+    run(
+      `WITH RECURSIVE i(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM i WHERE x < ?)
+       INSERT INTO answers (user_id, match_id, question_id, difficulty, correct, time_ms, answered_at)
+       SELECT 1, 'm', 'q' || x, 'easy', 1, 1000, ? FROM i`,
+      n,
+      at,
+    );
+  // More than two batches' worth past the limit: a fixed amount per run fell behind once enough people played.
+  insert(12_345, now - (ANSWER_LOG_DAYS + 1) * DAY);
+  insert(10, now - DAY);
+  assert.equal(await pruneAnswers(now), 12_345);
+  assert.equal(count('answers'), 10, 'the recent ones stay');
 });
 
 test('daily snapshots: one per day, a working copy, only the newest kept', async () => {

@@ -77,3 +77,43 @@ test('a daily attempt cut short by a crash can be played again', T, async () => 
     await first.stop();
   }
 });
+
+test(
+  'a daily cut short by a crash after an answer was revealed keeps the score so far, and is no replay',
+  T,
+  async () => {
+    const first = await startServer();
+    let second: TestServer | undefined;
+    try {
+      const A = await register(first.url, 'videl_otgovora');
+      const sa = connect(first.url, A.cookie);
+      await connected(sa);
+      const question = next(sa, 'game:question');
+      assert.ok((await emitAck(sa, 'daily:start')).ok);
+      const q = await question;
+      const revealed = next(sa, 'game:reveal');
+      sa.emit('game:answer', { index: q.index, choice: 0 });
+      await revealed;
+      await first.kill('SIGKILL');
+      sa.close();
+
+      second = await startServer({ DB_PATH: first.dbPath });
+      const again = connect(second.url, A.cookie);
+      await connected(again);
+      const refused = await emitAck(again, 'daily:start');
+      assert.equal(refused.ok, false, 'the answer was seen: the same ten questions must not come again');
+      assert.match(refused.error, /прекъсна при нас след 1 въпрос/);
+      const saved = first.db
+        .prepare(
+          'SELECT finished_at, revealed FROM daily_results d JOIN users u ON u.id = d.user_id WHERE u.username = ?',
+        )
+        .get('videl_otgovora') as { finished_at: number | null; revealed: number };
+      assert.ok(saved.finished_at, 'the run stands, with the score at its last reveal');
+      assert.equal(saved.revealed, 1);
+      again.close();
+    } finally {
+      await second?.stop();
+      await first.stop();
+    }
+  },
+);

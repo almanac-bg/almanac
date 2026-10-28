@@ -21,3 +21,21 @@ test('a newcomer plays a first solo match as a guest', async ({ page }) => {
   await expect(page.getByText(/^Запази тези [\d\s]+ XP/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Запази прогреса', exact: true })).toBeVisible();
 });
+
+test('results open at the top, however far down the lobby was when the match began', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
+  await expectLobby(page);
+  // Дуел sits below the first screen on a phone: the lobby is scrolled to reach it.
+  const duel = page.getByRole('button', { name: 'Играй Дуел', exact: true });
+  await duel.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, 150));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await duel.click();
+  await expect(page).toHaveURL(/\/game$/);
+  await playMatch(page);
+  await expect(page.getByRole('heading', { name: 'Награди', exact: true })).toBeAttached();
+  // The browser restored the lobby's scroll a moment after the results drew: give it that moment.
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});

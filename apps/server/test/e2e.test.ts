@@ -448,12 +448,15 @@ test('guests play right away, stay off the boards, and keep everything when they
   assert.equal(claimed.body.user.isGuest, false);
   assert.equal(claimed.body.user.username, 'bivsh_gost');
   assert.equal(claimed.body.user.xp, xp, 'progress kept');
+  assert.ok(claimed.cookie && claimed.cookie !== G.cookie, 'a session of its own for the account');
+  assert.equal((await api.get('/api/me', G.cookie)).body.user, null, "the guest's cookie opens nothing any more");
   assert.equal(
     (await api.send('POST', '/api/auth/login', '', { username: 'bivsh_gost', password: 'secret123' })).status,
     200,
   );
   assert.equal(
-    (await api.send('POST', '/api/account/claim', G.cookie, { username: 'drugo_ime', password: 'secret123' })).status,
+    (await api.send('POST', '/api/account/claim', claimed.cookie, { username: 'drugo_ime', password: 'secret123' }))
+      .status,
     400,
   );
   sg.close();
@@ -595,6 +598,14 @@ test('profiles, achievements, leaderboards, loadout', T, async () => {
   assert.equal(duel.body.entries[0].user.id, A.user.id);
   assert.ok(duel.body.season?.name, 'ranked boards are seasonal');
   assert.ok((await api.get('/api/leaderboard/level', B.cookie)).body.me.rank >= 1);
+  // A banned player is on no board while the ban lasts.
+  srv.db.prepare('UPDATE users SET banned_until = ? WHERE id = ?').run(Date.now() + 60_000, A.user.id);
+  for (const board of ['level', 'duel']) {
+    const { entries } = (await api.get(`/api/leaderboard/${board}`, B.cookie)).body;
+    assert.ok(!entries.some((e: { user: { id: number } }) => e.user.id === A.user.id), `not on the ${board} board`);
+  }
+  srv.db.prepare('UPDATE users SET banned_until = NULL WHERE id = ?').run(A.user.id);
+  assert.equal((await api.get('/api/leaderboard/duel', B.cookie)).body.entries[0].user.id, A.user.id, 'back after it');
   assert.equal(
     (await api.send('PATCH', '/api/me/loadout', A.cookie, { avatar: 'crown' })).status,
     200,
@@ -672,10 +683,14 @@ test(
         username: `saver${Math.floor(Math.random() * 1e6)}`,
         password: 'secret123',
       });
-    assert.equal((await claim(G.cookie)).status, 200);
-    assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'saved today: today’s run stands');
-    assert.equal((await api.get('/api/daily', G.cookie)).body.ownSet, true);
+    const saved = await claim(G.cookie);
+    assert.equal(saved.status, 200);
     sg.close();
+    const sSaved = connect(srv.url, saved.cookie!);
+    await connected(sSaved);
+    assert.equal((await emitAck(sSaved, 'daily:start')).ok, false, 'saved today: today’s run stands');
+    assert.equal((await api.get('/api/daily', saved.cookie)).body.ownSet, true);
+    sSaved.close();
 
     // A guest from yesterday that saves its profile today opens the shared daily at once.
     const H = await guest(srv.url);
@@ -685,11 +700,15 @@ test(
     const own = autoPlay(sh, 'right', newLog());
     assert.ok((await emitAck(sh, 'daily:start')).ok);
     assert.equal((await own).end.rewards!.daily!.rank, null, 'as a guest, its own');
-    assert.equal((await claim(H.cookie)).status, 200);
-    assert.equal((await api.get('/api/daily', H.cookie)).body.ownSet, false);
+    const savedH = await claim(H.cookie);
+    assert.equal(savedH.status, 200);
+    sh.close();
+    assert.equal((await api.get('/api/daily', savedH.cookie)).body.ownSet, false);
+    const sh2 = connect(srv.url, savedH.cookie!);
+    await connected(sh2);
     const logShared = newLog();
-    const again = autoPlay(sh, 'wrong', logShared);
-    assert.ok((await emitAck(sh, 'daily:start')).ok, 'with a profile, the shared daily is open');
+    const again = autoPlay(sh2, 'wrong', logShared);
+    assert.ok((await emitAck(sh2, 'daily:start')).ok, 'with a profile, the shared daily is open');
     const { end: shared } = await again;
     assert.deepEqual(
       logShared.questions.map((q) => q.id),
@@ -697,7 +716,7 @@ test(
       'the shared questions',
     );
     assert.equal(typeof shared.rewards!.daily!.rank, 'number', 'and a place on the board');
-    sh.close();
+    sh2.close();
   },
 );
 
@@ -1066,6 +1085,10 @@ test('email verification, password reset and change', T, async () => {
     400,
   );
 
+  // A reset link mailed before a password change can't undo it.
+  await api.send('POST', '/api/auth/forgot', '', { login: 'pesho_mail' });
+  const beforeChange = tokenFrom(srv.mails().at(-1)!);
+
   // Changing the password needs the current one and keeps only this session.
   const second = await fetch(`${srv.url}/api/auth/login`, {
     method: 'POST',
@@ -1084,6 +1107,13 @@ test('email verification, password reset and change', T, async () => {
   );
   assert.ok((await api.get('/api/me', newCookie)).body.user, 'the current session stays');
   assert.equal((await api.get('/api/me', secondCookie)).body.user, null, 'other sessions are logged out');
+  assert.equal(
+    (await api.send('POST', '/api/auth/reset', '', { token: beforeChange, password: 'taken-over-1' })).status,
+    400,
+    'a reset link from before the change is dead',
+  );
+  await api.send('POST', '/api/auth/forgot', '', { login: 'pesho_mail' });
+  const beforeRemoval = tokenFrom(srv.mails().at(-1)!);
 
   assert.equal(
     (await api.send('DELETE', '/api/account/email', newCookie, {})).status,
@@ -1101,6 +1131,11 @@ test('email verification, password reset and change', T, async () => {
     .slice(sentBefore)
     .find((m) => m.to === 'Pesho@Example.com');
   assert.match(notice?.subject ?? '', /премахнат/, 'the old address is told');
+  assert.equal(
+    (await api.send('POST', '/api/auth/reset', '', { token: beforeRemoval, password: 'taken-over-2' })).status,
+    400,
+    'nor does one mailed to an address the account no longer has',
+  );
 });
 
 test('moderation: name filter, reports, rename, ban', T, async () => {
@@ -1178,13 +1213,18 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
 });
 
 test('a moderator gives the password again for changes, at most an hour after giving it', T, async () => {
-  // A saved guest made a moderator: its session never had a password given for it.
-  const M = await guest(srv.url);
-  const claimed = await api.send('POST', '/api/account/claim', M.cookie, {
+  // A saved guest made a moderator. Saving set the password, so it counts as given then; an hour and more ago here.
+  const guestM = await guest(srv.url);
+  const claimed = await api.send('POST', '/api/account/claim', guestM.cookie, {
     username: 'nov_moderator',
     password: 'secret123',
   });
   assert.equal(claimed.status, 200);
+  const M = { cookie: claimed.cookie! };
+  const sessionHash = createHash('sha256')
+    .update(decodeURIComponent(M.cookie.split('=')[1]))
+    .digest('base64url');
+  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
   assert.equal(cli(srv.dbPath, 'admin', 'add', 'nov_moderator').status, 0);
   const reject = () => api.send('POST', '/api/admin/submissions/999999/reject', M.cookie, { reason: '' });
 
@@ -1196,10 +1236,7 @@ test('a moderator gives the password again for changes, at most an hour after gi
   assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'secret123' })).status, 200);
   assert.equal((await reject()).status, 400, 'then the change goes through (to "no such question")');
 
-  const hash = createHash('sha256')
-    .update(decodeURIComponent(M.cookie.split('=')[1]))
-    .digest('base64url');
-  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, hash);
+  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
   assert.equal((await reject()).status, 403, 'an hour later it asks again');
 });
 

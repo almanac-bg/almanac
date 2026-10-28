@@ -98,6 +98,8 @@ function setup(opts: {
       release: () => {
         released++;
       },
+      // In the order things happen: the score so far is saved before the answer goes out.
+      progress: () => events.push({ to: 'hooks', event: 'progress', payload: null }),
       draining: () => draining,
       onClosed: () => {},
     },
@@ -111,8 +113,10 @@ function setup(opts: {
     missed,
     released: () => released,
     finalized: () => standings !== null,
+    /** The registry's startDraining(). */
     drain: () => {
       draining = true;
+      game.drain();
     },
     placement: (id: string) => standings?.find((s) => s.id === id)?.placement,
     right: (userId: number) => game.answer(`u${userId}`, game.index, q().answer),
@@ -417,6 +421,40 @@ test('playing alone, the player can stop on a fact: the next question waits for 
   assert.equal(g.game.index, stoppedAt + 1, 'after two minutes it goes on by itself');
 });
 
+test('once the server drains, a run stopped on a fact goes on, and no new stop can hold it up', () => {
+  const g = setup({ humans: [1] });
+  const onFact = () => {
+    for (let i = 0; i < 20 && !g.game.questions[g.game.index].fact; i++) {
+      g.right(1);
+      advance(5_000);
+    }
+    g.right(1);
+    advance(700);
+    assert.equal(g.game.phase, 'reveal');
+  };
+  onFact();
+  const stoppedAt = g.game.index;
+  assert.equal(g.game.hold('u1', stoppedAt), true);
+  g.drain();
+  advance(5_000);
+  assert.equal(g.game.phase, 'question', 'the update is announced: the run goes on as if nobody had stopped');
+  assert.equal(g.game.index, stoppedAt + 1);
+  onFact();
+  assert.equal(g.game.hold('u1', g.game.index), false, 'no more stops while the server drains');
+});
+
+test('a one-attempt run saves its score so far before each answer goes out', () => {
+  const g = setup({ humans: [1], daily: true });
+  g.right(1);
+  advance(700);
+  const order = g.events.map((e) => e.event).filter((e) => e === 'progress' || e === 'game:reveal');
+  assert.deepEqual(order, ['progress', 'game:reveal']);
+  const match = setup({ humans: [2, 3] });
+  match.right(2);
+  advance(TIME + 1_000);
+  assert.ok(!match.events.some((e) => e.event === 'progress'), 'other matches save at the end only');
+});
+
 test('with other people in the match, nobody can stop it to read', () => {
   const g = setup({ humans: [1, 2] });
   for (let i = 0; i < 20 && !g.game.questions[g.game.index].fact; i++) {
@@ -476,6 +514,20 @@ test('the speed bonus waits out the reading window: no gain from tapping before 
   const [reveal] = g.reveals();
   assert.equal(reveal.results.u1.points, reveal.results.u2.points, 'both inside the window: the same points');
   assert.equal(reveal.results.u1.points, 1000);
+});
+
+test('a daily the server has to stop once a question was shown ends with what was played, never given back', () => {
+  const g = setup({ humans: [1], daily: true });
+  g.right(1);
+  advance(700);
+  g.game.stop();
+  assert.equal(g.game.phase, 'ended');
+  assert.equal(g.finalized(), true, 'the answers seen so far count');
+  assert.equal(g.released(), 0, 'a replay would come knowing them');
+
+  const early = setup({ humans: [2], daily: true, countdown: true });
+  early.game.stop();
+  assert.equal(early.released(), 1, 'stopped in its countdown: nothing was played, the attempt is theirs again');
 });
 
 test('a daily left in its countdown was no attempt: it is the player’s again, and nothing is saved', () => {

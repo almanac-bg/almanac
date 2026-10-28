@@ -11,8 +11,9 @@ import {
   unlockedIds,
 } from '@quiz/shared';
 import { unlockContext } from '../account';
-import { releaseChallengeAttempt } from '../challenges';
-import { releaseDailyAttempt } from '../daily';
+import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';
+import { releaseDailyAttempt, saveDailyProgress } from '../daily';
+import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
 import { markSeen, type PreparedQuestion, pickQuestions, recentFor } from '../questions';
 import { getRating } from '../seasons';
@@ -95,6 +96,30 @@ function releaseAttempts(game: Game) {
   }
 }
 
+/** Longer than any match can run (see sweepStuck). */
+const STUCK_MS = 90 * 60_000;
+
+/** Why a match can't start, in words for the player (any other error is ours: they're told only that it failed). */
+export class StartError extends Error {}
+
+/** What a player is told when their match couldn't start; an error that isn't a StartError is reported, not shown. */
+export function startFailure(err: unknown): string {
+  if (err instanceof StartError) return err.message;
+  void reportError(err, 'start a match');
+  return 'Играта не можа да започне.';
+}
+
+/** A daily or challenge-link run reveals an answer: its score so far stands if the run is cut short from here on. */
+function saveProgress(game: Game) {
+  for (const h of game.humans) {
+    const userId = h.player.userId!;
+    if (game.setup.dailyDay)
+      saveDailyProgress(userId, game.setup.dailyDay, game.played, h.score, h.correct, h.answerMs);
+    if (game.setup.challengeId)
+      saveChallengeProgress(game.setup.challengeId, userId, game.played, h.score, h.correct, h.answerMs);
+  }
+}
+
 /** How long a result waits for a player who was offline when their match ended. */
 const MISSED_RESULT_MS = 15 * 60_000;
 
@@ -106,7 +131,24 @@ export class GameRegistry {
   private idleWaiters: (() => void)[] = [];
   private draining = false;
 
-  constructor(private io: IO) {}
+  constructor(private io: IO) {
+    setInterval(() => this.sweepStuck(), 5 * 60_000).unref();
+  }
+
+  /**
+   * Even the longest match (a solo run stopped on every fact, its player away the longest a run waits) is over well
+   * within this. One still registered after it is stuck on a bug: its players would be "in a game" until a restart.
+   */
+  private sweepStuck(now = Date.now()) {
+    for (const game of [...this.games.values()]) {
+      if (now - game.startedAt < STUCK_MS) continue;
+      void reportError(new Error('A match was still running after 90 minutes'), 'stuck match', {
+        extra: { match: game.id, mode: game.setup.mode, phase: game.phase },
+      });
+      game.stop();
+      if (this.games.has(game.id)) this.close(game);
+    }
+  }
 
   onClosed(listener: (game: Game) => void) {
     this.closedListeners.push(listener);
@@ -127,11 +169,12 @@ export class GameRegistry {
 
   /**
    * The server is about to stop: runs waiting for an absent player end now (their attempt kept) instead of holding the
-   * restart up until the drain times out; from here on a run whose player drops ends the same way.
+   * restart up until the drain times out, and runs stopped on a fact go on; from here on a run whose player drops ends
+   * the same way, and nobody can stop on a fact.
    */
   startDraining() {
     this.draining = true;
-    for (const game of [...this.games.values()]) if (game.held) game.endForDrain();
+    for (const game of [...this.games.values()]) game.drain();
   }
 
   /** Ends every match still running (the server is stopping); returns how many there were. */
@@ -156,7 +199,7 @@ export class GameRegistry {
   start(opts: NewGame): Game {
     const userIds = opts.humans.map((h) => h.player.userId!);
     const questions = opts.questions ?? pickQuestions(opts.questionCount, opts.category, recentFor(userIds));
-    if (questions.length < opts.questionCount) throw new Error('Няма достатъчно въпроси за тази категория.');
+    if (questions.length < opts.questionCount) throw new StartError('Няма достатъчно въпроси за тази категория.');
 
     const room = (id: string) => `game:${id}`;
     let game: Game;
@@ -197,6 +240,7 @@ export class GameRegistry {
           }
         },
         release: releaseAttempts,
+        progress: saveProgress,
         draining: () => this.draining,
         undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
         onClosed: (g) => this.close(g),
@@ -256,7 +300,8 @@ export class GameRegistry {
   }
 
   private close(game: Game) {
-    this.games.delete(game.id);
+    // Once only: a match closed twice (its end ran again after a bug) mustn't tell its listeners twice.
+    if (!this.games.delete(game.id)) return;
     const userIds: number[] = [];
     for (const p of game.humans) {
       const userId = p.player.userId!;

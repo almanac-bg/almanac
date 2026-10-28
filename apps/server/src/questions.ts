@@ -4,6 +4,8 @@ import { CATEGORY_IDS, type CategoryChoice, type CategoryId, type Difficulty } f
 import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';
+import { reportError } from './monitoring';
+import { installationSecret } from './settings';
 
 /** The longest "Знаеше ли?" fact: one or two sentences, readable at a glance. */
 export const FACT_MAX = 200;
@@ -52,43 +54,68 @@ export function questionById(id: string): Question | undefined {
   return everything!.get(id);
 }
 
+/** Who wrote a question, as the bank has it now (community questions only): a rename or a deletion shows at once. */
+export const questionAuthor = (id: string) => questionById(id)?.author ?? null;
+
+/**
+ * A set kept for later (a day's, a link's) is kept without its authors' names: they come from the bank when the
+ * questions are shown (questionAuthor), so a renamed or deleted author's old name isn't left behind in it.
+ */
+export const withoutAuthors = (questions: PreparedQuestion[]) => questions.map(({ author: _author, ...q }) => q);
+
 /** Questions matches draw from: built-in ones from the JSON file plus approved community questions, minus hidden ones. */
 export function questionBank(): Question[] {
-  if (!bank) {
-    const builtIn = z.array(QuestionSchema).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
-    const community = all<{
-      id: string;
-      category: CategoryId;
-      difficulty: Difficulty;
-      q: string;
-      options: string;
-      answer: number;
-      author: string | null;
-    }>(
-      `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
-       FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
-    ).map((r) => ({ ...r, options: JSON.parse(r.options) as string[] }));
-    const hidden = new Set(
-      all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
-    );
-    everything = new Map([...builtIn, ...community].map((q) => [q.id, q]));
-    bank = [...everything.values()].filter((q) => !hidden.has(q.id));
-    console.log(
-      `📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`,
-    );
-    if (QUESTIONS_PATH === SAMPLE_BANK) {
-      (config.production ? console.warn : console.log)(
-        '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
-      );
-    }
-  }
+  if (!bank) ({ everything, bank } = loadBank());
   return bank;
 }
 
-/** Call after approving or hiding a question so new matches see the change. */
+/** The last reload's error, while the bank on disk can't be read (the one loaded before keeps the game going). */
+let reloadFailure: string | null = null;
+export const bankProblem = () => reloadFailure;
+
+/**
+ * Call after approving or hiding a question so new matches see the change. The new bank replaces the old one only
+ * once it has loaded: a broken file (a bad pull of the private bank) leaves the game on the bank it has, says so in
+ * /api/health, and is reported, rather than stopping every match from starting.
+ */
 export function reloadQuestionBank() {
-  bank = null;
-  questionBank();
+  try {
+    ({ everything, bank } = loadBank());
+    reloadFailure = null;
+  } catch (err) {
+    reloadFailure = err instanceof Error ? err.message : String(err);
+    void reportError(err, 'reload the question bank');
+  }
+}
+
+function loadBank(): { everything: Map<string, Question>; bank: Question[] } {
+  const builtIn = z.array(QuestionSchema).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
+  const community = all<{
+    id: string;
+    category: CategoryId;
+    difficulty: Difficulty;
+    q: string;
+    options: string;
+    answer: number;
+    author: string | null;
+  }>(
+    `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
+     FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
+  ).map((r) => ({ ...r, options: JSON.parse(r.options) as string[] }));
+  const hidden = new Set(
+    all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
+  );
+  const everything = new Map([...builtIn, ...community].map((q) => [q.id, q]));
+  const bank = [...everything.values()].filter((q) => !hidden.has(q.id));
+  console.log(
+    `📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`,
+  );
+  if (QUESTIONS_PATH === SAMPLE_BANK) {
+    (config.production ? console.warn : console.log)(
+      '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
+    );
+  }
+  return { everything, bank };
 }
 
 export type Rng = () => number;
@@ -173,11 +200,13 @@ export function pickQuestions(
 
 /**
  * The same questions with the options in an order of their own for this seed (e.g. a day and a player): a set everyone
- * plays stays the same, but "the answers were Б, А, Г…" gives nothing away.
+ * plays stays the same, but "the answers were Б, А, Г…" gives nothing away. The seed is mixed with this server's own
+ * secret: the code is public, and without it one player's order would convert into anyone else's.
  */
 export function reorderOptions(questions: PreparedQuestion[], seed: string): PreparedQuestion[] {
+  const secret = installationSecret('option-order');
   return questions.map((q) => {
-    const order = shuffle([0, 1, 2, 3], seededRng(`${seed}:${q.id}`));
+    const order = shuffle([0, 1, 2, 3], seededRng(`${secret}:${seed}:${q.id}`));
     return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
   });
 }

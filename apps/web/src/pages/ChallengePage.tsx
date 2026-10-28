@@ -113,8 +113,8 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute -top-28 -right-20 size-72 rounded-full opacity-15 blur-3xl"
-            style={{ background: ACCENT_TO }}
+            className="pointer-events-none absolute -top-28 -right-20 size-72 rounded-full opacity-15 glow"
+            style={{ color: ACCENT_TO }}
           />
 
           <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -146,7 +146,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
 
           <div className="relative mt-6">
             {mine ? (
-              <YourResult entry={mine} total={info.entries.length} expired={expired} />
+              <YourResult entry={mine} total={info.total} expired={expired} />
             ) : expired ? (
               <p className="rounded-2xl border border-line bg-black/20 p-4 text-sm text-fg-2">
                 {info.attempted
@@ -268,9 +268,7 @@ function Board({ info }: { info: ChallengeInfo }) {
   return (
     <section aria-labelledby="challenge-board">
       <SectionTitle
-        aside={
-          entries.length > 0 && <span className="text-sm text-fg-3">{plural(entries.length, 'играч', 'играчи')}</span>
-        }
+        aside={info.total > 0 && <span className="text-sm text-fg-3">{plural(info.total, 'играч', 'играчи')}</span>}
       >
         <span id="challenge-board">Класиране</span>
       </SectionTitle>

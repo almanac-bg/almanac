@@ -34,7 +34,7 @@ export function FriendsCard({ className }: { className?: string }) {
 
   return (
     <Card className={clsx('relative flex flex-col overflow-hidden p-5 sm:p-7', className)}>
-      <div className="absolute -bottom-20 -left-10 size-56 rounded-full bg-fuchsia-600/20 blur-3xl" />
+      <div className="absolute -bottom-20 -left-10 size-56 rounded-full glow text-fuchsia-600/20" />
       <div className="relative flex flex-1 flex-col">
         <div className="flex items-center gap-2 text-fuchsia-300">
           <Users className="size-5" />

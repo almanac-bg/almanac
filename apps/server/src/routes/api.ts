@@ -66,6 +66,7 @@ import {
   unhideQuestion,
 } from '../questionReports';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
+import { guestsPaused } from '../settings';
 import { siteInfo } from '../site';
 import { count, launchStats } from '../stats';
 import {
@@ -77,13 +78,14 @@ import {
   rejectSubmission,
   submitQuestion,
 } from '../submissions';
-import { network, throttled } from '../throttle';
+import { network, throttled, wideNetwork } from '../throttle';
 import {
   emailKey,
   getUser,
   getUserByLogin,
   getUserByName,
   isAdmin,
+  NOT_BANNED,
   nameTaken,
   toPublicUser,
   type UserRow,
@@ -223,7 +225,7 @@ api.post('/auth/register', async (req, res) => {
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
   }
-  if (creds.email) requestEmailChange(userId, creds.email);
+  if (creds.email) requestEmailChange(userId, creds.email, network(req.ip));
   count('signups');
   setSessionCookie(res, createSession(userId));
   setDeviceCookie(res, userId);
@@ -333,12 +335,22 @@ api.post('/auth/guest', (req, res) => {
     res.json({ user: getMe(current) });
     return;
   }
+  if (guestsPaused()) {
+    res.status(503).json({ error: 'В момента не приемаме нови гости. Направи си профил или опитай по-късно.' });
+    return;
+  }
   // A mobile operator puts thousands of phones behind one address, and a challenge link shared in a group chat sends
-  // them in together: the per-network cap is high, and a cap on all new guests is the brake on abuse.
-  if (throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) || throttled('guest-all', 5_000, 60 * 60_000)) {
+  // them in together: the caps per address and per wider network are high. No cap is shared by everyone (a flood from
+  // many networks would turn every newcomer away): an unusual hour is reported, and `cli guests off` is the brake.
+  if (
+    throttled(`guest:${network(req.ip)}`, 300, 60 * 60_000) ||
+    throttled(`guest-wide:${wideNetwork(req.ip)}`, 1_000, 60 * 60_000)
+  ) {
     res.status(429).json({ error: 'Твърде много нови гости от тази мрежа. Опитай по-късно или си направи профил.' });
     return;
   }
+  if (throttled('guest-all', 5_000, 60 * 60_000) && !throttled('guest-all-reported', 1, 60 * 60_000))
+    void reportError(new Error('Over 5,000 new guests in an hour'), 'guest flood');
   const userId = createGuest();
   count('guests');
   setSessionCookie(res, createSession(userId, false));
@@ -433,7 +445,7 @@ api.post('/account/email', requireAuth, requireAccount, async (req, res) => {
     }
     if (!(await confirmPassword(res, body.password))) return;
   }
-  const result = requestEmailChange(res.locals.userId, body.email);
+  const result = requestEmailChange(res.locals.userId, body.email, network(req.ip));
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
@@ -521,7 +533,14 @@ api.post('/account/claim', requireAuth, async (req, res) => {
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
   }
-  if (creds.email) requestEmailChange(me.id, creds.email);
+  // The account gets a session of its own: whoever else held the guest's cookie (copied off this device, or planted
+  // in it before the name and password were set) is left holding nothing. Their open sockets go a few seconds later,
+  // once this answer has given the player's tabs the new cookie to come back with.
+  const guestSession = sessionTokenFromCookieHeader(req.headers.cookie);
+  run('DELETE FROM sessions WHERE user_id = ?', me.id);
+  setSessionCookie(res, createSession(me.id));
+  if (guestSession) setTimeout(() => disconnectSession(hashToken(guestSession)), 5_000).unref();
+  if (creds.email) requestEmailChange(me.id, creds.email, network(req.ip));
   // Today's daily as a guest had questions of its own; with a profile, the shared ones (and the board) are open.
   forgetGuestDaily(me.id);
   count('claims');
@@ -559,6 +578,11 @@ api.post('/reminders/off', (req, res) => {
 });
 
 api.get('/account/export', requireAuth, (_req, res) => {
+  // Everything ever played, built on the thread the matches run on: a few a while is plenty.
+  if (throttled(`export:${res.locals.userId}`, 3, 10 * 60_000)) {
+    res.status(429).json({ error: 'Вече изтегли данните си. Опитай пак след няколко минути.' });
+    return;
+  }
   res.setHeader('content-disposition', 'attachment; filename="almanac-data.json"');
   res.type('application/json').send(JSON.stringify(exportAccount(res.locals.userId), null, 2));
 });
@@ -992,9 +1016,15 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
 
   if (board === 'level') {
     // Guests play but aren't listed (they can be made by the dozen); they still see where they'd stand.
-    const rows = all<BoardRow>('SELECT * FROM users WHERE is_guest = 0 ORDER BY xp DESC, id ASC LIMIT ?', LIMIT);
+    const rows = all<BoardRow>(
+      `SELECT * FROM users u WHERE u.is_guest = 0 AND ${NOT_BANNED} ORDER BY u.xp DESC, u.id ASC LIMIT ?`,
+      LIMIT,
+    );
     const me = getUser(userId)!;
-    const rank = one<{ n: number }>('SELECT COUNT(*) + 1 AS n FROM users WHERE is_guest = 0 AND xp > ?', me.xp)!.n;
+    const rank = one<{ n: number }>(
+      `SELECT COUNT(*) + 1 AS n FROM users u WHERE u.is_guest = 0 AND ${NOT_BANNED} AND u.xp > ?`,
+      me.xp,
+    )!.n;
     return { board, entries: rows.map((r, i) => toEntry(r, i + 1)), me: toEntry(me, rank), season: null };
   }
 
@@ -1002,7 +1032,8 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
   const mode: QueueModeId = board;
   const rows = all<BoardRow>(
     `SELECT u.*, r.rating, r.games, r.wins FROM season_ratings r JOIN users u ON u.id = r.user_id
-     WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 ORDER BY r.rating DESC, u.id ASC LIMIT ?`,
+     WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 AND ${NOT_BANNED}
+     ORDER BY r.rating DESC, u.id ASC LIMIT ?`,
     season,
     mode,
     LIMIT,
@@ -1017,7 +1048,7 @@ function leaderboard(board: LeaderboardBoard, userId: number): LeaderboardRespon
   const rank = mine
     ? one<{ n: number }>(
         `SELECT COUNT(*) + 1 AS n FROM season_ratings r JOIN users u ON u.id = r.user_id
-         WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 AND r.rating > ?`,
+         WHERE r.season = ? AND r.mode = ? AND r.games > 0 AND u.is_guest = 0 AND ${NOT_BANNED} AND r.rating > ?`,
         season,
         mode,
         mine.rating!,

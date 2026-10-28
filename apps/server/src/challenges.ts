@@ -9,11 +9,12 @@ import {
   ordinal,
 } from '@quiz/shared';
 import { config } from './config';
+import { cutShortError } from './daily';
 import { all, one, run } from './db';
 import { notify, unreadAbout } from './notifications';
-import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions } from './questions';
+import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, withoutAuthors } from './questions';
 import { count } from './stats';
-import { toPublicUser, type UserRow } from './users';
+import { NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
 const CHALLENGE_DAYS = 7;
@@ -40,7 +41,7 @@ export function createChallenge(creatorId: number): string {
     'INSERT INTO challenges (id, creator_id, questions, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
     id,
     creatorId,
-    JSON.stringify(questions),
+    JSON.stringify(withoutAuthors(questions)),
     now,
     now + CHALLENGE_DAYS * DAY,
   );
@@ -53,16 +54,23 @@ export function challengeQuestions(id: string, userId: number): PreparedQuestion
   return reorderOptions(JSON.parse(getChallenge(id)!.questions), `challenge:${id}:${userId}`);
 }
 
-/** One attempt per player and link — except one a server restart cut short. */
+/**
+ * One attempt per player and link — except one a server restart cut short before any of its answers was revealed. Once
+ * one was, the run ends with the score saved at its last reveal.
+ */
 export function claimChallengeAttempt(id: string, userId: number): { ok: true } | { ok: false; error: string } {
   const challenge = getChallenge(id);
   if (!challenge) return { ok: false, error: 'Няма такова предизвикателство.' };
   if (challenge.expires_at < Date.now()) return { ok: false, error: 'Това предизвикателство вече изтече.' };
-  const mine = one<{ started_at: number; finished_at: number | null }>(
-    'SELECT started_at, finished_at FROM challenge_results WHERE challenge_id = ? AND user_id = ?',
+  const mine = one<{ started_at: number; finished_at: number | null; revealed: number }>(
+    'SELECT started_at, finished_at, revealed FROM challenge_results WHERE challenge_id = ? AND user_id = ?',
     id,
     userId,
   );
+  if (mine && !mine.finished_at && mine.started_at < config.bootedAt && mine.revealed > 0) {
+    run('UPDATE challenge_results SET finished_at = ? WHERE challenge_id = ? AND user_id = ?', Date.now(), id, userId);
+    return { ok: false, error: cutShortError(mine.revealed) };
+  }
   if (mine && (mine.finished_at || mine.started_at >= config.bootedAt)) {
     return { ok: false, error: 'Вече изигра това предизвикателство — всеки има по един опит.' };
   }
@@ -77,17 +85,89 @@ export function claimChallengeAttempt(id: string, userId: number): { ok: true } 
   return { ok: true };
 }
 
-/** The run never got going (or its result couldn't be saved): the link's one attempt is the player's again. */
+/** Saved at each reveal of a link run: what stands if the run is cut short from here on. */
+export function saveChallengeProgress(
+  id: string,
+  userId: number,
+  revealed: number,
+  score: number,
+  correct: number,
+  timeMs: number,
+) {
+  run(
+    `UPDATE challenge_results SET revealed = ?, score = ?, correct = ?, time_ms = ?
+     WHERE challenge_id = ? AND user_id = ? AND finished_at IS NULL`,
+    revealed,
+    score,
+    correct,
+    timeMs,
+    id,
+    userId,
+  );
+}
+
+/**
+ * A run that ended without its result: with none of its answers revealed the link's one attempt is the player's again;
+ * once one was, the run stands with the score saved at its last reveal (see releaseDailyAttempt).
+ */
 export function releaseChallengeAttempt(id: string, userId: number) {
+  run(
+    `UPDATE challenge_results SET finished_at = ?
+     WHERE challenge_id = ? AND user_id = ? AND finished_at IS NULL AND revealed > 0`,
+    Date.now(),
+    id,
+    userId,
+  );
   run('DELETE FROM challenge_results WHERE challenge_id = ? AND user_id = ? AND finished_at IS NULL', id, userId);
 }
 
-function finished(id: string): ResultRow[] {
+/** How many rows of a link's board are sent: the page shows these, and the viewer's own further down. */
+const BOARD_ROWS = 50;
+
+/** The link's best runs, best first: higher score, then faster, then earlier. */
+function finished(id: string, limit = BOARD_ROWS): ResultRow[] {
   return all<ResultRow>(
     `SELECT u.*, r.score, r.correct, r.time_ms FROM challenge_results r JOIN users u ON u.id = r.user_id
-     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL ORDER BY r.score DESC, r.time_ms ASC, r.finished_at ASC`,
+     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}
+     ORDER BY r.score DESC, r.time_ms ASC, r.finished_at ASC LIMIT ?`,
     id,
+    limit,
   );
+}
+
+/** How many are on the link's board. */
+const boardSize = (id: string) =>
+  one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM challenge_results r JOIN users u ON u.id = r.user_id
+     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}`,
+    id,
+  )!.n;
+
+/**
+ * A player's run on the link and its place on the board (counted, not found in a list: a link shared widely can have
+ * thousands of runs). Null if they have no finished run on it.
+ */
+function placeOf(id: string, userId: number): (ResultRow & { rank: number }) | null {
+  const mine = one<ResultRow & { finished_at: number }>(
+    `SELECT u.*, r.score, r.correct, r.time_ms, r.finished_at FROM challenge_results r JOIN users u ON u.id = r.user_id
+     WHERE r.challenge_id = ? AND r.user_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}`,
+    id,
+    userId,
+  );
+  if (!mine) return null;
+  const ahead = one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM challenge_results r JOIN users u ON u.id = r.user_id
+     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED} AND (r.score > ?
+       OR (r.score = ? AND r.time_ms < ?) OR (r.score = ? AND r.time_ms = ? AND r.finished_at < ?))`,
+    id,
+    mine.score,
+    mine.score,
+    mine.time_ms,
+    mine.score,
+    mine.time_ms,
+    mine.finished_at,
+  )!.n;
+  return { ...mine, rank: ahead + 1 };
 }
 
 /**
@@ -131,19 +211,18 @@ export function recordChallengeResult(
     id,
     userId,
   );
-  const results = finished(id);
-  const rank = results.findIndex((r) => r.id === userId) + 1;
+  const player = placeOf(id, userId);
+  const rank = player?.rank ?? 0;
   const creator = getChallenge(id)?.creator_id;
-  const player = results[rank - 1];
   if (creator && creator !== userId && player) {
     // Kept for the creator (they're rarely on the page when a friend plays): the reason to come back and send another.
-    const creatorPlace = results.findIndex((r) => r.id === creator) + 1;
+    const creatorPlace = placeOf(id, creator)?.rank ?? 0;
     const beaten = rank === 1 && creatorPlace > 1;
     const link = `/c/${id}`;
     // Played by several since the creator last looked: one note says how many (and who's ahead), not one each.
     const since = sinceSeen(creator, link);
     const fresh = since === null ? 1 : freshResults(id, creator, since);
-    const leader = results[0];
+    const leader = finished(id, 1)[0];
     notify(creator, {
       icon: beaten || (fresh > 1 && creatorPlace > 1) ? '⚔️' : '🔗',
       text:
@@ -156,7 +235,7 @@ export function recordChallengeResult(
       replace: true,
     });
   }
-  return { id, rank, total: results.length };
+  return { id, rank, total: boardSize(id) };
 }
 
 export function challengeInfo(id: string, viewerId: number): ChallengeInfo | null {
@@ -165,14 +244,17 @@ export function challengeInfo(id: string, viewerId: number): ChallengeInfo | nul
   const creator = challenge.creator_id
     ? one<UserRow>('SELECT * FROM users WHERE id = ?', challenge.creator_id)
     : undefined;
-  const entries: ChallengeEntry[] = finished(id).map((r, i) => ({
-    rank: i + 1,
+  const entry = (r: ResultRow, rank: number): ChallengeEntry => ({
+    rank,
     user: toPublicUser(r),
     score: r.score,
     correct: r.correct,
     timeMs: r.time_ms,
     you: r.id === viewerId,
-  }));
+  });
+  const entries = finished(id).map((r, i) => entry(r, i + 1));
+  const mine = entries.some((e) => e.you) ? null : placeOf(id, viewerId);
+  if (mine) entries.push(entry(mine, mine.rank));
   return {
     id,
     creator: creator ? toPublicUser(creator) : null,
@@ -180,6 +262,7 @@ export function challengeInfo(id: string, viewerId: number): ChallengeInfo | nul
     expiresAt: challenge.expires_at,
     questions: MODES.challenge.questions,
     entries,
+    total: boardSize(id),
     attempted: !!one('SELECT 1 AS x FROM challenge_results WHERE challenge_id = ? AND user_id = ?', id, viewerId),
     expired: challenge.expires_at < Date.now(),
   };
@@ -196,7 +279,8 @@ export function challengePreview(id: string): ChallengePreview | null {
       )
     : undefined;
   const top = one<{ score: number | null; players: number }>(
-    'SELECT MAX(score) AS score, COUNT(*) AS players FROM challenge_results WHERE challenge_id = ? AND finished_at IS NOT NULL',
+    `SELECT MAX(r.score) AS score, COUNT(*) AS players FROM challenge_results r JOIN users u ON u.id = r.user_id
+     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}`,
     id,
   )!;
   return {
@@ -216,15 +300,14 @@ export function myChallenges(userId: number): MyChallenge[] {
     Date.now() - 30 * DAY,
   );
   return rows.map((c) => {
-    const results = finished(c.id);
-    const mine = results.find((r) => r.id === userId);
+    const leader = finished(c.id, 1)[0];
     return {
       id: c.id,
       createdAt: c.created_at,
       expiresAt: c.expires_at,
-      players: results.length,
-      myScore: mine?.score ?? null,
-      leader: results[0] ? { username: results[0].username, score: results[0].score } : null,
+      players: boardSize(c.id),
+      myScore: placeOf(c.id, userId)?.score ?? null,
+      leader: leader ? { username: leader.username, score: leader.score } : null,
     };
   });
 }

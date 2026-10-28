@@ -23,6 +23,22 @@ const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
 ].join('; ');
 
+const appOrigin = new URL(config.appUrl).origin;
+
+/**
+ * Refuses a change sent from another site. The session cookie is SameSite=Lax, so another site's form can't act as the
+ * player, but its answer could still sign them out or swap their cookie for a new guest's, and a guest's cookie is the
+ * only key to their progress. Browsers say where a request comes from (Sec-Fetch-Site, or at least Origin); a request
+ * with neither isn't a page's (Scaleway's notices, a mail app's one-click unsubscribe) and carries no cookie to lose.
+ */
+export const sameSiteWrites: RequestHandler = (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const site = req.get('sec-fetch-site');
+  const origin = req.get('origin');
+  if (site ? site === 'same-origin' || site === 'none' : !origin || origin === appOrigin) return next();
+  res.status(403).json({ error: 'Заявката не идва от сайта.' });
+};
+
 /** Browser hardening headers on every response. HSTS is set by Caddy, which terminates HTTPS. */
 export const securityHeaders: RequestHandler = (_req, res, next) => {
   res.setHeader('content-security-policy', CONTENT_SECURITY_POLICY);

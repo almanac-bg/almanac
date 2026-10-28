@@ -95,6 +95,18 @@ export function network(ip: string | undefined): string {
 }
 
 /**
+ * The wider network around an address: an IPv4 /24, an IPv6 /48 (what one site or provider customer usually holds).
+ * A flood spread over many addresses of one network still shares this.
+ */
+export function wideNetwork(ip: string | undefined): string {
+  const net = network(ip);
+  const v4 = /^(\d+\.\d+\.\d+)\.\d+$/.exec(net);
+  if (v4) return `${v4[1]}.0/24`;
+  if (!net.endsWith('::/64')) return net;
+  return `${net.slice(0, -'::/64'.length).split(':').slice(0, 3).join(':')}::/48`;
+}
+
+/**
  * Token bucket for socket events: short bursts are fine (answer + joker + emote), a stream isn't.
  * Returns a function that says whether the next event is allowed.
  */

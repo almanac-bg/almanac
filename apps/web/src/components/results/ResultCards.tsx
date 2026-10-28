@@ -38,7 +38,7 @@ export function DailyCard({
   useEffect(() => rememberDailyShare(text), [text]);
   return (
     <Card className="relative overflow-hidden p-6">
-      <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
+      <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-amber-400/25" />
       {daily.rank === null ? (
         // A run on questions of its own (a guest's, a new account's) has no place on the board.
         <>
@@ -130,7 +130,7 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
   const p = levelProgress(Math.round(xp));
   return (
     <Card className="relative overflow-hidden p-6">
-      <div className="absolute -top-16 -left-10 size-48 rounded-full bg-violet-600/25 blur-3xl" />
+      <div className="absolute -top-16 -left-10 size-48 rounded-full glow text-violet-600/25" />
       <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="t-card">Награди</h2>
         <span className="font-display text-2xl font-black text-violet-300 sm:text-3xl">

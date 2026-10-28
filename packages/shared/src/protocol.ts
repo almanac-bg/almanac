@@ -591,8 +591,10 @@ export interface ChallengeInfo {
   createdAt: number;
   expiresAt: number;
   questions: number;
-  /** Finished runs, best first. */
+  /** The best finished runs (up to 50), best first, and the viewer's own after them if it's further down. */
   entries: ChallengeEntry[];
+  /** How many finished runs there are in all. */
+  total: number;
   /** You started it (one attempt each). */
   attempted: boolean;
   expired: boolean;

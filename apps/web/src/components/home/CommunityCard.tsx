@@ -34,7 +34,7 @@ export function CommunityCard({ className }: { className?: string }) {
 
   return (
     <Card className={clsx('relative flex flex-col overflow-hidden p-5 sm:p-7', className)}>
-      <div className="absolute -right-10 -bottom-16 size-48 rounded-full bg-emerald-500/15 blur-3xl" />
+      <div className="absolute -right-10 -bottom-16 size-48 rounded-full glow text-emerald-500/15" />
       <div className="relative flex items-center gap-2 text-emerald-300">
         <PenLine className="size-5" />
         <span className="t-eyebrow">Общност</span>

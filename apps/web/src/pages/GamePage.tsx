@@ -50,7 +50,9 @@ function useMatchKeys(paused: boolean) {
       if ((choice < 0 && !powerup) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (pausedNow.current || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
-      if (choice >= 0) actions.answer(choice);
+      // Like a tap, on what's on screen: not on a question still on its way in behind the last one's reveal.
+      if (choice >= 0)
+        document.querySelector<HTMLButtonElement>(`[data-answer="${choice}"]:not([aria-disabled])`)?.click();
       else document.querySelector<HTMLButtonElement>(`[data-powerup="${powerup}"]:not(:disabled)`)?.click();
     };
     window.addEventListener('keydown', onKey);

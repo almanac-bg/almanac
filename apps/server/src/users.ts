@@ -62,6 +62,9 @@ export const GUEST_NAME = /^(гост|gost|guest)[\s_.-]*\d*$/iu;
 /** Shown in other players' match history once an account is deleted. */
 export const DELETED_NAME = 'Изтрит играч';
 
+/** SQL for "not banned right now", on the users table as `u`: a banned player is on no board while the ban lasts. */
+export const NOT_BANNED = '(u.banned_until IS NULL OR u.banned_until < unixepoch() * 1000)';
+
 export const getUser = (id: number) => one<UserRow>('SELECT * FROM users WHERE id = ?', id);
 export const usernameKey = (username: string) => username.normalize('NFC').toLowerCase();
 export const getUserByName = (username: string) =>

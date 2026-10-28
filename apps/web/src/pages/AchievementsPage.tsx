@@ -90,8 +90,8 @@ export function AchievementsPage() {
               >
                 {done && (
                   <div
-                    className="absolute -top-12 -right-12 size-36 rounded-full opacity-30 blur-2xl"
-                    style={{ background: rarity.color }}
+                    className="absolute -top-12 -right-12 size-36 rounded-full opacity-30 glow"
+                    style={{ color: rarity.color }}
                   />
                 )}
                 <div className="relative flex items-start gap-4">

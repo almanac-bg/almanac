@@ -56,13 +56,18 @@ function consumeToken(token: string, purpose: Purpose): { userId: number; email:
   return { userId: row.user_id, email: row.email };
 }
 
+/** Unused reset links die whenever the password or the address changes: a link mailed before can't undo the change. */
+function dropResetLinks(userId: number) {
+  run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'", userId);
+}
+
 const link = (path: string, token: string) => `${config.appUrl}${path}?token=${encodeURIComponent(token)}`;
 
 /**
  * Sets an address as pending and mails a verification link. It doesn't say whether the address is already
  * taken (that would reveal who plays here) — verification refuses it instead, and only the mailbox owner sees that.
  */
-export function requestEmailChange(userId: number, email: string): Result {
+export function requestEmailChange(userId: number, email: string, net: string): Result {
   const parsed = EmailSchema.safeParse(email.trim());
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const user = getUser(userId)!;
@@ -72,6 +77,8 @@ export function requestEmailChange(userId: number, email: string): Result {
   // site's name again and again.
   if (
     throttled(`email-to:${emailKey(parsed.data)}`, 3, 24 * 60 * 60_000) ||
+    // One network's share of the ceiling below: no single sender can use all of it up for everyone else.
+    throttled(`verify-mail-net:${net}`, 20, 60 * 60_000) ||
     throttled('verify-mail-all', 300, 60 * 60_000)
   )
     return { ok: false, error: 'Твърде много писма до този адрес. Опитай отново утре.' };
@@ -88,6 +95,7 @@ export function removeEmail(userId: number) {
     userId,
   );
   run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'", userId);
+  dropResetLinks(userId);
   if (user.email) sendMail(emailChangedMail(user.email, user.username, true));
 }
 
@@ -99,6 +107,7 @@ export function verifyEmailToken(token: string): Result<{ userId: number }> {
     if (owner && owner.id !== t.userId)
       return { result: { ok: false, error: 'Този имейл вече е свързан с друг профил.' } };
     const before = getUser(t.userId)!;
+    if (before.email_key !== emailKey(t.email)) dropResetLinks(t.userId);
     run(
       'UPDATE users SET email = ?, email_key = ?, pending_email = NULL, email_bounced_at = NULL WHERE id = ?',
       t.email,
@@ -121,6 +130,12 @@ export function verifyEmailToken(token: string): Result<{ userId: number }> {
 export function requestPasswordReset(login: string) {
   const user = getUserByLogin(login.trim());
   if (!user?.email) return;
+  // Per account, whichever name or address it was asked by: a stranger can't fill someone's inbox with resets.
+  if (
+    throttled(`reset-mail:#${user.id}`, 5, 60 * 60_000) ||
+    throttled(`reset-mail-day:#${user.id}`, 10, 24 * 60 * 60_000)
+  )
+    return;
   const token = issueToken(user.id, 'reset', user.email);
   sendMail(resetPasswordMail(user.email, user.username, link('/reset-password', token)));
 }
@@ -130,7 +145,9 @@ export async function resetPassword(token: string, password: string): Promise<Re
   const hash = await hashPassword(password);
   const result = tx((): Result<{ userId: number }> => {
     const t = consumeToken(token, 'reset');
-    if (!t) return { ok: false, error: 'Линкът е невалиден или е изтекъл. Поискай нов.' };
+    // Mailed to an address the account no longer has: whoever reads that mailbox now has no say over the account.
+    if (!t?.email || getUser(t.userId)?.email_key !== emailKey(t.email))
+      return { ok: false, error: 'Линкът е невалиден или е изтекъл. Поискай нов.' };
     run('UPDATE users SET password_hash = ? WHERE id = ?', hash, t.userId);
     run('DELETE FROM sessions WHERE user_id = ?', t.userId);
     run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'", t.userId);
@@ -151,6 +168,7 @@ export async function changePassword(
   if (!(await verifyPassword(current, user.password_hash))) return { ok: false, error: 'Текущата парола е грешна.' };
   const hash = await hashPassword(next);
   run('UPDATE users SET password_hash = ? WHERE id = ?', hash, userId);
+  dropResetLinks(userId);
   const keep = keepToken ? hashSessionToken(keepToken) : '';
   run('DELETE FROM sessions WHERE user_id = ? AND token != ?', userId, keep);
   disconnectOtherSessions(userId, keep || null);

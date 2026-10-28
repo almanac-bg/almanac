@@ -34,8 +34,33 @@ function load(loader: Loader): Promise<Module> {
   });
 }
 
+/**
+ * A page that's about to be shown didn't arrive. A tab opened before a deploy asks for files that are gone: one reload
+ * gets the new version. Not while offline (that would only swap the app for the offline page), and not twice in a
+ * row. Only for a page being shown: a background fetch that fails (prefetchPages) mustn't reload the app under the
+ * player, taking whatever they were typing with it.
+ */
+function reloadForNewVersion() {
+  if (!navigator.onLine) return;
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
+    sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
+  } catch {
+    /* storage unavailable: reload anyway */
+  }
+  window.location.reload();
+}
+
 function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeof loaders)[L]>>) {
-  const Lazy = lazy(() => load(loader).then((mod) => ({ default: mod[name as string] })));
+  const Lazy = lazy(() =>
+    load(loader).then(
+      (mod) => ({ default: mod[name as string] }),
+      (err: unknown) => {
+        reloadForNewVersion();
+        throw err;
+      },
+    ),
+  );
   // biome-ignore lint/correctness/noComponentHookFactories: made once per page when this module loads, never in a render, so each page's component stays the same
   function Page(props: object) {
     // Decided once per mount: a page whose code is here already renders at once (no "loading" in between, and a page

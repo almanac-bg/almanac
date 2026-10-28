@@ -65,7 +65,7 @@ export function LockerPage() {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <Card className="relative flex flex-col items-center overflow-hidden p-8 text-center lg:sticky lg:top-24 lg:self-start">
-          <div className="absolute -top-20 size-64 rounded-full bg-violet-600/30 blur-3xl" />
+          <div className="absolute -top-20 size-64 rounded-full glow text-violet-600/30" />
           <motion.div
             key={`${me.avatar}-${me.frame}`}
             initial={{ scale: 0.85, rotate: -6 }}

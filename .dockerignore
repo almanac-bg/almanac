@@ -8,5 +8,8 @@
 .env
 .env.*
 !.env.example
+# The private question bank never goes into an image (the published one is public): it's mounted at run time.
+private
+**/data/questions.json
 *.log
 .DS_Store

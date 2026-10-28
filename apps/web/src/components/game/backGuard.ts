@@ -19,14 +19,8 @@ function arm() {
 let onBack: (() => void) | null = null;
 /** Our own step back is in flight: what to run when it lands (it isn't the player pressing back). */
 let landing: (() => void) | null = null;
-/** How the browser restored scroll before our own step back set that aside (null: nothing to put back). */
-let restoration: ScrollRestoration | null = null;
 
 window.addEventListener('popstate', () => {
-  if (restoration) {
-    window.history.scrollRestoration = restoration;
-    restoration = null;
-  }
   if (landing) {
     const then = landing;
     landing = null;
@@ -39,14 +33,11 @@ window.addEventListener('popstate', () => {
 });
 
 /**
- * Steps off the guard entry (if we're on it), then runs `then`. The browser would bring back the scroll position the
- * real /game entry was left at (where the lobby was scrolled when the match began) and drop the results half-way down
- * the page: this step back keeps the page where it is.
+ * Steps off the guard entry (if we're on it), then runs `then`. (The browser doesn't move the page for it: the app
+ * restores no scroll positions, see main.tsx, so the results don't open where the lobby was scrolled.)
  */
 function stepOff(then: () => void) {
   if (!onGuard()) return then();
-  restoration ??= window.history.scrollRestoration;
-  window.history.scrollRestoration = 'manual';
   landing = then;
   window.history.back();
 }

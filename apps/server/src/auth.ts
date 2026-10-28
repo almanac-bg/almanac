@@ -42,7 +42,13 @@ function parseHash(stored: string): { params: ScryptParams; salt: string; hash: 
   return { params, salt: parts[2], hash: parts[3] };
 }
 
-export const SESSION_COOKIE = 'quiz_session';
+/**
+ * The session cookie. Over HTTPS it carries the __Host- prefix: browsers then take it only from this very host, so a
+ * page on some other subdomain could never plant a session of its choosing. Sessions issued under the old name still
+ * work until they lapse (30 days after the prefix shipped), and are moved to the new name as they're renewed.
+ */
+export const SESSION_COOKIE = config.cookieSecure ? '__Host-quiz_session' : 'quiz_session';
+const OLD_SESSION_COOKIE = 'quiz_session';
 const SESSION_MS = config.sessionDays * 24 * 60 * 60 * 1000;
 
 /** Thrown when too many password checks are already queued; the API answers 503. */
@@ -137,7 +143,8 @@ export function destroySession(token: string) {
 
 export function sessionTokenFromCookieHeader(header: string | undefined): string | null {
   if (!header) return null;
-  return parseCookie(header)[SESSION_COOKIE] ?? null;
+  const cookies = parseCookie(header);
+  return cookies[SESSION_COOKIE] ?? cookies[OLD_SESSION_COOKIE] ?? null;
 }
 
 /**
@@ -190,18 +197,18 @@ export function userIdFromRequest(req: Request, res: Response): number | null {
 }
 
 export function setSessionCookie(res: Response, token: string | null) {
-  res.append(
-    'Set-Cookie',
+  const cookie = (name: string, value: string, maxAge: number) =>
     stringifySetCookie({
-      name: SESSION_COOKIE,
-      value: token ?? '',
+      name,
+      value,
       httpOnly: true,
       sameSite: 'lax',
       secure: config.cookieSecure,
       path: '/',
-      maxAge: token ? SESSION_MS / 1000 : 0,
-    }),
-  );
+      maxAge,
+    });
+  res.append('Set-Cookie', cookie(SESSION_COOKIE, token ?? '', token ? SESSION_MS / 1000 : 0));
+  if (SESSION_COOKIE !== OLD_SESSION_COOKIE) res.append('Set-Cookie', cookie(OLD_SESSION_COOKIE, '', 0));
 }
 
 export const DEVICE_COOKIE = 'quiz_device';

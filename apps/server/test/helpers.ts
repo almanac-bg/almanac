@@ -105,6 +105,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       GAME_TIME_SCALE: '0.05',
       MAIL_OUTBOX: outbox,
       APP_URL: 'https://almanac.test',
+      // The tests talk to it over plain HTTP, as if from behind the proxy.
+      COOKIE_SECURE: 'false',
       SMTP_URL: '',
       ...env,
     },
@@ -204,8 +206,13 @@ export function http(url: string) {
       headers: { cookie, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    // A new session (signing in, saving a guest) comes as a cookie: the one to go on with.
+    const session = r.headers
+      .getSetCookie()
+      .find((c) => /quiz_session=./.test(c))
+      ?.split(';')[0];
     // biome-ignore lint/suspicious/noExplicitAny: tests read whichever fields of a route's JSON they assert on
-    return { status: r.status, body: (await r.json()) as any };
+    return { status: r.status, body: (await r.json()) as any, cookie: session };
   };
   return {
     get: (path: string, cookie = '') => call('GET', path, cookie),

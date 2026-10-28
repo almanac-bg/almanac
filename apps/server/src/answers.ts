@@ -1,3 +1,4 @@
+import { setImmediate as yieldToMatches } from 'node:timers/promises';
 import type { Difficulty, PlayCheck } from '@quiz/shared';
 import { all, run } from './db';
 import type { AnswerLogEntry } from './game/Game';
@@ -33,19 +34,30 @@ export function recordAnswers(matchId: string, userId: number, log: AnswerLogEnt
   }
 }
 
-/** Answers dropped per maintenance run at most: a short delete, so the matches going on don't wait on it. */
+/** Answers dropped in one delete: a short one, so the matches going on don't wait on it. */
 const PRUNE_BATCH = 5_000;
+/** At most this many batches a run, the matches getting their turn between them (about a million answers). */
+const PRUNE_BATCHES = 200;
 
-/** Drops answers older than ANSWER_LOG_DAYS (the totals per question stay). Returns how many went. */
-export function pruneAnswers(now = Date.now()): number {
+/**
+ * Drops answers older than ANSWER_LOG_DAYS (the totals per question stay), batch after batch until none are left: a
+ * fixed amount per run would fall behind once enough people play, and the table would grow without end. Returns how
+ * many went.
+ */
+export async function pruneAnswers(now = Date.now()): Promise<number> {
   const before = now - ANSWER_LOG_DAYS * 24 * 60 * 60_000;
-  return Number(
-    run(
+  let pruned = 0;
+  for (let i = 0; i < PRUNE_BATCHES; i++) {
+    const { changes } = run(
       'DELETE FROM answers WHERE rowid IN (SELECT rowid FROM answers WHERE answered_at < ? LIMIT ?)',
       before,
       PRUNE_BATCH,
-    ).changes,
-  );
+    );
+    pruned += Number(changes);
+    if (Number(changes) < PRUNE_BATCH) break;
+    await yieldToMatches();
+  }
+  return pruned;
 }
 
 /**

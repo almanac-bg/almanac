@@ -120,12 +120,28 @@ body {
   @apply text-[11px] font-bold tracking-[0.16em] uppercase;
 }
 
+/*
+ * A soft glow in the text colour (`glow text-violet-600/30`, or `style={{ color }}`): a gradient that fades out in a
+ * bell-like curve, drawn twice its size. Not a blurred circle: a blur filter is redrawn whenever anything near it
+ * changes, and next to the question timer that kept Safari's CPU busy for the whole question.
+ */
+@utility glow {
+  scale: 2;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, currentColor 80%, transparent),
+    color-mix(in oklab, currentColor 50%, transparent) 30%,
+    color-mix(in oklab, currentColor 18%, transparent) 62%,
+    transparent
+  );
+}
+
 @layer components {
+  /* No backdrop blur: the build kept only Safari's prefixed copy, so the cards were drawn without it everywhere else
+     (the look as reviewed), and Safari paid for a blur nobody else saw. */
   .glass {
     background: linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.025));
     border: 1px solid var(--color-line);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
   /*
@@ -192,6 +208,17 @@ body {
     box-shadow:
       0 0 0 2px var(--color-ink),
       0 0 0 4px var(--color-cyan);
+  }
+}
+
+/*
+ * On a phone, iOS zooms the whole page into any field whose text is under 16 px when it's tapped, and doesn't zoom
+ * back out. Outside every layer, so it wins over a field's own text size (e.g. `text-[15px]`).
+ */
+@media (pointer: coarse) {
+  .field,
+  .field-box input {
+    font-size: 16px;
   }
 }
 

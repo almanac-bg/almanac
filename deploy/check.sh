@@ -20,8 +20,9 @@ end=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$domain" 2>/de
 [ -n "$end" ] || fail "no certificate for $domain"
 [ "$(date -d "$end" +%s)" -gt "$(($(date +%s) + 14 * 86400))" ] || fail "the certificate for $domain expires $end"
 
+# Early enough to act: a full disk fails every write (results, sign-ups) and the backups with them.
 used=$(df --output=pcent / | tail -1 | tr -dc 0-9)
-[ "$used" -le 85 ] || fail "the disk is $used% full"
+[ "$used" -le 70 ] || fail "the disk is $used% full"
 
 services="app caddy"
 grep -q '^COMPOSE_PROFILES=.*backup' .env && services="$services litestream"
@@ -30,6 +31,16 @@ for service in $services; do
 done
 docker compose exec -T app wget -qO- http://127.0.0.1:3001/api/health >/dev/null || fail "the app's health check fails"
 
+# The app restarting by itself (out of memory, a crash Node couldn't report) shows nowhere else. Docker counts the
+# restarts of a container; a deploy makes a new one, which starts again from zero.
+app=$(docker compose ps -q app)
+[ "$(docker inspect -f '{{.State.OOMKilled}}' "$app")" != true ] || fail "the app was stopped for running out of memory"
+restarts=$(docker inspect -f '{{.RestartCount}}' "$app")
+state=/var/tmp/almanac-app-restarts
+before=$(cat "$state" 2>/dev/null || echo "$restarts")
+echo "$restarts" >"$state"
+[ "$restarts" -le "$before" ] || fail "the app restarted by itself $((restarts - before)) time(s) since the last check"
+
 # Security updates reboot the server by themselves at night (README → step 1); one still waiting means that broke.
 if [ -f /var/run/reboot-required ]; then
   waiting=$((($(date +%s) - $(stat -c %Y /var/run/reboot-required)) / 86400))
@@ -37,4 +48,6 @@ if [ -f /var/run/reboot-required ]; then
 fi
 
 [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null
-echo "$(date -u +%FT%TZ) check ok"
+# How the database grows, day by day, in this log.
+data=$(docker compose exec -T app du -sh /data 2>/dev/null | cut -f1)
+echo "$(date -u +%FT%TZ) check ok (disk $used% full, data ${data:-?})"

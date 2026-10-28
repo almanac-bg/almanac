@@ -92,6 +92,30 @@ test('responses carry the browser hardening headers', async () => {
   assert.equal(res.headers.get('x-powered-by'), null);
 });
 
+test("another site's form can't sign a player out or swap their cookie for a new guest's", async () => {
+  const player = await register(srv.url, 'Мишена');
+  const fromElsewhere = { 'content-type': 'text/plain', origin: 'https://evil.example' };
+  for (const path of ['/api/auth/logout', '/api/auth/guest']) {
+    const browser = await fetch(`${srv.url}${path}`, {
+      method: 'POST',
+      headers: { ...fromElsewhere, 'sec-fetch-site': 'cross-site' },
+    });
+    assert.equal(browser.status, 403, `${path} from another site`);
+    assert.equal(browser.headers.get('set-cookie'), null, `${path} sets no cookie`);
+    const older = await fetch(`${srv.url}${path}`, { method: 'POST', headers: fromElsewhere });
+    assert.equal(older.status, 403, `${path} from another origin, no Sec-Fetch-Site`);
+  }
+  assert.equal((await http(srv.url).get('/api/me', player.cookie)).body.user.username, 'Мишена', 'still signed in');
+
+  // The site's own pages, and callers that aren't a page at all (mail apps, Scaleway), still get through.
+  const own = await fetch(`${srv.url}/api/auth/guest`, {
+    method: 'POST',
+    headers: { origin: 'https://almanac.test', 'sec-fetch-site': 'same-origin' },
+  });
+  assert.equal(own.status, 201);
+  assert.equal((await fetch(`${srv.url}/api/auth/guest`, { method: 'POST' })).status, 201);
+});
+
 const built = fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'));
 
 test('each public page has its own title and address; the game says noindex; a wrong address is a 404', {
@@ -224,6 +248,38 @@ test('the server knows every screen of the app (else it would answer it with a 4
   const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) => m[1].replace(/:[a-z]+/g, 'x1'));
   assert.ok(routes.length > 15, `found ${routes.length} routes`);
   for (const route of routes) assert.notEqual(routeKind(route), 'unknown', route);
+});
+
+test('`cli guests off` turns new guests away until `cli guests on`; accounts are unaffected', async () => {
+  const off = cli(srv.dbPath, 'guests', 'off');
+  assert.equal(off.status, 0, off.output);
+  const refused = await fetch(`${srv.url}/api/auth/guest`, { method: 'POST' });
+  assert.equal(refused.status, 503);
+  assert.match(((await refused.json()) as { error: string }).error, /не приемаме нови гости/);
+  await register(srv.url, 'vse_oshte_moje');
+  assert.equal(cli(srv.dbPath, 'guests', 'on').status, 0);
+  assert.equal((await fetch(`${srv.url}/api/auth/guest`, { method: 'POST' })).status, 201);
+});
+
+test('over HTTPS the session cookie is Secure and host-only by default; sessions under the old name still work', async () => {
+  const secure = await startServer({ NODE_ENV: 'production', COOKIE_SECURE: '', OPERATOR_NAME: 'Тест Тестов' });
+  try {
+    const res = await fetch(`${secure.url}/api/auth/guest`, { method: 'POST' });
+    const cookies = res.headers.getSetCookie();
+    const session = cookies.find((c) => c.startsWith('__Host-quiz_session='));
+    assert.ok(session, cookies.join(' | '));
+    assert.match(session, /; Secure/i);
+    assert.match(session, /; Path=\//i);
+    assert.doesNotMatch(session, /Domain=/i);
+    const token = session.split(';')[0].split('=')[1];
+    const before = await http(secure.url).get('/api/me', `quiz_session=${token}`);
+    assert.ok(before.body.user, 'a cookie issued before the prefix is still read');
+  } finally {
+    await secure.stop();
+  }
+  const typo = await startServer({ PUBLIC_QUEUES: 'duel,royal' }).catch((err: Error) => err);
+  assert.ok(typo instanceof Error, 'a typo in PUBLIC_QUEUES stops the server');
+  assert.match(typo.message, /PUBLIC_QUEUES has royal/);
 });
 
 test('health answers from the database', async () => {

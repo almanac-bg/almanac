@@ -71,7 +71,7 @@ export function ProfilePage() {
   return (
     <div className="space-y-8">
       <Card className="relative overflow-hidden p-5 sm:p-8">
-        <div className="absolute -top-24 -right-24 size-80 rounded-full bg-fuchsia-600/20 blur-3xl" />
+        <div className="absolute -top-24 -right-24 size-80 rounded-full glow text-fuchsia-600/20" />
         {/* Phones: a smaller avatar beside the name, the level bar and the buttons full width under them. Wider: the
             avatar spans the name and the bar; from lg the buttons go to the right. */}
         <div className="relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 sm:gap-x-6 lg:grid-cols-[auto_minmax(0,1fr)_auto]">

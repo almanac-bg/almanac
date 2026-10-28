@@ -33,7 +33,13 @@ export function FitName({ name, className, min = 16 }: { name: string; className
       probe.remove();
     };
     fit();
-    const observer = new ResizeObserver(fit);
+    // Refitted in the next frame, not in the observer's own callback: changing the size there resizes the column again
+    // in the same frame, which Safari reports as an observer loop (and lays the heading out twice).
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fit);
+    });
     observer.observe(column);
     // Measured in the fallback font, a name fits that the display font (wider, loaded later) breaks: once more then.
     let live = true;
@@ -44,6 +50,7 @@ export function FitName({ name, className, min = 16 }: { name: string; className
     });
     return () => {
       live = false;
+      cancelAnimationFrame(frame);
       observer.disconnect();
     };
   }, [name, min]);

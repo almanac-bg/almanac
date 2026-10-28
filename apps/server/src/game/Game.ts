@@ -26,7 +26,7 @@ import {
 } from '@quiz/shared';
 import { config } from '../config';
 import { reportError } from '../monitoring';
-import { type PreparedQuestion, shuffle } from '../questions';
+import { type PreparedQuestion, questionAuthor, shuffle } from '../questions';
 import type { BotBrain } from './bots';
 
 const COUNTDOWN_MS = 3_500;
@@ -72,8 +72,13 @@ export interface GameEmitter {
 export interface GameHooks {
   /** Persist results; returns per-user rewards. */
   finalize(game: Game, standings: FinalStanding[]): Map<number, MatchRewards>;
-  /** A one-attempt run ended without a result (cut short by us): the attempt is the player's again. */
+  /**
+   * A one-attempt run ended without a result (cut short by us, or saving failed): the attempt is the player's again if
+   * nothing was revealed, else it stands with the score saved by progress().
+   */
   release(game: Game): void;
+  /** A one-attempt run is about to reveal an answer: its score so far is what stands if it's cut short from here on. */
+  progress(game: Game): void;
   /** The server is about to stop: a run waiting for an absent player shouldn't hold it up. */
   draining(): boolean;
   /** The match ended while this player was offline: they get the result when they're back. */
@@ -231,68 +236,73 @@ export class Game {
   }
 
   // ─── Player actions ──────────────────────────────────────────────────────
+  // Those that move the match along run in guard(): a bug in one ends the match cleanly instead of leaving it stuck.
 
   answer(playerId: string, index: number, choice: number) {
-    const p = this.participants.get(playerId);
-    if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
-    // The client drew the pick as locked in: say why it wasn't taken, so it can unlock it and tell the player.
-    const reject = (reason: AnswerRejection) => {
-      if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
-    };
-    if (this.phase !== 'question' || index !== this.index) return reject('late');
-    if (!Number.isInteger(choice) || choice < 0 || choice > 3) return;
-    if (p.removed.includes(choice)) return reject('removed');
-    const limit = this.setup.timeMs + p.extraMs;
-    const elapsed = this.elapsed();
-    if (elapsed > limit + GRACE_MS) return reject('late');
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      // The client drew the pick as locked in: say why it wasn't taken, so it can unlock it and tell the player.
+      const reject = (reason: AnswerRejection) => {
+        if (!p.brain) this.emit.toUser(p.player.userId!, 'game:rejected', { index, reason });
+      };
+      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      if (!Number.isInteger(choice) || choice < 0 || choice > 3) return;
+      if (p.removed.includes(choice)) return reject('removed');
+      const limit = this.setup.timeMs + p.extraMs;
+      const elapsed = this.elapsed();
+      if (elapsed > limit + GRACE_MS) return reject('late');
 
-    const q = this.questions[this.index];
-    if (p.retryArmed && p.firstWrong === null && choice !== q.answer) {
-      // "Втори шанс": the first miss isn't final.
-      p.firstWrong = choice;
-      p.removed = [...p.removed, choice];
-      this.emit.toUser(p.player.userId!, 'game:retry', { wrong: choice });
-      return;
-    }
-    p.answer = { choice, timeMs: Math.min(elapsed, limit), retried: p.firstWrong !== null };
-    this.toGame('game:answered', { playerId });
-    this.maybeRevealEarly();
+      const q = this.questions[this.index];
+      if (p.retryArmed && p.firstWrong === null && choice !== q.answer) {
+        // "Втори шанс": the first miss isn't final.
+        p.firstWrong = choice;
+        p.removed = [...p.removed, choice];
+        this.emit.toUser(p.player.userId!, 'game:retry', { wrong: choice });
+        return;
+      }
+      p.answer = { choice, timeMs: Math.min(elapsed, limit), retried: p.firstWrong !== null };
+      this.toGame('game:answered', { playerId });
+      this.maybeRevealEarly();
+    });
   }
 
   usePowerup(playerId: string, index: number, powerup: PowerupId) {
-    const p = this.participants.get(playerId);
-    if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p) || p.answer) return;
-    if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
-    const userId = p.player.userId!;
-    const q = this.questions[this.index];
-    if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || this.phase !== 'question' || index !== this.index || !this.isActive(p) || p.answer) return;
+      if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
+      const userId = p.player.userId!;
+      const q = this.questions[this.index];
+      if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
-    this.consume(p, powerup);
-    switch (powerup) {
-      case 'fifty':
-        p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i))).slice(0, 2);
-        // A bot has nobody to tell which ones went; the others only see that it was played.
-        if (p.brain) this.toGame('game:powerup', { playerId, powerup });
-        else {
-          this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
+      this.consume(p, powerup);
+      switch (powerup) {
+        case 'fifty':
+          p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i))).slice(0, 2);
+          // A bot has nobody to tell which ones went; the others only see that it was played.
+          if (p.brain) this.toGame('game:powerup', { playerId, powerup });
+          else {
+            this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
+            this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
+          }
+          break;
+        case 'double':
+          p.doubled = true;
+          this.toGame('game:powerup', { playerId, powerup });
+          break;
+        case 'retry':
+          p.retryArmed = true;
+          this.toGame('game:powerup', { playerId, powerup });
+          break;
+        case 'time':
+          p.extraMs = TIME_BONUS_MS;
+          this.emit.toUser(userId, 'game:powerup', { playerId, powerup, extraMs: TIME_BONUS_MS });
           this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
-        }
-        break;
-      case 'double':
-        p.doubled = true;
-        this.toGame('game:powerup', { playerId, powerup });
-        break;
-      case 'retry':
-        p.retryArmed = true;
-        this.toGame('game:powerup', { playerId, powerup });
-        break;
-      case 'time':
-        p.extraMs = TIME_BONUS_MS;
-        this.emit.toUser(userId, 'game:powerup', { playerId, powerup, extraMs: TIME_BONUS_MS });
-        this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
-        this.rescheduleQuestionTimer();
-        break;
-    }
+          this.rescheduleQuestionTimer();
+          break;
+      }
+    });
   }
 
   /**
@@ -300,6 +310,8 @@ export class Game {
    * question on screen (nobody else is waiting); the next question then waits for resume(), or FACT_HOLD_MS.
    */
   hold(playerId: string, index: number): boolean {
+    // Not while the server drains: stopping on fact after fact would keep the run going until it's cut short.
+    if (this.hooks.draining()) return false;
     if (!this.alone || this.phase !== 'reveal' || index !== this.index || this.reading) return false;
     if (!this.participants.has(playerId) || !this.questions[this.index]?.fact) return false;
     const seq = ++this.readingSeq;
@@ -310,11 +322,13 @@ export class Game {
 
   /** On with the run after a fact (or after FACT_HOLD_MS: `seq` says which stop the timer was for). */
   resume(playerId: string, seq = this.reading) {
-    if (!this.reading || seq !== this.reading || !this.participants.has(playerId)) return;
-    this.reading = 0;
-    if (!this.waitingForReader) return;
-    this.waitingForReader = false;
-    this.advance();
+    this.guard(() => {
+      if (!this.reading || seq !== this.reading || !this.participants.has(playerId)) return;
+      this.reading = 0;
+      if (!this.waitingForReader) return;
+      this.waitingForReader = false;
+      this.advance();
+    });
   }
 
   react(playerId: string, emote: string) {
@@ -327,44 +341,48 @@ export class Game {
   }
 
   leave(playerId: string) {
-    const p = this.participants.get(playerId);
-    if (!p || p.left || this.phase === 'ended') return;
-    p.left = true;
-    p.leftOrder = ++this.leaves;
-    p.connected = false;
-    this.toGame('game:presence', { playerId, connected: false, left: true });
-    if (this.decided()) this.endedByWalkout = true;
-    if (this.humans.every((h) => h.left) || this.decided()) return this.end();
-    this.maybeRevealEarly();
-    this.checkAbandoned();
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || p.left || this.phase === 'ended') return;
+      p.left = true;
+      p.leftOrder = ++this.leaves;
+      p.connected = false;
+      this.toGame('game:presence', { playerId, connected: false, left: true });
+      if (this.decided()) this.endedByWalkout = true;
+      if (this.humans.every((h) => h.left) || this.decided()) return this.end();
+      this.maybeRevealEarly();
+      this.checkAbandoned();
+    });
   }
 
   setConnected(playerId: string, connected: boolean) {
-    const p = this.participants.get(playerId);
-    if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
-    p.connected = connected;
-    p.disconnectedAt = connected ? null : gameClock.now();
-    // Someone who dropped isn't reading: the disconnect hold takes over (and a fresh tab knows nothing of the stop).
-    if (!connected && this.reading) {
-      this.reading = 0;
-      if (this.waitingForReader) {
-        this.waitingForReader = false;
-        this.advance();
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || p.left || p.connected === connected || this.phase === 'ended') return;
+      p.connected = connected;
+      p.disconnectedAt = connected ? null : gameClock.now();
+      // Someone who dropped isn't reading: the disconnect hold takes over (and a fresh tab knows nothing of the stop).
+      if (!connected && this.reading) {
+        this.reading = 0;
+        if (this.waitingForReader) {
+          this.waitingForReader = false;
+          this.advance();
+        }
       }
-    }
-    this.toGame('game:presence', { playerId, connected, left: false });
-    if (connected && this.abandonTimer) {
-      clearTimeout(this.abandonTimer);
-      this.abandonTimer = null;
-    }
-    if (connected && this.held) {
-      this.held = false;
-      this.later(RESUME_MS, () => this.advance());
-    }
-    if (!connected) {
-      this.later(DISCONNECT_GRACE_MS + 50, () => this.maybeRevealEarly());
-      this.checkAbandoned();
-    }
+      this.toGame('game:presence', { playerId, connected, left: false });
+      if (connected && this.abandonTimer) {
+        clearTimeout(this.abandonTimer);
+        this.abandonTimer = null;
+      }
+      if (connected && this.held) {
+        this.held = false;
+        this.later(RESUME_MS, () => this.advance());
+      }
+      if (!connected) {
+        this.later(DISCONNECT_GRACE_MS + 50, () => this.maybeRevealEarly());
+        this.checkAbandoned();
+      }
+    });
   }
 
   /**
@@ -400,16 +418,34 @@ export class Game {
    * was played: giving it back would let anyone close the tab when an update is announced and replay the same ten
    * questions, knowing some answers. Someone actually playing isn't held: the drain waits for them.
    */
-  endForDrain() {
-    if (this.index < 0) return this.stop();
+  endForDrain(): void {
+    if (this.index < 0) {
+      this.stop();
+      return;
+    }
     this.guard(() => this.finishUnattended());
+  }
+
+  /** The server starts draining: a run held for its absent player ends now, and one stopped on a fact goes on. */
+  drain() {
+    if (this.held) return this.endForDrain();
+    if (!this.reading) return;
+    this.reading = 0;
+    if (!this.waitingForReader) return;
+    this.waitingForReader = false;
+    this.guard(() => this.advance());
   }
 
   /**
    * The server is stopping and can't wait any longer: the match ends here, and the scores so far count (unrated: we cut
-   * it, not the players). A run played alone gets its attempt back instead.
+   * it, not the players). A daily or challenge-link run ends with what was played once a question was shown (giving it
+   * back would mean a replay knowing answers); before that it was no attempt, and the player gets it back.
    */
-  stop() {
+  stop(): void {
+    if (this.index >= 0 && (this.setup.dailyDay || this.setup.challengeId)) {
+      this.endForDrain();
+      return;
+    }
     this.cutShort = true;
     this.guard(() => this.end());
   }
@@ -551,6 +587,15 @@ export class Game {
       const loser = active[active.length - 1];
       loser.eliminatedAt = questionNo;
       eliminated.push(loser.player.id);
+    }
+
+    // A one-attempt run keeps its score so far before the answer goes out: cut short from here on, that score stands.
+    if (this.setup.dailyDay || this.setup.challengeId) {
+      try {
+        this.hooks.progress(this);
+      } catch (err) {
+        void reportError(err, 'save run progress', { extra: { match: this.id } });
+      }
     }
 
     const nextInMs = REVEAL_MS + (eliminated.length ? ELIMINATION_EXTRA_MS : 0);
@@ -843,7 +888,7 @@ export class Game {
       difficulty: q.difficulty,
       q: q.q,
       options: q.options,
-      author: q.author ?? null,
+      author: questionAuthor(q.id),
       durationMs: this.setup.timeMs,
       remainingMs: Math.max(0, this.setup.timeMs - this.elapsed()),
       readMs: this.readMs,

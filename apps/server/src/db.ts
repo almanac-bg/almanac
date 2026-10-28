@@ -455,6 +455,20 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ) WITHOUT ROWID;
     `,
   },
+
+  // v18, from the full review:
+  // - `revealed`: how many of a daily or challenge-link run's questions have been revealed, saved with the score so
+  //   far at each reveal. A run a crash cut short is the player's again only if nothing was revealed; otherwise it
+  //   ends with the score so far (replaying it would mean knowing answers). Older code leaves it at 0: the old rule.
+  // - `challenge_results_board`: a link's board, best first, without reading every run on it.
+  {
+    compatible: `
+    ALTER TABLE daily_results ADD COLUMN revealed INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE challenge_results ADD COLUMN revealed INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX challenge_results_board ON challenge_results(challenge_id, score DESC, time_ms, finished_at)
+      WHERE finished_at IS NOT NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
@@ -595,7 +609,10 @@ export function afterCommit(fn: () => void) {
  */
 export function tx<T>(fn: () => T): T {
   if (txDepth > 0) return savepoint(fn);
-  db.exec('BEGIN');
+  // IMMEDIATE: the write lock is taken up front, waiting out busy_timeout if Litestream (or the admin command line)
+  // holds it. A plain BEGIN that reads first and writes later fails at once instead, with no wait, whenever another
+  // connection wrote in between.
+  db.exec('BEGIN IMMEDIATE');
   txDepth++;
   let committed = false;
   try {

@@ -90,6 +90,18 @@ function watchLink(s: GameSocket) {
 
 function bind(s: GameSocket) {
   watchLink(s);
+  // Back online, or back on a tab that was asleep (a locked phone): try again at once. Left to itself, Socket.IO waits
+  // out its own back-off first (14 s in Chrome and Safari), and in Firefox it never came back after a lost network
+  // until the page was reloaded. Not after signing out: that socket was closed on purpose (`active` is false).
+  if (typeof window !== 'undefined') {
+    const retry = () => {
+      if (!s.connected && s.active) s.disconnect().connect();
+    };
+    window.addEventListener('online', retry);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') retry();
+    });
+  }
   s.on('connect', () => {
     crowded = false;
     const { game } = getState();

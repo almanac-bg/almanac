@@ -10,20 +10,33 @@ import { config } from './config';
 import { db } from './db';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
-import { questionBank } from './questions';
+import { bankProblem, questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
-import { securityHeaders } from './security';
+import { sameSiteWrites, securityHeaders } from './security';
 import { siteInfo } from './site';
 import { network, throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
+
+// The last stop wrote that it was clean (shutdown below). Without that, the process was killed: out of memory, a
+// crash Node couldn't report, a host reboot. Running matches vanished with it, and nothing else would say so.
+{
+  const clean = db.prepare("SELECT value FROM settings WHERE key = 'clean_shutdown'").get();
+  const alive = db.prepare("SELECT value FROM settings WHERE key = 'alive_at'").get() as { value: string } | undefined;
+  if (clean) db.prepare("DELETE FROM settings WHERE key = 'clean_shutdown'").run();
+  else if (alive)
+    void reportError(new Error('The server restarted without a clean shutdown'), 'unclean restart', {
+      extra: { lastAliveAt: new Date(Number(alive.value)).toISOString() },
+    });
+}
 
 const app = express();
 app.disable('x-powered-by');
 // Behind a reverse proxy (Caddy in Docker) this must trust it, or every visitor shares the proxy's IP.
 app.set('trust proxy', config.trustProxy);
 app.use(securityHeaders);
+app.use('/api', sameSiteWrites);
 app.use(express.json({ limit: '20kb' }));
 /** Below this much free space on the database's disk, writes are about to start failing (and backups with them). */
 const MIN_FREE_DISK = 256 * 1024 * 1024;
@@ -44,6 +57,11 @@ app.get('/api/health', (_req, res) => {
     db.prepare('SELECT 1').get();
   } catch {
     res.status(503).json({ ok: false, problem: 'database' });
+    return;
+  }
+  // The bank on disk can't be loaded: matches go on with the one loaded before, but a restart would fail.
+  if (bankProblem()) {
+    res.status(503).json({ ok: false, problem: 'questions' });
     return;
   }
   const free = freeDisk();
@@ -360,6 +378,9 @@ async function shutdown(signal: string) {
   realtime.io.close();
   // A backup being copied finishes first: closing the database under it would only fail it.
   await stopMaintenance();
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES ('clean_shutdown', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+  ).run(String(Date.now()));
   server.close(() => {
     db.close();
     process.exit(0);

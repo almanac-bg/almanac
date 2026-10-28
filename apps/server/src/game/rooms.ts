@@ -17,7 +17,7 @@ import { publicUser } from '../users';
 import { type Bot, makeBots } from './bots';
 import type { Game } from './Game';
 import type { IO, IOSocket } from './io';
-import { averageOf, buildHuman, type GameRegistry } from './registry';
+import { averageOf, buildHuman, type GameRegistry, startFailure } from './registry';
 
 /** Lobby members who drop (e.g. a page refresh) keep their seat this long. */
 const RECONNECT_GRACE_MS = 20_000;
@@ -246,7 +246,7 @@ export class RoomManager {
         bots: room.bots.map((b) => ({ ...b, player: { ...b.player, team: teamOf(b.player.id) } })),
       });
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Играта не можа да започне.' };
+      return { ok: false, error: startFailure(err) };
     }
     this.broadcast(room);
     return { ok: true };

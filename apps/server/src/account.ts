@@ -176,8 +176,9 @@ export async function deleteAccount(
   // A guest has no password: being signed in on this device is the proof.
   if (!user.is_guest && !(await verifyPassword(password, user.password_hash)))
     return { ok: false, error: 'Грешна парола.' };
+  const authored = one('SELECT 1 AS x FROM questions WHERE author_id = ? LIMIT 1', userId);
   eraseAccount(userId);
-  reloadQuestionBank(); // approved questions stop showing their name
+  if (authored) reloadQuestionBank(); // their approved questions stop showing their name
   return { ok: true };
 }
 
