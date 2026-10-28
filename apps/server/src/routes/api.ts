@@ -18,6 +18,7 @@ import express, { type NextFunction, type Request, type Response, Router } from 
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
+import { playCheck } from '../answers';
 import {
   confirmSession,
   createSession,
@@ -761,6 +762,10 @@ api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
 
 api.get('/admin/stats', requireAuth, requireAdmin, (_req, res) => {
   res.json(launchStats());
+});
+
+api.get('/admin/play-check', requireAuth, requireAdmin, (_req, res) => {
+  res.json(playCheck());
 });
 
 api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {

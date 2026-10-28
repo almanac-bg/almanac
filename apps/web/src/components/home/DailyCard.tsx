@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { ownDailyLine } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
 import { Avatar } from '../Avatar';
@@ -83,7 +84,9 @@ export function DailyCard({ className }: { className?: string }) {
           </div>
           {/* The soft hyphen is for 320 px phones; wider, the long word just goes to the next line. */}
           <h2 className="mt-3 t-card md:[hyphens:none] lg:text-2xl">{DAILY_TITLE}</h2>
-          <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
+          <p className="mt-1 text-sm text-fg-2">
+            {info?.ownSet ? 'Днес — 10 въпроса само за теб. Един опит.' : MODES.daily.tagline}
+          </p>
 
           <div className="mt-auto pt-5">
             {failed ? (
@@ -103,9 +106,7 @@ export function DailyCard({ className }: { className?: string }) {
                     )}
                   </div>
                   {info.played.rank === null && (
-                    <p className="mt-1 max-w-64 text-xs text-fg-3">
-                      Като гост играеш свои въпроси. С профил — общите и класацията.
-                    </p>
+                    <p className="mt-1 max-w-64 text-xs text-fg-3">{ownDailyLine(me.isGuest)}</p>
                   )}
                 </div>
                 <div className="ml-auto flex gap-2">
@@ -124,9 +125,12 @@ export function DailyCard({ className }: { className?: string }) {
                 Днешният опит е използван. Ново предизвикателство след {countdown(info.endsAt - now)}.
               </p>
             ) : (
-              <Button variant="gold" size="lg" onClick={play} loading={busy}>
-                Играй днешното <ArrowRight className="size-5" />
-              </Button>
+              <>
+                <Button variant="gold" size="lg" onClick={play} loading={busy}>
+                  Играй днешното <ArrowRight className="size-5" />
+                </Button>
+                {info.ownSet && <p className="mt-2 max-w-80 text-xs text-fg-3">{ownDailyLine(me.isGuest)}</p>}
+              </>
             )}
             {info && !failed && <AmongFriends friends={info.friends} meId={me.id} />}
             {info && !failed && !info.attempted && (
@@ -164,10 +168,12 @@ export function DailyCard({ className }: { className?: string }) {
                   </li>
                 ))}
               </ol>
-            ) : me.isGuest ? (
-              // A guest who just played would otherwise read "nobody has played today" beside their own score.
+            ) : info.ownSet ? (
+              // Off the board today: "nobody has played today" beside their own score would be wrong.
               <p className="py-4 text-center text-sm text-fg-3">
-                Класацията на деня е за играчи с профил. Запази прогреса и играеш общите въпроси още днес.
+                {me.isGuest
+                  ? 'Класацията на деня е за играчи с профил.'
+                  : 'Класацията на деня се отваря за новия ти профил от утре.'}
               </p>
             ) : (
               <p className="py-4 text-center text-sm text-fg-3">Още никой не е играл днес. Започни класацията!</p>

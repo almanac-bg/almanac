@@ -14,7 +14,7 @@ type Result = { ok: true } | { ok: false; error: string };
 const REASONS = new Set<string>(QUESTION_REPORT_REASONS.map((r) => r.id));
 const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ?', id);
 
-function info(q: Question): QuestionInfo {
+export function questionInfo(q: Question): QuestionInfo {
   return {
     id: q.id,
     category: q.category,
@@ -66,7 +66,7 @@ export function openQuestionReports(): QuestionReportGroup[] {
   for (const r of rows) {
     const q = questionById(r.question_id);
     if (!q) continue; // a community question that no longer exists
-    const group = groups.get(r.question_id) ?? { question: info(q), reports: [] };
+    const group = groups.get(r.question_id) ?? { question: questionInfo(q), reports: [] };
     group.reports.push({
       id: r.id,
       reason: r.reason,
@@ -110,7 +110,7 @@ export function hiddenQuestions(): QuestionInfo[] {
   return all<{ question_id: string }>('SELECT question_id FROM hidden_questions ORDER BY hidden_at DESC')
     .map((r) => questionById(r.question_id))
     .filter((q): q is Question => !!q)
-    .map(info);
+    .map(questionInfo);
 }
 
 export function unhideQuestion(questionId: string): Result {

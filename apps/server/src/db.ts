@@ -412,6 +412,49 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
   // v16: when the session last proved it knows the password (signing in, or confirming it again): what an admin
   // changes needs a recent one. Older code leaves it empty, which only means "confirm again".
   { compatible: 'ALTER TABLE sessions ADD COLUMN confirmed_at INTEGER;' },
+
+  // v17, from the adversarial review:
+  // - `won`: the match counted as a win (not one the other side walked out of before it got going). Older code leaves it
+  //   empty; repair() fills it in the old way.
+  // - `reward_peak`: the season's peak from its 10th game on (SEASON_MIN_GAMES), which the season's reward goes by: a
+  //   peak from the first few games, or from the carry-over, isn't a season. Older code leaves it as it was.
+  // - `own_set`: the daily run was on questions of its own (a guest's, or an account's made that day), off the board.
+  // - `room_xp`: what private-room placements paid that day, against a daily cap.
+  // - `answers`: every answer each person gave, kept ANSWER_LOG_DAYS to spot play no person could manage;
+  //   `question_stats`: totals per question, kept, for how hard each question really is and which may be wrong.
+  {
+    compatible: `
+    ALTER TABLE match_players ADD COLUMN won INTEGER;
+    UPDATE match_players SET won = (placement = 1 AND left_match = 0
+      AND (SELECT player_count FROM matches m WHERE m.id = match_id) > 1);
+    CREATE INDEX match_players_unsettled ON match_players(match_id) WHERE won IS NULL;
+    ALTER TABLE season_ratings ADD COLUMN reward_peak REAL;
+    UPDATE season_ratings SET reward_peak = peak WHERE games >= 10;
+    ALTER TABLE daily_results ADD COLUMN own_set INTEGER;
+    UPDATE daily_results SET own_set = (SELECT is_guest FROM users u WHERE u.id = user_id);
+    ALTER TABLE users ADD COLUMN room_xp_day TEXT;
+    ALTER TABLE users ADD COLUMN room_xp INTEGER NOT NULL DEFAULT 0;
+
+    CREATE TABLE answers (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      match_id TEXT NOT NULL,
+      question_id TEXT NOT NULL,
+      difficulty TEXT NOT NULL,
+      correct INTEGER NOT NULL,
+      time_ms INTEGER,
+      answered_at INTEGER NOT NULL
+    );
+    CREATE INDEX answers_user ON answers(user_id, answered_at);
+    CREATE INDEX answers_age ON answers(answered_at);
+
+    CREATE TABLE question_stats (
+      question_id TEXT PRIMARY KEY,
+      answered INTEGER NOT NULL DEFAULT 0,
+      correct INTEGER NOT NULL DEFAULT 0,
+      correct_ms INTEGER NOT NULL DEFAULT 0
+    ) WITHOUT ROWID;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
@@ -495,6 +538,9 @@ function repair() {
     id: number;
     username: string;
   }[];
+  // Wins older code saved while it ran on this database: counted the old way (the stayer of a no contest included).
+  db.exec(`UPDATE match_players SET won = (placement = 1 AND left_match = 0
+    AND (SELECT player_count FROM matches m WHERE m.id = match_id) > 1) WHERE won IS NULL`);
   if (!unshaped.length) return;
   const update = db.prepare('UPDATE users SET username_shape = ? WHERE id = ?');
   tx(() => {

@@ -1,8 +1,8 @@
 import { actions, type LiveGame } from '@quiz/client';
 import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
-import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * A key per коз, where there's a keyboard: left to right as in the bar, under 1–4 for the answers. Matched by the key's
@@ -41,16 +41,16 @@ function readExplained(): string[] {
 
 /**
  * Which of `ids` this player hasn't read about yet (on this device): fixed when the screen opens, and remembered as
- * read once they've been on it `readMs`. Shown where there's time to read (waiting for players, the countdown), never
- * under the clock.
+ * read once they've been on it `readMs` — only where the whole explanation is on screen with time to read it (waiting
+ * for players, the category picker, a room); `null` never remembers (the countdown, which only names them).
  */
-export function useNewPowerups(ids: readonly PowerupId[], readMs = 3000): PowerupDef[] {
+export function useNewPowerups(ids: readonly PowerupId[], readMs: number | null): PowerupDef[] {
   const [fresh] = useState(() => {
     const explained = readExplained();
     return POWERUPS.filter((p) => ids.includes(p.id) && !explained.includes(p.id));
   });
   useEffect(() => {
-    if (!fresh.length) return;
+    if (!fresh.length || readMs === null) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem(
@@ -65,6 +65,31 @@ export function useNewPowerups(ids: readonly PowerupId[], readMs = 3000): Poweru
   }, [fresh, readMs]);
   return fresh;
 }
+
+/**
+ * Every коз this player hasn't read about yet, explained: for a screen with time to read before a match. Read once it
+ * has been on screen a few seconds (not merely on the page, scrolled out of sight).
+ */
+export function FreshPowerupNotes({ className }: { className?: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  const fresh = useNewPowerups(ALL_POWERUPS, inView ? 4000 : null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || inView) return;
+    const watch = new IntersectionObserver(([entry]) => entry.isIntersecting && setInView(true), { threshold: 0.6 });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [inView]);
+  if (!fresh.length) return null;
+  return (
+    <div ref={box} className={className}>
+      <PowerupNotes powerups={fresh} />
+    </div>
+  );
+}
+
+const ALL_POWERUPS = POWERUPS.map((p) => p.id);
 
 /** What new козове do, with their keys: for the wait for players, where there are seconds to read it. */
 export function PowerupNotes({ powerups, className }: { powerups: PowerupDef[]; className?: string }) {
@@ -91,8 +116,8 @@ export function PowerupNotes({ powerups, className }: { powerups: PowerupDef[]; 
 }
 
 /**
- * The same, for a countdown: a glance, not a read. One new коз keeps its description; more get their names (what each
- * does is in "Колекция").
+ * The same, for a countdown: a glance, not a read (so it doesn't count as explained). One new коз keeps its description;
+ * more get their names (what each does is in "Колекция", and on the next screen with time for it).
  */
 export function PowerupNotesLine({ powerups, className }: { powerups: PowerupDef[]; className?: string }) {
   if (!powerups.length) return null;
@@ -131,7 +156,8 @@ function blockedBy(game: LiveGame, p: PowerupDef): string | null {
 /** Chips for козове already working on this question. */
 export function ActivePowerups({ game }: { game: LiveGame }) {
   const chips: string[] = [];
-  if (game.doubled) chips.push('💰 ×2 точки');
+  // The bet's downside stays in view until the answer: "or nothing" is easy to miss under an icon.
+  if (game.doubled) chips.push('💰 ×2 точки · грешка −500');
   if (game.retryArmed && !game.retryPrompt) chips.push('🔁 „Втори шанс“ е активен');
   if (game.extraMs > 0) chips.push(`⏳ +${Math.round(game.extraMs / 1000)} с`);
   if (!chips.length) return null;
@@ -151,13 +177,25 @@ export function ActivePowerups({ game }: { game: LiveGame }) {
   );
 }
 
+/** How long the reason a коз can't be played stays up after tapping it. */
+const BLOCKED_HINT_MS = 2200;
+
 /**
  * The козове, while the question is open. Nothing to read here: what they do was said before the match (and is in
- * "Колекция"); here a tap, or a key.
+ * "Колекция"); here a tap, or a key, and on a phone a word under each icon. Tapping one that can't be played says why
+ * (a touch screen has no hover title to tell).
  */
 export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean }) {
+  const [hint, setHint] = useState<{ id: PowerupId; text: string } | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(hintTimer.current), []);
   if (game.start.powerups.length === 0) return null;
   const powerups = POWERUPS.filter((p) => game.start.powerups.includes(p.id));
+  const explain = (p: PowerupDef, blocked: string) => {
+    clearTimeout(hintTimer.current);
+    setHint({ id: p.id, text: `${p.icon} ${p.name}: ${blocked}` });
+    hintTimer.current = setTimeout(() => setHint(null), BLOCKED_HINT_MS);
+  };
 
   return (
     <motion.div
@@ -168,6 +206,20 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
     >
       <div className="flex flex-wrap items-center gap-2">
         <ActivePowerups game={game} />
+        <AnimatePresence>
+          {hint && (
+            <motion.span
+              key={hint.id}
+              role="status"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="rounded-full border border-line bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2"
+            >
+              {hint.text}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
       {/* Phones (and phones held sideways): one row of icons, so the козове sit on the same screen as the answers. The
           names are in each button's label. */}
@@ -185,13 +237,15 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               key={p.id}
               type="button"
               data-powerup={p.id}
-              disabled={!!blocked || offline}
-              onClick={() => actions.powerup(p.id)}
+              // Not `disabled` when it's only blocked: a tap then says why.
+              disabled={offline || used}
+              aria-disabled={!!blocked || undefined}
+              onClick={() => (blocked ? explain(p, blocked) : actions.powerup(p.id))}
               title={blocked ? `${p.name} — ${blocked}` : `${p.name} (${POWERUP_KEYS[p.id]}): ${p.description}`}
               aria-label={`${p.name}: ${p.description}${blocked ? ` (${blocked})` : ''}`}
               aria-keyshortcuts={POWERUP_KEYS[p.id]}
               className={clsx(
-                'focus-ring relative inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:min-w-10 max-sm:max-w-14 max-sm:flex-1 max-sm:justify-center max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
+                'focus-ring relative inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:h-12 max-sm:min-w-10 max-sm:max-w-16 max-sm:flex-1 max-sm:flex-col max-sm:justify-center max-sm:gap-0.5 max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
                 used
                   ? 'border-line text-fg-3 line-through opacity-50'
                   : blocked
@@ -199,10 +253,13 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
                     : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
               )}
             >
-              <span className="text-base leading-none max-sm:text-lg flat:text-lg" aria-hidden>
+              <span className="text-base leading-none max-sm:text-base flat:text-lg" aria-hidden>
                 {p.icon}
               </span>
               <span className="max-sm:hidden flat:hidden">{p.name}</span>
+              <span aria-hidden className="text-[10px] leading-none font-semibold sm:hidden flat:hidden">
+                {p.short}
+              </span>
               {!used && (
                 <KeyHint className="absolute -top-2 -right-1.5 bg-ink-2 leading-4 max-sm:hidden! flat:hidden!">
                   {POWERUP_KEYS[p.id]}

@@ -1,11 +1,12 @@
 import { fmt, type LiveGame } from '@quiz/client';
 import { MODES } from '@quiz/shared';
 import clsx from 'clsx';
-import { Flame, Volume2, VolumeX, X } from 'lucide-react';
+import { Flame, Skull, Volume2, VolumeX, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { accentFill } from '../../lib/accent';
 import { useCountUp } from '../../lib/hooks';
 import { useMuted } from '../../lib/sound';
+import { nextElimination } from './elimination';
 import { myTeamOf, TeamScoreBar, teamTotals } from './teams';
 
 /** The match screen's top bar: the mode, how far along it is, your score, the sound and the way out. */
@@ -14,6 +15,8 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
   const me = game.standings.find((s) => s.id === game.start.youId);
   const score = useCountUp(me?.score ?? 0);
   const q = game.question;
+  // Phones have no room for the dots that mark the knockouts: the next one, in a word.
+  const knockout = me && me.eliminatedAt === null && !me.left ? nextElimination(game) : null;
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6 flat:h-12">
@@ -61,6 +64,13 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
             <span className="sr-only">
               Въпрос {q.index + 1} от {q.total}
             </span>
+          </span>
+        )}
+        {knockout !== null && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-xs font-bold text-rose-300 tabular-nums sm:hidden">
+            <Skull aria-hidden className="size-3.5" />
+            <span aria-hidden>{knockout}</span>
+            <span className="sr-only">Следващото отпадане е след въпрос {knockout}</span>
           </span>
         )}
         <div className="ml-auto flex items-center gap-2 sm:gap-3">

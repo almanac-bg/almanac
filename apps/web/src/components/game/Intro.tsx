@@ -15,7 +15,7 @@ import { myTeamOf, teamColor } from './teams';
 /** Before the first question: the countdown, and who plays whom. */
 export function Intro({ game }: { game: LiveGame }) {
   // Козове this player meets for the first time: named here, where nothing is ticking yet.
-  const fresh = useNewPowerups(game.start.powerups);
+  const fresh = useNewPowerups(game.start.powerups, null);
   // Once per match (the countdown screen mounts once): the first few matches spell out how points are counted. One
   // note at a time, so the countdown stays on a small phone's screen: new козове first, the scoring waits a match.
   const [scoring] = useState(() => !fresh.length && takeScoringHint());

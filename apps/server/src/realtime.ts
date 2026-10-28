@@ -15,7 +15,7 @@ import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import { challengeQuestions, claimChallengeAttempt, createChallenge, releaseChallengeAttempt } from './challenges';
 import { config } from './config';
-import { claimDailyAttempt, dailyQuestions, guestDailyQuestions, releaseDailyAttempt } from './daily';
+import { claimDailyAttempt, dailyQuestions, ownDailyQuestions, releaseDailyAttempt } from './daily';
 import { friendIds, incomingRequests } from './friends';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
@@ -270,7 +270,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           category: 'mixed',
           elimination: false,
           dailyDay: claim.day,
-          questions: guest() ? guestDailyQuestions(userId) : dailyQuestions(claim.day, userId),
+          questions: claim.ownSet ? ownDailyQuestions(userId) : dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
         });

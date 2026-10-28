@@ -14,12 +14,14 @@ import {
 } from '@quiz/shared';
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
+import { recordAnswers } from '../answers';
 import { recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { advanceQuests } from '../quests';
 import { getRating, recordRating } from '../seasons';
 import { count, countActive } from '../stats';
+import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
 import type { Game, Participant } from './Game';
@@ -33,8 +35,16 @@ const XP = {
   teamWin: 60,
   soloScoreDivisor: 250,
   perfect: 50,
+  /** The perfect-match bonus needs a match this long (as the achievement does): five easy questions are no feat. */
+  perfectFrom: 10,
   daily: 100,
 };
+
+/**
+ * What placements in private rooms (wins, places above others) pay a day, at most: rooms are for friends, and a room
+ * with a second account of your own in it was the fastest XP in the game.
+ */
+export const ROOM_PLACEMENT_XP_PER_DAY = 600;
 
 /** Elo step against people; bots move ratings less (their strength is an estimate). */
 const RATING_K = 40;
@@ -100,8 +110,8 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       const p = game.participants.get(s.id)!;
       run(
         `INSERT INTO match_players (match_id, player_id, user_id, name, avatar, is_bot, placement, score, correct,
-           faced, best_streak, eliminated_at, left_match, rating_delta, team)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           faced, best_streak, eliminated_at, left_match, rating_delta, team, won)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         game.id,
         s.id,
         p.player.userId,
@@ -124,6 +134,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       const p = game.participants.get(s.id)!;
       if (p.player.userId === null) continue;
       const r = rewardHuman(game, p, s, standings, deltas.get(s.id) ?? null, ratings.unrated.get(s.id) ?? null);
+      recordAnswers(game.id, p.player.userId, p.log);
       rewards.set(p.player.userId, r);
       run('UPDATE match_players SET xp_gained = ? WHERE match_id = ? AND player_id = ?', r.xpGained, game.id, s.id);
     }
@@ -158,15 +169,22 @@ function rewardHuman(
   const daily = setup.dailyDay !== null;
   const challenge = setup.challengeId !== null;
   // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
-  // there earns nothing extra (else a room full of bots is an XP farm).
+  // there earns nothing extra (else a room full of bots is an XP farm). Nor does beating someone in a room who didn't
+  // play: a second window that never answers was a win every half a minute.
   const rivals = standings.filter((o) => {
-    const them = game.participants.get(o.id)!.player;
-    return o.id !== s.id && (!setup.roomCode || !them.isBot) && (!setup.teams || them.team !== p.player.team);
+    const them = game.participants.get(o.id)!;
+    return (
+      o.id !== s.id &&
+      (!setup.roomCode || (!them.player.isBot && them.answered * 2 >= them.faced)) &&
+      (!setup.teams || them.player.team !== p.player.team)
+    );
   });
   const beaten = rivals.filter((o) => o.placement > s.placement).length;
   // A private room with nobody else in it is practice: winning there doesn't count as a win (counters, quests,
   // achievements), or one bot in a five-question room would hand them out.
   const realWin = won && (!setup.roomCode || rivals.length > 0);
+  // Before the achievements below: the per-mode wins they count include this one.
+  run('UPDATE match_players SET won = ? WHERE match_id = ? AND player_id = ?', realWin ? 1 : 0, game.id, s.id);
 
   // ── XP ──
   const lines: XpLine[] = [];
@@ -178,22 +196,27 @@ function rewardHuman(
   if (correctXp > 0) lines.push({ label: `Верни отговори (${p.correct})`, amount: correctXp });
   // A win by walkout pays for the part of the match that was played.
   const share = game.playedShare;
+  const placementLine = (label: string, earned: number) => {
+    if (earned <= 0) return;
+    const paid = setup.roomCode ? roomAllowance(userId, earned) : earned;
+    lines.push({ label: paid < earned ? `${label} (дневният таван за стаи)` : label, amount: paid });
+  };
   if (counts && setup.teams) {
-    if (won && rivals.length > 0) lines.push({ label: 'Отборна победа', amount: Math.round(XP.teamWin * share) });
+    if (won && rivals.length > 0) placementLine('Отборна победа', Math.round(XP.teamWin * share));
   } else if (counts && multiplayer) {
     const amount = won
       ? rivals.length
         ? XP.winBase + XP.winPerOpponent * rivals.length
         : 0
       : XP.perOpponentBeaten * beaten;
-    const paid = Math.round(amount * share);
-    if (paid > 0) lines.push({ label: won ? 'Победа' : `${ordinal(s.placement)} място`, amount: paid });
+    placementLine(won ? 'Победа' : `${ordinal(s.placement)} място`, Math.round(amount * share));
   }
   if (counts && (solo || daily || challenge)) {
     const amount = Math.floor(s.score / XP.soloScoreDivisor);
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
-  if (counts && p.faced === game.questions.length && p.correct === game.questions.length) {
+  const full = game.questions.length;
+  if (counts && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
     lines.push({ label: 'Перфектен мач', amount: XP.perfect });
   }
   const today = dayKey();
@@ -206,7 +229,9 @@ function rewardHuman(
   // ── Daily challenge (recorded even after leaving: one attempt per day) ──
   let dailyResult: MatchRewards['daily'] = null;
   if (daily) {
-    dailyResult = recordDailyResult(userId, setup.dailyDay!, s.score, p.correct, p.answerMs);
+    // A day played is half the run or more: leaving at once uses the day's attempt but doesn't keep a streak alive.
+    const played = p.faced * 2 >= game.questions.length;
+    dailyResult = recordDailyResult(userId, setup.dailyDay!, s.score, p.correct, p.answerMs, played);
     if (!left) {
       lines.push({ label: 'Дневно предизвикателство', amount: DAILY_XP.complete });
       const streakBonus = Math.min(dailyResult.streak, DAILY_XP.streakCap) * DAILY_XP.perStreakDay;
@@ -278,19 +303,21 @@ function rewardHuman(
   let rating: MatchRewards['rating'] = null;
   if (ratingDelta !== null && isQueueMode(setup.mode)) {
     const old = getRating(userId, setup.mode);
-    recordRating(userId, setup.mode, old + ratingDelta, won);
+    recordRating(userId, setup.mode, old + ratingDelta, won, counts);
     rating = { before: Math.round(old), after: Math.round(old + ratingDelta) };
   }
 
   // ── Achievements ──
   const topScore = Math.max(...standings.map((x) => x.score));
   const runnerUp = setup.teams ? null : standings.find((x) => x.placement === 2);
+  const sideSize = (team: number) => [...game.participants.values()].filter((x) => x.player.team === team).length;
   const match: MatchContext = {
     mode: setup.mode,
     won: realWin,
     left: !counts,
     completed: !game.endedByWalkout,
     teams: setup.teams,
+    twoAside: setup.teams && sideSize(0) >= 2 && sideSize(1) >= 2,
     elimination: setup.elimination,
     fastestHardCorrectMs: p.fastestHardCorrectMs,
     questions: game.questions.length,
@@ -328,6 +355,19 @@ function rewardHuman(
   };
 }
 
+/**
+ * The XP a private-room placement may still pay today (ROOM_PLACEMENT_XP_PER_DAY), booked as paid. Call inside the
+ * match's transaction.
+ */
+function roomAllowance(userId: number, earned: number): number {
+  const today = dayKey();
+  const u = getUser(userId)!;
+  const used = u.room_xp_day === today ? u.room_xp : 0;
+  const paid = Math.max(0, Math.min(earned, ROOM_PLACEMENT_XP_PER_DAY - used));
+  run('UPDATE users SET room_xp_day = ?, room_xp = ? WHERE id = ?', today, used + paid, userId);
+  return paid;
+}
+
 const ratingOf = (game: Game, id: string) => game.participants.get(id)!.player.rating ?? START_RATING;
 
 /**
@@ -355,20 +395,41 @@ function overplayedPairs(game: Game): Set<string> {
   return pairs;
 }
 
-/** Players of this match who are guests: they play people unrated (a guest is one click away, so any per-account guard
- * would be void), though bots still rate them. */
-function guestsIn(game: Game): Set<number> {
-  return new Set(game.humans.map((h) => h.player.userId!).filter((id) => getUser(id)?.is_guest === 1));
+/**
+ * Players of this match who don't move people's ratings yet: guests (one click away, so any per-account guard would be
+ * void) and accounts too new to (ratesPeople). Bots still rate them.
+ */
+function unprovenIn(game: Game): Map<number, 'guest' | 'new'> {
+  const unproven = new Map<number, 'guest' | 'new'>();
+  for (const h of game.humans) {
+    const user = getUser(h.player.userId!);
+    if (!user) continue;
+    if (user.is_guest === 1) unproven.set(user.id, 'guest');
+    else if (!ratesPeople(user)) unproven.set(user.id, 'new');
+  }
+  return unproven;
 }
 
+/** Why `me` and `them` (both people) don't rate each other, if they don't: a guest first, then whose account is new. */
+function unprovenReason(unproven: Map<number, 'guest' | 'new'>, me: number, them: number): UnratedReason | null {
+  const mine = unproven.get(me);
+  const theirs = unproven.get(them);
+  if (mine === 'guest' || theirs === 'guest') return 'guest';
+  return mine ? 'new' : theirs ? 'new_rival' : null;
+}
+
+/** A match the other side walked out of moves the rating of whoever stayed by the share that was played. */
+const walkoutShare = (game: Game, p: Participant) => (game.endedByWalkout && !game.forfeited(p) ? game.playedShare : 1);
+
 /**
- * Multiplayer Elo: every pair of players is treated as a head-to-head result. A pair is skipped when either of them is a
- * guest or the two already played their rated games today; when the match is a no contest, only whoever walked out
- * moves (down).
+ * Multiplayer Elo: every pair of players is treated as a head-to-head result. A pair of people is skipped when either
+ * is a guest or a new account, or the two already played their rated games today; when the match is a no contest, only
+ * whoever walked out moves (down). A later walkout pays whoever stayed for the part that was played (with an
+ * accomplice who leaves at the fourth question, a win took twenty seconds).
  */
 function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
   const overplayed = overplayedPairs(game);
-  const guests = guestsIn(game);
+  const unproven = unprovenIn(game);
   const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
   const ratings: Ratings = { deltas: new Map(), unrated: new Map() };
   for (const me of standings) {
@@ -390,8 +451,9 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
     for (const other of standings) {
       if (other.id === me.id) continue;
       const them = game.participants.get(other.id)!.player;
-      if (them.userId !== null && (guests.has(myUserId) || guests.has(them.userId))) {
-        skipped = 'guest';
+      const unprovenPair = them.userId === null ? null : unprovenReason(unproven, myUserId, them.userId);
+      if (unprovenPair) {
+        skipped = unprovenPair;
         continue;
       }
       if (them.userId !== null && overplayed.has(pairKey(myUserId, them.userId))) {
@@ -404,25 +466,21 @@ function ratingDeltas(game: Game, standings: FinalStanding[]): Ratings {
       rated++;
     }
     if (rated === 0 && skipped) ratings.unrated.set(me.id, skipped);
-    else ratings.deltas.set(me.id, sum / (standings.length - 1));
+    else ratings.deltas.set(me.id, (sum / (standings.length - 1)) * walkoutShare(game, mine));
   }
   return ratings;
 }
 
 /**
- * Team Elo: your team's average rating against theirs; everyone on a team moves together. A guest playing with or
- * against other people makes the match unrated for all.
+ * Team Elo: your team's average rating against theirs; everyone on a team moves together. A guest or a new account
+ * playing with or against other people makes the match unrated for all.
  */
 function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
   const ratings: Ratings = { deltas: new Map(), unrated: new Map() };
   const humans = standings.filter((s) => game.participants.get(s.id)!.player.userId !== null);
-  const reason: UnratedReason | null = game.noContest
-    ? 'no_contest'
-    : game.cutShort
-      ? 'cut'
-      : humans.length > 1 && guestsIn(game).size > 0
-        ? 'guest'
-        : null;
+  const unproven = humans.length > 1 ? unprovenIn(game) : new Map<number, 'guest' | 'new'>();
+  const anyGuest = [...unproven.values()].includes('guest');
+  const matchReason: UnratedReason | null = game.noContest ? 'no_contest' : game.cutShort ? 'cut' : null;
   const avg = (team: number) => {
     const members = standings.filter((s) => game.participants.get(s.id)!.player.team === team);
     return members.reduce((sum, s) => sum + ratingOf(game, s.id), 0) / Math.max(1, members.length);
@@ -430,13 +488,24 @@ function teamRatingDeltas(game: Game, standings: FinalStanding[]): Ratings {
   for (const s of humans) {
     const p = game.participants.get(s.id)!;
     if (p.player.team === null) continue;
-    if (reason && !((reason === 'no_contest' || reason === 'cut') && game.forfeited(p))) {
-      ratings.unrated.set(s.id, reason);
+    if (matchReason && !game.forfeited(p)) {
+      ratings.unrated.set(s.id, matchReason);
+      continue;
+    }
+    const newcomers: UnratedReason | null = anyGuest
+      ? 'guest'
+      : unproven.has(p.player.userId!)
+        ? 'new'
+        : unproven.size
+          ? 'new_rival'
+          : null;
+    if (newcomers) {
+      ratings.unrated.set(s.id, newcomers);
       continue;
     }
     const expected = 1 / (1 + 10 ** ((avg(1 - p.player.team) - avg(p.player.team)) / 400));
     const k = standings.some((o) => game.participants.get(o.id)!.player.isBot) ? botK(ratingOf(game, s.id)) : RATING_K;
-    ratings.deltas.set(s.id, k * ((s.placement === 1 ? 1 : 0) - expected));
+    ratings.deltas.set(s.id, k * ((s.placement === 1 ? 1 : 0) - expected) * walkoutShare(game, p));
   }
   return ratings;
 }

@@ -62,8 +62,6 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
   const { target, reports } = group;
   const [mode, setMode] = useState<'idle' | 'rename' | 'ban'>('idle');
   const [name, setName] = useState('');
-  const [days, setDays] = useState('7');
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function decide(decision: ModerationAction, message: string) {
@@ -142,35 +140,11 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
           </form>
         )}
         {mode === 'ban' && (
-          <form
-            className="mt-4 space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void decide(
-                { action: 'ban', days: days === 'forever' ? null : Number(days), reason },
-                days === 'forever'
-                  ? 'Профилът е спрян завинаги'
-                  : `Профилът е спрян за ${BAN_OPTIONS.find((o) => o.value === days)!.label}`,
-              );
-            }}
-          >
-            <Segmented value={days} onChange={setDays} options={BAN_OPTIONS} />
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Причина (играчът ще я види при вход)"
-              maxLength={200}
-              className="field h-10 w-full rounded-xl px-3 text-sm"
-            />
-            <div className="flex gap-2">
-              <Button size="sm" variant="danger" type="submit" loading={busy}>
-                <Ban className="size-4" /> Спри профила
-              </Button>
-              <Button size="sm" variant="ghost" type="button" onClick={() => setMode('idle')}>
-                Отказ
-              </Button>
-            </div>
-          </form>
+          <BanForm
+            busy={busy}
+            onBan={(decision, message) => void decide(decision, message)}
+            onCancel={() => setMode('idle')}
+          />
         )}
         {mode === 'idle' && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -197,5 +171,50 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
         )}
       </Card>
     </motion.div>
+  );
+}
+
+/** How long, and why: the decision to stop a profile (from a report, or from the answer log's check). */
+export function BanForm({
+  busy,
+  onBan,
+  onCancel,
+}: {
+  busy: boolean;
+  onBan: (decision: Extract<ModerationAction, { action: 'ban' }>, message: string) => void;
+  onCancel: () => void;
+}) {
+  const [days, setDays] = useState('7');
+  const [reason, setReason] = useState('');
+  return (
+    <form
+      className="mt-4 space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onBan(
+          { action: 'ban', days: days === 'forever' ? null : Number(days), reason },
+          days === 'forever'
+            ? 'Профилът е спрян завинаги'
+            : `Профилът е спрян за ${BAN_OPTIONS.find((o) => o.value === days)!.label}`,
+        );
+      }}
+    >
+      <Segmented value={days} onChange={setDays} options={BAN_OPTIONS} />
+      <input
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Причина (играчът ще я види при вход)"
+        maxLength={200}
+        className="field h-10 w-full rounded-xl px-3 text-sm"
+      />
+      <div className="flex gap-2">
+        <Button size="sm" variant="danger" type="submit" loading={busy}>
+          <Ban className="size-4" /> Спри профила
+        </Button>
+        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
+          Отказ
+        </Button>
+      </div>
+    </form>
   );
 }

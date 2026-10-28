@@ -64,7 +64,10 @@ test('a daily attempt cut short by a crash can be played again', T, async () => 
     second = await startServer({ DB_PATH: first.dbPath });
     const again = connect(second.url, A.cookie);
     await connected(again);
+    const retried = next(again, 'game:question');
     assert.ok((await emitAck(again, 'daily:start')).ok, 'the attempt died with the old process, so it is not lost');
+    // Walked out once the first question is on screen (before it, nothing was played: the attempt would come back).
+    await retried;
     again.emit('game:leave');
     await sleep(200);
     assert.equal((await emitAck(again, 'daily:start')).ok, false, 'walking out of the retry still uses it up');

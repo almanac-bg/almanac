@@ -5,6 +5,7 @@ import {
   levelProgress,
   type MatchRewards,
   RARITIES,
+  RATED_AFTER,
   RATED_GAMES_PER_PAIR,
   rankFor,
   type UnratedReason,
@@ -14,6 +15,7 @@ import { Share2 } from 'lucide-react';
 import { animate, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { ownDailyLine } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
 import { LevelBadge, RankBadge } from '../Avatar';
@@ -25,10 +27,12 @@ export function DailyCard({
   daily,
   history,
   total,
+  guest,
 }: {
   daily: NonNullable<MatchRewards['daily']>;
   history: ReviewItem[];
   total: number;
+  guest: boolean;
 }) {
   const text = dailyShareText(history, total, daily.streak);
   useEffect(() => rememberDailyShare(text), [text]);
@@ -36,13 +40,10 @@ export function DailyCard({
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full bg-amber-400/25 blur-3xl" />
       {daily.rank === null ? (
-        // A guest's daily has questions of its own, so it has no place on the board.
+        // A run on questions of its own (a guest's, a new account's) has no place on the board.
         <>
           <h2 className="relative t-card">Денят е твой</h2>
-          <p className="relative mt-2 text-sm text-fg-2">
-            Като гост играеш свои 10 въпроса за деня. Запази профила си и ще изиграеш общите — тези, по които се класира
-            цяла България.
-          </p>
+          <p className="relative mt-2 text-sm text-fg-2">{ownDailyLine(guest)}</p>
         </>
       ) : (
         <>
@@ -255,18 +256,24 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
 }
 
 /** A ranked match that left the rating as it was, and why (instead of a puzzling "+0"). */
+const UNRATED: Record<Exclude<UnratedReason, 'no_contest' | 'guest'>, string> = {
+  pair: `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`,
+  cut: 'Мачът приключи по-рано заради нас (обновяване или грешка), затова не променя рейтинга.',
+  new: `Профилът ти е нов: срещу хора играеш с рейтинг, щом е на поне ден и има ${RATED_AFTER.games} мача (срещу ботове — от първия).`,
+  new_rival:
+    'Съперникът ти е с нов профил: срещу него мачът е без рейтинг, докато профилът му не навърти първия си ден и мачове.',
+};
+
 export function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_contest'>; guest: boolean }) {
   return (
     <Card className="p-6">
       <h2 className="t-card">Рейтинг</h2>
       <p className="mt-2 text-sm text-fg-2">
-        {reason === 'pair'
-          ? `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`
-          : reason === 'cut'
-            ? 'Мачът приключи по-рано заради нас (обновяване или грешка), затова не променя рейтинга.'
-            : guest
-              ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
-              : 'Мачовете срещу гости са без рейтинг.'}
+        {reason !== 'guest'
+          ? UNRATED[reason]
+          : guest
+            ? 'Като гост играеш срещу хора без рейтинг (срещу ботове — с рейтинг). Запази профила си, за да се класираш.'
+            : 'Мачовете срещу гости са без рейтинг.'}
       </p>
     </Card>
   );

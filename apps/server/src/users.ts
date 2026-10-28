@@ -51,6 +51,9 @@ export interface UserRow {
   last_seen_at: number | null;
   /** When the "your account will be deleted" email went out; cleared by signing in. */
   inactivity_warned_at: number | null;
+  /** Placement XP from private rooms on `room_xp_day`, against ROOM_PLACEMENT_XP_PER_DAY. */
+  room_xp_day: string | null;
+  room_xp: number;
 }
 
 /** Names guests get ("Гост_4821137"); nobody can register one. */

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
+  answerPoints,
   dayEndsAt,
   dayKey,
   eliminationSchedule,
@@ -11,7 +12,9 @@ import {
   levelProgress,
   meetsRequirement,
   newlyUnlocked,
+  READING,
   rankFor,
+  readingMs,
   seasonEndsAt,
   seasonName,
   seasonTitle,
@@ -37,6 +40,19 @@ test('elimination schedule leaves a two-player final', () => {
   assert.deepEqual(eliminationSchedule(4, 10), [3, 8]);
   assert.deepEqual(eliminationSchedule(2, 10), []);
   assert.deepEqual(eliminationSchedule(8, 5), [3], 'caps eliminations when there are too few questions');
+});
+
+test('scoring: the speed bonus drains only after the reading window, which grows with the question', () => {
+  assert.equal(readingMs(''), READING.minMs);
+  assert.equal(readingMs('x'.repeat(500)), READING.maxMs);
+  assert.ok(readingMs('x'.repeat(90)) > readingMs('x'.repeat(40)));
+  const at = (timeMs: number) =>
+    answerPoints({ timeMs, limitMs: 15_000, readMs: 2_000, streak: 1, doubled: false, retried: false });
+  assert.equal(at(300), 1000, 'tapped before reading: nothing gained…');
+  assert.equal(at(2_000), 1000, '…over reading it first');
+  assert.equal(at(8_500), 750, 'halfway through the rest of the clock: half the speed bonus');
+  assert.equal(at(15_000), 500);
+  assert.equal(at(20_000), 500, '"Още време" buys time, not speed points');
 });
 
 test('level curve', () => {

@@ -255,6 +255,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 50,
   },
   {
+    id: 'level_100',
+    name: 'Сто нива',
+    description: 'Достигни ниво 100.',
+    icon: '💯',
+    rarity: 'legendary',
+    xp: 3000,
+    goal: 100,
+  },
+  {
     id: 'team_win',
     name: 'Отборен дух',
     description: 'Спечели отборен мач 2 на 2.',

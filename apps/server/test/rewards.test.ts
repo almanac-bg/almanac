@@ -1,6 +1,7 @@
 // What a ranked match pays, on a real database and a mocked clock: a walkout before the match gets going is no contest,
-// a later one is a win paid for the part played, guests play people unrated, the win-trading guard says why a rating
-// stayed put, and a guest never draws a quest only an account can finish.
+// a later one is a win paid for the part played, guests and new accounts play people unrated, the win-trading guard
+// says why a rating stayed put, a private room pays only for beating people who played (and only so much a day), and a
+// guest never draws a quest only an account can finish.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,6 +11,7 @@ import {
   type GameEndPayload,
   type GamePlayer,
   POWERUPS,
+  RATED_AFTER,
   RATED_GAMES_PER_PAIR,
   shiftDay,
   xpToReach,
@@ -25,14 +27,16 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
-const { botK, finalizeMatch } = await import('../src/game/rewards');
+const { botK, finalizeMatch, ROOM_PLACEMENT_XP_PER_DAY } = await import('../src/game/rewards');
+const { playCheck, SUSPICIOUS } = await import('../src/answers');
+const { recordRating } = await import('../src/seasons');
 const { buildHuman } = await import('../src/game/registry');
 const { pickQuestions } = await import('../src/questions');
 const { createGuest } = await import('../src/guests');
 const { questsInfo } = await import('../src/quests');
 const { dailyQuestions, redrawDailyWithout } = await import('../src/daily');
 const { reloadQuestionBank } = await import('../src/questions');
-const { one, run } = await import('../src/db');
+const { all, one, run } = await import('../src/db');
 const { getUser, usernameKey } = await import('../src/users');
 
 const COUNTDOWN = 3_500;
@@ -44,13 +48,15 @@ const advance = (ms: number) => {
 };
 
 let accounts = 0;
-function account(): number {
+/** An account that has been around (a day old, RATED_AFTER.games played), or a `fresh` one made just now. */
+function account({ fresh = false } = {}): number {
   const name = `player${++accounts}`;
   const { lastInsertRowid } = run(
-    "INSERT INTO users (username, username_key, password_hash, created_at) VALUES (?, ?, '', ?)",
+    "INSERT INTO users (username, username_key, password_hash, created_at, games_played) VALUES (?, ?, '', ?, ?)",
     name,
     usernameKey(name),
-    Date.now(),
+    Date.now() - (fresh ? 0 : RATED_AFTER.ms),
+    fresh ? 0 : RATED_AFTER.games,
   );
   return Number(lastInsertRowid);
 }
@@ -127,6 +133,48 @@ function duel(winner: number, other: number, leaveAfter: number | null, cutAfter
   return { end: ends.get(winner)!, deltaOf };
 }
 
+/**
+ * A private room for two people: the host answers everything right; the other answers wrong, or never (`idle`: a
+ * second window left open).
+ */
+function room(host: number, other: number, { questions = 10, idle = false } = {}) {
+  const ends = new Map<number, GameEndPayload>();
+  const game = new Game(
+    {
+      mode: 'custom',
+      ranked: false,
+      roomCode: '123456',
+      hostUserId: host,
+      timeMs: TIME,
+      category: 'mixed',
+      elimination: false,
+      teams: false,
+      dailyDay: null,
+      challengeId: null,
+      questions: pickQuestions(questions, 'mixed', new Map()),
+      humans: [host, other].map((id) => ({ player: player(id), powerups: [], emotes: [] })),
+      bots: [],
+    },
+    {
+      toGame: () => {},
+      toUser: (userId, event, ...args) => {
+        if (event === 'game:end') ends.set(userId, args[0] as GameEndPayload);
+      },
+      toGameExcept: () => {},
+    } satisfies GameEmitter,
+    { finalize: finalizeMatch, undelivered: () => {}, release: () => {}, draining: () => false, onClosed: () => {} },
+  );
+  game.start();
+  advance(COUNTDOWN);
+  while (game.phase !== 'ended') {
+    const q = game.questions[game.index];
+    game.answer(`u${host}`, game.index, q.answer);
+    if (!idle) game.answer(`u${other}`, game.index, (q.answer + 1) % 4);
+    advance(idle ? TIME + 4_000 + 500 : NEXT_QUESTION);
+  }
+  return ends.get(host)!;
+}
+
 const labels = (end: GameEndPayload) => end.rewards!.breakdown.map((l) => l.label);
 
 beforeEach(() => {
@@ -149,7 +197,7 @@ test('walking out before the third question is no contest: no win, no rating, no
     assert.equal(deltaOf(a), null);
     assert.ok(deltaOf(b)! < 0, 'the one who walked out still loses rating');
     const user = getUser(a)!;
-    assert.deepEqual([user.wins, user.games_played, user.mp_games], [0, 0, 0]);
+    assert.deepEqual([user.wins, user.games_played - RATED_AFTER.games, user.mp_games], [0, 0, 0]);
   }
 });
 
@@ -159,7 +207,8 @@ test('a walkout later in the match is a win, paid for the part that was played',
   assert.equal(end.noContest, false);
   const win = end.rewards!.breakdown.find((l) => l.label === 'Победа');
   assert.equal(win?.amount, Math.round((50 + 15) * 0.4), '4 of 10 questions');
-  assert.ok(end.rewards!.rating!.after > end.rewards!.rating!.before);
+  // A full win between two at 1000 is +20 (K 40); four questions of ten pay 40% of it.
+  assert.equal(end.rewards!.rating!.after - end.rewards!.rating!.before, 8, 'rating for the part played, too');
   assert.ok(!end.rewards!.achievements.includes('photo_finish'), 'no photo finish against an empty chair');
   assert.equal(getUser(a)!.wins, 1);
 });
@@ -319,4 +368,103 @@ test('a question hidden before anyone has played the day leaves the day’s set;
     run('DELETE FROM hidden_questions');
     reloadQuestionBank();
   }
+});
+
+test('a new account plays people unrated for its first day and matches, and both sides are told why', () => {
+  const a = account();
+  const fresh = account({ fresh: true });
+  const first = duel(a, fresh, null);
+  assert.equal(first.end.rewards!.rating, null);
+  assert.equal(first.end.rewards!.unrated, 'new_rival');
+  assert.equal(first.deltaOf(fresh), null);
+  assert.equal(duel(fresh, a, null).end.rewards!.unrated, 'new');
+
+  // A day old but short of matches: still new.
+  run('UPDATE users SET created_at = ?, games_played = ? WHERE id = ?', Date.now() - RATED_AFTER.ms, 9, fresh);
+  assert.equal(duel(a, fresh, null).end.rewards!.unrated, 'new_rival');
+  run('UPDATE users SET games_played = ? WHERE id = ?', RATED_AFTER.games, fresh);
+  assert.notEqual(duel(a, fresh, null).end.rewards!.rating, null, 'a day old with the matches: rated');
+});
+
+test('a private room pays for beating people who played, and placements only so much a day', () => {
+  const host = account();
+  const idle = room(host, account(), { idle: true });
+  assert.ok(!labels(idle).includes('Победа'), 'a second window that never answers is no rival');
+  assert.equal(getUser(host)!.wins, 0, 'nor a win');
+
+  assert.equal(getUser(host)!.room_xp, 0, 'nothing paid for it');
+  // A win over one person pays 50 + 15: twelve of them would be 780, past the day's cap.
+  const paid = Array.from({ length: 12 }, () => {
+    const line = room(host, account()).rewards!.breakdown.find((l) => l.label.startsWith('Победа'));
+    return line?.amount ?? 0;
+  });
+  assert.equal(
+    paid.reduce((sum, n) => sum + n, 0),
+    ROOM_PLACEMENT_XP_PER_DAY,
+    `placements stop at the cap (${paid})`,
+  );
+  assert.equal(getUser(host)!.room_xp, ROOM_PLACEMENT_XP_PER_DAY);
+});
+
+test('the perfect-match bonus needs ten questions or more', () => {
+  const short = room(account(), account(), { questions: 5 });
+  assert.ok(!labels(short).includes('Перфектен мач'), labels(short).join(', '));
+  assert.ok(labels(room(account(), account(), { questions: 10 })).includes('Перфектен мач'));
+});
+
+test('a win the other side walked out of before it got going is no win for "Дуелен инстинкт"', () => {
+  const a = account();
+  for (let i = 0; i < 10; i++) duel(a, account(), 0);
+  const wins = one<{ n: number }>('SELECT COUNT(*) AS n FROM match_players WHERE user_id = ? AND won = 1', a)!.n;
+  assert.equal(wins, 0);
+  assert.equal(
+    one('SELECT 1 AS x FROM user_achievements WHERE user_id = ? AND achievement_id = ?', a, 'duelist'),
+    undefined,
+  );
+});
+
+test('every answer a person gives is logged, with totals per question; too-perfect play is flagged for a moderator', () => {
+  const [a, b] = [account(), account()];
+  const { end } = duel(a, b, null);
+  const logged = all<{ correct: number }>('SELECT correct FROM answers WHERE user_id = ?', a);
+  assert.equal(logged.length, 10);
+  assert.ok(logged.every((r) => r.correct === 1));
+  assert.equal(all('SELECT 1 FROM answers WHERE user_id = ?', b).length, 10, 'the other side too');
+  assert.ok(end.standings.length === 2);
+  const totals = one<{ n: number }>('SELECT SUM(answered) AS n FROM question_stats')!.n;
+  assert.ok(totals >= 20);
+
+  // A script reading the answers off a copy of the bank: every medium and hard one right, in under a second.
+  const bot = account();
+  for (let i = 0; i < SUSPICIOUS.minAnswers; i++)
+    run(
+      `INSERT INTO answers (user_id, match_id, question_id, difficulty, correct, time_ms, answered_at)
+       VALUES (?, 'm', ?, 'hard', 1, 800, ?)`,
+      bot,
+      `q${i}`,
+      Date.now(),
+    );
+  const flagged = playCheck().suspicious.map((p) => p.user.id);
+  assert.ok(flagged.includes(bot));
+  assert.ok(!flagged.includes(a), 'ten answers say nothing yet');
+});
+
+test('a season counts only matches played out, and its reward goes by the peak from the tenth on', () => {
+  const a = account();
+  const row = () =>
+    one<{ games: number; peak: number; reward_peak: number | null }>(
+      "SELECT games, peak, reward_peak FROM season_ratings WHERE user_id = ? AND mode = 'duel'",
+      a,
+    )!;
+  // Ten forfeits: the rating moves, but none is one of the season's games.
+  for (let i = 0; i < 10; i++) recordRating(a, 'duel', 1290 - i, false, false);
+  assert.equal(row().games, 0);
+  // A lucky start doesn't make the season: the reward's peak starts at the tenth game.
+  recordRating(a, 'duel', 1400, true);
+  for (let i = 0; i < 8; i++) recordRating(a, 'duel', 1300, false);
+  assert.equal(row().reward_peak, null);
+  recordRating(a, 'duel', 1310, true);
+  assert.deepEqual({ ...row() }, { games: 10, peak: 1400, reward_peak: 1310 });
+  recordRating(a, 'duel', 1350, true);
+  assert.equal(row().reward_peak, 1350);
 });

@@ -131,6 +131,10 @@ export function exportAccount(userId: number) {
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
     challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
     challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),
+    answers: rows(
+      `SELECT match_id, question_id, difficulty, correct, time_ms, answered_at FROM answers WHERE user_id = ?
+       ORDER BY answered_at`,
+    ),
     notifications: rows(
       'SELECT icon, text, link, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY id',
     ),

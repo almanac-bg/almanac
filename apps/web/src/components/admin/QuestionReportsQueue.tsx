@@ -56,7 +56,7 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
   );
 }
 
-function QuestionCard({ question, children }: { question: QuestionInfo; children?: ReactNode }) {
+export function QuestionCard({ question, children }: { question: QuestionInfo; children?: ReactNode }) {
   const category = categoryById(question.category);
   return (
     <>

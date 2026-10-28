@@ -39,17 +39,31 @@ export function getRatings(userId: number): Partial<Record<QueueModeId, number>>
   return Object.fromEntries(QUEUE_MODES.map((m) => [m, Math.round(getRating(userId, m))]));
 }
 
-export function recordRating(userId: number, mode: QueueModeId, rating: number, won: boolean) {
+/**
+ * A rated match's new rating. `counted`: played out, not walked out of — a forfeit moves the rating but isn't one of the
+ * season's games (ten instant forfeits made a season). The season's reward goes by `reward_peak`: the best rating from
+ * its SEASON_MIN_GAMES-th game on, so neither the carry-over nor a lucky first few games make the tier.
+ */
+export function recordRating(userId: number, mode: QueueModeId, rating: number, won: boolean, counted = true) {
+  const games = counted ? 1 : 0;
   run(
-    `INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, ?, ?, ?, ?, 1, ?)
+    `INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins, reward_peak)
+     VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? >= ? THEN ? END)
      ON CONFLICT (user_id, season, mode) DO UPDATE SET rating = excluded.rating, peak = MAX(peak, excluded.rating),
-       games = games + 1, wins = wins + excluded.wins`,
+       games = games + excluded.games, wins = wins + excluded.wins,
+       reward_peak = CASE WHEN games + excluded.games >= ? THEN MAX(COALESCE(reward_peak, excluded.rating), excluded.rating)
+         ELSE reward_peak END`,
     userId,
     seasonKey(),
     mode,
     rating,
     rating,
+    games,
     won ? 1 : 0,
+    games,
+    SEASON_MIN_GAMES,
+    rating,
+    SEASON_MIN_GAMES,
   );
 }
 
@@ -82,9 +96,10 @@ export function settleSeasons(
   unlocksFor: (seasonTier: number) => UnlockRef[],
   addXp: (xp: number) => void,
 ): SeasonReward[] {
-  // The best peak among the modes played enough: a lucky streak of three games doesn't make a season.
+  // The best peak among the modes played enough, from the tenth game on: a lucky streak of three games doesn't make a
+  // season. (A row older code finished the tenth game on has no reward peak: its peak stands in.)
   const finished = all<{ season: string; peak: number | null }>(
-    `SELECT season, MAX(CASE WHEN games >= ? THEN peak END) AS peak FROM season_ratings
+    `SELECT season, MAX(CASE WHEN games >= ? THEN COALESCE(reward_peak, peak) END) AS peak FROM season_ratings
      WHERE user_id = ? AND season < ? AND season NOT IN (SELECT season FROM season_rewards WHERE user_id = ?)
      GROUP BY season ORDER BY season`,
     SEASON_MIN_GAMES,

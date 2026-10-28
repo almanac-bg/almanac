@@ -106,6 +106,7 @@ const question = (index: number, over: Partial<QuestionPayload> = {}): QuestionP
   author: null,
   durationMs: 15_000,
   remainingMs: 15_000,
+  readMs: 2_000,
   elimination: false,
   answered: [],
   ...over,

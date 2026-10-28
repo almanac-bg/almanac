@@ -9,6 +9,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
+import { inDropZone, nextElimination } from './elimination';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
 
 /** A question on screen: the clock, the points it's worth, the answers, your pick and how it went. */
@@ -60,6 +61,13 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           >
             <Skull className="size-3.5" /> Елиминация след този въпрос
           </motion.span>
+        )}
+        {inDropZone(game) === youId && !reveal && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200">
+            {q.elimination
+              ? 'Ти си последен: изпревари някого!'
+              : `Ти си последен · отпадане след въпрос ${nextElimination(game)}`}
+          </span>
         )}
       </div>
 
@@ -238,7 +246,8 @@ function LockStatus({ game, offline }: { game: LiveGame; offline: boolean }) {
 
 /**
  * What a right answer would score if you picked it now: the speed bonus draining in front of you makes every question
- * a race. Once you've picked, it stops at what your pick can earn.
+ * a race — once the question has been read (it holds still for its reading window). Once you've picked, it stops at
+ * what your pick can earn.
  */
 function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
   const picked = game.myChoice !== null;
@@ -250,6 +259,7 @@ function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
   const points = answerPoints({
     timeMs: Math.max(0, now - openedAt),
     limitMs: q.durationMs,
+    readMs: q.readMs,
     streak,
     doubled: game.doubled,
     retried: game.retryPrompt,

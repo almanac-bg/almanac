@@ -116,6 +116,8 @@ export interface QuestionPayload {
   author: string | null;
   durationMs: number;
   remainingMs: number;
+  /** The reading window (readingMs): the speed bonus starts to drain after it. */
+  readMs: number;
   /** Someone gets knocked out after this question. */
   elimination: boolean;
   /** Ids of players who already locked in (for reconnects). */
@@ -208,7 +210,7 @@ export interface MatchRewards {
   /** Why a ranked match left the rating as it was (`rating` is null then). */
   unrated: UnratedReason | null;
   /** `shieldsUsed`: missed days a streak shield covered; `shieldEarned`: this run completed a week. */
-  // `rank` is null for a guest: their run has questions of its own (see the server's guestDailyQuestions).
+  // `rank` is null for a run on questions of its own (a guest, or an account made today: see the server's daily.ts).
   daily: { rank: number | null; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
   /** A challenge-link run: where it placed among everyone who played that link. */
   challenge: { id: string; rank: number; total: number } | null;
@@ -216,10 +218,11 @@ export interface MatchRewards {
 
 /**
  * `pair`: these two already played their rated games today (the win-trading guard). `guest`: guests play people
- * unrated. `no_contest`: the other side walked out before the match got going. `cut`: we ended the match early (an
- * update that couldn't wait, or a fault on our side).
+ * unrated. `new`: your account is new (RATED_AFTER), `new_rival`: the person you played is. `no_contest`: the other side
+ * walked out before the match got going. `cut`: we ended the match early (an update that couldn't wait, or a fault on
+ * our side).
  */
-export type UnratedReason = 'pair' | 'guest' | 'no_contest' | 'cut';
+export type UnratedReason = 'pair' | 'guest' | 'new' | 'new_rival' | 'no_contest' | 'cut';
 
 export interface FinalStanding extends Standing {
   placement: number;
@@ -427,7 +430,12 @@ export interface DailyInfo {
   streak: number;
   /** Started today but not finished (a dropped attempt counts). */
   attempted: boolean;
-  /** `rank` is null for a guest, whose run has questions of its own and isn't on the board. */
+  /**
+   * Today's run is on questions of its own, not the shared set, and isn't on the board: a guest's, or an account's made
+   * today (one made to read the answers off before playing with another would have been).
+   */
+  ownSet: boolean;
+  /** `rank` is null for a run on questions of its own (`ownSet`). */
   played: { score: number; correct: number; rank: number | null } | null;
   total: number;
   entries: LeaderboardEntry[];
@@ -538,6 +546,30 @@ export interface QuestionReportGroup {
 }
 
 export type QuestionReportAction = 'dismiss' | 'hide';
+
+/** What the answer log says, for moderators: play no person could manage, and questions whose label is off. */
+export interface PlayCheck {
+  /** Medium and hard questions answered right nearly always and fast (the rules are in `rules`). */
+  suspicious: {
+    user: PublicUser & { bannedUntil: number | null };
+    answers: number;
+    accuracy: number;
+    medianCorrectMs: number;
+    lastAt: number;
+  }[];
+  /**
+   * `wrong`: so few get it right that the marked answer may be the wrong one; `harder`/`easier`: people find it much
+   * harder or easier than its difficulty says.
+   */
+  questions: {
+    question: QuestionInfo;
+    verdict: 'wrong' | 'harder' | 'easier';
+    answered: number;
+    correctShare: number;
+    avgCorrectMs: number | null;
+  }[];
+  rules: { minAnswers: number; minAccuracy: number; maxMedianMs: number; questionMinAnswers: number; logDays: number };
+}
 
 // ─── Challenge links ─────────────────────────────────────────────────────────
 

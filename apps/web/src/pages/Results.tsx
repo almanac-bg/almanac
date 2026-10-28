@@ -1,11 +1,11 @@
 import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
 import { categoryById, isQueueMode, MODES, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
+import { ArrowRight, ChartColumn, Home, RotateCcw, Save, Share2, Skull, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { GuestNudge } from '../components/ClaimAccount';
+import { ClaimAccountModal, GuestNudge } from '../components/ClaimAccount';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
@@ -31,6 +31,7 @@ export function Results({ game }: { game: LiveGame }) {
   const room = useStore((s) => s.room);
   const guest = useStore((s) => !!s.me?.isGuest);
   const [busy, setBusy] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const youId = game.start.youId;
   const mine = end.standings.find((s) => s.id === youId)!;
   const solo = end.mode === 'solo';
@@ -270,7 +271,7 @@ export function Results({ game }: { game: LiveGame }) {
         {sideCards && (
           <div className="space-y-4">
             {rewards.daily && (
-              <DailyCard daily={rewards.daily} history={game.history} total={game.start.totalQuestions} />
+              <DailyCard daily={rewards.daily} history={game.history} total={game.start.totalQuestions} guest={guest} />
             )}
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
@@ -294,7 +295,12 @@ export function Results({ game }: { game: LiveGame }) {
       <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
         <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
-          {daily ? (
+          {daily && guest && rewards?.daily?.rank === null ? (
+            // A guest's daily is off the board: what opens it is saving the profile.
+            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={() => setClaiming(true)}>
+              <Save className="size-5" /> Запази профила
+            </Button>
+          ) : daily ? (
             // One attempt a day — no "play again".
             <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={dailyBoard}>
               <ChartColumn className="size-5" /> Класиране за деня
@@ -338,6 +344,7 @@ export function Results({ game }: { game: LiveGame }) {
           )}
         </div>
       </div>
+      <ClaimAccountModal open={claiming} onClose={() => setClaiming(false)} />
     </div>
   );
 }

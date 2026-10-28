@@ -3,9 +3,11 @@ import { emoteById, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Skull } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef } from 'react';
 import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, PlayerTag } from '../Avatar';
+import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
 
 /* Who stands where during a match: the board beside it on wide screens, the strip of players on phones. */
@@ -154,6 +156,16 @@ export function MobileStrip({ game }: { game: LiveGame }) {
   const teams = game.start.teams;
   const short = useMediaQuery('(max-height: 740px)');
   const strip = useSideScroll<HTMLUListElement>();
+  // Who goes out at the next knockout (a ring), and you, kept in view when the row is wider than the screen: last
+  // place is at the far end, where the row fades.
+  const danger = inDropZone(game);
+  const mine = useRef<HTMLLIElement>(null);
+  const myRank = game.standings.find((s) => s.id === game.start.youId)?.rank;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolled when your place changes
+  useEffect(() => {
+    // The middle, not just inside the edge: the row's far end fades out.
+    mine.current?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [myRank]);
   // Team games: group teammates together so the colors read as two blocks.
   const order = teams
     ? [...game.standings].sort((a, b) => (game.players[a.id]?.team ?? 0) - (game.players[b.id]?.team ?? 0))
@@ -190,14 +202,26 @@ export function MobileStrip({ game }: { game: LiveGame }) {
               ? 'отпадна'
               : `${s.score} точки${answered ? ', отговори' : ''}`;
           return (
-            <motion.li layout key={s.id} className="relative flex shrink-0 flex-col items-center gap-1">
+            <motion.li
+              layout
+              key={s.id}
+              ref={me ? mine : undefined}
+              className="relative flex shrink-0 flex-col items-center gap-1"
+            >
               <span className="sr-only">
                 {me ? 'Ти' : p.name}
                 {p.isBot && ' (бот)'}: {status}
+                {danger === s.id && ', отпада при следващото отпадане'}
               </span>
               <div
                 className="relative rounded-full"
-                style={color ? { boxShadow: `0 0 0 2px ${color}` } : undefined}
+                style={
+                  color
+                    ? { boxShadow: `0 0 0 2px ${color}` }
+                    : danger === s.id
+                      ? { boxShadow: '0 0 0 2px #fb7185' }
+                      : undefined
+                }
                 aria-hidden
               >
                 <Avatar avatar={p.avatar} frame={p.frame} size={short ? 32 : 40} dim={out}>

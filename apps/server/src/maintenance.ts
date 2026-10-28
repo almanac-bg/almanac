@@ -3,6 +3,7 @@ import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
 import { eraseAccount } from './account';
+import { pruneAnswers } from './answers';
 import { purgeOldChallenges } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
@@ -28,8 +29,9 @@ const PRE_MIGRATION_NAME = /^quiz-v\d+-before-v\d+\.db$/;
 const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, and addresses
- * that were never verified once their link is gone — nothing kept longer than it's useful.
+ * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, addresses
+ * that were never verified once their link is gone, and answers past ANSWER_LOG_DAYS — nothing kept longer than it's
+ * useful.
  */
 export function purgeExpired(now = Date.now()) {
   run('DELETE FROM sessions WHERE expires_at < ?', now);
@@ -41,6 +43,7 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM quest_progress WHERE day < ?', shiftDay(dayKey(now), -7));
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
+  pruneAnswers(now);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,15 +90,18 @@ export function sendStreakReminders(now = Date.now()): number {
   const hour = sofiaHour(now);
   if (hour < REMINDER_HOURS[0] || hour > REMINDER_HOURS[1]) return 0;
   const today = dayKey(now);
-  // A streak can still be alive a few days back if shields cover the gap; liveDailyStreak decides.
+  // A streak can still be alive a few days back if shields cover the gap; liveDailyStreak decides. Whoever already used
+  // today's attempt (and left it at once, so the day didn't count) can't save the streak today: no email.
   const candidates = all<UserRow>(
     `SELECT * FROM users WHERE streak_reminders = 1 AND email IS NOT NULL AND is_guest = 0
      AND last_daily_day >= ? AND last_daily_day < ? AND (reminded_day IS NULL OR reminded_day < ?)
-     AND (banned_until IS NULL OR banned_until < ?) LIMIT ?`,
+     AND (banned_until IS NULL OR banned_until < ?)
+     AND NOT EXISTS (SELECT 1 FROM daily_results d WHERE d.user_id = users.id AND d.day = ?) LIMIT ?`,
     shiftDay(today, -3),
     today,
     today,
     now,
+    today,
     REMINDERS_PER_RUN,
   );
   let sent = 0;

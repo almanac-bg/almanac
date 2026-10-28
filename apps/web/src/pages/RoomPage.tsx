@@ -32,6 +32,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
+import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
@@ -284,6 +285,9 @@ export function RoomPage() {
           </div>
         </Card>
       </div>
+
+      {/* Waiting for the host is time to read what the козове do (the countdown only names them). */}
+      <FreshPowerupNotes />
 
       {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
       <div

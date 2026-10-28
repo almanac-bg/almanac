@@ -4,7 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
-import type { FinalStanding, GamePlayer, PowerupId, QuestionPayload, RevealPayload } from '@quiz/shared';
+import {
+  answerPoints,
+  type FinalStanding,
+  type GamePlayer,
+  type PowerupId,
+  type QuestionPayload,
+  type RevealPayload,
+  readingMs,
+} from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
@@ -52,6 +60,8 @@ function setup(opts: {
   powerups?: PowerupId[];
   /** A daily run (one attempt). */
   daily?: boolean;
+  /** Stay in the countdown (don't play up to the first question). */
+  countdown?: boolean;
 }) {
   const events: { to: string; event: string; payload: unknown }[] = [];
   let standings: FinalStanding[] | null = null;
@@ -93,7 +103,7 @@ function setup(opts: {
     },
   );
   game.start();
-  advance(COUNTDOWN);
+  if (!opts.countdown) advance(COUNTDOWN);
   const q = () => game.questions[game.index];
   return {
     game,
@@ -406,4 +416,64 @@ test('with other people in the match, nobody can stop it to read', () => {
   advance(700);
   assert.equal(g.game.phase, 'reveal');
   assert.equal(g.game.hold('u1', g.game.index), false);
+});
+
+test('bots made up their minds when the question opened: once every person has answered, they answer at once', () => {
+  // pace 0.3: the bot would answer three seconds in; the person answers after one.
+  const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
+  advance(1_000);
+  g.right(1);
+  advance(600 + 50);
+  const [reveal] = g.reveals();
+  assert.ok(reveal, 'revealed without waiting for the bot');
+  const botResult = reveal.results.b1;
+  assert.equal(botResult.correct, true);
+  assert.ok(botResult.timeMs! > 2_000, `the bot keeps the time it took (${botResult.timeMs} ms), and its points`);
+  assert.equal(
+    botResult.points,
+    answerPoints({
+      timeMs: botResult.timeMs!,
+      limitMs: TIME,
+      readMs: readingMs(g.game.questions[0].q),
+      streak: 1,
+      doubled: false,
+      retried: false,
+    }),
+  );
+});
+
+test('a bot that zoned out keeps nobody waiting once the people have answered', () => {
+  const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
+  g.game.participants.get('b1')!.move = null;
+  g.right(1);
+  advance(600 + 50);
+  assert.equal(g.reveals().length, 1);
+  assert.equal(g.reveals()[0].results.b1.choice, null);
+});
+
+test('the speed bonus waits out the reading window: no gain from tapping before the question is read', () => {
+  const g = setup({ humans: [1, 2] });
+  const read = readingMs(g.game.questions[0].q);
+  assert.ok(read >= 1_000 && read <= 3_500);
+  advance(200);
+  g.right(1);
+  advance(read - 300);
+  g.right(2);
+  advance(600 + 50);
+  const [reveal] = g.reveals();
+  assert.equal(reveal.results.u1.points, reveal.results.u2.points, 'both inside the window: the same points');
+  assert.equal(reveal.results.u1.points, 1000);
+});
+
+test('a daily left in its countdown was no attempt: it is the player’s again, and nothing is saved', () => {
+  const g = setup({ humans: [1], daily: true, countdown: true });
+  g.game.leave('u1');
+  assert.equal(g.game.phase, 'ended');
+  assert.equal(g.released(), 1);
+  assert.equal(g.finalized(), false);
+  // Once a question has been on screen, walking out uses the attempt up.
+  const h = setup({ humans: [2], daily: true });
+  h.game.leave('u2');
+  assert.equal(h.released(), 0);
+  assert.equal(h.finalized(), true);
 });

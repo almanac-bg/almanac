@@ -47,6 +47,8 @@ export interface MatchContext {
   /** Played to the last question (the other side didn't walk out). */
   completed: boolean;
   teams: boolean;
+  /** A team match with at least two on each side (a "team" of one in a room carries nobody). */
+  twoAside: boolean;
   /** Players were knocked out along the way (Royale, an elimination room). */
   elimination: boolean;
   /** This match's fastest right answer to a medium or hard question. */
@@ -97,7 +99,7 @@ const RULES: Record<string, Rule> = {
   photo_finish: { earned: (_, m) => !!m && m.won && m.completed && m.winMargin !== null && m.winMargin < 100 },
   giant_slayer: { earned: (_, m) => !!m && !m.left && m.beatLevelGap >= 5 },
   team_win: { progress: (a) => a.teamWins },
-  team_carry: { earned: (_, m) => !!m && m.won && m.teams && m.topScorer },
+  team_carry: { earned: (_, m) => !!m && m.won && m.twoAside && m.topScorer },
   daily_first: { progress: (a) => a.dailyCompleted },
   daily_streak_7: { progress: (a) => a.bestDailyStreak },
   daily_streak_30: { progress: (a) => a.bestDailyStreak },
@@ -110,6 +112,7 @@ const RULES: Record<string, Rule> = {
   level_10: { progress: (a) => a.level },
   level_25: { progress: (a) => a.level },
   level_50: { progress: (a) => a.level },
+  level_100: { progress: (a) => a.level },
   rank_gold: { earned: (a) => a.maxRating >= 1250 },
   rank_master: { earned: (a) => a.maxRating >= 1700 },
 };
@@ -118,10 +121,10 @@ export function loadAggregate(userId: number): Aggregate {
   const u = getUser(userId)!;
   const count = (sql: string, ...params: (number | string)[]) => one<{ n: number }>(sql, ...params)?.n ?? 0;
   const cats = all<{ correct: number }>('SELECT correct FROM category_stats WHERE user_id = ?', userId);
+  // Wins that counted: not the ones the other side walked out of before the match got going.
   const modeWins = all<{ mode: ModeId; wins: number }>(
     `SELECT m.mode, COUNT(*) AS wins FROM match_players mp JOIN matches m ON m.id = mp.match_id
-     WHERE mp.user_id = ? AND mp.placement = 1 AND m.player_count > 1 AND mp.left_match = 0
-     GROUP BY m.mode`,
+     WHERE mp.user_id = ? AND mp.won = 1 GROUP BY m.mode`,
     userId,
   );
   return {
@@ -137,10 +140,12 @@ export function loadAggregate(userId: number): Aggregate {
     categoriesCovered: cats.filter((c) => c.correct >= POLYMATH_PER_CATEGORY).length,
     maxCategoryCorrect: Math.max(0, ...cats.map((c) => c.correct)),
     modeWins: Object.fromEntries(modeWins.map((r) => [r.mode, r.wins])),
-    // In a private room, only against people: a room of friends against bots is practice.
+    // Two on each side ("2 на 2"); in a private room, only against people: a room of friends against bots is practice.
     teamWins: count(
       `SELECT COUNT(*) AS n FROM match_players mp JOIN matches m ON m.id = mp.match_id
-       WHERE mp.user_id = ? AND mp.team IS NOT NULL AND mp.placement = 1 AND mp.left_match = 0
+       WHERE mp.user_id = ? AND mp.team IS NOT NULL AND mp.won = 1
+         AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
+         AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
          AND (m.room_code IS NULL OR EXISTS (
            SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team))`,
       userId,

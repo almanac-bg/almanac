@@ -77,17 +77,26 @@ test('daily quests: three a day that stay put, paid once each, plus a bonus for 
 test('streak shields: earned every 7 days, spent on a missed day instead of the streak', () => {
   const d = (n: number) => shiftDay('2026-11-01', n);
   const id = user({ daily_streak: 6, last_daily_day: d(-1) });
-  const week = recordDailyResult(id, d(0), 5000, 8, 60_000);
+  const week = recordDailyResult(id, d(0), 5000, 8, 60_000, true);
   assert.equal(week.streak, 7);
   assert.ok(week.shieldEarned);
   assert.equal(getUser(id)!.streak_shields, 1);
 
   assert.equal(liveDailyStreak(getUser(id)!, d(2)), 7, 'one missed day: still alive, thanks to the shield');
-  const saved = recordDailyResult(id, d(2), 5000, 8, 60_000);
+  const saved = recordDailyResult(id, d(2), 5000, 8, 60_000, true);
   assert.deepEqual([saved.streak, saved.shieldsUsed, getUser(id)!.streak_shields], [8, 1, 0]);
 
   assert.equal(liveDailyStreak(getUser(id)!, d(5)), 0, 'two missed days with no shields left: gone');
-  assert.equal(recordDailyResult(id, d(5), 5000, 8, 60_000).streak, 1);
+  assert.equal(recordDailyResult(id, d(5), 5000, 8, 60_000, true).streak, 1);
+});
+
+test('a daily left in its first questions uses the day’s attempt, but is no day played for the streak', () => {
+  const d = (n: number) => shiftDay('2026-11-20', n);
+  const id = user({ daily_streak: 6, last_daily_day: d(-1) });
+  const left = recordDailyResult(id, d(0), 0, 0, 150_000, false);
+  assert.equal(left.streak, 6, 'the streak as it was');
+  assert.equal(left.shieldEarned, false);
+  assert.deepEqual([getUser(id)!.daily_streak, getUser(id)!.last_daily_day], [6, d(-1)]);
 });
 
 test('the streak reminder goes out in the evening, once a day, with a working unsubscribe', () => {
@@ -103,6 +112,19 @@ test('the streak reminder goes out in the evening, once a day, with a working un
   });
   user({ email: 'quiet@example.com', streak_reminders: 0, daily_streak: 5, last_daily_day: shiftDay(today, -1) });
   user({ email: 'done@example.com', streak_reminders: 1, reminder_key: 'k', daily_streak: 5, last_daily_day: today });
+  // Started today's daily and walked out of it at once: the day is gone, and an email can't save it.
+  const quitter = user({
+    email: 'quit@example.com',
+    streak_reminders: 1,
+    reminder_key: 'q',
+    daily_streak: 5,
+    last_daily_day: shiftDay(today, -1),
+  });
+  run(
+    'INSERT INTO daily_results (user_id, day, started_at, finished_at, score) VALUES (?, ?, 0, 1, 0)',
+    quitter,
+    today,
+  );
 
   assert.equal(sendStreakReminders(evening - 6 * 60 * 60_000), 0, 'not in the afternoon');
   assert.equal(sendStreakReminders(evening), 1, 'only the opted-in player whose streak is at stake');

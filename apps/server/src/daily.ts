@@ -5,7 +5,11 @@ import { friendIds } from './friends';
 import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions, seededRng } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
+import { playsSharedDaily } from './trust';
 import { getUser, toPublicUser, type UserRow } from './users';
+
+/** A run on the shared set: what the board and the friends' view compare (a run from older code: a guest's wasn't). */
+const SHARED_RUN = 'COALESCE(d.own_set, u.is_guest) = 0';
 
 /** Today's question set — generated once per day from a date seed, then frozen in the database. */
 function dailySet(day: string): PreparedQuestion[] {
@@ -23,15 +27,15 @@ function dailySet(day: string): PreparedQuestion[] {
 }
 
 /**
- * A question was just hidden (a moderator found it wrong): if it's in the day's set and no account has started the
- * daily yet, the set is drawn again without it. Once someone has played, the set stands — the board compares the same
- * ten questions for everyone. Guests don't count: they play questions of their own.
+ * A question was just hidden (a moderator found it wrong): if it's in the day's set and nobody has started it yet, the
+ * set is drawn again without it. Once someone has played, the set stands — the board compares the same ten questions
+ * for everyone. Runs on questions of their own (guests, accounts made today) don't count.
  */
 export function redrawDailyWithout(questionId: string, day = dayKey()): boolean {
   const set = one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', day);
   if (!set || !(JSON.parse(set.questions) as PreparedQuestion[]).some((q) => q.id === questionId)) return false;
   const started = one(
-    'SELECT 1 AS x FROM daily_results r JOIN users u ON u.id = r.user_id WHERE r.day = ? AND u.is_guest = 0 LIMIT 1',
+    `SELECT 1 AS x FROM daily_results d JOIN users u ON u.id = d.user_id WHERE d.day = ? AND ${SHARED_RUN} LIMIT 1`,
     day,
   );
   if (started) return false;
@@ -48,16 +52,21 @@ export function dailyQuestions(day: string, userId: number): PreparedQuestion[] 
 }
 
 /**
- * A guest's run of the day: ten questions of its own rather than the shared set. A guest costs one click, so with the
- * shared set anyone could read the day's answers off a throwaway guest and then top the board with their real profile.
- * Guests aren't on the board anyway; saving the profile opens the shared set to them (forgetGuestDaily).
+ * The run of a guest, or of an account made today: ten questions of its own rather than the shared set (playsSharedDaily).
+ * A second account costs seconds, so with the shared set anyone could read the day's answers off a throwaway and then
+ * top the board with their real profile. These runs aren't on the board; tomorrow the shared set opens to the account.
  */
-export function guestDailyQuestions(userId: number): PreparedQuestion[] {
+export function ownDailyQuestions(userId: number): PreparedQuestion[] {
   return pickQuestions(MODES.daily.questions, 'mixed', recentFor([userId]));
 }
 
-/** A guest just saved their profile: today's guest run (its own questions) makes way for the shared set and the board. */
+/**
+ * A guest just saved their profile. Made before today, the account plays the shared set now: today's guest run (its
+ * own questions) makes way for it. Made today, the run stands, and the shared set opens tomorrow.
+ */
 export function forgetGuestDaily(userId: number) {
+  const user = getUser(userId);
+  if (!user || !playsSharedDaily(user)) return;
   run('DELETE FROM daily_results WHERE user_id = ? AND day = ?', userId, dayKey());
 }
 
@@ -65,16 +74,18 @@ export function forgetGuestDaily(userId: number) {
  * Claims today's single attempt. Starting counts — leaving or disconnecting doesn't give a retry; only a server restart
  * that cut the attempt short does.
  */
-export function claimDailyAttempt(userId: number): { ok: true; day: string } | { ok: false; error: string } {
+export function claimDailyAttempt(
+  userId: number,
+): { ok: true; day: string; ownSet: boolean } | { ok: false; error: string } {
   const day = dayKey();
-  const existing = one<{ started_at: number; finished_at: number | null }>(
-    'SELECT started_at, finished_at FROM daily_results WHERE user_id = ? AND day = ?',
+  const existing = one<{ started_at: number; finished_at: number | null; own_set: number | null }>(
+    'SELECT started_at, finished_at, own_set FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
   if (existing && !existing.finished_at && existing.started_at < config.bootedAt) {
     run('UPDATE daily_results SET started_at = ? WHERE user_id = ? AND day = ?', Date.now(), userId, day);
-    return { ok: true, day };
+    return { ok: true, day, ownSet: existing.own_set === 1 };
   }
   if (existing) {
     return {
@@ -84,9 +95,16 @@ export function claimDailyAttempt(userId: number): { ok: true; day: string } | {
         : 'Днешният опит вече е започнат — имаш само един на ден.',
     };
   }
-  run('INSERT INTO daily_results (user_id, day, started_at) VALUES (?, ?, ?)', userId, day, Date.now());
+  const ownSet = !playsSharedDaily(getUser(userId)!, day);
+  run(
+    'INSERT INTO daily_results (user_id, day, started_at, own_set) VALUES (?, ?, ?, ?)',
+    userId,
+    day,
+    Date.now(),
+    ownSet ? 1 : 0,
+  );
   count('daily_runs');
-  return { ok: true, day };
+  return { ok: true, day, ownSet };
 }
 
 /** The run never got going (or its result couldn't be saved): the day's one attempt is the player's again. */
@@ -94,17 +112,17 @@ export function releaseDailyAttempt(userId: number, day: string) {
   run('DELETE FROM daily_results WHERE user_id = ? AND day = ? AND finished_at IS NULL', userId, day);
 }
 
-/** Place on the day's board, and how many are on it. A guest's run has questions of its own: no place for it. */
-function rankOf(day: string, score: number, timeMs: number, guest = false): { rank: number | null; total: number } {
+/** Place on the day's board, and how many are on it. A run on questions of its own has no place on it. */
+function rankOf(day: string, score: number, timeMs: number, ownSet = false): { rank: number | null; total: number } {
   const listed = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0`,
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN}`,
     day,
   )!.n;
-  if (guest) return { rank: null, total: listed };
+  if (ownSet) return { rank: null, total: listed };
   const better = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN}
      AND (d.score > ? OR (d.score = ? AND d.time_ms < ?))`,
     day,
     score,
@@ -114,8 +132,18 @@ function rankOf(day: string, score: number, timeMs: number, guest = false): { ra
   return { rank: better + 1, total: listed };
 }
 
-/** Saves the result and advances the player's day streak. */
-export function recordDailyResult(userId: number, day: string, score: number, correct: number, timeMs: number) {
+/**
+ * Saves the result and, when the run was played (`played`: at least half of it, not walked out of in the first
+ * questions), advances the player's day streak. A run left at once uses the day's attempt but isn't a day played.
+ */
+export function recordDailyResult(
+  userId: number,
+  day: string,
+  score: number,
+  correct: number,
+  timeMs: number,
+  played: boolean,
+) {
   run(
     'UPDATE daily_results SET finished_at = ?, score = ?, correct = ?, time_ms = ? WHERE user_id = ? AND day = ?',
     Date.now(),
@@ -126,9 +154,14 @@ export function recordDailyResult(userId: number, day: string, score: number, co
     day,
   );
   const u = getUser(userId)!;
-  const guest = u.is_guest === 1;
-  if (u.last_daily_day === day)
-    return { ...rankOf(day, score, timeMs, guest), streak: u.daily_streak, shieldsUsed: 0, shieldEarned: false };
+  const ownSet = one<{ own_set: number | null }>(
+    'SELECT own_set FROM daily_results WHERE user_id = ? AND day = ?',
+    userId,
+    day,
+  )?.own_set;
+  const rank = rankOf(day, score, timeMs, (ownSet ?? u.is_guest) === 1);
+  if (u.last_daily_day === day || !played)
+    return { ...rank, streak: liveDailyStreak(u, day), shieldsUsed: 0, shieldEarned: false };
 
   // Consecutive day: the streak grows. Missed days are covered by shields, one each, if there are enough.
   const missed = u.last_daily_day ? daysBetween(u.last_daily_day, day) - 1 : Infinity;
@@ -152,7 +185,7 @@ export function recordDailyResult(userId: number, day: string, score: number, co
     shields,
     userId,
   );
-  return { ...rankOf(day, score, timeMs, guest), streak, shieldsUsed, shieldEarned };
+  return { ...rank, streak, shieldsUsed, shieldEarned };
 }
 
 /** A streak only counts while it's alive: played today or yesterday, or the days missed since are covered by shields. */
@@ -169,7 +202,7 @@ function friendsToday(day: string, userId: number) {
   const ids = [userId, ...friendIds(userId)];
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND d.user_id IN (${ids.map(() => '?').join(', ')})
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN} AND d.user_id IN (${ids.map(() => '?').join(', ')})
      ORDER BY d.score DESC, d.time_ms ASC`,
     day,
     ...ids,
@@ -184,22 +217,30 @@ export function dailyInfo(userId: number): DailyInfo {
     score: number | null;
     correct: number | null;
     time_ms: number | null;
-  }>('SELECT finished_at, score, correct, time_ms FROM daily_results WHERE user_id = ? AND day = ?', userId, day);
+    own_set: number | null;
+  }>(
+    'SELECT finished_at, score, correct, time_ms, own_set FROM daily_results WHERE user_id = ? AND day = ?',
+    userId,
+    day,
+  );
   const rows = all<UserRow & { score: number; correct: number }>(
     `SELECT u.*, d.score, d.correct FROM daily_results d JOIN users u ON u.id = d.user_id
-     WHERE d.day = ? AND d.finished_at IS NOT NULL AND u.is_guest = 0 ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
+     WHERE d.day = ? AND d.finished_at IS NOT NULL AND ${SHARED_RUN} ORDER BY d.score DESC, d.time_ms ASC LIMIT 50`,
     day,
   );
   const me = getUser(userId)!;
   const guest = me.is_guest === 1;
+  // Today's run as it was started; one not started yet goes by the account as it is now.
+  const ownSet = mine ? (mine.own_set ?? me.is_guest) === 1 : !playsSharedDaily(me, day);
   const played = mine?.finished_at
-    ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, guest) }
+    ? { score: mine.score!, correct: mine.correct!, ...rankOf(day, mine.score!, mine.time_ms!, ownSet) }
     : null;
   return {
     day,
     endsAt: dayEndsAt(day),
     streak: liveDailyStreak(me),
     attempted: !!mine,
+    ownSet,
     played: played && { score: played.score, correct: played.correct, rank: played.rank },
     total: rankOf(day, 0, 0, true).total,
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),

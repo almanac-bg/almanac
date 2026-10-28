@@ -9,6 +9,7 @@ import {
   type GameStartPayload,
   type PowerupEvent,
   type QuestionPayload,
+  RATED_AFTER,
   type RevealPayload,
   type RoomState,
   SEASON_REWARD_XP,
@@ -52,6 +53,10 @@ before(async () => {
   api = http(srv.url);
   A = await register(srv.url, 'Иван_тест');
   B = await register(srv.url, 'maria_test');
+  // Accounts from yesterday: they play the shared daily (a brand-new account gets its own: the guest's daily below).
+  srv.db
+    .prepare('UPDATE users SET created_at = ? WHERE id IN (?, ?)')
+    .run(Date.now() - RATED_AFTER.ms, A.user.id, B.user.id);
   sa = connect(srv.url, A.cookie);
   sb = connect(srv.url, B.cookie);
   await connected(sa, sb);
@@ -235,6 +240,13 @@ test('solo', T, async () => {
 });
 
 test('ranked duel with a mid-game reconnect', T, async () => {
+  // People rate each other once each has RATED_AFTER.games matches behind them: lent for this match, then given back,
+  // so the counts the later tests check are the real ones.
+  const lend = (games: number) =>
+    srv.db
+      .prepare('UPDATE users SET games_played = games_played + ? WHERE id IN (?, ?)')
+      .run(games, A.user.id, B.user.id);
+  lend(RATED_AFTER.games);
   const pa = autoPlay(sa, 'right');
   const bFirstQuestion = next(sb, 'game:question');
   assert.ok((await emitAck(sa, 'queue:join', 'duel')).ok);
@@ -254,6 +266,7 @@ test('ranked duel with a mid-game reconnect', T, async () => {
   assert.ok(ea.rewards!.rating!.after > ea.rewards!.rating!.before, 'winner gains rating');
   assert.ok(eb.rewards!.rating!.after < eb.rewards!.rating!.before, 'loser drops rating');
   assert.ok(ea.rewards!.achievements.includes('first_win') && ea.rewards!.achievements.includes('flawless_duel'));
+  lend(-RATED_AFTER.games);
 });
 
 test('royale with bots and eliminations', T, async () => {
@@ -632,41 +645,61 @@ test('daily challenge', T, async () => {
   assert.equal(board.body.me.rank, 2);
 });
 
-test('a guest plays a daily of their own, off the board; saving the profile opens the shared one', T, async () => {
-  const G = await guest(srv.url);
-  const sg = connect(srv.url, G.cookie);
-  await connected(sg);
-  const log = newLog();
-  const play = autoPlay(sg, 'right', log);
-  assert.ok((await emitAck(sg, 'daily:start')).ok);
-  const { end } = await play;
-  // A throwaway guest must not be a way to read the day's answers before playing for the board.
-  assert.notDeepEqual(
-    log.questions.map((q) => q.id),
-    sharedDaily,
-    'questions of its own',
-  );
-  assert.equal(end.rewards!.daily!.rank, null, 'no place on the board');
-  assert.equal((await api.get('/api/daily', G.cookie)).body.played.rank, null);
-  assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'still one run a day');
+test(
+  'a guest, or an account made today, plays a daily of its own, off the board; from the next day the shared one',
+  T,
+  async () => {
+    const G = await guest(srv.url);
+    const sg = connect(srv.url, G.cookie);
+    await connected(sg);
+    const log = newLog();
+    const play = autoPlay(sg, 'right', log);
+    assert.ok((await emitAck(sg, 'daily:start')).ok);
+    const { end } = await play;
+    // A throwaway guest must not be a way to read the day's answers before playing for the board.
+    assert.notDeepEqual(
+      log.questions.map((q) => q.id),
+      sharedDaily,
+      'questions of its own',
+    );
+    assert.equal(end.rewards!.daily!.rank, null, 'no place on the board');
+    assert.equal((await api.get('/api/daily', G.cookie)).body.played.rank, null);
+    assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'still one run a day');
 
-  const saved = await api.send('POST', '/api/account/claim', G.cookie, {
-    username: `saver${Math.floor(Math.random() * 1e6)}`,
-    password: 'secret123',
-  });
-  assert.equal(saved.status, 200);
-  const logShared = newLog();
-  const again = autoPlay(sg, 'wrong', logShared);
-  assert.ok((await emitAck(sg, 'daily:start')).ok, 'with a profile, the shared daily is open');
-  const { end: shared } = await again;
-  assert.deepEqual(
-    logShared.questions.map((q) => q.id),
-    sharedDaily,
-    'the shared questions',
-  );
-  assert.equal(typeof shared.rewards!.daily!.rank, 'number', 'and a place on the board');
-  sg.close();
-});
+    // Saved the same day it was made: an account made today could still be a throwaway, so the run stands.
+    const claim = (cookie: string) =>
+      api.send('POST', '/api/account/claim', cookie, {
+        username: `saver${Math.floor(Math.random() * 1e6)}`,
+        password: 'secret123',
+      });
+    assert.equal((await claim(G.cookie)).status, 200);
+    assert.equal((await emitAck(sg, 'daily:start')).ok, false, 'saved today: today’s run stands');
+    assert.equal((await api.get('/api/daily', G.cookie)).body.ownSet, true);
+    sg.close();
+
+    // A guest from yesterday that saves its profile today opens the shared daily at once.
+    const H = await guest(srv.url);
+    srv.db.prepare('UPDATE users SET created_at = ? WHERE id = ?').run(Date.now() - RATED_AFTER.ms, H.user.id);
+    const sh = connect(srv.url, H.cookie);
+    await connected(sh);
+    const own = autoPlay(sh, 'right', newLog());
+    assert.ok((await emitAck(sh, 'daily:start')).ok);
+    assert.equal((await own).end.rewards!.daily!.rank, null, 'as a guest, its own');
+    assert.equal((await claim(H.cookie)).status, 200);
+    assert.equal((await api.get('/api/daily', H.cookie)).body.ownSet, false);
+    const logShared = newLog();
+    const again = autoPlay(sh, 'wrong', logShared);
+    assert.ok((await emitAck(sh, 'daily:start')).ok, 'with a profile, the shared daily is open');
+    const { end: shared } = await again;
+    assert.deepEqual(
+      logShared.questions.map((q) => q.id),
+      sharedDaily,
+      'the shared questions',
+    );
+    assert.equal(typeof shared.rewards!.daily!.rank, 'number', 'and a place on the board');
+    sh.close();
+  },
+);
 
 /** A and B (friends by now) see each other out of any room: the next test starts clean. */
 const bothOutOfRooms = () =>

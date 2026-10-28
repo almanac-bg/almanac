@@ -28,19 +28,32 @@ export const SCORING = {
   doubleStake: 500,
 } as const;
 
+/** The reading window: as long as it takes to read the question, at most this much of the clock. */
+export const READING = { baseMs: 400, perCharMs: 30, minMs: 1_000, maxMs: 3_500 } as const;
+
 /**
- * What a correct answer scores: the base, the speed bonus for the time left on the regular clock ("Още време" buys
- * time, not speed points) and the streak bonus, doubled by "Двойно или нищо", halved for a "Втори шанс" pick.
- * `streak` counts this answer.
+ * How long a question takes to read (by its length): the speed bonus only starts to drain after it, so a fast reader
+ * gains nothing over a slow one, and nobody gains by tapping before they've read it.
+ */
+export function readingMs(question: string): number {
+  return Math.min(READING.maxMs, Math.max(READING.minMs, READING.baseMs + question.length * READING.perCharMs));
+}
+
+/**
+ * What a correct answer scores: the base, the speed bonus for the time left on the regular clock after the reading
+ * window ("Още време" buys time, not speed points) and the streak bonus, doubled by "Двойно или нищо", halved for a
+ * "Втори шанс" pick. `streak` counts this answer.
  */
 export function answerPoints(a: {
   timeMs: number;
   limitMs: number;
+  readMs: number;
   streak: number;
   doubled: boolean;
   retried: boolean;
 }) {
-  const speed = Math.round(SCORING.speed * Math.max(0, 1 - a.timeMs / a.limitMs));
+  const drained = Math.max(0, a.timeMs - a.readMs) / Math.max(1, a.limitMs - a.readMs);
+  const speed = Math.round(SCORING.speed * Math.max(0, 1 - drained));
   const streakBonus = Math.min((a.streak - 1) * SCORING.streakStep, SCORING.streakMax);
   return Math.round((SCORING.base + speed + streakBonus) * (a.doubled ? 2 : 1) * (a.retried ? 0.5 : 1));
 }
@@ -49,6 +62,12 @@ export const START_RATING = 1000;
 
 /** Win-trading guard: the same two people only move each other's rating this many times a day. */
 export const RATED_GAMES_PER_PAIR = 3;
+
+/**
+ * A new account plays people unrated until it is this old and has played this many matches (against bots it's rated
+ * from the first): a throwaway account to trade wins with costs a day and real play, not ten seconds.
+ */
+export const RATED_AFTER = { ms: 24 * 60 * 60 * 1000, games: 10 } as const;
 
 export const RANK_TIERS = [
   { id: 'bronze', name: 'Бронз', min: -Infinity, color: '#d4915c' },

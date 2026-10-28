@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { LaunchStatsPanel } from '../components/admin/LaunchStatsPanel';
+import { PlayCheckPanel } from '../components/admin/PlayCheckPanel';
 import { QuestionReportsQueue } from '../components/admin/QuestionReportsQueue';
 import { ReportsQueue } from '../components/admin/ReportsQueue';
 import { LoadError } from '../components/LoadError';
@@ -24,14 +25,15 @@ const toDraft = (s: Submission): QuestionDraft => ({
   answer: s.answer,
 });
 
-type Section = 'questions' | 'flags' | 'reports' | 'stats';
+type Section = 'questions' | 'flags' | 'reports' | 'play' | 'stats';
 
 export function AdminPage() {
   usePageTitle('Модерация');
   const me = useStore((s) => s.me)!;
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');
-  const section: Section = tab === 'reports' || tab === 'flags' || tab === 'stats' ? tab : 'questions';
+  const section: Section =
+    tab === 'reports' || tab === 'flags' || tab === 'play' || tab === 'stats' ? tab : 'questions';
   const [counts, setCounts] = useState<{
     pendingQuestions: number;
     openReports: number;
@@ -65,6 +67,7 @@ export function AdminPage() {
             { value: 'questions', label: <>Въпроси{badge(counts?.pendingQuestions)}</> },
             { value: 'flags', label: <>Сигнали{badge(counts?.questionReports)}</> },
             { value: 'reports', label: <>Доклади{badge(counts?.openReports)}</> },
+            { value: 'play', label: 'Игра' },
             { value: 'stats', label: 'Статистика' },
           ]}
         />
@@ -76,6 +79,7 @@ export function AdminPage() {
         <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />
       )}
       {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />}
+      {section === 'play' && <PlayCheckPanel />}
       {section === 'stats' && <LaunchStatsPanel />}
     </div>
   );

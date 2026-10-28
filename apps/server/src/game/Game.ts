@@ -17,6 +17,7 @@ import {
   POWERUPS,
   type PowerupId,
   type QuestionPayload,
+  readingMs,
   SCORING,
   type ServerToClientEvents,
   type Standing,
@@ -108,6 +109,10 @@ export interface Participant {
   correct: number;
   /** Questions this player was still in the match for. */
   faced: number;
+  /** Of those, the ones they picked an answer on (someone who never does is no rival to beat in a private room). */
+  answered: number;
+  /** A person's answer to each question they faced, in order (the answer log). */
+  log: AnswerLogEntry[];
   streak: number;
   bestStreak: number;
   fastestCorrectMs: number | null;
@@ -135,6 +140,22 @@ export interface Participant {
   extraMs: number;
   retryArmed: boolean;
   firstWrong: number | null;
+  /** A bot's mind for this question, made up when it opened (scheduleBots); null when it zones out. */
+  move: BotMove | null;
+}
+
+export interface AnswerLogEntry {
+  questionId: string;
+  difficulty: Difficulty;
+  correct: boolean;
+  /** Null: no answer in time. */
+  timeMs: number | null;
+}
+
+interface BotMove {
+  knows: boolean;
+  afterMs: number;
+  joker: PowerupId | null;
 }
 
 type Phase = 'countdown' | 'question' | 'reveal' | 'ended';
@@ -167,6 +188,8 @@ export class Game {
   private waitingForReader = false;
 
   private questionStartedAt = 0;
+  /** The open question's reading window (readingMs): its speed bonus drains only after it. */
+  private readMs = 0;
   private timers = new Set<NodeJS.Timeout>();
   private questionTimer: NodeJS.Timeout | null = null;
   private abandonTimer: NodeJS.Timeout | null = null;
@@ -406,6 +429,7 @@ export class Game {
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
     this.questionStartedAt = gameClock.now();
+    this.readMs = readingMs(this.questions[this.index].q);
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
@@ -414,6 +438,7 @@ export class Game {
       p.extraMs = 0;
       p.retryArmed = false;
       p.firstWrong = null;
+      p.move = null;
     }
     this.toGame('game:question', this.questionPayload());
     this.scheduleBots();
@@ -434,10 +459,13 @@ export class Game {
     const reconnecting = (p: Participant) =>
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
     // Alone, the clock is the only limit: nobody else is waiting for the question to close.
-    const waitingOn = [...this.participants.values()].filter(
-      (p) => this.isActive(p) && (this.alone || p.connected || p.brain || reconnecting(p)),
+    const undecided = [...this.participants.values()].filter(
+      (p) => this.isActive(p) && !p.answer && (this.alone || p.connected || p.brain || reconnecting(p)),
     );
-    if (waitingOn.some((p) => !p.answer)) return;
+    if (undecided.some((p) => !p.brain)) return;
+    // Only bots left: they made up their minds when the question opened, so they answer now, with the time they took,
+    // instead of keeping people waiting for a bot's clock (a duel against one took half again as long as a solo run).
+    for (const p of undecided) this.botAnswerNow(p);
     if (this.questionTimer) clearTimeout(this.questionTimer);
     this.questionTimer = this.later(EARLY_REVEAL_MS, () => this.reveal());
   }
@@ -456,6 +484,7 @@ export class Game {
       if (!p.answer && p.firstWrong !== null)
         p.answer = { choice: p.firstWrong, timeMs: this.setup.timeMs + p.extraMs, retried: false };
       p.faced++;
+      if (p.answer) p.answered++;
       const cat = p.categories.get(q.category) ?? { answered: 0, correct: 0, correctMs: 0 };
       p.categories.set(q.category, cat);
       cat.answered++;
@@ -475,13 +504,22 @@ export class Game {
         p.bestStreak = Math.max(p.bestStreak, p.streak);
         p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
         if (q.difficulty !== 'easy') p.fastestHardCorrectMs = Math.min(p.fastestHardCorrectMs ?? timeMs, timeMs);
-        points = answerPoints({ timeMs, limitMs: this.setup.timeMs, streak: p.streak, doubled: p.doubled, retried });
+        points = answerPoints({
+          timeMs,
+          limitMs: this.setup.timeMs,
+          readMs: this.readMs,
+          streak: p.streak,
+          doubled: p.doubled,
+          retried,
+        });
       } else {
         p.streak = 0;
         // "Двойно или нищо" is a bet: a miss costs points (never below zero).
         if (p.doubled && p.score > 0) points = -Math.min(SCORING.doubleStake, p.score);
       }
       p.score += points;
+      if (!p.brain)
+        p.log.push({ questionId: q.id, difficulty: q.difficulty, correct, timeMs: p.answer?.timeMs ?? null });
       results[p.player.id] = {
         choice: p.answer?.choice ?? null,
         correct,
@@ -524,8 +562,9 @@ export class Game {
     this.clearTimers();
     if (this.abandonTimer) clearTimeout(this.abandonTimer);
 
-    // A one-attempt run we cut short has no fair result: nothing is saved and the attempt is the player's again.
-    if (this.cutShort && (this.setup.dailyDay || this.setup.challengeId)) {
+    // A one-attempt run we cut short has no fair result, and one left before its first question was no attempt: nothing
+    // is saved and the attempt is the player's again.
+    if ((this.cutShort || this.index < 0) && (this.setup.dailyDay || this.setup.challengeId)) {
       try {
         this.hooks.release(this);
       } catch (err) {
@@ -618,7 +657,7 @@ export class Game {
    * plays on the way, as a person would — 50/50 when it doesn't know, "Двойно или нищо" mostly when it does (now and
    * then on a hunch, which costs it). Null when it zones out.
    */
-  private botMove(p: Participant): { knows: boolean; afterMs: number; joker: PowerupId | null } | null {
+  private botMove(p: Participant): BotMove | null {
     const brain = p.brain!;
     const q = this.questions[this.index];
     if (Math.random() < 0.04) return null; // zoned out — lets the clock run down
@@ -652,11 +691,24 @@ export class Game {
     for (const p of this.participants.values()) {
       if (!p.brain || !this.isActive(p)) continue;
       const move = this.botMove(p);
+      p.move = move;
       if (!move) continue;
       const { joker } = move;
       if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
       this.later(move.afterMs, () => this.answer(p.player.id, index, this.botChoice(p, move.knows)));
     }
+  }
+
+  /**
+   * A bot answers at once, as it was going to (its коз first, if it hadn't played it yet), with the time it would have
+   * taken: its points are the same as if everyone had waited. One that zoned out stays without an answer.
+   */
+  private botAnswerNow(p: Participant) {
+    const move = p.move;
+    if (!move || p.answer) return;
+    if (move.joker) this.usePowerup(p.player.id, this.index, move.joker);
+    p.answer = { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
+    this.toGame('game:answered', { playerId: p.player.id });
   }
 
   /**
@@ -783,6 +835,7 @@ export class Game {
       author: q.author ?? null,
       durationMs: this.setup.timeMs,
       remainingMs: Math.max(0, this.setup.timeMs - this.elapsed()),
+      readMs: this.readMs,
       elimination: this.schedule.includes(this.index + 1),
       answered: [...this.participants.values()].filter((p) => p.answer).map((p) => p.player.id),
     };
@@ -885,6 +938,8 @@ export class Game {
       score: 0,
       correct: 0,
       faced: 0,
+      answered: 0,
+      log: [],
       streak: 0,
       bestStreak: 0,
       fastestCorrectMs: null,
@@ -907,6 +962,7 @@ export class Game {
       extraMs: 0,
       retryArmed: false,
       firstWrong: null,
+      move: null,
     };
   }
 }

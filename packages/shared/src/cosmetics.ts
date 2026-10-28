@@ -43,6 +43,8 @@ export type PowerupId = 'fifty' | 'double' | 'retry' | 'time';
 export interface PowerupDef {
   id: PowerupId;
   name: string;
+  /** Under the icon on a phone's bar, where the full name doesn't fit. */
+  short: string;
   icon: string;
   description: string;
   /** Not on an easy question: a bet on one is no bet (and every match opens with easy ones). */
@@ -75,6 +77,10 @@ export const AVATARS: AvatarDef[] = [
   { id: 'peacock', name: 'Паун', emoji: '🦚', req: { level: 43 } },
   { id: 'genie', name: 'Джин', emoji: '🧞', req: { level: 46 } },
   { id: 'star', name: 'Суперзвезда', emoji: '🌟', req: { level: 50 } },
+  // Past 50 the levels go on (every five take a week or two of regular play): something to reach for to 100.
+  { id: 'zmey', name: 'Змей', emoji: '🐉', req: { level: 55 } },
+  { id: 'amphora', name: 'Амфора', emoji: '🏺', req: { level: 70 } },
+  { id: 'milkyway', name: 'Млечен път', emoji: '🌌', req: { level: 90 } },
   { id: 'bolt', name: 'Мълния', emoji: '⚡', req: { achievement: 'speed_demon' } },
   { id: 'flame', name: 'Пламък', emoji: '🔥', req: { achievement: 'streak_10' } },
   { id: 'target', name: 'В десетката', emoji: '🎯', req: { achievement: 'perfect' } },
@@ -128,6 +134,26 @@ export const FRAMES: FrameDef[] = [
     background: 'conic-gradient(#1e1b4b,#c026d3,#1e1b4b,#38bdf8,#f0abfc,#1e1b4b)',
     animated: true,
     req: { level: 45 },
+  },
+  {
+    id: 'amber',
+    name: 'Кехлибар',
+    background: 'linear-gradient(135deg,#fef3c7,#f59e0b,#78350f,#fbbf24)',
+    req: { level: 60 },
+  },
+  {
+    id: 'crystal',
+    name: 'Кристал',
+    background: 'conic-gradient(#e0f2fe,#ffffff,#a5f3fc,#c7d2fe,#ffffff,#e0f2fe)',
+    animated: true,
+    req: { level: 80 },
+  },
+  {
+    id: 'eternity',
+    name: 'Вечност',
+    background: 'conic-gradient(#fde047,#a855f7,#0f0a1f,#22d3ee,#f472b6,#fde047)',
+    animated: true,
+    req: { level: 100 },
   },
   {
     id: 'inferno',
@@ -204,6 +230,11 @@ export const TITLES: TitleDef[] = [
   { id: 'library', name: 'Жива библиотека', req: { level: 40 } },
   { id: 'wisdom', name: 'Вековна мъдрост', req: { level: 45 } },
   { id: 'legend', name: 'Жива легенда', req: { level: 50 } },
+  { id: 'keeper', name: 'Пазител на знанието', req: { level: 55 } },
+  { id: 'walking', name: 'Ходеща енциклопедия', req: { level: 65 } },
+  { id: 'deathless', name: 'Безсмъртен ум', req: { level: 75 } },
+  { id: 'chronicler', name: 'Летописец', req: { level: 85 } },
+  { id: 'almanac', name: 'Жив алманах', req: { level: 100 } },
   { id: 'speedster', name: 'Демон на скоростта', req: { achievement: 'speed_demon' } },
   { id: 'unstoppable', name: 'Неудържима серия', req: { achievement: 'streak_10' } },
   { id: 'perfectionist', name: 'Безупречност', req: { achievement: 'perfect' } },
@@ -249,17 +280,19 @@ export const EMOTES: EmoteDef[] = [
  * everyone compares). Bar order, left to right, and the keys Q to R.
  */
 export const POWERUPS: PowerupDef[] = [
-  { id: 'fifty', name: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.' },
+  { id: 'fifty', name: '50/50', short: '50/50', icon: '✂️', description: 'Премахва два грешни отговора.' },
   {
     id: 'retry',
     name: 'Втори шанс',
+    short: 'Шанс',
     icon: '🔁',
     description: 'Ако сгрешиш, имаш още един опит (за половин точки).',
   },
-  { id: 'time', name: 'Още време', icon: '⏳', description: '+5 секунди само за теб.' },
+  { id: 'time', name: 'Още време', short: 'Време', icon: '⏳', description: '+5 секунди само за теб.' },
   {
     id: 'double',
     name: 'Двойно или нищо',
+    short: 'Двойно',
     icon: '💰',
     description: 'Удвоява точките за среден или труден въпрос, ако отговориш вярно. Ако сгрешиш, губиш 500 точки.',
     notOnEasy: true,

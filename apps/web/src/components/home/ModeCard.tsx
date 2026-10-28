@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
 import { RankBadge } from '../Avatar';
+import { FreshPowerupNotes } from '../game/Powerups';
 import { SCORING_LINE } from '../game/scoring';
 import { Button, buttonClass, Modal } from '../ui';
 
@@ -232,6 +233,8 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
   const options = [MIXED_CATEGORY, ...CATEGORIES];
   return (
     <Modal open={open} onClose={onClose} title="Избери категория" className="max-w-2xl">
+      {/* A first solo is where most players meet the козове: here, before the clock, is the time to read what they do. */}
+      <FreshPowerupNotes className="mb-4" />
       {/* As many columns as fit tiles wide enough for the longest word („литература“, „Технологии“) beside the icon:
           one on a 320 px phone, two from 375; from tablets up the icon and padding grow, so the tiles do too (two
           wide columns in the dialog, not three cramped ones that split the word). */}
