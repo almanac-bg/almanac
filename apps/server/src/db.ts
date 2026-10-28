@@ -488,6 +488,42 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX daily_results_via ON daily_results(via, day) WHERE via IS NOT NULL;
     `,
   },
+
+  // v20, foundations for opponents from recorded play and for measured difficulty:
+  // - `runs`: each person's finished match, question by question (runs.ts), kept RUN_KEEP_DAYS.
+  // - `question_skill`, `player_skill`: how hard each question is and how strong each player is (overall and per
+  //   category), on one scale, moved by every answer (skill.ts). Older code leaves all three alone.
+  {
+    compatible: `
+    CREATE TABLE runs (
+      id INTEGER PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mode TEXT NOT NULL,
+      category TEXT NOT NULL,
+      rating REAL,
+      score INTEGER NOT NULL,
+      correct INTEGER NOT NULL,
+      answers TEXT NOT NULL,
+      played_at INTEGER NOT NULL
+    );
+    CREATE INDEX runs_user ON runs(user_id, played_at);
+    CREATE INDEX runs_mode ON runs(mode, played_at);
+
+    CREATE TABLE question_skill (
+      question_id TEXT PRIMARY KEY,
+      rating REAL NOT NULL,
+      answers INTEGER NOT NULL DEFAULT 0
+    ) WITHOUT ROWID;
+    CREATE TABLE player_skill (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      rating REAL NOT NULL,
+      answers INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, category)
+    ) WITHOUT ROWID;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

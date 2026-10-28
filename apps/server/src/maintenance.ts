@@ -13,6 +13,7 @@ import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
 import { reloadQuestionBank } from './questions';
+import { pruneRuns } from './runs';
 import { count } from './stats';
 import type { UserRow } from './users';
 
@@ -173,6 +174,7 @@ export function startMaintenance() {
       );
       purgeExpired();
       await pruneAnswers();
+      await pruneRuns();
       await purgeGuests();
       const inactive = retireInactiveAccounts();
       if (inactive.warned || inactive.erased)

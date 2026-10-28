@@ -19,7 +19,9 @@ import { recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { advanceQuests } from '../quests';
+import { recordRun } from '../runs';
 import { getRating, recordRating } from '../seasons';
+import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
@@ -135,6 +137,17 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       if (p.player.userId === null) continue;
       const r = rewardHuman(game, p, s, standings, deltas.get(s.id) ?? null, ratings.unrated.get(s.id) ?? null);
       recordAnswers(game.id, p.player.userId, p.log);
+      recordRun({
+        matchId: game.id,
+        userId: p.player.userId,
+        mode: game.setup.mode,
+        category: game.setup.category,
+        rating: game.setup.ranked ? p.player.rating : null,
+        score: s.score,
+        correct: p.correct,
+        log: p.log,
+      });
+      recordSkill(p.player.userId, p.log);
       rewards.set(p.player.userId, r);
       run('UPDATE match_players SET xp_gained = ? WHERE match_id = ? AND player_id = ?', r.xpGained, game.id, s.id);
     }

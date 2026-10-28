@@ -16,9 +16,11 @@ import { createRealtime } from './realtime';
 import { api } from './routes/api';
 import { sameSiteWrites, securityHeaders } from './security';
 import { siteInfo } from './site';
+import { seedSkillOnce } from './skill';
 import { network, throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
+seedSkillOnce();
 
 // The last stop wrote that it was clean (shutdown below). Without that, the process was killed: out of memory, a
 // crash Node couldn't report, a host reboot. Running matches vanished with it, and nothing else would say so.

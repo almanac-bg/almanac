@@ -35,7 +35,32 @@ const PREFIX = {
   literature: 'lit',
   nature: 'nat',
 };
-const KEYS = ['id', 'category', 'difficulty', 'q', 'options', 'answer', 'fact', 'factSource'];
+// The bank's fields, in the order they're kept (apps/server/src/questions.ts has the schema for each format).
+const KEYS = [
+  'id',
+  'kind',
+  'category',
+  'difficulty',
+  'q',
+  'options',
+  'answer',
+  'number',
+  'items',
+  'direction',
+  'image',
+  'fact',
+  'factSource',
+  'answerSource',
+  'tags',
+  'added',
+  'reviewBy',
+];
+/** What each format can't do without (`kind` left out: four options). */
+const REQUIRED = {
+  choice: ['options', 'answer'],
+  number: ['number'],
+  order: ['items', 'direction'],
+};
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 /** The mix every match draws (pickQuestions in apps/server/src/questions.ts): the bank keeps the same split. */
 const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 };
@@ -134,7 +159,9 @@ function append(bank, added) {
   const next = {};
   for (const q of bank.questions) next[q.category] = Math.max(next[q.category] ?? 0, number(q.id));
   for (const q of added) {
-    const missing = ['category', 'difficulty', 'q', 'options', 'answer'].filter((k) => q[k] === undefined);
+    const required = REQUIRED[q.kind ?? 'choice'];
+    if (!required) fail(`${q.id ?? q.q}: unknown kind ${q.kind}`);
+    const missing = ['category', 'difficulty', 'q', ...required].filter((k) => q[k] === undefined);
     if (missing.length) fail(`${q.id ?? q.q ?? JSON.stringify(q).slice(0, 60)}: missing ${missing.join(', ')}`);
     if (!PREFIX[q.category]) fail(`${q.q}: unknown category ${q.category}`);
     const unknown = Object.keys(q).filter((k) => !KEYS.includes(k));

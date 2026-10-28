@@ -129,6 +129,11 @@ export function exportAccount(userId: number) {
     seasonRewards: rows('SELECT * FROM season_rewards WHERE user_id = ?'),
     dailyResults: rows('SELECT * FROM daily_results WHERE user_id = ?'),
     dailyLinks: rows('SELECT code, day, created_at FROM daily_links WHERE user_id = ?'),
+    // Each finished match question by question (the options as the bank orders them), and the skill measured from them.
+    runs: rows(
+      'SELECT match_id, mode, category, rating, score, correct, answers, played_at FROM runs WHERE user_id = ?',
+    ).map((r) => ({ ...r, answers: JSON.parse(String(r.answers)) })),
+    skill: rows('SELECT category, rating, answers FROM player_skill WHERE user_id = ?'),
     dailyQuests: rows('SELECT day, quest, progress, done_at FROM quest_progress WHERE user_id = ? ORDER BY day'),
     challengesCreated: rows('SELECT id, created_at, expires_at FROM challenges WHERE creator_id = ?'),
     challengeResults: rows('SELECT * FROM challenge_results WHERE user_id = ?'),

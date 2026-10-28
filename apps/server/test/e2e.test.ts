@@ -630,6 +630,26 @@ test('daily challenge', T, async () => {
   assert.equal(end.rewards!.daily!.rank, 1);
   assert.ok(end.rewards!.achievements.includes('daily_first') && end.rewards!.achievements.includes('daily_perfect'));
   assert.equal((await emitAck(sa, 'daily:start')).ok, false, 'one attempt per day');
+  // The run is kept answer by answer, the option as the bank orders it (the fixture's right one is i % 4), whatever
+  // order the options were shown in.
+  const kept = srv.db.prepare("SELECT answers FROM runs WHERE user_id = ? AND mode = 'daily'").get(A.user.id) as {
+    answers: string;
+  };
+  const answers = JSON.parse(kept.answers) as { q: string; i: number; c: number; ok: number }[];
+  assert.deepEqual(
+    answers.map((a) => a.i),
+    [...Array(10).keys()],
+  );
+  for (const a of answers)
+    assert.equal(a.c, Number(a.q.split('-').pop()) % 4, `${a.q}: the right one, as the bank has it`);
+  assert.ok(
+    (
+      srv.db.prepare('SELECT answers FROM player_skill WHERE user_id = ? AND category = ?').get(A.user.id, 'all') as {
+        answers: number;
+      }
+    ).answers >= 10,
+    'and the skill measured from it',
+  );
 
   const logB = newLog();
   const pb = autoPlay(sb, 'wrong', logB);

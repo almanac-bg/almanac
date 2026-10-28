@@ -10,20 +10,96 @@ import { installationSecret } from './settings';
 /** The longest "Знаеше ли?" fact: one or two sentences, readable at a glance. */
 export const FACT_MAX = 200;
 
+/** What every format has: where it belongs, how hard it's meant to be, the question, and what's behind it. */
+const common = {
+  id: z.string().min(1),
+  category: z.enum(CATEGORY_IDS as [CategoryId, ...CategoryId[]]),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  q: z.string().min(1),
+  /** "Знаеше ли?": something worth knowing behind the answer, shown once it's revealed. */
+  fact: z.string().min(1).max(FACT_MAX).optional(),
+  /** Where the fact can be checked (for whoever reviews the bank; players never see it). */
+  factSource: z.url({ protocol: /^https$/ }).optional(),
+  /** Where the answer can be checked (for whoever reviews the bank). */
+  answerSource: z.url({ protocol: /^https$/ }).optional(),
+  /** Topics across categories ("bg" for Bulgaria, "football"…): themed sets and links draw on them. */
+  tags: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).optional(),
+  /** When it joined the bank (YYYY-MM-DD). */
+  added: z.iso.date().optional(),
+  /** When its answer may no longer hold (a record, an office, a count): checked again by then. */
+  reviewBy: z.iso.date().optional(),
+};
+
+/** A picture over the question (a flag, a landmark, a painting), with its licence: free licences only. */
+const ImageSchema = z.object({
+  /** The file under the site's image store; its name says nothing about the answer. */
+  file: z.string().regex(/^[\w-]+\.(webp|jpg|png)$/),
+  w: z.number().int().positive(),
+  h: z.number().int().positive(),
+  /** What's in it, for screen readers (without giving the answer away). */
+  alt: z.string().min(3),
+  credit: z.string().min(1),
+  license: z.enum(['PD', 'CC0', 'CC BY', 'CC BY-SA']),
+  sourceUrl: z.url({ protocol: /^https$/ }),
+});
+
+const needsFactSource = (q: { fact?: string; factSource?: string }) => !q.fact || !!q.factSource;
+const factSourceIssue = { message: 'a fact needs its source (factSource)', path: ['factSource'] };
+
+/** Four options, one right: what every match plays today. With an image, it waits until the game shows images. */
 const QuestionSchema = z
   .object({
-    id: z.string().min(1),
-    category: z.enum(CATEGORY_IDS as [CategoryId, ...CategoryId[]]),
-    difficulty: z.enum(['easy', 'medium', 'hard']),
-    q: z.string().min(1),
+    ...common,
+    kind: z.literal('choice').optional(),
     options: z.array(z.string().min(1)).length(4),
     answer: z.number().int().min(0).max(3),
-    /** "Знаеше ли?": something worth knowing behind the answer, shown once it's revealed. */
-    fact: z.string().min(1).max(FACT_MAX).optional(),
-    /** Where the fact can be checked (for whoever reviews the bank; players never see it). */
-    factSource: z.url({ protocol: /^https$/ }).optional(),
+    image: ImageSchema.optional(),
   })
-  .refine((q) => !q.fact || q.factSource, { message: 'a fact needs its source (factSource)', path: ['factSource'] });
+  .refine(needsFactSource, factSourceIssue);
+
+/**
+ * "Колко…?", "През коя година…?": a number typed in, scored by how close it is. On a linear scale a guess `tolerance`
+ * away scores nothing; on a log scale, one `tolerance` times too big or too small. Not played yet (the format comes
+ * with the game's next version); the bank can hold them.
+ */
+const NumberQuestionSchema = z
+  .object({
+    ...common,
+    kind: z.literal('number'),
+    number: z
+      .object({
+        answer: z.number(),
+        /** What the number counts ("г.", "км", "души"); empty for a year. */
+        unit: z.string(),
+        /** The range the keypad or slider allows. */
+        min: z.number(),
+        max: z.number(),
+        step: z.number().positive(),
+        scale: z.enum(['linear', 'log']),
+        tolerance: z.number().positive(),
+      })
+      .refine((n) => n.min <= n.answer && n.answer <= n.max, { message: 'the answer is outside min–max' })
+      .refine((n) => n.scale === 'linear' || (n.min > 0 && n.tolerance > 1), {
+        message: 'a log scale needs min above 0 and a tolerance above 1 (a factor)',
+      }),
+  })
+  .refine(needsFactSource, factSourceIssue);
+
+/** "Подреди": four things put in order by a number each has (a year, a height…). Not played yet either. */
+const OrderQuestionSchema = z
+  .object({
+    ...common,
+    kind: z.literal('order'),
+    items: z
+      .array(z.object({ text: z.string().min(1).max(45), value: z.number() }))
+      .length(4)
+      .refine((items) => new Set(items.map((i) => i.value)).size === 4, { message: 'two items share a value' }),
+    direction: z.enum(['asc', 'desc']),
+  })
+  .refine(needsFactSource, factSourceIssue);
+
+export type NumberQuestion = z.infer<typeof NumberQuestionSchema>;
+export type OrderQuestion = z.infer<typeof OrderQuestionSchema>;
 
 export type Question = z.infer<typeof QuestionSchema> & {
   /** Username of the player who submitted it (community questions only). */
@@ -52,6 +128,12 @@ let bank: Question[] | null = null;
 export function questionById(id: string): Question | undefined {
   questionBank();
   return everything!.get(id);
+}
+
+/** An option as shown in a match, as the bank orders them (null if the question has changed since it was drawn). */
+export function bankOption(q: PreparedQuestion, shown: number): number | null {
+  const index = questionById(q.id)?.options.indexOf(q.options[shown]) ?? -1;
+  return index < 0 ? null : index;
 }
 
 /** Who wrote a question, as the bank has it now (community questions only): a rename or a deletion shows at once. */
@@ -88,8 +170,46 @@ export function reloadQuestionBank() {
   }
 }
 
+/** The bank file's questions by format, each checked against its own schema (the first problems, with their ids). */
+function readBankFile(): { choice: Question[]; number: NumberQuestion[]; order: OrderQuestion[] } {
+  const items = z.array(z.record(z.string(), z.unknown())).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
+  const read = { choice: [] as Question[], number: [] as NumberQuestion[], order: [] as OrderQuestion[] };
+  const problems: string[] = [];
+  for (const item of items) {
+    const kind = item.kind ?? 'choice';
+    const schema =
+      kind === 'choice'
+        ? QuestionSchema
+        : kind === 'number'
+          ? NumberQuestionSchema
+          : kind === 'order'
+            ? OrderQuestionSchema
+            : null;
+    if (!schema) {
+      problems.push(`${String(item.id)}: unknown kind ${String(kind)}`);
+      continue;
+    }
+    const parsed = schema.safeParse(item);
+    if (!parsed.success) {
+      problems.push(
+        `${String(item.id)}: ${parsed.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}`,
+      );
+      continue;
+    }
+    (read[kind as keyof typeof read] as unknown[]).push(parsed.data);
+  }
+  if (problems.length) throw new Error(`The question bank has problems: ${problems.slice(0, 5).join(' | ')}`);
+  return read;
+}
+
+/** Questions in the formats the game doesn't play yet, by format (kept for the next version). */
+let waiting = { number: 0, order: 0, image: 0 };
+export const waitingFormats = () => waiting;
+
 function loadBank(): { everything: Map<string, Question>; bank: Question[] } {
-  const builtIn = z.array(QuestionSchema).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
+  const file = readBankFile();
+  waiting = { number: file.number.length, order: file.order.length, image: file.choice.filter((q) => q.image).length };
+  const builtIn = file.choice;
   const community = all<{
     id: string;
     category: CategoryId;
@@ -101,14 +221,19 @@ function loadBank(): { everything: Map<string, Question>; bank: Question[] } {
   }>(
     `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
      FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
-  ).map((r) => ({ ...r, options: JSON.parse(r.options) as string[] }));
+  ).map((r): Question => ({ ...r, options: JSON.parse(r.options) as string[] }));
   const hidden = new Set(
     all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
   );
   const everything = new Map([...builtIn, ...community].map((q) => [q.id, q]));
-  const bank = [...everything.values()].filter((q) => !hidden.has(q.id));
+  // Until the game shows pictures, a question with one is held back (it may need the picture to be answered).
+  const bank = [...everything.values()].filter((q) => !hidden.has(q.id) && !q.image);
   console.log(
-    `📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}`,
+    `📚 ${builtIn.length} built-in + ${community.length} community questions${hidden.size ? `, ${hidden.size} hidden` : ''}${
+      waiting.number + waiting.order + waiting.image
+        ? ` (waiting for the game to play them: ${waiting.number} number, ${waiting.order} order, ${waiting.image} with an image)`
+        : ''
+    }`,
   );
   if (QUESTIONS_PATH === SAMPLE_BANK) {
     (config.production ? console.warn : console.log)(

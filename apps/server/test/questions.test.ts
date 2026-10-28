@@ -8,6 +8,8 @@ import { CATEGORY_IDS } from '@quiz/shared';
 
 interface Q {
   id: string;
+  /** Four options (the default), a number to guess, or four things to put in order: see the schemas in questions.ts. */
+  kind?: 'choice' | 'number' | 'order';
   category: string;
   difficulty: string;
   q: string;
@@ -66,7 +68,9 @@ const normalize = (s: string) =>
 const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 } as const;
 
 for (const { name, file, perCategory, perDifficulty, balanced } of BANKS) {
-  const bank: Q[] = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // The rules here are for four-option questions; the other formats are checked by the server's schemas when it loads
+  // the bank (and get rules of their own once the game plays them).
+  const bank: Q[] = (JSON.parse(fs.readFileSync(file, 'utf8')) as Q[]).filter((q) => (q.kind ?? 'choice') === 'choice');
 
   test(`${name}: every question is well-formed`, () => {
     for (const q of bank) {

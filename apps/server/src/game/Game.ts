@@ -26,7 +26,7 @@ import {
 } from '@quiz/shared';
 import { config } from '../config';
 import { reportError } from '../monitoring';
-import { type PreparedQuestion, questionAuthor, shuffle } from '../questions';
+import { bankOption, type PreparedQuestion, questionAuthor, shuffle } from '../questions';
 import type { BotBrain } from './bots';
 
 const COUNTDOWN_MS = 3_500;
@@ -142,6 +142,8 @@ export interface Participant {
   doubled: boolean;
   removed: number[];
   powerupThisQuestion: boolean;
+  /** Which коз that was (for the answer log). */
+  powerupNow: PowerupId | null;
   extraMs: number;
   retryArmed: boolean;
   firstWrong: number | null;
@@ -151,10 +153,19 @@ export interface Participant {
 
 export interface AnswerLogEntry {
   questionId: string;
+  /** Its place in the match (0 = the first question). */
+  index: number;
+  category: CategoryId;
   difficulty: Difficulty;
+  /** The option picked, as the bank orders them (not as shown): null for no answer in time. */
+  choice: number | null;
   correct: boolean;
   /** Null: no answer in time. */
   timeMs: number | null;
+  /** What the answer scored (negative: a lost "Двойно или нищо"). */
+  points: number;
+  /** The коз played on this question, if one was. */
+  powerup: PowerupId | null;
 }
 
 interface BotMove {
@@ -482,6 +493,7 @@ export class Game {
       p.doubled = false;
       p.removed = [];
       p.powerupThisQuestion = false;
+      p.powerupNow = null;
       p.extraMs = 0;
       p.retryArmed = false;
       p.firstWrong = null;
@@ -566,7 +578,17 @@ export class Game {
       }
       p.score += points;
       if (!p.brain)
-        p.log.push({ questionId: q.id, difficulty: q.difficulty, correct, timeMs: p.answer?.timeMs ?? null });
+        p.log.push({
+          questionId: q.id,
+          index: this.index,
+          category: q.category,
+          difficulty: q.difficulty,
+          choice: p.answer ? bankOption(q, p.answer.choice) : null,
+          correct,
+          timeMs: p.answer?.timeMs ?? null,
+          points,
+          powerup: p.powerupNow,
+        });
       results[p.player.id] = {
         choice: p.answer?.choice ?? null,
         correct,
@@ -839,6 +861,7 @@ export class Game {
   private consume(p: Participant, powerup: PowerupId) {
     p.usedPowerups.add(powerup);
     p.powerupThisQuestion = true;
+    p.powerupNow = powerup;
   }
 
   /**
@@ -1015,6 +1038,7 @@ export class Game {
       doubled: false,
       removed: [],
       powerupThisQuestion: false,
+      powerupNow: null,
       extraMs: 0,
       retryArmed: false,
       firstWrong: null,
