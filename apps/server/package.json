@@ -9,7 +9,8 @@
     "build": "node build.mjs",
     "start": "NODE_ENV=production node dist/index.mjs",
     "test": "node --import tsx --test test/*.test.ts",
-    "test:dist": "TEST_TARGET=dist node --import tsx --test test/*.test.ts"
+    "test:dist": "TEST_TARGET=dist node --import tsx --test test/*.test.ts",
+    "load": "node --import tsx test/load.ts"
   },
   "dependencies": {
     "@quiz/shared": "*",
