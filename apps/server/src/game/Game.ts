@@ -395,6 +395,17 @@ export class Game {
   }
 
   /**
+   * The server is about to stop while this run waits for its absent player. Before its first question it was no
+   * attempt (stop: theirs again). Once questions have been shown it ends as it would after ALONE_ABANDON_MS, with what
+   * was played: giving it back would let anyone close the tab when an update is announced and replay the same ten
+   * questions, knowing some answers. Someone actually playing isn't held: the drain waits for them.
+   */
+  endForDrain() {
+    if (this.index < 0) return this.stop();
+    this.guard(() => this.finishUnattended());
+  }
+
+  /**
    * The server is stopping and can't wait any longer: the match ends here, and the scores so far count (unrated: we cut
    * it, not the players). A run played alone gets its attempt back instead.
    */
@@ -416,7 +427,7 @@ export class Game {
       return;
     }
     if (this.alone && !this.humans[0]?.connected) {
-      if (this.hooks.draining()) return this.stop();
+      if (this.hooks.draining()) return this.endForDrain();
       this.held = true;
       return;
     }

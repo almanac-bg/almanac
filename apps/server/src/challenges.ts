@@ -10,7 +10,7 @@ import {
 } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
-import { notify } from './notifications';
+import { notify, unreadAbout } from './notifications';
 import { type PreparedQuestion, pickQuestions, recentFor, reorderOptions } from './questions';
 import { count } from './stats';
 import { toPublicUser, type UserRow } from './users';
@@ -90,6 +90,30 @@ function finished(id: string): ResultRow[] {
   );
 }
 
+/**
+ * Since when the creator hasn't looked at this link's notes: null when nothing about it is waiting unread (this result
+ * is the first news), else when they last read one (0: never).
+ */
+function sinceSeen(creatorId: number, link: string): number | null {
+  if (!unreadAbout(creatorId, link)) return null;
+  return (
+    one<{ t: number | null }>(
+      'SELECT MAX(read_at) AS t FROM notifications WHERE user_id = ? AND link = ? AND read_at IS NOT NULL',
+      creatorId,
+      link,
+    )?.t ?? 0
+  );
+}
+
+/** Others' runs on the link finished after `since`. */
+const freshResults = (id: string, creatorId: number, since: number) =>
+  one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM challenge_results WHERE challenge_id = ? AND user_id <> ? AND finished_at > ?`,
+    id,
+    creatorId,
+    since,
+  )!.n;
+
 /** Saves a finished run (also one cut short by leaving: it was the one attempt) and tells the creator. */
 export function recordChallengeResult(
   id: string,
@@ -115,12 +139,21 @@ export function recordChallengeResult(
     // Kept for the creator (they're rarely on the page when a friend plays): the reason to come back and send another.
     const creatorPlace = results.findIndex((r) => r.id === creator) + 1;
     const beaten = rank === 1 && creatorPlace > 1;
+    const link = `/c/${id}`;
+    // Played by several since the creator last looked: one note says how many (and who's ahead), not one each.
+    const since = sinceSeen(creator, link);
+    const fresh = since === null ? 1 : freshResults(id, creator, since);
+    const leader = results[0];
     notify(creator, {
-      icon: beaten ? '⚔️' : '🔗',
-      text: beaten
-        ? `${player.username} те изпревари на линка ти: ${score} точки — вече си ${ordinal(creatorPlace)}.`
-        : `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място. Води ${results[0].username}.`,
-      link: `/c/${id}`,
+      icon: beaten || (fresh > 1 && creatorPlace > 1) ? '⚔️' : '🔗',
+      text:
+        fresh > 1
+          ? `${fresh} души изиграха линка ти, последен ${player.username}. Води ${leader.username} с ${leader.score} точки${creatorPlace > 1 ? ` — ти си ${ordinal(creatorPlace)}` : ''}.`
+          : beaten
+            ? `${player.username} те изпревари на линка ти: ${score} точки — вече си ${ordinal(creatorPlace)}.`
+            : `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място. Води ${leader.username}.`,
+      link,
+      replace: true,
     });
   }
   return { id, rank, total: results.length };

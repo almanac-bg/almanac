@@ -56,7 +56,40 @@ let leftGameId: string | null = null;
 /** Turned away for having too many connections open: said once, until a connection goes through. */
 let crowded = false;
 
+/** When the server was last heard from (any event, or its ping). */
+let lastHeard = Date.now();
+/** Silence longer than this is no quiet lobby: the server pings every 10 s (realtime.ts on the server). */
+const SILENT_MS = 14_000;
+/** A reveal comes within half a second of the clock running out; this much later, the link is likely gone. */
+const REVEAL_OVERDUE_MS = 3_000;
+
+/** Flags a link that went quiet while the socket still reads as connected (checked every second). */
+function watchLink(s: GameSocket) {
+  const heard = () => {
+    lastHeard = Date.now();
+    if (getState().stalled) setState({ stalled: false });
+  };
+  s.onAny(heard);
+  s.io.on('ping', heard);
+  s.on('connect', heard);
+  // A tab back from the background (a locked phone) gets a fresh window: its timers were asleep, not the link.
+  if (typeof document !== 'undefined')
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') lastHeard = Date.now();
+    });
+  const timer = setInterval(() => {
+    const { connected, stalled, game } = getState();
+    const now = Date.now();
+    const overdue = game?.phase === 'question' && now > game.deadline + REVEAL_OVERDUE_MS && now - lastHeard > 2_000;
+    const quiet = connected && (now - lastHeard > SILENT_MS || overdue);
+    if (quiet !== stalled) setState({ stalled: quiet });
+  }, 1000);
+  // Node (the client's tests) shouldn't stay up for it.
+  (timer as { unref?: () => void }).unref?.();
+}
+
 function bind(s: GameSocket) {
+  watchLink(s);
   s.on('connect', () => {
     crowded = false;
     const { game } = getState();
@@ -73,7 +106,7 @@ function bind(s: GameSocket) {
     }
   });
   s.on('disconnect', (reason) => {
-    setState({ connected: false });
+    setState({ connected: false, stalled: false });
     // The server closed this connection on purpose (logged out here or elsewhere): Socket.IO won't come back on its own.
     // Signed out → the sign-in page; still signed in → connect again.
     if (reason === 'io server disconnect') {
@@ -168,6 +201,15 @@ function bind(s: GameSocket) {
     clearTimeout(staleQuestionTimer);
     const g = getState().game;
     if (!g) return;
+    // Back after the link died: questions went by meanwhile (a tunnel is noticed only when the ping times out).
+    const missed = g.question ? question.index - g.question.index - 1 : 0;
+    if (missed > 0) {
+      toast({
+        kind: 'info',
+        title:
+          missed === 1 ? 'Докато нямаше връзка, мина 1 въпрос.' : `Докато нямаше връзка, минаха ${missed} въпроса.`,
+      });
+    }
     const same = g.question?.index === question.index && g.phase === 'question' ? g : null;
     // A resync after a reconnect says where you stand on the question (a fresh tab knows nothing of it): the server's
     // word goes, including the extra time already in `remainingMs`.

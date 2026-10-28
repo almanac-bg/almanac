@@ -47,7 +47,7 @@ export function Intro({ game }: { game: LiveGame }) {
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
-            {game.start.mode === 'daily' ? '📅' : category?.icon}
+            {game.start.mode === 'daily' ? '🗓️' : category?.icon}
           </motion.span>
           <h1 className="mt-4 font-display text-3xl font-bold">
             {game.start.mode === 'daily' ? 'Въпросите на деня' : category?.name}

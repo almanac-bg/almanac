@@ -16,6 +16,7 @@ import {
   AchievementsCard,
   DailyCard,
   RatingCard,
+  RatingChip,
   RewardsCard,
   UnlocksCard,
   UnratedCard,
@@ -49,6 +50,10 @@ export function Results({ game }: { game: LiveGame }) {
   const byWalkout = won && !single && !teamScores && end.standings.every((s) => s.id === youId || s.left);
   const rivals = end.standings.length > 2 ? 'Съперниците напуснаха' : 'Съперникът напусна';
   const perfect = mine.correct === game.start.totalQuestions;
+  // Lost to other people: no fanfare (a level gained along the way still says so, quietly).
+  const lost = !single && !won && !end.noContest;
+  const best = rewards?.soloBest ?? null;
+  const newBest = best !== null && best > 0 && mine.score > best;
   // A no contest says so in the headline; the other reasons a rating stayed put get a card.
   const unrated = rewards?.unrated && rewards.unrated !== 'no_contest' ? rewards.unrated : null;
   // A no contest has no podium to show, and nothing to award unless a question or two were answered.
@@ -79,11 +84,11 @@ export function Results({ game }: { game: LiveGame }) {
   );
 
   useEffect(() => {
-    if (won || (single && perfect)) {
+    if (won || (single && perfect) || newBest) {
       sfx.win();
       burst(1.2);
     }
-  }, [won, single, perfect]);
+  }, [won, single, perfect, newBest]);
 
   async function again() {
     const mode = end.mode;
@@ -196,7 +201,9 @@ export function Results({ game }: { game: LiveGame }) {
             'text-balance',
             won
               ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'
-              : 'text-gradient',
+              : lost
+                ? 'text-fg'
+                : 'text-gradient',
           )}
         >
           {headline}
@@ -224,6 +231,31 @@ export function Results({ game }: { game: LiveGame }) {
               </>
             )}
           </p>
+        )}
+        {/* What changed, before anything else: the rating, the record to beat, the XP. */}
+        {rewards && !end.noContest && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm font-semibold">
+            {rewards.rating && <RatingChip rating={rewards.rating} />}
+            {best !== null && (
+              <span
+                className={clsx(
+                  'rounded-full px-3 py-1',
+                  newBest ? 'bg-amber-400/15 text-amber-200' : 'bg-white/5 text-fg-2',
+                )}
+              >
+                {newBest
+                  ? `🏆 Нов личен рекорд! (беше ${fmt(best)})`
+                  : best === 0
+                    ? `Рекорд за побиване: ${fmt(mine.score)}`
+                    : `Личен рекорд: ${fmt(best)}`}
+              </span>
+            )}
+            {rewards.xpGained > 0 && (
+              <span className="rounded-full bg-violet-500/15 px-3 py-1 text-violet-200">
+                +{fmt(rewards.xpGained)} XP
+              </span>
+            )}
+          </div>
         )}
         {(end.noContest || byWalkout) && (
           <p className={clsx('mx-auto max-w-md text-fg-3', end.noContest ? 'mt-4' : 'mt-2 text-sm')}>
@@ -264,7 +296,7 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       >
         {!rewardsCard ? null : rewards ? (
-          <RewardsCard rewards={rewards} />
+          <RewardsCard rewards={rewards} quiet={lost} />
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}
@@ -290,28 +322,41 @@ export function Results({ game }: { game: LiveGame }) {
       <LearnedToday items={game.history} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
-      {/* Phones: the next step stays in reach at the bottom while the rewards and the review scroll by — and so does a
-          rematch offer, which can arrive at any moment. */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a
+          rematch offer, which can arrive at any moment. Wider screens: a floating bar in the middle. */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
         {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
         <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
           {daily && guest && rewards?.daily?.rank === null ? (
             // A guest's daily is off the board: what opens it is saving the profile.
-            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={() => setClaiming(true)}>
+            <Button
+              size="lg"
+              className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
+              onClick={() => setClaiming(true)}
+            >
               <Save className="size-5" /> Запази профила
             </Button>
           ) : daily ? (
             // One attempt a day — no "play again".
-            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={dailyBoard}>
+            <Button
+              size="lg"
+              className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
+              onClick={dailyBoard}
+            >
               <ChartColumn className="size-5" /> Класиране за деня
             </Button>
           ) : challenge && guest ? (
             // A link plays once and guests can't make their own: home is the way on.
-            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={home}>
+            <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none" onClick={home}>
               <Home className="size-5" /> Към началото
             </Button>
           ) : (
-            <Button size="lg" className="min-w-0 flex-1 sm:flex-none" onClick={again} loading={busy}>
+            <Button
+              size="lg"
+              className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
+              onClick={again}
+              loading={busy}
+            >
               {challenge ? (
                 <>
                   <Swords className="size-5" />
@@ -331,13 +376,19 @@ export function Results({ game }: { game: LiveGame }) {
           )}
           {/* The daily and a challenge link share from their own cards (with the board and the link). */}
           {!daily && !challenge && !end.noContest && (
-            <Button size="lg" variant="secondary" onClick={share} aria-label="Сподели резултата">
+            <Button
+              size="lg"
+              variant="secondary"
+              className="max-sm:w-14 max-sm:px-0"
+              onClick={share}
+              aria-label="Сподели резултата"
+            >
               <Share2 className="size-5" />
               <span className="max-sm:hidden">Сподели</span>
             </Button>
           )}
           {!(challenge && guest) && (
-            <Button size="lg" variant="secondary" onClick={home}>
+            <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
               <Home className="size-5" />
               <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
             </Button>

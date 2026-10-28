@@ -197,7 +197,7 @@ test('a run played alone waits for its player: no early close, and it holds befo
   assert.equal(g.reveals()[1].results.u1.choice, null);
 });
 
-test('a run alone ends with what was played after ten minutes away; when the server stops it keeps the attempt', () => {
+test('a run alone ends with what was played after ten minutes away, or when the server stops while they are away', () => {
   const away = setup({ humans: [1], daily: true });
   away.right(1);
   away.game.setConnected('u1', false);
@@ -216,9 +216,21 @@ test('a run alone ends with what was played after ten minutes away; when the ser
   cut.drain(); // an update: nobody waits for the absent player
   advance(5_000);
   assert.equal(cut.game.phase, 'ended');
-  assert.equal(cut.finalized(), false, 'no result for a run we cut');
-  assert.equal(cut.released(), 1, 'the attempt is theirs again');
-  assert.ok(cut.events.some((e) => e.to === 'u1' && e.event === 'game:aborted'));
+  // Given back, the same ten questions would come again after the update, some answers already known.
+  assert.equal(cut.finalized(), true, 'a question was played: the result stands');
+  assert.equal(cut.released(), 0);
+
+  // Away before the first question: nothing was played, so the attempt is theirs again.
+  mock.timers.reset();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 3_000_000 });
+  const early = setup({ humans: [1], daily: true, countdown: true });
+  early.game.setConnected('u1', false);
+  early.drain();
+  advance(5_000);
+  assert.equal(early.game.phase, 'ended');
+  assert.equal(early.finalized(), false);
+  assert.equal(early.released(), 1, 'the attempt is theirs again');
+  assert.ok(early.events.some((e) => e.to === 'u1' && e.event === 'game:aborted'));
 });
 
 test("once every person is knocked out, the bots' final is decided at once (and quietly)", () => {
@@ -303,6 +315,7 @@ test('bots play as strong as the rating they show, never rate above the cap, and
   assert.ok(strong.brain.accuracy > weak.brain.accuracy, 'strength follows rating, not level');
   assert.ok(strong.brain.pace < weak.brain.pace, 'stronger bots answer sooner');
   assert.ok(gentle.brain.accuracy < weak.brain.accuracy);
+  assert.ok(gentle.player.rating! < weak.player.rating!, 'and it shows: everyone in the match is rated against that');
 });
 
 /** Plays a match to the end, the human always wrong; what the bot did comes from the events. */

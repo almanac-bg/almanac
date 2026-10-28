@@ -284,7 +284,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     id: 'daily_first',
     name: 'Дневна доза',
     description: 'Изиграй дневното предизвикателство.',
-    icon: '📅',
+    icon: '🗓️',
     rarity: 'common',
     xp: 75,
     goal: 1,

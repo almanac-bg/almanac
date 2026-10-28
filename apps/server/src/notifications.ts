@@ -28,12 +28,23 @@ const toNotification = (r: Row): AppNotification => ({
 export const unreadNotifications = (userId: number) =>
   one<{ n: number }>('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL', userId)!.n;
 
+/** Unread notes of a player's that point to `link` (e.g. one challenge link's results). */
+export const unreadAbout = (userId: number, link: string) =>
+  one<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND link = ? AND read_at IS NULL',
+    userId,
+    link,
+  )!.n;
+
 /**
  * Something for a player to see whenever they're back: kept until read, and shown at once (a toast and the bell's
- * count) if they're on the page. Inside a transaction it goes out with the commit, like any notice.
+ * count) if they're on the page. Inside a transaction it goes out with the commit, like any notice. `replace`: it
+ * stands for the unread ones about the same link (a link played by many is one note, not a page of them).
  */
-export function notify(userId: number, note: { icon: string; text: string; link?: string | null }) {
+export function notify(userId: number, note: { icon: string; text: string; link?: string | null; replace?: boolean }) {
   const now = Date.now();
+  if (note.replace && note.link)
+    run('DELETE FROM notifications WHERE user_id = ? AND link = ? AND read_at IS NULL', userId, note.link);
   const { lastInsertRowid } = run(
     'INSERT INTO notifications (user_id, icon, text, link, created_at) VALUES (?, ?, ?, ?, ?)',
     userId,

@@ -81,6 +81,11 @@ interface State {
   me: MeUser | null;
   authChecked: boolean;
   connected: boolean;
+  /**
+   * Connected as far as the socket knows, but the server has gone quiet (no ping, or a reveal long overdue): a link
+   * that died without closing, as in a tunnel. The socket itself only notices when its ping times out.
+   */
+  stalled: boolean;
   lobby: LobbyStats | null;
   queue: QueueStatus | null;
   /** Local timestamp the current queue search started (for the stopwatch). */
@@ -101,6 +106,7 @@ export const useStore = create<State>(() => ({
   me: null,
   authChecked: false,
   connected: false,
+  stalled: false,
   lobby: null,
   queue: null,
   queueSince: 0,

@@ -55,12 +55,17 @@ let botSeq = 0;
 /** Bots never rate higher than this: beyond it, climbing has to come from beating people. */
 export const BOT_MAX_RATING = 1600;
 const BOT_MIN_RATING = 700;
+/**
+ * How much weaker a newcomer's bots are, in rating: they show it, and play it. With the rating unchanged and only the
+ * play softer, everyone else in the match beat bots rated above how they played and gained rating for it.
+ */
+const GENTLE_RATING_GAP = 170;
 const jitter = (spread: number) => (Math.random() * 2 - 1) * spread;
 
 /**
  * Bots sized to the humans they play against. A bot plays as strong as the rating it shows, so Elo against bots
  * settles where the player's skill really is instead of climbing forever. Players new to multiplayer get slightly
- * kinder bots for their first few matches.
+ * kinder bots for their first few matches: rated lower, and playing to it.
  */
 export function makeBots(
   count: number,
@@ -70,7 +75,8 @@ export function makeBots(
 ): Bot[] {
   const names = shuffle(NAMES.filter((n) => !takenNames.includes(n)));
   return Array.from({ length: count }, (_, i) => {
-    const rating = Math.round(clamp(around.rating + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
+    const centre = around.rating - (opts.gentle ? GENTLE_RATING_GAP : 0);
+    const rating = Math.round(clamp(centre + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
     const skill = rating - START_RATING;
     const level = clamp(Math.round(around.level + jitter(3)), 1, 60);
     return {
@@ -88,7 +94,7 @@ export function makeBots(
         team: null,
       },
       brain: {
-        accuracy: clamp(0.5 + skill * 0.0006 + jitter(0.05) - (opts.gentle ? 0.1 : 0), 0.3, 0.92),
+        accuracy: clamp(0.5 + skill * 0.0006 + jitter(0.05), 0.3, 0.92),
         pace: clamp(0.5 - skill * 0.0003 + jitter(0.1), 0.18, 0.75),
       },
     };

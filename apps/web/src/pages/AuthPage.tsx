@@ -40,7 +40,7 @@ const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙',
 
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
-  { icon: '📅', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класиране до полунощ' },
+  { icon: '🗓️', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класиране до полунощ' },
   { icon: '🔗', title: 'Предизвикай приятел', body: 'Пращаш линк, играе същите въпроси, когато може' },
   { icon: '⚔️', title: 'Дуели и Роял', body: 'Битки в реално време, до 8 играчи' },
 ];

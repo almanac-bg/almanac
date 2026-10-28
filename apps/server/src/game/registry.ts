@@ -131,7 +131,7 @@ export class GameRegistry {
    */
   startDraining() {
     this.draining = true;
-    for (const game of [...this.games.values()]) if (game.held) game.stop();
+    for (const game of [...this.games.values()]) if (game.held) game.endForDrain();
   }
 
   /** Ends every match still running (the server is stopping); returns how many there were. */

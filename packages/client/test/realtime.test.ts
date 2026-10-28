@@ -13,6 +13,14 @@ class FakeSocket extends EventEmitter {
   sent: [string, ...unknown[]][] = [];
   /** The link died without a word: emits pile up in the buffer, as Socket.IO's do while it waits for a ping. */
   stalled = false;
+  /** The connection manager underneath, where the server's pings arrive. */
+  io = new EventEmitter();
+  private catchAll: ((event: string, ...args: unknown[]) => void)[] = [];
+
+  onAny(listener: (event: string, ...args: unknown[]) => void) {
+    this.catchAll.push(listener);
+    return this;
+  }
 
   connect() {
     this.connected = true;
@@ -42,6 +50,7 @@ class FakeSocket extends EventEmitter {
     };
   }
   deliver(event: string, ...args: unknown[]) {
+    for (const listener of this.catchAll) listener(event, ...args);
     super.emit(event, ...args);
   }
   sentNames() {
@@ -164,6 +173,14 @@ test('a link that died silently: the pick stays out of the buffer and off the sc
   assert.deepEqual(socket.sendBuffer, [], 'not left to replay after the reconnect');
   assert.equal(game().myChoice, null);
   assert.deepEqual(toasts(), ['Отговорът не е изпратен.']);
+});
+
+test('back after the link died, the player hears how many questions went by', () => {
+  inMatch();
+  socket.deliver('game:question', question(3));
+  assert.deepEqual(toasts(), ['Докато нямаше връзка, минаха 2 въпроса.']);
+  socket.deliver('game:question', question(4));
+  assert.deepEqual(toasts(), ['Докато нямаше връзка, минаха 2 въпроса.'], 'the next one in turn is no news');
 });
 
 test('after a reconnect the question stays locked until the server says it is still open', () => {

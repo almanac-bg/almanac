@@ -75,7 +75,7 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
     {
       def: {
         id: 'daily',
-        icon: '📅',
+        icon: '🗓️',
         text: 'Изиграй дневното предизвикателство',
         goal: 1,
         xp: 60,

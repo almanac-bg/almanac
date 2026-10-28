@@ -18,7 +18,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
-  const active = !game.eliminated.includes(youId) && !reveal && !game.resyncing;
+  // Knocked out: the questions go on, to watch (not to tap).
+  const watching = game.eliminated.includes(youId);
+  const active = !watching && !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
   const reduceMotion = useReducedMotion();
 
@@ -61,6 +63,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           >
             <Skull className="size-3.5" /> Елиминация след този въпрос
           </motion.span>
+        )}
+        {watching && (
+          <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2">👀 Гледаш</span>
         )}
         {inDropZone(game) === youId && !reveal && (
           <span className="inline-flex items-center gap-1 rounded-full border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200">
@@ -122,6 +127,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
               locked={game.myChoice !== null}
               removed={game.removed.includes(i)}
               disabled={!active || offline}
+              watching={watching}
               offline={(offline || game.resyncing) && !reveal}
               correct={reveal ? reveal.correct === i : null}
               pickers={pickers[i] ?? []}
@@ -336,6 +342,7 @@ function AnswerButton({
   locked,
   removed,
   disabled,
+  watching,
   offline,
   correct,
   pickers,
@@ -346,6 +353,8 @@ function AnswerButton({
   locked: boolean;
   removed: boolean;
   disabled: boolean;
+  /** Knocked out and watching: the answers are there to read, not to pick. */
+  watching: boolean;
   /** No connection (or not yet re-synced): shown as out of reach, not just unresponsive. */
   offline: boolean;
   correct: boolean | null;
@@ -362,7 +371,7 @@ function AnswerButton({
         : 'dim'
     : selected
       ? 'selected'
-      : locked || offline
+      : locked || offline || watching
         ? 'dim'
         : 'idle';
 

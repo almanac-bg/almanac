@@ -214,6 +214,8 @@ export interface MatchRewards {
   daily: { rank: number | null; total: number; streak: number; shieldsUsed: number; shieldEarned: boolean } | null;
   /** A challenge-link run: where it placed among everyone who played that link. */
   challenge: { id: string; rank: number; total: number } | null;
+  /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
+  soloBest: number | null;
 }
 
 /**

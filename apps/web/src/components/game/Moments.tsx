@@ -7,7 +7,8 @@ import { Avatar } from '../Avatar';
 
 export function Feed({ game }: { game: LiveGame }) {
   return (
-    <div className="pointer-events-none absolute -top-2 right-0 z-20 flex flex-col items-end gap-1.5">
+    // On a phone, the right half at most: the category and difficulty chips on the left stay readable.
+    <div className="pointer-events-none absolute -top-2 right-0 z-20 flex flex-col items-end gap-1.5 max-sm:max-w-[48%]">
       <AnimatePresence>
         {game.feed.map((f) => (
           <motion.span
@@ -15,7 +16,7 @@ export function Feed({ game }: { game: LiveGame }) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
-            className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
+            className="max-w-full truncate rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
           >
             {f.icon} {f.text}
           </motion.span>

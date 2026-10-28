@@ -14,6 +14,9 @@ import { useMediaQuery } from '../lib/media';
 import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 
+/** Guests play everything but aren't on the boards: what puts them there. */
+const GUEST_LINE = 'Класациите са за играчи с профил: запази прогреса си, за да влезеш в тях.';
+
 export function LeaderboardPage() {
   usePageTitle('Класации');
   const me = useStore((s) => s.me)!;
@@ -87,7 +90,7 @@ export function LeaderboardPage() {
       ) : entries.length === 0 ? (
         <Card>
           <EmptyState
-            icon={board === 'daily' ? '📅' : '🏁'}
+            icon={board === 'daily' ? '🗓️' : '🏁'}
             title={
               amongFriends
                 ? 'Никой от приятелите ти не е играл днес'
@@ -96,9 +99,11 @@ export function LeaderboardPage() {
                   : 'Още никой не е класиран'
             }
             body={
-              board === 'daily'
-                ? 'Изиграй дневното предизвикателство от началната страница.'
-                : 'Изиграй класиран мач и оглави тази класация.'
+              me.isGuest
+                ? GUEST_LINE
+                : board === 'daily'
+                  ? 'Изиграй дневното предизвикателство от началната страница.'
+                  : 'Изиграй класиран мач и оглави тази класация.'
             }
           />
         </Card>
@@ -162,9 +167,11 @@ export function LeaderboardPage() {
           )}
           {!meEntry && !amongFriends && board !== 'level' && (
             <p className="text-center text-sm text-fg-3">
-              {board === 'daily'
-                ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.'
-                : 'Изиграй мач в този режим, за да влезеш в класацията.'}
+              {me.isGuest
+                ? GUEST_LINE
+                : board === 'daily'
+                  ? 'Изиграй днешното предизвикателство, за да влезеш в класацията.'
+                  : 'Изиграй мач в този режим, за да влезеш в класацията.'}
             </p>
           )}
           {entries.length <= 3 && <BringFriends />}

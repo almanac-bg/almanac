@@ -96,9 +96,16 @@ export function DailyCard({
   );
 }
 
-export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
+/** Lines shown before "още": the match itself (played, right answers, place); the rest is a tap away. */
+const SHOWN_LINES = 3;
+
+/** XP and the level bar. `quiet`: a lost match — a level gained along the way gets its line, not confetti. */
+export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards; quiet?: boolean }) {
   const [xp, setXp] = useState(rewards.xpBefore);
   const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [allLines, setAllLines] = useState(false);
+  const folded = !allLines && rewards.breakdown.length > SHOWN_LINES + 1;
+  const lines = folded ? rewards.breakdown.slice(0, SHOWN_LINES) : rewards.breakdown;
 
   useEffect(() => {
     let lastLevel = levelFromXp(rewards.xpBefore);
@@ -113,12 +120,12 @@ export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
           lastLevel = l;
           setLevelUp(l);
           sfx.levelUp();
-          burst(0.7);
+          if (!quiet) burst(0.7);
         }
       },
     });
     return () => controls.stop();
-  }, [rewards]);
+  }, [rewards, quiet]);
 
   const p = levelProgress(Math.round(xp));
   return (
@@ -162,7 +169,7 @@ export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
       </div>
 
       <ul className="relative mt-5 space-y-1.5 text-sm">
-        {rewards.breakdown.map((line, i) => (
+        {lines.map((line, i) => (
           <motion.li
             key={line.label}
             initial={{ opacity: 0, x: -10 }}
@@ -175,7 +182,31 @@ export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
           </motion.li>
         ))}
       </ul>
+      {folded && (
+        <button
+          type="button"
+          onClick={() => setAllLines(true)}
+          className="focus-ring relative mt-2 rounded-lg text-sm font-semibold text-violet-300 hover:underline"
+        >
+          + още {rewards.breakdown.length - SHOWN_LINES} {rewards.breakdown.length - SHOWN_LINES === 1 ? 'ред' : 'реда'}
+        </button>
+      )}
     </Card>
+  );
+}
+
+/** The rating change in a word, for the results' headline (the card below has the rank). */
+export function RatingChip({ rating }: { rating: { before: number; after: number } }) {
+  const delta = rating.after - rating.before;
+  return (
+    <span
+      className={clsx(
+        'rounded-full px-3 py-1 tabular-nums',
+        delta >= 0 ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200',
+      )}
+    >
+      Рейтинг {fmt(rating.after)} ({delta >= 0 ? `+${delta}` : `−${-delta}`})
+    </span>
   );
 }
 

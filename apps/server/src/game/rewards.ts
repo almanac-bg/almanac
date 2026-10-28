@@ -352,6 +352,7 @@ function rewardHuman(
     unrated: rating ? null : unrated,
     daily: dailyResult,
     challenge: challengeResult,
+    soloBest: solo && counts ? before.best_solo_score : null,
   };
 }
 

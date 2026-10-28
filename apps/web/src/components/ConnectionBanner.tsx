@@ -13,7 +13,9 @@ const GRACE_MS = 1500;
  * comes and goes. `explained`: the page already says why (the update banner), so this keeps quiet.
  */
 export function ConnectionBanner({ explained = false }: { explained?: boolean }) {
-  const connected = useStore((s) => s.connected);
+  // A link gone quiet reads as lost too: the socket would only notice when its ping times out, with the match going on.
+  const connected = useStore((s) => s.connected && !s.stalled);
+  const stalled = useStore((s) => s.connected && s.stalled);
   const [banner, setBanner] = useState<'offline' | 'restored' | null>(null);
   const shown = useRef(false);
 
@@ -41,7 +43,7 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
     // The live region stays mounted so the change itself gets announced. `data-connection` is for the browser tests.
     <div
       role="status"
-      data-connection={connected ? 'up' : 'down'}
+      data-connection={connected ? 'up' : stalled ? 'stalled' : 'down'}
       className="pointer-events-none fixed inset-x-0 top-[4.5rem] z-40 flex justify-center px-4"
     >
       <AnimatePresence mode="wait">
@@ -61,7 +63,7 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
             {banner === 'offline' ? (
               <>
                 <WifiOff className="size-4 shrink-0" aria-hidden />
-                Няма връзка — опитваме отново…
+                {stalled ? 'Връзката прекъсва — чакаме сървъра…' : 'Няма връзка — опитваме отново…'}
               </>
             ) : (
               <>

@@ -70,6 +70,10 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     serveClient: false,
     // Every client message is tiny; the 1 MB default only invites abuse.
     maxHttpBufferSize: 16 * 1024,
+    // A link that dies without closing (a tunnel, a phone switching networks) is noticed within 18 s, not the default
+    // 45: a match goes on meanwhile. The client flags silence sooner on its own (watchLink in @quiz/client).
+    pingInterval: 10_000,
+    pingTimeout: 8_000,
     // Only same-origin pages may open a socket (blocks cross-site socket hijacking with the session cookie).
     allowRequest: (req, cb) => {
       const origin = req.headers.origin;

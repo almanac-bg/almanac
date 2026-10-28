@@ -152,7 +152,74 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
   );
 }
 
+/**
+ * A duel on a phone: the two of you side by side, always in the same places, with the gap between you — a strip sorted
+ * by score swapped the two of you after every question.
+ */
+function DuelBar({ game }: { game: LiveGame }) {
+  const short = useMediaQuery('(max-height: 740px)');
+  const youId = game.start.youId;
+  const mine = game.standings.find((s) => s.id === youId);
+  const theirs = game.standings.find((s) => s.id !== youId);
+  if (!mine || !theirs) return null;
+  const them = game.players[theirs.id];
+  const you = game.players[youId];
+  const gap = mine.score - theirs.score;
+  const answered = (id: string) => game.phase === 'question' && game.answered.includes(id);
+  const side = (s: Standing, p: typeof you, me: boolean) => (
+    <div className={clsx('flex min-w-0 items-center gap-2.5', !me && 'flex-row-reverse text-right')}>
+      <div className="relative shrink-0" aria-hidden>
+        <Avatar avatar={p.avatar} frame={p.frame} size={short ? 32 : 40} dim={s.left}>
+          {answered(s.id) && (
+            <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-ink bg-emerald-400" />
+          )}
+        </Avatar>
+        <PlayerMark me={me} bot={p.isBot} />
+        <Reactions reactions={game.reactions.filter((r) => r.playerId === s.id)} />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] text-fg-3">{me ? 'Ти' : p.name}</p>
+        <p className={clsx('font-display text-lg leading-tight font-bold tabular-nums', me && 'text-violet-300')}>
+          {fmt(s.score)}
+        </p>
+      </div>
+    </div>
+  );
+  return (
+    <div className="border-b border-line lg:hidden flat:hidden">
+      <p className="sr-only">
+        Ти: {mine.score} точки, {them.name}
+        {them.isBot && ' (бот)'}: {theirs.score} точки
+      </p>
+      <div
+        aria-hidden
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 short:py-1.5"
+      >
+        {side(mine, you, true)}
+        <span
+          className={clsx(
+            'rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums',
+            gap > 0
+              ? 'bg-emerald-500/15 text-emerald-200'
+              : gap < 0
+                ? 'bg-rose-500/15 text-rose-200'
+                : 'bg-white/5 text-fg-2',
+          )}
+        >
+          {gap > 0 ? `+${fmt(gap)}` : gap < 0 ? `−${fmt(-gap)}` : 'равни'}
+        </span>
+        {side(theirs, them, false)}
+      </div>
+    </div>
+  );
+}
+
 export function MobileStrip({ game }: { game: LiveGame }) {
+  if (game.start.players.length === 2 && !game.start.teams) return <DuelBar game={game} />;
+  return <Strip game={game} />;
+}
+
+function Strip({ game }: { game: LiveGame }) {
   const teams = game.start.teams;
   const short = useMediaQuery('(max-height: 740px)');
   const strip = useSideScroll<HTMLUListElement>();
