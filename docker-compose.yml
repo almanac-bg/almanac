@@ -9,6 +9,8 @@ x-logging: &logging
 
 services:
   app:
+    # deploy/deploy.sh pulls the image CI published for the commit (ghcr.io/almanac-bg/almanac:<commit>) and tags it
+    # almanac:latest; nothing is built on the server. `build` stays for running it from a checkout by hand.
     build: .
     image: almanac:latest
     restart: unless-stopped
@@ -45,8 +47,13 @@ services:
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}
       EMAIL_EVENTS_SECRET: ${EMAIL_EVENTS_SECRET:-}
+      # The private question bank, from the checkout next to this file (deploy/deploy.sh pulls it): it isn't in the
+      # image, which CI builds from this repository alone. Missing, the server stops at once instead of playing the
+      # public sample.
+      QUESTIONS_PATH: /app/private/questions.json
     volumes:
       - data:/data
+      - ./private:/app/private:ro
     # Only reachable from the server itself (Caddy); never from the internet.
     ports:
       - "127.0.0.1:3001:3001"

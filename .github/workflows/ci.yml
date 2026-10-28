@@ -128,3 +128,35 @@ jobs:
           register restored after_restore
           echo "restored users: $(users restored)"
           test "$(users restored)" = "before_backup,after_backup,after_restore"
+
+  # On main, once every check above has passed: the image production runs, built for its ARM server (Hetzner CAX11) on
+  # GitHub's ARM runners, started once, and pushed to the GitHub Container Registry under the commit. deploy/deploy.sh
+  # pulls exactly that image: what runs is what was tested, nothing is built on the server, and a commit that failed
+  # here has no image to deploy. The image holds only this repository's code; the private question bank is mounted at
+  # run time (docker-compose.yml).
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, docker]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: >-
+          docker build -t "$IMAGE"
+          --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}"
+          --label "org.opencontainers.image.revision=${{ github.sha }}" .
+      - name: The image starts and answers
+        run: |
+          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI "$IMAGE"
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3001/api/health && exit 0
+            sleep 1
+          done
+          docker logs almanac
+          exit 1
+      - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - run: docker push "$IMAGE"
