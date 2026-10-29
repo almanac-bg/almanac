@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { setImmediate as yieldToMatches } from 'node:timers/promises';
 import {
   dayKey,
   GROUPS,
@@ -281,17 +282,35 @@ function crowned(groupId: number, now = Date.now()): number | null {
   );
 }
 
-/** The upkeep's part: settles the week just finished in every group that hasn't had it settled. Returns how many. */
-export function settleGroupWeeks(now = Date.now()): number {
+/** Groups settled per upkeep run: the rest wait 15 minutes. */
+const SETTLE_BATCH = 500;
+/** Each settled group tells every member: the matches going on get their turn after this many. */
+const SETTLE_TURN = 20;
+
+/**
+ * The upkeep's part: settles the week just finished in every group that hasn't had it settled. Returns how many. Once
+ * every group's is, the week is noted as done: the groups aren't looked through again until the next one ends.
+ */
+export async function settleGroupWeeks(now = Date.now()): Promise<number> {
   const lastWeek = shiftDay(weekStart(dayKey(now)), -7);
+  if (one("SELECT 1 AS x FROM settings WHERE key = 'groups_settled' AND value = ?", lastWeek)) return 0;
   const due = all<{ id: number }>(
     `SELECT id FROM player_groups g WHERE created_at < ?
-     AND NOT EXISTS (SELECT 1 FROM group_weeks w WHERE w.group_id = g.id AND w.week = ?) LIMIT 500`,
+     AND NOT EXISTS (SELECT 1 FROM group_weeks w WHERE w.group_id = g.id AND w.week = ?) LIMIT ?`,
     weekEndsAt(lastWeek),
     lastWeek,
+    SETTLE_BATCH,
   );
   let settled = 0;
-  for (const { id } of due) if (tx(() => settleWeek(id, lastWeek, now))) settled++;
+  for (const [i, { id }] of due.entries()) {
+    if (tx(() => settleWeek(id, lastWeek, now))) settled++;
+    if (i % SETTLE_TURN === SETTLE_TURN - 1) await yieldToMatches();
+  }
+  if (due.length < SETTLE_BATCH)
+    run(
+      "INSERT INTO settings (key, value) VALUES ('groups_settled', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      lastWeek,
+    );
   return settled;
 }
 

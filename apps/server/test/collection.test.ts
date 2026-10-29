@@ -299,7 +299,7 @@ test('groups: an invite link, at most 200 in one and 5 per player; the owner han
   assert.equal(one('SELECT 1 AS x FROM player_groups WHERE id = ?', made.id), undefined);
 });
 
-test("a group's week: the best five dailies summed; its winner hears so, and wears the crown all the next week", () => {
+test("a group's week: the best five dailies summed; its winner hears so, and wears the crown all the next week", async () => {
   const now = Date.now();
   const monday = weekStart(dayKey(now));
   const lastMonday = shiftDay(monday, -7);
@@ -326,8 +326,8 @@ test("a group's week: the best five dailies summed; its winner hears so, and wea
   daily(ivan, dayKey(now), 5000);
 
   run('DELETE FROM notifications');
-  assert.equal(groups.settleGroupWeeks(now), 1);
-  assert.equal(groups.settleGroupWeeks(now), 0, 'once');
+  assert.equal(await groups.settleGroupWeeks(now), 1);
+  assert.equal(await groups.settleGroupWeeks(now), 0, 'once');
   const won = one<{ winner_id: number; score: number }>(
     'SELECT winner_id, score FROM group_weeks WHERE group_id = ? AND week = ?',
     made.id,

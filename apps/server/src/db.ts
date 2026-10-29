@@ -749,6 +749,79 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ) WITHOUT ROWID;
     `,
   },
+
+  // v27, long history (6e; test/plans.ts found each of these by asking SQLite how it runs every statement):
+  // - an index on every column pointing at a player, so deleting an account (a guest swept every day) finds the rows
+  //   to clear by index instead of reading eleven tables; the same for a run's plays of its recording;
+  // - indexes for what the upkeep looks for every 15 minutes, and for the moderators' lists; the level board's
+  //   index holds accounts only (a guest is never on it), and the recordings' untold plays are kept by owner;
+  // - running tallies: `mode_stats` (games, wins and places per player and mode, for profiles and achievements, which
+  //   counted them from every match the player ever played) and `answer_tallies` (the hard answers of the last
+  //   ANSWER_LOG_DAYS per player, for the moderators' flag list, which grouped the whole answer log), with
+  //   `settings.tallied_at` saying how far they go (see catchUpTallies);
+  // - `users.settled`: the season and achievement list the player's account was last settled for, so /me settles only
+  //   when one of them changed (it did so on every call, in a write transaction);
+  // - `users.freezes` goes: unused since "Леден удар" went, and no release that can run on this database reads it.
+  // The tallies are filled at the first start (tallies.ts). Older code leaves them alone; what it plays meanwhile is
+  // counted at the next start.
+  {
+    compatible: `
+    CREATE INDEX reports_target ON reports(target_id);
+    CREATE INDEX reports_reporter ON reports(reporter_id) WHERE reporter_id IS NOT NULL;
+    CREATE INDEX reports_resolver ON reports(resolved_by) WHERE resolved_by IS NOT NULL;
+    CREATE INDEX question_reports_user ON question_reports(user_id);
+    CREATE INDEX question_reports_resolver ON question_reports(resolved_by) WHERE resolved_by IS NOT NULL;
+    CREATE INDEX question_reports_recent ON question_reports(question_id, created_at);
+    CREATE INDEX hidden_questions_by ON hidden_questions(hidden_by) WHERE hidden_by IS NOT NULL;
+    CREATE INDEX submissions_reviewer ON question_submissions(reviewed_by) WHERE reviewed_by IS NOT NULL;
+    CREATE INDEX record_plays_run ON record_plays(run_id);
+    CREATE INDEX record_plays_player ON record_plays(player_id) WHERE player_id IS NOT NULL;
+    CREATE INDEX record_plays_age ON record_plays(played_at);
+    DROP INDEX record_plays_untold;
+    CREATE INDEX record_plays_untold ON record_plays(owner_id, played_at) WHERE told = 0;
+    CREATE INDEX player_groups_owner ON player_groups(owner_id) WHERE owner_id IS NOT NULL;
+    CREATE INDEX group_weeks_winner ON group_weeks(winner_id) WHERE winner_id IS NOT NULL;
+    CREATE INDEX question_sets_copied ON question_sets(copied_from) WHERE copied_from IS NOT NULL;
+    CREATE INDEX evening_results_user ON evening_results(user_id, placement);
+    DROP INDEX evening_wins;
+    CREATE INDEX moderation_log_admin ON moderation_log(admin_id) WHERE admin_id IS NOT NULL;
+    CREATE INDEX moderation_log_undoer ON moderation_log(undone_by) WHERE undone_by IS NOT NULL;
+
+    CREATE INDEX email_tokens_expiry ON email_tokens(expires_at);
+    CREATE INDEX email_tokens_used ON email_tokens(used_at) WHERE used_at IS NOT NULL;
+    CREATE INDEX notifications_age ON notifications(created_at);
+    CREATE INDEX runs_age ON runs(played_at);
+    CREATE INDEX set_images_age ON set_images(created_at);
+    CREATE INDEX matches_ended ON matches(ended_at);
+    CREATE INDEX users_pending_email ON users(id) WHERE pending_email IS NOT NULL;
+    CREATE INDEX users_champion ON users(id) WHERE title = 'evening_champion';
+    CREATE INDEX users_push ON users(id) WHERE push_prefs IS NOT NULL;
+    CREATE INDEX users_admins ON users(username) WHERE is_admin = 1;
+    DROP INDEX users_xp;
+    CREATE INDEX users_board ON users(xp DESC, id) WHERE is_guest = 0;
+
+    CREATE TABLE mode_stats (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mode TEXT NOT NULL,
+      games INTEGER NOT NULL,
+      firsts INTEGER NOT NULL,
+      wins INTEGER NOT NULL,
+      team_wins INTEGER NOT NULL,
+      placed INTEGER NOT NULL,
+      placements INTEGER NOT NULL,
+      PRIMARY KEY (user_id, mode)
+    ) WITHOUT ROWID;
+    CREATE TABLE answer_tallies (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      answered INTEGER NOT NULL,
+      correct INTEGER NOT NULL,
+      last_at INTEGER NOT NULL
+    );
+
+    ALTER TABLE users ADD COLUMN settled TEXT;
+    ALTER TABLE users DROP COLUMN freezes;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
@@ -842,12 +915,22 @@ function repair() {
   });
 }
 
+/**
+ * Tests only: each statement the process prepares is written once to this folder, and test/plans.ts then asks SQLite
+ * how it would run every one of them (an unindexed read of a table that grows fails the suite).
+ */
+const sqlLog = process.env.SQL_LOG ? path.join(process.env.SQL_LOG, `${process.pid}.jsonl`) : null;
+if (sqlLog) fs.mkdirSync(path.dirname(sqlLog), { recursive: true });
+
 const statements = new Map<string, ReturnType<DatabaseSync['prepare']>>();
 function stmt(sql: string) {
   let s = statements.get(sql);
   if (!s) {
     s = db.prepare(sql);
     statements.set(sql, s);
+    // The server's own statements, not a test's fixtures written through these helpers.
+    if (sqlLog && !new Error().stack?.split('\n')[3]?.includes(`${path.sep}test${path.sep}`))
+      fs.appendFileSync(sqlLog, `${JSON.stringify(sql)}\n`);
   }
   return s;
 }
@@ -862,6 +945,12 @@ export function all<T>(sql: string, ...params: SQLInputValue[]): T[] {
 
 export function run(sql: string, ...params: SQLInputValue[]) {
   return stmt(sql).run(...params);
+}
+
+/** Another connection held the write lock for longer than busy_timeout (SQLITE_BUSY and its extended codes). */
+export function isBusy(err: unknown): boolean {
+  const code = (err as { errcode?: unknown } | null)?.errcode;
+  return typeof code === 'number' && (code & 0xff) === 5;
 }
 
 /** A UNIQUE constraint said no: e.g. two sign-ups for the same name at once, both past the "is it free?" check. */
@@ -933,3 +1022,13 @@ function savepoint<T>(fn: () => T): T {
 
 migrate();
 repair();
+optimize(true);
+
+/**
+ * Keeps SQLite's picture of the tables (sqlite_stat1) up to date, so it picks the right index as they grow: at the start
+ * (0x10002: every table, as a long-lived connection should) and with the upkeep after. Each table is sampled, never
+ * read whole (analysis_limit), so it takes milliseconds however big the database.
+ */
+export function optimize(atStart = false) {
+  db.exec(`PRAGMA analysis_limit = 400; PRAGMA optimize${atStart ? ' = 0x10002' : ''};`);
+}

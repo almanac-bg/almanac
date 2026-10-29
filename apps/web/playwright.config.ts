@@ -103,6 +103,8 @@ export default defineConfig({
       PUBLIC_QUEUES: '',
       SMTP_URL: '',
       SENTRY_DSN: '',
+      // Every statement it runs, beside the server tests' (`npm run plans -w @quiz/server` checks them all).
+      SQL_LOG: path.join(root, 'apps/server/.sql-log'),
     },
   },
 });

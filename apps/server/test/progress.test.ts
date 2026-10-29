@@ -202,3 +202,20 @@ test('launch statistics: daily counters, and returns counted against the day a p
   );
   assert.equal(at(shiftDay(today, -7)).returned_d7, 1);
 });
+
+test('/me settles the account only when the season or the list of achievements changed since it last did', async () => {
+  const { getMe } = await import('../src/account');
+  const id = user();
+  const has = (achievement: string) =>
+    !!one('SELECT 1 AS x FROM user_achievements WHERE user_id = ? AND achievement_id = ?', id, achievement);
+  getMe(id);
+  assert.ok(getUser(id)!.settled, 'the first /me settles, and notes for what');
+  // XP from somewhere that didn't settle (as nothing does now): /me doesn't look again…
+  run('UPDATE users SET xp = 100000 WHERE id = ?', id);
+  getMe(id);
+  assert.equal(has('level_10'), false, 'no write transaction on every /me');
+  // …until a season ends or an achievement is added: then it does, once.
+  run("UPDATE users SET settled = '2026-09 old-list' WHERE id = ?", id);
+  getMe(id);
+  assert.equal(has('level_10'), true);
+});

@@ -49,6 +49,15 @@ export function getSocket(): GameSocket {
   return socket;
 }
 
+/** How soon a dropped connection tries again: Socket.IO's own 1 s, give or take half. */
+const RECONNECT = { delayMs: 1000, jitter: 0.5 };
+/**
+ * …and after a restart the server announced (server:draining): anywhere in the first 5 s. Every open tab drops at the
+ * same moment, and coming back in the same second too, thousands of them made the new server's first seconds stutter
+ * (test/load.ts on 2000 players: up to half a second); spread out, it's a handful a millisecond.
+ */
+const AFTER_RESTART = { delayMs: 2500, jitter: 1 };
+
 /** Wanted connected: a sign-out while the library was still loading doesn't connect it afterwards. */
 let wanted = false;
 export async function connectRealtime() {
@@ -118,6 +127,7 @@ function bind(s: GameSocket) {
   }
   s.on('connect', () => {
     crowded = false;
+    s.io.reconnectionDelay(RECONNECT.delayMs).randomizationFactor(RECONNECT.jitter);
     const { game } = getState();
     setState({ connected: true, queue: null, room: null, maintenance: null });
     if (game && game.phase !== 'ended') {
@@ -488,7 +498,10 @@ function bind(s: GameSocket) {
 
   s.on('notice', ({ kind, message }) => toast({ kind, title: message }));
 
-  s.on('server:draining', ({ message }) => setState({ maintenance: message }));
+  s.on('server:draining', ({ message }) => {
+    setState({ maintenance: message });
+    s.io.reconnectionDelay(AFTER_RESTART.delayMs).randomizationFactor(AFTER_RESTART.jitter);
+  });
 }
 
 /**

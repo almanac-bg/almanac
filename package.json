@@ -14,7 +14,7 @@
     "start": "npm run start -w @quiz/server",
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/client && tsc --noEmit -p packages/client/test && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/e2e",
     "test": "npm test -w @quiz/server && npm test -w @quiz/client",
-    "test:browser": "npm run build && npm run test:browser -w @quiz/web",
+    "test:browser": "npm run build && npm run test:browser -w @quiz/web && npm run plans -w @quiz/server",
     "lint": "biome ci .",
     "format": "biome check --write ."
   },

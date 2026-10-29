@@ -1,0 +1,199 @@
+// deploy/deploy.sh and deploy/rollback.sh, run for real against a checkout of their own: git does what it does, while
+// docker, curl and sleep are stand-ins that keep their state in files (which images exist under which name, what
+// compose was asked to run, whether the site answers). What production relies on: no image, no change; the image that
+// ran becomes the way back; an unhealthy deploy goes back by itself; a rollback runs what ran before.
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { after, test } from 'node:test';
+
+const repo = path.resolve(import.meta.dirname, '../../..');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-deploy-'));
+after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+const gitEnv = {
+  ...process.env,
+  GIT_AUTHOR_NAME: 'Test',
+  GIT_AUTHOR_EMAIL: 'test@example.test',
+  GIT_COMMITTER_NAME: 'Test',
+  GIT_COMMITTER_EMAIL: 'test@example.test',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+};
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', args, { cwd, env: gitEnv, encoding: 'utf8' }).trim();
+
+/** A file in `dir`, committed and pushed: a new commit on the origin's main. Returns its full hash. */
+function publishCommit(work: string, file: string, content: string): string {
+  fs.writeFileSync(path.join(work, file), content);
+  git(work, 'add', '-A');
+  git(work, 'commit', '-q', '-m', file);
+  git(work, 'push', '-q', 'origin', 'HEAD:main');
+  return git(work, 'rev-parse', 'HEAD');
+}
+
+const stubs = path.join(tmp, 'bin');
+const state = path.join(tmp, 'state');
+fs.mkdirSync(stubs);
+fs.mkdirSync(path.join(state, 'images'), { recursive: true });
+const stub = (name: string, body: string) =>
+  fs.writeFileSync(path.join(stubs, name), `#!/bin/sh\n${body}`, { mode: 0o755 });
+// Images live in state/images, one file per name holding the image's id; state/registry lists what CI published.
+stub(
+  'docker',
+  `S="$STUB_STATE"
+echo "docker $*" >>"$S/calls.log"
+name() { printf '%s' "$1" | tr '/:' '__'; }
+case "$1" in
+  pull)
+    [ "$2" = --quiet ] && img=$3 || img=$2
+    id=$(sed -n "s|^$img ||p" "$S/registry")
+    [ -n "$id" ] || exit 1
+    echo "$id" >"$S/images/$(name "$img")" ;;
+  image)
+    case "$2" in
+      inspect)
+        if [ "$3" = -f ]; then img=$5; else img=$3; fi
+        [ -f "$S/images/$(name "$img")" ] || exit 1
+        if [ "$3" = -f ]; then cat "$S/images/$(name "$img")"; fi ;;
+    esac ;;
+  tag)
+    [ -f "$S/images/$(name "$2")" ] || exit 1
+    cp "$S/images/$(name "$2")" "$S/images/$(name "$3")" ;;
+  rmi) rm -f "$S/images/$(name "$2")" ;;
+  compose) shift; echo "APP_RELEASE=\${APP_RELEASE:-} $*" >>"$S/compose.log" ;;
+esac
+exit 0
+`,
+);
+// The site answers through Caddy unless state/down says otherwise.
+stub('curl', '[ -f "$STUB_STATE/down" ] && exit 7\nexit 0\n');
+stub('sleep', 'exit 0\n');
+
+// The origin (GitHub), a developer's clone to push from, and the server's checkout with the private bank inside.
+const origin = path.join(tmp, 'origin.git');
+const bankOrigin = path.join(tmp, 'bank.git');
+const work = path.join(tmp, 'work');
+const bankWork = path.join(tmp, 'bank-work');
+const checkout = path.join(tmp, 'checkout');
+for (const bare of [origin, bankOrigin]) git(tmp, 'init', '-q', '--bare', '-b', 'main', bare);
+git(tmp, 'clone', '-q', origin, work);
+git(tmp, 'clone', '-q', bankOrigin, bankWork);
+fs.mkdirSync(path.join(work, 'deploy'));
+for (const script of ['deploy.sh', 'rollback.sh'])
+  fs.copyFileSync(path.join(repo, 'deploy', script), path.join(work, 'deploy', script));
+fs.writeFileSync(path.join(work, '.gitignore'), '/private/\n/.release\n/.release-previous\n/.env\n');
+const first = publishCommit(work, 'app.txt', 'v1');
+publishCommit(bankWork, 'questions.json', '[1]');
+git(tmp, 'clone', '-q', origin, checkout);
+git(checkout, 'clone', '-q', bankOrigin, 'private');
+fs.writeFileSync(path.join(checkout, '.env'), 'DOMAIN=example.test\n');
+
+let second = '';
+
+const short = (commit: string) => commit.slice(0, 7);
+const image = (commit: string) => `ghcr.io/almanac-bg/almanac:${commit}`;
+const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : null);
+/** The id the image under this name has (null: no such name). */
+const tagged = (name: string) => read(path.join(state, 'images', name.replaceAll('/', '_').replaceAll(':', '_')));
+const compose = () => read(path.join(state, 'compose.log'))?.split('\n') ?? [];
+/** CI published this commit's image, with this id. */
+const published = (commit: string, id: string) =>
+  fs.appendFileSync(path.join(state, 'registry'), `${image(commit)} ${id}\n`);
+
+function run(script: string, ...args: string[]) {
+  fs.rmSync(path.join(state, 'compose.log'), { force: true });
+  const r = spawnSync('sh', [path.join(checkout, 'deploy', script), ...args], {
+    env: { ...gitEnv, PATH: `${stubs}:${process.env.PATH}`, STUB_STATE: state },
+    encoding: 'utf8',
+  });
+  return { status: r.status, output: `${r.stdout}${r.stderr}` };
+}
+
+test('deploys: the published image runs, and the one before stays as the way back', () => {
+  fs.writeFileSync(path.join(state, 'registry'), '');
+  // What runs now: the first commit's image.
+  published(first, 'sha256:one');
+  fs.writeFileSync(path.join(state, 'images', 'almanac_latest'), 'sha256:one\n');
+  fs.writeFileSync(path.join(checkout, '.release'), `${short(first)}\n`);
+
+  // A new commit CI hasn't published (yet): nothing changes, not even the checkout.
+  second = publishCommit(work, 'app.txt', 'v2');
+  const refused = run('deploy.sh');
+  assert.equal(refused.status, 1);
+  assert.match(refused.output, new RegExp(`No image for ${short(second)}`));
+  assert.equal(git(checkout, 'rev-parse', 'HEAD'), first, 'the checkout stays');
+  assert.equal(tagged('almanac:latest'), 'sha256:one');
+  assert.deepEqual(compose(), []);
+
+  // Published: it runs, under its release, and the first one is kept.
+  published(second, 'sha256:two');
+  const deployed = run('deploy.sh');
+  assert.equal(deployed.status, 0, deployed.output);
+  assert.match(deployed.output, new RegExp(`deployed ${short(second)}`));
+  assert.equal(git(checkout, 'rev-parse', 'HEAD'), second);
+  assert.equal(tagged('almanac:latest'), 'sha256:two');
+  assert.equal(tagged('almanac:previous'), 'sha256:one');
+  assert.equal(tagged(image(second)), null, 'only the two names keep an image');
+  assert.equal(read(path.join(checkout, '.release')), short(second));
+  assert.equal(read(path.join(checkout, '.release-previous')), short(first));
+  assert.ok(compose().includes(`APP_RELEASE=${short(second)} up -d`), compose().join('\n'));
+});
+
+test('the same image again with new questions: the app restarts on them, and the way back stays', () => {
+  const current = git(checkout, 'rev-parse', 'HEAD');
+  publishCommit(bankWork, 'questions.json', '[1,2]');
+  const again = run('deploy.sh');
+  assert.equal(again.status, 0, again.output);
+  assert.equal(tagged('almanac:previous'), 'sha256:one', 'not replaced by the image that runs');
+  assert.equal(read(path.join(checkout, '.release-previous')), short(first));
+  assert.ok(
+    compose().includes(`APP_RELEASE=${short(current)} up -d --no-deps --force-recreate app`),
+    compose().join('\n'),
+  );
+  assert.equal(git(path.join(checkout, 'private'), 'rev-parse', 'HEAD'), git(bankWork, 'rev-parse', 'HEAD'));
+});
+
+test('a deploy that isn’t answering after 90 s goes back by itself', () => {
+  const third = publishCommit(work, 'app.txt', 'v3');
+  published(third, 'sha256:three');
+  fs.writeFileSync(path.join(state, 'down'), '');
+  try {
+    const r = run('deploy.sh');
+    assert.equal(r.status, 1);
+    assert.match(r.output, new RegExp(`${short(third)} isn't answering through Caddy after 90 s`));
+    assert.match(r.output, /rolled back to/);
+    assert.equal(tagged('almanac:latest'), 'sha256:two', 'what ran before runs again');
+    assert.equal(read(path.join(checkout, '.release')), short(second));
+  } finally {
+    fs.rmSync(path.join(state, 'down'));
+  }
+});
+
+test('rollback: to what ran before; to a commit CI published, and only to one', () => {
+  const back = run('rollback.sh', first);
+  assert.equal(back.status, 0, back.output);
+  assert.equal(tagged('almanac:latest'), 'sha256:one');
+  assert.equal(tagged('almanac:previous'), 'sha256:two', 'what ran becomes the way back');
+  assert.equal(read(path.join(checkout, '.release')), short(first));
+  assert.ok(compose().includes(`APP_RELEASE=${short(first)} up -d --no-build app`), compose().join('\n'));
+
+  const forward = run('rollback.sh');
+  assert.equal(forward.status, 0, forward.output);
+  assert.equal(tagged('almanac:latest'), 'sha256:two');
+  assert.equal(read(path.join(checkout, '.release')), short(second));
+
+  // A commit nobody published an image for (CI failed on it): nothing changes.
+  const unpublished = publishCommit(work, 'app.txt', 'v4');
+  git(checkout, 'fetch', '-q', 'origin');
+  const refused = run('rollback.sh', unpublished);
+  assert.equal(refused.status, 1);
+  assert.match(refused.output, new RegExp(`No image for ${short(unpublished)}`));
+  assert.equal(tagged('almanac:latest'), 'sha256:two');
+
+  fs.rmSync(path.join(state, 'images', 'almanac_previous'));
+  const nothing = run('rollback.sh');
+  assert.equal(nothing.status, 1);
+  assert.match(nothing.output, /No previous image to go back to/);
+});

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  dayKey,
   type QuestionSetInfo,
   type QuestionSetSummary,
   type RoomSettings,
@@ -246,9 +247,16 @@ function withPictures(questions: SetQuestion[]): Result<{ questions: SetQuestion
 
 /**
  * Pictures no set has used for a day go (an upload left behind by an editor closed before saving, a question changed
- * since): `SETS.images` is about what a host keeps, not what they ever tried. Returns how many went.
+ * since): `SETS.images` is about what a host keeps, not what they ever tried. It reads every set, so it runs once a
+ * day (the upkeep's first run of the day). Returns how many went.
  */
 export function sweepPictures(now = Date.now()): number {
+  const today = dayKey(now);
+  if (one("SELECT 1 AS x FROM settings WHERE key = 'pictures_swept' AND value = ?", today)) return 0;
+  run(
+    "INSERT INTO settings (key, value) VALUES ('pictures_swept', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    today,
+  );
   const used = new Set(
     all<{ id: string }>(
       `SELECT DISTINCT json_extract(q.value, '$.image.id') AS id FROM question_sets s, json_each(s.questions) q

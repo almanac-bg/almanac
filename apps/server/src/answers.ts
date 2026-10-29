@@ -1,9 +1,10 @@
 import { setImmediate as yieldToMatches } from 'node:timers/promises';
 import { CROWD, type Crowd, type Difficulty, type PlayCheck } from '@quiz/shared';
-import { all, one, run } from './db';
+import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionInfo } from './questionReports';
 import { bankOption, isChoice, type PreparedQuestion, questionById } from './questions';
+import { accurateAnswerers, tallyAnswer } from './tallies';
 import { getUser, toPublicUser } from './users';
 
 /** How long each person's answers are kept: enough to see a pattern, not a history of everything they ever played. */
@@ -26,6 +27,7 @@ export function recordAnswers(matchId: string, userId: number, log: AnswerLogEnt
       a.timeMs,
       at,
     );
+    tallyAnswer(userId, a.difficulty, a.correct, at);
     run(
       `INSERT INTO question_stats (question_id, answered, correct, correct_ms) VALUES (?, 1, ?, ?)
        ON CONFLICT (question_id) DO UPDATE SET answered = answered + 1, correct = correct + excluded.correct,
@@ -90,11 +92,19 @@ export async function pruneAnswers(now = Date.now()): Promise<number> {
   const before = now - ANSWER_LOG_DAYS * 24 * 60 * 60_000;
   let pruned = 0;
   for (let i = 0; i < PRUNE_BATCHES; i++) {
-    const { changes } = run(
-      'DELETE FROM answers WHERE rowid IN (SELECT rowid FROM answers WHERE answered_at < ? LIMIT ?)',
-      before,
-      PRUNE_BATCH,
-    );
+    // The same rows twice in one transaction (the index's order): what leaves the log leaves the tallies.
+    const batch = 'SELECT rowid FROM answers WHERE answered_at < ? ORDER BY answered_at, rowid LIMIT ?';
+    const { changes } = tx(() => {
+      run(
+        `UPDATE answer_tallies SET answered = answered - g.n, correct = correct - g.hits
+         FROM (SELECT user_id, COUNT(*) AS n, SUM(correct) AS hits FROM answers
+           WHERE rowid IN (${batch}) AND difficulty <> 'easy' GROUP BY user_id) AS g
+         WHERE answer_tallies.user_id = g.user_id`,
+        before,
+        PRUNE_BATCH,
+      );
+      return run(`DELETE FROM answers WHERE rowid IN (${batch})`, before, PRUNE_BATCH);
+    });
     pruned += Number(changes);
     if (Number(changes) < PRUNE_BATCH) break;
     await yieldToMatches();
@@ -110,14 +120,7 @@ export async function pruneAnswers(now = Date.now()): Promise<number> {
 export const SUSPICIOUS = { minAnswers: 40, minAccuracy: 0.95, maxMedianMs: 2_500 } as const;
 
 function suspiciousPlayers(limit = 50): PlayCheck['suspicious'] {
-  const rows = all<{ user_id: number; n: number; hits: number; last_at: number }>(
-    `SELECT user_id, COUNT(*) AS n, SUM(correct) AS hits, MAX(answered_at) AS last_at FROM answers
-     WHERE difficulty <> 'easy' GROUP BY user_id HAVING n >= ? AND hits >= n * ?
-     ORDER BY hits * 1.0 / n DESC, n DESC LIMIT ?`,
-    SUSPICIOUS.minAnswers,
-    SUSPICIOUS.minAccuracy,
-    limit * 4,
-  );
+  const rows = accurateAnswerers(SUSPICIOUS.minAnswers, SUSPICIOUS.minAccuracy, limit * 4);
   const flagged: PlayCheck['suspicious'] = [];
   for (const r of rows) {
     const times = all<{ t: number }>(

@@ -60,8 +60,16 @@ test('old answers are all pruned however many there are, a batch at a time; rece
   // More than two batches' worth past the limit: a fixed amount per run fell behind once enough people played.
   insert(12_345, now - (ANSWER_LOG_DAYS + 1) * DAY);
   insert(10, now - DAY);
-  assert.equal(await pruneAnswers(now), 12_345);
+  // The matches going on get their turn between batches: the event loop goes round each time.
+  let turns = 0;
+  const matches = setInterval(() => turns++, 0);
+  try {
+    assert.equal(await pruneAnswers(now), 12_345);
+  } finally {
+    clearInterval(matches);
+  }
   assert.equal(count('answers'), 10, 'the recent ones stay');
+  assert.ok(turns >= 2, `three batches, a turn for the matches between each (${turns})`);
 });
 
 test('daily snapshots: one per day, a working copy, only the newest kept', async () => {

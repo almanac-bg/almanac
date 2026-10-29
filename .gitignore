@@ -9,6 +9,9 @@ dist-ssr/
 .DS_Store
 *.log
 *.db.partial
+# The statements the tests ran, for the query-plan check (apps/server/test/plans.ts)
+.sql-log/
+
 # Browser tests (apps/web/e2e): results, traces and the HTML report
 test-results/
 playwright-report/

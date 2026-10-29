@@ -11,6 +11,7 @@ import { factCount } from './almanac';
 import { all, one, run } from './db';
 import { eveningWins } from './evening';
 import { bestSeasonTier } from './seasons';
+import { modeTallies } from './tallies';
 import { getUser } from './users';
 
 /** Right answers in a category that count it as covered for "Всестранен ум". */
@@ -130,12 +131,8 @@ export function loadAggregate(userId: number): Aggregate {
   const u = getUser(userId)!;
   const count = (sql: string, ...params: (number | string)[]) => one<{ n: number }>(sql, ...params)?.n ?? 0;
   const cats = all<{ correct: number }>('SELECT correct FROM category_stats WHERE user_id = ?', userId);
-  // Wins that counted: not the ones the other side walked out of before the match got going.
-  const modeWins = all<{ mode: ModeId; wins: number }>(
-    `SELECT m.mode, COUNT(*) AS wins FROM match_players mp JOIN matches m ON m.id = mp.match_id
-     WHERE mp.user_id = ? AND mp.won = 1 GROUP BY m.mode`,
-    userId,
-  );
+  // Wins that counted: not the ones the other side walked out of before the match got going (tallies.ts).
+  const modes = modeTallies(userId);
   return {
     gamesPlayed: u.games_played,
     mpGames: u.mp_games,
@@ -148,17 +145,9 @@ export function loadAggregate(userId: number): Aggregate {
     level: levelFromXp(u.xp),
     categoriesCovered: cats.filter((c) => c.correct >= POLYMATH_PER_CATEGORY).length,
     maxCategoryCorrect: Math.max(0, ...cats.map((c) => c.correct)),
-    modeWins: Object.fromEntries(modeWins.map((r) => [r.mode, r.wins])),
+    modeWins: Object.fromEntries(modes.filter((r) => r.wins).map((r) => [r.mode, r.wins])),
     // Two on each side ("2 на 2"); in a private room, only against people: a room of friends against bots is practice.
-    teamWins: count(
-      `SELECT COUNT(*) AS n FROM match_players mp JOIN matches m ON m.id = mp.match_id
-       WHERE mp.user_id = ? AND mp.team IS NOT NULL AND mp.won = 1
-         AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
-         AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
-         AND (m.room_code IS NULL OR EXISTS (
-           SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team))`,
-      userId,
-    ),
+    teamWins: modes.reduce((sum, r) => sum + r.teamWins, 0),
     maxRating: Math.round(
       one<{ r: number | null }>('SELECT MAX(peak) AS r FROM season_ratings WHERE user_id = ?', userId)?.r ??
         START_RATING,

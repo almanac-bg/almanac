@@ -61,6 +61,7 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
     'MAIL_OUTBOX',
     'PUSH_OUTBOX',
     'PUSH_QUIET',
+    'SQL_LOG',
     'NODE_ENV',
     'PORT',
     'UV_THREADPOOL_SIZE',

@@ -1581,6 +1581,8 @@ test('season settlement', T, async () => {
       "INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, '2000-01', 'duel', 900, 950, 1, 0)",
     )
     .run(B.user.id);
+  // As when a new season begins: the season these accounts were last settled for is over.
+  srv.db.prepare('UPDATE users SET settled = NULL WHERE id IN (?, ?)').run(A.user.id, B.user.id);
   const me = (await api.get('/api/me', A.cookie)).body.user;
   assert.equal(me.seasonRewards.length, 1);
   assert.equal(me.seasonRewards[0].tier, 'gold');

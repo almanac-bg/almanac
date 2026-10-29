@@ -85,7 +85,7 @@ export async function pruneRuns(now = Date.now()): Promise<number> {
   let pruned = 0;
   for (;;) {
     const { changes } = run(
-      'DELETE FROM runs WHERE id IN (SELECT id FROM runs WHERE played_at < ? ORDER BY id LIMIT ?)',
+      'DELETE FROM runs WHERE id IN (SELECT id FROM runs WHERE played_at < ? ORDER BY played_at LIMIT ?)',
       before,
       PRUNE_BATCH,
     );

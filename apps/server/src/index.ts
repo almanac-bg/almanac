@@ -8,7 +8,7 @@ import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
-import { db } from './db';
+import { db, isBusy } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
@@ -18,10 +18,13 @@ import { api } from './routes/api';
 import { sameSiteWrites, securityHeaders } from './security';
 import { siteInfo } from './site';
 import { seedSkillOnce } from './skill';
+import { catchUpTallies, keepTallies } from './tallies';
 import { network, throttled } from './throttle';
 
 questionBank(); // fail fast on a broken question file
 seedSkillOnce();
+if (catchUpTallies())
+  console.log('🧮 Counted the running tallies again (the last stop wasn’t this release’s clean one)');
 
 // The last stop wrote that it was clean (shutdown below). Without that, the process was killed: out of memory, a
 // crash Node couldn't report, a host reboot. Running matches vanished with it, and nothing else would say so.
@@ -95,6 +98,13 @@ app.use('/api', (_req: Request, res: Response) => {
 app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ServerBusyError) {
     res.status(503).json({ error: err.message });
+    return;
+  }
+  // Another writer (Litestream, the command line) held the database past busy_timeout: a busy moment for the player,
+  // worth a report for us (it should take milliseconds).
+  if (isBusy(err)) {
+    void reportError(err, `${req.method} ${req.route?.path ?? req.path}: the database stayed locked`);
+    res.status(503).json({ error: 'Сървърът е натоварен. Опитай след малко.' });
     return;
   }
   // Malformed JSON bodies and the like.
@@ -496,6 +506,7 @@ async function shutdown(signal: string) {
   realtime.io.close();
   // A backup being copied finishes first: closing the database under it would only fail it.
   await stopMaintenance();
+  keepTallies();
   db.prepare(
     "INSERT INTO settings (key, value) VALUES ('clean_shutdown', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   ).run(String(Date.now()));

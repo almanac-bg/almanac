@@ -103,10 +103,12 @@ export interface TestServer {
 export async function startServer(env: Record<string, string> = {}): Promise<TestServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-test-'));
   const questions = path.join(dir, 'questions.json');
-  const dbPath = path.join(dir, 'test.db');
+  // A given database: the same one again, as after a restart.
+  const dbPath = env.DB_PATH ?? path.join(dir, 'test.db');
   const outbox = path.join(dir, 'outbox');
   writeFixtureQuestions(questions);
-  const port = await freePort();
+  // A given port: the same server again, as after a restart (test/load.ts).
+  const port = env.PORT ? Number(env.PORT) : await freePort();
   const args =
     process.env.TEST_TARGET === 'dist'
       ? [path.join(serverDir, 'dist/index.mjs')]
@@ -238,12 +240,18 @@ export function http(url: string) {
   };
 }
 
-export function connect(url: string, cookie: string, extraHeaders: Record<string, string> = {}): Client {
+/** A player's connection. Tests reconnect by hand; `reconnects` makes it come back by itself, as the app's does. */
+export function connect(
+  url: string,
+  cookie: string,
+  extraHeaders: Record<string, string> = {},
+  { reconnects = false } = {},
+): Client {
   return io(url, {
     transports: ['websocket'],
     extraHeaders: { cookie, ...extraHeaders },
     forceNew: true,
-    reconnection: false,
+    reconnection: reconnects,
   });
 }
 

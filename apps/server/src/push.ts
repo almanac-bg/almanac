@@ -186,9 +186,11 @@ export function dailyReminderPushes(now = Date.now()): number {
     `SELECT u.id, u.push_prefs FROM users u
      WHERE u.push_prefs IS NOT NULL AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = u.id)
      AND NOT EXISTS (SELECT 1 FROM daily_results d WHERE d.user_id = u.id AND d.day = ?)
-     AND NOT EXISTS (SELECT 1 FROM push_sent p WHERE p.user_id = u.id AND p.kind = 'daily' AND p.day = ?)`,
+     AND NOT EXISTS (SELECT 1 FROM push_sent p WHERE p.user_id = u.id AND p.kind = 'daily' AND p.day = ?)
+     AND json_extract(u.push_prefs, '$.daily') <= ?`,
     today,
     today,
+    minute,
   );
   let sent = 0;
   for (const u of due) {

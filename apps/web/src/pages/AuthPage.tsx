@@ -1,19 +1,12 @@
 import { api, errorMessage, plural, setState } from '@quiz/client';
-import {
-  BRAND,
-  type ChallengePreview,
-  type DailyPreview,
-  type GroupPreview,
-  type ModeId,
-  PASSWORD_MIN_LENGTH,
-} from '@quiz/shared';
+import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, UsersRound } from 'lucide-react';
 import { m } from 'motion/react';
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { Emoji } from '../components/Emoji';
-import { LegalLinks, MINORS_NOTICE } from '../components/LegalLinks';
+import { LegalLinks } from '../components/LegalLinks';
 import { AboutGame, ProofLine } from '../components/landing/About';
 import { DESKTOP } from '../components/landing/device';
 import { ChallengeLanding, Consent, DailyLanding, GuestPlay, NewcomerStart, Or } from '../components/landing/Entry';

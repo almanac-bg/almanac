@@ -62,6 +62,8 @@ export interface UserRow {
   /** Placement XP from private rooms on `room_xp_day`, against ROOM_PLACEMENT_XP_PER_DAY. */
   room_xp_day: string | null;
   room_xp: number;
+  /** The season and achievement list the account was last settled for (account.ts → settleIfDue). */
+  settled: string | null;
 }
 
 /** Names guests get ("Гост_4821137"); nobody can register one. */

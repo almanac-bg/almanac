@@ -29,6 +29,7 @@ import { recordRun } from '../runs';
 import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
+import { tallyMatchPlayer } from '../tallies';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
@@ -229,6 +230,7 @@ function rewardHuman(
   const realWin = won && (!setup.roomCode || rivals.length > 0);
   // Before the achievements below: the per-mode wins they count include this one.
   run('UPDATE match_players SET won = ? WHERE match_id = ? AND player_id = ?', realWin ? 1 : 0, game.id, s.id);
+  tallyMatchPlayer(game.id, s.id);
 
   // ── XP ──
   const lines: XpLine[] = [];
@@ -315,27 +317,30 @@ function rewardHuman(
   const counted = counts ? 1 : 0;
   // What a review run knew it knew from being told: its answers stay out of the player's accuracy and records.
   const known = practice ? 0 : 1;
-  const fastest =
-    p.fastestCorrectMs === null || practice
-      ? before.fastest_correct_ms
-      : Math.min(before.fastest_correct_ms ?? Infinity, p.fastestCorrectMs);
+  const fastest = p.fastestCorrectMs === null || practice ? null : p.fastestCorrectMs;
+  // Added to what the row holds as it's written, not to `before`: a match never overwrites what another write put there
+  // meanwhile (the command line, or a step above that touches the row).
   run(
-    `UPDATE users SET games_played = ?, mp_games = ?, wins = ?, questions_answered = ?, correct_answers = ?,
-       best_streak = ?, fastest_correct_ms = ?, total_correct_ms = ?, powerups_used = ?, best_solo_score = ?,
-       hosted_games = ?, last_daily_bonus = ?, xp = xp + ?
+    `UPDATE users SET games_played = games_played + ?, mp_games = mp_games + ?, wins = wins + ?,
+       questions_answered = questions_answered + ?, correct_answers = correct_answers + ?,
+       best_streak = MAX(best_streak, ?), fastest_correct_ms = COALESCE(MIN(fastest_correct_ms, ?), fastest_correct_ms, ?),
+       total_correct_ms = total_correct_ms + ?, powerups_used = powerups_used + ?,
+       best_solo_score = MAX(best_solo_score, ?), hosted_games = hosted_games + ?,
+       last_daily_bonus = COALESCE(?, last_daily_bonus), xp = xp + ?
      WHERE id = ?`,
-    before.games_played + counted,
-    before.mp_games + (multiplayer ? counted : 0),
-    before.wins + (realWin ? 1 : 0),
-    before.questions_answered + p.faced * known,
-    before.correct_answers + p.correct * known,
-    Math.max(before.best_streak, p.bestStreak * known),
+    counted,
+    multiplayer ? counted : 0,
+    realWin ? 1 : 0,
+    p.faced * known,
+    p.correct * known,
+    p.bestStreak * known,
     fastest,
-    before.total_correct_ms + p.correctMs * known,
-    before.powerups_used + p.usedPowerups.size,
-    solo && counts ? Math.max(before.best_solo_score, s.score) : before.best_solo_score,
-    before.hosted_games + (setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0),
-    claimDaily ? today : before.last_daily_bonus,
+    fastest,
+    p.correctMs * known,
+    p.usedPowerups.size,
+    solo && counts ? s.score : 0,
+    setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0,
+    claimDaily ? today : null,
     lines.reduce((sum, l) => sum + l.amount, 0),
     userId,
   );

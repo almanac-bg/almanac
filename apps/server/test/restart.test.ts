@@ -1,5 +1,8 @@
 // Deploys restart the server: running matches must play out first, and nobody may start a new one meanwhile.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
 import { autoPlay, connect, connected, emitAck, next, register, sleep, startServer, type TestServer } from './helpers';
 
@@ -35,6 +38,50 @@ test('a restart lets the running match finish, refuses new ones, then exits', T,
     await srv.stop();
   }
 });
+
+test('a restart while a run alone is stopped on a fact: the run goes on, and no new stop holds it up', T, async () => {
+  const srv = await startServer({ DRAIN_SECONDS: '60' });
+  try {
+    const A = await register(srv.url, 'spira_da_chete');
+    const sa = connect(srv.url, A.cookie);
+    await connected(sa);
+    let exited: Promise<number | null> | null = null;
+    const holds: { ok: boolean }[] = [];
+    sa.on('game:reveal', async (r) => {
+      holds.push(await emitAck(sa, 'game:hold', { index: r.index }));
+      // Stopped on the first one and never going on: the restart comes now.
+      exited ??= srv.kill('SIGTERM');
+    });
+    const play = autoPlay(sa, 'right');
+    assert.ok((await emitAck(sa, 'solo:start', { category: 'mixed' })).ok);
+    const { end } = await play;
+    assert.equal(end.standings[0].correct, 10, 'the run went on past the stop and played out');
+    assert.deepEqual(holds[0], { ok: true });
+    assert.ok(
+      holds.slice(1).every((h) => !h.ok),
+      'while the server drains, a stop isn’t granted (stop after stop would keep it waiting)',
+    );
+    assert.equal(await exited, 0, 'then the server stops on its own');
+    sa.close();
+  } finally {
+    await srv.stop();
+  }
+});
+
+test(
+  'a question bank that can’t be read stops the start, saying why (the deploy then goes back by itself)',
+  T,
+  async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-bad-bank-'));
+    try {
+      const file = path.join(dir, 'questions.json');
+      fs.writeFileSync(file, '[{ "id": "half a pull');
+      await assert.rejects(startServer({ QUESTIONS_PATH: file }), /exited early[\s\S]*JSON/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
 
 test('an idle server stops right away', T, async () => {
   const srv = await startServer({ DRAIN_SECONDS: '60' });

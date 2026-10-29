@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
 import {
+  ACHIEVEMENTS,
   dayKey,
   isUnlocked,
   type Loadout,
   levelFromXp,
   type MeUser,
   newlyUnlocked,
+  seasonKey,
   setPictureUrl,
   type UnlockContext,
 } from '@quiz/shared';
@@ -24,7 +27,7 @@ import { pushPrefs } from './push';
 import { reloadQuestionBank } from './questions';
 import { questsInfo } from './quests';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
-import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser } from './users';
+import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser, type UserRow } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
   return {
@@ -37,8 +40,8 @@ export function unlockContext(userId: number): UnlockContext {
 }
 
 /**
- * Pays out anything earned outside a match: finished seasons and achievements whose progress moved
- * (friends, approved questions…). Cheap when there's nothing to do, so it runs on every /me.
+ * Pays out anything earned outside a match: finished seasons and achievements whose progress moved (friends, approved
+ * questions, XP from a friend duel or a recording…). What moves it calls this; /me only when settleIfDue says so.
  */
 export function settleAccount(userId: number) {
   const unlocked = tx(() => {
@@ -61,9 +64,27 @@ export function grantXp(userId: number, xp: number) {
   settleAccount(userId);
 }
 
+/**
+ * What an account is settled for: the season (one that ended pays out) and the achievements there are, with their
+ * goals (a new one may already be earned). Everything else that unlocks something settles as it happens.
+ */
+const ACHIEVEMENT_LIST = createHash('sha256')
+  .update(ACHIEVEMENTS.map((a) => `${a.id}:${a.goal ?? ''}`).join())
+  .digest('base64url')
+  .slice(0, 12);
+
+/** Settles the account when the season or the list of achievements changed since it last was: not on every /me. */
+function settleIfDue(row: UserRow) {
+  const due = `${seasonKey()} ${ACHIEVEMENT_LIST}`;
+  if (row.settled === due) return;
+  settleAccount(row.id);
+  run('UPDATE users SET settled = ? WHERE id = ?', due, row.id);
+}
+
 export function getMe(userId: number): MeUser | null {
-  if (!getUser(userId)) return null;
-  settleAccount(userId);
+  const before = getUser(userId);
+  if (!before) return null;
+  settleIfDue(before);
   const row = getUser(userId)!;
   const today = dayKey();
   return {

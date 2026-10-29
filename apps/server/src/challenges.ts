@@ -13,6 +13,7 @@ import {
   type MyChallenge,
   ordinal,
 } from '@quiz/shared';
+import { grantXp } from './account';
 import { config } from './config';
 import { cutShortError } from './daily';
 import { all, one, run } from './db';
@@ -443,7 +444,7 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
     });
   } else {
     const theirs = standing.outcome === 'won' ? 'lost' : standing.outcome === 'lost' ? 'won' : 'draw';
-    if (theirs === 'won') run('UPDATE users SET xp = xp + ? WHERE id = ?', DUEL.winXp, friendId);
+    if (theirs === 'won') grantXp(friendId, DUEL.winXp);
     notify(friendId, {
       icon: theirs === 'won' ? '🏆' : theirs === 'lost' ? '⚔️' : '🤝',
       text: `${me.username} изигра дуела ви: ${standing.theirs.score} на ${score} — ${NOTE_OUTCOME[theirs]}${

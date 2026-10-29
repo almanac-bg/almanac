@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
+import { verifyPassword } from '../auth';
 import { ACCOUNT_ONLY } from '../guests';
+import { throttled } from '../throttle';
 import { getUser, isAdmin } from '../users';
 
 /**
@@ -50,4 +52,20 @@ export function requireRecentPassword(_req: Request, res: Response, next: NextFu
     return;
   }
   next();
+}
+
+/**
+ * The player's password, given again: to change or remove the email (whoever controls it can reset the password), and
+ * to confirm a session for what needs a recent one (/auth/confirm, requireRecentPassword). Ten tries in 15 minutes.
+ */
+export async function confirmPassword(res: Response, password: string): Promise<boolean> {
+  if (throttled(`confirm-password:${res.locals.userId}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return false;
+  }
+  if (!(await verifyPassword(password, getUser(res.locals.userId)!.password_hash))) {
+    res.status(400).json({ error: 'Грешна парола.' });
+    return false;
+  }
+  return true;
 }

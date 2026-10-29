@@ -28,7 +28,7 @@ const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
 const { botK, finalizeMatch, PROVISIONAL, ROOM_PLACEMENT_XP_PER_DAY } = await import('../src/game/rewards');
-const { playCheck, SUSPICIOUS } = await import('../src/answers');
+const { playCheck, recordAnswers, SUSPICIOUS } = await import('../src/answers');
 const { recordRating } = await import('../src/seasons');
 const getRatingOf = (userId: number) =>
   one<{ rating: number }>("SELECT rating FROM season_ratings WHERE user_id = ? AND mode = 'duel'", userId)?.rating ??
@@ -560,14 +560,26 @@ test('every answer a person gives is logged, with totals per question; too-perfe
 
   // A script reading the answers off a copy of the bank: every medium and hard one right, in under a second.
   const bot = account();
-  for (let i = 0; i < SUSPICIOUS.minAnswers; i++)
-    run(
-      `INSERT INTO answers (user_id, match_id, question_id, difficulty, correct, time_ms, answered_at)
-       VALUES (?, 'm', ?, 'hard', 1, 800, ?)`,
-      bot,
-      `q${i}`,
-      Date.now(),
-    );
+  recordAnswers(
+    'm',
+    bot,
+    Array.from({ length: SUSPICIOUS.minAnswers }, (_, i) => ({
+      questionId: `q${i}`,
+      index: i % 10,
+      category: 'history' as const,
+      difficulty: 'hard' as const,
+      choice: 0,
+      guess: null,
+      closeness: null,
+      arranged: null,
+      placed: null,
+      correct: true,
+      timeMs: 800,
+      points: 900,
+      powerup: null,
+      retried: false,
+    })),
+  );
   const flagged = playCheck().suspicious.map((p) => p.user.id);
   assert.ok(flagged.includes(bot));
   assert.ok(!flagged.includes(a), 'ten answers say nothing yet');

@@ -6,6 +6,19 @@ import { EventEmitter } from 'node:events';
 import { beforeEach, mock, test } from 'node:test';
 import type { GamePlayer, GameStartPayload, QuestionPayload, Standing } from '@quiz/shared';
 
+class FakeManager extends EventEmitter {
+  delayMs = 1000;
+  jitter = 0.5;
+  reconnectionDelay(ms: number) {
+    this.delayMs = ms;
+    return this;
+  }
+  randomizationFactor(jitter: number) {
+    this.jitter = jitter;
+    return this;
+  }
+}
+
 /** The socket the client gets: records what it sends; `deliver` plays the server. */
 class FakeSocket extends EventEmitter {
   connected = false;
@@ -13,8 +26,8 @@ class FakeSocket extends EventEmitter {
   sent: [string, ...unknown[]][] = [];
   /** The link died without a word: emits pile up in the buffer, as Socket.IO's do while it waits for a ping. */
   stalled = false;
-  /** The connection manager underneath, where the server's pings arrive. */
-  io = new EventEmitter();
+  /** The connection manager underneath, where the server's pings arrive (and its reconnection pace is set). */
+  io = new FakeManager();
   private catchAll: ((event: string, ...args: unknown[]) => void)[] = [];
 
   onAny(listener: (event: string, ...args: unknown[]) => void) {
@@ -377,4 +390,14 @@ test('a round is picked by whoever is asked, once; everyone sees what it became'
   });
   actions.pickCategory('music');
   assert.equal(socket.sent.length, 1);
+});
+
+test('a restart the server announced: the tab comes back at a random moment in the first seconds, then as usual', () => {
+  socket.connect();
+  socket.deliver('server:draining', { message: 'Обновяваме играта.' });
+  assert.equal(getState().maintenance, 'Обновяваме играта.');
+  assert.deepEqual([socket.io.delayMs, socket.io.jitter], [2500, 1], 'anywhere from 0 to 5 s, not all in one second');
+  socket.drop();
+  socket.connect();
+  assert.deepEqual([socket.io.delayMs, socket.io.jitter], [1000, 0.5], 'back in: a later drop retries as usual');
 });

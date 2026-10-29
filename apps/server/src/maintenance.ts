@@ -8,7 +8,7 @@ import { pruneAnswers } from './answers';
 import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
-import { all, db, run } from './db';
+import { all, db, optimize, run } from './db';
 import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests } from './guests';
@@ -42,7 +42,8 @@ const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export function purgeExpired(now = Date.now()) {
   run('DELETE FROM sessions WHERE expires_at < ?', now);
-  run('DELETE FROM email_tokens WHERE expires_at < ? OR used_at IS NOT NULL', now);
+  run('DELETE FROM email_tokens WHERE expires_at < ?', now);
+  run('DELETE FROM email_tokens WHERE used_at IS NOT NULL');
   run(
     `UPDATE users SET pending_email = NULL WHERE pending_email IS NOT NULL AND NOT EXISTS (
        SELECT 1 FROM email_tokens t WHERE t.user_id = users.id AND t.purpose = 'verify')`,
@@ -193,11 +194,12 @@ export function startMaintenance() {
       tellExpiredDuels();
       // The evening champion's title is worn for a day.
       retireChampionTitles();
-      const weeks = settleGroupWeeks();
+      const weeks = await settleGroupWeeks();
       if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
       const pictures = sweepPictures();
       if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
       if (moderatorDigest()) console.log('🛡️  Morning summary sent to the moderators');
+      optimize();
       const pushed = dailyReminderPushes() + timedPushes((u) => liveDailyStreak(u), eveningStartsAt(dayKey()));
       if (pushed) console.log(`📲 Pushes sent: ${pushed}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {

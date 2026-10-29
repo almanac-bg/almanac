@@ -550,4 +550,5 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 1);
   assert.ok(one('SELECT 1 AS x FROM set_images WHERE id = ?', up.id));
   assert.ok(!one('SELECT 1 AS x FROM set_images WHERE id = ?', spare.ok ? spare.id : ''));
+  assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 0, 'once a day: the next run that day reads no sets');
 });

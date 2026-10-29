@@ -8,7 +8,8 @@
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "build": "node build.mjs",
     "start": "NODE_ENV=production node dist/index.mjs",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "rm -rf .sql-log && SQL_LOG=\"$PWD/.sql-log\" node --import tsx --test test/*.test.ts && npm run plans",
+    "plans": "node --import tsx test/plans.ts",
     "test:dist": "TEST_TARGET=dist node --import tsx --test test/*.test.ts",
     "load": "node --import tsx test/load.ts"
   },

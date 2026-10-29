@@ -11,6 +11,7 @@ import {
   shiftDay,
   sofiaHour,
 } from '@quiz/shared';
+import { grantXp } from './account';
 import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
@@ -231,7 +232,7 @@ export function tellRecordOwners(now = Date.now()): number {
   tx(() => {
     for (const o of owners) {
       const xp = Math.min(o.won * RECORDS.xpPerWin, RECORDS.xpPerDay);
-      if (xp > 0) run('UPDATE users SET xp = xp + ? WHERE id = ?', xp, o.owner_id);
+      if (xp > 0) grantXp(o.owner_id, xp);
       const text = `Записите на мачовете ти изиграха ${duels(o.games)} вчера: ${o.won ? `${wins(o.won)}, +${xp} XP` : 'без победа този път'}.`;
       notify(o.owner_id, { icon: '📼', text, link: '/settings' });
       push(o.owner_id, 'records', { title: '📼 Записите ти играха вчера', body: text, url: '/notifications' });
