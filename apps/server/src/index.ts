@@ -397,14 +397,16 @@ function challengePage(html: string, id: string): string | null {
   if (!preview) return null;
   const name = preview.creator?.username ?? 'Някой';
   // Messenger and Viber often show the title alone: the score to beat goes in it.
+  // Nobody has scored yet (or only zero): nothing to beat, the plain invitation.
+  const toBeat = preview.topScore ? preview.topScore : null;
   const title =
-    preview.topScore !== null && !preview.expired
-      ? `${name} те предизвиква: ${points(preview.topScore)} точки за биене`
+    toBeat !== null && !preview.expired
+      ? `${name} те предизвиква: ${points(toBeat)} точки за биене`
       : `${name} те предизвиква в ${BRAND.name}`;
   const description = preview.expired
     ? 'Това предизвикателство изтече — но можеш да създадеш свое.'
-    : preview.topScore !== null
-      ? `Резултатът за биене: ${preview.topScore} точки. 10 въпроса, един опит — можеш ли повече?`
+    : toBeat !== null
+      ? `Резултатът за биене: ${toBeat} точки. 10 въпроса, един опит — можеш ли повече?`
       : '10 въпроса, един опит. Приемаш ли?';
   // A challenge is for the people it's sent to, not for search results.
   return withHead(html, {
