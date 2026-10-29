@@ -78,7 +78,9 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    - **Caching → Configuration:** Browser Cache TTL — Respect Existing Headers (колко се пазят файловете, решава
      сървърът).
    - **Security → Settings:** Bot Fight Mode и JavaScript detections изключени (не добавят скрипт и бисквитка към
-     всяка страница).
+     всяка страница); Security Level — Essentially Off: проверка „дали си човек“ насред мач спира заявките и връзката
+     на играта, а мобилните оператори дават един адрес на много хора. Защитата от DDoS атаки работи и така, а
+     опитите за вход ограничава самото приложение.
    - В `.env`: `PROXY_PROVIDER` (виж `.env.example`), за да го посочи политиката за поверителност.
 
    Без прокси (всички записи DNS only) изключи Universal SSL: тогава не върши нищо, а при CAA записи Cloudflare тихо
