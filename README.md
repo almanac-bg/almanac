@@ -680,6 +680,10 @@ Issues и pull request-и са добре дошли: виж [CONTRIBUTING.md](C
 - **Банката с въпроси на играта**, която не е в това хранилище. Примерната банка в него е част от кода и може да се
   използва заедно с него.
 
+Чуждото в хранилището е под собствените си лицензи: шрифтовете Onest и Unbounded — SIL Open Font License
+(`apps/web/src/fonts`), а картинките на играта (аватари, категории, козове, постижения) — Fluent Emoji на Microsoft, MIT
+(`apps/web/src/emoji/LICENSE`).
+
 ## Настройки на хранилището в GitHub
 
 `scripts/github-setup.sh almanac-bg/almanac` настройва хранилището в GitHub (може спокойно да се пуска повторно):

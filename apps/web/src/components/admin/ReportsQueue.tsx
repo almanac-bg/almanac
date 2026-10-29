@@ -100,7 +100,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
 
         <ul className="mt-4 space-y-2">
           {reports.map((r) => (
-            <li key={r.id} className="rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
+            <li key={r.id} className="rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{reasonLabel(r.reason)}</span>
                 <span className="text-xs text-fg-3">

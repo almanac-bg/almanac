@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { keepTogether } from '../lib/typography';
+import { Emoji } from './Emoji';
 import { numberText } from './game/numbers';
 import { Thumbnail } from './game/QuestionPicture';
 import { Button, Card } from './ui';
@@ -18,7 +19,7 @@ export function TierBadge({ tier, className }: { tier: number; className?: strin
         className,
       )}
     >
-      <span aria-hidden>{t.icon}</span>
+      <Emoji e={t.icon} />
       {t.name}
     </span>
   );
@@ -70,7 +71,7 @@ export function ReviewCard({ queue, className }: { queue: ReviewQueue; className
       <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-emerald-400/20" />
       <div className="relative flex flex-wrap items-center gap-4">
         <span aria-hidden className="text-4xl leading-none">
-          📒
+          <Emoji e="📒" />
         </span>
         <div className="min-w-0 flex-1 basis-56">
           <h2 className="t-card">Поправителен</h2>

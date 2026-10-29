@@ -6,6 +6,8 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
 import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
+import { Emoji } from '../Emoji';
+import { accentText } from '../game/answers';
 import { BIG_MATCH, topAndYou } from '../game/bigMatch';
 import { teamColor } from '../game/teams';
 import { challengeShareText } from '../home/challengeLink';
@@ -80,9 +82,7 @@ export function ChallengeStanding({
 /** The chip PlayerTag shows for bots, for the podium (which doesn't use PlayerTag). */
 function MachineTag({ label }: { label: string }) {
   return (
-    <span className="shrink-0 rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-3">
-      {label}
-    </span>
+    <span className="shrink-0 rounded-md bg-tint/10 px-1 py-px text-xs font-bold tracking-wide text-fg-3">{label}</span>
   );
 }
 
@@ -118,7 +118,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                   transition={{ delay: 1, type: 'spring' }}
                   className="text-4xl drop-shadow-[0_0_16px_rgb(251_191_36/0.7)]"
                 >
-                  👑
+                  <Emoji e="👑" />
                 </motion.span>
               )}
               <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 84 : 68} dim={s.left} />
@@ -132,7 +132,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                   // A recording is someone's match: their profile is a tap away.
                   <Link
                     to={`/profile/${encodeURIComponent(p.name)}`}
-                    className="focus-ring truncate rounded underline decoration-white/30 underline-offset-2"
+                    className="focus-ring truncate rounded underline decoration-tint/30 underline-offset-2"
                   >
                     {p.name}
                   </Link>
@@ -153,10 +153,10 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                   heights[s.placement],
                   s.placement === 1
                     ? 'bg-[linear-gradient(180deg,rgb(251_191_36/0.3),rgb(251_191_36/0.02))]'
-                    : 'bg-[linear-gradient(180deg,rgb(255_255_255/0.08),rgb(255_255_255/0.01))]',
+                    : 'bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-tint)_8%,transparent),transparent)]',
                 )}
               >
-                {medals[s.placement]}
+                <Emoji e={medals[s.placement]} />
               </div>
             </motion.div>
           );
@@ -184,7 +184,15 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                 </div>
                 <FriendButton player={p} youId={game.start.youId} compact />
                 <span className="text-sm text-fg-2 tabular-nums">
-                  {s.left ? 'напусна' : s.eliminatedAt !== null ? `💀 ${s.eliminatedAt}` : fmt(s.score)}
+                  {s.left ? (
+                    'напусна'
+                  ) : s.eliminatedAt !== null ? (
+                    <>
+                      <Emoji e="💀" /> {s.eliminatedAt}
+                    </>
+                  ) : (
+                    fmt(s.score)
+                  )}
                 </span>
               </div>
             );
@@ -225,12 +233,12 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
             >
               <div
                 className="absolute -top-16 -right-10 size-48 rounded-full opacity-25 glow"
-                style={{ color: color }}
+                style={{ color: accentText(color) }}
               />
               <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="t-card" style={{ color }}>
-                    {won && <span className="mr-1.5">👑</span>}
+                    {won && <Emoji e="👑" className="mr-1.5" />}
                     {TEAMS[team].name}
                   </p>
                   <p className="text-xs text-fg-3">{myTeam === team ? 'Твоят отбор' : 'Съперници'}</p>

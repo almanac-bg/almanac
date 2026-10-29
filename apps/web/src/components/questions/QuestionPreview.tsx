@@ -2,7 +2,8 @@ import { DIFFICULTY_LABEL } from '@quiz/client';
 import { categoryById, type QuestionDraft } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { LETTERS, OPTION_COLORS } from '../game/answers';
+import { Emoji } from '../Emoji';
+import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
 
 /** Read-only question card styled like the in-game one, with the correct answer highlighted. */
 export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; compact?: boolean }) {
@@ -12,11 +13,11 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
       <div className="flex flex-wrap items-center gap-2">
         <span
           className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
-          style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: cat.color }}
+          style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: accentText(cat.color) }}
         >
-          {cat.icon} {cat.name}
+          <Emoji e={cat.icon} /> {cat.name}
         </span>
-        <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
+        <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
           {DIFFICULTY_LABEL[draft.difficulty]}
         </span>
       </div>
@@ -52,7 +53,10 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
               <span className="absolute inset-y-0 left-0 w-1" style={{ background: correct ? '#34d399' : color }} />
               <span
                 className="grid size-8 shrink-0 place-items-center rounded-lg font-display text-sm font-bold"
-                style={{ background: correct ? '#34d399' : `${color}22`, color: correct ? '#0b0a14' : color }}
+                style={{
+                  background: correct ? '#34d399' : `${color}22`,
+                  color: correct ? '#0b0a14' : accentText(color),
+                }}
               >
                 {correct ? <Check className="size-4" strokeWidth={3} /> : LETTERS[i]}
               </span>

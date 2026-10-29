@@ -1,7 +1,8 @@
 import { dismissToast, useStore } from '@quiz/client';
 import clsx from 'clsx';
-import { X } from 'lucide-react';
+import { AlertTriangle, Info, Sparkles, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { Emoji } from './Emoji';
 
 /** How far a toast has to be swiped to go. */
 const SWIPE_PX = 80;
@@ -35,9 +36,16 @@ export function Toasts() {
               t.kind === 'success' && 'border-emerald-400/40',
             )}
           >
-            <span className="text-xl leading-none" aria-hidden>
-              {t.icon ?? (t.kind === 'error' ? '⚠️' : t.kind === 'success' ? '✨' : 'ℹ️')}
-            </span>
+            {/* An achievement or an unlock brings its own picture; otherwise a line icon for what kind of news it is. */}
+            {t.icon ? (
+              <Emoji e={t.icon} size="1.5rem" />
+            ) : t.kind === 'error' ? (
+              <AlertTriangle aria-hidden className="size-5 shrink-0 text-rose-300" />
+            ) : t.kind === 'success' ? (
+              <Sparkles aria-hidden className="size-5 shrink-0 text-emerald-300" />
+            ) : (
+              <Info aria-hidden className="size-5 shrink-0 text-cyan-300" />
+            )}
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">{t.title}</span>
               {t.body && <span className="mt-0.5 block text-xs text-fg-2">{t.body}</span>}

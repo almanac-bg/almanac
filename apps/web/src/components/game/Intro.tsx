@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, machineTag, RankBadge } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { BIG_MATCH } from './bigMatch';
 import { PowerupNotesLine, useNewPowerups } from './Powerups';
 import { PlayerMark } from './Scoreboard';
@@ -58,13 +59,17 @@ export function Intro({ game }: { game: LiveGame }) {
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
           <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
-            {game.start.duelWith
-              ? '⚔️'
-              : game.start.mode === 'daily'
-                ? '🗓️'
-                : game.start.mode === 'review'
-                  ? '📒'
-                  : category?.icon}
+            <Emoji
+              e={
+                game.start.duelWith
+                  ? '⚔️'
+                  : game.start.mode === 'daily'
+                    ? '🗓️'
+                    : game.start.mode === 'review'
+                      ? '📒'
+                      : (category?.icon ?? '🎲')
+              }
+            />
           </motion.span>
           <h1 className="mt-4 font-display text-3xl font-bold">
             {game.start.duelWith
@@ -114,7 +119,7 @@ export function Intro({ game }: { game: LiveGame }) {
             </motion.div>
           ))}
           {players.length > BIG_MATCH && (
-            <div className="grid size-16 place-items-center self-start justify-self-center rounded-full border border-line bg-white/5 font-display font-bold text-fg-2">
+            <div className="grid size-16 place-items-center self-start justify-self-center rounded-full border border-line bg-tint/5 font-display font-bold text-fg-2">
               +{players.length - (BIG_MATCH - 1)}
             </div>
           )}
@@ -149,15 +154,16 @@ export function Intro({ game }: { game: LiveGame }) {
 
 /** A player's best category mastery: „🥇 Майстор · История“ (`short`: the two icons, where names don't fit). */
 function MasteryLine({ mastery, short }: { mastery: CategoryMastery; short?: boolean }) {
-  const icons = `${MASTERY_TIERS[mastery.tier].icon}${categoryById(mastery.category)?.icon ?? ''}`;
+  const category = categoryById(mastery.category);
   return short ? (
     <span className="text-xs" title={masteryName(mastery)}>
-      <span aria-hidden>{icons}</span>
+      <Emoji e={MASTERY_TIERS[mastery.tier].icon} />
+      {category && <Emoji e={category.icon} />}
       <span className="sr-only">{masteryName(mastery)}</span>
     </span>
   ) : (
     <span className="text-xs text-balance text-emerald-200">
-      {MASTERY_TIERS[mastery.tier].icon} {masteryName(mastery)}
+      <Emoji e={MASTERY_TIERS[mastery.tier].icon} /> {masteryName(mastery)}
     </span>
   );
 }
@@ -175,7 +181,7 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
     >
       <Avatar avatar={p.avatar} frame={p.frame} size={roomy ? 120 : 88} />
       <div className="flex max-w-full items-center gap-1.5">
-        <span className={clsx('min-w-0 truncate font-display font-bold', !roomy && 'text-sm')}>{p.name}</span>
+        <span className={clsx('min-w-0 truncate font-extrabold', !roomy && 'text-sm')}>{p.name}</span>
         {roomy && <LevelBadge level={p.level} className="shrink-0" />}
       </div>
       {p.rating !== null && <RankBadge rating={p.rating} />}
@@ -188,7 +194,13 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
       {p.mastery && <MasteryLine mastery={p.mastery} />}
       {p.isBot && !!p.strong?.length && (
         <span className="text-xs text-balance text-fg-2">
-          силен в {p.strong.map((c) => `${categoryById(c)?.icon} ${categoryById(c)?.name}`).join(', ')}
+          силен в{' '}
+          {p.strong.map((c, i) => (
+            <span key={c}>
+              {i > 0 && ', '}
+              <Emoji e={categoryById(c)?.icon ?? ''} /> {categoryById(c)?.name}
+            </span>
+          ))}
         </span>
       )}
     </motion.div>
@@ -209,7 +221,7 @@ function RoundsPlan({ game }: { game: LiveGame }) {
     <p className="mt-6 max-w-md text-sm text-balance text-fg-2">
       Рунд 1:{' '}
       <span className="font-semibold text-fg">
-        {first?.icon} {first?.name}
+        {first && <Emoji e={first.icon} />} {first?.name}
       </span>
       . Категорията на следващите {game.rounds.length - 1} избира изоставащият. Накрая — финал с число.
     </p>
@@ -243,7 +255,7 @@ function TeamsVersus({ game }: { game: LiveGame }) {
         className="flex w-36 min-w-0 flex-col items-center gap-4 sm:w-52"
       >
         <span
-          className="max-w-full rounded-full border px-3 py-1 text-center font-display text-sm font-bold"
+          className="max-w-full rounded-full border px-3 py-1 text-center text-sm font-extrabold"
           style={{ color, borderColor: `${color}66`, background: `${color}18`, boxShadow: `0 0 24px -8px ${color}` }}
         >
           {TEAMS[team].name}

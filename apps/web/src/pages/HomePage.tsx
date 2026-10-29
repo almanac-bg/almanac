@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useStartReview } from '../components/almanac';
 import { useDuels, usePlayDuel } from '../components/duels';
+import { Emoji } from '../components/Emoji';
 import { ChallengeCard } from '../components/home/ChallengeCard';
 import { CommunityCard } from '../components/home/CommunityCard';
 import { DailyCard } from '../components/home/DailyCard';
@@ -169,7 +170,7 @@ function ReviewTurn() {
       className="flex items-center gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.08] px-4 py-3"
     >
       <span aria-hidden className="text-xl leading-none">
-        📒
+        <Emoji e="📒" />
       </span>
       <p className="min-w-0 flex-1 text-sm">
         <b>Поправителен:</b>{' '}

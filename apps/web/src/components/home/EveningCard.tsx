@@ -5,6 +5,7 @@ import { ChevronDown, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button, Card } from '../ui';
 import { countdown } from './time';
 
@@ -87,7 +88,7 @@ export function EveningCard({ className }: { className?: string }) {
             className="focus-ring flex w-full items-center gap-2 rounded-lg text-left text-sm"
           >
             <span className="min-w-0 flex-1 truncate">
-              <span className="text-fg-3">{night.day === status?.day ? 'Тази вечер' : 'Снощи'}:</span> 👑{' '}
+              <span className="text-fg-3">{night.day === status?.day ? 'Тази вечер' : 'Снощи'}:</span> <Emoji e="👑" />{' '}
               <b>{night.top[0]?.placement === 1 ? night.top[0].user.username : '—'}</b>
               <span className="text-fg-3"> · {night.players} играха</span>
             </span>

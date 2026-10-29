@@ -1,4 +1,14 @@
-import { fmt, plural, type ReviewItem, unlockPreview, useStore } from '@quiz/client';
+import {
+  api,
+  errorMessage,
+  fmt,
+  plural,
+  type ReviewItem,
+  setState as setStore,
+  toast,
+  unlockPreview,
+  useStore,
+} from '@quiz/client';
 import {
   achievementById,
   type CategoryMastery,
@@ -17,7 +27,7 @@ import {
   type UnratedReason,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { Share2 } from 'lucide-react';
+import { ArrowUp, Check, Share2 } from 'lucide-react';
 import { animate, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
@@ -25,6 +35,7 @@ import { dailyLinkUrl, offBoardWhy } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 import { DayField } from './DayField';
@@ -86,13 +97,13 @@ export function DailyCard({
       )}
       {daily.streak > 0 && (
         <p className="relative mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-sm font-bold text-orange-300">
-          🔥 Серия {plural(daily.streak, 'ден', 'дни')}
+          <Emoji e="🔥" /> Серия {plural(daily.streak, 'ден', 'дни')}
         </p>
       )}
       {daily.shieldsUsed > 0 && (
         <p className="relative mt-3 flex items-start gap-2.5 rounded-2xl border border-sky-300/20 bg-sky-400/10 px-3.5 py-2.5 text-sm text-sky-100">
           <span aria-hidden className="text-lg leading-5">
-            🛡️
+            <Emoji e="🛡️" />
           </span>
           {daily.shieldsUsed === 1
             ? 'Щит спаси серията ти: пропуснатият ден не я прекъсна.'
@@ -107,7 +118,7 @@ export function DailyCard({
           className="relative mt-3 flex items-center gap-3 rounded-2xl border border-sky-300/35 bg-[linear-gradient(110deg,rgb(56_189_248/0.22),rgb(167_139_250/0.14))] px-3.5 py-3"
         >
           <span aria-hidden className="text-3xl leading-none drop-shadow-[0_0_14px_rgb(56_189_248/0.7)]">
-            🛡️
+            <Emoji e="🛡️" />
           </span>
           <p className="text-sm text-sky-50">
             <b className="font-display">Имаш нов щит!</b> Ако пропуснеш ден, той ще запази серията.
@@ -140,7 +151,7 @@ function AgainstSharer({
   const me = useStore((s) => s.me);
   const verdict = score > sharer.score ? 'Би го!' : score < sharer.score ? `${sharer.user.username} води` : 'Равни сте';
   return (
-    <div className="relative mt-4 rounded-2xl border border-line bg-black/20 p-3.5">
+    <div className="relative mt-4 rounded-2xl border border-line bg-sunk/20 p-3.5">
       <p className="t-eyebrow text-fg-3">По линка на {sharer.user.username}</p>
       <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 text-sm">
         <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={28} />
@@ -154,7 +165,7 @@ function AgainstSharer({
           {correct}/{of} · {fmt(score)} т.
         </span>
       </div>
-      <p className="mt-2 font-display text-base font-bold text-amber-300">{verdict}</p>
+      <p className="mt-2 text-base font-extrabold text-amber-300">{verdict}</p>
     </div>
   );
 }
@@ -215,7 +226,7 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
             {fmt(p.into)} / {fmt(p.needed)}
           </span>
         </div>
-        <div className="h-3 overflow-hidden rounded-full bg-white/8">
+        <div className="h-3 overflow-hidden rounded-full bg-tint/8">
           <div
             className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#e879f9,#22d3ee)] shadow-[0_0_16px_rgb(168_85_247/0.8)]"
             style={{ width: `${p.pct * 100}%` }}
@@ -226,9 +237,9 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
             key={levelUp}
             initial={{ opacity: 0, scale: 0.5, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="mt-4 rounded-2xl bg-[linear-gradient(110deg,rgb(168_85_247/0.25),rgb(34_211_238/0.2))] p-3 text-center font-display font-bold"
+            className="mt-4 rounded-2xl bg-[linear-gradient(110deg,rgb(168_85_247/0.25),rgb(34_211_238/0.2))] p-3 text-center font-extrabold"
           >
-            ⬆️ Ново ниво {levelUp}!
+            <ArrowUp aria-hidden className="mb-1 inline size-5" /> Ново ниво {levelUp}!
           </motion.div>
         )}
       </div>
@@ -299,7 +310,9 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
                 background: `linear-gradient(110deg, ${rarity.color}1f, transparent 70%)`,
               }}
             >
-              <span className="grid size-11 place-items-center rounded-xl bg-black/30 text-2xl">{a.icon}</span>
+              <span className="grid size-11 place-items-center rounded-xl bg-sunk/30">
+                <Emoji e={a.icon} size="1.75rem" />
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{a.name}</div>
                 <div className="text-xs text-fg-3">{a.description}</div>
@@ -337,16 +350,77 @@ export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
               className="flex items-center gap-3"
             >
               <span aria-hidden className="text-4xl leading-none">
-                {tier.icon}
+                <Emoji e={tier.icon} />
               </span>
               <div className="min-w-0">
-                <p className="font-display text-lg font-bold">{masteryName(m)}</p>
-                <p className="text-sm text-fg-2">{category?.icon} Нова степен — и титла, която можеш да носиш.</p>
+                <p className="text-lg font-extrabold">{masteryName(m)}</p>
+                <p className="text-sm text-fg-2">
+                  {category && <Emoji e={category.icon} />} Нова степен — и титла, която можеш да носиш.
+                </p>
               </div>
             </motion.li>
           );
         })}
       </ul>
+    </Card>
+  );
+}
+
+/**
+ * A new avatar or frame, shown big at the top of the rewards: on you, springing in, with „Сложи го“ to wear it at once
+ * (as the collection does). The rest of what was unlocked is listed in UnlocksCard.
+ */
+export function UnlockReveal({ rewards }: { rewards: MatchRewards }) {
+  const me = useStore((s) => s.me);
+  const unlock = rewards.unlocks.find((u) => u.kind === 'avatar' || u.kind === 'frame');
+  const [state, setState] = useState<'idle' | 'saving' | 'worn'>('idle');
+  useEffect(() => {
+    // The level-up has a sound of its own already.
+    const leveled = rewards.levelAfter > rewards.levelBefore;
+    if (!unlock || leveled) return;
+    const t = setTimeout(sfx.levelUp, 900);
+    return () => clearTimeout(t);
+  }, [unlock, rewards.levelAfter, rewards.levelBefore]);
+  if (!unlock || !me) return null;
+  const { name } = unlockPreview(unlock);
+  const avatar = unlock.kind === 'avatar' ? unlock.id : me.avatar;
+  const frame = unlock.kind === 'frame' ? unlock.id : me.frame;
+  const worn = state === 'worn' || (unlock.kind === 'avatar' ? me.avatar === unlock.id : me.frame === unlock.id);
+
+  async function wear() {
+    setState('saving');
+    try {
+      const { user } = await api.loadout({ [unlock!.kind]: unlock!.id });
+      setStore({ me: user });
+      setState('worn');
+    } catch (err) {
+      setState('idle');
+      toast({ kind: 'error', title: errorMessage(err, 'Неуспешно запазване.') });
+    }
+  }
+
+  return (
+    <Card className="flex items-center gap-5 overflow-hidden p-5 sm:p-6">
+      <motion.div
+        initial={{ scale: 0.3, rotate: -18, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.8 }}
+      >
+        <Avatar avatar={avatar} frame={frame} size={96} />
+      </motion.div>
+      <div className="min-w-0 flex-1">
+        <p className="t-eyebrow text-amber-300">Ново за теб</p>
+        <p className="mt-1 text-lg font-extrabold">{name}</p>
+        {worn ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
+            <Check aria-hidden className="size-4" /> Носиш го
+          </p>
+        ) : (
+          <Button size="sm" className="mt-3" onClick={() => void wear()} loading={state === 'saving'}>
+            Сложи го
+          </Button>
+        )}
+      </div>
     </Card>
   );
 }
@@ -372,9 +446,9 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 1.2 + i * 0.06 }}
-              className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm"
+              className="inline-flex items-center gap-2 rounded-xl border border-line bg-tint/5 px-3 py-2 text-sm"
             >
-              <span className="text-lg leading-none">{icon}</span>
+              <Emoji e={icon} size="1.25rem" />
               {name}
             </motion.span>
           );

@@ -3,6 +3,7 @@ import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { Emoji } from '../Emoji';
 
 /**
  * A key per коз, where there's a keyboard: left to right as in the bar, under 1–4 for the answers. Matched by the key's
@@ -16,7 +17,7 @@ export function KeyHint({ children, className }: { children: string; className?:
     <kbd
       aria-hidden
       className={clsx(
-        'hidden min-w-5 place-items-center rounded-md border border-white/15 px-1 font-sans text-[11px] leading-5 font-semibold text-fg-3 pointer-fine:inline-grid',
+        'hidden min-w-5 place-items-center rounded-md border border-tint/15 px-1 font-sans text-[11px] leading-5 font-semibold text-fg-3 pointer-fine:inline-grid',
         className,
       )}
     >
@@ -101,7 +102,7 @@ export function PowerupNotes({ powerups, className }: { powerups: PowerupDef[]; 
         {powerups.map((p) => (
           <li key={p.id} className="flex gap-2.5 text-sm">
             <span className="text-base leading-snug" aria-hidden>
-              {p.icon}
+              <Emoji e={p.icon} />
             </span>
             <span className="min-w-0 flex-1 text-fg-2">
               <span className="font-bold text-fg">{p.name}</span> — {p.description}
@@ -127,14 +128,13 @@ export function PowerupNotesLine({ powerups, className }: { powerups: PowerupDef
       <p className="mb-1.5 t-eyebrow text-amber-300">{powerups.length === 1 ? 'Нов коз' : 'Нови козове'}</p>
       {powerups.length === 1 ? (
         <p>
-          <span aria-hidden>{only.icon}</span> <span className="font-bold text-fg">{only.name}</span> —{' '}
-          {only.description}
+          <Emoji e={only.icon} /> <span className="font-bold text-fg">{only.name}</span> — {only.description}
         </p>
       ) : (
         <p className="flex flex-wrap justify-center gap-x-3 gap-y-1 font-semibold text-fg">
           {powerups.map((p) => (
             <span key={p.id}>
-              <span aria-hidden>{p.icon}</span> {p.name}
+              <Emoji e={p.icon} /> {p.name}
             </span>
           ))}
         </p>
@@ -195,7 +195,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
   const powerups = POWERUPS.filter((p) => game.start.powerups.includes(p.id));
   const explain = (p: PowerupDef, blocked: string) => {
     clearTimeout(hintTimer.current);
-    setHint({ id: p.id, text: `${p.icon} ${p.name}: ${blocked}` });
+    setHint({ id: p.id, text: `${p.name}: ${blocked}` });
     hintTimer.current = setTimeout(() => setHint(null), BLOCKED_HINT_MS);
   };
 
@@ -216,9 +216,9 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="rounded-full border border-line bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2"
+              className="rounded-full border border-line bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2"
             >
-              {hint.text}
+              <Emoji e={POWERUPS.find((d) => d.id === hint.id)?.icon ?? ''} /> {hint.text}
             </motion.span>
           )}
         </AnimatePresence>
@@ -256,10 +256,10 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               )}
             >
               <span className="text-base leading-none max-sm:text-base flat:text-lg" aria-hidden>
-                {p.icon}
+                <Emoji e={p.icon} />
               </span>
               <span className="max-sm:hidden flat:hidden">{p.name}</span>
-              <span aria-hidden className="text-[10px] leading-none font-semibold sm:hidden flat:hidden">
+              <span aria-hidden className="text-xs leading-none font-semibold sm:hidden flat:hidden">
                 {p.short}
               </span>
               {!used && (

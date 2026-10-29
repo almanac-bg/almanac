@@ -11,7 +11,10 @@ export type Effect =
   | 'invite'
   | 'reaction'
   /** A round's category is decided. */
-  | 'round';
+  | 'round'
+  /** One on one, the lead changes hands: you took it, or lost it. */
+  | 'leadTaken'
+  | 'leadLost';
 
 export interface ClientConfig {
   /** Server origin, e.g. "https://almanac.bg". Empty = same origin. */

@@ -54,7 +54,7 @@ export function TeamScoreBar({
       {side(0, a)}
       <div
         className={clsx(
-          'relative h-2 overflow-hidden rounded-full bg-white/10',
+          'relative h-2 overflow-hidden rounded-full bg-tint/10',
           compact ? 'w-full min-w-16 flex-1' : 'w-28 lg:w-40',
         )}
       >

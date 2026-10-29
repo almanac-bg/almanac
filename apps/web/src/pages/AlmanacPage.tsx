@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronRight, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { FactItem, ReviewCard, TierBadge } from '../components/almanac';
+import { Emoji } from '../components/Emoji';
 import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, INPUT, PageSpinner, ProgressBar } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -53,10 +54,10 @@ function Overview() {
               <li key={c.category}>
                 <Link
                   to={`/almanac/${c.category}`}
-                  className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-white/[0.06]"
+                  className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06]"
                 >
                   <span aria-hidden className="text-3xl leading-none">
-                    {cat.icon}
+                    <Emoji e={cat.icon} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -122,7 +123,7 @@ function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id
       </Link>
       <header className="flex flex-wrap items-center gap-4">
         <span aria-hidden className="text-5xl leading-none">
-          {cat.icon}
+          <Emoji e={cat.icon} />
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="t-page">{cat.name}</h1>

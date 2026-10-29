@@ -5,6 +5,7 @@ import { Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { Emoji } from '../components/Emoji';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, PageSpinner, ProgressBar, Segmented } from '../components/ui';
@@ -100,9 +101,11 @@ export function AchievementsPage() {
                       'grid size-14 shrink-0 place-items-center rounded-2xl text-3xl',
                       !done && 'grayscale',
                     )}
-                    style={{ background: done ? `${rarity.color}22` : 'rgb(255 255 255 / 0.05)' }}
+                    style={{
+                      background: done ? `${rarity.color}22` : 'color-mix(in oklab, var(--color-tint) 5%, transparent)',
+                    }}
                   >
-                    {done ? a.icon : <Lock className="size-5 text-fg-3" />}
+                    {done ? <Emoji e={a.icon} size="1.75rem" /> : <Lock className="size-5 text-fg-3" />}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">

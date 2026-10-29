@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
+import { Emoji } from '../components/Emoji';
 import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
 import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
@@ -47,7 +48,7 @@ export function SubmitPage() {
 function LockedCard({ level }: { level: number }) {
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-      <span className="grid size-16 place-items-center rounded-2xl bg-white/5">
+      <span className="grid size-16 place-items-center rounded-2xl bg-tint/5">
         <Lock className="size-7 text-fg-3" />
       </span>
       <h2 className="t-card">Отключва се на ниво {SUBMISSION_RULES.minLevel}</h2>
@@ -153,10 +154,10 @@ function MySubmissions({ refresh }: { refresh: number }) {
                   className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5"
                 >
                   <span
-                    className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/5 text-xl"
+                    className="grid size-10 shrink-0 place-items-center rounded-xl bg-tint/5 text-xl"
                     title={cat.name}
                   >
-                    {cat.icon}
+                    <Emoji e={cat.icon} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold break-words">{s.q}</p>

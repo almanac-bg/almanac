@@ -6,6 +6,7 @@ import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ClaimAccountModal } from '../ClaimAccount';
 import { DuelRow, useDuels, usePlayDuel } from '../duels';
+import { Emoji } from '../Emoji';
 import { Button, Card } from '../ui';
 
 export function FriendsCard({ className }: { className?: string }) {
@@ -96,7 +97,7 @@ export function FriendsCard({ className }: { className?: string }) {
             to="/sets"
             className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg text-sm font-semibold text-fuchsia-300 hover:text-fuchsia-200"
           >
-            📝 Моите въпроси — твои въпроси за стаята
+            <Emoji e="📝" /> Моите въпроси — твои въпроси за стаята
           </Link>
         )}
         {/* Guests can join a room but not open one: the button is still there, and on tap it says why. */}

@@ -8,7 +8,8 @@ import { PICTURE_SIZES } from './components/game/QuestionPicture';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
-import { buzz, sfx } from './lib/sound';
+import { buzz, sfx, unlockAudioOnFirstTap } from './lib/sound';
+import { watchSystemTheme } from './lib/theme';
 import { preloadPage } from './pages/lazy';
 import './styles.css';
 
@@ -22,10 +23,12 @@ const SOUNDS: Partial<Record<Effect, () => void>> = {
   wrong: sfx.wrong,
   powerup: sfx.powerup,
   eliminated: sfx.eliminated,
-  knockedOut: sfx.eliminated,
+  knockedOut: sfx.knockedOut,
   achievement: sfx.achievement,
-  invite: sfx.achievement,
+  invite: sfx.invite,
   round: sfx.go,
+  leadTaken: () => sfx.lead(true),
+  leadLost: () => sfx.lead(false),
 };
 
 /** Felt, not heard: a tap for your pick, a double pulse for right, a thud for wrong, a long one for being knocked out. */
@@ -70,6 +73,10 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 startMonitoring();
+// public/theme.js put the chosen theme on before the first paint; this keeps up with the device's own while it's the
+// choice.
+watchSystemTheme();
+unlockAudioOnFirstTap();
 
 // Installed or not: without a connection, a page shows "Няма връзка" instead of the browser's error (public/sw.js).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

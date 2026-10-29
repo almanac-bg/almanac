@@ -2,6 +2,7 @@ import { actions, type LiveGame, useNow } from '@quiz/client';
 import { type CategoryId, categoryById, ROUNDS } from '@quiz/shared';
 import clsx from 'clsx';
 import { motion } from 'motion/react';
+import { Emoji } from '../Emoji';
 import { Spinner } from '../ui';
 import { KeyHint } from './Powerups';
 
@@ -20,11 +21,15 @@ export function RoundPick({ game }: { game: LiveGame }) {
   const drawn = decided && game.rounds[pick.round]?.pickedBy === null;
   const chosen = decided ? categoryById(pick.chosen!) : null;
 
-  const title = chosen
-    ? `${chosen.icon} ${chosen.name}`
-    : mine
-      ? 'Избери категория'
-      : `${picker?.name ?? 'Противникът'} избира…`;
+  const title = chosen ? (
+    <>
+      <Emoji e={chosen.icon} /> {chosen.name}
+    </>
+  ) : mine ? (
+    'Избери категория'
+  ) : (
+    `${picker?.name ?? 'Противникът'} избира…`
+  );
   const note = decided
     ? drawn
       ? 'Никой не избра навреме — изтеглихме я.'
@@ -52,7 +57,7 @@ export function RoundPick({ game }: { game: LiveGame }) {
 
       {!decided && (
         <div
-          className="mt-5 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-white/10"
+          className="mt-5 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-tint/10"
           role="timer"
           aria-label={`Остават ${Math.ceil(left / 1000)} секунди`}
         >
@@ -99,9 +104,9 @@ function Tile({
   const body = (
     <>
       <span className="text-4xl short:text-3xl" aria-hidden>
-        {cat.icon}
+        <Emoji e={cat.icon} />
       </span>
-      <span className="font-display text-lg font-bold">{cat.name}</span>
+      <span className="text-lg font-extrabold">{cat.name}</span>
       {sending && <Spinner className="absolute top-3 right-3 size-4" />}
       {mine && !sending && <KeyHint className="absolute top-3 right-3">{String(index + 1)}</KeyHint>}
     </>

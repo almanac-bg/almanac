@@ -1,14 +1,15 @@
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@quiz/client';
 import { answerPoints, type Crowd, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Flame, Skull, Users, WifiOff, X } from 'lucide-react';
+import { ArrowRight, Check, Flame, Lightbulb, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
-import { LETTERS, OPTION_COLORS } from './answers';
+import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderQuestion';
@@ -54,23 +55,22 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       <div className="flex flex-wrap items-center gap-2">
         {q.final && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-extrabold tracking-wide text-amber-200 uppercase">
-            🎯 Финал
+            <Emoji e="🎯" /> Финал
           </span>
         )}
         {game.start.questionSet ? (
           // A host's own set: its name, not a category or difficulty of the bank's.
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-bold text-fg-2">
-            📝 {game.start.questionSet}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-tint/5 px-3 py-1 text-xs font-bold text-fg-2">
+            <Emoji e="📝" /> {game.start.questionSet}
           </span>
         ) : (
           <>
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
-              style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: cat.color }}
-            >
-              {cat.icon} {cat.name}
+            {/* Neutral: a category's own colour right above the answers (geography's green, literature's red) read as
+                right or wrong. */}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-tint/5 px-3 py-1 text-xs font-bold text-fg-2">
+              <Emoji e={cat.icon} /> {cat.name}
             </span>
-            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
+            <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
               {DIFFICULTY_LABEL[q.difficulty]}
             </span>
           </>
@@ -86,7 +86,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           </motion.span>
         )}
         {watching && (
-          <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2">👀 Гледаш</span>
+          <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
+            <Emoji e="👀" /> Гледаш
+          </span>
         )}
         {inDropZone(game).has(youId) && !reveal && (
           <span className="inline-flex items-center gap-1 rounded-full border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200">
@@ -137,7 +139,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             className="mt-4 overflow-hidden"
           >
             <div className="flex items-center gap-3 rounded-2xl border border-amber-300/40 bg-amber-400/12 px-4 py-3 text-amber-100">
-              <span className="text-xl">🔁</span>
+              <span className="text-xl">
+                <Emoji e="🔁" />
+              </span>
               <span className="text-sm font-semibold sm:text-base">
                 Грешно! Имаш още един опит <span className="text-amber-300">(за ½ точки)</span>
               </span>
@@ -258,7 +262,9 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
       className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
     >
       <p className="text-sm text-fg-2 text-pretty sm:text-[15px]">
-        <span className="font-bold text-amber-200">💡 Знаеше ли? </span>
+        <span className="font-bold text-amber-200">
+          <Lightbulb aria-hidden className="mb-0.5 inline size-4" /> Знаеше ли?{' '}
+        </span>
         {fact}
       </p>
       <div className="mt-2 flex justify-end">
@@ -374,11 +380,12 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
   const remaining = frozen ?? Math.max(0, deadline - now);
   const secs = Math.ceil(remaining / 1000);
   const pct = Math.min(1, remaining / duration);
-  const color = pct > 0.5 ? '#22d3ee' : pct > 0.25 ? '#fbbf24' : '#fb7185';
+  // The theme's own (deeper on the light one, where the bright ones don't read on white).
+  const color = pct > 0.5 ? 'var(--color-cyan)' : pct > 0.25 ? 'var(--color-gold)' : 'var(--color-bad)';
 
   const lastTick = useRef(secs);
   useEffect(() => {
-    if (!stopped && secs !== lastTick.current && secs <= 5 && secs > 0) sfx.tick();
+    if (!stopped && secs !== lastTick.current && secs <= 5 && secs > 0) sfx.tick(secs);
     lastTick.current = secs;
   }, [secs, stopped]);
 
@@ -402,7 +409,7 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
         className="absolute inset-0 -rotate-90 overflow-visible will-change-transform"
         aria-hidden
       >
-        <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="5" />
+        <circle cx="32" cy="32" r={R} fill="none" style={{ stroke: 'var(--color-line)' }} strokeWidth="5" />
         <circle
           cx="32"
           cy="32"
@@ -501,15 +508,17 @@ function AnswerButton({
           'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 short:max-sm:min-h-12 short:max-sm:py-2 tiny:max-sm:min-h-11 tiny:max-sm:py-1.5 sm:min-h-[5.5rem] sm:gap-4 sm:p-5 large:min-h-28 flat:min-h-10 flat:p-2',
           compact && 'max-sm:min-h-12 max-sm:gap-2 max-sm:px-2.5 max-sm:py-2 sm:min-h-16 sm:py-3',
           liftable && 'group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
+          // Told apart by more than colour: the right answer is filled in, a wrong pick an outline with its text struck
+          // through.
           state === 'correct'
-            ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
+            ? 'border-emerald-300 bg-emerald-400 text-emerald-950 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
             : state === 'wrong'
-              ? 'border-rose-400/70 bg-rose-500/20'
+              ? 'border-2 border-rose-400 bg-transparent'
               : // Not .glass: no backdrop blur on buttons that move with every question and reveal (a moving blurred
                 // backdrop is re-blurred each frame on a phone's GPU); the page behind is soft already.
                 state === 'selected'
-                ? 'border-(--pick) bg-white/[0.045] shadow-[0_0_0_1px_var(--pick),0_0_36px_-8px_var(--pick)]'
-                : 'border-line bg-white/[0.045] hover:bg-white/[0.08]',
+                ? 'border-(--pick) bg-tint/[0.045] shadow-[0_0_0_1px_var(--pick),0_0_36px_-8px_var(--pick)]'
+                : 'border-line bg-tint/[0.045] hover:bg-tint/[0.08]',
           // Your own pick, once the answer is out: a ring in the result's colour (the pick's accent outline is gone).
           revealed && selected && (correct ? 'ring-2 ring-emerald-200/70' : 'ring-2 ring-rose-200/70'),
           removed && 'line-through',
@@ -529,8 +538,14 @@ function AnswerButton({
             compact && 'max-sm:size-8',
           )}
           style={{
-            background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
-            color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
+            // On the filled right answer, a darker badge; on a wrong pick, a solid red one.
+            background:
+              state === 'correct'
+                ? 'color-mix(in oklab, currentColor 16%, transparent)'
+                : state === 'wrong'
+                  ? '#fb7185'
+                  : `${color}22`,
+            color: state === 'correct' ? 'inherit' : state === 'wrong' ? '#0b0a14' : accentText(color),
           }}
         >
           {state === 'correct' ? (
@@ -541,7 +556,13 @@ function AnswerButton({
             LETTERS[index]
           )}
         </span>
-        <span className={clsx('flex-1 font-semibold sm:text-base large:text-lg', compact ? 'text-sm' : 'text-[15px]')}>
+        <span
+          className={clsx(
+            'flex-1 font-semibold sm:text-base large:text-lg',
+            compact ? 'text-sm' : 'text-[15px]',
+            state === 'wrong' && 'line-through decoration-rose-400 decoration-2',
+          )}
+        >
           <span className="sr-only">{LETTERS[index]}) </span>
           {keepTogether(text)}
           {status.length > 0 && <span className="sr-only"> — {status.join(' — ')}</span>}
@@ -556,7 +577,7 @@ function AnswerButton({
               </motion.span>
             ))}
             {pickers.length > 4 && (
-              <span className="grid size-[26px] place-items-center rounded-full bg-white/15 text-[10px] font-bold">
+              <span className="grid size-[26px] place-items-center rounded-full bg-tint/15 text-[11px] font-bold">
                 +{pickers.length - 4}
               </span>
             )}
@@ -585,7 +606,7 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
           )}
           {result.retried && (
             <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-sm font-bold text-amber-200">
-              🔁 Втори шанс · ½ точки
+              <Emoji e="🔁" /> Втори шанс · ½ точки
             </span>
           )}
           {result.streak >= 2 && (
@@ -604,7 +625,7 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
           </span>
           {result.points < 0 && (
             <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-sm font-bold text-rose-300">
-              💰 −{fmt(-result.points)}
+              <Emoji e="💰" /> −{fmt(-result.points)}
             </span>
           )}
         </>

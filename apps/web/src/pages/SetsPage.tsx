@@ -5,7 +5,8 @@ import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, 
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
-import { LETTERS, OPTION_COLORS } from '../components/game/answers';
+import { Emoji } from '../components/Emoji';
+import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -81,10 +82,10 @@ function SetList() {
             <li key={s.id}>
               <Link
                 to={`/sets/${s.id}`}
-                className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-white/[0.06] sm:px-5"
+                className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:px-5"
               >
                 <span aria-hidden className="text-3xl">
-                  📝
+                  <Emoji e="📝" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{s.name}</span>
@@ -387,7 +388,7 @@ function QuestionCard({
   return (
     <Card className="p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-display font-bold">Въпрос {index + 1}</h2>
+        <h2 className="font-extrabold">Въпрос {index + 1}</h2>
         <div className="ml-auto flex items-center gap-1">
           <IconButton label="По-нагоре" onClick={() => onMove(-1)} disabled={index === 0}>
             <ArrowUp className="size-4" />
@@ -451,7 +452,7 @@ function QuestionCard({
                 aria-label={`${LETTERS[i]} е верният`}
                 className="size-5 shrink-0 accent-emerald-400"
               />
-              <span className="w-5 shrink-0 font-display font-bold" style={{ color: OPTION_COLORS[i] }}>
+              <span className="w-5 shrink-0 font-display font-bold" style={{ color: accentText(OPTION_COLORS[i]) }}>
                 {LETTERS[i]}
               </span>
               <input
@@ -706,7 +707,7 @@ function IconButton({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="focus-ring grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-white/10 hover:text-fg disabled:opacity-30"
+      className="focus-ring grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-tint/10 hover:text-fg disabled:opacity-30"
     >
       {children}
     </button>
@@ -775,7 +776,7 @@ function SharedSet({ code }: { code: string }) {
     <div className="mx-auto max-w-md space-y-4">
       <Card className="p-6 text-center sm:p-8">
         <span aria-hidden className="text-5xl">
-          📝
+          <Emoji e="📝" />
         </span>
         <p className="mt-4 t-eyebrow text-fg-3">Набор с въпроси</p>
         <h1 className="mt-2 font-display text-3xl font-black [overflow-wrap:anywhere]">{data.name}</h1>

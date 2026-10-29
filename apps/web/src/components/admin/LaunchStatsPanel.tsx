@@ -190,11 +190,11 @@ function ActiveChart({ days }: { days: Day[] }) {
       <div
         role="img"
         aria-label={`Активни играчи на ден за последните ${days.length} дни: днес ${values.at(-1)}, най-много ${max}.`}
-        className="relative flex h-40 items-end gap-0.5 border-b border-white/15"
+        className="relative flex h-40 items-end gap-0.5 border-b border-tint/15"
         onMouseLeave={() => setHover(null)}
       >
         {/* Recessive guide at the top value. */}
-        <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-white/10" />
+        <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-tint/10" />
         <span className="pointer-events-none absolute -top-2.5 right-0 bg-ink-2 pl-1 text-[11px] text-fg-3 tabular-nums">
           {fmt(max)}
         </span>

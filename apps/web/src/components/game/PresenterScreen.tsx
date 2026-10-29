@@ -1,13 +1,15 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Users } from 'lucide-react';
+import { Check, Lightbulb, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
+import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button } from '../ui';
-import { LETTERS, OPTION_COLORS } from './answers';
+import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { numberText } from './numbers';
 import { orderValueText } from './OrderQuestion';
 import { QuestionPicture } from './QuestionPicture';
@@ -17,6 +19,8 @@ import { QuestionPicture } from './QuestionPicture';
  * The question large, how many have answered, then how many picked each option, the fact, and the top five.
  */
 export function PresenterScreen({ game }: { game: LiveGame }) {
+  // A projector washes out a dark screen: the big screen is light, whatever this device's own theme.
+  useForcedTheme('light');
   const navigate = useNavigate();
   const now = useNow(250);
   const playing = game.start.players.length;
@@ -75,9 +79,9 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                   <span
                     key={c}
                     className="rounded-3xl border-2 px-6 py-4 font-display text-2xl font-bold"
-                    style={{ borderColor: cat.color, color: cat.color }}
+                    style={{ borderColor: cat.color, color: accentText(cat.color) }}
                   >
-                    {cat.icon} {cat.name}
+                    <Emoji e={cat.icon} /> {cat.name}
                   </span>
                 );
               })}
@@ -91,16 +95,20 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
               className="font-semibold"
               style={{ color: game.start.questionSet ? undefined : categoryById(q.category)?.color }}
             >
-              {game.start.questionSet
-                ? `📝 ${game.start.questionSet}`
-                : `${categoryById(q.category)?.icon} ${categoryById(q.category)?.name}`}
+              {game.start.questionSet ? (
+                `📝 ${game.start.questionSet}`
+              ) : (
+                <>
+                  <Emoji e={categoryById(q.category)?.icon ?? ''} /> {categoryById(q.category)?.name}
+                </>
+              )}
               {q.final && <span className="ml-3 text-amber-200">🎯 Финал</span>}
             </p>
             <h1 className="mt-3 font-display text-[clamp(1.75rem,3.6vw,3.25rem)] leading-tight font-bold text-balance">
               {keepTogether(q.q)}
             </h1>
             {!reveal && (
-              <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-6 h-2 overflow-hidden rounded-full bg-tint/10">
                 <div
                   className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)] transition-[width] duration-300 ease-linear"
                   style={{ width: `${Math.max(0, (game.deadline - now) / q.durationMs) * 100}%` }}
@@ -167,7 +175,9 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
             </p>
             {reveal?.fact && (
               <p className="mt-6 max-w-4xl rounded-3xl border border-amber-300/25 bg-amber-400/[0.07] p-5 text-xl text-fg-2 text-pretty">
-                <span className="font-bold text-amber-200">💡 Знаеше ли? </span>
+                <span className="font-bold text-amber-200">
+                  <Lightbulb aria-hidden className="mb-1 inline size-6" /> Знаеше ли?{' '}
+                </span>
                 {reveal.fact}
               </p>
             )}
@@ -202,7 +212,7 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
             <span
               className={clsx(
                 'grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black',
-                answer ? 'bg-amber-300 text-amber-950' : 'border-2 border-dashed border-white/25 text-fg-2',
+                answer ? 'bg-amber-300 text-amber-950' : 'border-2 border-dashed border-tint/25 text-fg-2',
               )}
             >
               {answer ? place + 1 : LETTERS[item]}
@@ -291,7 +301,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
               transition={{ delay: 0.3 + (2 - i) * 0.4 }}
               className="glass flex flex-col items-center gap-3 rounded-3xl p-6 text-center"
             >
-              <span className="text-5xl">{medals[i]}</span>
+              <Emoji e={medals[i]} size="3rem" />
               <Avatar avatar={p.avatar} frame={p.frame} size={88} />
               <span className="font-display text-2xl font-bold [overflow-wrap:anywhere]">{p.name}</span>
               <span className="text-xl text-fg-2 tabular-nums">{fmt(s.score)} т.</span>

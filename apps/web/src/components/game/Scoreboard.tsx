@@ -7,6 +7,7 @@ import { Fragment, useEffect, useRef } from 'react';
 import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, machineTag, PlayerTag } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { BIG_MATCH, topAndYou } from './bigMatch';
 import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
@@ -62,11 +63,11 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
               style={{ background: `linear-gradient(90deg, ${color}26, transparent 80%)` }}
             >
               <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-              <span className="font-display text-sm font-bold" style={{ color }}>
+              <span className="text-sm font-extrabold" style={{ color }}>
                 {TEAMS[team].name}
               </span>
               {myTeam === team && <span className="text-xs font-semibold text-fg-3">· твоят отбор</span>}
-              {leader === team && <span className="text-sm">👑</span>}
+              {leader === team && <Emoji e="👑" />}
               <TeamTotal value={totals[team]} className="ml-auto t-card" />
             </div>
             <ul className="space-y-1 p-2">
@@ -167,7 +168,7 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
             transition={{ duration: 2.4, times: [0, 0.15, 0.7, 1] }}
             className="absolute text-2xl"
           >
-            {emoteById(r.emote)?.emoji}
+            <Emoji e={emoteById(r.emote)?.emoji ?? ''} />
           </motion.span>
         ))}
       </AnimatePresence>
@@ -226,7 +227,7 @@ function DuelBar({ game }: { game: LiveGame }) {
               ? 'bg-emerald-500/15 text-emerald-200'
               : gap < 0
                 ? 'bg-rose-500/15 text-rose-200'
-                : 'bg-white/5 text-fg-2',
+                : 'bg-tint/5 text-fg-2',
           )}
         >
           {gap > 0 ? `+${fmt(gap)}` : gap < 0 ? `−${fmt(-gap)}` : 'равни'}
@@ -348,7 +349,7 @@ function Strip({ game }: { game: LiveGame }) {
                 className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')}
                 aria-hidden
               >
-                {out ? '💀' : fmt(s.score)}
+                {out ? <Emoji e="💀" /> : fmt(s.score)}
               </span>
               {color && <span className="h-0.5 w-6 rounded-full" style={{ background: color }} aria-hidden />}
               <Reactions reactions={reactions} />
@@ -368,8 +369,8 @@ export function PlayerMark({ me, tag }: { me: boolean; tag: string | null }) {
     <span
       aria-hidden
       className={clsx(
-        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[10px] leading-none font-extrabold tracking-wide',
-        me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-white/20',
+        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[11px] leading-none font-extrabold tracking-wide',
+        me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-tint/20',
       )}
     >
       {me ? 'ТИ' : tag}

@@ -15,6 +15,7 @@ import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../lib/load';
 import { Avatar } from './Avatar';
+import { Emoji } from './Emoji';
 import { Button, Modal } from './ui';
 
 /** "остават 21 ч.", "остават 35 мин.": how long the second of a duel has to play it. */
@@ -118,10 +119,10 @@ function RematchPicker({ friend, open, onClose }: { friend: PublicUser; open: bo
               aria-pressed={at >= 0}
               className={clsx(
                 'focus-ring relative flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors',
-                at >= 0 ? 'border-violet-400/70 bg-violet-500/15' : 'border-line bg-white/[0.04] hover:bg-white/[0.08]',
+                at >= 0 ? 'border-violet-400/70 bg-violet-500/15' : 'border-line bg-tint/[0.04] hover:bg-tint/[0.08]',
               )}
             >
-              <span aria-hidden>{c.icon}</span>
+              <Emoji e={c.icon} />
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
               {at >= 0 && (
                 <span className="grid size-6 shrink-0 place-items-center rounded-full bg-violet-500 text-xs font-bold text-white">

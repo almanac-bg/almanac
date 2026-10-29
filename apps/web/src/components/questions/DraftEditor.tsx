@@ -1,7 +1,8 @@
 import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMISSION_RULES } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { LETTERS, OPTION_COLORS } from '../game/answers';
+import { Emoji } from '../Emoji';
+import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
 import { Segmented } from '../ui';
 import type { DraftErrors } from './draft';
 
@@ -56,11 +57,11 @@ export function DraftEditor({
                   aria-pressed={active}
                   className={clsx(
                     'focus-ring flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors pointer-coarse:min-h-11',
-                    active ? 'text-fg' : 'border-line bg-white/[0.03] text-fg-2 hover:bg-white/[0.07]',
+                    active ? 'text-fg' : 'border-line bg-tint/[0.03] text-fg-2 hover:bg-tint/[0.07]',
                   )}
                   style={active ? { borderColor: `${c.color}99`, background: `${c.color}1f` } : undefined}
                 >
-                  <span className="text-lg leading-none">{c.icon}</span>
+                  <Emoji e={c.icon} className="size-5" size="" />
                   <span className="truncate">{c.name}</span>
                 </button>
               );
@@ -112,7 +113,7 @@ export function DraftEditor({
                 <span className="absolute inset-y-0 left-0 w-1" style={{ background: correct ? '#34d399' : color }} />
                 <span
                   className="grid size-8 shrink-0 place-items-center rounded-lg font-display text-sm font-bold"
-                  style={{ background: `${color}22`, color }}
+                  style={{ background: `${color}22`, color: accentText(color) }}
                 >
                   {LETTERS[i]}
                 </span>
@@ -131,7 +132,7 @@ export function DraftEditor({
                   title="Верен отговор"
                   className={clsx(
                     'focus-ring inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition-colors pointer-coarse:h-11',
-                    correct ? 'bg-emerald-400 text-ink' : 'bg-white/5 text-fg-3 hover:bg-white/10 hover:text-fg-2',
+                    correct ? 'bg-emerald-400 text-ink' : 'bg-tint/5 text-fg-3 hover:bg-tint/10 hover:text-fg-2',
                   )}
                 >
                   <Check className="size-3.5" strokeWidth={3} />

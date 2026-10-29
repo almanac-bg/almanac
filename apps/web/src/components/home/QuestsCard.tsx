@@ -3,6 +3,7 @@ import type { QuestInfo } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, ListChecks } from 'lucide-react';
 import { useEffect } from 'react';
+import { Emoji } from '../Emoji';
 import { Card, ProgressBar } from '../ui';
 import { countdown } from './time';
 
@@ -53,7 +54,7 @@ export function QuestsCard({ className }: { className?: string }) {
         )}
       >
         <span aria-hidden className="text-xl leading-none">
-          🎁
+          <Emoji e="🎁" />
         </span>
         <p className="min-w-0 flex-1 text-sm text-fg-2">
           {quests.bonusDone ? 'Бонусът за трите задачи е твой!' : 'Изпълни и трите за бонус'}
@@ -83,10 +84,10 @@ function Quest({ quest: q }: { quest: QuestInfo }) {
         aria-hidden
         className={clsx(
           'relative grid size-10 shrink-0 place-items-center rounded-xl text-xl leading-none',
-          q.done ? 'bg-emerald-400/15' : 'bg-white/5',
+          q.done ? 'bg-emerald-400/15' : 'bg-tint/5',
         )}
       >
-        {q.icon}
+        <Emoji e={q.icon} />
         {q.done && (
           <span className="absolute -right-1 -bottom-1 grid size-4.5 place-items-center rounded-full bg-emerald-400 text-emerald-950 ring-2 ring-ink-2">
             <Check className="size-3" strokeWidth={3.5} />

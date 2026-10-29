@@ -19,6 +19,7 @@ import { Check, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
+import { Emoji } from '../components/Emoji';
 import { KeyHint, POWERUP_KEYS } from '../components/game/Powerups';
 import { Card, Segmented } from '../components/ui';
 import { usePageTitle } from '../lib/title';
@@ -160,7 +161,7 @@ export function LockerPage() {
                   {CATEGORIES.map((c) => (
                     <div key={c.id} className="glass rounded-2xl p-3">
                       <p className="px-1 text-sm font-semibold">
-                        <span aria-hidden>{c.icon}</span> {c.name}
+                        <Emoji e={c.icon} /> {c.name}
                       </p>
                       <div className="mt-2 grid grid-cols-3 gap-1.5">
                         {MASTERY_TIERS.map((tier, i) => {
@@ -193,7 +194,7 @@ export function LockerPage() {
               <Grid>
                 {EMOTES.map((e) => (
                   <Item key={e.id} name="" req={e.req} unlocked={unlocked(e.req)}>
-                    <span className="text-5xl">{e.emoji}</span>
+                    <Emoji e={e.emoji} size="3rem" />
                   </Item>
                 ))}
               </Grid>
@@ -214,9 +215,9 @@ export function LockerPage() {
                         aria-hidden
                         className="grid size-12 place-items-center rounded-2xl bg-amber-400/15 text-2xl"
                       >
-                        {p.icon}
+                        <Emoji e={p.icon} />
                       </span>
-                      <div className="font-display font-bold">{p.name}</div>
+                      <div className="font-extrabold">{p.name}</div>
                       <KeyHint className="ml-auto">{POWERUP_KEYS[p.id]}</KeyHint>
                     </div>
                     <p className="mt-3 text-sm text-fg-2">{p.description}</p>
@@ -267,14 +268,14 @@ function Item({
           'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',
           equipped && 'border-violet-400/70 bg-violet-500/15 shadow-[0_0_24px_-8px_rgb(139_92_246/0.9)]',
           clickable &&
-            'hover:bg-white/10 group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
+            'hover:bg-tint/10 group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
           saving && 'animate-pulse',
         )}
       >
         <span className={clsx(!unlocked && 'opacity-30 grayscale')}>{children}</span>
         {name && <span className="w-full truncate text-xs font-semibold">{name}</span>}
         {!unlocked && (
-          <span className="flex max-w-full items-center gap-1 text-[10px] leading-tight text-fg-3">
+          <span className="flex max-w-full items-center gap-1 text-xs leading-tight text-fg-3">
             {'level' in req && <Lock className="size-3 shrink-0" />}
             <span className="truncate">{requirementLabel(req, true)}</span>
           </span>
@@ -319,14 +320,14 @@ function TitleButton({
         onClick={onEquip}
         aria-label={`${t.name}: ${open ? state.toLowerCase() : requirementLabel(t.req)}`}
         className={clsx(
-          'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-white/[0.03] px-1.5 py-2 text-center transition-colors',
-          open && !equipped && 'hover:bg-white/10',
+          'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-tint/[0.03] px-1.5 py-2 text-center transition-colors',
+          open && !equipped && 'hover:bg-tint/10',
           equipped && 'border-violet-400/60 bg-violet-500/15',
           !open && 'opacity-55',
         )}
       >
         <span aria-hidden className="text-lg leading-6">
-          {equipped ? <Check className="mx-auto size-5 text-violet-300" /> : icon}
+          {equipped ? <Check className="mx-auto size-5 text-violet-300" /> : icon && <Emoji e={icon} />}
         </span>
         <span className="max-w-full truncate text-sm font-semibold">{label}</span>
         <span className="text-[11px] text-fg-3">{state}</span>
@@ -339,7 +340,7 @@ function TitleButton({
       onClick={onEquip}
       className={clsx(
         'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
-        open && !equipped && 'hover:bg-white/10',
+        open && !equipped && 'hover:bg-tint/10',
         equipped && 'border-violet-400/60 bg-violet-500/15',
         !open && 'opacity-55',
       )}

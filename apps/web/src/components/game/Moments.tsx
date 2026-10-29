@@ -1,7 +1,9 @@
 import { type LiveGame, plural } from '@quiz/client';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 
 /* What happens in a match as it happens: the running feed, a streak, a knockout. */
 
@@ -18,7 +20,7 @@ export function Feed({ game }: { game: LiveGame }) {
             exit={{ opacity: 0 }}
             className="max-w-full truncate rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
           >
-            {f.icon} {f.text}
+            <Emoji e={f.icon} /> {f.text}
           </motion.span>
         ))}
       </AnimatePresence>
@@ -50,8 +52,13 @@ export function StreakBurst({ game }: { game: LiveGame }) {
   useEffect(() => {
     if (streak === null) return setShown(null);
     setShown(streak);
+    // After the right answer's own chime.
+    const sound = setTimeout(() => sfx.streak(streak), 380);
     const hide = setTimeout(() => setShown(null), quick ? 850 : 1400);
-    return () => clearTimeout(hide);
+    return () => {
+      clearTimeout(hide);
+      clearTimeout(sound);
+    };
   }, [reveal?.index, streak]);
 
   return (
@@ -72,7 +79,7 @@ export function StreakBurst({ game }: { game: LiveGame }) {
             transition={{ type: 'spring', stiffness: 420, damping: 14 }}
             className="relative rounded-full border border-orange-400/50 bg-ink-2/95 px-6 py-3 font-display text-3xl font-black text-orange-200 shadow-[0_0_48px_-6px_rgb(249_115_22/0.75)] sm:px-8 sm:text-4xl"
           >
-            🔥 Серия {shown}!
+            <Emoji e="🔥" /> Серия {shown}!
           </motion.p>
         </motion.div>
       )}
@@ -122,10 +129,13 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
                 className="flex flex-col items-center text-center"
               >
                 <Avatar avatar={p.avatar} frame={p.frame} size={110} dim />
-                <p className="mt-4 font-display text-4xl font-black text-rose-300 drop-shadow-[0_0_24px_rgb(251_113_133/0.7)]">
-                  {me ? 'Отпадна!' : `${p.name} отпада!`}
-                </p>
-                <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
+                {/* On a plate of its own: over the answers, bare text ran into them. */}
+                <div className="mx-4 mt-4 rounded-3xl border border-rose-400/40 bg-ink-2/95 px-6 py-4 shadow-2xl">
+                  <p className="font-display text-4xl font-black text-rose-300">
+                    {me ? 'Отпадна!' : `${p.name} отпада!`}
+                  </p>
+                  <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
+                </div>
                 {me && alive > 0 && (
                   // Within the screen on a phone (it can take two lines there).
                   <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">

@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelButton, DuelRow, useDuels, usePlayDuel } from '../components/duels';
+import { Emoji } from '../components/Emoji';
 import { GroupsSection } from '../components/groups';
 import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
@@ -32,7 +33,7 @@ function GuestFriends() {
       </div>
       <Card className="grid place-items-center gap-2 px-6 py-12 text-center">
         <span aria-hidden className="text-5xl">
-          👯
+          <Emoji e="👯" />
         </span>
         <p className="t-card">Приятелите са за играчи с профил</p>
         <p className="max-w-md text-sm text-fg-3">

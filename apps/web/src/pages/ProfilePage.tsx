@@ -33,6 +33,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { DuelButton, recordLine } from '../components/duels';
+import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
@@ -101,13 +102,13 @@ export function ProfilePage() {
             <div className={clsx('flex flex-wrap gap-2', HEADER_ACTIONS)}>
               <Link
                 to="/locker"
-                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10"
+                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-tint/10"
               >
                 Промени визията
               </Link>
               <Link
                 to="/settings"
-                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-white/10"
+                className="glass focus-ring inline-flex min-h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-tint/10"
               >
                 Настройки
               </Link>
@@ -173,7 +174,7 @@ export function ProfilePage() {
                   className="flex items-center gap-2.5 rounded-2xl border px-3.5 py-2"
                   style={t ? { borderColor: `${t.color}55`, background: `${t.color}12` } : undefined}
                 >
-                  <span className="text-xl">{t ? '🏅' : '—'}</span>
+                  {t ? <Emoji e="🏅" size="1.5rem" /> : <span className="text-xl">—</span>}
                   <span className="text-sm">
                     <span className="block font-semibold">{seasonTitle(season)}</span>
                     <span className="text-xs" style={{ color: t?.color }}>
@@ -263,7 +264,7 @@ export function ProfilePage() {
                   className="flex items-center gap-2.5 rounded-2xl border px-3 py-2"
                   style={{ borderColor: `${color}44`, background: `${color}10` }}
                 >
-                  <span className="text-xl">{a.icon}</span>
+                  <Emoji e={a.icon} size="1.5rem" />
                   <span className="text-sm font-semibold">{a.name}</span>
                 </div>
               );
@@ -315,7 +316,7 @@ export function ProfilePage() {
                 </thead>
                 <tbody className="divide-y divide-line">
                   {data.recent.map((r) => (
-                    <tr key={r.matchId} className="hover:bg-white/[0.03]">
+                    <tr key={r.matchId} className="hover:bg-tint/[0.03]">
                       <td className="px-5 py-3 font-semibold">{MODES[r.mode].name}</td>
                       <td className="px-3 py-3">
                         {r.players === 1 ? <span className="text-fg-3">—</span> : <Placement match={r} />}
@@ -345,7 +346,7 @@ function Placement({ match }: { match: ProfileStats['recent'][number] }) {
   const won = match.placement === 1;
   return (
     <span className={clsx(won && 'font-bold text-amber-300')}>
-      {won ? '🏆 ' : ''}
+      {won && <Emoji e="🏆" className="mr-1" />}
       {match.placement}/{match.players}
     </span>
   );
@@ -449,7 +450,7 @@ function ReportButton({ username }: { username: string }) {
               key={r.id}
               className={clsx(
                 'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
-                reason === r.id ? 'border-rose-400/50 bg-rose-500/10' : 'border-line hover:bg-white/5',
+                reason === r.id ? 'border-rose-400/50 bg-rose-500/10' : 'border-line hover:bg-tint/5',
               )}
             >
               <input
@@ -494,7 +495,7 @@ function Stat({ label, value, hint, to }: { label: string; value: string; hint?:
     </>
   );
   return to ? (
-    <Link to={to} className="focus-ring glass block rounded-3xl p-4 transition-colors hover:bg-white/[0.06] sm:p-5">
+    <Link to={to} className="focus-ring glass block rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:p-5">
       {body}
     </Link>
   ) : (
@@ -530,22 +531,22 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
             onMouseLeave={() => setActive(null)}
             className={clsx(
               'relative grid grid-cols-[minmax(0,11.5rem)_1fr_3.5rem] items-center gap-3 rounded-xl px-2 py-1.5',
-              isActive && 'bg-white/[0.04]',
+              isActive && 'bg-tint/[0.04]',
             )}
           >
             <span role="cell" className="flex min-w-0 items-center gap-2 text-sm text-fg-2">
-              <span aria-hidden>{r.icon}</span>
+              <Emoji e={r.icon} />
               <span className="truncate">{r.name}</span>
               {r.tier !== null && (
                 <span title={MASTERY_TIERS[r.tier].name} className="shrink-0">
-                  <span aria-hidden>{MASTERY_TIERS[r.tier].icon}</span>
+                  <Emoji e={MASTERY_TIERS[r.tier].icon} />
                   <span className="sr-only"> ({MASTERY_TIERS[r.tier].name})</span>
                 </span>
               )}
             </span>
             <span role="cell" className="relative h-2.5">
               {/* The baseline the bar grows from; with no answers it would stand alone, a tick that reads as a glitch. */}
-              {r.answered > 0 && <span className="absolute inset-y-0 left-0 w-full border-l border-white/15" />}
+              {r.answered > 0 && <span className="absolute inset-y-0 left-0 w-full border-l border-tint/15" />}
               {r.correct > 0 && (
                 <span
                   className="absolute inset-y-0 left-0 rounded-r-[4px] transition-[width] duration-700"
@@ -591,7 +592,7 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
           Майсторство:
           {MASTERY_TIERS.map((t) => (
             <span key={t.id} className="whitespace-nowrap">
-              <span aria-hidden>{t.icon}</span> {t.name}
+              <Emoji e={t.icon} /> {t.name}
             </span>
           ))}
         </p>

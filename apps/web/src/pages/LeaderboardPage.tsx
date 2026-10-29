@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
+import { Emoji } from '../components/Emoji';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
@@ -124,12 +125,12 @@ export function LeaderboardPage() {
                 <Link to={`/profile/${encodeURIComponent(e.user.username)}`} className="focus-ring block rounded-3xl">
                   <Card
                     className={clsx(
-                      'relative flex flex-col items-center overflow-hidden px-2 py-4 text-center transition-colors hover:bg-white/10 sm:p-6',
+                      'relative flex flex-col items-center overflow-hidden px-2 py-4 text-center transition-colors hover:bg-tint/10 sm:p-6',
                       i === 0 && 'border-amber-300/40 pt-6 sm:pt-8',
                     )}
                   >
                     {i === 0 && <div className="absolute -top-16 size-48 rounded-full glow text-amber-400/25" />}
-                    <span className="relative text-2xl sm:text-3xl">{['🥇', '🥈', '🥉'][i]}</span>
+                    <Emoji e={['🥇', '🥈', '🥉'][i]} className="relative size-7 sm:size-9" size="" />
                     <Avatar
                       avatar={e.user.avatar}
                       frame={e.user.frame}
@@ -187,7 +188,7 @@ function BringFriends() {
   return (
     <Card className="flex flex-col items-center gap-4 p-6 text-center sm:p-8">
       <div>
-        <p className="font-display font-bold">Класацията тепърва се пълни</p>
+        <p className="font-extrabold">Класацията тепърва се пълни</p>
         <p className="mt-1 text-sm text-fg-2">
           Доведи приятели — тук ще ги виждаш до себе си, а в дуел ще разберете кой знае повече.
         </p>
@@ -216,7 +217,7 @@ function Row({ board, entry: e, me }: { board: LeaderboardBoard; entry: Leaderbo
     <Link
       to={`/profile/${encodeURIComponent(e.user.username)}`}
       className={clsx(
-        'flex items-center gap-4 px-5 py-3 transition-colors hover:bg-white/[0.04]',
+        'flex items-center gap-4 px-5 py-3 transition-colors hover:bg-tint/[0.04]',
         me && 'bg-violet-500/10',
       )}
     >

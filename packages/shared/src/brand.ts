@@ -10,5 +10,5 @@ export const BRAND = {
 export const LEGAL = {
   updated: '29 октомври 2026 г.',
   /** The same day, for the sitemap. */
-  updatedIso: '2026-10-28',
+  updatedIso: '2026-10-29',
 } as const;

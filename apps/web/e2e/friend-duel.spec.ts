@@ -42,7 +42,7 @@ test('a friend duel: one plays it now, the other later from the home page, and b
     await picker.getByRole('button', { name: /^Играй/ }).click();
   }
   await expect(boris.getByText(/^Въпрос 1 от 10$/)).toBeAttached({ timeout: 10_000 });
-  if (lost) await expect(boris.getByText('🏛️ История').first()).toBeVisible();
+  if (lost) await expect(boris.getByText('История', { exact: true }).first()).toBeVisible();
   expect((await playMatch(boris)).total).toBe(10);
 
   // Anna sees how it ended among her duels.

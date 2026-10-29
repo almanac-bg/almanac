@@ -36,7 +36,7 @@ export function QuestionPicture({
     <figure className={clsx('mx-auto', className)} style={{ width: `min(100%, calc(${maxHeight} * ${ratio}))` }}>
       <div
         className={clsx(
-          'relative overflow-hidden rounded-2xl border border-line bg-white/[0.04]',
+          'relative overflow-hidden rounded-2xl border border-line bg-tint/[0.04]',
           !loaded && 'motion-safe:animate-pulse',
         )}
         style={{ aspectRatio: `${image.w} / ${image.h}` }}

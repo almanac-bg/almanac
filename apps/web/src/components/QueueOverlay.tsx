@@ -7,6 +7,7 @@ import { type RefObject, useId, useRef } from 'react';
 import { accentFill } from '../lib/accent';
 import { Avatar } from './Avatar';
 import { Background } from './Background';
+import { Emoji } from './Emoji';
 import { PowerupNotes, useNewPowerups } from './game/Powerups';
 import { Button, useDialog } from './ui';
 
@@ -109,10 +110,10 @@ function Searching({
             key={i}
             initial={false}
             animate={{ scale: i < queue.found ? 1 : 0.85, opacity: i < queue.found ? 1 : 0.35 }}
-            className="grid size-10 place-items-center rounded-full border border-line bg-white/5 text-lg"
+            className="grid size-10 place-items-center rounded-full border border-line bg-tint/5 text-lg"
             style={i < queue.found ? { borderColor: mode.accent[0], boxShadow: `0 0 16px -4px ${mode.accent[0]}` } : {}}
           >
-            {i === 0 ? avatarEmoji(me.avatar) : i < queue.found ? <User className="size-4" /> : '·'}
+            {i === 0 ? <Emoji e={avatarEmoji(me.avatar)} /> : i < queue.found ? <User className="size-4" /> : '·'}
           </motion.span>
         ))}
       </div>
@@ -122,7 +123,7 @@ function Searching({
           {queue.found} от {queue.needed} играчи
         </p>
         {botsIn !== null && queue.found < queue.needed && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-tint/5 px-3 py-1.5 text-xs text-fg-2">
             <Bot aria-hidden className="size-3.5" />
             {/* "секунди" in full: "След 6 с … с ботове" read as two of the same word. */}
             {botsIn <= 0

@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
+import { Emoji } from '../components/Emoji';
 import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, PageSpinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -60,7 +61,7 @@ function Item({ note }: { note: AppNotification }) {
   const body = (
     <>
       <span aria-hidden className="text-2xl leading-none">
-        {note.icon}
+        <Emoji e={note.icon} />
       </span>
       <span className="min-w-0 flex-1">
         <span className={clsx('block text-sm', note.read ? 'text-fg-2' : 'font-semibold text-fg')}>{note.text}</span>
@@ -76,7 +77,7 @@ function Item({ note }: { note: AppNotification }) {
   );
   const row = 'flex items-center gap-3.5 px-5 py-4';
   return note.link ? (
-    <Link to={note.link} className={clsx(row, 'focus-ring transition-colors hover:bg-white/[0.04]')}>
+    <Link to={note.link} className={clsx(row, 'focus-ring transition-colors hover:bg-tint/[0.04]')}>
       {body}
     </Link>
   ) : (

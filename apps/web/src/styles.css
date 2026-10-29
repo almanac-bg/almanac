@@ -49,21 +49,19 @@
   --color-bad: #fb7185;
   --color-gold: #fbbf24;
 
-  --animate-float: float 6s ease-in-out infinite;
+  /* A tint over a surface (`bg-tint/5`, `border-tint/10`): light on the dark theme, ink on the light one. */
+  --color-tint: #fff;
+  /* A sunken panel's shade (`bg-sunk/20`). */
+  --color-sunk: #000;
+  /* The disc behind an avatar. */
+  --color-avatar-hi: #2a2445;
+  --color-avatar-lo: #0e0c18;
+
   --animate-spin-slow: spin 4s linear infinite;
   --animate-shimmer: shimmer 2.4s linear infinite;
   --animate-shimmer-once: shimmer 2.4s linear;
   --animate-pulse-ring: pulse-ring 2.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
 
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0) rotate(0deg);
-    }
-    50% {
-      transform: translateY(-14px) rotate(4deg);
-    }
-  }
   @keyframes shimmer {
     from {
       background-position: 200% 0;
@@ -84,8 +82,136 @@
   }
 }
 
+/*
+ * The light theme (`data-theme="light"` on <html>: lib/theme.ts, public/theme.js): the same names with light values.
+ * The accent palettes run the other way round (300 becomes 700, 950 becomes 50…): a light shade picked to read on ink
+ * is a dark one on paper, and a pale fill under dark text stays a pale fill under dark text — every component as it is.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-ink: #f4f3f9;
+  --color-ink-2: #ffffff;
+  --color-line: rgb(22 19 40 / 0.12);
+  --color-fg: #16131f;
+  --color-fg-2: #4a4462;
+  --color-fg-3: #67617f;
+  --color-violet: #7c3aed;
+  --color-fuchsia: #c026d3;
+  --color-cyan: #0891b2;
+  --color-good: #047857;
+  --color-bad: #be123c;
+  --color-gold: #b45309;
+  --color-tint: #16131f;
+  --color-sunk: #9d97bd;
+  --color-avatar-hi: #ffffff;
+  --color-avatar-lo: #e4e1f2;
+  --gradient-a: #c026d3;
+  --gradient-b: #7c3aed;
+  --gradient-c: #0891b2;
+  --field: #fff;
+  --field-focus: #fff;
+  --accent-ink: 55%;
+  --color-amber-50: oklch(27.9% 0.077 45.635);
+  --color-amber-100: oklch(41.4% 0.112 45.904);
+  --color-amber-200: oklch(47.3% 0.137 46.201);
+  --color-amber-300: oklch(55.5% 0.163 48.998);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-amber-600: oklch(82.8% 0.189 84.429);
+  --color-amber-700: oklch(87.9% 0.169 91.605);
+  --color-amber-800: oklch(92.4% 0.12 95.746);
+  --color-amber-900: oklch(96.2% 0.059 95.617);
+  --color-amber-950: oklch(98.7% 0.022 95.277);
+  --color-rose-50: oklch(27.1% 0.105 12.094);
+  --color-rose-100: oklch(41% 0.159 10.272);
+  --color-rose-200: oklch(45.5% 0.188 13.697);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
+  --color-rose-600: oklch(71.2% 0.194 13.428);
+  --color-rose-700: oklch(81% 0.117 11.638);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-violet-50: oklch(28.3% 0.141 291.089);
+  --color-violet-100: oklch(38% 0.189 293.745);
+  --color-violet-200: oklch(43.2% 0.232 292.759);
+  --color-violet-300: oklch(49.1% 0.27 292.581);
+  --color-violet-400: oklch(54.1% 0.281 293.009);
+  --color-violet-600: oklch(70.2% 0.183 293.541);
+  --color-violet-700: oklch(81.1% 0.111 293.571);
+  --color-violet-800: oklch(89.4% 0.057 293.283);
+  --color-violet-900: oklch(94.3% 0.029 294.588);
+  --color-violet-950: oklch(96.9% 0.016 293.756);
+  --color-emerald-50: oklch(26.2% 0.051 172.552);
+  --color-emerald-100: oklch(37.8% 0.077 168.94);
+  --color-emerald-200: oklch(43.2% 0.095 166.913);
+  --color-emerald-300: oklch(50.8% 0.118 165.612);
+  --color-emerald-400: oklch(59.6% 0.145 163.225);
+  --color-emerald-600: oklch(76.5% 0.177 163.223);
+  --color-emerald-700: oklch(84.5% 0.143 164.978);
+  --color-emerald-800: oklch(90.5% 0.093 164.15);
+  --color-emerald-900: oklch(95% 0.052 163.051);
+  --color-emerald-950: oklch(97.9% 0.021 166.113);
+  --color-fuchsia-50: oklch(29.3% 0.136 325.661);
+  --color-fuchsia-100: oklch(40.1% 0.17 325.612);
+  --color-fuchsia-200: oklch(45.2% 0.211 324.591);
+  --color-fuchsia-300: oklch(51.8% 0.253 323.949);
+  --color-fuchsia-400: oklch(59.1% 0.293 322.896);
+  --color-fuchsia-600: oklch(74% 0.238 322.16);
+  --color-fuchsia-700: oklch(83.3% 0.145 321.434);
+  --color-fuchsia-800: oklch(90.3% 0.076 319.62);
+  --color-fuchsia-900: oklch(95.2% 0.037 318.852);
+  --color-fuchsia-950: oklch(97.7% 0.017 320.058);
+  --color-sky-50: oklch(29.3% 0.066 243.157);
+  --color-sky-100: oklch(39.1% 0.09 240.876);
+  --color-sky-200: oklch(44.3% 0.11 240.79);
+  --color-sky-300: oklch(50% 0.134 242.749);
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-sky-600: oklch(74.6% 0.16 232.661);
+  --color-sky-700: oklch(82.8% 0.111 230.318);
+  --color-sky-800: oklch(90.1% 0.058 230.902);
+  --color-sky-900: oklch(95.1% 0.026 236.824);
+  --color-sky-950: oklch(97.7% 0.013 236.62);
+  --color-orange-50: oklch(26.6% 0.079 36.259);
+  --color-orange-100: oklch(40.8% 0.123 38.172);
+  --color-orange-200: oklch(47% 0.157 37.304);
+  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-400: oklch(64.6% 0.222 41.116);
+  --color-orange-600: oklch(75% 0.183 55.934);
+  --color-orange-700: oklch(83.7% 0.128 66.29);
+  --color-orange-800: oklch(90.1% 0.076 70.697);
+  --color-orange-900: oklch(95.4% 0.038 75.164);
+  --color-orange-950: oklch(98% 0.016 73.684);
+  --color-indigo-50: oklch(25.7% 0.09 281.288);
+  --color-indigo-100: oklch(35.9% 0.144 278.697);
+  --color-indigo-200: oklch(39.8% 0.195 277.366);
+  --color-indigo-300: oklch(45.7% 0.24 277.023);
+  --color-indigo-400: oklch(51.1% 0.262 276.966);
+  --color-indigo-600: oklch(67.3% 0.182 276.935);
+  --color-indigo-700: oklch(78.5% 0.115 274.713);
+  --color-indigo-800: oklch(87% 0.065 274.039);
+  --color-indigo-900: oklch(93% 0.034 272.788);
+  --color-indigo-950: oklch(96.2% 0.018 272.314);
+  --color-cyan-50: oklch(30.2% 0.056 229.695);
+  --color-cyan-100: oklch(39.8% 0.07 227.392);
+  --color-cyan-200: oklch(45% 0.085 224.283);
+  --color-cyan-300: oklch(52% 0.105 223.128);
+  --color-cyan-400: oklch(60.9% 0.126 221.723);
+  --color-cyan-600: oklch(78.9% 0.154 211.53);
+  --color-cyan-700: oklch(86.5% 0.127 207.078);
+  --color-cyan-800: oklch(91.7% 0.08 205.041);
+  --color-cyan-900: oklch(95.6% 0.045 203.388);
+  --color-cyan-950: oklch(98.4% 0.019 200.873);
+}
+
 :root {
   color-scheme: dark;
+  /* The gradient of the name, and a field's well: brighter on ink, deeper on paper. */
+  --gradient-a: #f0abfc;
+  --gradient-b: #a78bfa;
+  --gradient-c: #22d3ee;
+  --field: rgb(0 0 0 / 0.3);
+  --field-focus: rgb(0 0 0 / 0.4);
+  --accent-ink: 100%;
   background: var(--color-ink);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
@@ -107,14 +233,19 @@ body {
  * The type scale: four display steps and one label style, named once instead of retyped on every page.
  * Page titles · section titles · card titles · the small uppercase labels above them ("С ПРИЯТЕЛИ", "КЛАСИРАНЕ").
  */
+/* A long word („предизвикателство“ in the display face) breaks rather than pushing a narrow or zoomed page sideways. */
 @utility t-page {
-  @apply font-display text-3xl font-bold tracking-tight sm:text-4xl;
+  @apply font-display text-3xl font-bold tracking-tight wrap-anywhere hyphens-auto sm:text-4xl;
 }
 @utility t-section {
-  @apply font-display text-2xl font-bold tracking-tight;
+  @apply font-display text-2xl font-bold tracking-tight wrap-anywhere hyphens-auto;
 }
+/*
+ * Card titles are in the text face: the display face's Bulgarian letterforms are its signature at heading sizes, but
+ * at 18 px and under they read as Latin („Награgu“).
+ */
 @utility t-card {
-  @apply font-display text-lg font-bold;
+  @apply text-lg font-extrabold wrap-anywhere hyphens-auto;
 }
 @utility t-eyebrow {
   @apply text-[11px] font-bold tracking-[0.16em] uppercase;
@@ -143,6 +274,13 @@ body {
     background: linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.025));
     border: 1px solid var(--color-line);
   }
+  /* Paper on the light theme: a white card lifted by a soft shadow. */
+  :root[data-theme='light'] .glass {
+    background: #fff;
+    box-shadow:
+      0 1px 2px rgb(22 19 40 / 0.05),
+      0 10px 28px -14px rgb(22 19 40 / 0.18);
+  }
 
   /*
    * Still by default. The shimmer across it (`animate-shimmer`) moves a background, which the browser repaints on the
@@ -150,7 +288,13 @@ body {
    * people stay on. A shimmering logo in the nav bar kept the page drawing 60+ times a second forever.
    */
   .text-gradient {
-    background: linear-gradient(100deg, #f0abfc 0%, #a78bfa 35%, #22d3ee 70%, #f0abfc 100%);
+    background: linear-gradient(
+      100deg,
+      var(--gradient-a) 0%,
+      var(--gradient-b) 35%,
+      var(--gradient-c) 70%,
+      var(--gradient-a) 100%
+    );
     background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
@@ -163,8 +307,8 @@ body {
 
   .grid-lines {
     background-image:
-      linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+      linear-gradient(color-mix(in oklab, var(--color-tint) 3.5%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklab, var(--color-tint) 3.5%, transparent) 1px, transparent 1px);
     background-size: 56px 56px;
     mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 75%);
   }
@@ -179,7 +323,7 @@ body {
   .field,
   .field-box {
     border: 1px solid var(--color-line);
-    background-color: rgb(0 0 0 / 0.3);
+    background-color: var(--field);
     outline: none;
     transition:
       border-color 150ms,
@@ -198,10 +342,13 @@ body {
     background-position: right 0.875rem center;
     background-size: 1.125rem;
   }
+  :root[data-theme='light'] select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a4462' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
   .field:focus-visible,
   .field-box:focus-within {
     border-color: #a78bfa;
-    background-color: rgb(0 0 0 / 0.4);
+    background-color: var(--field-focus);
     box-shadow: 0 0 0 3px rgb(139 92 246 / 0.35);
   }
   .focus-ring:focus-visible {

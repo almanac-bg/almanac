@@ -36,7 +36,7 @@ export function UnsubscribePage() {
   const home = (
     <Link
       to={signedIn ? '/settings' : '/'}
-      className="glass focus-ring mt-6 inline-flex h-11 items-center justify-center rounded-2xl px-5 text-[15px] font-semibold hover:bg-white/10"
+      className="glass focus-ring mt-6 inline-flex h-11 items-center justify-center rounded-2xl px-5 text-[15px] font-semibold hover:bg-tint/10"
     >
       {signedIn ? 'Към настройките' : 'Към играта'}
     </Link>

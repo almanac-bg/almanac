@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
 import { DuelCard, RematchButton } from '../components/duels';
+import { Emoji } from '../components/Emoji';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
@@ -20,6 +21,7 @@ import {
   RatingCard,
   RatingChip,
   RewardsCard,
+  UnlockReveal,
   UnlocksCard,
   UnratedCard,
 } from '../components/results/ResultCards';
@@ -282,7 +284,7 @@ export function Results({ game }: { game: LiveGame }) {
               <span
                 className={clsx(
                   'rounded-full px-3 py-1',
-                  newBest ? 'bg-amber-400/15 text-amber-200' : 'bg-white/5 text-fg-2',
+                  newBest ? 'bg-amber-400/15 text-amber-200' : 'bg-tint/5 text-fg-2',
                 )}
               >
                 {newBest
@@ -294,7 +296,7 @@ export function Results({ game }: { game: LiveGame }) {
             )}
             {end.mode === 'evening' && mine.placement === 1 && (
               <span className="rounded-full bg-indigo-400/15 px-3 py-1 text-indigo-100">
-                🌙 Шампион на вечерта — титлата е твоя за денонощие
+                <Emoji e="🌙" /> Шампион на вечерта — титлата е твоя за денонощие
               </span>
             )}
             {/* A guest has it in the card that offers to keep it, right below. */}
@@ -352,7 +354,10 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       >
         {!rewardsCard ? null : rewards ? (
-          <RewardsCard rewards={rewards} quiet={lost} />
+          <div className="space-y-4">
+            <UnlockReveal rewards={rewards} />
+            <RewardsCard rewards={rewards} quiet={lost} />
+          </div>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}

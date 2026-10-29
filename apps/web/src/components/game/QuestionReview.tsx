@@ -1,10 +1,11 @@
 import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, ChevronDown, Flag, X } from 'lucide-react';
+import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { keepTogether } from '../../lib/typography';
+import { Emoji } from '../Emoji';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
 import { numberText, offText } from './numbers';
@@ -98,7 +99,16 @@ function ReviewRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-fg-3">
-          {item.index + 1}. {ownQuestion(item) ? '📝 От набора на домакина' : `${category?.icon} ${category?.name}`}
+          {item.index + 1}.{' '}
+          {ownQuestion(item) ? (
+            <>
+              <Emoji e="📝" /> От набора на домакина
+            </>
+          ) : (
+            <>
+              <Emoji e={category?.icon ?? ''} /> {category?.name}
+            </>
+          )}
         </p>
         <p className="mt-0.5 font-semibold">{keepTogether(item.q)}</p>
         {item.image && (
@@ -159,8 +169,7 @@ function ReviewRow({
         )}
         {item.fact && (
           <p className="mt-2 text-sm text-fg-2 text-pretty">
-            <span className="font-semibold text-amber-200">💡 </span>
-            {item.fact}
+            <Lightbulb aria-hidden className="mb-0.5 inline size-4 text-amber-200" /> {item.fact}
           </p>
         )}
       </div>
@@ -173,7 +182,7 @@ function ReviewRow({
           aria-label={reported ? 'Сигнализирано' : `Сигнализирай за грешка във въпрос ${item.index + 1}`}
           className={clsx(
             'focus-ring -mt-1.5 -mr-2 grid size-11 shrink-0 place-items-center rounded-xl transition-colors',
-            reported ? 'text-amber-300' : 'text-fg-3 hover:bg-white/10 hover:text-amber-300',
+            reported ? 'text-amber-300' : 'text-fg-3 hover:bg-tint/10 hover:text-amber-300',
           )}
         >
           <Flag className={clsx('size-4', reported && 'fill-current')} />
@@ -196,13 +205,13 @@ function OptionShares({ item, picks, answers }: { item: ReviewItem; picks: numbe
             <li
               // biome-ignore lint/suspicious/noArrayIndexKey: the four options are fixed slots (А–Г)
               key={i}
-              className="relative overflow-hidden rounded-lg bg-white/[0.03] px-2.5 py-1 text-sm"
+              className="relative overflow-hidden rounded-lg bg-tint/[0.03] px-2.5 py-1 text-sm"
             >
               <span
                 aria-hidden
                 className={clsx(
                   'absolute inset-y-0 left-0 rounded-lg',
-                  right ? 'bg-emerald-500/20' : mine ? 'bg-rose-500/20' : 'bg-white/[0.06]',
+                  right ? 'bg-emerald-500/20' : mine ? 'bg-rose-500/20' : 'bg-tint/[0.06]',
                 )}
                 style={{ width: percent(picks[i]) }}
               />
@@ -262,7 +271,7 @@ function ReportQuestion({
 
   return (
     <Modal open={!!item} onClose={close} title="Сигнализирай за грешка">
-      {item && <p className="mb-4 rounded-2xl bg-white/5 p-3 text-sm text-fg-2">{keepTogether(item.q)}</p>}
+      {item && <p className="mb-4 rounded-2xl bg-tint/5 p-3 text-sm text-fg-2">{keepTogether(item.q)}</p>}
       <div className="space-y-2">
         {/* The fact is a reason only where there is one. */}
         {QUESTION_REPORT_REASONS.filter((r) => r.id !== 'fact' || item?.fact).map((r) => (
@@ -270,7 +279,7 @@ function ReportQuestion({
             key={r.id}
             className={clsx(
               'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
-              reason === r.id ? 'border-amber-400/50 bg-amber-500/10' : 'border-line hover:bg-white/5',
+              reason === r.id ? 'border-amber-400/50 bg-amber-500/10' : 'border-line hover:bg-tint/5',
             )}
           >
             <input

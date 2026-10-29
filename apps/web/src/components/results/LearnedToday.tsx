@@ -1,5 +1,5 @@
 import type { ReviewItem } from '@quiz/client';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Lightbulb } from 'lucide-react';
 import { Link } from 'react-router';
 import { keepTogether } from '../../lib/typography';
 import { numberText } from '../game/numbers';
@@ -21,7 +21,9 @@ export function LearnedToday({ items, added }: { items: ReviewItem[]; added: num
   return (
     <Card className="mt-4 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2 className="t-card">💡 Научи днес</h2>
+        <h2 className="t-card">
+          <Lightbulb aria-hidden className="mb-1 inline size-5 text-amber-200" /> Научи днес
+        </h2>
         {added > 0 && (
           <Link
             to="/almanac"

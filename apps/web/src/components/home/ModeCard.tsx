@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
 import { RankBadge } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { FreshPowerupNotes } from '../game/Powerups';
 import { SCORING_LINE } from '../game/scoring';
 import { Button, buttonClass, Modal } from '../ui';
@@ -101,7 +102,7 @@ export function ModeCard({
             <button
               type="button"
               onClick={onRankInfo}
-              className="focus-ring relative z-10 -my-2.5 -ml-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-white/5"
+              className="focus-ring relative z-10 -my-2.5 -ml-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-tint/5"
             >
               <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
               <RankBadge rating={rating} compact />
@@ -110,24 +111,30 @@ export function ModeCard({
             </button>
           )}
         </div>
-        <h3 className={clsx('mt-3 font-display font-bold', big ? 'text-3xl sm:text-4xl' : 'text-2xl @lg:text-4xl')}>
-          {mode.name}
-        </h3>
-        <p className={clsx('mt-1 text-sm text-fg-2', big ? 'max-w-[17rem]' : 'max-w-[17rem] @lg:max-w-md')}>
-          {mode.tagline}
-        </p>
-        <p className={clsx('mt-2 text-sm text-fg-3', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>{mode.description}</p>
+        {/* Clear of the big numeral in the corner, in a narrow card. */}
+        <div className={clsx(!big && '@max-sm:pr-16')}>
+          <h3 className={clsx('mt-3 font-display font-bold', big ? 'text-3xl sm:text-4xl' : 'text-2xl @lg:text-4xl')}>
+            {mode.name}
+          </h3>
+          <p className={clsx('mt-1 text-sm text-fg-2', big ? 'max-w-[17rem]' : 'max-w-[17rem] @lg:max-w-md')}>
+            {mode.tagline}
+          </p>
+          {/* On a phone the tagline says enough: the description repeated what the chips say. */}
+          <p className={clsx('mt-2 hidden text-sm text-fg-3 sm:block', big ? 'max-w-xs' : 'max-w-xs @lg:max-w-md')}>
+            {mode.description}
+          </p>
+        </div>
         {/* Desktop: the card is two rows tall, so it lists what you can train in instead of leaving the space empty. */}
         {big && (
           <ul aria-label="Категории" className="mt-6 hidden grid-cols-2 gap-2 lg:grid">
             {CATEGORIES.map((c, i) => (
               <li
                 key={c.id}
-                className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-white/5 px-2.5 py-2 text-xs font-semibold text-fg-2 transition-transform duration-300 group-hover:-translate-y-0.5"
+                className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-tint/5 px-2.5 py-2 text-xs font-semibold text-fg-2 transition-transform duration-300 group-hover:-translate-y-0.5"
                 style={{ transitionDelay: `${i * 25}ms` }}
               >
                 <span aria-hidden className="text-base leading-none">
-                  {c.icon}
+                  <Emoji e={c.icon} />
                 </span>
                 <span className="leading-tight">{c.name}</span>
               </li>
@@ -171,7 +178,7 @@ export function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boo
   return (
     <Modal open={open} onClose={onClose} title="Рейтинг и рангове">
       <div className="space-y-4 text-sm text-fg-2">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-white/5 p-3.5">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-line bg-tint/5 p-3.5">
           Твоят рейтинг в „{MODES[mode].name}“: <RankBadge rating={rating} />
         </p>
         <p>
@@ -182,14 +189,14 @@ export function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boo
           {RANK_TIERS.map((t, i) => (
             <li
               key={t.id}
-              className={clsx('rounded-xl border px-3 py-2', t.id === tier.id && 'ring-1 ring-white/40')}
+              className={clsx('rounded-xl border px-3 py-2', t.id === tier.id && 'ring-1 ring-tint/40')}
               style={{ borderColor: `${t.color}44`, background: `${t.color}10` }}
             >
               <div className="flex items-center gap-1.5 font-bold" style={{ color: t.color }}>
                 <span className="size-1.5 rounded-full" style={{ background: t.color }} />
                 {t.name}
                 {t.id === tier.id && (
-                  <span className="ml-auto text-[10px] font-semibold tracking-wide text-fg-2 uppercase">ти</span>
+                  <span className="ml-auto text-xs font-semibold tracking-wide text-fg-2 uppercase">ти</span>
                 )}
               </div>
               <div className="mt-0.5 text-xs text-fg-3 tabular-nums">
@@ -249,7 +256,7 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
             disabled={busy !== null}
             onClick={() => start(c.id as CategoryChoice)}
             className={clsx(
-              'focus-ring group relative flex items-center gap-2.5 overflow-hidden rounded-2xl border border-line bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-60 sm:gap-3 sm:p-3.5',
+              'focus-ring group relative flex items-center gap-2.5 overflow-hidden rounded-2xl border border-line bg-tint/[0.03] p-3 text-left transition-colors hover:bg-tint/[0.07] disabled:opacity-60 sm:gap-3 sm:p-3.5',
               c.id === 'mixed' && 'col-span-full',
             )}
           >
@@ -257,7 +264,7 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
               className="absolute inset-y-0 left-0 w-1 opacity-70 transition-all group-hover:w-1.5"
               style={{ background: c.color }}
             />
-            <span className="text-xl sm:text-2xl">{c.icon}</span>
+            <Emoji e={c.icon} className="size-6 sm:size-7" size="" />
             <span className="min-w-0 text-sm font-semibold break-words">{c.name}</span>
             {c.id === 'mixed' && <span className="ml-auto text-xs text-fg-3">по малко от всичко</span>}
           </motion.button>

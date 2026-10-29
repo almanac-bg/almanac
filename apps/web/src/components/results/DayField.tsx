@@ -38,7 +38,7 @@ export function DayField({ field, correct, className }: { field: DailyField; cor
             className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
             onPointerEnter={() => setPointed(i)}
           >
-            {i === correct && <span className="mb-0.5 text-[10px] leading-3 font-bold text-fg">ти</span>}
+            {i === correct && <span className="mb-0.5 text-xs leading-3 font-bold text-fg">ти</span>}
             <div
               className={clsx(
                 'w-full max-w-6 rounded-t-[4px]',
@@ -56,7 +56,7 @@ export function DayField({ field, correct, className }: { field: DailyField; cor
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: one label per column
             key={i}
-            className={clsx('flex-1 text-center text-[10px] tabular-nums', i === correct ? 'text-fg' : 'text-fg-3')}
+            className={clsx('flex-1 text-center text-xs tabular-nums', i === correct ? 'text-fg' : 'text-fg-3')}
           >
             {i}
           </span>

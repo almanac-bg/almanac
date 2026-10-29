@@ -1,6 +1,8 @@
 import { avatarEmoji, frameById, type GamePlayer, rankFor, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { Emoji } from './Emoji';
+import { accentText } from './game/answers';
 
 export function Avatar({
   avatar,
@@ -35,12 +37,10 @@ export function Avatar({
         />
       </div>
       <div
-        className="absolute grid place-items-center rounded-full bg-[radial-gradient(circle_at_30%_25%,#2a2445,#0e0c18_70%)]"
+        className="absolute grid place-items-center rounded-full bg-[radial-gradient(circle_at_30%_25%,var(--color-avatar-hi),var(--color-avatar-lo)_70%)]"
         style={{ inset: ring }}
       >
-        <span aria-hidden style={{ fontSize: size * 0.5, lineHeight: 1 }}>
-          {avatarEmoji(avatar)}
-        </span>
+        <Emoji e={avatarEmoji(avatar)} size={Math.round(size * 0.6)} />
       </div>
       {children}
     </div>
@@ -67,7 +67,7 @@ export function RankBadge({ rating, compact }: { rating: number; compact?: boole
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-bold"
-      style={{ borderColor: `${tier.color}55`, background: `${tier.color}14`, color: tier.color }}
+      style={{ borderColor: `${tier.color}55`, background: `${tier.color}14`, color: accentText(tier.color) }}
     >
       <span className="size-1.5 rounded-full" style={{ background: tier.color, boxShadow: `0 0 8px ${tier.color}` }} />
       {tier.name}
@@ -97,7 +97,7 @@ export function PlayerTag({
         <span className="truncate font-semibold">{name}</span>
         <LevelBadge level={level} />
         {tag && (
-          <span className="rounded-md bg-white/10 px-1 py-px text-[10px] font-bold tracking-wide text-fg-2">{tag}</span>
+          <span className="rounded-md bg-tint/10 px-1 py-px text-xs font-bold tracking-wide text-fg-2">{tag}</span>
         )}
       </div>
       <div className="truncate text-xs text-fg-3">{titleName(title)}</div>

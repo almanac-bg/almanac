@@ -46,7 +46,7 @@ export function EmailNudge() {
         }}
         aria-label="Скрий"
         title="Скрий"
-        className="focus-ring col-start-3 row-start-1 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+        className="focus-ring col-start-3 row-start-1 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/5 hover:text-fg"
       >
         <X className="size-4" />
       </button>

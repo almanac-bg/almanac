@@ -14,7 +14,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { useMuted } from '../lib/sound';
 import { Avatar, LevelBadge } from './Avatar';
@@ -48,18 +48,35 @@ function RequestBadge({ count }: { count: number }) {
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={clsx('font-display font-black tracking-tight', className)}>
+    <span className={clsx('inline-flex items-baseline font-display font-black tracking-tight', className)}>
       {/* One sweep when it appears, then still (see .text-gradient). */}
       <span className="text-gradient animate-shimmer-once">{BRAND.name}</span>
-      <span aria-hidden className="text-fuchsia-400">
-        ⚡
-      </span>
+      <Bolt className="ml-[0.08em] h-[0.9em] w-auto self-center" />
     </span>
   );
 }
 
+/**
+ * The mark's lightning (public/favicon.svg), in its gold: the same on every device, where the ⚡ emoji was Apple's on
+ * one phone and Google's on the next.
+ */
+export function Bolt({ className }: { className?: string }) {
+  const id = useId();
+  return (
+    <svg aria-hidden viewBox="13 5 38 54" className={className}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fef08a" />
+          <stop offset="1" stopColor="#f59e0b" />
+        </linearGradient>
+      </defs>
+      <path d="M36 6 14 36h14l-4 22 26-32H36l4-20z" fill={`url(#${id})`} />
+    </svg>
+  );
+}
+
 const ICON_BUTTON =
-  'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg';
+  'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/5 hover:text-fg';
 
 function OfflineDot() {
   return (
@@ -84,13 +101,13 @@ function GuestButton({ connected }: { connected: boolean }) {
         onClick={() => setOpen(true)}
         aria-label="Гост — запази прогреса"
         title="Играеш като гост — запази прогреса си"
-        className="focus-ring relative flex h-11 shrink-0 items-center gap-2 rounded-2xl p-1 hover:bg-white/5 sm:border sm:border-amber-300/30 sm:bg-amber-400/10 sm:px-3 sm:text-sm sm:font-semibold sm:text-amber-100 sm:hover:bg-amber-400/15"
+        className="focus-ring relative flex h-11 shrink-0 items-center gap-2 rounded-2xl p-1 hover:bg-tint/5 sm:border sm:border-amber-300/30 sm:bg-amber-400/10 sm:px-3 sm:text-sm sm:font-semibold sm:text-amber-100 sm:hover:bg-amber-400/15"
       >
         <span className="relative sm:hidden">
           <Avatar avatar={me.avatar} frame={me.frame} size={36} />
           <span
             aria-hidden
-            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[10px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
+            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[11px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
           >
             Гост
           </span>
@@ -125,7 +142,7 @@ function NotificationsButton({ unread }: { unread: number }) {
       to="/notifications"
       aria-label={label}
       title={label}
-      className={({ isActive }) => clsx(ICON_BUTTON, 'relative', isActive && 'bg-white/10 text-fg')}
+      className={({ isActive }) => clsx(ICON_BUTTON, 'relative', isActive && 'bg-tint/10 text-fg')}
     >
       <Bell className="size-4.5" />
       {unread > 0 && (
@@ -161,7 +178,7 @@ export function NavBar() {
                 className={({ isActive }) =>
                   clsx(
                     'focus-ring flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors',
-                    isActive ? 'bg-white/10 text-fg' : 'text-fg-3 hover:text-fg-2',
+                    isActive ? 'bg-tint/10 text-fg' : 'text-fg-3 hover:text-fg-2',
                   )
                 }
               >
@@ -198,7 +215,7 @@ export function NavBar() {
                   !me.isGuest && 'sm:pr-3 md:max-lg:pr-1',
                   // Phones reach the profile from the tab bar; for a guest the "Гост" button takes this spot.
                   me.isGuest && 'max-sm:hidden',
-                  isActive ? 'bg-white/10' : 'hover:bg-white/5',
+                  isActive ? 'bg-tint/10' : 'hover:bg-tint/5',
                 )
               }
             >
@@ -212,7 +229,7 @@ export function NavBar() {
                   <LevelBadge level={progress.level} />
                 </div>
                 {connected ? (
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-tint/10">
                     <div
                       className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)]"
                       style={{ width: `${progress.pct * 100}%` }}

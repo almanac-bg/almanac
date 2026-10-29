@@ -5,6 +5,7 @@ import { DoorOpen } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
+import { Emoji } from '../components/Emoji';
 import { MatchAnnouncer } from '../components/game/Announcer';
 import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
 import { EmoteBar } from '../components/game/EmoteBar';
@@ -137,9 +138,13 @@ function Arena({ game }: { game: LiveGame }) {
           )}
         >
           {watching ? (
-            <p className="text-balance text-rose-200">💀 Отпадна — гледаш като зрител</p>
+            <p className="text-balance text-rose-200">
+              <Emoji e="💀" /> Отпадна — гледаш като зрител
+            </p>
           ) : (
-            <p className="text-balance text-rose-200">💀 Отпадна. Останаха само ботове — резултатът идва след миг.</p>
+            <p className="text-balance text-rose-200">
+              <Emoji e="💀" /> Отпадна. Останаха само ботове — резултатът идва след миг.
+            </p>
           )}
           {freeToGo && watching && (
             <>

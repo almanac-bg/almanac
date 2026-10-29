@@ -6,6 +6,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { GuestNudge } from '../components/ClaimAccount';
+import { Emoji } from '../components/Emoji';
 import { GroupRow } from '../components/groups';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, SectionTitle } from '../components/ui';
@@ -68,7 +69,7 @@ function GroupList() {
         <h1 className="t-page">Групи</h1>
         <p className="mt-2 max-w-xl text-fg-2 text-pretty">
           Клас, офис, семейство: група с линк за покана и седмична класация на въпросите на деня — сборът от най-добрите
-          ти {GROUPS.bestDays} дни от понеделник до неделя. Победителят носи 👑 цялата следваща седмица.
+          ти {GROUPS.bestDays} дни от понеделник до неделя. Победителят носи <Emoji e="👑" /> цялата следваща седмица.
         </p>
       </header>
 
@@ -83,7 +84,7 @@ function GroupList() {
       ) : (
         <Card>
           <EmptyState
-            icon="👥"
+            icon="🫂"
             title="Още не си в група"
             body="Създай една и прати линка — или отвори линк, който са ти пратили."
           />
@@ -164,7 +165,7 @@ function GroupView({ id }: { id: number }) {
   if (!g && error)
     return error.status === 404 ? (
       <Card className="mx-auto max-w-md">
-        <EmptyState icon="👥" title="Няма такава група" body="Или вече не си в нея. Поискай нов линк за покана." page />
+        <EmptyState icon="🫂" title="Няма такава група" body="Или вече не си в нея. Поискай нов линк за покана." page />
       </Card>
     ) : (
       <LoadError title="Групата не се зареди" error={error} onRetry={retry} />
@@ -199,7 +200,7 @@ function GroupView({ id }: { id: number }) {
       <Card className="p-5 sm:p-6">
         <h2 className="t-card">Покани</h2>
         <p className="mt-1 text-sm text-fg-2">Който отвори линка, влиза в групата — с профил или като гост.</p>
-        <p className="mt-3 truncate rounded-xl bg-white/5 px-3 py-2 font-mono text-sm text-fg-2">{inviteUrl(g.code)}</p>
+        <p className="mt-3 truncate rounded-xl bg-tint/5 px-3 py-2 font-mono text-sm text-fg-2">{inviteUrl(g.code)}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button onClick={() => shareInvite(g)}>
             <Share2 className="size-4" /> Прати линка
@@ -221,7 +222,7 @@ function GroupView({ id }: { id: number }) {
           className="focus-ring flex items-center gap-3 rounded-3xl border border-amber-300/25 bg-amber-400/10 p-4 text-amber-100 hover:bg-amber-400/15"
         >
           <span aria-hidden className="text-2xl">
-            📅
+            <Emoji e="📅" />
           </span>
           <span className="min-w-0 flex-1 text-sm">
             <b className="text-fg">Днешните въпроси</b> те чакат — всеки ден е шанс за точки в групата.
@@ -258,8 +259,8 @@ function GroupView({ id }: { id: number }) {
           </Card>
         )}
         <p className="mt-2 text-xs text-fg-3">
-          Сбор от най-добрите {GROUPS.bestDays} дни на всеки до неделя вечер. Победителят носи 👑 цялата следваща
-          седмица.
+          Сбор от най-добрите {GROUPS.bestDays} дни на всеки до неделя вечер. Победителят носи <Emoji e="👑" /> цялата
+          следваща седмица.
         </p>
       </section>
 
@@ -292,7 +293,8 @@ function GroupView({ id }: { id: number }) {
                 <span className="min-w-0 flex-1 basis-44 text-fg-3">{weekName(h.week)}</span>
                 {h.winner ? (
                   <span className="font-semibold">
-                    👑 {h.winner.username} <span className="font-normal text-fg-3">· {fmt(h.score)} т.</span>
+                    <Emoji e="👑" /> {h.winner.username}{' '}
+                    <span className="font-normal text-fg-3">· {fmt(h.score)} т.</span>
                   </span>
                 ) : (
                   <span className="text-fg-3">никой не игра</span>
@@ -392,7 +394,7 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
       onClick={onClick}
       aria-label={`Премахни ${name} от групата`}
       title="Премахни от групата"
-      className="focus-ring -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/10 hover:text-rose-300"
+      className="focus-ring -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/10 hover:text-rose-300"
     >
       <UserMinus className="size-4" />
     </button>
@@ -514,7 +516,7 @@ function GroupInvite({ code }: { code: string }) {
     <div className="mx-auto max-w-md space-y-4">
       <Card className="p-6 text-center sm:p-8">
         <span aria-hidden className="text-5xl">
-          👥
+          <Emoji e="🫂" />
         </span>
         <p className="mt-4 t-eyebrow text-fg-3">Покана за група</p>
         <h1 className="mt-2 font-display text-3xl font-black [overflow-wrap:anywhere]">{data.name}</h1>
@@ -524,7 +526,7 @@ function GroupInvite({ code }: { code: string }) {
         </p>
         <p className="mt-4 text-sm text-fg-2 text-pretty">
           Всяка седмица — класация на въпросите на деня: сборът от най-добрите {GROUPS.bestDays} дни на всеки.
-          Победителят носи 👑.
+          Победителят носи <Emoji e="👑" />.
         </p>
         {data.full ? (
           <p className="mt-6 text-sm text-rose-300">Групата е пълна ({GROUPS.maxMembers} членове).</p>

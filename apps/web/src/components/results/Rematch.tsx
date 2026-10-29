@@ -155,7 +155,7 @@ export function RematchStrip({ rematch: r, bar, className }: { rematch: Rematch;
         bar ? 'rounded-2xl border px-3 py-2' : 'glass mx-auto max-w-xl rounded-3xl p-4 sm:px-5',
         invited
           ? 'border-amber-300/50 bg-amber-400/10 shadow-[0_0_32px_-12px_rgb(251_191_36/0.7)]'
-          : bar && 'border-line bg-white/5',
+          : bar && 'border-line bg-tint/5',
         r.status === 'over' && 'opacity-70',
         className,
       )}

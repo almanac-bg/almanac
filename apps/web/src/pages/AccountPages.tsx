@@ -14,8 +14,10 @@ import {
   Mail,
   MailCheck,
   MailWarning,
+  Moon,
   Save,
   ShieldAlert,
+  Sun,
   Trash2,
   TriangleAlert,
   Volume2,
@@ -26,9 +28,10 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
-import { Button, buttonClass, Card, INPUT, Modal, Spinner, SwitchTrack } from '../components/ui';
+import { Button, buttonClass, Card, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
+import { setTheme, useThemeChoice } from '../lib/theme';
 import { usePageTitle } from '../lib/title';
 
 /** A labelled password input with a show/hide toggle (the label names the input alone, not the toggle). */
@@ -221,6 +224,7 @@ export function SettingsPage() {
           <RecordSettings />
         </>
       )}
+      <ThemeSettings />
       <SoundSettings />
       {!me.isGuest && <PasswordSettings />}
       <DataSettings />
@@ -417,6 +421,35 @@ function SwitchCard({
   );
 }
 
+/** The colour theme on this device (lib/theme). */
+function ThemeSettings() {
+  const choice = useThemeChoice();
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2">
+        {choice === 'light' ? (
+          <Sun aria-hidden className="size-5 text-amber-300" />
+        ) : (
+          <Moon aria-hidden className="size-5 text-violet-300" />
+        )}
+        <h2 className="t-card">Тема</h2>
+      </div>
+      <p className="mt-1 text-sm text-fg-3">На това устройство. Големият екран на стая е винаги светъл.</p>
+      <div className="mt-4">
+        <Segmented
+          value={choice}
+          onChange={setTheme}
+          options={[
+            { value: 'dark', label: 'Тъмна' },
+            { value: 'light', label: 'Светла' },
+            { value: 'system', label: 'Като системата' },
+          ]}
+        />
+      </div>
+    </Card>
+  );
+}
+
 function SoundSettings() {
   const [muted, setMuted] = useMuted();
   const on = !muted;
@@ -539,7 +572,7 @@ function ReminderSettings() {
         </div>
       </Modal>
       {blocked && (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm">
           <MailWarning aria-hidden className="size-5 shrink-0 text-amber-300" />
           <span className="min-w-0 flex-1 basis-48 text-fg-2">
             {me.pendingEmail ? (

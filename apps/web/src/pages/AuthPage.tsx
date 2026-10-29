@@ -31,6 +31,7 @@ import { motion } from 'motion/react';
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../components/Avatar';
+import { Emoji } from '../components/Emoji';
 import { LegalLinks, MINORS_NOTICE } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Field, INPUT, Segmented, Spinner } from '../components/ui';
@@ -40,8 +41,6 @@ import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
 import { useSite } from '../lib/site';
 import { usePageTitle } from '../lib/title';
-
-const FLOATERS = ['🦊', '🧠', '⚡', '🐼', '🏆', '🦄', '🔥', '🐙', '👑', '🎯'];
 
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
@@ -197,7 +196,7 @@ export function AuthPage() {
           {/* With an invite or a challenge, phones skip the pitch: the card says it all and stays on the first screen. */}
           <span
             className={clsx(
-              'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
+              'mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-tint/5 px-3 py-1 text-xs font-semibold text-fg-2 sm:mb-6',
               linked && 'max-sm:hidden',
             )}
           >
@@ -448,7 +447,7 @@ export function AuthPage() {
               className="glass flex items-center gap-3.5 rounded-2xl bg-ink-2/90 p-3.5 sm:block sm:p-4 md:flex lg:block"
             >
               <div aria-hidden className="text-2xl">
-                {f.icon}
+                <Emoji e={f.icon} />
               </div>
               <div>
                 <div className="text-sm font-bold sm:mt-2 md:mt-0 lg:mt-2">{f.title}</div>
@@ -460,23 +459,6 @@ export function AuthPage() {
 
         {/* After the pitch on phones; under the card from tablets up. With more below, at the bottom of the page. */}
         {!about && <LegalLinks className="justify-center md:col-start-2 md:row-start-3" />}
-        {/* Floating avatars: last in the page, so search engines don't take them for its opening words. */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          {FLOATERS.map((e, i) => (
-            <span
-              key={e}
-              className="absolute animate-float text-3xl opacity-25 blur-[0.5px] sm:text-4xl"
-              style={{
-                left: `${(i * 37) % 95}%`,
-                top: `${(i * 53 + 7) % 90}%`,
-                animationDelay: `${-i * 0.9}s`,
-                animationDuration: `${5 + (i % 4)}s`,
-              }}
-            >
-              {e}
-            </span>
-          ))}
-        </div>
       </div>
       {about && (
         <AboutGame
@@ -544,8 +526,8 @@ function AboutGame({ cta }: { cta: ReactNode }) {
           <p className="mt-1.5 text-sm text-fg-3">Избираш категория в „Соло“ или играеш микс от всички.</p>
           <ul className="mt-4 flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
-              <li key={c.id} className="rounded-full border border-line bg-white/5 px-3 py-1.5 text-sm text-fg-2">
-                <span aria-hidden>{c.icon}</span> {c.name}
+              <li key={c.id} className="rounded-full border border-line bg-tint/5 px-3 py-1.5 text-sm text-fg-2">
+                <Emoji e={c.icon} /> {c.name}
               </li>
             ))}
           </ul>
@@ -817,7 +799,7 @@ function ChallengeLanding({
     return (
       <div className="text-center">
         <span aria-hidden className="text-5xl">
-          🔗
+          <Emoji e="🔗" />
         </span>
         <h2 className="mt-3 t-section">Линкът не работи</h2>
         <p className="mt-2 text-sm text-fg-3">
@@ -839,9 +821,7 @@ function ChallengeLanding({
       <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
         <Swords aria-hidden className="size-3.5" /> Предизвикателство
         {expired && (
-          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">
-            Изтекло
-          </span>
+          <span className="ml-auto rounded-full bg-tint/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">Изтекло</span>
         )}
       </p>
       {/* On the narrowest phones the title goes under the avatar rather than breaking a word. */}
@@ -870,7 +850,7 @@ function ChallengeLanding({
           <Stat label="Изиграха го" value={fmt(players)} />
         </dl>
       ) : (
-        <p className="mt-5 rounded-2xl border border-line bg-black/20 p-4 text-sm text-fg-2">
+        <p className="mt-5 rounded-2xl border border-line bg-sunk/20 p-4 text-sm text-fg-2">
           {expired ? 'Никой не го изигра навреме.' : 'Още никой не го е изиграл. Постави първия резултат!'}
         </p>
       )}
@@ -904,7 +884,7 @@ function ChallengeLanding({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-line bg-black/20 p-3.5">
+    <div className="min-w-0 rounded-2xl border border-line bg-sunk/20 p-3.5">
       <dt className="text-[11px] font-semibold tracking-wide text-fg-3 uppercase">{label}</dt>
       <dd className="mt-1 font-display text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
     </div>

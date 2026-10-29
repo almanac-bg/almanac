@@ -1,10 +1,11 @@
 import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast } from '@quiz/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionInfo, type QuestionReportGroup } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, EyeOff, Flag, RotateCcw } from 'lucide-react';
+import { Check, EyeOff, Flag, Lightbulb, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
+import { Emoji } from '../Emoji';
 import { LETTERS } from '../game/answers';
 import { RightOrderList } from '../game/OrderQuestion';
 import { QuestionPicture } from '../game/QuestionPicture';
@@ -63,7 +64,8 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
   return (
     <>
       <p className="text-xs text-fg-3">
-        <code>{question.id}</code> · {category?.icon} {category?.name} · {DIFFICULTY_LABEL[question.difficulty]}
+        <code>{question.id}</code> · {category && <Emoji e={category.icon} />} {category?.name} ·{' '}
+        {DIFFICULTY_LABEL[question.difficulty]}
         {question.author && ` · от ${question.author}`}
       </p>
       <p className="mt-1 font-semibold">{question.q}</p>
@@ -77,7 +79,7 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
       )}
       {question.number && (
         <p className="mt-3 rounded-xl bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-200">
-          🔢 {question.number.answer.toLocaleString('bg-BG')} {question.number.unit} ✓
+          <Emoji e="🔢" /> {question.number.answer.toLocaleString('bg-BG')} {question.number.unit} ✓
         </p>
       )}
       <ol className="mt-3 grid gap-1.5 text-sm empty:hidden sm:grid-cols-2">
@@ -87,7 +89,7 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
             key={i}
             className={clsx(
               'rounded-xl px-3 py-2',
-              i === question.answer ? 'bg-emerald-500/15 font-semibold text-emerald-200' : 'bg-white/5 text-fg-2',
+              i === question.answer ? 'bg-emerald-500/15 font-semibold text-emerald-200' : 'bg-tint/5 text-fg-2',
             )}
           >
             {LETTERS[i]}) {o} {i === question.answer && '✓'}
@@ -96,8 +98,7 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
       </ol>
       {question.fact && (
         <p className="mt-3 rounded-xl bg-amber-400/[0.07] px-3 py-2 text-sm text-fg-2">
-          <span className="font-semibold text-amber-200">💡 </span>
-          {question.fact}
+          <Lightbulb aria-hidden className="mb-0.5 inline size-4 text-amber-200" /> {question.fact}
           {question.factSource && (
             <>
               {' '}
@@ -156,7 +157,7 @@ function QuestionReportCard({
         </div>
         <ul className="mt-4 space-y-2">
           {group.reports.map((r) => (
-            <li key={r.id} className="rounded-2xl border border-line bg-black/20 px-4 py-3 text-sm">
+            <li key={r.id} className="rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{reasonLabel(r.reason)}</span>
                 <span className="text-xs text-fg-3">

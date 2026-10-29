@@ -122,7 +122,7 @@ export function FriendButton({
         'focus-ring border transition-colors disabled:opacity-60',
         incoming
           ? 'border-amber-300/40 bg-amber-400/15 text-amber-200 hover:bg-amber-400/25'
-          : 'border-line bg-white/5 text-fg-2 hover:bg-white/10 hover:text-fg',
+          : 'border-line bg-tint/5 text-fg-2 hover:bg-tint/10 hover:text-fg',
       )}
     >
       {busy ? (

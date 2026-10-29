@@ -112,7 +112,7 @@ function ChallengeRow({ challenge: c, now }: { challenge: MyChallenge; now: numb
   return (
     <li
       className={clsx(
-        'flex items-center gap-1 rounded-2xl border border-line bg-black/20 py-0.5 pr-1 pl-3.5',
+        'flex items-center gap-1 rounded-2xl border border-line bg-sunk/20 py-0.5 pr-1 pl-3.5',
         expired && 'opacity-60',
       )}
     >
@@ -131,7 +131,7 @@ function ChallengeRow({ challenge: c, now }: { challenge: MyChallenge; now: numb
           onClick={() => shareText(challengeShareText(c.id, c.myScore), 'Линкът е копиран')}
           aria-label={`Сподели предизвикателството от ${made}`}
           title="Сподели линка"
-          className="focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+          className="focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/5 hover:text-fg"
         >
           <Share2 className="size-4" />
         </button>

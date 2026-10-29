@@ -4,6 +4,8 @@ import confetti from 'canvas-confetti';
 import { motion } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
 import { sfx } from '../lib/sound';
+import { Emoji } from './Emoji';
+import { accentText } from './game/answers';
 import { Button, Modal } from './ui';
 
 /** Shown once after a season ends: the best rank reached, its XP and the cosmetics it unlocked. */
@@ -54,10 +56,10 @@ export function SeasonRecap() {
               boxShadow: `0 0 60px -10px ${tier.color}`,
             }}
           >
-            🏅
+            <Emoji e="🏅" />
           </motion.div>
           <p className="mt-4 text-fg-2">
-            Достигна ранг <b style={{ color: tier.color }}>{tier.name}</b>
+            Достигна ранг <b style={{ color: accentText(tier.color) }}>{tier.name}</b>
           </p>
           <p className="mt-1 font-display text-3xl font-black text-violet-300">+{fmt(reward.xp)} XP</p>
           {reward.unlocks.length > 0 && (
@@ -67,7 +69,7 @@ export function SeasonRecap() {
                 return (
                   <span
                     key={`${u.kind}:${u.id}`}
-                    className="inline-flex items-center gap-2 rounded-xl border border-line bg-white/5 px-3 py-2 text-sm"
+                    className="inline-flex items-center gap-2 rounded-xl border border-line bg-tint/5 px-3 py-2 text-sm"
                   >
                     <span className="text-lg leading-none">{icon}</span>
                     {name}

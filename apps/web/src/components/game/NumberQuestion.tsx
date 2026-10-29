@@ -14,6 +14,7 @@ import { Delete, Flame, Lock, Minus, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button } from '../ui';
 import { lineRange, maxDigits, numberText, offText, placeOn } from './numbers';
 
@@ -90,7 +91,7 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
         aria-label={shown === null ? 'Още няма число' : `Твоят отговор: ${numberText(shown, n)}`}
         className={clsx(
           'flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl border px-4 font-display text-4xl font-bold tabular-nums short:min-h-12 short:text-3xl',
-          locked ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100' : 'border-line bg-white/[0.045]',
+          locked ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100' : 'border-line bg-tint/[0.045]',
           !locked && text && !valid && 'border-rose-400/50',
         )}
       >
@@ -200,7 +201,7 @@ function Key({
       onMouseDown={(e) => e.preventDefault()}
       disabled={disabled}
       aria-label={label}
-      className="focus-ring grid h-14 place-items-center rounded-2xl border border-line bg-white/[0.045] font-display text-2xl font-bold transition-[background,transform] select-none hover:bg-white/[0.08] active:scale-[0.96] disabled:opacity-40 short:h-11 short:text-xl"
+      className="focus-ring grid h-14 place-items-center rounded-2xl border border-line bg-tint/[0.045] font-display text-2xl font-bold transition-[background,transform] select-none hover:bg-tint/[0.08] active:scale-[0.96] disabled:opacity-40 short:h-11 short:text-xl"
     >
       {children}
     </button>
@@ -224,7 +225,7 @@ function StepButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="focus-ring grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-white/[0.045] hover:bg-white/[0.08] disabled:opacity-40"
+      className="focus-ring grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-tint/[0.045] hover:bg-tint/[0.08] disabled:opacity-40"
     >
       {children}
     </button>
@@ -261,7 +262,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
   return (
     <div className="glass rounded-3xl px-5 pt-4 pb-5 sm:px-8">
       <div className="relative mx-4 h-36 sm:mx-6">
-        <div className="absolute inset-x-0 top-[96px] h-1 rounded-full bg-white/10" />
+        <div className="absolute inset-x-0 top-[96px] h-1 rounded-full bg-tint/10" />
         {ordered.map((g, i) => (
           <motion.div
             key={g.id}
@@ -274,7 +275,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
             <span
               className={clsx(
                 'mb-0.5 rounded-full px-1.5 text-[11px] leading-4 font-bold whitespace-nowrap tabular-nums',
-                isExact(g.guess, { answer, step: n.step }) ? 'bg-amber-400/25 text-amber-200' : 'bg-white/10 text-fg-2',
+                isExact(g.guess, { answer, step: n.step }) ? 'bg-amber-400/25 text-amber-200' : 'bg-tint/10 text-fg-2',
               )}
             >
               {offText(g.guess, answer, n)}
@@ -283,7 +284,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
               <Avatar avatar={g.player.avatar} frame={g.player.frame} size={28} />
             </span>
             {/* Down to the line: from the upper row, past the lower one. */}
-            <span className="w-px bg-white/40" style={{ height: row.get(g.id) ? 50 : 16 }} />
+            <span className="w-px bg-tint/40" style={{ height: row.get(g.id) ? 50 : 16 }} />
           </motion.div>
         ))}
         <motion.div
@@ -334,7 +335,9 @@ export function NumberSummary({ result, q, answer }: { result: PlayerResult; q: 
       className="flex flex-wrap items-center gap-3"
     >
       {guess === null ? (
-        <span className="font-display text-2xl font-bold text-rose-300">Времето изтече ⏱️</span>
+        <span className="font-display text-2xl font-bold text-rose-300">
+          Времето изтече <Emoji e="⏱️" />
+        </span>
       ) : (
         <>
           <span
@@ -346,9 +349,11 @@ export function NumberSummary({ result, q, answer }: { result: PlayerResult; q: 
             +{fmt(result.points)}
           </span>
           {isExact(guess, { answer, step: n.step }) ? (
-            <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-sm font-bold text-amber-200">🎯 Точно!</span>
+            <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-sm font-bold text-amber-200">
+              <Emoji e="🎯" /> Точно!
+            </span>
           ) : (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-sm font-bold text-fg-2">
+            <span className="rounded-full bg-tint/10 px-2.5 py-1 text-sm font-bold text-fg-2">
               {result.points > 0 ? '' : 'Твърде далеч · '}
               {offText(guess, answer, n)}
             </span>

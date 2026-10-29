@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { Button } from '../ui';
 import { LETTERS } from './answers';
 import { KeyHint } from './Powerups';
@@ -83,8 +84,8 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
                     ? locked
                       ? 'border-emerald-400/40 bg-emerald-500/10'
                       : 'border-violet-300/60 bg-violet-500/15'
-                    : 'border-line bg-white/[0.045]',
-                  !inert && 'hover:bg-white/[0.08]',
+                    : 'border-line bg-tint/[0.045]',
+                  !inert && 'hover:bg-tint/[0.08]',
                   inert && !placed && 'opacity-45',
                 )}
               >
@@ -96,7 +97,7 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
                       ? locked
                         ? 'bg-emerald-400 text-emerald-950'
                         : 'bg-violet-400 text-violet-950'
-                      : 'border border-dashed border-white/25 text-fg-3',
+                      : 'border border-dashed border-tint/25 text-fg-3',
                   )}
                 >
                   {placed ? place + 1 : LETTERS[item]}
@@ -156,7 +157,7 @@ export function OrderReveal({ game, q, reveal }: { game: LiveGame; q: QuestionPa
               transition={{ delay: 0.08 * place }}
               className={clsx(
                 'flex min-h-14 items-center gap-3 rounded-2xl border px-3.5 py-2.5 short:min-h-11 short:py-1.5',
-                hit ? 'border-emerald-400/60 bg-emerald-500/15' : 'border-line bg-white/[0.045]',
+                hit ? 'border-emerald-400/60 bg-emerald-500/15' : 'border-line bg-tint/[0.045]',
               )}
             >
               <span
@@ -216,7 +217,9 @@ export function OrderSummary({ result }: { result: PlayerResult }) {
       className="flex flex-wrap items-center gap-3"
     >
       {!result.order?.given ? (
-        <span className="font-display text-2xl font-bold text-rose-300">Времето изтече ⏱️</span>
+        <span className="font-display text-2xl font-bold text-rose-300">
+          Времето изтече <Emoji e="⏱️" />
+        </span>
       ) : (
         <>
           <span
@@ -230,7 +233,7 @@ export function OrderSummary({ result }: { result: PlayerResult }) {
           <span
             className={clsx(
               'rounded-full px-2.5 py-1 text-sm font-bold',
-              result.correct ? 'bg-amber-400/20 text-amber-200' : 'bg-white/10 text-fg-2',
+              result.correct ? 'bg-amber-400/20 text-amber-200' : 'bg-tint/10 text-fg-2',
             )}
           >
             {result.correct ? '🎯 Всичко на място!' : `${placed} от ${ORDER.items} на място`}

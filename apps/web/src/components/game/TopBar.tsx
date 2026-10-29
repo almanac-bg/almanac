@@ -24,7 +24,7 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
           type="button"
           onClick={onLeave}
           aria-label="Напусни мача"
-          className="focus-ring -ml-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+          className="focus-ring -ml-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/5 hover:text-fg"
         >
           <X className="size-5" />
         </button>
@@ -48,7 +48,7 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
                   key={i}
                   className={clsx(
                     'h-1.5 rounded-full transition-all',
-                    i < q.index ? 'w-3 bg-violet-400/70' : i === q.index ? 'w-6 bg-white' : 'w-3 bg-white/15',
+                    i < q.index ? 'w-3 bg-violet-400/70' : i === q.index ? 'w-6 bg-fg' : 'w-3 bg-tint/15',
                     game.start.eliminationSchedule.includes(i + 1) && i >= q.index && 'bg-rose-400/50',
                   )}
                 />
@@ -104,7 +104,7 @@ function MuteButton() {
       onClick={() => setMuted(!muted)}
       aria-label={label}
       title={label}
-      className="focus-ring -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-white/5 hover:text-fg"
+      className="focus-ring -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-tint/5 hover:text-fg"
     >
       {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
     </button>

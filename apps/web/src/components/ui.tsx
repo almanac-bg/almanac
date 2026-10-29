@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Emoji } from './Emoji';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'accent';
 type Size = 'sm' | 'md' | 'lg' | 'field';
@@ -11,11 +12,12 @@ const VARIANTS: Record<Variant, string> = {
   // Starts at purple-600: white on the lighter #a855f7 was under 4:1 where long labels begin.
   primary:
     'text-white bg-[linear-gradient(110deg,#9333ea,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110',
-  secondary: 'glass text-fg hover:bg-white/10',
-  ghost: 'text-fg-2 hover:text-fg hover:bg-white/5',
+  secondary: 'glass text-fg hover:bg-tint/10',
+  ghost: 'text-fg-2 hover:text-fg hover:bg-tint/5',
   // rose-600, darker on hover: white on rose-500 is under 4:1.
   danger: 'text-white bg-rose-600 hover:bg-rose-700 shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
-  gold: 'text-amber-950 bg-[linear-gradient(110deg,#fde68a,#f59e0b)] shadow-[0_8px_28px_-10px_rgb(245_158_11/0.8)] hover:brightness-105',
+  // A fixed dark brown, not the palette's (that one runs light on the light theme): the gold is the same on both.
+  gold: 'text-[#451a03] bg-[linear-gradient(110deg,#fde68a,#f59e0b)] shadow-[0_8px_28px_-10px_rgb(245_158_11/0.8)] hover:brightness-105',
   // A game mode's own colours, given by the caller (style={accentFill(mode)}).
   accent: 'hover:brightness-110',
 };
@@ -106,7 +108,7 @@ export function SwitchTrack({ on }: { on: boolean }) {
       aria-hidden
       className={clsx(
         'relative h-7 w-12 shrink-0 rounded-full border transition-colors',
-        on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-white/10',
+        on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-tint/10',
       )}
     >
       <span
@@ -141,7 +143,7 @@ export function Pill({
     <span
       style={style}
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full border border-line bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2',
+        'inline-flex items-center gap-1.5 rounded-full border border-line bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2',
         className,
       )}
     >
@@ -278,7 +280,7 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Затвори"
-              className="focus-ring absolute top-3 right-3 grid size-11 place-items-center rounded-full text-fg-3 hover:bg-white/10 hover:text-fg"
+              className="focus-ring absolute top-3 right-3 grid size-11 place-items-center rounded-full text-fg-3 hover:bg-tint/10 hover:text-fg"
             >
               <X className="size-5" />
             </button>
@@ -308,7 +310,7 @@ export function Segmented<T extends string | number>({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-line bg-black/20 p-1">
+    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-line bg-sunk/20 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -318,13 +320,13 @@ export function Segmented<T extends string | number>({
           onClick={() => onChange(o.value)}
           className={clsx(
             'focus-ring relative h-9 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default pointer-coarse:min-h-11 pointer-coarse:min-w-11',
-            o.value === value ? 'text-white' : 'text-fg-3 hover:text-fg-2',
+            o.value === value ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
           )}
         >
           {o.value === value && (
             <motion.span
               layoutId={`seg-${options.map((x) => x.value).join('-')}`}
-              className="absolute inset-0 rounded-xl bg-white/12 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
+              className="absolute inset-0 rounded-xl bg-tint/12 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
               transition={{ type: 'spring', stiffness: 500, damping: 38 }}
             />
           )}
@@ -337,7 +339,7 @@ export function Segmented<T extends string | number>({
 
 export function ProgressBar({ value, className, gradient }: { value: number; className?: string; gradient?: string }) {
   return (
-    <div className={clsx('h-2 overflow-hidden rounded-full bg-white/8', className)}>
+    <div className={clsx('h-2 overflow-hidden rounded-full bg-tint/8', className)}>
       <motion.div
         className="h-full rounded-full"
         style={{ background: gradient ?? 'linear-gradient(90deg,#a855f7,#22d3ee)' }}
@@ -364,10 +366,8 @@ export function EmptyState({
   const Title = page ? 'h1' : 'p';
   return (
     <div className="grid place-items-center gap-2 py-12 text-center">
-      <span aria-hidden className="text-5xl">
-        {icon}
-      </span>
-      <Title className="font-display font-bold">{title}</Title>
+      <Emoji e={icon} size="3.5rem" />
+      <Title className="font-extrabold">{title}</Title>
       {body && <p className="max-w-sm text-sm text-fg-3">{body}</p>}
     </div>
   );

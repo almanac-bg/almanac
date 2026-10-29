@@ -20,7 +20,7 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
     expect(tries, 'never managed to stop on a fact').toBeLessThan(9);
     await answer.first().click({ timeout: 15_000 });
     question = (await counter.textContent())!;
-    await expect(page.getByText('💡 Знаеше ли?')).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText('Знаеше ли?')).toBeVisible({ timeout: 2_000 });
     await stop.click({ timeout: 1_500 }).catch((error) => {
       if (!(error instanceof errors.TimeoutError)) throw error;
     });
@@ -37,7 +37,7 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
   await expect(counter).toHaveText(new RegExp(`^Въпрос ${next} от`));
 
   await playMatch(page);
-  await expect(page.getByRole('heading', { name: '💡 Научи днес', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Научи днес', exact: true })).toBeVisible();
   // Three up front, the other seven in the review below.
   await expect(page.getByText('Още 7 — в прегледа на въпросите по-долу.')).toBeVisible();
 });

@@ -301,6 +301,7 @@ function bind(s: GameSocket) {
   });
 
   s.on('game:reveal', (reveal) => {
+    const before = getState().game;
     patchGame((g) => {
       const q = g.question;
       const mine = reveal.results[g.start.youId];
@@ -362,6 +363,14 @@ function bind(s: GameSocket) {
     if (!g) return;
     const mine = reveal.results[g.start.youId];
     if (mine) effect(mine.correct ? 'correct' : 'wrong');
+    // One on one: who leads now, if that changed (a tie leads nobody).
+    if (before && g.start.players.length === 2) {
+      const leader = (standings: typeof g.standings) =>
+        standings[0] && standings[0].score > (standings[1]?.score ?? 0) ? standings[0].id : null;
+      const was = leader(before.standings);
+      const now = leader(reveal.standings);
+      if (now && was !== now) setTimeout(() => effect(now === g.start.youId ? 'leadTaken' : 'leadLost'), 450);
+    }
     if (reveal.eliminated.length)
       setTimeout(() => effect(reveal.eliminated.includes(g.start.youId) ? 'knockedOut' : 'eliminated'), 900);
   });

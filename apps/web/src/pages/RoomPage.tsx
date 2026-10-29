@@ -136,7 +136,7 @@ export function RoomPage() {
             title="Копирай линк за покана"
           >
             <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
-            <span className="grid size-9 place-items-center rounded-xl bg-white/5 text-fg-2 group-hover:bg-white/10">
+            <span className="grid size-9 place-items-center rounded-xl bg-tint/5 text-fg-2 group-hover:bg-tint/10">
               {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
             </span>
           </button>
@@ -343,7 +343,7 @@ export function RoomPage() {
             {isHost ? (
               startButton
             ) : (
-              <p className="rounded-2xl bg-white/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>
+              <p className="rounded-2xl bg-tint/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>
             )}
             {isHost && startHint && <p className="text-center text-xs text-fg-3">{startHint}</p>}
           </div>
@@ -544,7 +544,7 @@ function Toggle({
       onClick={() => onChange(!checked)}
       className={clsx(
         'focus-ring flex w-full items-center gap-3 rounded-2xl border border-line p-3 text-left',
-        disabled ? 'cursor-not-allowed' : 'hover:bg-white/5',
+        disabled ? 'cursor-not-allowed' : 'hover:bg-tint/5',
         disabled && !checked && 'opacity-60',
       )}
     >
@@ -589,14 +589,14 @@ function PlayerCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       className={clsx(
-        'flex items-center gap-2.5 rounded-2xl border border-line bg-white/[0.04] p-2.5 sm:gap-3 sm:p-3',
+        'flex items-center gap-2.5 rounded-2xl border border-line bg-tint/[0.04] p-2.5 sm:gap-3 sm:p-3',
         p.id === `u${meId}` && 'border-violet-400/40 bg-violet-500/10',
       )}
     >
       {/* Bots are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would squeeze it out. */}
       <Avatar avatar={p.avatar} frame={p.frame} size={44}>
         {p.isBot && (
-          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[10px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[11px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
             БОТ
           </span>
         )}
@@ -708,7 +708,7 @@ function TeamColumns({
             >
               <div className="mb-2 flex items-center gap-2 px-1">
                 <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-                <span className="font-display text-sm font-bold" style={{ color }}>
+                <span className="text-sm font-extrabold" style={{ color }}>
                   {TEAMS[team].name}
                 </span>
                 <span className="ml-auto text-xs font-semibold text-fg-3">{members.length}</span>
@@ -730,7 +730,7 @@ function TeamColumns({
                             onClick={() => actions.roomTeam(p.id)}
                             title={`Премести при ${other}`}
                             aria-label={`Премести ${p.name} при ${other}`}
-                            className={clsx(SEAT_BUTTON, 'hover:bg-white/10 hover:text-fg')}
+                            className={clsx(SEAT_BUTTON, 'hover:bg-tint/10 hover:text-fg')}
                           >
                             <ArrowLeftRight className="size-4" />
                           </button>
@@ -825,7 +825,7 @@ function InviteFriends({ room }: { room: RoomState }) {
             return (
               <li
                 key={f.user.id}
-                className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.03] p-2.5"
+                className="flex items-center gap-3 rounded-2xl border border-line bg-tint/[0.03] p-2.5"
               >
                 <Avatar avatar={f.user.avatar} frame={f.user.frame} size={38} />
                 <div className="min-w-0 flex-1">

@@ -8,6 +8,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelCard } from '../components/duels';
+import { Emoji } from '../components/Emoji';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -176,7 +177,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
             {mine ? (
               <YourResult entry={mine} total={info.total} expired={expired} />
             ) : expired ? (
-              <p className="rounded-2xl border border-line bg-black/20 p-4 text-sm text-fg-2">
+              <p className="rounded-2xl border border-line bg-sunk/20 p-4 text-sm text-fg-2">
                 {info.attempted
                   ? 'Предизвикателството изтече, а опитът ти не завърши.'
                   : 'Предизвикателството изтече, преди да го изиграеш. Ето как завърши.'}
@@ -242,9 +243,9 @@ function YourResult({ entry, total, expired }: { entry: ChallengeEntry; total: n
         : `Водиш пред още ${plural(total - 1, 'играч', 'играчи')}.`
     : `${ordinal(entry.rank)} място от ${total}.`;
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-line bg-black/20 p-4">
+    <div className="flex items-center gap-4 rounded-2xl border border-line bg-sunk/20 p-4">
       <span aria-hidden className="text-4xl">
-        {MEDALS[entry.rank - 1] ?? '🎯'}
+        <Emoji e={MEDALS[entry.rank - 1] ?? '🎯'} />
       </span>
       <div className="min-w-0">
         <p className="t-eyebrow text-fg-3">{expired ? 'Краен резултат' : 'Твоят резултат'}</p>
@@ -264,11 +265,11 @@ function YourResult({ entry, total, expired }: { entry: ChallengeEntry; total: n
 function Interrupted({ inGame, busy, onRetry }: { inGame: boolean; busy: boolean; onRetry: () => void }) {
   if (inGame) {
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-black/20 p-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-sunk/20 p-4">
         <p className="min-w-0 flex-1 basis-48 text-sm text-fg-2">Играеш го в момента — резултатът ще се появи тук.</p>
         <Link
           to="/game"
-          className="glass focus-ring inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[15px] font-semibold hover:bg-white/10"
+          className="glass focus-ring inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[15px] font-semibold hover:bg-tint/10"
         >
           <Gamepad2 aria-hidden className="size-4" /> Към играта
         </Link>
@@ -337,16 +338,13 @@ function EntryRow({ entry, creatorId }: { entry: ChallengeEntry; creatorId: numb
   const body = (
     <>
       <span aria-hidden className="w-6 shrink-0 text-center font-bold text-fg-3 tabular-nums">
-        {MEDALS[entry.rank - 1] ?? entry.rank}
+        {MEDALS[entry.rank - 1] ? <Emoji e={MEDALS[entry.rank - 1]} /> : entry.rank}
       </span>
       <span className="sr-only">{ordinal(entry.rank)} място:</span>
       {user ? (
         <Avatar avatar={user.avatar} frame={user.frame} size={40} />
       ) : (
-        <span
-          aria-hidden
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-white/5 text-lg text-fg-3"
-        >
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-tint/5 text-lg text-fg-3">
           ?
         </span>
       )}
@@ -374,7 +372,7 @@ function EntryRow({ entry, creatorId }: { entry: ChallengeEntry; creatorId: numb
   return user ? (
     <Link
       to={`/profile/${encodeURIComponent(user.username)}`}
-      className={clsx(row, 'focus-ring transition-colors hover:bg-white/[0.04]')}
+      className={clsx(row, 'focus-ring transition-colors hover:bg-tint/[0.04]')}
     >
       {body}
     </Link>
@@ -441,7 +439,7 @@ function Missing() {
     <div className="mx-auto max-w-xl space-y-8">
       <Card className="grid place-items-center gap-2 px-6 py-12 text-center">
         <span aria-hidden className="text-5xl">
-          🔗
+          <Emoji e="🔗" />
         </span>
         <h1 className="t-section">Линкът не работи</h1>
         <p className="max-w-sm text-sm text-fg-3">
@@ -449,7 +447,7 @@ function Missing() {
         </p>
         <Link
           to="/"
-          className="glass focus-ring mt-4 inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[15px] font-semibold hover:bg-white/10"
+          className="glass focus-ring mt-4 inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[15px] font-semibold hover:bg-tint/10"
         >
           <Gamepad2 aria-hidden className="size-4" /> Към играта
         </Link>

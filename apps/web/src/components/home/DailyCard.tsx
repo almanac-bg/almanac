@@ -17,6 +17,7 @@ import { dailyLinkUrl, offBoardLine } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
 import { Avatar } from '../Avatar';
+import { Emoji } from '../Emoji';
 import { GroupStandings } from '../groups';
 import { LoadError } from '../LoadError';
 import { Button, Card, Spinner } from '../ui';
@@ -86,7 +87,7 @@ export function DailyCard({ className }: { className?: string }) {
         <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-amber-950 uppercase"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#451a03] uppercase"
               style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
             >
               <CalendarDays className="size-3.5" /> №{info?.number ?? dayNumber(me.daily.day)} · {dayLabel}
@@ -106,7 +107,7 @@ export function DailyCard({ className }: { className?: string }) {
             {failed ? (
               <LoadError compact title="Въпросите на деня не се заредиха" error={error} onRetry={retry} />
             ) : !info ? (
-              <div aria-hidden className="h-14 w-56 max-w-full animate-pulse rounded-2xl bg-white/8" />
+              <div aria-hidden className="h-14 w-56 max-w-full animate-pulse rounded-2xl bg-tint/8" />
             ) : info.played ? (
               <div className="flex flex-wrap items-center gap-3">
                 <div>
@@ -156,7 +157,7 @@ export function DailyCard({ className }: { className?: string }) {
         </div>
 
         {!failed && (
-          <div className="rounded-2xl border border-line bg-black/20 p-4">
+          <div className="rounded-2xl border border-line bg-sunk/20 p-4">
             <p className="mb-3 t-eyebrow text-fg-3">Топ на деня</p>
             {!info ? (
               <div className="grid place-items-center py-4">
@@ -167,7 +168,7 @@ export function DailyCard({ className }: { className?: string }) {
               <ol className="space-y-2">
                 {info.entries.slice(0, 3).map((e) => (
                   <li key={e.user.id} className="flex items-center gap-2.5 text-sm">
-                    <span className="w-5 text-center">{['🥇', '🥈', '🥉'][e.rank - 1]}</span>
+                    <Emoji e={['🥇', '🥈', '🥉'][e.rank - 1]} className="size-5" size="" />
                     <Avatar avatar={e.user.avatar} frame={e.user.frame} size={30} />
                     <span
                       className={clsx(
@@ -220,10 +221,13 @@ function StreakShields({ shields, streak }: { shields: number; streak: number })
             'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors',
             shields
               ? 'bg-sky-400/15 text-sky-200 group-hover/shield:bg-sky-400/25'
-              : 'bg-white/5 text-fg-3 group-hover/shield:bg-white/10',
+              : 'bg-tint/5 text-fg-3 group-hover/shield:bg-tint/10',
           )}
         >
-          <span aria-hidden>🛡️</span>×{shields}
+          <span aria-hidden>
+            <Emoji e="🛡️" />
+          </span>
+          ×{shields}
           <span className="sr-only">{shields === 1 ? ' щит' : ' щита'} за серията — какво е това?</span>
           <ChevronDown aria-hidden className={clsx('size-3.5 transition-transform', open && 'rotate-180')} />
         </span>

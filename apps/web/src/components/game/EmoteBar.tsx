@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useId, useState } from 'react';
 import { sfx } from '../../lib/sound';
+import { Emoji } from '../Emoji';
 
 /**
  * Wider screens: the whole bar, fixed along the bottom (below the answers). Phones: a button in the page under the
@@ -36,7 +37,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
       )}
       aria-label={`Реакция ${emoteById(id)?.emoji}`}
     >
-      {emoteById(id)?.emoji}
+      <Emoji e={emoteById(id)?.emoji ?? ''} />
     </motion.button>
   ));
   // Phones (and phones held sideways, where a bar along the bottom would sit on the jokers): a button that opens the

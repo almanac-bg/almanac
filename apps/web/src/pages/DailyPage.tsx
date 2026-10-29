@@ -106,7 +106,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
         />
         <div className="relative">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-amber-950 uppercase"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#451a03] uppercase"
             style={{ background: `linear-gradient(90deg, ${ACCENT_FROM}, ${ACCENT_TO})` }}
           >
             <CalendarDays className="size-3.5" /> №{info.number} · {dayLabel(info.day)}
@@ -115,7 +115,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
           <p className="mt-2 text-fg-2">{MODE.tagline}</p>
 
           {sharer && (
-            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-black/25 p-3.5">
+            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-sunk/25 p-3.5">
               <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{sharer.user.username} те кани</p>

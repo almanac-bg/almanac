@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { useLoad } from '../lib/load';
+import { Emoji } from './Emoji';
 import { Card, SectionTitle } from './ui';
 
 /** A group in a list: where you stand this week, and who leads. */
@@ -12,18 +13,18 @@ export function GroupRow({ group: g, compact }: { group: GroupSummary; compact?:
     <Link
       to={`/groups/${g.id}`}
       className={clsx(
-        'focus-ring flex items-center gap-4 rounded-3xl transition-colors hover:bg-white/[0.06]',
+        'focus-ring flex items-center gap-4 rounded-3xl transition-colors hover:bg-tint/[0.06]',
         compact ? '-mx-1 gap-3 px-1 py-1.5' : 'glass p-4 sm:px-5',
       )}
     >
       <span
         aria-hidden
         className={clsx(
-          'grid shrink-0 place-items-center rounded-2xl bg-white/5',
+          'grid shrink-0 place-items-center rounded-2xl bg-tint/5',
           compact ? 'size-9 text-xl' : 'size-11 text-2xl',
         )}
       >
-        {g.crown ? '👑' : '👥'}
+        <Emoji e={g.crown ? '👑' : '🫂'} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold">{g.name}</span>
@@ -87,7 +88,7 @@ export function GroupsSection() {
       ) : (
         <Card className="flex items-center gap-4 p-4 sm:px-5">
           <span aria-hidden className="text-3xl">
-            👥
+            <Emoji e="🫂" />
           </span>
           <p className="min-w-0 flex-1 text-sm text-fg-2">
             Клас, офис, семейство: група с линк за покана и седмична класация на въпросите на деня.

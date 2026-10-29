@@ -82,7 +82,7 @@ export function ProfileCard({ className }: { className?: string }) {
 function UpNext({ unlock }: { unlock: UnlockRef & { level: number } }) {
   const { icon, name } = unlockPreview(unlock);
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs text-fg-2 sm:px-3">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-tint/5 px-2.5 py-1 text-xs text-fg-2 sm:px-3">
       <span className="shrink-0">Ниво {unlock.level}:</span>
       <span aria-hidden className="text-base leading-none">
         {icon}
@@ -101,7 +101,7 @@ function SeasonChip({ ratings, className }: { ratings: Partial<Record<QueueModeI
     <Link
       to="/leaderboard"
       className={clsx(
-        'inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-fg-2 hover:bg-white/10',
+        'inline-flex items-center gap-2 rounded-full bg-tint/5 px-3 py-1 text-xs text-fg-2 hover:bg-tint/10',
         className,
       )}
     >
@@ -121,7 +121,7 @@ function QuickStats({ stats }: { stats: MeUser['stats'] }) {
   return (
     <dl className="relative mt-6 hidden grid-cols-3 gap-2 md:grid">
       {items.map(([label, value]) => (
-        <div key={label} className="min-w-0 rounded-2xl border border-line bg-white/[0.03] px-3 py-2.5">
+        <div key={label} className="min-w-0 rounded-2xl border border-line bg-tint/[0.03] px-3 py-2.5">
           <dt className="truncate text-xs text-fg-3">{label}</dt>
           <dd className="mt-0.5 font-display text-xl font-bold tabular-nums">{value}</dd>
         </div>
