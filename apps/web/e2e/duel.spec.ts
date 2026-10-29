@@ -41,8 +41,9 @@ test('level after the first round, one of the two picks the next category, and b
   const borisMe = await me(boris);
   const play = (player: typeof anna) => player.getByRole('button', { name: 'Играй Дуел', exact: true }).click();
   await Promise.all([play(anna), play(boris)]);
-  await Promise.all([anna, boris].map((player) => expect(player).toHaveURL(/\/game$/)));
-  // A loaded machine can be a second late for the queue, and bots take the seats (BOT_FILL_SECONDS): nothing to test.
+  // The second gets three seconds to arrive before bots take the seat (BOT_FILL_BUSY_SECONDS in playwright.config.ts).
+  await Promise.all([anna, boris].map((player) => expect(player).toHaveURL(/\/game$/, { timeout: 10_000 })));
+  // Should a loaded machine still be later than that, bots took the seats: nothing to test.
   const paired = await anna
     .getByText(borisMe.username)
     .first()

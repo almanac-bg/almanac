@@ -15,6 +15,7 @@ dist-ssr/
 # Browser tests (apps/web/e2e): results, traces and the HTML report
 test-results/
 playwright-report/
+reports/
 blob-report/
 
 # The real question bank: a clone of the private almanac-questions repository (see docs/questions.md).

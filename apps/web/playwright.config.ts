@@ -57,7 +57,10 @@ export default defineConfig({
   workers: CI ? 4 : undefined,
   timeout: Math.round(60_000 * Math.max(1, Number(timeScale) / 0.15)),
   expect: { timeout: 10_000 },
-  reporter: CI ? [['github'], ['list'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
+  // In CI also as JSON: .github/flaky.mjs lists the tests that passed only on their retry.
+  reporter: CI
+    ? [['github'], ['list'], ['html', { open: 'never' }], ['json', { outputFile: 'reports/results.json' }]]
+    : [['list'], ['html', { open: 'never' }]],
 
   use: {
     baseURL,
@@ -135,8 +138,11 @@ export default defineConfig({
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
       // engines more (CI runs WebKit and Firefox at 0.5, as their clicks take longer than Chrome's).
       GAME_TIME_SCALE: timeScale,
+      // Bots after a second for a player alone; three while someone else is online and free — the second of two
+      // players pressing „Играй“ together (a slow engine's click can take longer than a second: the two then
+      // didn't meet, and the round-pick test skipped itself half the time).
       BOT_FILL_SECONDS: '1',
-      BOT_FILL_BUSY_SECONDS: '1',
+      BOT_FILL_BUSY_SECONDS: '3',
       BACKUP_DIR: 'off',
       OPERATOR_NAME: 'Тест Тестов',
       OPERATOR_ADDRESS: 'ул. Примерна 1, София',
