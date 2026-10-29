@@ -5,6 +5,7 @@ import {
   type QuestionReportAction,
   type QuestionReportGroup,
   type QuestionReportReason,
+  RATED_AFTER,
 } from '@quiz/shared';
 import { alertModerators } from './alerts';
 import { config } from './config';
@@ -85,14 +86,17 @@ export function questionInfo(q: PlayableQuestion): QuestionInfo {
 }
 
 /**
- * A player flags a mistake. Repeating it while the first report is open just updates it. Enough flags from players
- * with accounts older than a day (MODERATION) take the question out of new matches until a moderator looks: a wrong
- * answer taught to everyone is worse than a good question missed for a day.
+ * A player flags a mistake. Repeating it while the first report is open just updates it. Enough flags that count
+ * (MODERATION.autoHideFlags) take the question out of new matches until a moderator looks: a wrong answer taught to
+ * everyone is worse than a good question missed for a day. Every flag waits in „Сигнали“; only those from players who
+ * were shown the question and rate others count, never again ones a moderator dismissed, and at most
+ * MODERATION.autoHidesPerDay hides a day — a few accounts must not be able to strip the bank.
  */
 export function reportQuestion(userId: number, questionId: string, reason: string, details: string): Result {
   const q = questionById(questionId);
   if (!q) return { ok: false, error: 'Няма такъв въпрос.' };
   if (!REASONS.has(reason)) return { ok: false, error: 'Избери причина.' };
+  const now = Date.now();
   run(
     `INSERT INTO question_reports (question_id, user_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (question_id, user_id) WHERE status = 'open' DO UPDATE SET reason = excluded.reason, details = excluded.details`,
@@ -100,25 +104,46 @@ export function reportQuestion(userId: number, questionId: string, reason: strin
     userId,
     reason,
     details.trim().slice(0, 500),
-    Date.now(),
+    now,
   );
-  const flags = one<{ all: number; settled: number }>(
-    `SELECT COUNT(*) AS "all", SUM(u.created_at < ?) AS settled FROM question_reports r JOIN users u ON u.id = r.user_id
+  const flags = one<{ all: number; counted: number }>(
+    `SELECT COUNT(*) AS "all", SUM(u.is_guest = 0 AND u.created_at <= ? AND u.games_played >= ?
+       AND EXISTS (SELECT 1 FROM seen_questions s WHERE s.user_id = r.user_id AND s.question_id = r.question_id)
+       AND NOT EXISTS (SELECT 1 FROM question_reports d
+                       WHERE d.question_id = r.question_id AND d.user_id = r.user_id AND d.status = 'dismissed')) AS counted
+     FROM question_reports r JOIN users u ON u.id = r.user_id
      WHERE r.question_id = ? AND r.status = 'open'`,
-    Date.now() - MODERATION.flaggerAgeDays * 24 * 60 * 60_000,
+    now - RATED_AFTER.ms,
+    RATED_AFTER.games,
     questionId,
   )!;
-  if ((flags.settled ?? 0) >= MODERATION.autoHideFlags && !isHidden(questionId)) {
-    hideQuestion(null, questionId);
-    alertModerators(`question:${questionId}`, `Въпрос, скрит от сигналите на играчите: ${questionId}`, [
-      `„${q.q}“`,
-      `${flags.all} сигнала. Скрит е от новите мачове, докато някой го провери (в „Сигнали“; в „Дневник“ — отмяна).`,
-    ]);
-  } else if (flags.all >= MODERATION.alertAt) {
-    alertModerators(`question:${questionId}`, `${flags.all} сигнала за въпрос ${questionId}`, [`„${q.q}“`]);
+  const counted = flags.counted ?? 0;
+  if (counted < MODERATION.autoHideFlags || isHidden(questionId)) {
+    if (counted >= MODERATION.alertAt) alertFlags();
+    return { ok: true };
   }
+  const hiddenToday = one<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM hidden_questions WHERE hidden_by IS NULL AND hidden_at > ?',
+    now - 24 * 60 * 60_000,
+  )!.n;
+  if (hiddenToday >= MODERATION.autoHidesPerDay) {
+    alertFlags();
+    return { ok: true };
+  }
+  hideQuestion(null, questionId);
+  // One mail a day for these, whatever their number (the morning summary lists the rest).
+  alertModerators('questions-auto-hidden', 'Въпроси, скрити от сигналите на играчите', [
+    `Първият днес: ${questionId} — „${q.q}“.`,
+    'Скрити са от новите мачове, докато някой ги провери (в „Сигнали“; в „Дневник“ — отмяна).',
+  ]);
   return { ok: true };
 }
+
+/** Flags waiting on questions: one mail a day, however many questions (a flood of flags must not flood the inbox). */
+const alertFlags = () =>
+  alertModerators('question-flags', 'Сигнали за въпроси чакат проверка', [
+    `Въпроси със сигнали: ${openQuestionReportCount()}.`,
+  ]);
 
 export const openQuestionReportCount = () =>
   one<{ n: number }>("SELECT COUNT(DISTINCT question_id) AS n FROM question_reports WHERE status = 'open'")!.n;
@@ -186,8 +211,10 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
   ).map((r) => r.user_id);
   let shown = false;
   tx(() => {
+    // Dismissed: those players' flags on this question never count toward hiding it again (reportQuestion).
     run(
-      "UPDATE question_reports SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",
+      "UPDATE question_reports SET status = ?, resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",
+      action === 'dismiss' ? 'dismissed' : 'resolved',
       Date.now(),
       adminId,
       questionId,

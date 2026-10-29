@@ -803,9 +803,13 @@ export const MODERATION = {
   /** A reason a player is told is at least this long: „нарушение“ alone tells them nothing. */
   reasonMin: 10,
   reasonMax: 300,
-  /** Flags on a question from this many players (with accounts at least `flaggerAgeDays` old) hide it until checked. */
+  /**
+   * Flags on a question from this many players hide it until checked: players who were shown it, whose accounts rate
+   * others (RATED_AFTER: a day old, ten matches), and whose flags on it a moderator never dismissed.
+   */
   autoHideFlags: 3,
-  flaggerAgeDays: 1,
+  /** At most this many questions a day are hidden by flags alone; past it, the flags still alert the moderators. */
+  autoHidesPerDay: 5,
   /** This many open reports or flags about one player or question bring a moderator an email at once. */
   alertAt: 3,
   /** The moderators' morning summary (Sofia time). */

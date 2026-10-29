@@ -2104,41 +2104,84 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
   assert.equal(exported.questionReportsFiled.length, 1, 'reports are part of the data export');
 });
 
-test('flags from three settled players hide a question until checked; „Поправен“ starts it over', T, async () => {
-  const id = 'history-7';
-  const F = await register(srv.url, 'signal_test');
-  const flag = (cookie: string) => api.send('POST', `/api/questions/${id}/report`, cookie, { reason: 'wrong' });
-  const hidden = async () =>
-    (await api.get('/api/admin/question-reports', A.cookie)).body.hidden.map((q: { id: string }) => q.id);
+test(
+  'flags hide a question only from players who were shown it and rate others; „Поправен“ starts it over; dismissed flags never count again; a few a day',
+  T,
+  async () => {
+    const id = 'history-7';
+    const F = await register(srv.url, 'signal_test');
+    const flag = (cookie: string, q = id) =>
+      api.send('POST', `/api/questions/${q}/report`, cookie, { reason: 'wrong' });
+    const hidden = async () =>
+      (await api.get('/api/admin/question-reports', A.cookie)).body.hidden.map((q: { id: string }) => q.id);
+    const settle = (userId: number) =>
+      srv.db
+        .prepare('UPDATE users SET created_at = ?, games_played = MAX(games_played, 10) WHERE id = ?')
+        .run(Date.now() - 2 * 86_400_000, userId);
+    const show = (userId: number, q = id) =>
+      srv.db
+        .prepare('INSERT OR REPLACE INTO seen_questions (user_id, question_id, seen_at) VALUES (?, ?, ?)')
+        .run(userId, q, Date.now());
+    settle(A.user.id);
+    settle(B.user.id);
 
-  await flag(A.cookie);
-  await flag(B.cookie);
-  await flag(F.cookie);
-  assert.deepEqual(await hidden(), [], 'an account made today does not count yet');
-  srv.db.prepare('UPDATE users SET created_at = ? WHERE id = ?').run(Date.now() - 2 * 86_400_000, F.user.id);
-  await flag(F.cookie);
-  assert.deepEqual(await hidden(), [id], 'three settled players hide it');
-  const [auto] = (await api.get('/api/admin/log', A.cookie)).body.entries;
-  assert.equal(auto.action, 'auto_hide_question');
-  assert.equal(auto.admin, null, 'the game did it');
-  assert.equal(auto.target, id);
+    await flag(A.cookie);
+    await flag(B.cookie);
+    await flag(F.cookie);
+    assert.deepEqual(await hidden(), [], 'nobody was shown it: anyone can guess an id');
+    for (const u of [A, B, F]) show(u.user.id);
+    await flag(F.cookie);
+    assert.deepEqual(await hidden(), [], 'an account made today, without matches, does not count yet');
+    settle(F.user.id);
+    await flag(F.cookie);
+    assert.deepEqual(await hidden(), [id], 'three players who were shown it hide it');
+    const [auto] = (await api.get('/api/admin/log', A.cookie)).body.entries;
+    assert.equal(auto.action, 'auto_hide_question');
+    assert.equal(auto.admin, null, 'the game did it');
+    assert.equal(auto.target, id);
 
-  srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
-  const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });
-  assert.equal(fixed.status, 200, fixed.body.error);
-  assert.equal(fixed.body.groups.length, 0);
-  assert.deepEqual(
-    fixed.body.hidden.map((q: { id: string }) => q.id),
-    [],
-    'back in play',
-  );
-  assert.equal(
-    srv.db.prepare('SELECT 1 AS x FROM question_stats WHERE question_id = ?').get(id),
-    undefined,
-    'its numbers start over',
-  );
-  assert.match((await api.get('/api/notifications', F.cookie)).body.notifications[0].text, /поправен/);
-});
+    srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
+    const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });
+    assert.equal(fixed.status, 200, fixed.body.error);
+    assert.equal(fixed.body.groups.length, 0);
+    assert.deepEqual(
+      fixed.body.hidden.map((q: { id: string }) => q.id),
+      [],
+      'back in play',
+    );
+    assert.equal(
+      srv.db.prepare('SELECT 1 AS x FROM question_stats WHERE question_id = ?').get(id),
+      undefined,
+      'its numbers start over',
+    );
+    assert.match((await api.get('/api/notifications', F.cookie)).body.notifications[0].text, /поправен/);
+
+    // Flagged again and dismissed: the same three can't take it out again.
+    for (const u of [A, B, F]) await flag(u.cookie);
+    assert.deepEqual(await hidden(), [id]);
+    const dismissed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, {
+      action: 'dismiss',
+    });
+    assert.equal(dismissed.status, 200, dismissed.body.error);
+    for (const u of [A, B, F]) await flag(u.cookie);
+    assert.deepEqual(await hidden(), [], 'their flags were dismissed once: they wait for a moderator now');
+    await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'dismiss' });
+
+    // Past MODERATION.autoHidesPerDay a day, flags alert the moderators but hide nothing more.
+    const insert = srv.db.prepare(
+      'INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, NULL, ?)',
+    );
+    for (let i = 0; i < 5; i++) insert.run(`cap-${i}`, Date.now());
+    const other = 'history-8';
+    for (const u of [A, B, F]) {
+      show(u.user.id, other);
+      await flag(u.cookie, other);
+    }
+    assert.ok(!(await hidden()).includes(other), 'five hidden by flags today already');
+    srv.db.prepare("DELETE FROM hidden_questions WHERE question_id LIKE 'cap-%'").run();
+    await api.send('POST', `/api/admin/question-reports/${other}/resolve`, A.cookie, { action: 'dismiss' });
+  },
+);
 
 const webDist = path.resolve(import.meta.dirname, '../../web/dist');
 
