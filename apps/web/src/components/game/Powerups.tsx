@@ -17,7 +17,7 @@ export function KeyHint({ children, className }: { children: string; className?:
     <kbd
       aria-hidden
       className={clsx(
-        'hidden min-w-5 place-items-center rounded-md border border-tint/15 px-1 font-sans text-[11px] leading-5 font-semibold text-fg-3 pointer-fine:inline-grid',
+        'hidden min-w-5 place-items-center rounded-md border border-tint/15 px-1 font-sans text-xs leading-5 font-semibold text-fg-3 pointer-fine:inline-grid',
         className,
       )}
     >

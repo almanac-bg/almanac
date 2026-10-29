@@ -57,13 +57,30 @@ export function FitName({ name, className, min = 16 }: { name: string; className
 
   return (
     <h1 ref={ref} className={clsx('line-clamp-2 [overflow-wrap:anywhere]', className)}>
-      {name.split(/(?<=[_.-])|(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u).map((part, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one name, in order
-        <Fragment key={i}>
-          {i > 0 && <wbr />}
-          {part}
-        </Fragment>
-      ))}
+      <Breakable name={name} />
     </h1>
   );
+}
+
+/**
+ * A name in a list or a row: whole, on two lines at most (a 20-letter name doesn't fit a phone's row at the usual
+ * size), broken where FitName breaks one — instead of cut off with "…".
+ */
+export function PlayerName({ name, className }: { name: string; className?: string }) {
+  return (
+    <span className={clsx('line-clamp-2 min-w-0 [overflow-wrap:anywhere]', className)}>
+      <Breakable name={name} />
+    </span>
+  );
+}
+
+/** The name with line-break chances after "_", "." and "-", and where letters meet digits. */
+function Breakable({ name }: { name: string }) {
+  return name.split(/(?<=[_.-])|(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u).map((part, i) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one name, in order
+    <Fragment key={i}>
+      {i > 0 && <wbr />}
+      {part}
+    </Fragment>
+  ));
 }

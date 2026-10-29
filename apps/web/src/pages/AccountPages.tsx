@@ -28,7 +28,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
-import { Button, buttonClass, Card, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
+import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 import { setTheme, useThemeChoice } from '../lib/theme';
@@ -187,7 +187,7 @@ export function VerifyEmailPage() {
       ) : (
         <div className="text-center">
           <XCircle className="mx-auto size-12 text-rose-400" />
-          <h1 className="mt-3 t-section">Не стана</h1>
+          <h1 className="mt-3 t-section">Имейлът не е потвърден</h1>
           <p className="mt-2 text-sm text-fg-2">{state.error}</p>
           <Link to={signedIn ? '/settings' : '/'} className={clsx('mt-6', buttonClass({ variant: 'secondary' }))}>
             {signedIn ? 'Към настройките' : 'Към входа'}
@@ -212,7 +212,6 @@ export function SettingsPage() {
             {me.isGuest ? 'Профил на гост' : 'Профил'} <b className="text-fg">{me.username}</b>
           </p>
         </div>
-        <LogoutButton />
       </div>
       {/* A guest has no email or password yet: saving the account comes first, and brings both. */}
       {me.isGuest ? (
@@ -228,6 +227,10 @@ export function SettingsPage() {
       <SoundSettings />
       {!me.isGuest && <PasswordSettings />}
       <DataSettings />
+      {/* Last: leaving is the rarest thing done here, and the least to be hit by mistake. */}
+      <div className="flex justify-center pt-2">
+        <LogoutButton />
+      </div>
     </div>
   );
 }
@@ -785,17 +788,20 @@ function EmailSettings() {
         </p>
       )}
       {me.email && removing && (
-        <form noValidate onSubmit={remove} className="mt-3 flex flex-wrap gap-2">
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-            autoComplete="current-password"
-            placeholder="Парола за потвърждение"
-            aria-label="Парола за потвърждение"
-            className={`${INPUT} min-w-0 sm:flex-1`}
-          />
+        <form noValidate onSubmit={remove} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="w-full min-w-0 sm:flex-1">
+            <Field label="Парола за потвърждение" htmlFor={`${EMAIL_INPUT_ID}-remove`}>
+              <input
+                id={`${EMAIL_INPUT_ID}-remove`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                autoComplete="current-password"
+                className={INPUT}
+              />
+            </Field>
+          </div>
           <Button type="submit" variant="danger" size="field" loading={busy === 'remove'}>
             Премахни имейла
           </Button>
@@ -827,30 +833,36 @@ function EmailSettings() {
           e.preventDefault();
           void save(email.trim(), 'save');
         }}
-        className="mt-4 flex flex-wrap gap-2"
+        className="mt-4 flex flex-wrap items-end gap-2"
       >
-        {/* Phones: one field per row; wider screens: side by side. */}
-        <input
-          id={EMAIL_INPUT_ID}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          type="email"
-          required
-          autoComplete="email"
-          placeholder={me.email ? 'Нов имейл' : 'твоят@имейл.bg'}
-          aria-label="Имейл"
-          className={`${INPUT} min-w-0 sm:flex-1`}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="Парола за потвърждение"
-          aria-label="Парола за потвърждение"
-          className={`${INPUT} min-w-0 sm:flex-1`}
-        />
+        {/* Phones: one field per row; wider screens: side by side. Labels stay visible (a placeholder goes as you type). */}
+        <div className="w-full min-w-0 sm:flex-1">
+          <Field label={me.email ? 'Нов имейл' : 'Имейл'} htmlFor={EMAIL_INPUT_ID}>
+            <input
+              id={EMAIL_INPUT_ID}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="твоят@имейл.bg"
+              className={INPUT}
+            />
+          </Field>
+        </div>
+        <div className="w-full min-w-0 sm:flex-1">
+          <Field label="Парола за потвърждение" htmlFor={`${EMAIL_INPUT_ID}-password`}>
+            <input
+              id={`${EMAIL_INPUT_ID}-password`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              required
+              autoComplete="current-password"
+              className={INPUT}
+            />
+          </Field>
+        </div>
         <Button type="submit" variant="secondary" size="field" className="w-full sm:w-auto" loading={busy === 'save'}>
           {me.email ? 'Смени' : 'Добави'}
         </Button>

@@ -53,7 +53,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first_win',
     name: 'Вкус на победа',
-    description: 'Спечели мултиплейър мач.',
+    description: 'Спечели мач срещу съперници.',
     icon: '🏆',
     rarity: 'common',
     xp: 100,
@@ -109,7 +109,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'party_animal',
     name: 'Душата на купона',
-    description: 'Изиграй 25 мултиплейър мача.',
+    description: 'Изиграй 25 мача срещу съперници.',
     icon: '🎉',
     rarity: 'rare',
     xp: 250,
@@ -258,7 +258,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'photo_finish',
     name: 'Фотофиниш',
-    description: 'Спечели мултиплейър мач с под 100 точки разлика.',
+    description: 'Спечели мач срещу съперници с под 100 точки разлика.',
     icon: '📸',
     rarity: 'rare',
     xp: 200,

@@ -151,6 +151,11 @@ export interface QuestionPayload {
   durationMs: number;
   remainingMs: number;
   /** The reading window (readingMs): the speed bonus starts to drain after it. */
+  /**
+   * The clock the speed bonus drains over: `durationMs`, except in Соло at 30 s (half of it, the usual clock); null
+   * without a clock (no speed bonus).
+   */
+  speedMs: number | null;
   readMs: number;
   /** Someone gets knocked out after this question. */
   elimination: boolean;
@@ -234,9 +239,25 @@ export const CROWD = {
   minAnswers: 30,
 } as const;
 
+/**
+ * Соло's clock: the usual 15 s; 30 s (the speed bonus still counts against the usual clock, so a record can't be
+ * bought with time); or none (base points and streaks, no speed bonus) — to read and think at leisure.
+ */
+export const SOLO_PACES = [
+  { id: 'normal', label: '15 с', hint: 'С бонус за бързина' },
+  { id: 'relaxed', label: '30 с', hint: 'Двойно време, бонусът за бързина — както при 15 с' },
+  { id: 'untimed', label: 'Без часовник', hint: 'Без бонус за бързина' },
+] as const;
+
+export type SoloPace = (typeof SOLO_PACES)[number]['id'];
+
+export const isSoloPace = (v: unknown): v is SoloPace => SOLO_PACES.some((p) => p.id === v);
+
 export interface GameStartPayload {
   gameId: string;
   mode: ModeId;
+  /** Соло's clock (SOLO_PACES); every other mode plays 'normal'. */
+  pace: SoloPace;
   ranked: boolean;
   roomCode: string | null;
   players: GamePlayer[];
@@ -483,7 +504,7 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   'queue:join': (mode: QueueModeId, ack: Ack) => void;
   'queue:leave': () => void;
-  'solo:start': (opts: { category: CategoryChoice }, ack: Ack) => void;
+  'solo:start': (opts: { category: CategoryChoice; pace?: SoloPace }, ack: Ack) => void;
   /** `via`: the code of the daily link it was opened from (/daily/<code>). */
   'daily:start': (p: { via?: string }, ack: Ack) => void;
   /** Plays a challenge link (`id`), or creates a new one and plays it first (no `id`). */

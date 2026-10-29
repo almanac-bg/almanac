@@ -37,7 +37,6 @@ import { Avatar, PlayerTag } from '../components/Avatar';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
-import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { PRESENCE } from '../components/presence';
 import { Button, Card, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -157,6 +156,18 @@ export function RoomPage() {
           >
             <LogOut className="size-4" /> Напусни стаята
           </Button>
+        </div>
+        {/* Wide screens start from up here, in view however long the settings run (narrower ones from the bar pinned
+            to the bottom). */}
+        <div className="hidden w-full justify-end lg:flex">
+          {isHost ? (
+            <div className="flex items-center gap-3">
+              {startHint && <p className="max-w-xs text-right text-sm text-fg-3">{startHint}</p>}
+              <div className="w-56">{startButton}</div>
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-tint/5 px-4 py-2.5 text-sm text-fg-2">Чакаме домакина да започне…</p>
+          )}
         </div>
       </div>
 
@@ -337,16 +348,6 @@ export function RoomPage() {
                   : `Последният отпада на всеки няколко въпроса (до ${ROOM_LIMITS.eliminationPlayers} играчи)`
             }
           />
-
-          {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
-          <div className="hidden space-y-3 lg:block">
-            {isHost ? (
-              startButton
-            ) : (
-              <p className="rounded-2xl bg-tint/5 p-4 text-center text-sm text-fg-2">Чакаме домакина да започне…</p>
-            )}
-            {isHost && startHint && <p className="text-center text-xs text-fg-3">{startHint}</p>}
-          </div>
         </Card>
       </div>
 
@@ -356,8 +357,8 @@ export function RoomPage() {
       {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
       <div
         className={clsx(
-          'sticky z-30 -mx-4 flex items-center gap-3 border-t border-line bg-ink/85 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden',
-          ABOVE_TAB_BAR,
+          // The tab bar steps aside in a room: the bar sits at the very bottom, clear of the home indicator.
+          'sticky bottom-0 z-30 -mx-4 flex items-center gap-3 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden',
         )}
       >
         <div className="min-w-0 flex-1">
@@ -596,7 +597,7 @@ function PlayerCard({
       {/* Bots are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would squeeze it out. */}
       <Avatar avatar={p.avatar} frame={p.frame} size={44}>
         {p.isBot && (
-          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-[11px] leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-xs leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
             БОТ
           </span>
         )}

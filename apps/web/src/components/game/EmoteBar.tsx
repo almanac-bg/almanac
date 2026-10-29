@@ -64,7 +64,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
           {open ? <X className="size-5" /> : <span className="text-2xl">😀</span>}
         </button>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 hidden pb-[env(safe-area-inset-bottom)] sm:block flat:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 hidden pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] sm:block flat:hidden">
         <div className="mx-auto mb-3 flex w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl">
           {buttons}
         </div>

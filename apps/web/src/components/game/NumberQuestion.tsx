@@ -274,7 +274,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
           >
             <span
               className={clsx(
-                'mb-0.5 rounded-full px-1.5 text-[11px] leading-4 font-bold whitespace-nowrap tabular-nums',
+                'mb-0.5 rounded-full px-1.5 text-xs leading-4 font-bold whitespace-nowrap tabular-nums',
                 isExact(g.guess, { answer, step: n.step }) ? 'bg-amber-400/25 text-amber-200' : 'bg-tint/10 text-fg-2',
               )}
             >

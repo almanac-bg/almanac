@@ -69,6 +69,19 @@ function Searching({
   // Where a match may start smaller (Арена): with whoever came, bots only making up its minimum.
   const enough = !!mode.minPlayers && queue.found >= mode.minPlayers;
   const seconds = botsIn !== null ? plural(botsIn, 'секунда', 'секунди') : '';
+  // "секунди" in full: "След 6 с … с ботове" read as two of the same word.
+  const botsLine =
+    botsIn === null || queue.found >= queue.needed
+      ? null
+      : botsIn <= 0
+        ? 'Започваме…'
+        : partner
+          ? `След ${seconds} играете срещу два бота на вашето ниво`
+          : enough
+            ? `След ${seconds} започваме — вече сте ${queue.found}`
+            : mode.minPlayers
+              ? `След ${seconds} започваме — ботове на твоето ниво допълват до ${mode.minPlayers === 3 ? 'трима' : mode.minPlayers}`
+              : `След ${seconds} местата се попълват с ботове на твоето ниво`;
 
   return (
     <div className="flex w-full max-w-md flex-col items-center text-center">
@@ -117,24 +130,19 @@ function Searching({
           </motion.span>
         ))}
       </div>
-      {/* Changes only when the server sends news (a seat filled), so it's read out then and stays quiet otherwise. */}
-      <div aria-live="polite" className="flex flex-col items-center">
+      {/* Changes only when the server sends news (a seat filled), so it's read out then and stays quiet otherwise. One
+          sentence for screen readers: the two lines below, read as one, ran into each other ("играчиСлед…"). */}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {`${queue.found} от ${queue.needed} играчи.${botsLine ? ` ${botsLine}.` : ''}`}
+      </p>
+      <div aria-hidden className="flex flex-col items-center">
         <p className="mt-3 text-sm text-fg-3">
           {queue.found} от {queue.needed} играчи
         </p>
-        {botsIn !== null && queue.found < queue.needed && (
+        {botsLine && (
           <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-tint/5 px-3 py-1.5 text-xs text-fg-2">
-            <Bot aria-hidden className="size-3.5" />
-            {/* "секунди" in full: "След 6 с … с ботове" read as two of the same word. */}
-            {botsIn <= 0
-              ? 'Започваме…'
-              : partner
-                ? `След ${seconds} играете срещу два бота на вашето ниво`
-                : enough
-                  ? `След ${seconds} започваме — вече сте ${queue.found}`
-                  : mode.minPlayers
-                    ? `След ${seconds} започваме — ботове на твоето ниво допълват до ${mode.minPlayers === 3 ? 'трима' : mode.minPlayers}`
-                    : `След ${seconds} местата се попълват с ботове на твоето ниво`}
+            <Bot className="size-3.5" />
+            {botsLine}
           </p>
         )}
       </div>

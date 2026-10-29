@@ -12,6 +12,7 @@ import {
   type QueueModeId,
   type RoomSettingsPatch,
   type ServerToClientEvents,
+  type SoloPace,
 } from '@quiz/shared';
 import { io, type Socket } from 'socket.io-client';
 import { api } from './api';
@@ -566,7 +567,8 @@ export const actions = {
     getSocket().emit('queue:leave');
     setState({ queue: null });
   },
-  startSolo: (category: CategoryChoice) => ask(() => withTimeout().emitWithAck('solo:start', { category })),
+  startSolo: (category: CategoryChoice, pace: SoloPace = 'normal') =>
+    ask(() => withTimeout().emitWithAck('solo:start', { category, pace })),
   /** The evening Роял's lobby: in (while it's open), or out. */
   joinEvening: () => ask(() => withTimeout().emitWithAck('evening:join')),
   leaveEvening: () => {

@@ -5,6 +5,7 @@ import {
   isCategoryChoice,
   isCategoryId,
   isQueueMode,
+  isSoloPace,
   type LobbyStats,
   MODES,
   POWERUPS,
@@ -309,7 +310,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     on('evening:leave', () => evening.leave(userId));
 
     on('solo:start', (opts, ack) => {
-      const { category } = obj(opts);
+      const { category, pace } = obj(opts);
       if (!isCategoryChoice(category)) return reply(ack, { ok: false, error: 'Непозната категория.' });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
@@ -327,6 +328,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           elimination: false,
           humans: [buildHuman(userId, 'solo')],
           bots: [],
+          pace: isSoloPace(pace) ? pace : 'normal',
         });
         reply(ack, { ok: true });
       } catch (err) {
@@ -374,7 +376,10 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       if (!id) {
         if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
         if (throttled(`challenge-create:${userId}`, 20, 24 * 60 * 60_000)) {
-          return reply(ack, { ok: false, error: 'Стига предизвикателства за днес — изпрати тези, които вече имаш.' });
+          return reply(ack, {
+            ok: false,
+            error: 'Днес направи много предизвикателства: прати тези, които вече имаш, и утре направи нови.',
+          });
         }
         if (rival !== undefined) {
           // A friend duel: for a friend, on three categories (a rematch's, distinct) or drawn ones.
@@ -528,9 +533,9 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const game = games.forUser(userId);
       const index = int(obj(p).index);
       const held = !!game?.hold(game.playerIdFor(userId), index);
-      if (held) {
+      // Stopped to read its fact: the fact is theirs (right or wrong). A plain pause (Соло, no fact) is neither.
+      if (held && game!.questions[index].fact) {
         count('fact_holds');
-        // Stopped to read it: the fact is theirs (right or wrong).
         learn(userId, [game!.questions[index].id]);
       }
       reply(ack, held ? { ok: true } : { ok: false, error: 'Въпросът вече продължи.' });

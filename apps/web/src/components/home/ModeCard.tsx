@@ -2,6 +2,7 @@ import { actions, fmt, toast, useStore } from '@quiz/client';
 import {
   CATEGORIES,
   type CategoryChoice,
+  type CategoryId,
   MIXED_CATEGORY,
   MODES,
   type ModeDef,
@@ -11,6 +12,8 @@ import {
   SCORING,
   SEASON_MIN_GAMES,
   SEASON_REWARD_XP,
+  SOLO_PACES,
+  type SoloPace,
   START_RATING,
 } from '@quiz/shared';
 import clsx from 'clsx';
@@ -19,11 +22,12 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
+import { savedSoloPace, saveSoloPace } from '../../lib/soloPace';
 import { RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { FreshPowerupNotes } from '../game/Powerups';
 import { SCORING_LINE } from '../game/scoring';
-import { Button, buttonClass, Modal } from '../ui';
+import { Button, buttonClass, Modal, Segmented } from '../ui';
 
 export function ModeCard({
   mode,
@@ -46,6 +50,14 @@ export function ModeCard({
   onRankInfo?: () => void;
 }) {
   const [a, b] = mode.accent;
+  // Соло's categories on a wide screen: each starts a match in it, straight away.
+  const [starting, setStarting] = useState<CategoryId | null>(null);
+  async function startIn(category: CategoryId) {
+    setStarting(category);
+    const res = await actions.startSolo(category, savedSoloPace());
+    setStarting(null);
+    if (!res.ok) toast({ kind: 'error', title: res.error });
+  }
   return (
     // The whole card plays: the "Играй" button stretches over it (its ::after). The rank chip sits above as its own button.
     // A container: a card that spans more of the grid (however many modes are open) sets itself bigger.
@@ -86,13 +98,13 @@ export function ModeCard({
         {/* In a narrow card the chips wrap before they reach the big numeral in the corner. */}
         <div className={clsx('flex flex-wrap items-center gap-2', !big && '@max-sm:pr-16')}>
           <span
-            className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider uppercase"
+            className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wider uppercase"
             style={accentFill(mode)}
           >
             {mode.short}
           </span>
           {starter && (
-            <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
+            <span className="rounded-full bg-emerald-400/15 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
               Започни оттук
             </span>
           )}
@@ -104,10 +116,10 @@ export function ModeCard({
               onClick={onRankInfo}
               className="focus-ring relative z-10 -my-2.5 -ml-1.5 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1.5 hover:bg-tint/5"
             >
-              <span className="text-[11px] font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
+              <span className="text-xs font-bold tracking-wider text-fg-2 uppercase">Класиран</span>
               <RankBadge rating={rating} compact />
               <CircleHelp aria-hidden className="size-3.5 text-fg-3" />
-              <span className="sr-only">— какво е рангът?</span>
+              <span className="sr-only">— какво е рангът в {mode.name}?</span>
             </button>
           )}
         </div>
@@ -126,17 +138,26 @@ export function ModeCard({
         </div>
         {/* Desktop: the card is two rows tall, so it lists what you can train in instead of leaving the space empty. */}
         {big && (
-          <ul aria-label="Категории" className="mt-6 hidden grid-cols-2 gap-2 lg:grid">
+          // Above the card's own button (its ::after covers the card), so each is a button of its own.
+          <ul aria-label="Соло в категория" className="relative z-10 mt-6 hidden grid-cols-2 gap-2 lg:grid">
             {CATEGORIES.map((c, i) => (
-              <li
-                key={c.id}
-                className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-tint/5 px-2.5 py-2 text-xs font-semibold text-fg-2 transition-transform duration-300 group-hover:-translate-y-0.5"
-                style={{ transitionDelay: `${i * 25}ms` }}
-              >
-                <span aria-hidden className="text-base leading-none">
-                  <Emoji e={c.icon} />
-                </span>
-                <span className="leading-tight">{c.name}</span>
+              <li key={c.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => void startIn(c.id)}
+                  disabled={starting !== null}
+                  aria-label={`Соло: ${c.name}`}
+                  className={clsx(
+                    'focus-ring flex w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-tint/5 px-2.5 py-2 text-left text-xs font-semibold text-fg-2 transition-[translate,background-color] duration-300 hover:bg-tint/15 hover:text-fg group-hover:-translate-y-0.5',
+                    starting === c.id && 'animate-pulse',
+                  )}
+                  style={{ transitionDelay: `${i * 25}ms` }}
+                >
+                  <span aria-hidden className="text-base leading-none">
+                    <Emoji e={c.icon} />
+                  </span>
+                  <span className="leading-tight">{c.name}</span>
+                </button>
               </li>
             ))}
           </ul>
@@ -228,10 +249,12 @@ export function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boo
 
 export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [busy, setBusy] = useState<CategoryChoice | null>(null);
+  const [pace, setPace] = useState<SoloPace>(savedSoloPace);
 
   async function start(category: CategoryChoice) {
     setBusy(category);
-    const res = await actions.startSolo(category);
+    saveSoloPace(pace);
+    const res = await actions.startSolo(category, pace);
     setBusy(null);
     if (res.ok) onClose();
     else toast({ kind: 'error', title: res.error });
@@ -242,6 +265,11 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
     <Modal open={open} onClose={onClose} title="Избери категория" className="max-w-2xl">
       {/* A first solo is where most players meet the козове: here, before the clock, is the time to read what they do. */}
       <FreshPowerupNotes className="mb-4" />
+      <fieldset className="mb-4 min-w-0 border-0 p-0">
+        <legend className="mb-2 text-sm font-semibold text-fg-2">Време за въпрос</legend>
+        <Segmented value={pace} onChange={setPace} options={SOLO_PACES.map((p) => ({ value: p.id, label: p.label }))} />
+        <p className="mt-2 text-xs text-fg-3">{SOLO_PACES.find((p) => p.id === pace)!.hint}</p>
+      </fieldset>
       {/* As many columns as fit tiles wide enough for the longest word („литература“, „Технологии“) beside the icon:
           one on a 320 px phone, two from 375; from tablets up the icon and padding grow, so the tiles do too (two
           wide columns in the dialog, not three cramped ones that split the word). */}

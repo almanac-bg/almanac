@@ -8,6 +8,7 @@ import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
+import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { shrinkPicture } from '../lib/pictures';
@@ -331,7 +332,12 @@ function SetEditor({ id }: { id: number }) {
       </div>
 
       {/* The save stays in reach while the questions scroll by. */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+1px+env(safe-area-inset-bottom))] z-30 border-t border-line bg-ink/90 px-4 py-3 backdrop-blur-xl md:bottom-0">
+      <div
+        className={clsx(
+          'fixed inset-x-0 z-30 border-t border-line bg-ink/90 py-3 cramped:static pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur-xl',
+          ABOVE_TAB_BAR,
+        )}
+      >
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <p className={clsx('min-w-0 flex-1 text-sm', problem ? 'text-rose-300' : 'text-fg-3')} aria-live="polite">
             {problem ??

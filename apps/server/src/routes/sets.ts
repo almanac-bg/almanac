@@ -34,7 +34,7 @@ setsRouter.get('/sets', requireAuth, requireAccount, (_req, res) => {
 
 setsRouter.post('/sets', requireAuth, requireAccount, (req, res) => {
   if (throttled(`set-create:${res.locals.userId}`, 30, 24 * 60 * 60_000)) {
-    res.status(429).json({ error: 'Стига нови набори за днес.' });
+    res.status(429).json({ error: 'Днес направи много нови набори. Утре можеш да продължиш.' });
     return;
   }
   const made = createSet(res.locals.userId, req.body);
@@ -131,7 +131,7 @@ setsRouter.get('/sets/shared/:code', requireAuth, (req, res) => {
 
 setsRouter.post('/sets/shared/:code/copy', requireAuth, requireAccount, (req, res) => {
   if (throttled(`set-create:${res.locals.userId}`, 30, 24 * 60 * 60_000)) {
-    res.status(429).json({ error: 'Стига нови набори за днес.' });
+    res.status(429).json({ error: 'Днес направи много нови набори. Утре можеш да продължиш.' });
     return;
   }
   const copied = copySet(shareCode(req), res.locals.userId);

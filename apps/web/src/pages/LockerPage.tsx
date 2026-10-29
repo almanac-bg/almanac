@@ -1,5 +1,6 @@
-import { api, errorMessage, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
+import { api, errorMessage, fmt, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
 import {
+  ACHIEVEMENTS,
   AVATARS,
   CATEGORIES,
   EMOTES,
@@ -13,6 +14,7 @@ import {
   TITLES,
   type TitleDef,
   titleName,
+  xpToReach,
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Lock } from 'lucide-react';
@@ -21,7 +23,9 @@ import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
 import { KeyHint, POWERUP_KEYS } from '../components/game/Powerups';
-import { Card, Segmented } from '../components/ui';
+import { Card, Modal, ProgressBar, Segmented } from '../components/ui';
+import { useLoad } from '../lib/load';
+import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
@@ -34,6 +38,7 @@ export function LockerPage() {
   const ctx = unlockContextOf(me);
   const level = ctx.level;
   const unlocked = (req: Requirement) => meetsRequirement(req, ctx);
+  const wide = useMediaQuery('(min-width: 1024px)');
 
   async function equip(patch: Partial<Loadout>) {
     const key = Object.values(patch)[0]!;
@@ -69,26 +74,33 @@ export function LockerPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <Card className="relative flex flex-col items-center overflow-hidden p-8 text-center lg:sticky lg:top-24 lg:self-start">
+        {/* Phones: one row (avatar beside the name), so the collection itself starts on the first screen. */}
+        <Card className="relative flex items-center gap-4 overflow-hidden p-4 lg:sticky lg:top-24 lg:flex-col lg:gap-0 lg:self-start lg:p-8 lg:text-center">
           <div className="absolute -top-20 size-64 rounded-full glow text-violet-600/30" />
           <motion.div
             key={`${me.avatar}-${me.frame}`}
             initial={{ scale: 0.85, rotate: -6 }}
             animate={{ scale: 1, rotate: 0 }}
+            className="shrink-0"
           >
-            <Avatar avatar={me.avatar} frame={me.frame} size={140} className="relative" />
+            <Avatar avatar={me.avatar} frame={me.frame} size={wide ? 140 : 72} className="relative" />
           </motion.div>
-          <h1 className="relative mt-5 flex items-center gap-2 t-section">
-            {me.username} <LevelBadge level={level} />
-          </h1>
-          <p className="relative mt-1 font-semibold text-violet-300">{titleName(me.title)}</p>
-          <p className="relative mt-4 text-sm text-fg-3">Така те виждат другите играчи в лобито и по време на игра.</p>
+          <div className="relative min-w-0">
+            <h1 className="flex items-center gap-2 t-section lg:mt-5 lg:justify-center">
+              <span className="truncate">{me.username}</span> <LevelBadge level={level} />
+            </h1>
+            <p className="mt-1 font-semibold text-violet-300">{titleName(me.title)}</p>
+            <p className="mt-4 text-sm text-fg-3 max-lg:hidden">
+              Така те виждат другите играчи в лобито и по време на игра.
+            </p>
+          </div>
         </Card>
 
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="t-section">Колекция</h2>
             <Segmented
+              scroll
               value={tab}
               onChange={setTab}
               options={[
@@ -189,7 +201,7 @@ export function LockerPage() {
           {tab === 'emote' && (
             <>
               <p className="text-sm text-fg-3">
-                Емоциите се използват по време на мултиплейър мачове — всички отключени са винаги под ръка.
+                Емоциите се използват в мачовете срещу съперници — всички отключени са винаги под ръка.
               </p>
               <Grid>
                 {EMOTES.map((e) => (
@@ -254,6 +266,7 @@ function Item({
   children: ReactNode;
 }) {
   const clickable = unlocked && !equipped && !!onEquip;
+  const [info, setInfo] = useState(false);
   return (
     // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer). The
     // wrapper's column is the tile's: a long requirement line truncates instead of widening it past the screen.
@@ -261,8 +274,10 @@ function Item({
       <motion.button
         type="button"
         whileTap={clickable ? { scale: 0.96 } : undefined}
-        disabled={!clickable}
-        onClick={onEquip}
+        // Locked: still a button, which says what it takes (a disabled one can't be reached or tapped).
+        disabled={unlocked && !clickable}
+        onClick={unlocked ? onEquip : () => setInfo(true)}
+        aria-label={unlocked ? undefined : `${name || 'Емоция'}: заключено — ${requirementLabel(req)}`}
         title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
         className={clsx(
           'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',
@@ -286,6 +301,83 @@ function Item({
           </span>
         )}
       </motion.button>
+      {!unlocked && (
+        <LockedInfo name={name || 'Емоция'} req={req} open={info} onClose={() => setInfo(false)}>
+          {children}
+        </LockedInfo>
+      )}
+    </div>
+  );
+}
+
+/** What a locked item takes, and how far along you are. */
+function LockedInfo({
+  name,
+  req,
+  open,
+  onClose,
+  children,
+}: {
+  name: string;
+  req: Requirement;
+  open: boolean;
+  onClose: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={name}>
+      <div className="flex items-center gap-4">
+        {children && (
+          <span aria-hidden className="shrink-0 opacity-60 grayscale">
+            {children}
+          </span>
+        )}
+        <div>
+          <p className="text-sm text-fg-3">
+            <Lock aria-hidden className="mb-0.5 inline size-3.5" /> Отключва се с
+          </p>
+          <p className="font-semibold">{requirementLabel(req)}</p>
+        </div>
+      </div>
+      {open && 'level' in req && <LevelProgress level={req.level} />}
+      {open && 'achievement' in req && <AchievementSteps id={req.achievement} />}
+      {open && 'mastery' in req && (
+        <p className="mt-4 text-sm text-fg-2">
+          Степента се мери спрямо останалите играчи, след поне 30 отговора в категорията.
+        </p>
+      )}
+    </Modal>
+  );
+}
+
+function LevelProgress({ level }: { level: number }) {
+  const xp = useStore((s) => s.me!.xp);
+  const need = xpToReach(level);
+  return (
+    <div className="mt-5">
+      <ProgressBar value={xp / need} />
+      <p className="mt-1.5 text-sm text-fg-3 tabular-nums">
+        {fmt(xp)} / {fmt(need)} XP · още {fmt(Math.max(0, need - xp))} XP
+      </p>
+    </div>
+  );
+}
+
+function AchievementSteps({ id }: { id: string }) {
+  const def = ACHIEVEMENTS.find((a) => a.id === id);
+  const { data } = useLoad(() => api.achievements());
+  const progress = data?.achievements.find((a) => a.id === id)?.progress ?? null;
+  return (
+    <div className="mt-5 space-y-2">
+      {def && <p className="text-sm text-fg-2">{def.description}</p>}
+      {def?.goal !== undefined && progress !== null && (
+        <>
+          <ProgressBar value={progress / def.goal} />
+          <p className="text-sm text-fg-3 tabular-nums">
+            {fmt(progress)} / {fmt(def.goal)}
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -312,44 +404,50 @@ function TitleButton({
   compact?: boolean;
 }) {
   const state = open ? (equipped ? 'Избрана' : 'Избери') : compact ? 'заключена' : requirementLabel(t.req);
+  const [info, setInfo] = useState(false);
+  const locked = !open && <LockedInfo name={t.name} req={t.req} open={info} onClose={() => setInfo(false)} />;
   if (compact)
     return (
-      <button
-        type="button"
-        disabled={!open || equipped}
-        onClick={onEquip}
-        aria-label={`${t.name}: ${open ? state.toLowerCase() : requirementLabel(t.req)}`}
-        className={clsx(
-          'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-tint/[0.03] px-1.5 py-2 text-center transition-colors',
-          open && !equipped && 'hover:bg-tint/10',
-          equipped && 'border-violet-400/60 bg-violet-500/15',
-          !open && 'opacity-55',
-        )}
-      >
-        <span aria-hidden className="text-lg leading-6">
-          {equipped ? <Check className="mx-auto size-5 text-violet-300" /> : icon && <Emoji e={icon} />}
-        </span>
-        <span className="max-w-full truncate text-sm font-semibold">{label}</span>
-        <span className="text-[11px] text-fg-3">{state}</span>
-      </button>
+      <>
+        <button
+          type="button"
+          disabled={open && equipped}
+          onClick={open ? onEquip : () => setInfo(true)}
+          aria-label={`${t.name}: ${open ? state.toLowerCase() : requirementLabel(t.req)}`}
+          className={clsx(
+            'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-tint/[0.03] px-1.5 py-2 text-center transition-colors',
+            open && !equipped && 'hover:bg-tint/10',
+            equipped && 'border-violet-400/60 bg-violet-500/15',
+          )}
+        >
+          <span aria-hidden className={clsx('text-lg leading-6', !open && 'opacity-50 grayscale')}>
+            {equipped ? <Check className="mx-auto size-5 text-violet-300" /> : icon && <Emoji e={icon} />}
+          </span>
+          <span className="max-w-full truncate text-sm font-semibold">{label}</span>
+          <span className="text-xs text-fg-3">{state}</span>
+        </button>
+        {locked}
+      </>
     );
   return (
-    <button
-      type="button"
-      disabled={!open || equipped}
-      onClick={onEquip}
-      className={clsx(
-        'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
-        open && !equipped && 'hover:bg-tint/10',
-        equipped && 'border-violet-400/60 bg-violet-500/15',
-        !open && 'opacity-55',
-      )}
-    >
-      <span>
-        <span className="block font-semibold">{t.name}</span>
-        <span className="text-xs text-fg-3">{state}</span>
-      </span>
-      {equipped ? <Check className="size-5 text-violet-300" /> : !open && <Lock className="size-4 text-fg-3" />}
-    </button>
+    <>
+      <button
+        type="button"
+        disabled={open && equipped}
+        onClick={open ? onEquip : () => setInfo(true)}
+        className={clsx(
+          'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
+          open && !equipped && 'hover:bg-tint/10',
+          equipped && 'border-violet-400/60 bg-violet-500/15',
+        )}
+      >
+        <span>
+          <span className="block font-semibold">{t.name}</span>
+          <span className="text-xs text-fg-3">{state}</span>
+        </span>
+        {equipped ? <Check className="size-5 text-violet-300" /> : !open && <Lock className="size-4 text-fg-3" />}
+      </button>
+      {locked}
+    </>
   );
 }

@@ -28,7 +28,7 @@ import {
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Flag, UserPlus } from 'lucide-react';
+import { ArrowRight, Check, Flag, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
@@ -37,7 +37,7 @@ import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
-import { Button, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
+import { Button, buttonClass, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
@@ -135,14 +135,14 @@ export function ProfilePage() {
             value={fmt(o.wins)}
             hint={
               o.multiplayerGames
-                ? `${pct(o.wins, o.multiplayerGames)}% от ${plural(o.multiplayerGames, 'мултиплейър мач', 'мултиплейър мача')}`
+                ? `${pct(o.wins, o.multiplayerGames)}% от ${plural(o.multiplayerGames, 'мач срещу съперници', 'мача срещу съперници')}`
                 : undefined
             }
           />
           <Stat
             label="Точност"
-            value={`${pct(o.correctAnswers, o.questionsAnswered)}%`}
-            hint={`${fmt(o.correctAnswers)} от ${fmt(o.questionsAnswered)} верни`}
+            value={o.questionsAnswered ? `${pct(o.correctAnswers, o.questionsAnswered)}%` : '—'}
+            hint={o.questionsAnswered ? `${fmt(o.correctAnswers)} от ${fmt(o.questionsAnswered)} верни` : undefined}
           />
           <Stat label="Най-дълга серия" value={`🔥 ${o.bestStreak}`} />
           <Stat
@@ -277,7 +277,17 @@ export function ProfilePage() {
         <SectionTitle>Последни мачове</SectionTitle>
         <Card className="overflow-x-auto">
           {data.recent.length === 0 ? (
-            <EmptyState icon="🎮" title="Няма изиграни мачове" />
+            <EmptyState
+              icon="🎮"
+              title="Няма изиграни мачове"
+              body={isMe ? 'Първият мач пълни тази страница: точност, серии, рекорди.' : undefined}
+            >
+              {isMe && (
+                <Link to="/" className={buttonClass({ size: 'sm' })}>
+                  Към игрите <ArrowRight aria-hidden className="size-4" />
+                </Link>
+              )}
+            </EmptyState>
           ) : (
             <>
               {/* Phones: one match per row, the numbers under it, instead of a table to scroll sideways. */}
@@ -342,12 +352,14 @@ export function ProfilePage() {
   );
 }
 
+/** „2-ро от 5“; alone (Соло, a link, the daily) a place says nothing. */
 function Placement({ match }: { match: ProfileStats['recent'][number] }) {
+  if (match.players <= 1) return <span className="text-fg-3">—</span>;
   const won = match.placement === 1;
   return (
-    <span className={clsx(won && 'font-bold text-amber-300')}>
+    <span className={clsx('whitespace-nowrap', won && 'font-bold text-amber-300')}>
       {won && <Emoji e="🏆" className="mr-1" />}
-      {match.placement}/{match.players}
+      {ordinal(match.placement)} <span className="sr-only">място </span>от {match.players}
     </span>
   );
 }

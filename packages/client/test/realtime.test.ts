@@ -88,6 +88,7 @@ const standing = (id: string): Standing => ({
 const start = (over: Partial<GameStartPayload> = {}): GameStartPayload => ({
   gameId: 'g1',
   mode: 'duel',
+  pace: 'normal',
   ranked: true,
   roomCode: null,
   players: [player('u1', 'Ана'), player('b1', 'Бот')],
@@ -122,6 +123,7 @@ const question = (index: number, over: Partial<QuestionPayload> = {}): QuestionP
   author: null,
   durationMs: 15_000,
   remainingMs: 15_000,
+  speedMs: 15_000,
   readMs: 2_000,
   elimination: false,
   answered: [],
@@ -285,7 +287,9 @@ test('one tab too many: the player is told once why, and it keeps trying', () =>
       mock.timers.tick(10_000);
     }
     assert.equal(tries, 3);
-    assert.deepEqual(told, [['Играта е отворена в твърде много раздели.'], [], []]);
+    // One toast, not one per try (it leaves when the screen's time for it runs out: see Toasts).
+    const once = ['Играта е отворена в твърде много раздели.'];
+    assert.deepEqual(told, [once, once, once]);
   } finally {
     socket.connect = FakeSocket.prototype.connect;
   }

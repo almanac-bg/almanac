@@ -35,7 +35,7 @@ import { Emoji } from '../components/Emoji';
 import { LegalLinks, MINORS_NOTICE } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { Button, Card, Field, INPUT, Segmented, Spinner } from '../components/ui';
-import { credentialsProblem } from '../lib/credentials';
+import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { type LoadFailure, useLoad } from '../lib/load';
 import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
@@ -81,6 +81,7 @@ export function AuthPage() {
   // A returning device on a computer types its name at once (a phone's keyboard would cover the page). Focused by an
   // effect rather than autoFocus, so the server's markup and the first render stay the same.
   const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on arrival
   useEffect(() => {
     if (DESKTOP && returning) usernameRef.current?.focus();
@@ -95,7 +96,7 @@ export function AuthPage() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The field the error is about (when the check here found it): marked while the message shows.
-  const [invalid, setInvalid] = useState<'username' | 'password' | null>(null);
+  const [invalid, setInvalid] = useState<CredentialField[]>([]);
   const [busy, setBusy] = useState(false);
   const [guestBusy, setGuestBusy] = useState(false);
   const id = useId();
@@ -118,9 +119,13 @@ export function AuthPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     // The message goes in the box above the button (where the eyes are), the field gets marked and points to it.
-    const problem = credentialsProblem(username, password, { newAccount: mode === 'register' });
-    setInvalid(problem?.field ?? null);
-    if (problem) return setError(problem.message);
+    // Everything wrong at once, and the first field to fix gets the focus.
+    const problems = credentialsProblems(username, password, { newAccount: mode === 'register' });
+    setInvalid(problems.map((p) => p.field));
+    if (problems.length) {
+      (problems[0].field === 'username' ? usernameRef : passwordRef).current?.focus();
+      return setError(problems.map((p) => p.message).join(' '));
+    }
     setError(null);
     setBusy(true);
     try {
@@ -169,7 +174,8 @@ export function AuthPage() {
 
   const guest = (
     <GuestPlay
-      primary={!returning}
+      // On the sign-in tab, signing in is what's asked for: the guest button steps back.
+      primary={!returning && mode !== 'login'}
       label={inviteCode ? 'Влез като гост' : challengeId && playable ? 'Приеми като гост' : 'Играй като гост'}
       busy={guestBusy}
       error={guestError}
@@ -200,12 +206,12 @@ export function AuthPage() {
               linked && 'max-sm:hidden',
             )}
           >
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Безплатна онлайн викторина
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Нови 10 въпроса всеки ден
           </span>
           <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
             <Logo />
             {/* What the name is, for screen readers and search results: the logo alone says only "АЛМАНАХ". */}
-            <span className="sr-only"> — онлайн викторина с въпросите на деня</span>
+            <span className="sr-only"> — онлайн викторина на български: 10 въпроса на деня</span>
           </h1>
           <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
           <p className={clsx('mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl', linked && 'max-sm:hidden')}>
@@ -341,8 +347,8 @@ export function AuthPage() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         autoComplete="username"
-                        aria-invalid={!!error && invalid === 'username'}
-                        aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
+                        aria-invalid={!!error && invalid.includes('username')}
+                        aria-describedby={error && invalid.includes('username') ? `${id}-error` : undefined}
                         ref={usernameRef}
                         required
                         minLength={mode === 'register' ? 3 : 1}
@@ -372,8 +378,9 @@ export function AuthPage() {
                           onChange={(e) => setPassword(e.target.value)}
                           type={show ? 'text' : 'password'}
                           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                          aria-invalid={!!error && invalid === 'password'}
-                          aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
+                          aria-invalid={!!error && invalid.includes('password')}
+                          aria-describedby={error && invalid.includes('password') ? `${id}-error` : undefined}
+                          ref={passwordRef}
                           required
                           minLength={PASSWORD_MIN_LENGTH}
                           placeholder={mode === 'register' ? `поне ${PASSWORD_MIN_LENGTH} символа` : '••••••••'}
@@ -416,7 +423,7 @@ export function AuthPage() {
                     <Button
                       type="submit"
                       size="lg"
-                      variant={returning ? 'primary' : 'secondary'}
+                      variant={returning || mode === 'login' ? 'primary' : 'secondary'}
                       className="w-full"
                       loading={busy}
                     >
@@ -475,11 +482,57 @@ export function AuthPage() {
   );
 }
 
+const WHY: { icon: string; title: string; text: string }[] = [
+  {
+    icon: '✅',
+    title: 'Проверени въпроси',
+    text: 'Всеки въпрос е проверен по източник. Видиш ли грешка, сигнализираш от прегледа след мача — и я поправяме.',
+  },
+  {
+    icon: '💡',
+    title: 'Научаваш по нещо всеки ден',
+    text: 'След отговора — „Знаеше ли?“ с факт за него. Всичко научено се събира в „Моят алманах“.',
+  },
+  {
+    icon: '🫂',
+    title: 'С приятели и с цяла България',
+    text: 'Една класация за въпросите на деня, дуели по линк, групи със седмична класация и Роял всяка вечер.',
+  },
+  {
+    icon: '🛡️',
+    title: 'Без реклами и проследяване',
+    text: 'Безплатно, без реклами и без проследяващи бисквитки. Кодът на играта е отворен.',
+  },
+];
+
+/** „Защо АЛМАНАХ“: what sets it apart, in four lines, after how it's played. */
+function WhyAlmanac() {
+  const id = useId();
+  return (
+    <div className="mt-12">
+      {/* One string: the drawn page holds it whole (no marker between the parts). */}
+      <p className="t-eyebrow text-violet-300">{`Защо ${BRAND.name}`}</p>
+      <h2 id={id} className="mt-2 t-section text-balance">
+        Игра, след която знаеш повече
+      </h2>
+      <ul aria-labelledby={id} className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {WHY.map((w) => (
+          <li key={w.title} className="glass rounded-2xl p-5">
+            <Emoji e={w.icon} className="size-8" size="" />
+            <h3 className="mt-3 t-card">{w.title}</h3>
+            <p className="mt-1.5 text-sm text-fg-3">{w.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** The game in numbers, under the slogan: how many questions, and what it costs (nothing). */
 function ProofLine({ className }: { className?: string }) {
   const questions = useSite()?.questions;
   // One string: the drawn page holds the sentence whole (no markers between its parts).
-  const line = `${questions ? `Над ${fmt(questions)} проверени въпроса` : 'Проверени въпроси'} в ${CATEGORIES.length} категории · безплатно · без реклами`;
+  const line = `${questions ? `Над ${fmt(questions)} въпроса, проверени по източници` : 'Въпроси, проверени по източници'} · ${CATEGORIES.length} категории · безплатно · без реклами`;
   return <p className={clsx('text-sm text-fg-3', className)}>{line}</p>;
 }
 
@@ -542,6 +595,8 @@ function AboutGame({ cta }: { cta: ReactNode }) {
           {cta && <div className="mt-6 max-w-sm">{cta}</div>}
         </div>
       </div>
+
+      <WhyAlmanac />
 
       <LegalLinks className="mt-12 justify-center border-t border-line pt-2" />
     </section>
@@ -821,7 +876,7 @@ function ChallengeLanding({
       <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
         <Swords aria-hidden className="size-3.5" /> Предизвикателство
         {expired && (
-          <span className="ml-auto rounded-full bg-tint/10 px-2 py-0.5 text-[11px] text-fg-2 normal-case">Изтекло</span>
+          <span className="ml-auto rounded-full bg-tint/10 px-2 py-0.5 text-xs text-fg-2 normal-case">Изтекло</span>
         )}
       </p>
       {/* On the narrowest phones the title goes under the avatar rather than breaking a word. */}
@@ -885,7 +940,7 @@ function ChallengeLanding({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-sunk/20 p-3.5">
-      <dt className="text-[11px] font-semibold tracking-wide text-fg-3 uppercase">{label}</dt>
+      <dt className="text-xs font-semibold tracking-wide text-fg-3 uppercase">{label}</dt>
       <dd className="mt-1 font-display text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
     </div>
   );

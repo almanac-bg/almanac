@@ -297,9 +297,9 @@ export function recordChallengeResult(
       icon: beaten || (fresh > 1 && creatorPlace > 1) ? '⚔️' : '🔗',
       text:
         fresh > 1
-          ? `${fresh} души изиграха линка ти, последен ${player.username}. Води ${leader.username} с ${leader.score} точки${creatorPlace > 1 ? ` — ти си ${ordinal(creatorPlace)}` : ''}.`
+          ? `${fresh} души изиграха линка ти, последен ${player.username}. Води ${leader.username} с ${leader.score} точки${creatorPlace > 1 ? ` — ти си на ${ordinal(creatorPlace)} място` : ''}.`
           : beaten
-            ? `${player.username} те изпревари на линка ти: ${score} точки — вече си ${ordinal(creatorPlace)}.`
+            ? `${player.username} те изпревари на линка ти: ${score} точки — вече си на ${ordinal(creatorPlace)} място.`
             : `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място. Води ${leader.username}.`,
       link,
       replace: true,

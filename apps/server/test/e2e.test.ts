@@ -14,6 +14,7 @@ import {
   RATED_AFTER,
   type RevealPayload,
   type RoomState,
+  SCORING,
   SEASON_REWARD_XP,
   seasonKey,
 } from '@quiz/shared';
@@ -331,6 +332,59 @@ test('stopping to read a fact in a run alone makes it the player’s, right answ
     s.close();
   }
 });
+
+test(
+  'Соло at its own pace: 30 s gives time, not points; without a clock only base points; a pause on any answer',
+  T,
+  async () => {
+    const P = await register(srv.url, 'bavno_igrae');
+    const s = connect(srv.url, P.cookie);
+    await connected(s);
+    try {
+      // 30 s: twice the clock, the speed bonus still against the usual one.
+      const relaxed = newLog();
+      const playRelaxed = autoPlay(s, 'right', relaxed);
+      await emitAck(s, 'solo:start', { category: 'music', pace: 'relaxed' });
+      const r = await playRelaxed;
+      assert.equal(r.start!.pace, 'relaxed');
+      const first = relaxed.questions[0];
+      assert.equal(first.durationMs, first.speedMs! * 2);
+
+      // No clock: no speed bonus — a first right answer is the base alone, a second adds the streak step.
+      const holds = () =>
+        (
+          srv.db.prepare("SELECT COALESCE(SUM(value), 0) AS n FROM daily_stats WHERE metric = 'fact_holds'").get() as {
+            n: number;
+          }
+        ).n;
+      const holdsBefore = holds();
+      const untimed = newLog();
+      let paused = false;
+      s.on('game:reveal', async (rv) => {
+        if (paused || rv.fact) return;
+        paused = true;
+        assert.deepEqual(await emitAck(s, 'game:hold', { index: rv.index }), { ok: true }, 'a pause without a fact');
+        s.emit('game:resume');
+      });
+      const playUntimed = autoPlay(s, 'right', untimed);
+      await emitAck(s, 'solo:start', { category: 'music', pace: 'untimed' });
+      const u = await playUntimed;
+      s.off('game:reveal');
+      assert.equal(u.start!.pace, 'untimed');
+      assert.equal(untimed.questions[0].speedMs, null);
+      const choice = untimed.reveals.filter((rv) => {
+        const q = untimed.questions.find((x) => x.index === rv.index)!;
+        return q.kind === 'choice';
+      });
+      const mine = (rv: (typeof choice)[number]) => rv.results[u.start!.youId];
+      assert.equal(mine(choice[0]).points, SCORING.base + (mine(choice[0]).streak - 1) * SCORING.streakStep);
+      assert.ok(paused);
+      assert.equal(holds(), holdsBefore, 'a pause is not a fact stopped on');
+    } finally {
+      s.close();
+    }
+  },
+);
 
 test('groups: made by an account, joined from the invite link (a guest too), a board for members only', T, async () => {
   const G = await guest(srv.url);

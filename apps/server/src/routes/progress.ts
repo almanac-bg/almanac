@@ -49,7 +49,7 @@ progress.post('/groups', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ name: z.string().max(200) }), req, res);
   if (!body) return;
   if (throttled(`group-create:${res.locals.userId}`, 10, 24 * 60 * 60_000)) {
-    res.status(429).json({ error: 'Стига нови групи за днес.' });
+    res.status(429).json({ error: 'Днес направи много нови групи. Утре можеш да продължиш.' });
     return;
   }
   const made = createGroup(res.locals.userId, body.name);

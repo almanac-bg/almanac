@@ -9,9 +9,9 @@ import { BRAND } from './brand.ts';
 /** Pages for everyone, search engines included: each has its own title and description in the page itself. */
 export const PUBLIC_PAGES: Record<string, { title: string; description: string }> = {
   '/': {
-    title: `${BRAND.name} — онлайн викторина с въпросите на деня`,
+    title: `${BRAND.name} — онлайн викторина на български: 10 въпроса на деня`,
     description:
-      'Безплатна онлайн викторина на български: 10 въпроса на деня за цяла България, предизвикателства по линк, дуели и Роял. Без регистрация, без реклами.',
+      'Безплатна онлайн викторина: 10 въпроса на деня за цяла България, дуели с приятели и Роял. Проверени въпроси с „Знаеше ли?“ след отговора. Без регистрация и реклами.',
   },
   '/privacy': {
     title: `Политика за поверителност — ${BRAND.name}`,
@@ -19,7 +19,7 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
   },
   '/terms': {
     title: `Условия за ползване — ${BRAND.name}`,
-    description: `Условията за игра в ${BRAND.name}: профил и гост, честна игра, предложени въпроси, виртуални награди.`,
+    description: `Условията за игра в ${BRAND.name}: профил и гост, честна игра, модериране и обжалване, предложени въпроси, виртуални награди.`,
   },
 };
 

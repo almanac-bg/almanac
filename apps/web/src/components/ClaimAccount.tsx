@@ -1,8 +1,8 @@
 import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
 import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import { Eye, EyeOff, Save } from 'lucide-react';
-import { type FormEvent, type ReactNode, useId, useState } from 'react';
-import { credentialsProblem } from '../lib/credentials';
+import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
+import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { markReturning } from '../lib/returning';
 import { MINORS_NOTICE } from './LegalLinks';
 import { Button, Field, INPUT, Modal } from './ui';
@@ -25,16 +25,21 @@ export function ClaimAccountModal({
   const [email, setEmail] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The field the error is about (when the check here found it): marked while the message shows.
-  const [invalid, setInvalid] = useState<'username' | 'password' | null>(null);
+  // The fields the error is about (when the check here found them): marked while the message shows.
+  const [invalid, setInvalid] = useState<CredentialField[]>([]);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const id = useId();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const problem = credentialsProblem(username, password, { newAccount: true });
-    setInvalid(problem?.field ?? null);
-    if (problem) return setError(problem.message);
+    const problems = credentialsProblems(username, password, { newAccount: true });
+    setInvalid(problems.map((p) => p.field));
+    if (problems.length) {
+      (problems[0].field === 'username' ? usernameRef : passwordRef).current?.focus();
+      return setError(problems.map((p) => p.message).join(' '));
+    }
     setError(null);
     setBusy(true);
     try {
@@ -69,12 +74,24 @@ export function ClaimAccountModal({
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
-            aria-invalid={!!error && invalid === 'username'}
-            aria-describedby={error && invalid === 'username' ? `${id}-error` : undefined}
+            aria-invalid={!!error && invalid.includes('username')}
+            aria-describedby={error && invalid.includes('username') ? `${id}-error` : undefined}
+            ref={usernameRef}
             required
             minLength={3}
             maxLength={20}
             placeholder="напр. Мозъчко"
+            className={INPUT}
+          />
+        </Field>
+        <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
+          <input
+            id={`${id}-email`}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            autoComplete="email"
+            placeholder="за възстановяване на паролата"
             className={INPUT}
           />
         </Field>
@@ -86,8 +103,9 @@ export function ClaimAccountModal({
               onChange={(e) => setPassword(e.target.value)}
               type={show ? 'text' : 'password'}
               autoComplete="new-password"
-              aria-invalid={!!error && invalid === 'password'}
-              aria-describedby={error && invalid === 'password' ? `${id}-error` : undefined}
+              aria-invalid={!!error && invalid.includes('password')}
+              aria-describedby={error && invalid.includes('password') ? `${id}-error` : undefined}
+              ref={passwordRef}
               required
               minLength={PASSWORD_MIN_LENGTH}
               placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
@@ -102,17 +120,6 @@ export function ClaimAccountModal({
               {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
             </button>
           </div>
-        </Field>
-        <Field label="Имейл (по желание)" htmlFor={`${id}-email`}>
-          <input
-            id={`${id}-email`}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            autoComplete="email"
-            placeholder="за възстановяване на паролата"
-            className={INPUT}
-          />
         </Field>
         {error && (
           <p id={`${id}-error`} role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200">

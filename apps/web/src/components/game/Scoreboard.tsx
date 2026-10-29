@@ -202,7 +202,7 @@ function DuelBar({ game }: { game: LiveGame }) {
         <Reactions reactions={game.reactions.filter((r) => r.playerId === s.id)} />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-[11px] text-fg-3">{me ? 'Ти' : p.name}</p>
+        <p className="truncate text-xs text-fg-3">{me ? 'Ти' : p.name}</p>
         <p className={clsx('font-display text-lg leading-tight font-bold tabular-nums', me && 'text-violet-300')}>
           {fmt(s.score)}
         </p>
@@ -210,14 +210,14 @@ function DuelBar({ game }: { game: LiveGame }) {
     </div>
   );
   return (
-    <div className="border-b border-line lg:hidden flat:hidden">
+    <div className="border-b border-line lg:hidden">
       <p className="sr-only">
         Ти: {mine.score} точки, {them.name}
         {machineTag(them) && ` (${machineTag(them)!.toLowerCase()})`}: {theirs.score} точки
       </p>
       <div
         aria-hidden
-        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 short:py-1.5"
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-2.5 short:py-1.5 flat:hidden"
       >
         {side(mine, you, true)}
         <span
@@ -233,6 +233,16 @@ function DuelBar({ game }: { game: LiveGame }) {
           {gap > 0 ? `+${fmt(gap)}` : gap < 0 ? `−${fmt(-gap)}` : 'равни'}
         </span>
         {side(theirs, them, false)}
+      </div>
+      {/* A phone held sideways has no height for avatars: one line, the two scores and the gap. */}
+      <div aria-hidden className="hidden items-center justify-center gap-3 px-4 py-1 text-sm flat:flex">
+        <span className="font-display font-bold text-violet-300 tabular-nums">Ти {fmt(mine.score)}</span>
+        <span className="text-xs font-bold text-fg-3 tabular-nums">
+          {gap > 0 ? `+${fmt(gap)}` : gap < 0 ? `−${fmt(-gap)}` : 'равни'}
+        </span>
+        <span className="min-w-0 truncate font-display font-bold tabular-nums">
+          {fmt(theirs.score)} {them.name}
+        </span>
       </div>
     </div>
   );
@@ -346,7 +356,7 @@ function Strip({ game }: { game: LiveGame }) {
                 <PlayerMark me={me} tag={machineTag(p)} />
               </div>
               <span
-                className={clsx('text-[11px] font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')}
+                className={clsx('text-xs font-bold tabular-nums', me ? 'text-violet-300' : 'text-fg-2')}
                 aria-hidden
               >
                 {out ? <Emoji e="💀" /> : fmt(s.score)}
@@ -369,7 +379,7 @@ export function PlayerMark({ me, tag }: { me: boolean; tag: string | null }) {
     <span
       aria-hidden
       className={clsx(
-        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-[11px] leading-none font-extrabold tracking-wide',
+        'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-xs leading-none font-extrabold tracking-wide',
         me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-tint/20',
       )}
     >

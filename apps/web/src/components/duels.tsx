@@ -16,6 +16,7 @@ import { Link } from 'react-router';
 import { useLoad } from '../lib/load';
 import { Avatar } from './Avatar';
 import { Emoji } from './Emoji';
+import { PlayerName } from './FitName';
 import { Button, Modal } from './ui';
 
 /** "остават 21 ч.", "остават 35 мин.": how long the second of a duel has to play it. */
@@ -258,9 +259,9 @@ export function DuelRow({ duel, onPlay, playing }: { duel: DuelEntry; onPlay: ()
         <Avatar avatar={friend.avatar} frame={friend.frame} size={36} />
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 text-sm font-semibold">
-            <span className="truncate">{friend.username}</span>
+            <PlayerName name={friend.username} />
             {duel.state === 'yours' && (
-              <span className="shrink-0 rounded-full bg-amber-400/20 px-2 py-px text-[11px] font-bold text-amber-200">
+              <span className="shrink-0 rounded-full bg-amber-400/20 px-2 py-px text-xs font-bold text-amber-200">
                 Твой ред
               </span>
             )}

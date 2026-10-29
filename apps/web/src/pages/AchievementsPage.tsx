@@ -1,6 +1,5 @@
 import { api, fmt, longDate } from '@quiz/client';
 import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
-import clsx from 'clsx';
 import { Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
@@ -86,7 +85,7 @@ export function AchievementsPage() {
               transition={{ delay: Math.min(i * 0.02, 0.4) }}
             >
               <Card
-                className={clsx('relative flex h-full flex-col overflow-hidden p-5', !done && 'opacity-75')}
+                className="relative flex h-full flex-col overflow-hidden p-4 sm:p-5"
                 style={done ? { borderColor: `${rarity.color}55` } : undefined}
               >
                 {done && (
@@ -95,17 +94,19 @@ export function AchievementsPage() {
                     style={{ color: rarity.color }}
                   />
                 )}
-                <div className="relative flex items-start gap-4">
+                {/* Locked ones keep full contrast (the lock says it): faded text was hard to read. */}
+                <div className="relative flex items-start gap-3 sm:gap-4">
                   <span
-                    className={clsx(
-                      'grid size-14 shrink-0 place-items-center rounded-2xl text-3xl',
-                      !done && 'grayscale',
-                    )}
+                    className="grid size-11 shrink-0 place-items-center rounded-2xl text-3xl sm:size-14"
                     style={{
                       background: done ? `${rarity.color}22` : 'color-mix(in oklab, var(--color-tint) 5%, transparent)',
                     }}
                   >
-                    {done ? <Emoji e={a.icon} size="1.75rem" /> : <Lock className="size-5 text-fg-3" />}
+                    {done ? (
+                      <Emoji e={a.icon} size="1.75rem" />
+                    ) : (
+                      <Lock aria-label="Заключено" className="size-5 text-fg-2" />
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
@@ -121,7 +122,7 @@ export function AchievementsPage() {
                   </div>
                 </div>
                 {/* At the bottom of the card, so a row of cards (as tall as its tallest) lines up its dates and bars. */}
-                <div className="relative mt-auto pt-4">
+                <div className="relative mt-auto pt-3 sm:pt-4">
                   {done ? (
                     <p className="text-xs font-semibold text-emerald-300">✓ Отключено на {longDate(p!.unlockedAt!)}</p>
                   ) : a.goal !== undefined && p?.progress != null ? (

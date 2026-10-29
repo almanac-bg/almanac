@@ -106,7 +106,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
         />
         <div className="relative">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#451a03] uppercase"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wider text-[#451a03] uppercase"
             style={{ background: `linear-gradient(90deg, ${ACCENT_FROM}, ${ACCENT_TO})` }}
           >
             <CalendarDays className="size-3.5" /> №{info.number} · {dayLabel(info.day)}

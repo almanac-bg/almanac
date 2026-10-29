@@ -30,7 +30,12 @@ export interface Toast {
   title: string;
   body?: string;
   icon?: string;
+  /** How long it stays on screen (the screen's clock pauses while it's pointed at or focused). */
+  ttlMs: number;
 }
+
+/** An error stays at least this long: it has to be read, and it's what someone needs to act on. */
+export const ERROR_TOAST_MS = 10_000;
 
 /** `pick`: before a round, while its category is picked and shown. */
 export type GamePhase = 'countdown' | 'question' | 'reveal' | 'pick' | 'ended';
@@ -167,10 +172,12 @@ export const setState = useStore.setState;
 export const getState = useStore.getState;
 
 let toastSeq = 0;
-export function toast(t: Omit<Toast, 'id'>, ttlMs = 4500) {
+/** Shows a toast; the screen that draws it dismisses it after `ttlMs` (see Toasts). */
+export function toast(t: Omit<Toast, 'id' | 'ttlMs'>, ttlMs = 4500) {
   const id = ++toastSeq;
-  setState((s) => ({ toasts: [...s.toasts, { ...t, id }] }));
-  setTimeout(() => dismissToast(id), ttlMs);
+  setState((s) => ({
+    toasts: [...s.toasts, { ...t, id, ttlMs: t.kind === 'error' ? Math.max(ttlMs, ERROR_TOAST_MS) : ttlMs }],
+  }));
 }
 
 export function dismissToast(id: number) {

@@ -20,6 +20,7 @@ import { Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
 import { markReturning } from './lib/returning';
+import { useRouteFocus } from './lib/routeFocus';
 import { AuthPage } from './pages/AuthPage';
 import { HomePage } from './pages/HomePage';
 import {
@@ -57,6 +58,7 @@ export function App() {
   const me = useStore((s) => s.me);
   const authChecked = useStore((s) => s.authChecked);
   const { pathname } = useLocation();
+  useRouteFocus();
 
   // A new page — or the lobby right after signing in — starts at the top, not at the old scroll offset.
   const signedIn = !!me;
@@ -170,7 +172,7 @@ function SignedIn() {
       {!inGame && <NavBar />}
       {!inGame && <MaintenanceBanner />}
       {!inGame && <ActiveMatchBar />}
-      <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 sm:px-6 md:pb-16'}>
+      <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 cramped:pb-8 sm:px-6 md:pb-16'}>
         <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<HomePage />} />

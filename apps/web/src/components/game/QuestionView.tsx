@@ -1,7 +1,7 @@
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@quiz/client';
 import { answerPoints, type Crowd, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Flame, Lightbulb, Skull, Users, WifiOff, X } from 'lucide-react';
+import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
@@ -29,6 +29,14 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const reduceMotion = useReducedMotion();
   const number = q.kind === 'number';
   const order = q.kind === 'order';
+  // Each new question takes the focus (the view is new per question): a screen reader reads it, and Tab goes on to its
+  // answers — unless a field of its own (a number to type) has taken it already.
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const focused = document.activeElement;
+    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
+    heading.current?.focus({ preventScroll: true });
+  }, []);
 
   // Who picked what, shown under each option at reveal.
   const pickers = useMemo(() => {
@@ -98,8 +106,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                 ? 'Ти си сред отпадащите: изпревари някого!'
                 : `Ти си сред отпадащите · отпадане след въпрос ${nextElimination(game)}`
               : q.elimination
-                ? 'Ти си последен: изпревари някого!'
-                : `Ти си последен · отпадане след въпрос ${nextElimination(game)}`}
+                ? 'На последно място си: изпревари някого!'
+                : `На последно място си · отпадане след въпрос ${nextElimination(game)}`}
           </span>
         )}
       </div>
@@ -116,13 +124,22 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             two-word lines beside it. Wider screens: side by side. */}
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
-            <TimerRing deadline={game.deadline} duration={q.durationMs} stopped={!!reveal} />
+            <TimerRing
+              deadline={game.deadline}
+              duration={q.durationMs}
+              stopped={!!reveal}
+              untimed={q.speedMs === null}
+            />
             {/* A number has no speed bonus (what it's worth is how close it is), and an order's comes only with all of it
                 right. */}
             {!reveal && !number && !order && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
-            <h1 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]">
+            <h1
+              ref={heading}
+              tabIndex={-1}
+              className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]"
+            >
               {keepTogether(q.q)}
             </h1>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
@@ -220,6 +237,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       </div>
       {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
       {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
+      {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
+      {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
     </motion.section>
   );
 }
@@ -279,6 +298,28 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
         )}
       </div>
     </motion.div>
+  );
+}
+
+/** „Пауза“ after an answer in Соло: the next question waits until „Продължи“ (or a couple of minutes). */
+function PauseAfterAnswer({ index }: { index: number }) {
+  const [state, setState] = useState<'shown' | 'asking' | 'holding'>('shown');
+  async function hold() {
+    setState('asking');
+    setState((await actions.holdOnFact(index)) ? 'holding' : 'shown');
+  }
+  return (
+    <div className="mt-3 flex justify-end short:max-sm:mt-2">
+      {state === 'holding' ? (
+        <Button size="sm" onClick={actions.resumeAfterFact}>
+          Продължи <ArrowRight aria-hidden className="size-4" />
+        </Button>
+      ) : (
+        <Button size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
+          <Pause aria-hidden className="size-4" /> Пауза
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -352,11 +393,13 @@ function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
   const openedAt = game.deadline - q.durationMs;
   const points = answerPoints({
     timeMs: Math.max(0, now - openedAt),
-    limitMs: q.durationMs,
+    // A server from before Соло's paces sends no speedMs: then it's the question's clock.
+    limitMs: q.speedMs ?? q.durationMs,
     readMs: q.readMs,
     streak,
     doubled: game.doubled,
     retried: game.retryPrompt,
+    untimed: q.speedMs === null,
   });
   return (
     <p
@@ -371,8 +414,19 @@ function LivePoints({ game, q }: { game: LiveGame; q: QuestionPayload }) {
   );
 }
 
-function TimerRing({ deadline, duration, stopped }: { deadline: number; duration: number; stopped: boolean }) {
-  const now = useNow(100, !stopped);
+function TimerRing({
+  deadline,
+  duration,
+  stopped,
+  untimed,
+}: {
+  deadline: number;
+  duration: number;
+  stopped: boolean;
+  /** Соло without a clock: no countdown, just the sign that there's none. */
+  untimed?: boolean;
+}) {
+  const now = useNow(100, !stopped && !untimed);
   const [frozen, setFrozen] = useState<number | null>(null);
   useEffect(() => {
     if (stopped && frozen === null) setFrozen(Math.max(0, deadline - Date.now()));
@@ -385,9 +439,22 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
 
   const lastTick = useRef(secs);
   useEffect(() => {
-    if (!stopped && secs !== lastTick.current && secs <= 5 && secs > 0) sfx.tick(secs);
+    if (!stopped && !untimed && secs !== lastTick.current && secs <= 5 && secs > 0) sfx.tick(secs);
     lastTick.current = secs;
-  }, [secs, stopped]);
+  }, [secs, stopped, untimed]);
+
+  if (untimed)
+    return (
+      <div
+        role="img"
+        aria-label="Без часовник"
+        className="relative grid size-14 shrink-0 place-items-center rounded-full border-[3.5px] border-line short:max-sm:size-12 sm:size-20 flat:size-12"
+      >
+        <span aria-hidden className="font-display text-2xl font-bold text-fg-3 sm:text-3xl flat:text-xl">
+          ∞
+        </span>
+      </div>
+    );
 
   const R = 26;
   const C = 2 * Math.PI * R;
@@ -423,7 +490,11 @@ function TimerRing({ deadline, duration, stopped }: { deadline: number; duration
           style={{ transition: 'stroke-dashoffset 0.1s linear, stroke 0.3s', filter: `drop-shadow(0 0 6px ${color})` }}
         />
       </svg>
-      <span className="font-display text-xl font-bold tabular-nums sm:text-2xl" style={{ color }} aria-hidden>
+      <span
+        className="font-display text-xl font-bold tabular-nums short:max-sm:text-lg sm:text-2xl flat:text-lg"
+        style={{ color }}
+        aria-hidden
+      >
         {secs}
       </span>
     </div>
@@ -577,7 +648,7 @@ function AnswerButton({
               </motion.span>
             ))}
             {pickers.length > 4 && (
-              <span className="grid size-[26px] place-items-center rounded-full bg-tint/15 text-[11px] font-bold">
+              <span className="grid size-[26px] place-items-center rounded-full bg-tint/15 text-xs font-bold">
                 +{pickers.length - 4}
               </span>
             )}

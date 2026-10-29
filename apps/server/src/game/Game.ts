@@ -34,6 +34,7 @@ import {
   readingMs,
   SCORING,
   type ServerToClientEvents,
+  type SoloPace,
   START_RATING,
   type Standing,
   snapNumber,
@@ -80,6 +81,8 @@ const ALONE_ABANDON_MS = 10 * 60_000;
 const RESUME_MS = 2_500;
 /** A run alone can stop on a fact to read it; it goes on by itself after this long. */
 const FACT_HOLD_MS = 2 * 60_000;
+/** Соло without a clock still ends a question someone walked away from: after this long it's revealed. */
+const UNTIMED_MS = 10 * 60_000;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
@@ -152,6 +155,8 @@ export interface GameSetup {
   questionSet?: string | null;
   /** The evening Роял of this day (its places are kept for the night's top and the champion). */
   eveningDay?: string | null;
+  /** Соло's clock (SOLO_PACES): 'normal' unless the player chose otherwise. */
+  pace?: SoloPace;
 }
 
 /** A recorded answer to each of a match's questions (null: none in time), in the match's own option order. */
@@ -285,6 +290,10 @@ export class Game {
   cutShort = false;
   /** Nobody else in it (solo, the daily, a challenge link): no one is waiting on its player. */
   readonly alone: boolean;
+  /** Соло's clock; every other mode plays the usual one. */
+  get pace(): SoloPace {
+    return this.setup.mode === 'solo' ? (this.setup.pace ?? 'normal') : 'normal';
+  }
   /** A run played alone, paused before its next question until its player is back. */
   held = false;
   /** A run played alone whose player stopped on the fact (each stop gets a number, so an old timer can't end a new one). */
@@ -296,6 +305,11 @@ export class Game {
   private questionStartedAt = 0;
   /** The open question's clock: the match's, or a number's (longer: it's typed in). */
   private limitMs = 0;
+  /**
+   * The clock the speed bonus (and the time kept in stats) counts against: the usual one, even when Соло's pace gives
+   * more (`limitMs`), so more time never buys more points and slow answers don't skew the averages.
+   */
+  private scoreLimitMs = 0;
   /** The open question's reading window (readingMs): its speed bonus drains only after it. */
   private readMs = 0;
   /** A round's category being picked: by whom, from what, since when. */
@@ -481,14 +495,16 @@ export class Game {
   }
 
   /**
-   * "Спри, за да прочета": in a run played alone, the player stops on the question's fact to read it. Only during the reveal of the
-   * question on screen (nobody else is waiting); the next question then waits for resume(), or FACT_HOLD_MS.
+   * "Спри, за да прочета": in a run played alone, the player stops on the question's fact to read it (in Соло, on any
+   * reveal: „Пауза“). Only during the reveal of the question on screen (nobody else is waiting); the next question then
+   * waits for resume(), or FACT_HOLD_MS.
    */
   hold(playerId: string, index: number): boolean {
     // Not while the server drains: stopping on fact after fact would keep the run going until it's cut short.
     if (this.hooks.draining()) return false;
     if (!this.alone || this.phase !== 'reveal' || index !== this.index || this.reading) return false;
-    if (!this.participants.has(playerId) || !this.questions[this.index]?.fact) return false;
+    if (!this.participants.has(playerId)) return false;
+    if (this.setup.mode !== 'solo' && !this.questions[this.index]?.fact) return false;
     const seq = ++this.readingSeq;
     this.reading = seq;
     this.later(FACT_HOLD_MS, () => this.resume(playerId, seq));
@@ -675,7 +691,7 @@ export class Game {
     const image = questionImage(q);
     // A number or an order takes longer to give than a tap; a picture is quicker to know than a question to read
     // (in a room, though, the host's clock is everyone's).
-    this.limitMs =
+    this.scoreLimitMs =
       q.kind === 'number'
         ? Math.max(NUMBER.timeMs, this.setup.timeMs)
         : q.kind === 'order'
@@ -683,6 +699,8 @@ export class Game {
           : image && !this.setup.roomCode
             ? Math.min(IMAGE.timeMs, this.setup.timeMs)
             : this.setup.timeMs;
+    this.limitMs =
+      this.pace === 'relaxed' ? this.scoreLimitMs * 2 : this.pace === 'untimed' ? UNTIMED_MS : this.scoreLimitMs;
     this.readMs =
       readingMs(q.q, isChoice(q) ? q.options : q.kind === 'order' ? q.items.map((i) => i.text) : []) +
       (image ? IMAGE.readExtraMs : 0);
@@ -832,9 +850,9 @@ export class Game {
             : p.answer?.choice === q.answer;
       let points = 0;
       // Tie-breaks compare total time, so a question left unanswered costs the whole clock.
-      p.answerMs += p.answer?.timeMs ?? this.limitMs;
+      p.answerMs += Math.min(p.answer?.timeMs ?? this.scoreLimitMs, this.scoreLimitMs);
       if (correct && p.answer) {
-        const { timeMs } = p.answer;
+        const timeMs = Math.min(p.answer.timeMs, this.scoreLimitMs);
         p.streak++;
         p.correct++;
         p.correctByDifficulty[q.difficulty]++;
@@ -860,19 +878,21 @@ export class Game {
           ? orderPoints({
               right: placed ?? 0,
               timeMs: p.answer.timeMs,
-              limitMs: this.limitMs,
+              limitMs: this.scoreLimitMs,
               readMs: this.readMs,
               streak: p.streak,
+              untimed: this.pace === 'untimed',
             })
           : 0;
       } else if (correct && p.answer) {
         points = answerPoints({
           timeMs: p.answer.timeMs,
-          limitMs: this.limitMs,
+          limitMs: this.scoreLimitMs,
           readMs: this.readMs,
           streak: p.streak,
           doubled: p.doubled,
           retried: p.answer.retried,
+          untimed: this.pace === 'untimed',
         });
       } else if (p.doubled && p.score > 0) {
         // "Двойно или нищо" is a bet: a miss costs points (never below zero).
@@ -891,7 +911,7 @@ export class Game {
           arranged: q.kind === 'order' && given ? bankOrder(q, given) : null,
           placed,
           correct,
-          timeMs: p.answer?.timeMs ?? null,
+          timeMs: p.answer ? Math.min(p.answer.timeMs, this.scoreLimitMs) : null,
           points,
           powerup: p.powerupNow,
           retried: !!p.answer?.retried && correct,
@@ -1367,6 +1387,7 @@ export class Game {
       author: questionAuthor(q.id),
       durationMs: this.limitMs,
       remainingMs: Math.max(0, this.limitMs - this.elapsed()),
+      speedMs: this.pace === 'untimed' ? null : this.scoreLimitMs,
       readMs: this.readMs,
       elimination: this.schedule.includes(this.index + 1),
       answered: [...this.participants.values()].filter((p) => p.answer).map((p) => p.player.id),
@@ -1379,6 +1400,7 @@ export class Game {
     return {
       gameId: this.id,
       mode: this.setup.mode,
+      pace: this.pace,
       ranked: this.setup.ranked,
       roomCode: this.setup.roomCode,
       players: [...this.participants.values()].map((x) => x.player),

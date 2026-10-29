@@ -36,6 +36,7 @@ import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { PlayerName } from '../FitName';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 import { DayField } from './DayField';
@@ -155,7 +156,7 @@ function AgainstSharer({
       <p className="t-eyebrow text-fg-3">По линка на {sharer.user.username}</p>
       <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 text-sm">
         <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={28} />
-        <span className="min-w-0 truncate font-semibold">{sharer.user.username}</span>
+        <PlayerName name={sharer.user.username} className="font-semibold" />
         <span className="text-fg-2 tabular-nums">
           {sharer.correct}/{of} · {fmt(sharer.score)} т.
         </span>
@@ -462,9 +463,8 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
 const UNRATED: Record<Exclude<UnratedReason, 'no_contest' | 'guest'>, string> = {
   pair: `Двамата вече изиграхте ${RATED_GAMES_PER_PAIR} мача с рейтинг днес — до утре мачовете ви са без рейтинг.`,
   cut: 'Мачът приключи по-рано заради нас (обновяване или грешка), затова не променя рейтинга.',
-  new: `Профилът ти е нов: срещу хора играеш с рейтинг, щом е на поне ден и има ${RATED_AFTER.games} мача (срещу ботове — от първия).`,
-  new_rival:
-    'Съперникът ти е с нов профил: срещу него мачът е без рейтинг, докато профилът му не навърти първия си ден и мачове.',
+  new: `Профилът ти е нов: срещу хора рейтингът започва, когато профилът е на поне ден и има ${RATED_AFTER.games} мача. Срещу ботове се брои от първия мач.`,
+  new_rival: `Съперникът играе с нов профил: мачът е без рейтинг, докато профилът му не е на поне ден и няма ${RATED_AFTER.games} мача.`,
 };
 
 export function UnratedCard({ reason, guest }: { reason: Exclude<UnratedReason, 'no_contest'>; guest: boolean }) {

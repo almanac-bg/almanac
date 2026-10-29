@@ -10,9 +10,12 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
   const submit = page.getByRole('button', { name: /^Създай профил/ });
   const error = page.getByRole('alert');
 
+  // Everything at once, and the first field to fix has the focus.
   await submit.click();
-  await expect(error).toHaveText('Избери потребителско име.');
+  await expect(error).toHaveText('Избери потребителско име. Избери парола — поне 8 символа.');
   await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+  await expect(name).toBeFocused();
 
   await name.fill('ab');
   await password.fill('parola-123');
@@ -25,6 +28,7 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
   await expect(error).toHaveText('Паролата трябва да е поне 8 символа.');
   await expect(password).toHaveAttribute('aria-invalid', 'true');
   await expect(name).toHaveAttribute('aria-invalid', 'false');
+  await expect(password).toBeFocused();
 
   // Nothing was sent: still the form, no account.
   await expect(page.getByRole('heading', { name: 'Създай профил', exact: true })).toBeVisible();

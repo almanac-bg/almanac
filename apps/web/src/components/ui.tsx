@@ -303,14 +303,22 @@ export function Segmented<T extends string | number>({
   options,
   onChange,
   disabled,
+  scroll,
 }: {
   value: T;
   options: { value: T; label: ReactNode }[];
   onChange: (v: T) => void;
   disabled?: boolean;
+  /** On phones one row that scrolls sideways, instead of wrapping onto a second (many or long options). */
+  scroll?: boolean;
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-line bg-sunk/20 p-1">
+    <div
+      className={clsx(
+        'inline-flex gap-1 rounded-2xl border border-line bg-sunk/20 p-1',
+        scroll ? 'max-w-full overflow-x-auto max-sm:flex-nowrap max-sm:whitespace-nowrap sm:flex-wrap' : 'flex-wrap',
+      )}
+    >
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -357,18 +365,22 @@ export function EmptyState({
   title,
   body,
   page,
+  children,
 }: {
   icon: string;
   title: string;
   body?: string;
   page?: boolean;
+  /** What to do about it (a button or two), under the text. */
+  children?: ReactNode;
 }) {
   const Title = page ? 'h1' : 'p';
   return (
-    <div className="grid place-items-center gap-2 py-12 text-center">
+    <div className="grid place-items-center gap-2 px-6 py-12 text-center">
       <Emoji e={icon} size="3.5rem" />
       <Title className="font-extrabold">{title}</Title>
       {body && <p className="max-w-sm text-sm text-fg-3">{body}</p>}
+      {children && <div className="mt-3 flex flex-wrap justify-center gap-2">{children}</div>}
     </div>
   );
 }

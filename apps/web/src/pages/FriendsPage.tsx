@@ -1,7 +1,7 @@
 import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
-import { type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
+import { BRAND, type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, DoorOpen, Save, UserMinus, UserPlus, X } from 'lucide-react';
+import { Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
@@ -14,12 +14,36 @@ import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 
 export function FriendsPage() {
   usePageTitle('Приятели');
   const guest = useStore((s) => !!s.me?.isGuest);
   return guest ? <GuestFriends /> : <Friends />;
+}
+
+/** Your own name, for a friend to add: shown, and sent with the site's address. */
+function InviteFriend() {
+  const name = useStore((s) => s.me!.username);
+  return (
+    <>
+      <p className="w-full text-sm text-fg-2">
+        Твоето име: <b className="text-fg">{name}</b>
+      </p>
+      <Button
+        size="sm"
+        onClick={() =>
+          void shareText(
+            `Добави ме в ${BRAND.name} — името ми е „${name}“. Да се мерим: ${window.location.origin}`,
+            'Поканата е копирана',
+          )
+        }
+      >
+        <Share2 aria-hidden className="size-4" /> Прати името си
+      </Button>
+    </>
+  );
 }
 
 /** Friends need a saved account (a guest may be gone tomorrow), so a guest gets the why and the way, not a form that fails. */
@@ -173,8 +197,10 @@ function Friends() {
             <EmptyState
               icon="👯"
               title="Още нямаш приятели тук"
-              body="Добави някого по потребителско име горе — щом приеме, ще виждаш кога е онлайн и ще можеш да го предизвикаш на дуел."
-            />
+              body="Добави някого по потребителско име горе — или прати своето: щом се приемете, ще виждате кой е онлайн и ще се предизвиквате на дуел."
+            >
+              <InviteFriend />
+            </EmptyState>
           </Card>
         ) : (
           <Card className="divide-y divide-line">

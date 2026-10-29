@@ -232,7 +232,8 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.match(landing.html, /Онлайн викторина с приятели и цяла България/);
   assert.match(landing.html, /Играй като гост/);
   // The proof line, from the bank the server has (300 test questions).
-  assert.match(landing.html, /Над 300 проверени въпроса в 10 категории/);
+  assert.match(landing.html, /Над 300 въпроса, проверени по източници · 10 категории/);
+  assert.match(landing.html, /Защо АЛМАНАХ/);
   // Nothing drawn invisible, waiting for an entrance animation that only the browser would play.
   assert.doesNotMatch(landing.html, /opacity:0/);
   assert.match(landing.vary ?? '', /cookie/i);

@@ -62,8 +62,10 @@ export function Results({ game }: { game: LiveGame }) {
   const byWalkout = won && !single && !teamScores && end.standings.every((s) => s.id === youId || s.left);
   const rivals = end.standings.length > 2 ? 'Съперниците напуснаха' : 'Съперникът напусна';
   const perfect = mine.correct === game.start.totalQuestions;
+  // Beaten on a link's board (or by the friend, in a duel): played alone, but lost all the same.
+  const lostLink = !!link && (duel ? duel.outcome === 'lost' : link.rank > 1);
   // Lost to other people: no fanfare (a level gained along the way still says so, quietly).
-  const lost = !single && !won && !end.noContest;
+  const lost = (!single && !won && !end.noContest) || lostLink;
   const best = rewards?.soloBest ?? null;
   const newBest = best !== null && best > 0 && mine.score > best;
   // A no contest says so in the headline; the other reasons a rating stayed put get a card.
@@ -101,11 +103,11 @@ export function Results({ game }: { game: LiveGame }) {
   );
 
   useEffect(() => {
-    if (won || (single && perfect) || newBest) {
+    if (won || (single && perfect && !lostLink) || newBest) {
       sfx.win();
       burst(1.2);
     }
-  }, [won, single, perfect, newBest]);
+  }, [won, single, perfect, newBest, lostLink]);
 
   async function again() {
     const mode = end.mode;
@@ -385,7 +387,7 @@ export function Results({ game }: { game: LiveGame }) {
 
       {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a
           rematch offer, which can arrive at any moment. Wider screens: a floating bar in the middle. */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-10 border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
+      <div className="sticky bottom-0 z-30 -mx-4 mt-10 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
         {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
         <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
           {daily && rewards?.daily?.offBoard ? (
@@ -427,6 +429,8 @@ export function Results({ game }: { game: LiveGame }) {
           ) : (
             <Button
               size="lg"
+              // After a link, sharing it is the main thing (its card above); a new one is the way on.
+              variant={challenge ? 'secondary' : 'primary'}
               className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
               onClick={again}
               loading={busy}

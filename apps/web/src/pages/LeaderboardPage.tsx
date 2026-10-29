@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
+import { PlayerName } from '../components/FitName';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
@@ -138,7 +139,7 @@ export function LeaderboardPage() {
                       className="relative mt-2"
                     />
                     <div className="relative mt-2 flex max-w-full items-center gap-1.5 text-sm font-semibold sm:mt-3 sm:text-base">
-                      <span className="min-w-0 truncate">{e.user.username}</span>
+                      <PlayerName name={e.user.username} />
                       <LevelBadge level={e.user.level} className="shrink-0 max-sm:hidden" />
                     </div>
                     <div className="relative max-w-full truncate text-xs text-fg-3 max-sm:hidden">
@@ -225,7 +226,7 @@ function Row({ board, entry: e, me }: { board: LeaderboardBoard; entry: Leaderbo
       <Avatar avatar={e.user.avatar} frame={e.user.frame} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 font-semibold">
-          <span className="truncate">{e.user.username}</span>
+          <PlayerName name={e.user.username} />
           <LevelBadge level={e.user.level} />
         </div>
         <div className="truncate text-xs text-fg-3">{titleName(e.user.title)}</div>

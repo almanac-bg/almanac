@@ -52,9 +52,11 @@ export function answerPoints(a: {
   streak: number;
   doubled: boolean;
   retried: boolean;
+  /** Solo without a clock: no speed bonus. */
+  untimed?: boolean;
 }) {
   const drained = Math.max(0, a.timeMs - a.readMs) / Math.max(1, a.limitMs - a.readMs);
-  const speed = Math.round(SCORING.speed * Math.max(0, 1 - drained));
+  const speed = a.untimed ? 0 : Math.round(SCORING.speed * Math.max(0, 1 - drained));
   const streakBonus = Math.min((a.streak - 1) * SCORING.streakStep, SCORING.streakMax);
   return Math.round((SCORING.base + speed + streakBonus) * (a.doubled ? 2 : 1) * (a.retried ? 0.5 : 1));
 }

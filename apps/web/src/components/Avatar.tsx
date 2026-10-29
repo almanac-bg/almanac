@@ -2,6 +2,7 @@ import { avatarEmoji, frameById, type GamePlayer, rankFor, titleName } from '@qu
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { Emoji } from './Emoji';
+import { PlayerName } from './FitName';
 import { accentText } from './game/answers';
 
 export function Avatar({
@@ -53,10 +54,11 @@ export function LevelBadge({ level, className }: { level: number; className?: st
       title={`Ниво ${level}`}
       className={clsx(
         // A dark digit: white on this gradient is under 3:1.
-        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-[11px] leading-none font-extrabold text-ink shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
+        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-xs leading-none font-extrabold text-ink shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
         className,
       )}
     >
+      <span className="sr-only">ниво </span>
       {level}
     </span>
   );
@@ -94,7 +96,7 @@ export function PlayerTag({
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
-        <span className="truncate font-semibold">{name}</span>
+        <PlayerName name={name} className="font-semibold" />
         <LevelBadge level={level} />
         {tag && (
           <span className="rounded-md bg-tint/10 px-1 py-px text-xs font-bold tracking-wide text-fg-2">{tag}</span>

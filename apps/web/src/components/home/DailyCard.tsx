@@ -87,7 +87,7 @@ export function DailyCard({ className }: { className?: string }) {
         <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#451a03] uppercase"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wider text-[#451a03] uppercase"
               style={{ background: `linear-gradient(90deg, ${a}, ${b})` }}
             >
               <CalendarDays className="size-3.5" /> №{info?.number ?? dayNumber(me.daily.day)} · {dayLabel}

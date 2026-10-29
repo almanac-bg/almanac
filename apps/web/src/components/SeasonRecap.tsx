@@ -85,7 +85,7 @@ export function SeasonRecap() {
         </p>
       )}
       <Button className="mt-8 w-full" onClick={close} loading={closing}>
-        Супер!
+        Към новия сезон
       </Button>
     </Modal>
   );

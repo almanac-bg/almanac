@@ -366,7 +366,7 @@ function ActiveChart({ days }: { days: Day[] }) {
       >
         {/* Recessive guide at the top value. */}
         <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-tint/10" />
-        <span className="pointer-events-none absolute -top-2.5 right-0 bg-ink-2 pl-1 text-[11px] text-fg-3 tabular-nums">
+        <span className="pointer-events-none absolute -top-2.5 right-0 bg-ink-2 pl-1 text-xs text-fg-3 tabular-nums">
           {fmt(max)}
         </span>
         {values.map((n, i) => (
@@ -384,7 +384,7 @@ function ActiveChart({ days }: { days: Day[] }) {
           </div>
         ))}
       </div>
-      <figcaption className="mt-1.5 flex justify-between text-[11px] text-fg-3">
+      <figcaption className="mt-1.5 flex justify-between text-xs text-fg-3">
         <span>{shortDay(days[0].day)}</span>
         <span>днес</span>
       </figcaption>

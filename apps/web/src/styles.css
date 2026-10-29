@@ -27,6 +27,8 @@
 /* The smallest phones still around (a first iPhone SE, 568 px): tighter again. */
 @custom-variant tiny (@media (max-height: 600px));
 @custom-variant flat (@media (orientation: landscape) and (max-height: 480px));
+/* Too little height to pin bars to it: a phone held sideways, or a page zoomed in (400% of a laptop is 320×256). */
+@custom-variant cramped (@media (max-height: 480px));
 /* A big screen, wide and tall: the match grows into it instead of leaving its lower half empty. */
 @custom-variant large (@media (min-width: 1024px) and (min-height: 820px));
 
@@ -218,11 +220,37 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/*
+ * A field or link that gets the focus scrolls clear of the bars pinned to the screen (the header; the tab bar on
+ * phones), instead of under them. Where they aren't pinned (`cramped`), no room is kept for them.
+ */
+html {
+  scroll-padding-top: 5rem;
+  scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  html {
+    scroll-padding-bottom: 1rem;
+  }
+}
+@media (max-height: 480px) {
+  html {
+    scroll-padding-top: 1rem;
+    scroll-padding-bottom: 1rem;
+  }
+}
+
 /* No body background: it would paint over the fixed -z-10 ambient backdrop. */
 body {
   margin: 0;
   min-height: 100dvh;
   font-family: var(--font-sans);
+  /* A word too long for the line (a narrow phone, a zoomed page) breaks instead of pushing the page sideways; one that
+     fits is never broken. */
+  overflow-wrap: break-word;
+  /* A phone held sideways: nothing under the notch or the rounded corners (the backdrop still runs edge to edge). */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 ::selection {
@@ -235,7 +263,8 @@ body {
  */
 /* A long word („предизвикателство“ in the display face) breaks rather than pushing a narrow or zoomed page sideways. */
 @utility t-page {
-  @apply font-display text-3xl font-bold tracking-tight wrap-anywhere hyphens-auto sm:text-4xl;
+  /* A size down under 360 px: „Политика за поверителност“ split mid-word at the usual size. */
+  @apply font-display text-3xl font-bold tracking-tight wrap-anywhere hyphens-auto max-[22.5rem]:text-2xl sm:text-4xl;
 }
 @utility t-section {
   @apply font-display text-2xl font-bold tracking-tight wrap-anywhere hyphens-auto;
@@ -313,8 +342,30 @@ body {
     mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 75%);
   }
 
-  .focus-ring {
-    outline: none;
+  /*
+   * The focus ring is an outline, on everything that takes focus (not only what says `focus-ring`): an outline follows
+   * the corners, isn't clipped by overflow like a shadow often is, and stays visible in Windows' high-contrast mode,
+   * which drops shadows. A transparent one at rest is what that mode paints when a control is focused.
+   */
+  :where(a, button, input, select, textarea, summary, [tabindex], .focus-ring) {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  :where(
+    a,
+    button,
+    summary,
+    [tabindex],
+    .focus-ring,
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='range']
+  ):focus-visible {
+    outline-color: var(--color-cyan);
+  }
+  /* Where the app moves the focus to read from (a page's heading, a new question): no ring around the text. */
+  :where(h1, h2, main)[tabindex='-1']:focus-visible {
+    outline-color: transparent;
   }
   /*
    * A text field, select or textarea (or `field-box`: a box around a bare input). The border alone was too faint a cue
@@ -350,11 +401,9 @@ body {
     border-color: #a78bfa;
     background-color: var(--field-focus);
     box-shadow: 0 0 0 3px rgb(139 92 246 / 0.35);
-  }
-  .focus-ring:focus-visible {
-    box-shadow:
-      0 0 0 2px var(--color-ink),
-      0 0 0 4px var(--color-cyan);
+    /* The shadow's stand-in where high contrast drops it. */
+    outline: 2px solid transparent;
+    outline-offset: 0;
   }
 }
 

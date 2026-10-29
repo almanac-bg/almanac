@@ -3,7 +3,7 @@ import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Emoji } from '../Emoji';
 import { Button, Card, Modal } from '../ui';
@@ -18,6 +18,7 @@ const ownQuestion = (item: ReviewItem) => item.id.startsWith('set-');
 /** The match's questions with the right answers, and a way to flag a mistake in any of them. */
 export function QuestionReview({ items }: { items: ReviewItem[] }) {
   const [open, setOpen] = useState(false);
+  const listId = useId();
   const [reporting, setReporting] = useState<ReviewItem | null>(null);
   // Flagging needs a saved account (the server refuses guests).
   const canReport = useStore((s) => !s.me?.isGuest);
@@ -26,29 +27,39 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
 
   return (
     <Card className="mt-4 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="focus-ring flex w-full items-center justify-between gap-4 rounded-3xl p-5 text-left sm:px-6"
-      >
+      {/* A heading with the button in it (a heading can't go inside a button); the whole row still opens it. */}
+      <div className="relative flex w-full items-center justify-between gap-4 p-5 text-left sm:px-6">
         <div>
-          <h2 className="t-card">Преглед на въпросите</h2>
+          <h2 className="t-card">
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-controls={listId}
+              className="focus-ring rounded-lg text-left after:absolute after:inset-0 after:rounded-3xl after:content-['']"
+            >
+              Преглед на въпросите
+            </button>
+          </h2>
           <p className="text-sm text-fg-3">
             {right} от {items.length} верни
             {canReport && (
               <>
                 {' '}
-                · видя ли грешка във въпрос? Сигнализирай с <Flag className="inline size-3.5" />
+                · видя ли грешка във въпрос? Сигнализирай с <Flag aria-label="знамето" className="inline size-3.5" />
               </>
             )}
           </p>
         </div>
-        <ChevronDown className={clsx('size-5 shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
-      </button>
+        <ChevronDown
+          aria-hidden
+          className={clsx('size-5 shrink-0 text-fg-3 transition-transform', open && 'rotate-180')}
+        />
+      </div>
       <AnimatePresence initial={false}>
         {open && (
           <motion.ol
+            id={listId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

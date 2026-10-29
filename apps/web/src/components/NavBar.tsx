@@ -15,7 +15,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 import { useMuted } from '../lib/sound';
 import { Avatar, LevelBadge } from './Avatar';
 import { ClaimAccountModal } from './ClaimAccount';
@@ -40,7 +40,7 @@ export const ABOVE_TAB_BAR = 'bottom-[calc(4rem+1px+env(safe-area-inset-bottom))
 function RequestBadge({ count }: { count: number }) {
   if (!count) return null;
   return (
-    <span className="grid min-w-4.5 place-items-center rounded-full bg-fuchsia-600 px-1 text-[11px] leading-4.5 font-bold text-white">
+    <span className="grid min-w-4.5 place-items-center rounded-full bg-fuchsia-600 px-1 text-xs leading-4.5 font-bold text-white">
       {count}
     </span>
   );
@@ -107,7 +107,7 @@ function GuestButton({ connected }: { connected: boolean }) {
           <Avatar avatar={me.avatar} frame={me.frame} size={36} />
           <span
             aria-hidden
-            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-[11px] leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
+            className="absolute inset-x-0 -bottom-1 mx-auto w-fit rounded-md bg-amber-300 px-1 text-xs leading-3.5 font-extrabold tracking-wide text-amber-950 uppercase"
           >
             Гост
           </span>
@@ -159,10 +159,12 @@ export function NavBar() {
   const connected = useStore((s) => s.connected);
   const [muted, setMuted] = useMuted();
   const progress = levelProgress(me.xp);
+  // In a room the phone's bottom edge is the room's: its start bar (and leaving is a button in the room).
+  const inRoom = useLocation().pathname === '/room';
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-line bg-ink/70 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-line bg-ink/70 backdrop-blur-xl cramped:static">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
           <Link to="/" className="focus-ring flex h-11 shrink-0 items-center rounded-lg text-lg sm:text-xl">
             <Logo />
@@ -236,7 +238,7 @@ export function NavBar() {
                     />
                   </div>
                 ) : (
-                  <div aria-hidden className="text-[11px] leading-4 font-semibold text-rose-300">
+                  <div aria-hidden className="text-xs leading-4 font-semibold text-rose-300">
                     Свързване…
                   </div>
                 )}
@@ -252,7 +254,11 @@ export function NavBar() {
       {/* Mobile tab bar */}
       <nav
         aria-label="Раздели"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+        className={clsx(
+          // Too short a screen to give it a lasting strip: a row under the header that scrolls away with the page.
+          'fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/85 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] backdrop-blur-xl cramped:static md:hidden',
+          inRoom && 'hidden',
+        )}
       >
         <div className="grid grid-cols-5">
           {LINKS.filter((l) => l.mobile).map(({ to, label, icon: Icon, end }) => (
@@ -262,7 +268,7 @@ export function NavBar() {
               end={end}
               className={({ isActive }) =>
                 clsx(
-                  'relative flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-[11px] font-semibold tracking-tight',
+                  'relative flex h-16 min-w-0 flex-col items-center justify-center gap-1 text-xs font-semibold tracking-tight',
                   isActive ? 'text-fg' : 'text-fg-3',
                 )
               }

@@ -30,14 +30,24 @@ export function ProfileCard({ className }: { className?: string }) {
       <div className="absolute -top-24 -right-16 size-64 rounded-full glow text-violet-600/30" />
       <div className="relative flex items-center gap-4 sm:gap-5">
         <Avatar avatar={me.avatar} frame={me.frame} size={roomy ? 84 : 56} />
-        <div className="min-w-0">
-          <p className="text-sm text-fg-3">Здравей,</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-fg-3 max-sm:hidden">Здравей,</p>
           {/* Names run to 20 characters: a size down before a second line (see FitName). Half the width on tablets. */}
           <FitName
             name={me.username}
             className="font-display text-xl leading-tight font-bold sm:text-3xl md:text-2xl lg:text-3xl"
           />
-          <p className="text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
+          <p className="truncate text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
+        </div>
+        {/* Phones: the level beside the name, so the whole card is one row and the modes are on the first screen. */}
+        <div className="w-20 shrink-0 text-right sm:hidden">
+          <p className="flex justify-end">
+            <LevelBadge level={progress.level} />
+          </p>
+          <ProgressBar value={progress.pct} className="mt-1.5 h-1.5" />
+          <p className="mt-1 text-xs text-fg-3 tabular-nums">
+            {fmt(progress.into)} / {fmt(progress.needed)} XP
+          </p>
         </div>
       </div>
       {/* From tablets the card stands beside the taller daily card: the room is for the all-time totals (phones keep
@@ -45,7 +55,7 @@ export function ProfileCard({ className }: { className?: string }) {
       <QuickStats stats={me.stats} />
       {/* What height is left goes here: the level and the chips sit at the bottom. */}
       <div className="flex-1" />
-      <div className="relative mt-4 sm:mt-6">
+      <div className="relative mt-4 max-sm:hidden sm:mt-6">
         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2 font-semibold">
             <LevelBadge level={progress.level} /> Ниво {progress.level}
@@ -61,7 +71,7 @@ export function ProfileCard({ className }: { className?: string }) {
       <div
         className={clsx(
           'relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5',
-          !me.dailyBonusAvailable && !next && 'max-sm:hidden',
+          !me.dailyBonusAvailable && 'max-sm:hidden',
         )}
       >
         {me.dailyBonusAvailable && (
@@ -69,7 +79,7 @@ export function ProfileCard({ className }: { className?: string }) {
             <Gift aria-hidden className="size-3.5" /> Първият мач за деня носи +100 XP
           </span>
         )}
-        {next && <UpNext unlock={next} />}
+        {next && <UpNext unlock={next} className="max-sm:hidden" />}
         <SeasonChip ratings={me.ratings} className="max-sm:hidden" />
       </div>
       {/* Guests: right under the level it's about — all of this lives on this device until the account is saved. Once
@@ -79,10 +89,15 @@ export function ProfileCard({ className }: { className?: string }) {
   );
 }
 
-function UpNext({ unlock }: { unlock: UnlockRef & { level: number } }) {
+function UpNext({ unlock, className }: { unlock: UnlockRef & { level: number }; className?: string }) {
   const { icon, name } = unlockPreview(unlock);
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-tint/5 px-2.5 py-1 text-xs text-fg-2 sm:px-3">
+    <span
+      className={clsx(
+        'inline-flex max-w-full items-center gap-1.5 rounded-full bg-tint/5 px-2.5 py-1 text-xs text-fg-2 sm:px-3',
+        className,
+      )}
+    >
       <span className="shrink-0">Ниво {unlock.level}:</span>
       <span aria-hidden className="text-base leading-none">
         {icon}

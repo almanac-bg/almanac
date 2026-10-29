@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { PlayerName } from '../FitName';
 import { Button, Card } from '../ui';
 import { countdown } from './time';
 
@@ -103,7 +104,7 @@ export function EveningCard({ className }: { className?: string }) {
                 <li key={t.user.id} className="flex items-center gap-2.5 text-sm">
                   <span className="w-6 text-right text-fg-3 tabular-nums">{t.placement}.</span>
                   <Avatar avatar={t.user.avatar} frame={t.user.frame} size={26} />
-                  <span className="min-w-0 flex-1 truncate">{t.user.username}</span>
+                  <PlayerName name={t.user.username} className="flex-1" />
                   <span className="text-fg-2 tabular-nums">{fmt(t.score)}</span>
                 </li>
               ))}

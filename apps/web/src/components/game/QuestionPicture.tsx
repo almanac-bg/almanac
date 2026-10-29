@@ -62,7 +62,7 @@ export function QuestionPicture({
         <motion.figcaption
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-1.5 truncate text-right text-[11px] text-fg-3"
+          className="mt-1.5 truncate text-right text-xs text-fg-3"
         >
           {credit.sourceUrl ? (
             <a

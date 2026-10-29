@@ -89,7 +89,7 @@ export function FriendsCard({ className }: { className?: string }) {
             disabled={code.length !== ROOM_CODE_DIGITS}
             loading={busy === 'join'}
           >
-            Влез
+            Влез<span className="sr-only"> в стаята</span>
           </Button>
         </form>
         {!guest && (

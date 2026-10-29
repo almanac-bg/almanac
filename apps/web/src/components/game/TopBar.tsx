@@ -29,7 +29,7 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
           <X className="size-5" />
         </button>
         <span
-          className="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider whitespace-nowrap uppercase"
+          className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wider whitespace-nowrap uppercase"
           style={accentFill(mode)}
         >
           {game.start.mode === 'daily' ? 'Днес' : game.start.duelWith ? 'Дуел' : mode.name}

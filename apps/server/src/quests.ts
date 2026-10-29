@@ -66,7 +66,7 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
       def: {
         id: 'mp2',
         icon: '⚔️',
-        text: 'Изиграй 2 мултиплейър мача',
+        text: 'Изиграй 2 мача срещу съперници',
         goal: 2,
         xp: 70,
         count: (e) => (e.multiplayer ? 1 : 0),
@@ -134,7 +134,7 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
       def: {
         id: 'win2',
         icon: '🏆',
-        text: 'Спечели 2 мултиплейър мача',
+        text: 'Спечели 2 мача срещу съперници',
         goal: 2,
         xp: 100,
         count: (e) => (e.multiplayer && e.won ? 1 : 0),

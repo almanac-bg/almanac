@@ -87,10 +87,17 @@ export function rightOrder(values: readonly number[], direction: OrderDirection)
  * What an order scores: ORDER.perItem for each item in its place; all of them right add the speed bonus (over the time
  * left after the reading window) and the streak bonus. `streak` counts this answer.
  */
-export function orderPoints(a: { right: number; timeMs: number; limitMs: number; readMs: number; streak: number }) {
+export function orderPoints(a: {
+  right: number;
+  timeMs: number;
+  limitMs: number;
+  readMs: number;
+  streak: number;
+  untimed?: boolean;
+}) {
   const base = ORDER.perItem * a.right;
   if (a.right < ORDER.items) return base;
   const drained = Math.max(0, a.timeMs - a.readMs) / Math.max(1, a.limitMs - a.readMs);
-  const speed = Math.round(ORDER.speed * Math.max(0, 1 - drained));
+  const speed = a.untimed ? 0 : Math.round(ORDER.speed * Math.max(0, 1 - drained));
   return base + speed + Math.min((a.streak - 1) * SCORING.streakStep, SCORING.streakMax);
 }

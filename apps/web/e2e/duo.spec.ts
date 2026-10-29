@@ -15,7 +15,7 @@ test('Отбори: one asks a friend from the mode card, the friend says yes, a
   await anna.getByRole('button', { name: 'Играй Отбори', exact: true }).click();
   const picker = anna.getByRole('dialog', { name: 'Отбори: с кого играеш?' });
   await picker.getByRole('listitem').filter({ hasText: borisName }).getByRole('button', { name: 'Покани' }).click();
-  await expect(picker.getByText('Поканен')).toBeVisible();
+  await expect(picker.getByText('Поканата е пратена')).toBeVisible();
 
   // Boris says yes from the invite; both wait as a pair, then play two bots.
   await boris.getByRole('button', { name: `Играй Отбори с ${annaName}` }).click();

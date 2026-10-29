@@ -108,6 +108,8 @@ export interface NewGame {
   questionSet?: string | null;
   /** The evening Роял of this day. */
   eveningDay?: string | null;
+  /** Соло's clock. */
+  pace?: GameSetup['pace'];
   humans: HumanEntry[];
   bots: Bot[];
 }
@@ -277,6 +279,7 @@ export class GameRegistry {
         presenter: opts.presenter ?? null,
         questionSet: opts.questionSet ?? null,
         eveningDay: opts.eveningDay ?? null,
+        pace: opts.pace ?? 'normal',
       },
       emitter,
       {

@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
 import { Avatar } from '../Avatar';
 import { GuestNudge } from '../ClaimAccount';
+import { PlayerName } from '../FitName';
 import { PRESENCE } from '../presence';
 import { Button, Modal, Spinner } from '../ui';
 
@@ -61,7 +62,7 @@ export function DuoPicker({ open, onClose }: { open: boolean; onClose: () => voi
               <li key={f.user.id} className="flex items-center gap-3 py-2.5">
                 <Avatar avatar={f.user.avatar} frame={f.user.frame} size={40} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{f.user.username}</p>
+                  <PlayerName name={f.user.username} className="font-semibold" />
                   <p className="flex items-center gap-1.5 text-xs text-fg-3">
                     <span
                       aria-hidden
@@ -73,7 +74,7 @@ export function DuoPicker({ open, onClose }: { open: boolean; onClose: () => voi
                 </div>
                 {sent ? (
                   <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-300">
-                    <Check aria-hidden className="size-4" /> Поканен
+                    <Check aria-hidden className="size-4" /> Поканата е пратена
                   </span>
                 ) : (
                   <Button

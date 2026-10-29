@@ -5,23 +5,28 @@
  */
 import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
 
-export function credentialsProblem(
+export type CredentialField = 'username' | 'password';
+
+/** Everything wrong at once (at most one per field, the name's first), so a form says it all in one go. */
+export function credentialsProblems(
   username: string,
   password: string,
   { newAccount }: { newAccount: boolean },
-): { field: 'username' | 'password'; message: string } | null {
+): { field: CredentialField; message: string }[] {
   const name = username.trim();
+  const problems: { field: CredentialField; message: string }[] = [];
   if (newAccount) {
-    if (!name) return { field: 'username', message: 'Избери потребителско име.' };
-    if (name.length < 3) return { field: 'username', message: 'Името трябва да е поне 3 символа.' };
-    if (!password) return { field: 'password', message: `Избери парола — поне ${PASSWORD_MIN_LENGTH} символа.` };
-    if (password.length < PASSWORD_MIN_LENGTH)
-      return { field: 'password', message: `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.` };
-    if (password.toLowerCase() === name.toLowerCase())
-      return { field: 'password', message: 'Паролата не може да е същата като името.' };
+    if (!name) problems.push({ field: 'username', message: 'Избери потребителско име.' });
+    else if (name.length < 3) problems.push({ field: 'username', message: 'Името трябва да е поне 3 символа.' });
+    if (!password)
+      problems.push({ field: 'password', message: `Избери парола — поне ${PASSWORD_MIN_LENGTH} символа.` });
+    else if (password.length < PASSWORD_MIN_LENGTH)
+      problems.push({ field: 'password', message: `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.` });
+    else if (name && password.toLowerCase() === name.toLowerCase())
+      problems.push({ field: 'password', message: 'Паролата не може да е същата като името.' });
   } else {
-    if (!name) return { field: 'username', message: 'Въведи име или имейл.' };
-    if (!password) return { field: 'password', message: 'Въведи парола.' };
+    if (!name) problems.push({ field: 'username', message: 'Въведи име или имейл.' });
+    if (!password) problems.push({ field: 'password', message: 'Въведи парола.' });
   }
-  return null;
+  return problems;
 }

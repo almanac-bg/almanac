@@ -7,6 +7,7 @@ import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
 import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { PlayerName } from '../FitName';
 import { accentText } from '../game/answers';
 import { BIG_MATCH, topAndYou } from '../game/bigMatch';
 import { teamColor } from '../game/teams';
@@ -88,7 +89,8 @@ function MachineTag({ label }: { label: string }) {
 
 export function Podium({ game, standings }: { game: LiveGame; standings: FinalStanding[] }) {
   const top = standings.slice(0, 3);
-  const order = top.length === 3 ? [top[1], top[0], top[2]] : top.length === 2 ? [top[1], top[0]] : top;
+  // Drawn second–first–third, read first to last: the list is in its order, the columns placed with CSS `order`.
+  const column = (placement: number) => (top.length === 1 ? 0 : placement === 1 ? 2 : placement === 2 ? 1 : 3);
   const heights: Record<number, string> = { 1: 'h-36 sm:h-44', 2: 'h-24 sm:h-32', 3: 'h-16 sm:h-24' };
   const medals: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
   // A class in a room: the next few and you, not the whole room.
@@ -99,18 +101,20 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
 
   return (
     <section className="mt-10">
-      <div className="flex items-end justify-center gap-2 sm:gap-6">
-        {order.map((s) => {
+      <ol aria-label="Класиране" className="flex items-end justify-center gap-2 sm:gap-6">
+        {top.map((s) => {
           const p = game.players[s.id];
           const me = s.id === game.start.youId;
           return (
-            <motion.div
+            <motion.li
               key={s.id}
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + (3 - s.placement) * 0.2, type: 'spring', stiffness: 180, damping: 18 }}
               className="flex w-0 max-w-40 min-w-0 flex-1 flex-col items-center"
+              style={{ order: column(s.placement) }}
             >
+              <span className="sr-only">{ordinal(s.placement)} място:</span>
               {s.placement === 1 && (
                 <motion.span
                   initial={{ y: -20, opacity: 0, rotate: -20 }}
@@ -137,7 +141,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                     {p.name}
                   </Link>
                 ) : (
-                  <span className="truncate">{p.name}</span>
+                  <PlayerName name={p.name} />
                 )}
                 <LevelBadge level={p.level} />
               </div>
@@ -158,10 +162,10 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
               >
                 <Emoji e={medals[s.placement]} />
               </div>
-            </motion.div>
+            </motion.li>
           );
         })}
-      </div>
+      </ol>
       {rest.length > 0 && (
         <Card className="mx-auto mt-0 max-w-xl rounded-t-none p-2">
           {rest.map((s, i) => {

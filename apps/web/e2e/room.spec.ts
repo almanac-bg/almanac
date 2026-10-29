@@ -21,7 +21,7 @@ test('a private room: a friend joins by its code, the host starts, both play and
 
   // The friend types the code on the lobby.
   await friend.getByPlaceholder('Код на стая').fill(code);
-  await friend.getByRole('button', { name: 'Влез', exact: true }).click();
+  await friend.getByRole('button', { name: 'Влез в стаята', exact: true }).click();
   await expect(friend).toHaveURL(/\/room$/);
   await expect(friend.getByText('Чакаме домакина да започне…').filter({ visible: true }).first()).toBeVisible();
   await expect(host.getByText('Играчи 2/8').filter({ visible: true }).first()).toBeVisible();
