@@ -1198,8 +1198,8 @@ export interface SetImage {
   alt: string;
 }
 
-/** Where a set's picture is served. */
-export const setPictureUrl = (id: string) => `/api/sets/images/${id}`;
+/** Where a set's picture is served (an id is 16 hex digits; encoded all the same, as anything put in an address). */
+export const setPictureUrl = (id: string) => `/api/sets/images/${encodeURIComponent(id)}`;
 
 /** One question of a host's own set: four options, true or false (either with a picture), a number, or an order. */
 export type SetQuestion =

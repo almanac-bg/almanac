@@ -172,28 +172,32 @@ if (fs.existsSync(config.webDist)) {
       const css = path.join(config.webDist, 'assets', file);
       return fs.existsSync(css) ? `<style>${fs.readFileSync(css, 'utf8')}</style>` : link;
     });
-  // A build file's brotli copy (made by the build at the strongest setting) to a browser that takes brotli: Caddy leaves
-  // an encoded response as it is, and only compresses the rest on the fly.
+  // A build file's brotli copy (made by the build at the strongest setting) to a browser that takes brotli: the request
+  // is pointed at the .br file beside it, served below as the original's type. Caddy leaves an encoded response as it
+  // is, and only compresses the rest on the fly. Either way the answer varies with Accept-Encoding, so a cache on the
+  // way (Cloudflare's) never hands the brotli copy to a browser that didn't ask for it.
   const assets = path.join(config.webDist, 'assets');
   const brotli = new Set(fs.readdirSync(assets).filter((f) => f.endsWith('.br')));
   app.use('/assets', (req, res, next) => {
-    const name = req.path.slice(1);
-    if (!brotli.has(`${name}.br`) || !/\bbr\b/.test(req.headers['accept-encoding'] ?? '')) return next();
+    if (!brotli.has(`${req.path.slice(1)}.br`)) return next();
     res.vary('Accept-Encoding');
-    res.type(path.extname(name));
-    res.setHeader('content-encoding', 'br');
-    res.setHeader('cache-control', 'public, max-age=31536000, immutable');
-    res.sendFile(path.join(assets, `${name}.br`));
+    if (/\bbr\b/.test(req.headers['accept-encoding'] ?? '')) req.url = `${req.path}.br`;
+    next();
   });
   // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
   // never the page (a tab from an older deploy then reloads instead of running HTML as JavaScript).
   app.use(
     '/assets',
-    express.static(path.join(config.webDist, 'assets'), {
+    express.static(assets, {
       index: false,
       maxAge: '1y',
       immutable: true,
       fallthrough: false,
+      setHeaders: (res, file) => {
+        if (!file.endsWith('.br')) return;
+        res.setHeader('content-encoding', 'br');
+        (res as Response).type(path.extname(file.slice(0, -'.br'.length)));
+      },
     }),
     // …and that 404 is never kept: Safari holds on to one, and the same name can come back (a rollback, a retry once
     // the deploy is through), when a remembered 404 would break the tab until it's closed.

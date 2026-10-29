@@ -414,6 +414,10 @@ test("a build file goes as its brotli copy to a browser that takes brotli, as it
   assert.ok((await br.text()).length > 1000, 'decoded by the client like any brotli response');
   const plain = await fetch(`${srv.url}/assets/${js}`, { headers: { 'accept-encoding': 'identity' } });
   assert.equal(plain.headers.get('content-encoding'), null);
+  assert.match(plain.headers.get('vary') ?? '', /Accept-Encoding/i, 'a cache on the way keeps the two apart');
+  const head = await fetch(`${srv.url}/assets/${js}`, { method: 'HEAD', headers: { 'accept-encoding': 'gzip, br' } });
+  assert.equal(head.headers.get('content-encoding'), 'br');
+  assert.match(head.headers.get('content-type') ?? '', /javascript/);
 });
 
 test('the service worker is never kept by a cache on the way; the other files beside the page for an hour', {
