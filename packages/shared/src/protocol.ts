@@ -1054,6 +1054,8 @@ export interface SiteInfo {
   email: string;
   emailProvider: string | null;
   hosting: string | null;
+  /** The network every connection to the site passes through first (Cloudflare's proxy), if there is one. */
+  proxy: string | null;
   /** Where the off-site backups are kept, when that's not the hosting provider. */
   backups: string | null;
   /** Forwards mail sent to the contact address, if a service does. */

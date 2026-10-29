@@ -20,6 +20,7 @@ before(async () => {
     OPERATOR_ADDRESS: 'ул. Примерна 1, София',
     SOURCE_URL: 'https://example.test/almanac',
     BACKUP_PROVIDER: 'Примерни бекъпи',
+    PROXY_PROVIDER: 'Примерно прокси',
   });
 });
 
@@ -256,6 +257,9 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
     const privacy = await get('/privacy', cookie);
     assert.equal(privacy.root, '<div id="root" data-painted="">');
     assert.match(privacy.html, /<b>Тест Тестов<\/b>, физическо лице/);
+    // A proxy in front is named, with the cookie it may set.
+    assert.match(privacy.html, /<b>Защита от атаки:<\/b> (<!-- -->)?Примерно прокси/);
+    assert.match(privacy.html, /<code>cf_clearance<\/code>/);
   }
   const terms = await get('/terms');
   assert.equal(terms.root, '<div id="root" data-painted="">');
@@ -389,6 +393,7 @@ test('what the site says about itself: who runs it (configuration, not code), it
   assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
   assert.equal(legal.backups, 'Примерни бекъпи');
+  assert.equal(legal.proxy, 'Примерно прокси');
   assert.equal(legal.inbox, null, 'unset: the policy leaves the line out');
   assert.equal(legal.mailbox, null);
   // The test bank has 300 questions: the landing's "над 300 въпроса", rounded down to the hundred.
@@ -409,4 +414,11 @@ test("a build file goes as its brotli copy to a browser that takes brotli, as it
   assert.ok((await br.text()).length > 1000, 'decoded by the client like any brotli response');
   const plain = await fetch(`${srv.url}/assets/${js}`, { headers: { 'accept-encoding': 'identity' } });
   assert.equal(plain.headers.get('content-encoding'), null);
+});
+
+test('the service worker is never kept by a cache on the way; the other files beside the page for an hour', {
+  skip: !fs.existsSync(path.join(webDist, 'sw.js')) && 'web app not built',
+}, async () => {
+  assert.equal((await fetch(`${srv.url}/sw.js`)).headers.get('cache-control'), 'no-cache');
+  assert.equal((await fetch(`${srv.url}/theme.js`)).headers.get('cache-control'), 'public, max-age=3600');
 });

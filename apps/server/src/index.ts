@@ -210,7 +210,17 @@ if (fs.existsSync(config.webDist)) {
     }
     next();
   });
-  app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
+  app.use(
+    express.static(config.webDist, {
+      index: false,
+      maxAge: '1h',
+      // The service worker, asked for anew on every visit, comes from here each time: never from a cache on the way
+      // (Cloudflare's keeps a .js file as long as it's told), so a new one reaches every installed app at once.
+      setHeaders: (res, file) => {
+        if (path.basename(file) === 'sw.js') res.setHeader('cache-control', 'no-cache');
+      },
+    }),
+  );
   // Each public page with its own title, description and address in the page itself (link previews and search
   // engines read the page, not the app), and the page itself already drawn; the rest of the game says "don't index".
   const drawn = await paintPages();

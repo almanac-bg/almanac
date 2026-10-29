@@ -142,6 +142,7 @@ export const config = {
     email: process.env.CONTACT_EMAIL || `privacy@${BRAND.domain}`,
     emailProvider: process.env.EMAIL_PROVIDER || null,
     hosting: process.env.HOSTING_PROVIDER || null,
+    proxy: process.env.PROXY_PROVIDER || null,
     backups: process.env.BACKUP_PROVIDER || null,
     inbox: process.env.INBOX_PROVIDER || null,
     mailbox: process.env.MAILBOX_PROVIDER || null,
