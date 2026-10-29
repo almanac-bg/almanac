@@ -39,6 +39,7 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
 const { ordinal } = await import('@quiz/shared');
 const { nameProblem } = await import('../src/moderation');
+const { textProblem } = await import('../src/names');
 const { nameShape } = await import('../src/names');
 
 test('elimination schedule leaves a two-player final', () => {
@@ -284,6 +285,46 @@ test('username filter: catches disguised words, spares ordinary names', () => {
   ]) {
     assert.equal(nameProblem(ok), null, `should allow "${ok}"`);
   }
+});
+
+test('more words nobody should see (from the October 2026 review); group, set and room names get the same check', () => {
+  for (const bad of [
+    'Мангал_бой',
+    'Жидов',
+    'Негър',
+    'Сиптар',
+    'Лайнар',
+    'Гъзолизец',
+    'Духач',
+    'Kurec',
+    'SiegHeil',
+    'Heil88',
+    'Porno',
+  ])
+    assert.ok(nameProblem(bad), `should block "${bad}"`);
+  for (const bad of [
+    'Хитлер фен клуб',
+    'Kurvi i pedali',
+    'АЛМАНАХ Официален',
+    'Модератори',
+    'Хитлер беше прав',
+    'п1чка ти',
+    'Админ екип',
+  ])
+    assert.ok(textProblem(bad, 'Името'), `should block "${bad}"`);
+  for (const ok of [
+    'Слънчева система',
+    'Клас 7Б',
+    'Семейство Иванови',
+    'Почитатели на историята',
+    'Badminton клуб',
+    'Ребека',
+  ])
+    assert.equal(textProblem(ok, 'Името'), null, `should allow "${ok}"`);
+  assert.equal(
+    textProblem('Модератори', 'Името на групата'),
+    'Името на групата изглежда като на самата игра или на екипа ѝ — избери друго.',
+  );
 });
 
 test('names that look the same on screen have one shape; names that only share letters do not', () => {

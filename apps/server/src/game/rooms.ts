@@ -12,10 +12,11 @@ import {
 } from '@quiz/shared';
 import { areFriends } from '../friends';
 import { guarded } from '../guard';
+import { textProblem } from '../names';
 import { friendsChanged, notifyUser, presence } from '../notify';
 import { getRating } from '../seasons';
 import { prepareSet, setForRoom } from '../sets';
-import { getUser, publicUser } from '../users';
+import { getUser, nameTaken, publicUser } from '../users';
 import { type Bot, makeBots } from './bots';
 import type { Game } from './Game';
 import type { IO, IOSocket } from './io';
@@ -117,6 +118,11 @@ export class RoomManager {
     if (getUser(userId)?.is_guest) {
       name = cleanNickname(nickname);
       if (!name) return { ok: false, error: NICKNAME_ERROR };
+      // On the room's screen (a class's projector too): no words nobody should read, nothing that passes for the
+      // game, and no player's own name — a guest could appear as anyone.
+      const problem = textProblem(name, 'Името');
+      if (problem) return { ok: false, error: problem };
+      if (nameTaken(name)) return { ok: false, error: 'Това е името на друг играч — избери друго.' };
       const taken = new Set(this.state(room).players.map((p) => p.name.toLocaleLowerCase('bg')));
       if (taken.has(name.toLocaleLowerCase('bg'))) return { ok: false, error: 'Някой в стаята вече е с това име.' };
     }

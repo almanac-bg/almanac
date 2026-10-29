@@ -13,6 +13,7 @@ import {
 import { z } from 'zod';
 import { all, one, run, tx } from './db';
 import { logAction } from './modlog';
+import { textProblem } from './names';
 import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
 import { count } from './stats';
@@ -113,7 +114,11 @@ const SetQuestionSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const SetSchema = z.object({
-  name: text(SETS.name[0], SETS.name[1], 'Името'),
+  // Shown to whoever has its link, and on the room's big screen.
+  name: text(SETS.name[0], SETS.name[1], 'Името').superRefine((name, ctx) => {
+    const problem = textProblem(name, 'Името на набора');
+    if (problem) ctx.addIssue({ code: 'custom', message: problem });
+  }),
   questions: z.array(SetQuestionSchema).max(SETS.maxQuestions, `Най-много ${SETS.maxQuestions} въпроса.`),
 });
 

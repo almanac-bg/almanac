@@ -13,6 +13,7 @@ import {
   weekStart,
 } from '@quiz/shared';
 import { all, one, run, tx } from './db';
+import { textProblem } from './names';
 import { notify } from './notifications';
 import { count } from './stats';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
@@ -83,6 +84,8 @@ const TOO_MANY = `Можеш да си в най-много ${GROUPS.perPlayer} 
 export function createGroup(userId: number, rawName: unknown): Result<{ id: number }> {
   const name = cleanGroupName(rawName);
   if (!name) return { ok: false, error: NAME_ERROR };
+  const problem = textProblem(name, 'Името на групата');
+  if (problem) return { ok: false, error: problem };
   if (groupIdsOf(userId).length >= GROUPS.perPlayer) return { ok: false, error: TOO_MANY };
   const now = Date.now();
   const id = tx(() => {
@@ -167,6 +170,8 @@ export function manageGroup(
   if ('rename' in action) {
     const name = cleanGroupName(action.rename);
     if (!name) return { ok: false, error: NAME_ERROR };
+    const problem = textProblem(name, 'Името на групата');
+    if (problem) return { ok: false, error: problem };
     run('UPDATE player_groups SET name = ? WHERE id = ?', name, groupId);
   } else if ('newCode' in action) {
     run('UPDATE player_groups SET code = ? WHERE id = ?', newCode(), groupId);

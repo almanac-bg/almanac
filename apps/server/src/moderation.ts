@@ -15,7 +15,7 @@ import { config } from './config';
 import { all, one, run, tx } from './db';
 import { banMail, sendMail } from './mailer';
 import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
-import { nameShape } from './names';
+import { hasBlockedWords, nameShape, passesForTheGame } from './names';
 import { notify } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { hideQuestion, unhideQuestion } from './questionReports';
@@ -23,110 +23,10 @@ import { reloadQuestionBank } from './questions';
 import { hideSet } from './sets';
 import { GUEST_NAME, getUser, getUserByName, nameTaken, toPublicUser, type UserRow, usernameKey } from './users';
 
-// ─── Username filter ─────────────────────────────────────────────────────────
-
-const TRANSLIT: Record<string, string> = {
-  а: 'a',
-  б: 'b',
-  в: 'v',
-  г: 'g',
-  д: 'd',
-  е: 'e',
-  ж: 'zh',
-  з: 'z',
-  и: 'i',
-  й: 'y',
-  к: 'k',
-  л: 'l',
-  м: 'm',
-  н: 'n',
-  о: 'o',
-  п: 'p',
-  р: 'r',
-  с: 's',
-  т: 't',
-  у: 'u',
-  ф: 'f',
-  х: 'h',
-  ц: 'ts',
-  ч: 'ch',
-  ш: 'sh',
-  щ: 'sht',
-  ъ: 'a',
-  ь: 'y',
-  ю: 'yu',
-  я: 'ya',
-  ё: 'yo',
-  ы: 'i',
-  э: 'e',
-};
-const LEET: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', $: 's' };
-
-/** Lowercase Latin letters only: Cyrillic transliterated, leetspeak undone, separators dropped, repeats collapsed. */
-function skeleton(text: string): string {
-  // Transliterate on composed text first (NFKD would split "й" into "и" + a combining breve),
-  // then decompose to strip any remaining accents from Latin letters.
-  const latin = [...text.normalize('NFC').toLowerCase()]
-    .map((c) => TRANSLIT[c] ?? LEET[c] ?? c)
-    .join('')
-    .normalize('NFKD')
-    .replace(/[^a-z]/g, '');
-  return latin.replace(/(.)\1+/g, '$1');
-}
-
-// Substring matches (specific enough not to hit ordinary names).
-const BLOCKED_STEMS = [
-  'fuck',
-  'shit',
-  'cunt',
-  'nigg',
-  'fagot',
-  'whore',
-  'bitch',
-  'hitler',
-  'nazi',
-  'rapist',
-  'pedophil',
-  'pederas',
-  'putk',
-  'pichk',
-  'kurv',
-  'shiban',
-  'dupedav',
-  'ebalo',
-  'ebach',
-  'ebat',
-  'ebem',
-  'mamkati',
-  'mamkamu',
-];
-// Short stems: only at the start or end of a word, so "Себастиан" or "Шухуй…" style names aren't caught by accident.
-const BLOCKED_EDGES = ['huy', 'huj', 'pedal'];
-// Names that could impersonate staff or the game itself.
-const RESERVED_PREFIXES = [
-  'admin',
-  'moderat',
-  'almanac',
-  'almanah',
-  'support',
-  'podrazhka',
-  'system',
-  'sistema',
-  'official',
-  'ofitsial',
-];
-
+/** Why a username can't be had (words nobody should see, or one that passes for the game's own), or null. */
 export function nameProblem(name: string): string | null {
-  const whole = skeleton(name);
-  if (BLOCKED_STEMS.some((s) => whole.includes(s))) return 'Името съдържа неподходящи думи.';
-  const words = name
-    .split(/[\s_.\-\d]+/)
-    .map(skeleton)
-    .filter(Boolean);
-  if (words.some((w) => BLOCKED_EDGES.some((s) => w === s || w.startsWith(s) || w.endsWith(s)))) {
-    return 'Името съдържа неподходящи думи.';
-  }
-  if (RESERVED_PREFIXES.some((p) => whole.startsWith(p)) || GUEST_NAME.test(name.trim())) return 'Това име е запазено.';
+  if (hasBlockedWords(name)) return 'Името съдържа неподходящи думи.';
+  if (passesForTheGame(name) || GUEST_NAME.test(name.trim())) return 'Това име е запазено.';
   return null;
 }
 
