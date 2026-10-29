@@ -1957,11 +1957,18 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     .get(E.user.id) as { text: string };
   assert.match(unbanned.text, /можеш да играеш отново/);
 
-  // Undone in any order: each puts back what it changed.
-  const [unban] = await log();
+  // Undone newest first: each puts back what it changed. An older one waits while a later decision stands, or it
+  // would override it (undoing a week's ban once lifted a later permanent one).
+  const [unban, shorter] = await log();
   assert.equal((await undo(unban.id)).status, 200);
   assert.ok((await card()).ban, 'the unban undone: banned again');
   assert.equal((await undo(unban.id)).status, 400, 'once');
+  assert.ok(!(await log()).find((e: { id: number }) => e.id === ban.id).canUndo, 'not offered while the change stands');
+  const refused = await undo(ban.id);
+  assert.equal(refused.status, 400);
+  assert.match(refused.body.error, /По-късно решение/);
+  assert.ok((await card()).ban.until < Date.now() + 4 * 86_400_000, 'still the 3 days decided since');
+  assert.equal((await undo(shorter.id)).status, 200);
   assert.equal((await undo(ban.id)).status, 200);
   assert.equal((await card()).ban, null, 'the ban undone: as before it');
   assert.equal((await undo(annulled.id)).status, 200);

@@ -14,7 +14,7 @@ import { alertModerators } from './alerts';
 import { config } from './config';
 import { all, one, run, tx } from './db';
 import { banMail, sendMail } from './mailer';
-import { logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
+import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
 import { nameShape } from './names';
 import { notify } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
@@ -551,6 +551,7 @@ export function undoAction(adminId: number, logId: number): Result {
   if (row.undone_at !== null) return { ok: false, error: 'Вече е отменено.' };
   const undo = parseUndo<Record<string, unknown>>(row);
   if (!undo) return { ok: false, error: 'Това не може да се отмени.' };
+  if (laterDecision(row)) return { ok: false, error: 'По-късно решение промени това — отмени първо него.' };
   const userId = row.target_user_id;
   switch (row.action) {
     case 'ban':

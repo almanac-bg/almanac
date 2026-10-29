@@ -822,6 +822,13 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE users DROP COLUMN freezes;
     `,
   },
+  // v28, review fixes: an undo looks for a later decision about the same question, set or group (modlog.ts →
+  // laterDecision), by what it was about.
+  {
+    compatible: `
+    CREATE INDEX moderation_log_target ON moderation_log(target, id) WHERE target IS NOT NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

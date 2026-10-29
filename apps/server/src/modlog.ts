@@ -56,6 +56,36 @@ export function markUndone(id: number, adminId: number) {
   run('UPDATE moderation_log SET undone_at = ?, undone_by = ? WHERE id = ?', Date.now(), adminId, id);
 }
 
+/**
+ * Decisions that set the same thing (a player's ban, their name, their results; a question's, a set's place in play; a
+ * group's name). Undoing one puts back the state before it, so only the newest still standing can be undone: an older
+ * one would override what was decided since (undoing a week's ban lifted a later permanent one).
+ */
+const FAMILIES: ModerationLogAction[][] = [
+  ['ban', 'unban', 'ban_change'],
+  ['rename'],
+  ['annul'],
+  ['hide_question', 'auto_hide_question', 'unhide_question', 'fix_question', 'dismiss_flags'],
+  ['hide_set', 'unhide_set'],
+  ['rename_group'],
+];
+const ABOUT_PLAYER = new Set<ModerationLogAction>(['ban', 'unban', 'ban_change', 'rename', 'annul']);
+
+/** The later decision, still standing, that undoing this one would override; undefined when there's none. */
+export function laterDecision(r: LogRow): LogRow | undefined {
+  const family = FAMILIES.find((f) => f.includes(r.action)) ?? [r.action];
+  const byPlayer = ABOUT_PLAYER.has(r.action);
+  const subject = byPlayer ? r.target_user_id : r.target;
+  if (subject === null) return undefined;
+  return one<LogRow>(
+    `SELECT * FROM moderation_log WHERE ${byPlayer ? 'target_user_id' : 'target'} = ? AND id > ? AND undone_at IS NULL
+       AND action IN (${family.map(() => '?').join(', ')}) ORDER BY id LIMIT 1`,
+    subject,
+    r.id,
+    ...family,
+  );
+}
+
 /** Where a moderator sees what an entry was about. */
 function linkOf(r: LogRow): string | null {
   if (r.action === 'hide_set' || r.action === 'unhide_set') return r.target && `/sets/shared/${r.target}`;
@@ -78,7 +108,7 @@ function toEntry(r: LogRow, names: Map<number, UserRow | undefined>): Moderation
     createdAt: r.created_at,
     undoneAt: r.undone_at,
     undoneBy: name(r.undone_by),
-    canUndo: !!r.undo && r.undone_at === null,
+    canUndo: !!r.undo && r.undone_at === null && !laterDecision(r),
   };
 }
 
