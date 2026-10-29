@@ -14,4 +14,5 @@ export const siteInfo: SiteInfo = {
   // Every format in play: with options, with a picture, a number, an order.
   questions:
     Math.floor((questionBank().length + imageBank().length + numberBank().length + orderBank().length) / 100) * 100,
+  year: new Date().getFullYear(),
 };

@@ -81,6 +81,24 @@ const GENTLE_RATING_GAP = 170;
 const jitter = (spread: number) => (Math.random() * 2 - 1) * spread;
 
 /**
+ * Names for `count` bots, none already in the match: the list in a random order, then the list again numbered
+ * („Знайко 2“). A room takes up to 40, more than there are names.
+ */
+function botNames(count: number, taken: string[]): string[] {
+  const used = new Set(taken);
+  const names: string[] = [];
+  for (let round = 1; names.length < count; round++)
+    for (const base of shuffle([...NAMES])) {
+      const name = round === 1 ? base : `${base} ${round}`;
+      if (used.has(name)) continue;
+      used.add(name);
+      names.push(name);
+      if (names.length === count) break;
+    }
+  return names;
+}
+
+/**
  * Bots sized to the humans they play against: centred on how much they know (`around.skill`, see skillCentre), so a
  * match against them is close. A bot plays as strong as the rating it shows, so Elo against bots settles where the
  * player's skill really is instead of climbing forever. Players new to multiplayer get slightly kinder bots for their
@@ -92,7 +110,7 @@ export function makeBots(
   takenNames: string[] = [],
   opts: { gentle?: boolean } = {},
 ): Bot[] {
-  const names = shuffle(NAMES.filter((n) => !takenNames.includes(n)));
+  const names = botNames(count, takenNames);
   return Array.from({ length: count }, (_, i) => {
     const centre = around.skill - (opts.gentle ? GENTLE_RATING_GAP : 0);
     const rating = Math.round(clamp(centre + jitter(60), BOT_MIN_RATING, BOT_MAX_RATING));
@@ -102,7 +120,7 @@ export function makeBots(
       player: {
         id: `b${++botSeq}`,
         userId: null,
-        name: names[i % names.length],
+        name: names[i],
         level,
         isBot: true,
         isGuest: false,

@@ -347,6 +347,21 @@ test('ties: an unanswered question counts the whole clock', () => {
   assert.equal(reveal.standings[0].id, 'u1', 'trying beats sitting it out');
 });
 
+test('a full room of bots: every one has a name of its own, none taken by a player there', () => {
+  const players = ['Знайко', 'Ана'];
+  const bots = makeBots(40, { level: 5, skill: 1000 }, players);
+  const names = bots.map((b) => b.player.name);
+  assert.ok(
+    names.every((n) => typeof n === 'string' && n.length > 0),
+    'more bots than names in the list',
+  );
+  assert.equal(new Set([...names, ...players]).size, 42);
+  // Added one at a time, as a room does: still none twice.
+  const room = [...players];
+  for (let i = 0; i < 30; i++) room.push(makeBots(1, { level: 5, skill: 1000 }, room)[0].player.name);
+  assert.equal(new Set(room).size, room.length);
+});
+
 test('bots play as strong as the rating they show, never rate above the cap, go easy on newcomers, and have favourites', () => {
   const [weak] = makeBots(1, { level: 30, skill: 900 });
   const [strong] = makeBots(1, { level: 1, skill: 2400 });

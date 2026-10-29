@@ -69,8 +69,11 @@ const PUBLIC_PATHS = [
 ];
 /** Pages that look the same signed in or out (the legal ones, the guides): outside the game's frame. */
 const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path) || /^\/quiz\/[a-z]+$/.test(path);
-/** …and the legal pages don't even ask: they read the same either way (and the server may have drawn them). */
-const LEGAL_PATHS = ['/privacy', '/terms'];
+/**
+ * …and the public pages the server draws (the legal ones, the guides) don't even ask: they read the same either way, so
+ * the first draw here must be the page itself, as the server drew it, or hydrating it fails.
+ */
+const drawnForEveryone = (path: string) => path !== '/' && routeKind(path) === 'public';
 
 // Needed, not extra: without them the light components stay as they start (some of them invisible). A file that
 // didn't arrive is most likely an older build's after a deploy: one reload gets the new one.
@@ -140,7 +143,7 @@ export function App() {
   }, [userId]);
 
   // The server (and a page it drew for a visitor without a session) already knows: nobody to wait for.
-  if (!authChecked && !onServer && !paintedSignedOut && !LEGAL_PATHS.includes(pathname)) {
+  if (!authChecked && !onServer && !paintedSignedOut && !drawnForEveryone(pathname)) {
     return (
       <div className="grid min-h-dvh place-items-center">
         <Background />

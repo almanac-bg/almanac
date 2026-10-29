@@ -24,7 +24,7 @@ import {
 import clsx from 'clsx';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 // The public sample questions (the same file is in the open-source repository): the real bank never leaves the server.
 import SAMPLE from '../../../server/src/data/questions.sample.json';
 import { Emoji } from '../components/Emoji';
@@ -34,7 +34,7 @@ import { Logo } from '../components/NavBar';
 import { buttonClass, Card } from '../components/ui';
 import CHRISTMAS from '../content/christmas.json';
 import { useSite } from '../lib/site';
-import { usePageTitle } from '../lib/title';
+import { usePublicPageTitle } from '../lib/title';
 import { NotFoundPage } from './NotFoundPage';
 
 interface SampleQuestion {
@@ -122,7 +122,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /** The rules as the game plays them: every number below is the game's own constant. */
 export function HowToPlayPage() {
-  usePageTitle('Как се играе');
+  usePublicPageTitle(useLocation().pathname);
   const ranked = QUEUE_MODES.map((id) => MODES[id]);
   return (
     <GuideLayout
@@ -218,7 +218,7 @@ export function HowToPlayPage() {
 // ─── /quiz ───────────────────────────────────────────────────────────────────
 
 export function QuizHubPage() {
-  usePageTitle('Викторини по категории');
+  usePublicPageTitle(useLocation().pathname);
   const total = useSite()?.questions;
   return (
     <GuideLayout
@@ -277,7 +277,7 @@ export function QuizCategoryPage() {
   const found = categoryById(category ?? '');
   const c = found && found.id !== 'mixed' ? found : null;
   const title = holiday ? holiday.name : c ? `Викторина: ${c.name}` : undefined;
-  usePageTitle(title);
+  usePublicPageTitle(useLocation().pathname);
   const [picked, setPicked] = useState<Record<string, number>>({});
   if (!holiday && !c) return <NotFoundPage standalone />;
   const questions: QuizQuestion[] = holiday ? holiday.questions : byCategory(c!.id);
@@ -382,7 +382,7 @@ export function QuizCategoryPage() {
 // ─── /facts ──────────────────────────────────────────────────────────────────
 
 export function FactsPage() {
-  usePageTitle('Знаеше ли? Интересни факти');
+  usePublicPageTitle(useLocation().pathname);
   return (
     <GuideLayout
       title="Знаеше ли?"
@@ -425,7 +425,7 @@ export function FactsPage() {
 // ─── /teachers ───────────────────────────────────────────────────────────────
 
 export function TeachersPage() {
-  usePageTitle('За учители');
+  usePublicPageTitle(useLocation().pathname);
   return (
     <GuideLayout
       title={`${BRAND.name} в час`}

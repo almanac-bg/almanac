@@ -34,7 +34,7 @@ export function LegalLinks({ className = '' }: { className?: string }) {
         </a>
       )}
       <span className="inline-flex min-h-11 items-center">
-        © {new Date().getFullYear()} {BRAND.name}
+        © {op?.year ?? new Date().getFullYear()} {BRAND.name}
       </span>
     </nav>
   );

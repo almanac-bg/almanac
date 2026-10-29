@@ -1,3 +1,4 @@
+import { routeKind } from '@quiz/shared';
 import { type ComponentType, createElement, lazy, useState } from 'react';
 
 /**
@@ -113,9 +114,10 @@ export function prefetchPages({ admin }: { admin: boolean }) {
 }
 
 /**
- * The code of the page at this address, when it loads on demand: fetched before the app first draws it, so a page
- * the server sent drawn never blinks to "loading" (main.tsx). Only the legal pages are both.
+ * The code of the page at this address, when the server drew it and it loads on demand: fetched before the app first
+ * draws it, so the drawn page never blinks to "loading" (main.tsx). The legal pages and the guides (PUBLIC_PAGES).
  */
 export function preloadPage(pathname: string): Promise<unknown> {
-  return pathname === '/privacy' || pathname === '/terms' ? load('legal') : Promise.resolve();
+  if (pathname === '/privacy' || pathname === '/terms') return load('legal');
+  return pathname !== '/' && routeKind(pathname) === 'public' ? load('guide') : Promise.resolve();
 }

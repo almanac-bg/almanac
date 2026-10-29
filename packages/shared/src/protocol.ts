@@ -1068,6 +1068,8 @@ export interface SiteInfo {
   release: string | null;
   /** Questions in play, rounded down to the hundred ("над 1 900 въпроса"). */
   questions: number;
+  /** The year in the footer's ©: the server's, as it drew its pages (a browser's own could be a year on, and differ). */
+  year: number;
 }
 
 // ─── „Моят алманах“ ──────────────────────────────────────────────────────────
