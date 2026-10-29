@@ -7,6 +7,8 @@ import { config } from './config';
 import { reportError } from './monitoring';
 
 export interface Mail {
+  /** What it is (`reset`, `beaten`…): what a failed send reports — a subject can hold a player's name. */
+  kind: string;
   to: string;
   subject: string;
   text: string;
@@ -41,10 +43,11 @@ export function sendMail(message: Mail) {
     fs.writeFileSync(path.join(config.mailOutbox, name), JSON.stringify(mail));
   }
   if (transport) {
-    transport.sendMail({ from: config.mailFrom, ...mail }).catch((err) => {
+    const { kind, ...message } = mail;
+    transport.sendMail({ from: config.mailFrom, ...message }).catch((err) => {
       // A mail server's error can quote the recipient ("550 <x@y>: no such user"): never into a report.
-      const message = String(err instanceof Error ? err.message : err).replace(/[^\s<>"@]+@[^\s<>"@]+/g, '<address>');
-      void reportError(new Error(message), 'email', { extra: { subject: mail.subject } });
+      const why = String(err instanceof Error ? err.message : err).replace(/[^\s<>"@]+@[^\s<>"@]+/g, '<address>');
+      void reportError(new Error(why), 'email', { extra: { kind } });
     });
   } else if (config.production) {
     console.warn(`✉️  Not sent (SMTP_URL not set): "${mail.subject}"`);
@@ -85,6 +88,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:al
 
 export function verifyEmailMail(to: string, username: string, link: string): Mail {
   return {
+    kind: 'verify',
     to,
     subject: `Потвърди имейла си в ${BRAND.name}`,
     text: `Здравей, ${username}!\n\nПотвърди имейла си, за да можеш да възстановиш паролата си, ако я забравиш:\n${link}\n\nЛинкът е валиден 24 часа. Ако заявката не е от теб, просто игнорирай това писмо.`,
@@ -103,6 +107,7 @@ export function emailChangedMail(to: string, username: string, removed: boolean)
   const what = removed ? 'Имейлът беше премахнат от профила ти' : 'Профилът ти вече използва друг имейл';
   const advice = `Ако промяната не е от теб, смени паролата си веднага и ни пиши на ${config.operator.email}.`;
   return {
+    kind: 'email-changed',
     to,
     subject: `${what} в ${BRAND.name}`,
     text: `Здравей, ${username}!\n\n${what} (${BRAND.domain}). Това е последното писмо, което ще получиш на този адрес.\n\n${advice}`,
@@ -118,6 +123,7 @@ export function emailChangedMail(to: string, username: string, removed: boolean)
 
 export function resetPasswordMail(to: string, username: string, link: string): Mail {
   return {
+    kind: 'reset',
     to,
     subject: `Нова парола за ${BRAND.name}`,
     text: `Здравей, ${username}!\n\nПолучихме заявка за нова парола за профила ти. Избери нова парола тук:\n${link}\n\nЛинкът е валиден 1 час и може да се използва веднъж. Ако заявката не е от теб, игнорирай това писмо — старата ти парола остава.`,
@@ -142,6 +148,7 @@ export function inactiveAccountMail(to: string, username: string, deleteOn: numb
   const lead = `Профилът ти в ${BRAND.name} не е използван от три години. За да не пазим данни, които никой не ползва, на ${date} ще го изтрием заедно с нивото, статистиката и всичко изиграно.`;
   const keep = 'Искаш да го запазиш? Просто влез в профила си дотогава — нищо друго не е нужно.';
   return {
+    kind: 'inactive',
     to,
     subject: `Профилът ти в ${BRAND.name} ще бъде изтрит след месец`,
     text: `Здравей, ${username}!\n\n${lead}\n\n${keep}\n${config.appUrl}/`,
@@ -164,6 +171,7 @@ export function streakReminderMail(
   const shield = shields > 0 ? ' Имаш и щит за серията, но защо да го хабиш?' : '';
   const stop = 'Не искаш тези писма?';
   return {
+    kind: 'streak',
     to,
     subject: `🔥 ${streak} дни подред — днешните 10 въпроса още те чакат`,
     text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, около три минути:\n${config.appUrl}/daily\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
@@ -193,6 +201,7 @@ export function beatenMail(
   const next = 'Виж класирането — или направи нов линк и си върни първото място.';
   const stop = 'Писмото е по желание, най-много едно на ден. Не го искаш?';
   return {
+    kind: 'beaten',
     to,
     subject: `⚔️ ${beaten.rival} те изпревари на линка ти`,
     text: `Здравей, ${username}!\n\n${lead} ${next}\n${beaten.link}\n\n${stop} Спри тези писма: ${unsubscribe.page}`,
@@ -225,6 +234,7 @@ export function banMail(
   const why = `Основание: ${ban.basis}. Причина: ${ban.reason}`;
   const appeal = `Ако смяташ, че решението е грешно, отговори ни на ${config.operator.email} до 6 месеца и ще го прегледаме отново.`;
   return {
+    kind: 'ban',
     to,
     subject: `Профилът ти в ${BRAND.name} е спрян`,
     text: `Здравей, ${username}!\n\n${lead}\n${why}\n\n${appeal}\n\nУсловията за ползване: ${config.appUrl}/terms`,
@@ -241,6 +251,7 @@ export function banMail(
 /** To a moderator: something waits for them (`now`: an alert that can't wait for the morning summary). */
 export function moderatorMail(to: string, subject: string, lines: string[], link: string): Mail {
   return {
+    kind: 'moderators',
     to,
     subject,
     text: `${lines.join('\n')}\n\n${link}`,

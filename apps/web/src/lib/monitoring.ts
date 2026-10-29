@@ -30,8 +30,10 @@ export function startMonitoring() {
         environment: 'production',
         // Nothing about the person or their requests: no cookies, headers, bodies or query strings.
         dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false },
-        // Errors only: no performance tracing or session replays.
+        // Errors only: no performance tracing or session replays, and no "session" on every page load (release
+        // health: a record of visits by account, and it used up the day's cap on browser reports).
         tracesSampleRate: 0,
+        integrations: (defaults) => defaults.filter((integration) => integration.name !== 'BrowserSession'),
         beforeSend(event) {
           if (event.request) event.request = { url: scrub(event.request.url) as string | undefined };
           return event;
@@ -39,6 +41,9 @@ export function startMonitoring() {
         beforeBreadcrumb(crumb) {
           if (crumb.data)
             for (const key of ['url', 'from', 'to']) if (key in crumb.data) crumb.data[key] = scrub(crumb.data[key]);
+          // A click's trail names the element by its label („Премахни <name>“): players' names stay out of reports.
+          if (crumb.category?.startsWith('ui.') && crumb.message)
+            crumb.message = crumb.message.replace(/\[(aria-label|title|alt|name)="[^"]*"\]/g, '');
           return crumb;
         },
         ignoreErrors: IGNORED,
