@@ -213,9 +213,10 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
       await expectPressable(ordering);
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
-      await expect(page.getByText('Редът е заключен.'), `order for question ${index} not taken`).toBeAttached({
-        timeout: gameMs(2_000),
-      });
+      // Locked in — or already revealed as given: alone, the reveal follows the lock at once, so the line that says
+      // it's locked can come and go between two looks (or never be drawn at all).
+      const taken = page.getByText('Редът е заключен.').or(page.getByText(/(Всичко на място!|\d от \d на място)$/));
+      await expect(taken.first(), `order for question ${index} not taken`).toBeAttached({ timeout: gameMs(2_000) });
     } else if (await lock.isVisible()) {
       await giveNumber(page);
       // Locked in: the number stays on show, with nothing left to press.
