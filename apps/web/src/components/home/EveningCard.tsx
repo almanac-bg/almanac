@@ -56,7 +56,8 @@ export function EveningCard({ className }: { className?: string }) {
         <Moon aria-hidden className="size-8 shrink-0 text-indigo-300" />
         <div className="min-w-0 flex-1 basis-52">
           <h2 className="t-card">{MODES.evening.name}</h2>
-          <p className="text-sm text-fg-2" aria-live="polite">
+          {/* The countdown ticks every second: it stays out of the live line below, which says only what changed. */}
+          <p className="text-sm text-fg-2">
             {!status
               ? 'Утре пак, в 21:00.'
               : status.live
@@ -66,6 +67,15 @@ export function EveningCard({ className }: { className?: string }) {
                   : opening
                     ? `Входът е отворен · ${waitingText(status.waiting)} · започва след ${countdown(status.startsAt - now)}`
                     : `Всяка вечер в ${at}, до ${EVENING.maxPlayers} души. Входът се отваря ${EVENING.lobbyMinutes} минути преди това · след ${countdown(status.opensAt - now)}`}
+          </p>
+          <p className="sr-only" aria-live="polite">
+            {status?.live
+              ? 'Вечерният Роял започна.'
+              : status?.joined
+                ? 'Вътре си във вечерния Роял.'
+                : opening
+                  ? 'Входът за вечерния Роял е отворен.'
+                  : ''}
           </p>
         </div>
         {status?.joined ? (

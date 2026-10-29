@@ -62,6 +62,19 @@ test('a 1280×800 screen never scrolls sideways', { tag: '@desktop' }, async ({ 
 });
 
 // A request's card holds a name and two buttons: on a narrow phone the buttons go under the name.
+// On a touch screen every button is at least 44 px wide: in a row of tabs that scrolls, that once let them shrink under
+// their own text („Аватари 6/34амки 1/25…“) instead of scrolling.
+test("the Collection's tabs keep their whole text on a phone, and the row scrolls", async ({ page }) => {
+  await startAsGuest(page);
+  await page.goto('/locker');
+  const tabs = page.locator('button[aria-pressed]');
+  await expect(tabs.first()).toBeVisible();
+  const clipped = await tabs.evaluateAll((buttons) =>
+    buttons.filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.textContent),
+  );
+  expect(clipped).toEqual([]);
+});
+
 test('a friend request waiting fits the friends page on a 320 px phone', async ({ page, newPlayer }) => {
   const anna = uniqueName('Анна');
   await signUp(page, anna, 'parola-123');

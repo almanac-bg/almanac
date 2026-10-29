@@ -327,7 +327,8 @@ export function Segmented<T extends string | number>({
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
           className={clsx(
-            'focus-ring relative h-9 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default pointer-coarse:min-h-11 pointer-coarse:min-w-11',
+            // shrink-0: a touch screen's min-width replaces flex's own, and the tabs shrank under their text instead of scrolling.
+            'focus-ring relative h-9 shrink-0 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:cursor-default pointer-coarse:min-h-11 pointer-coarse:min-w-11',
             o.value === value ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
           )}
         >
