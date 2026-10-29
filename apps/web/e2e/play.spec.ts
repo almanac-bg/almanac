@@ -1,4 +1,4 @@
-import { expect, gameMs, playMatch, startAsGuest, startSolo, test } from './support';
+import { expect, expectPressable, gameMs, playMatch, startAsGuest, startSolo, test } from './support';
 
 test.describe('with motion on', () => {
   // Everything else runs with reduced motion (playwright.config.ts): here the animations play, from the lazily loaded
@@ -51,6 +51,7 @@ test('a whole match from the keyboard: Tab to the category, Enter, then 1–4 to
       continue;
     }
     if (await ordering.isVisible()) {
+      await expectPressable(ordering);
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
       await expect(page.getByText('Редът е заключен.'), `order ${index}: the keys didn't lock it`).toBeAttached({

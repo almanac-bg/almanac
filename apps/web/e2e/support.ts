@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { type BrowserContext, test as base, expect, type Page } from '@playwright/test';
+import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
 
 export type { Page };
 export { expect };
@@ -158,6 +158,16 @@ export async function startSolo(page: Page, category: string, pace?: '15 с' | '
   await expect(picker).toBeHidden();
 }
 
+/**
+ * Waits until a „Подреди“ question's items take a key or a tap: on its way in, behind the last question's reveal, they
+ * are aria-disabled, and the match's keys skip them (GamePage → useMatchKeys).
+ */
+export async function expectPressable(ordering: Locator) {
+  await expect(ordering.locator('button[data-answer]').first()).not.toHaveAttribute('aria-disabled', {
+    timeout: gameMs(5_000),
+  });
+}
+
 export interface MatchSummary {
   /** Questions this player answered (each one confirmed on screen). */
   answered: number;
@@ -198,7 +208,9 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
     total = of;
     expect(answered.has(index), `question ${index} offered twice`).toBe(false);
     if (await ordering.isVisible()) {
-      // „Подреди“: А, Б, В, Г in that order (1–4, as for options), Enter locks it.
+      // „Подреди“: А, Б, В, Г in that order (1–4, as for options), Enter locks it — once its items can be pressed (a
+      // key on a question still on its way in does nothing, as a tap wouldn't).
+      await expectPressable(ordering);
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
       await expect(page.getByText('Редът е заключен.'), `order for question ${index} not taken`).toBeAttached({
