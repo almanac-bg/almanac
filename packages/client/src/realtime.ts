@@ -10,7 +10,7 @@ import {
   type PowerupId,
   powerupById,
   type QueueModeId,
-  type RoomSettings,
+  type RoomSettingsPatch,
   type ServerToClientEvents,
 } from '@quiz/shared';
 import { io, type Socket } from 'socket.io-client';
@@ -158,6 +158,8 @@ function bind(s: GameSocket) {
   );
 
   s.on('room:state', (room) => setState({ room }));
+
+  s.on('evening:status', (evening) => setState({ evening }));
 
   s.on('rematch:state', (rematch) => {
     const mine = getState().game?.start;
@@ -537,6 +539,12 @@ export const actions = {
     setState({ queue: null });
   },
   startSolo: (category: CategoryChoice) => ask(() => withTimeout().emitWithAck('solo:start', { category })),
+  /** The evening Роял's lobby: in (while it's open), or out. */
+  joinEvening: () => ask(() => withTimeout().emitWithAck('evening:join')),
+  leaveEvening: () => {
+    getSocket().emit('evening:leave');
+    setState((st) => ({ evening: st.evening && { ...st.evening, joined: false } }));
+  },
   /** „Поправителен“: the missed questions that have come back. */
   startReview: () => ask(() => withTimeout().emitWithAck('review:start')),
   /** `via`: the code of the daily link it was opened from. */
@@ -555,19 +563,27 @@ export const actions = {
     getSocket().emit('rematch:decline', { gameId });
     setState({ rematch: null });
   },
-  createRoom: (settings: Partial<RoomSettings> = {}) =>
+  createRoom: (settings: RoomSettingsPatch = {}) =>
     ask<{ code: string }>(() => withTimeout().emitWithAck('room:create', settings)),
-  joinRoom: (code: string) => ask<{ code: string }>(() => withTimeout().emitWithAck('room:join', code)),
+  /** `nickname`: what a guest goes by in the room (a guest has to give one). */
+  joinRoom: (code: string, nickname?: string) =>
+    ask<{ code: string }>(() =>
+      withTimeout().emitWithAck('room:join', nickname === undefined ? code : { code, nickname }),
+    ),
   leaveRoom: () => {
     getSocket().emit('room:leave');
     setState({ room: null });
   },
-  roomSettings: (settings: Partial<RoomSettings>) => getSocket().emit('room:settings', settings),
+  /** What the host changes: settings as they are, but a set by its id (null: the bank's questions). */
+  roomSettings: (settings: RoomSettingsPatch) => getSocket().emit('room:settings', settings),
   roomBot: (action: 'add' | 'remove') => getSocket().emit('room:bot', action),
   roomKick: (playerId: string) => getSocket().emit('room:kick', playerId),
   roomTeam: (playerId: string) => getSocket().emit('room:team', playerId),
   startRoom: () => ask(() => withTimeout().emitWithAck('room:start')),
   invite: (userId: number) => ask(() => withTimeout().emitWithAck('invite:send', { userId })),
+  /** Отбори with a friend: ask them; once they say yes, the two of you wait in the queue together. */
+  inviteDuo: (userId: number) => ask(() => withTimeout().emitWithAck('duo:invite', { userId })),
+  acceptDuo: (inviteId: string) => ask(() => withTimeout().emitWithAck('duo:accept', { inviteId })),
   declineInvite: (invite: Invite) => {
     getSocket().emit('invite:decline', { inviteId: invite.id });
     dropInvite(invite.id);

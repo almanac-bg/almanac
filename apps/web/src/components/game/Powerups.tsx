@@ -150,6 +150,9 @@ function blockedBy(game: LiveGame, p: PowerupDef): string | null {
   if (game.usedPowerups.includes(p.id)) return 'вече е изигран';
   if (game.powerupThisQuestion) return 'само един коз на въпрос';
   if (p.notOnEasy && game.question?.difficulty === 'easy') return 'само на среден и труден въпрос';
+  // True or false (a host's own set): taking one away, or a second try, would be the answer.
+  if ((p.id === 'fifty' || p.id === 'retry') && (game.question?.options.length ?? 4) < 4)
+    return 'не и при вярно/невярно';
   return null;
 }
 

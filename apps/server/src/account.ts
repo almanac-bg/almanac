@@ -12,6 +12,7 @@ import { factCount, reviewQueue } from './almanac';
 import { verifyPassword } from './auth';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
+import { isChampion } from './evening';
 import { incomingRequests } from './friends';
 import { dropEmptyGroups, groupIdsOf } from './groups';
 import { earnedMastery } from './mastery';
@@ -28,6 +29,7 @@ export function unlockContext(userId: number): UnlockContext {
     achievements: achievementSet(userId),
     seasonTier: bestSeasonTier(userId),
     mastery: Object.fromEntries(earnedMastery(userId).map((m) => [m.category, m.tier])),
+    eveningChampion: isChampion(userId),
   };
 }
 
@@ -94,6 +96,7 @@ export function getMe(userId: number): MeUser | null {
     mastery: earnedMastery(userId).map((m) => ({ ...m })),
     almanac: { facts: factCount(userId), due: reviewQueue(userId).due },
     groups: groupIdsOf(userId).length,
+    eveningChampion: isChampion(userId),
   };
 }
 
@@ -146,10 +149,14 @@ export function exportAccount(userId: number) {
     learned: rows('SELECT question_id, learned_at FROM learned WHERE user_id = ? ORDER BY learned_at'),
     reviewQueue: rows('SELECT question_id, step, due_at FROM review_queue WHERE user_id = ? ORDER BY due_at'),
     mastery: rows('SELECT category, tier, earned_at FROM mastery WHERE user_id = ?'),
+    eveningResults: rows('SELECT day, placement, score, players FROM evening_results WHERE user_id = ? ORDER BY day'),
     groups: rows(
       `SELECT g.name, g.owner_id = m.user_id AS owner, m.joined_at FROM group_members m
        JOIN player_groups g ON g.id = m.group_id WHERE m.user_id = ?`,
     ),
+    questionSets: rows(
+      'SELECT name, code, questions, hidden, created_at, updated_at FROM question_sets WHERE owner_id = ?',
+    ).map((r) => ({ ...r, questions: JSON.parse(String(r.questions)) })),
     groupWeeksWon: rows(
       `SELECT g.name, w.week, w.score FROM group_weeks w JOIN player_groups g ON g.id = w.group_id
        WHERE w.winner_id = ?`,

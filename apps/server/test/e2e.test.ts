@@ -439,6 +439,171 @@ test('private room', T, async () => {
   sb.off('room:state', onState);
 });
 
+test('a class: guests join under a name of their own, the host runs it on a big screen, in rounds', T, async () => {
+  const pupils = await Promise.all([guest(srv.url), guest(srv.url)]);
+  const [s1, s2] = pupils.map((g) => connect(srv.url, g.cookie));
+  await connected(s1, s2);
+  let onState = (_: RoomState | null) => {};
+  try {
+    const states: RoomState[] = [];
+    onState = (st: RoomState | null) => st && states.push(st);
+    sa.on('room:state', onState);
+    const created = await emitAck(sa, 'room:create', { maxPlayers: 40, hostPlays: false, rounds: true, questions: 5 });
+    assert.ok(created.ok);
+    await eventually(() => assert.ok(states.length));
+    assert.deepEqual(
+      [states.at(-1)!.settings.maxPlayers, states.at(-1)!.settings.rounds, states.at(-1)!.settings.questions],
+      [40, true, 10],
+      'up to 40; rounds are ten questions',
+    );
+    // Knockouts are for a handful: on, the room takes at most 8.
+    sa.emit('room:settings', { elimination: true });
+    await eventually(() => assert.equal(states.at(-1)!.settings.maxPlayers, 8));
+    sa.emit('room:settings', { elimination: false, maxPlayers: 40 });
+    await eventually(() => assert.equal(states.at(-1)!.settings.maxPlayers, 40));
+
+    const nameless = await emitAck(s1, 'room:join', created.code);
+    assert.equal(nameless.ok, false, 'a guest picks a name first');
+    assert.ok((await emitAck(s1, 'room:join', { code: created.code, nickname: '  Ученик   1 ' })).ok);
+    const twin = await emitAck(s2, 'room:join', { code: created.code, nickname: 'ученик 1' });
+    assert.match((twin as { error: string }).error, /вече е с това име/);
+    assert.ok((await emitAck(s2, 'room:join', { code: created.code, nickname: 'Ученик 2' })).ok);
+    await eventually(() =>
+      assert.deepEqual(
+        states
+          .at(-1)!
+          .players.map((p) => p.name)
+          .slice(1),
+        ['Ученик 1', 'Ученик 2'],
+      ),
+    );
+
+    // The host's screen hears the whole match and plays none of it.
+    const screen = next(sa, 'game:start');
+    const reveal = next(sa, 'game:reveal');
+    const hostEnd = next(sa, 'game:end', 60_000);
+    const p1 = autoPlay(s1, 'right');
+    const p2 = autoPlay(s2, 'wrong');
+    assert.ok((await emitAck(sa, 'room:start')).ok);
+    const start = await screen;
+    assert.equal(start.presenter, true);
+    assert.equal(start.youId, '');
+    assert.deepEqual(
+      start.players.map((p) => p.name),
+      ['Ученик 1', 'Ученик 2'],
+      'the host is no player',
+    );
+    assert.equal(start.rounds.length, 3);
+    assert.equal(Object.keys((await reveal).results).length, 2);
+    const [{ end: e1 }] = await Promise.all([p1, p2]);
+    assert.equal(e1.standings[0].id, start.players.find((p) => p.name === 'Ученик 1')!.id);
+    assert.equal((await hostEnd).rewards, null);
+  } finally {
+    sa.off('room:state', onState);
+    sa.emit('room:leave');
+    s1.close();
+    s2.close();
+  }
+});
+
+test('„Моите въпроси“: a host plays their own set in a room; shared by link, copied, reported, hidden', T, async () => {
+  const set = {
+    name: '  Урок   по история ',
+    questions: [
+      {
+        kind: 'choice',
+        q: 'Коя е столицата на България?',
+        options: ['София ✓', 'Пловдив', 'Варна', 'Бургас'],
+        answer: 0,
+      },
+      { kind: 'truefalse', q: 'Дунав се влива в Черно море?', answer: true },
+      {
+        kind: 'number',
+        q: 'През коя година е Освобождението? (= 1878)',
+        number: { answer: 1878, unit: 'г.', tolerance: 10 },
+      },
+    ],
+  };
+  const bad = await api.send('POST', '/api/sets', A.cookie, {
+    ...set,
+    questions: [{ kind: 'choice', q: 'Двойно?', options: ['а', 'а', 'б', 'в'], answer: 0 }],
+  });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /^Въпрос 1: .*еднакви/);
+  const made = await api.send('POST', '/api/sets', A.cookie, set);
+  assert.equal(made.status, 200);
+  const mine = (await api.get(`/api/sets/${made.body.id}`, A.cookie)).body;
+  assert.equal(mine.name, 'Урок по история');
+  assert.equal((await api.get(`/api/sets/${made.body.id}`, B.cookie)).status, 404, 'theirs alone');
+
+  // Into a room: all of the set's questions, in its order, with no XP for answers and nothing measured.
+  const states: RoomState[] = [];
+  const onState = (st: RoomState | null) => st && states.push(st);
+  sa.on('room:state', onState);
+  try {
+    const room = (await emitAck(sa, 'room:create', {})) as { code: string };
+    assert.ok((await emitAck(sb, 'room:join', room.code)).ok);
+    sa.emit('room:settings', { set: made.body.id });
+    await eventually(() =>
+      assert.deepEqual(states.at(-1)!.settings.set, { id: made.body.id, name: 'Урок по история', questions: 3 }),
+    );
+    sb.emit('room:settings', { set: null }); // not the host
+    const log = newLog();
+    const pa = autoPlay(sa, 'right', log);
+    const pb = autoPlay(sb, 'right');
+    const before = (await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, A.cookie)).body.overview;
+    assert.ok((await emitAck(sa, 'room:start')).ok);
+    const [{ start, end }] = await Promise.all([pa, pb]);
+    assert.equal(start!.questionSet, 'Урок по история');
+    assert.deepEqual(
+      log.questions.map((q) => [q.kind, q.options.length]),
+      [
+        ['choice', 4],
+        ['choice', 2],
+        ['number', 0],
+      ],
+    );
+    assert.deepEqual(log.questions[1].options, ['Вярно', 'Невярно']);
+    assert.ok(!end.rewards!.breakdown.some((l) => l.label.startsWith('Верни отговори')), 'no XP for answers');
+    const after = (await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, A.cookie)).body.overview;
+    assert.equal(after.questionsAnswered, before.questionsAnswered, 'nothing measured');
+    sa.emit('room:leave');
+    sb.emit('room:leave');
+  } finally {
+    sa.off('room:state', onState);
+  }
+
+  // Shared: another host sees what it is, takes a copy; a report about it, and a moderator hides it.
+  const preview = (await api.get(`/api/sets/shared/${mine.code}`, B.cookie)).body;
+  assert.deepEqual(preview, {
+    name: 'Урок по история',
+    author: A.user.username,
+    questions: 3,
+    kinds: { choice: 1, truefalse: 1, number: 1 },
+    mine: null,
+    hidden: false,
+  });
+  const copy = await api.send('POST', `/api/sets/shared/${mine.code}/copy`, B.cookie);
+  assert.equal((await api.get(`/api/sets/${copy.body.id}`, B.cookie)).body.questions.length, 3);
+  assert.equal(
+    (await api.send('POST', `/api/sets/shared/${mine.code}/report`, B.cookie, { details: 'обидно' })).status,
+    200,
+  );
+  const filed = srv.db.prepare('SELECT details FROM reports WHERE target_id = ?').get(A.user.id) as {
+    details: string;
+  };
+  assert.match(filed.details, /^Набор „Урок по история“ \(\/sets\/shared\/.+\): обидно$/);
+  srv.db.prepare('DELETE FROM reports WHERE target_id = ?').run(A.user.id); // the moderation test counts its own
+  assert.equal((await api.send('POST', `/api/sets/shared/${mine.code}/hide`, B.cookie, { hidden: true })).status, 403);
+  srv.db.prepare('UPDATE question_sets SET hidden = 1 WHERE code = ?').run(mine.code);
+  assert.equal((await api.get(`/api/sets/shared/${mine.code}`, B.cookie)).status, 404, 'hidden');
+  assert.equal(
+    (await api.get(`/api/sets/shared/${mine.code}`, A.cookie)).body.mine,
+    made.body.id,
+    'its owner still sees it',
+  );
+});
+
 test('forfeit frees the player', T, async () => {
   const q = next(sb, 'game:question');
   await emitAck(sb, 'solo:start', { category: 'mixed' });
@@ -713,10 +878,10 @@ test('streak reminders: opt in with a verified email, opt out from the email lin
 test('profiles, achievements, leaderboards, loadout', T, async () => {
   const prof = await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, B.cookie);
   assert.equal(prof.status, 200);
-  // Solo, the ranked duel, Royale, the private room, the challenge link and two more duels; the rematch A walked out
-  // of is listed but doesn't count as played.
-  assert.equal(prof.body.overview.gamesPlayed, 7);
-  assert.equal(prof.body.recent.length, 8);
+  // Solo, the ranked duel, Royale, the private room, the room on A's own set, the challenge link and two more duels;
+  // the rematch A walked out of is listed but doesn't count as played. (Running a class on a big screen is no match.)
+  assert.equal(prof.body.overview.gamesPlayed, 8);
+  assert.equal(prof.body.recent.length, 9);
   // The home card's totals are the profile's.
   const { stats } = (await api.get('/api/me', A.cookie)).body.user;
   assert.equal(stats.games, prof.body.overview.gamesPlayed);
@@ -1106,16 +1271,46 @@ test('team room', T, async () => {
   await bothOutOfRooms();
 });
 
-test('ranked 2 на 2 queue', T, async () => {
-  const play = autoPlay(sa, 'right');
-  assert.ok((await emitAck(sa, 'queue:join', 'teams')).ok);
+test('Арена (3–5): alone, two bots make it three; the match is in rounds with a number final', T, async () => {
+  const log = newLog();
+  const play = autoPlay(sa, 'right', log);
+  assert.ok((await emitAck(sa, 'queue:join', 'squad')).ok);
   const { start, end } = await play;
+  assert.equal(start!.players.length, 3, 'up to its minimum, no more bots');
+  assert.equal(start!.totalQuestions, 10);
+  assert.equal(start!.rounds.length, 3);
+  assert.equal(log.questions.at(-1)!.kind, 'number');
+  assert.ok(end.rewards!.rating, 'rated');
+});
+
+test('Отбори: two friends go into the queue as a pair and play on one team (here against two bots)', T, async () => {
+  const alone = await emitAck(sa, 'queue:join', 'teams');
+  assert.equal(alone.ok, false, 'never one alone');
+  // Accounts with some history (a new one plays people unrated), whatever ran before this.
+  srv.db
+    .prepare('UPDATE users SET games_played = MAX(games_played, ?) WHERE id IN (?, ?)')
+    .run(RATED_AFTER.games, A.user.id, B.user.id);
+  const invited = next(sb, 'invite');
+  assert.deepEqual(await emitAck(sa, 'duo:invite', { userId: B.user.id }), { ok: true });
+  const invite = await invited;
+  assert.deepEqual([invite.kind, invite.from.id, invite.roomCode], ['duo', A.user.id, null]);
+  const playA = autoPlay(sa, 'right');
+  const playB = autoPlay(sb, 'wrong');
+  assert.deepEqual(await emitAck(sb, 'duo:accept', { inviteId: invite.id }), { ok: true });
+  const [{ start, end }, b] = await Promise.all([playA, playB]);
   assert.equal(start!.players.length, 4);
-  assert.equal(start!.players.filter((p) => p.team === 0).length, 2, 'two teams of two');
-  assert.ok(end.rewards!.rating, 'team rating moves');
+  const teamOf = (userId: number) => start!.players.find((p) => p.userId === userId)!.team;
+  assert.equal(teamOf(A.user.id), teamOf(B.user.id), 'the pair plays together');
+  assert.ok(
+    start!.players.filter((p) => p.team !== teamOf(A.user.id)).every((p) => p.isBot),
+    'against two bots',
+  );
+  assert.ok(end.rewards!.rating && b.end.rewards!.rating, 'team rating moves');
   // A ranked match against bots is a real one: its win counts.
   const won = end.standings.find((s) => s.id === `u${A.user.id}`)!.placement === 1;
   assert.equal(end.rewards!.achievements.includes('team_win'), won);
+  // An invite is good once.
+  assert.equal((await emitAck(sb, 'duo:accept', { inviteId: invite.id })).ok, false);
 });
 
 test('козове', T, async () => {
@@ -1280,7 +1475,7 @@ test('season settlement', T, async () => {
   assert.equal((await api.get('/api/me', A.cookie)).body.user.seasonRewards.length, 0);
   const season = (await api.get('/api/season', A.cookie)).body;
   assert.equal(season.history[0].tier, 'gold');
-  assert.equal(season.modes.length, 5);
+  assert.equal(season.modes.length, 4, 'every ranked queue');
 });
 
 test('email verification, password reset and change', T, async () => {

@@ -52,6 +52,7 @@ import {
   verifyEmailToken,
 } from '../emailAuth';
 import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
+import { eveningInfo } from '../evening';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
@@ -95,9 +96,11 @@ import {
 } from '../users';
 import { idParam, parse, requireAccount } from './common';
 import { progress } from './progress';
+import { setsRouter } from './sets';
 
 export const api = Router();
 api.use(progress);
+api.use(setsRouter);
 
 const Credentials = z
   .object({
@@ -712,6 +715,11 @@ api.post('/daily/link', requireAuth, (_req, res) => {
     return;
   }
   res.json({ code });
+});
+
+/** Tonight's evening Роял (whether you're in its lobby) and the last one's top. */
+api.get('/evening', requireAuth, (_req, res) => {
+  res.json(eveningInfo(res.locals.userId));
 });
 
 api.get('/season', requireAuth, (_req, res) => {

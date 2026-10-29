@@ -7,7 +7,10 @@ import { useNavigate } from 'react-router';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 
-/** Incoming room invites from friends (a friend duel waits as a note instead: it's played when it suits). */
+/**
+ * Incoming invites from friends: into their room, or to play Отбори together (a friend duel waits as a note instead:
+ * it's played when it suits).
+ */
 export function Invites() {
   const invites = useStore((s) => s.invites);
   const inGame = useStore((s) => !!s.game && s.game.phase !== 'ended');
@@ -34,13 +37,16 @@ function InviteCard({ invite }: { invite: Invite }) {
   const [busy, setBusy] = useState(false);
   const left = Math.max(0, Math.ceil((invite.expiresAt - now) / 1000));
 
+  const duo = invite.kind === 'duo';
+
   async function accept() {
     setBusy(true);
-    const res = await actions.joinRoom(invite.roomCode);
+    // Отбори: the two of you go into the queue (its screen opens by itself).
+    const res = duo ? await actions.acceptDuo(invite.id) : await actions.joinRoom(invite.roomCode!);
     setBusy(false);
     dropInvite(invite.id);
-    if (res.ok) navigate('/room');
-    else toast({ kind: 'error', title: res.error });
+    if (!res.ok) toast({ kind: 'error', title: res.error });
+    else if (!duo) navigate('/room');
   }
 
   return (
@@ -64,7 +70,7 @@ function InviteCard({ invite }: { invite: Invite }) {
             Покана
           </p>
           <p className="truncate text-sm">
-            <b>{invite.from.username}</b> те кани в стая.
+            <b>{invite.from.username}</b> {duo ? 'те кани за Отбори — двамата срещу двама.' : 'те кани в стая.'}
           </p>
         </div>
       </div>
@@ -72,8 +78,13 @@ function InviteCard({ invite }: { invite: Invite }) {
         <Button size="sm" variant="ghost" onClick={() => actions.declineInvite(invite)}>
           Откажи
         </Button>
-        <Button size="sm" onClick={accept} loading={busy}>
-          Влез
+        <Button
+          size="sm"
+          onClick={accept}
+          loading={busy}
+          aria-label={duo ? `Играй Отбори с ${invite.from.username}` : undefined}
+        >
+          {duo ? 'Играй' : 'Влез'}
           <span aria-hidden>· {left} с</span>
         </Button>
       </div>

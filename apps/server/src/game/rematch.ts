@@ -15,6 +15,8 @@ interface Offer {
   mode: QueueModeId;
   /** Player id in the match → user id. */
   players: Map<string, number>;
+  /** Who goes into the queue together (Отбори: each pair stays a pair). */
+  parties: number[][];
   ready: Set<string>;
   timer: NodeJS.Timeout;
 }
@@ -46,7 +48,7 @@ export class Rematches {
     const userIds = [...offer.players.values()];
     const startable = this.canStart() && userIds.every((id) => this.isOnline(id) && !this.games.forUser(id));
     this.close(offer, !startable);
-    if (startable) this.matchmaker.startWith(offer.mode, userIds);
+    if (startable) this.matchmaker.startWith(offer.mode, offer.parties);
   }
 
   decline(userId: number, gameId: string) {
@@ -64,10 +66,18 @@ export class Rematches {
     if (!ranked || !isQueueMode(mode)) return;
     const stayed = game.humans.filter((p) => !p.left && p.player.userId !== null);
     if (stayed.length < 2) return;
+    // Отбори: the same pairs again, so only while both of each pair are still here.
+    const parties = game.setup.teams
+      ? [0, 1]
+          .map((team) => stayed.filter((p) => p.player.team === team).map((p) => p.player.userId!))
+          .filter((p) => p.length)
+      : stayed.map((p) => [p.player.userId!]);
+    if (game.setup.teams && parties.some((p) => p.length !== 2)) return;
     const offer: Offer = {
       gameId: game.id,
       mode,
       players: new Map(stayed.map((p) => [p.player.id, p.player.userId!])),
+      parties,
       ready: new Set(),
       timer: setTimeout(
         guarded('rematch expiry', () => this.close(offer, true)),

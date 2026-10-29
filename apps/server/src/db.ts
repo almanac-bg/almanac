@@ -630,6 +630,38 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ) WITHOUT ROWID;
     `,
   },
+
+  // v23, rooms and the evening:
+  // - `question_sets`: a host's own questions for their rooms („Моите въпроси“, sets.ts), shared by `code`; `hidden`
+  //   by a moderator after a report.
+  // - `evening_results`: each person's place in the evening Роял (evening.ts), for the night's top ten, the
+  //   champion's title and the frame for three wins. Older code leaves both alone.
+  {
+    compatible: `
+    CREATE TABLE question_sets (
+      id INTEGER PRIMARY KEY,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      questions TEXT NOT NULL,
+      hidden INTEGER NOT NULL DEFAULT 0,
+      copied_from INTEGER REFERENCES question_sets(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX question_sets_owner ON question_sets(owner_id, updated_at);
+
+    CREATE TABLE evening_results (
+      day TEXT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      placement INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      players INTEGER NOT NULL,
+      PRIMARY KEY (day, user_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX evening_wins ON evening_results(user_id) WHERE placement = 1;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

@@ -19,5 +19,5 @@ export function useOpenQueues(): QueueModeId[] {
  * open. The profile and the achievements page count the same set.
  */
 export function availableAchievements(open: QueueModeId[], earned: (id: string) => boolean) {
-  return ACHIEVEMENTS.filter((a) => !a.queue || open.includes(a.queue) || earned(a.id));
+  return ACHIEVEMENTS.filter((a) => !a.queue || (open as string[]).includes(a.queue) || earned(a.id));
 }

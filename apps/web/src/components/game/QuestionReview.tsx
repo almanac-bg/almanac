@@ -9,6 +9,9 @@ import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
 import { numberText, offText } from './numbers';
 
+/** A question from a room host's own set („Моите въпроси“), not the bank. */
+const ownQuestion = (item: ReviewItem) => item.id.startsWith('set-');
+
 /** The match's questions with the right answers, and a way to flag a mistake in any of them. */
 export function QuestionReview({ items }: { items: ReviewItem[] }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +56,8 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
                 key={item.index}
                 item={item}
                 reported={reported.has(item.id)}
-                onReport={canReport ? () => setReporting(item) : null}
+                // A host's own question isn't the bank's to fix.
+                onReport={canReport && !ownQuestion(item) ? () => setReporting(item) : null}
               />
             ))}
           </motion.ol>
@@ -92,7 +96,7 @@ function ReviewRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-fg-3">
-          {item.index + 1}. {category?.icon} {category?.name}
+          {item.index + 1}. {ownQuestion(item) ? '📝 От набора на домакина' : `${category?.icon} ${category?.name}`}
         </p>
         <p className="mt-0.5 font-semibold">{keepTogether(item.q)}</p>
         {item.number ? (

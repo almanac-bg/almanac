@@ -1,4 +1,4 @@
-import type { QueueModeId } from './modes';
+import type { ModeId } from './modes';
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -11,8 +11,8 @@ export interface AchievementDef {
   xp: number;
   /** Achievements with a goal show a progress bar. */
   goal?: number;
-  /** Only earnable in this ranked queue (hidden while it's closed). */
-  queue?: QueueModeId;
+  /** Only earnable in this ranked queue (hidden while it's closed, or for good once it's gone, like Трио). */
+  queue?: ModeId;
 }
 
 export const RARITIES: Record<Rarity, { name: string; color: string }> = {
@@ -96,6 +96,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     rarity: 'epic',
     xp: 400,
     goal: 1,
+  },
+  {
+    id: 'evening_3',
+    name: 'Три вечери',
+    description: 'Спечели „Вечерен Роял“ три пъти.',
+    icon: '🌙',
+    rarity: 'epic',
+    xp: 600,
+    goal: 3,
   },
   {
     id: 'party_animal',

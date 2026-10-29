@@ -7,6 +7,7 @@ import {
   type ModeId,
   POWERUPS,
   type PowerupId,
+  ROUNDS_QUESTIONS,
   START_RATING,
   type TeamId,
   unlockedIds,
@@ -96,6 +97,15 @@ export interface NewGame {
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
   /** A friend duel: who it's against. */
   duelWith?: GameSetup['duelWith'];
+  /** Overrides the mode's own ROUNDS and number final (a room's settings). */
+  inRounds?: boolean;
+  final?: boolean;
+  /** A room's host who runs it on a big screen instead of playing. */
+  presenter?: number | null;
+  /** A room playing its host's own set (its name; `questions` are the set's). */
+  questionSet?: string | null;
+  /** The evening Роял of this day. */
+  eveningDay?: string | null;
   humans: HumanEntry[];
   bots: Bot[];
 }
@@ -138,6 +148,8 @@ const MISSED_RESULT_MS = 15 * 60_000;
 export class GameRegistry {
   private games = new Map<string, Game>();
   private byUser = new Map<number, Game>();
+  /** Room hosts running a match on a big screen, by user id. */
+  private presenting = new Map<number, Game>();
   private missed = new Map<number, { start: GameStartPayload; end: GameEndPayload; until: number }>();
   private closedListeners: ((game: Game) => void)[] = [];
   private idleWaiters: (() => void)[] = [];
@@ -169,6 +181,11 @@ export class GameRegistry {
   /** The match a user is currently playing (not one they walked out of). */
   forUser(userId: number): Game | undefined {
     return this.byUser.get(userId);
+  }
+
+  /** The match a room's host is running on a big screen without playing in it. */
+  presentedBy(userId: number): Game | undefined {
+    return this.presenting.get(userId);
   }
 
   get playersInGame() {
@@ -212,12 +229,16 @@ export class GameRegistry {
     const userIds = opts.humans.map((h) => h.player.userId!);
     const def = MODES[opts.mode];
     const seen = opts.questions ? new Map<string, number>() : recentFor(userIds);
+    const final = opts.final ?? def.final;
     const inRounds =
-      !opts.questions && def.rounds && opts.category === 'mixed' && opts.questionCount === def.questions
-        ? pickRounds(seen)
+      !opts.questions &&
+      (opts.inRounds ?? def.rounds) &&
+      opts.category === 'mixed' &&
+      opts.questionCount === ROUNDS_QUESTIONS
+        ? pickRounds(seen, Math.random, { final })
         : null;
     const questions =
-      opts.questions ?? inRounds?.questions ?? pickMatch(opts.questionCount, opts.category, seen, { final: def.final });
+      opts.questions ?? inRounds?.questions ?? pickMatch(opts.questionCount, opts.category, seen, { final });
     if (questions.length < opts.questionCount) throw new StartError('Няма достатъчно въпроси за тази категория.');
 
     const room = (id: string) => `game:${id}`;
@@ -249,6 +270,9 @@ export class GameRegistry {
         bots: opts.bots,
         records: opts.records ?? [],
         duelWith: opts.duelWith ?? null,
+        presenter: opts.presenter ?? null,
+        questionSet: opts.questionSet ?? null,
+        eveningDay: opts.eveningDay ?? null,
       },
       emitter,
       {
@@ -274,8 +298,9 @@ export class GameRegistry {
     );
 
     // Bookkeeping first: once the match is registered nothing may fail before it starts, or its players would be
-    // stuck "in a game" that never runs. A round still to be picked isn't seen yet (shown() comes when it is).
-    for (const userId of userIds) {
+    // stuck "in a game" that never runs. A round still to be picked isn't seen yet (shown() comes when it is); a host's
+    // own set isn't the bank's.
+    for (const userId of opts.questionSet ? [] : userIds) {
       try {
         markSeen(
           userId,
@@ -290,6 +315,11 @@ export class GameRegistry {
       this.missed.delete(userId);
       this.byUser.set(userId, game);
       this.io.in(`user:${userId}`).socketsJoin(room(game.id));
+    }
+    // The host running it on a big screen hears everything the match's room does, and gets in again after a drop.
+    if (opts.presenter) {
+      this.presenting.set(opts.presenter, game);
+      this.io.in(`user:${opts.presenter}`).socketsJoin(room(game.id));
     }
     try {
       game.start();
@@ -328,6 +358,8 @@ export class GameRegistry {
   private close(game: Game) {
     // Once only: a match closed twice (its end ran again after a bug) mustn't tell its listeners twice.
     if (!this.games.delete(game.id)) return;
+    const presenter = game.setup.presenter;
+    if (presenter && this.presenting.get(presenter) === game) this.presenting.delete(presenter);
     const userIds: number[] = [];
     for (const p of game.humans) {
       const userId = p.player.userId!;

@@ -27,7 +27,9 @@ import {
 } from './challenges';
 import { config } from './config';
 import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
+import { setEveningLobby } from './evening';
 import { areFriends, friendIds, incomingRequests } from './friends';
+import { EveningLobby } from './game/eveningLobby';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry, startFailure } from './game/registry';
@@ -42,6 +44,8 @@ import { eventBucket, network, throttled } from './throttle';
 import { getUser, publicUser } from './users';
 
 const POWERUP_IDS = POWERUPS.map((p) => p.id);
+
+const DUO_ONLY = 'Отбори се играе по двама: покани приятел от „Приятели“ или от картата на режима.';
 
 function reply<T extends object>(ack: unknown, result: AckResult<T>) {
   if (typeof ack === 'function') ack(result);
@@ -105,6 +109,8 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   };
   const matchmaker: Matchmaker = new Matchmaker(io, games, idleOnline);
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
+  const evening = new EveningLobby(io, games, (userId) => openSockets.has(userId) && !draining);
+  setEveningLobby(evening);
   /** Set when the server is shutting down for an update. */
   let draining = false;
   const rematches = new Rematches(
@@ -119,11 +125,12 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     if (!openSockets.has(userId)) return 'offline';
     if (games.forUser(userId)) return 'game';
     if (rooms.roomOf(userId)) return 'room';
-    if (matchmaker.modeOf(userId)) return 'queue';
+    if (matchmaker.modeOf(userId) || evening.has(userId)) return 'queue';
     return 'online';
   };
   setRealtime(io, presenceOf, friendIds, incomingRequests, (userId) => {
     matchmaker.leave(userId, false);
+    evening.leave(userId);
     rooms.leave(userId);
     games.leave(userId);
   });
@@ -195,6 +202,19 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     openSockets.set(userId, (openSockets.get(userId) ?? 0) + 1);
     if (firstSocket) friendsChanged(userId);
 
+    // In the evening Роял's lobby: how it stands.
+    if (evening.has(userId)) socket.emit('evening:status', evening.status(userId)!);
+
+    // A host running a match on a big screen: back on it.
+    const presented = games.presentedBy(userId);
+    if (presented) {
+      socket.join(`game:${presented.id}`);
+      const sync = presented.syncPresenter();
+      socket.emit('game:start', sync.start);
+      if (sync.question) socket.emit('game:question', sync.question);
+      if (sync.pick) socket.emit('game:pick', sync.pick);
+    }
+
     // Bring a reconnecting player back into whatever they were doing.
     const current = games.forUser(userId);
     if (current) {
@@ -225,6 +245,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     /** Going on to something new: off the queue, and any rematch offer from the last match is declined. */
     const moveOn = () => {
       matchmaker.leave(userId);
+      evening.leave(userId);
       rematches.cancelFor(userId);
     };
 
@@ -234,15 +255,58 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
         const open = config.openQueues.map((m) => `„${MODES[m].name}“`).join(' или ');
         return reply(ack, { ok: false, error: `Този режим ще се отвори скоро — дотогава опитай ${open}.` });
       }
+      // Отбори is for a pair of friends: they go in together from an invite (duo:invite), never one alone.
+      if (MODES[mode].teams) return reply(ack, { ok: false, error: DUO_ONLY });
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       rooms.leave(userId);
       rematches.cancelFor(userId);
-      matchmaker.join(userId, mode);
+      matchmaker.join([userId], mode);
+      reply(ack, { ok: true });
+    });
+
+    on('duo:invite', (p, ack) => {
+      if (guest()) return reply(ack, { ok: false, error: ACCOUNT_ONLY });
+      if (!config.openQueues.includes('teams')) return reply(ack, { ok: false, error: 'Отбори ще се отвори скоро.' });
+      const busy = busyError();
+      if (busy) return reply(ack, { ok: false, error: busy });
+      if (throttled(`duo-invite:${userId}`, 30, 10 * 60_000))
+        return reply(ack, { ok: false, error: 'Твърде много покани. Изчакай малко.' });
+      reply(
+        ack,
+        matchmaker.inviteDuo(userId, int(obj(p).userId), (id) => openSockets.has(id)),
+      );
+    });
+
+    on('duo:accept', (p, ack) => {
+      const busy = busyError();
+      if (busy) return reply(ack, { ok: false, error: busy });
+      const from = matchmaker.takeDuoInvite(userId, str(obj(p).inviteId, 64));
+      if (from === null) return reply(ack, { ok: false, error: 'Поканата вече не е валидна.' });
+      if (!openSockets.has(from) || games.forUser(from))
+        return reply(ack, { ok: false, error: 'Приятелят ти вече не е свободен.' });
+      for (const id of [from, userId]) {
+        rooms.leave(id);
+        rematches.cancelFor(id);
+      }
+      matchmaker.join([from, userId], 'teams');
+      const me = publicUser(userId);
+      if (me) notifyUser(from, 'notice', { kind: 'info', message: `${me.username} прие — търсим съперници.` });
       reply(ack, { ok: true });
     });
 
     on('queue:leave', () => matchmaker.leave(userId));
+
+    on('evening:join', (ack) => {
+      const busy = busyError();
+      if (busy) return reply(ack, { ok: false, error: busy });
+      matchmaker.leave(userId);
+      rooms.leave(userId);
+      rematches.cancelFor(userId);
+      reply(ack, evening.join(userId));
+    });
+
+    on('evening:leave', () => evening.leave(userId));
 
     on('solo:start', (opts, ack) => {
       const { category } = obj(opts);
@@ -392,7 +456,9 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       reply(ack, rooms.create(userId, obj(settings)));
     });
 
-    on('room:join', (code, ack) => {
+    on('room:join', (p, ack) => {
+      // The code alone (an older tab), or the code with the name a guest goes by there.
+      const { code, nickname } = typeof p === 'string' ? { code: p, nickname: undefined } : obj(p);
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       // Codes are short enough to type; this keeps them too slow to guess (per player, and per network: guests are free).
@@ -403,7 +469,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
         return reply(ack, { ok: false, error: 'Твърде много опити да влезеш в стая. Изчакай няколко минути.' });
       }
       moveOn();
-      reply(ack, rooms.join(userId, str(code, 10)));
+      reply(ack, rooms.join(userId, str(code, 10), typeof nickname === 'string' ? nickname.slice(0, 60) : null));
     });
 
     on('room:leave', () => rooms.leave(userId));
@@ -420,7 +486,8 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     );
 
     on('invite:decline', (p) => {
-      const from = rooms.declineInvite(userId, str(obj(p).inviteId, 64));
+      const inviteId = str(obj(p).inviteId, 64);
+      const from = rooms.declineInvite(userId, inviteId) ?? matchmaker.takeDuoInvite(userId, inviteId);
       const me = publicUser(userId);
       if (from && me) notifyUser(from, 'notice', { kind: 'info', message: `${me.username} отказа поканата.` });
     });

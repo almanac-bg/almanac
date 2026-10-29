@@ -65,6 +65,8 @@ export interface MeUser extends PublicUser {
   almanac: { facts: number; due: number };
   /** Groups the player is in. */
   groups: number;
+  /** Won the evening Роял in the last day: its title is theirs to wear. */
+  eveningChampion: boolean;
 }
 
 export interface QuestInfo {
@@ -228,6 +230,13 @@ export interface GameStartPayload {
   rounds: RoundInfo[];
   /** A friend duel: who it's against, and their score when they've played it already (the score to beat). */
   duelWith: { username: string; score: number | null } | null;
+  /**
+   * You're the room's host running it on a big screen („Само водя“), not a player: `youId` is nobody, and the screen
+   * shows the question, how everyone answered and the top of the standings.
+   */
+  presenter?: boolean;
+  /** A room playing its host's own set: its name (the questions have no category or difficulty of the bank's). */
+  questionSet?: string | null;
   /** Countdown before the first question (0 when re-syncing mid-game). */
   startsInMs: number;
 }
@@ -352,6 +361,8 @@ export interface QueueStatus {
   waitedMs: number;
   /** Milliseconds until bots fill the remaining seats. Null when bots are disabled. */
   botFillMs: number | null;
+  /** Who's waiting with you (your partner in Отбори). */
+  with?: string[];
 }
 
 export interface RoomPlayer extends GamePlayer {
@@ -389,13 +400,17 @@ export interface RematchState {
 
 export type Presence = 'offline' | 'online' | 'queue' | 'room' | 'game';
 
+/** `room`: come into my room (`roomCode`); `duo`: play Отбори with me (we queue as a pair). */
 export interface Invite {
   id: string;
   from: PublicUser;
-  roomCode: string;
-  kind: 'room';
+  roomCode: string | null;
+  kind: 'room' | 'duo';
   expiresAt: number;
 }
+
+/** What a host changes in a room: the settings as they are, but their own set by its id (null: the bank). */
+export type RoomSettingsPatch = Partial<Omit<RoomSettings, 'set'>> & { set?: number | null };
 
 export type AckResult<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
 export type Ack<T extends object = object> = (res: AckResult<T>) => void;
@@ -433,6 +448,8 @@ export interface ServerToClientEvents {
   /** The server is restarting for an update: running matches finish, no new ones start until it's back. */
   'server:draining': (p: { message: string }) => void;
   'rematch:state': (p: RematchState) => void;
+  /** The evening Роял's lobby changed (someone came or went, it opened, it started): to those in it. */
+  'evening:status': (p: EveningStatus) => void;
 }
 
 export interface ClientToServerEvents {
@@ -449,17 +466,24 @@ export interface ClientToServerEvents {
   'challenge:start': (p: { id?: string; rival?: number; categories?: CategoryId[] }, ack: Ack<{ id: string }>) => void;
   /** „Поправителен“: the missed questions that are due (REVIEW). */
   'review:start': (ack: Ack) => void;
+  /** The evening Роял's lobby: in (while it's open), or out. */
+  'evening:join': (ack: Ack) => void;
+  'evening:leave': () => void;
   'rematch:request': (p: { gameId: string }) => void;
   'rematch:decline': (p: { gameId: string }) => void;
-  'room:create': (settings: Partial<RoomSettings>, ack: Ack<{ code: string }>) => void;
-  'room:join': (code: string, ack: Ack<{ code: string }>) => void;
+  'room:create': (settings: RoomSettingsPatch, ack: Ack<{ code: string }>) => void;
+  /** `nickname`: what a guest goes by in the room (a guest has to give one). */
+  'room:join': (p: string | { code: string; nickname?: string }, ack: Ack<{ code: string }>) => void;
   'room:leave': () => void;
-  'room:settings': (settings: Partial<RoomSettings>) => void;
+  'room:settings': (settings: RoomSettingsPatch) => void;
   'room:bot': (action: 'add' | 'remove') => void;
   'room:kick': (playerId: string) => void;
   'room:team': (playerId: string) => void;
   'room:start': (ack: Ack) => void;
   'invite:send': (p: { userId: number }, ack: Ack) => void;
+  /** Отбори with a friend: ask them, or (as the one asked) say yes — the two then wait in the queue as a pair. */
+  'duo:invite': (p: { userId: number }, ack: Ack) => void;
+  'duo:accept': (p: { inviteId: string }, ack: Ack) => void;
   'invite:decline': (p: { inviteId: string }) => void;
   'game:answer': (p: { index: number; choice: number }) => void;
   /** The number given on a number question. */
@@ -941,4 +965,89 @@ export interface GroupPreview {
   /** The viewer is in it already (its id, to go there). */
   memberOf: number | null;
   full: boolean;
+}
+
+// ─── „Моите въпроси“: a host's own question sets ─────────────────────────────
+
+/** One question of a host's own set: four options, true or false, or a number to give. */
+export type SetQuestion =
+  | { kind: 'choice'; q: string; options: string[]; answer: number }
+  | { kind: 'truefalse'; q: string; answer: boolean }
+  | {
+      kind: 'number';
+      q: string;
+      /** The answer; `unit` after it („км“, „г.“); `tolerance`: how far off still scores (a guess that far scores 0). */
+      number: { answer: number; unit: string; tolerance: number };
+    };
+
+export const SETS = {
+  /** Questions in one set, and sets per host. */
+  maxQuestions: 50,
+  perOwner: 30,
+  name: [2, 40],
+  question: [5, 200],
+  option: [1, 60],
+  unit: 12,
+} as const;
+
+/** A set as its owner keeps and edits it. */
+export interface QuestionSetInfo {
+  id: number;
+  name: string;
+  /** Its share link (/sets/shared/<code>): other hosts take a copy for their rooms. */
+  code: string;
+  questions: SetQuestion[];
+  /** A moderator hid it (a report about it held up): it can't be played or shared. */
+  hidden: boolean;
+  updatedAt: number;
+}
+
+export interface QuestionSetSummary {
+  id: number;
+  name: string;
+  questions: number;
+  hidden: boolean;
+  updatedAt: number;
+}
+
+/** A shared set as another host sees it before taking a copy. */
+export interface SharedSetPreview {
+  name: string;
+  author: string | null;
+  questions: number;
+  /** The kinds in it, for the preview: „12 с избор, 3 вярно/невярно, 2 с число“. */
+  kinds: { choice: number; truefalse: number; number: number };
+  /** The viewer's own set (they can edit it rather than copy it). */
+  mine: number | null;
+  /** Hidden by a moderator (only its owner and moderators still see it). */
+  hidden: boolean;
+}
+
+// ─── „Вечерен Роял“ ──────────────────────────────────────────────────────────
+
+/** Tonight's evening Роял (EVENING): when its lobby opens, when it starts, who's waiting. */
+export interface EveningStatus {
+  /** The day it's for (a day key), and when it starts and its lobby opens. */
+  day: string;
+  startsAt: number;
+  opensAt: number;
+  /** In the lobby now (between opensAt and startsAt). */
+  waiting: number;
+  /** You're in the lobby. */
+  joined: boolean;
+  /** Its matches are being played now. */
+  live: boolean;
+}
+
+/** An evening that's been played: its top (EVENING.top), and how many played. */
+export interface EveningNight {
+  day: string;
+  players: number;
+  top: { placement: number; user: PublicUser; score: number }[];
+}
+
+export interface EveningInfo {
+  /** Null when there's no evening Роял on this server. */
+  status: EveningStatus | null;
+  lastNight: EveningNight | null;
 }

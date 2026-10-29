@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
 import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
+import { BIG_MATCH, topAndYou } from '../game/bigMatch';
 import { teamColor } from '../game/teams';
 import { challengeShareText } from '../home/challengeLink';
 import { Button, Card } from '../ui';
@@ -90,7 +91,11 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
   const order = top.length === 3 ? [top[1], top[0], top[2]] : top.length === 2 ? [top[1], top[0]] : top;
   const heights: Record<number, string> = { 1: 'h-36 sm:h-44', 2: 'h-24 sm:h-32', 3: 'h-16 sm:h-24' };
   const medals: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
-  const rest = standings.slice(3);
+  // A class in a room: the next few and you, not the whole room.
+  const { shown: rest, gap } =
+    standings.length > BIG_MATCH
+      ? topAndYou(standings.slice(3), game.start.youId, 7)
+      : { shown: standings.slice(3), gap: null };
 
   return (
     <section className="mt-10">
@@ -159,11 +164,12 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
       </div>
       {rest.length > 0 && (
         <Card className="mx-auto mt-0 max-w-xl rounded-t-none p-2">
-          {rest.map((s) => {
+          {rest.map((s, i) => {
             const p = game.players[s.id];
             return (
               <div
                 key={s.id}
+                style={i === gap ? { marginTop: '1.25rem' } : undefined}
                 className={clsx(
                   'flex items-center gap-2 rounded-2xl px-3 py-2 sm:gap-3',
                   s.id === game.start.youId && 'bg-violet-500/12',

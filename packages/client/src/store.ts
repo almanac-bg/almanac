@@ -2,6 +2,7 @@ import type {
   CategoryId,
   Crowd,
   Difficulty,
+  EveningStatus,
   GameEndPayload,
   GamePlayer,
   GameStartPayload,
@@ -110,6 +111,8 @@ interface State {
   stalled: boolean;
   lobby: LobbyStats | null;
   queue: QueueStatus | null;
+  /** The evening Роял's lobby, as the server last said (sent to those in it; the home card loads it too). */
+  evening: EveningStatus | null;
   /** Local timestamp the current queue search started (for the stopwatch). */
   queueSince: number;
   room: RoomState | null;
@@ -132,6 +135,7 @@ export const useStore = create<State>(() => ({
   lobby: null,
   queue: null,
   queueSince: 0,
+  evening: null,
   room: null,
   game: null,
   toasts: [],

@@ -3,7 +3,7 @@ import { ROOM_CODE_DIGITS } from '@quiz/shared';
 import clsx from 'clsx';
 import { Lock, Plus, Users } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { ClaimAccountModal } from '../ClaimAccount';
 import { DuelRow, useDuels, usePlayDuel } from '../duels';
 import { Button, Card } from '../ui';
@@ -33,6 +33,8 @@ export function FriendsCard({ className }: { className?: string }) {
   async function join(e: FormEvent) {
     e.preventDefault();
     if (code.length !== ROOM_CODE_DIGITS) return;
+    // A guest first says what to call them in the room (the invite link's page asks).
+    if (guest) return navigate(`/join/${code}`);
     setBusy('join');
     const res = await actions.joinRoom(code);
     setBusy(null);
@@ -51,8 +53,8 @@ export function FriendsCard({ className }: { className?: string }) {
         <h2 className="mt-2 t-card">Частна стая</h2>
         <p className="mt-1 text-sm text-fg-3">
           {guest
-            ? 'До 8 играчи. Имаш код от приятел? Въведи го и влизаш в стаята.'
-            : 'До 8 играчи, твои правила. Сподели кода и започвай.'}
+            ? 'До 40 играчи. Имаш код от приятел или от учителя? Въведи го и влизаш в стаята.'
+            : 'До 40 играчи, твои правила — и голям екран за класа. Сподели кода и започвай.'}
         </p>
         {open.length > 0 && (
           <div className="mt-4">
@@ -89,6 +91,14 @@ export function FriendsCard({ className }: { className?: string }) {
             Влез
           </Button>
         </form>
+        {!guest && (
+          <Link
+            to="/sets"
+            className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg text-sm font-semibold text-fuchsia-300 hover:text-fuchsia-200"
+          >
+            📝 Моите въпроси — твои въпроси за стаята
+          </Link>
+        )}
         {/* Guests can join a room but not open one: the button is still there, and on tap it says why. */}
         {guest && (
           <Button variant="secondary" className="mt-3 w-full" onClick={() => setClaiming(true)}>

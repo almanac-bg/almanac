@@ -38,6 +38,8 @@ const APP_PATHS = [
   /^\/almanac(\/[^/]+)?$/,
   /^\/groups(\/[^/]+)?$/,
   /^\/groups\/join\/[^/]+$/,
+  /^\/sets(\/[^/]+)?$/,
+  /^\/sets\/shared\/[^/]+$/,
   /^\/notifications$/,
   /^\/submit$/,
   /^\/admin$/,

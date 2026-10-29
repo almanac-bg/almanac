@@ -41,7 +41,7 @@ import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
 
-const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'custom'];
+const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'trio', 'squad', 'royale', 'evening', 'custom'];
 
 /** The header's buttons: a row of their own under the level bar; from lg a column on the right. */
 const HEADER_ACTIONS = 'col-span-2 sm:col-span-1 sm:col-start-2 lg:col-start-3 lg:row-span-2 lg:row-start-1';
@@ -67,7 +67,10 @@ export function ProfilePage() {
   const isMe = user.id === me.id;
   const played = MODE_ORDER.filter((id) => data.modes.some((m) => m.mode === id));
   // Only what can be played today: a ranked queue that hasn't opened yet would read as a to-do nobody can do.
-  const unplayed = MODE_ORDER.filter((id) => !played.includes(id) && (!isQueueMode(id) || openQueues.includes(id)));
+  // Трио is history (it joined Арена): listed only for those who played it.
+  const unplayed = MODE_ORDER.filter(
+    (id) => !played.includes(id) && id !== 'trio' && (!isQueueMode(id) || openQueues.includes(id)),
+  );
 
   return (
     <div className="space-y-8">

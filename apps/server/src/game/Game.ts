@@ -7,11 +7,13 @@ import {
   type Crowd,
   closeness,
   type Difficulty,
+  EVENING,
   eliminationSchedule,
   type FinalStanding,
   type GameEndPayload,
   type GamePlayer,
   type GameStartPayload,
+  knockoutsAfter,
   type MatchRewards,
   type ModeId,
   NUMBER,
@@ -133,6 +135,12 @@ export interface GameSetup {
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
   /** A friend duel: who it's against (and their score, if they've played it). */
   duelWith?: GameStartPayload['duelWith'];
+  /** A room's host who runs it on a big screen („Само водя“): hears the match, plays no part in it. */
+  presenter?: number | null;
+  /** A room playing its host's own set (its name): none of the bank's questions. */
+  questionSet?: string | null;
+  /** The evening Роял of this day (its places are kept for the night's top and the champion). */
+  eveningDay?: string | null;
 }
 
 /** A recorded answer to each of a match's questions (null: none in time), in the match's own option order. */
@@ -299,8 +307,13 @@ export class Game {
       this.participants.set(r.player.id, p);
     }
     this.alone = solo;
+    // The questions after which someone goes out: the evening Роял's checkpoints, or one at a time spread to the end.
     this.schedule =
-      setup.elimination && !setup.teams ? eliminationSchedule(this.participants.size, setup.questions.length) : [];
+      setup.mode === 'evening'
+        ? [...EVENING.checkpoints, EVENING.finalTwoAfter]
+        : setup.elimination && !setup.teams
+          ? eliminationSchedule(this.participants.size, setup.questions.length)
+          : [];
   }
 
   get humans() {
@@ -314,6 +327,7 @@ export class Game {
   start() {
     for (const p of this.humans)
       this.emit.toUser(p.player.userId!, 'game:start', this.startPayload(p.player.id, COUNTDOWN_MS));
+    if (this.setup.presenter) this.emit.toUser(this.setup.presenter, 'game:start', this.presenterStart(COUNTDOWN_MS));
     this.later(COUNTDOWN_MS, () => this.advance());
   }
 
@@ -330,7 +344,7 @@ export class Game {
       };
       if (this.phase !== 'question' || index !== this.index) return reject('late');
       const q = this.questions[this.index];
-      if (q.kind === 'number' || !Number.isInteger(choice) || choice < 0 || choice > 3) return;
+      if (q.kind === 'number' || !Number.isInteger(choice) || choice < 0 || choice >= q.options.length) return;
       if (p.removed.includes(choice)) return reject('removed');
       const limit = this.limitMs;
       const elapsed = this.elapsed();
@@ -390,8 +404,10 @@ export class Game {
       if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
       const userId = p.player.userId!;
       const q = this.questions[this.index];
-      // A number has no options to take away and no wrong pick to retry; and the final is played bare.
+      // A number has no options to take away and no wrong pick to retry; and the final is played bare. With only two
+      // options (true or false, in a host's own set), 50/50 or a second try would give the answer away.
       if (q.kind === 'number') return;
+      if ((powerup === 'fifty' || powerup === 'retry') && q.options.length < 4) return;
       if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
       this.consume(p, powerup);
@@ -399,10 +415,9 @@ export class Game {
         case 'fifty': {
           // A recording keeps the option it went on to pick (whatever it was): its answer is already given.
           const kept = p.script?.[this.index]?.choice;
-          p.removed = shuffle([0, 1, 2, 3].filter((i) => i !== q.answer && i !== kept && !p.removed.includes(i))).slice(
-            0,
-            2,
-          );
+          p.removed = shuffle(
+            q.options.map((_, i) => i).filter((i) => i !== q.answer && i !== kept && !p.removed.includes(i)),
+          ).slice(0, 2);
           // A bot (or a recording) has nobody to tell which ones went; the others only see that it was played.
           if (p.player.userId === null) this.toGame('game:powerup', { playerId, powerup });
           else {
@@ -527,6 +542,23 @@ export class Game {
             }
           : null,
       pick: this.pickPayload(),
+    };
+  }
+
+  /** What brings the big screen of a host who runs the match (and dropped) up to speed. */
+  syncPresenter(): { start: GameStartPayload; question: QuestionPayload | null; pick: PickPayload | null } {
+    return {
+      start: this.presenterStart(0),
+      question: this.phase === 'question' ? this.questionPayload() : null,
+      pick: this.pickPayload(),
+    };
+  }
+
+  /** The start as the host's big screen sees it: everyone in the match, and none of it theirs. */
+  private presenterStart(startsInMs: number): GameStartPayload {
+    return {
+      ...this.startPayload(null, startsInMs),
+      presenter: true,
     };
   }
 
@@ -798,8 +830,9 @@ export class Game {
 
     const eliminated: string[] = [];
     const active = this.ranked().filter((p) => this.isActive(p));
-    if (this.schedule.includes(questionNo) && active.length > 2) {
-      const loser = active[active.length - 1];
+    // The last of those still in (in the evening Роял, the bottom few): out.
+    const out = knockoutsAfter(this.setup.mode, this.schedule, questionNo, active.length);
+    for (const loser of active.slice(active.length - out)) {
       loser.eliminatedAt = questionNo;
       eliminated.push(loser.player.id);
     }
@@ -897,6 +930,18 @@ export class Game {
       this.emit.toUser(userId, 'game:end', payload);
       if (!p.connected) this.hooks.undelivered(userId, this.startPayload(p.player.id, 0), payload);
     }
+    if (this.setup.presenter) {
+      this.emit.toUser(this.setup.presenter, 'game:end', {
+        gameId: this.id,
+        mode: this.setup.mode,
+        ranked: this.setup.ranked,
+        roomCode: this.setup.roomCode,
+        standings,
+        teamScores,
+        rewards: null,
+        noContest: this.noContest,
+      });
+    }
     this.hooks.onClosed(this);
   }
 
@@ -968,7 +1013,7 @@ export class Game {
       !p.usedPowerups.has(id) &&
       !(q.difficulty === 'easy' && POWERUPS.find((d) => d.id === id)?.notOnEasy);
     const joker =
-      !knows && playable('fifty') && Math.random() < 0.35
+      !knows && playable('fifty') && q.options.length === 4 && Math.random() < 0.35
         ? 'fifty'
         : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
           ? 'double'
@@ -993,7 +1038,7 @@ export class Game {
     const q = this.questions[this.index];
     if (q.kind === 'number') return -1;
     if (knows) return q.answer;
-    const wrong = [0, 1, 2, 3].filter((i) => i !== q.answer && !p.removed.includes(i));
+    const wrong = q.options.map((_, i) => i).filter((i) => i !== q.answer && !p.removed.includes(i));
     if (p.removed.length) return Math.random() < 0.5 ? q.answer : wrong[0];
     return wrong[Math.floor(Math.random() * wrong.length)];
   }
@@ -1213,26 +1258,28 @@ export class Game {
     };
   }
 
-  private startPayload(playerId: string, startsInMs: number): GameStartPayload {
-    const p = this.participants.get(playerId)!;
+  /** `playerId`: whose it is (null: the host's big screen, who holds no козове). */
+  private startPayload(playerId: string | null, startsInMs: number): GameStartPayload {
+    const p = playerId === null ? null : this.participants.get(playerId)!;
     return {
       gameId: this.id,
       mode: this.setup.mode,
       ranked: this.setup.ranked,
       roomCode: this.setup.roomCode,
       players: [...this.participants.values()].map((x) => x.player),
-      youId: playerId,
+      youId: playerId ?? '',
       totalQuestions: this.questions.length,
       timeMs: this.setup.timeMs,
       category: this.setup.category,
       teams: this.setup.teams,
       eliminationSchedule: this.schedule,
-      powerups: p.powerups,
-      usedPowerups: [...p.usedPowerups],
-      emotes: [...p.emotes],
+      powerups: p?.powerups ?? [],
+      usedPowerups: p ? [...p.usedPowerups] : [],
+      emotes: p ? [...p.emotes] : [],
       standings: this.standings(),
       rounds: this.rounds,
       duelWith: this.setup.duelWith ?? null,
+      questionSet: this.setup.questionSet ?? null,
       startsInMs,
     };
   }

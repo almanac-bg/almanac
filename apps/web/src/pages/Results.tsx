@@ -137,6 +137,12 @@ export function Results({ game }: { game: LiveGame }) {
       if (!res.ok) toast({ kind: 'error', title: res.error });
       return;
     }
+    // Отбори starts from a friend's yes (or „Реванш“ with the same pair): home, where its card asks who with. The
+    // evening Роял is once a day: home too.
+    if (MODES[mode].teams || mode === 'evening') {
+      home();
+      return;
+    }
     if (isQueueMode(mode)) {
       actions.closeGame();
       navigate('/');
@@ -286,6 +292,11 @@ export function Results({ game }: { game: LiveGame }) {
                     : `Личен рекорд: ${fmt(best)}`}
               </span>
             )}
+            {end.mode === 'evening' && mine.placement === 1 && (
+              <span className="rounded-full bg-indigo-400/15 px-3 py-1 text-indigo-100">
+                🌙 Шампион на вечерта — титлата е твоя за денонощие
+              </span>
+            )}
             {/* A guest has it in the card that offers to keep it, right below. */}
             {rewards.xpGained > 0 && !guest && (
               <span className="rounded-full bg-violet-500/15 px-3 py-1 text-violet-200">
@@ -428,6 +439,10 @@ export function Results({ game }: { game: LiveGame }) {
               ) : review && !moreReview ? (
                 <>
                   <BookOpen className="size-5" /> Моят алманах
+                </>
+              ) : (MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening' ? (
+                <>
+                  <Home className="size-5" /> Към началото
                 </>
               ) : (
                 <>

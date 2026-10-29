@@ -5,7 +5,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { CROWD, DAILY_FIELD, dayEndsAt, dayKey, GROUPS, MASTERY, REVIEW, shiftDay, weekStart } from '@quiz/shared';
+import {
+  CROWD,
+  DAILY_FIELD,
+  dayEndsAt,
+  dayKey,
+  GROUPS,
+  MASTERY,
+  REVIEW,
+  shiftDay,
+  sofiaTimeOn,
+  weekStart,
+} from '@quiz/shared';
 import type { AnswerLogEntry } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
@@ -25,6 +36,7 @@ const { bestMastery, currentTier, forgetMasteryCutoffs, masteryCutoffs, settleMa
 );
 const groups = await import('../src/groups');
 const { recordDailyResult } = await import('../src/daily');
+const { champions, lastNight, recordEvening, retireChampionTitles } = await import('../src/evening');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -383,4 +395,26 @@ test('how the day went for everyone: shown once enough have played', () => {
     DAILY_FIELD.minPlayers,
   );
   assert.equal(field.histogram[10], 2);
+});
+
+test('the evening champion wears the title a day; then it goes back to their level’s best', () => {
+  const day = '2026-11-02';
+  const [winner, second] = [account('Шампион'), account('Втори')];
+  recordEvening(day, winner, 1, 9000, 14);
+  recordEvening(day, second, 2, 8000, 14);
+  run("UPDATE users SET title = 'evening_champion', xp = 0 WHERE id = ?", winner);
+  const during = sofiaTimeOn(day, 22);
+  assert.deepEqual(champions(during), [winner]);
+  assert.deepEqual(
+    lastNight(during)!.top.map((t) => [t.placement, t.user.username]),
+    [
+      [1, 'Шампион'],
+      [2, 'Втори'],
+    ],
+  );
+  assert.equal(retireChampionTitles(during), 0, 'still theirs');
+  const next = sofiaTimeOn(shiftDay(day, 1), 21, 0, 1);
+  assert.deepEqual(champions(next), [], 'a day on');
+  assert.equal(retireChampionTitles(next), 1);
+  assert.equal(one<{ title: string }>('SELECT title FROM users WHERE id = ?', winner)!.title, 'rookie');
 });

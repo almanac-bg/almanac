@@ -54,15 +54,24 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             🎯 Финал
           </span>
         )}
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
-          style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: cat.color }}
-        >
-          {cat.icon} {cat.name}
-        </span>
-        <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
-          {DIFFICULTY_LABEL[q.difficulty]}
-        </span>
+        {game.start.questionSet ? (
+          // A host's own set: its name, not a category or difficulty of the bank's.
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/5 px-3 py-1 text-xs font-bold text-fg-2">
+            📝 {game.start.questionSet}
+          </span>
+        ) : (
+          <>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
+              style={{ borderColor: `${cat.color}55`, background: `${cat.color}14`, color: cat.color }}
+            >
+              {cat.icon} {cat.name}
+            </span>
+            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-3">
+              {DIFFICULTY_LABEL[q.difficulty]}
+            </span>
+          </>
+        )}
         {q.elimination && (
           // MotionConfig only stills movement; this loop is opacity, so it stops here.
           <motion.span
@@ -76,11 +85,16 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         {watching && (
           <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-semibold text-fg-2">👀 Гледаш</span>
         )}
-        {inDropZone(game) === youId && !reveal && (
+        {inDropZone(game).has(youId) && !reveal && (
           <span className="inline-flex items-center gap-1 rounded-full border border-rose-400/40 bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-200">
-            {q.elimination
-              ? 'Ти си последен: изпревари някого!'
-              : `Ти си последен · отпадане след въпрос ${nextElimination(game)}`}
+            {/* The evening Роял knocks out the bottom few: "last" would be wrong for most of them. */}
+            {game.start.mode === 'evening'
+              ? q.elimination
+                ? 'Ти си сред отпадащите: изпревари някого!'
+                : `Ти си сред отпадащите · отпадане след въпрос ${nextElimination(game)}`
+              : q.elimination
+                ? 'Ти си последен: изпревари някого!'
+                : `Ти си последен · отпадане след въпрос ${nextElimination(game)}`}
           </span>
         )}
       </div>

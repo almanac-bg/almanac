@@ -41,7 +41,10 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(securityHeaders);
 app.use('/api', sameSiteWrites);
-app.use(express.json({ limit: '20kb' }));
+// A host's question set („Моите въпроси“, up to 50 questions) is the one bigger body there is.
+const json = express.json({ limit: '20kb' });
+const setJson = express.json({ limit: '128kb' });
+app.use((req, res, next) => (/^\/api\/sets(\/\d+)?$/.test(req.path) ? setJson : json)(req, res, next));
 /** Below this much free space on the database's disk, writes are about to start failing (and backups with them). */
 const MIN_FREE_DISK = 256 * 1024 * 1024;
 

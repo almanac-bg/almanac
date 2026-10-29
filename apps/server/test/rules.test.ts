@@ -9,6 +9,7 @@ import {
   dayEndsAt,
   dayKey,
   eliminationSchedule,
+  knockoutsAfter,
   levelFromXp,
   levelProgress,
   meetsRequirement,
@@ -25,6 +26,7 @@ import {
   shiftSeason,
   snapNumber,
   sofiaMidnight,
+  sofiaTimeOn,
   xpToReach,
 } from '@quiz/shared';
 import { writeFixtureQuestions } from './helpers';
@@ -122,7 +124,13 @@ test('days and seasons follow Sofia time, across DST changes', () => {
 });
 
 test('unlock requirements', () => {
-  const ctx = { level: 10, achievements: new Set(['royale_win']), seasonTier: 2, mastery: { history: 1 } };
+  const ctx = {
+    level: 10,
+    achievements: new Set(['royale_win']),
+    seasonTier: 2,
+    mastery: { history: 1 },
+    eveningChampion: false,
+  };
   assert.ok(meetsRequirement({ level: 10 }, ctx));
   assert.ok(!meetsRequirement({ level: 11 }, ctx));
   assert.ok(meetsRequirement({ achievement: 'royale_win' }, ctx));
@@ -134,8 +142,8 @@ test('unlock requirements', () => {
   assert.ok(!meetsRequirement({ mastery: { category: 'history', tier: 2 } }, ctx));
   assert.ok(!meetsRequirement({ mastery: { category: 'music', tier: 0 } }, ctx));
   const gained = newlyUnlocked(
-    { level: 2, achievements: new Set(), seasonTier: -1, mastery: {} },
-    { level: 3, achievements: new Set(), seasonTier: 1, mastery: { sports: 0 } },
+    { level: 2, achievements: new Set(), seasonTier: -1, mastery: {}, eveningChampion: false },
+    { level: 3, achievements: new Set(), seasonTier: 1, mastery: { sports: 0 }, eveningChampion: true },
   );
   assert.ok(
     gained.some((u) => u.kind === 'avatar' && u.id === 'tiger'),
@@ -149,6 +157,35 @@ test('unlock requirements', () => {
     gained.some((u) => u.kind === 'title' && u.id === 'sports_knower'),
     '„Познавач · Спорт“',
   );
+});
+
+test('the evening Роял: the bottom 30% go out at its checkpoints, and all but two after the 13th', () => {
+  const left: number[] = [];
+  let active = 50;
+  for (let n = 1; n <= 13; n++) {
+    active -= knockoutsAfter('evening', [], n, active);
+    if ([3, 6, 9, 12, 13].includes(n)) left.push(active);
+  }
+  assert.deepEqual(left, [35, 24, 17, 12, 2]);
+  // A small evening (the bots make it 8) still ends on two, one at a time where 30% is less than one.
+  const small: number[] = [];
+  active = 8;
+  for (const n of [3, 6, 9, 12, 13]) {
+    active -= knockoutsAfter('evening', [], n, active);
+    small.push(active);
+  }
+  assert.deepEqual(small, [6, 4, 3, 2, 2]);
+  assert.equal(knockoutsAfter('royale', [4, 6], 4, 8), 1);
+  assert.equal(knockoutsAfter('royale', [4, 6], 5, 8), 0);
+  assert.equal(knockoutsAfter('royale', [4, 6], 6, 2), 0, 'never below two');
+});
+
+test('21:00 in Sofia is the same wall-clock time across the clock changes', () => {
+  // Summer time (UTC+3) starts 2026-03-29 and ends 2026-10-25.
+  assert.equal(new Date(sofiaTimeOn('2026-03-28', 21)).toISOString(), '2026-03-28T19:00:00.000Z');
+  assert.equal(new Date(sofiaTimeOn('2026-03-29', 21)).toISOString(), '2026-03-29T18:00:00.000Z');
+  assert.equal(new Date(sofiaTimeOn('2026-10-25', 21)).toISOString(), '2026-10-25T19:00:00.000Z');
+  assert.equal(new Date(sofiaTimeOn('2026-10-24', 21, 30, 15)).toISOString(), '2026-10-24T18:30:15.000Z');
 });
 
 test('question picking: a ramp with blurred seams, category cap and seeded determinism', () => {

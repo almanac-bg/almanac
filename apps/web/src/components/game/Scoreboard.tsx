@@ -3,10 +3,11 @@ import { emoteById, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Skull } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, machineTag, PlayerTag } from '../Avatar';
+import { BIG_MATCH, topAndYou } from './bigMatch';
 import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
 
@@ -14,15 +15,32 @@ import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './team
 
 export function Scoreboard({ game }: { game: LiveGame }) {
   if (game.start.teams) return <TeamScoreboard game={game} />;
+  // A class in a room: the top and you, not forty rows.
+  const big = game.standings.length > BIG_MATCH;
+  const { shown, gap } = big ? topAndYou(game.standings, game.start.youId, 5) : { shown: game.standings, gap: null };
   return (
     <div className="glass sticky top-20 rounded-3xl p-3">
-      <p className="px-2 pt-1 pb-2 t-eyebrow text-fg-3">Класиране</p>
+      <p className="px-2 pt-1 pb-2 t-eyebrow text-fg-3">
+        Класиране{big && <span className="normal-case"> · {game.standings.length} играчи</span>}
+      </p>
       <ul className="space-y-1">
-        {game.standings.map((s) => (
-          <ScoreRow key={s.id} game={game} standing={s} />
+        {shown.map((s, i) => (
+          <Fragment key={s.id}>
+            {i === gap && <Gap />}
+            <ScoreRow game={game} standing={s} />
+          </Fragment>
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Places left out of a big match's board. */
+function Gap() {
+  return (
+    <li aria-hidden className="px-3 text-center text-fg-3">
+      ⋯
+    </li>
   );
 }
 
@@ -34,7 +52,9 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
     <div className="sticky top-20 space-y-3">
       {([0, 1] as TeamId[]).map((team) => {
         const color = teamColor(team);
-        const members = game.standings.filter((s) => game.players[s.id]?.team === team);
+        const all = game.standings.filter((s) => game.players[s.id]?.team === team);
+        const { shown: members, gap } =
+          game.standings.length > BIG_MATCH ? topAndYou(all, game.start.youId, 4) : { shown: all, gap: null };
         return (
           <div key={team} className="glass overflow-hidden rounded-3xl" style={{ borderColor: `${color}44` }}>
             <div
@@ -50,8 +70,11 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
               <TeamTotal value={totals[team]} className="ml-auto t-card" />
             </div>
             <ul className="space-y-1 p-2">
-              {members.map((s) => (
-                <ScoreRow key={s.id} game={game} standing={s} />
+              {members.map((s, i) => (
+                <Fragment key={s.id}>
+                  {i === gap && <Gap />}
+                  <ScoreRow game={game} standing={s} />
+                </Fragment>
               ))}
             </ul>
           </div>
@@ -216,7 +239,30 @@ function DuelBar({ game }: { game: LiveGame }) {
 
 export function MobileStrip({ game }: { game: LiveGame }) {
   if (game.start.players.length === 2 && !game.start.teams) return <DuelBar game={game} />;
+  if (game.start.players.length > BIG_MATCH) return <BigStrip game={game} />;
   return <Strip game={game} />;
+}
+
+/** A class in a room, on a phone: where you stand and who leads, in a line (forty avatars wouldn't help anyone). */
+function BigStrip({ game }: { game: LiveGame }) {
+  const mine = game.standings.find((s) => s.id === game.start.youId);
+  const leader = game.standings[0];
+  const leaderName = leader ? game.players[leader.id]?.name : null;
+  return (
+    <div className="border-b border-line px-4 py-2.5 text-sm lg:hidden flat:hidden">
+      {mine && (
+        <span className="font-semibold">
+          Ти: {mine.rank} от {game.standings.length} · {fmt(mine.score)} т.
+        </span>
+      )}
+      {leader && leader.id !== game.start.youId && (
+        <span className="text-fg-3">
+          {' '}
+          · води {leaderName} ({fmt(leader.score)})
+        </span>
+      )}
+    </div>
+  );
 }
 
 function Strip({ game }: { game: LiveGame }) {
@@ -278,14 +324,14 @@ function Strip({ game }: { game: LiveGame }) {
               <span className="sr-only">
                 {me ? 'Ти' : p.name}
                 {machineTag(p) && ` (${machineTag(p)!.toLowerCase()})`}: {status}
-                {danger === s.id && ', отпада при следващото отпадане'}
+                {danger.has(s.id) && ', отпада при следващото отпадане'}
               </span>
               <div
                 className="relative rounded-full"
                 style={
                   color
                     ? { boxShadow: `0 0 0 2px ${color}` }
-                    : danger === s.id
+                    : danger.has(s.id)
                       ? { boxShadow: '0 0 0 2px #fb7185' }
                       : undefined
                 }

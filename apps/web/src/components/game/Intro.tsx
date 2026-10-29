@@ -2,6 +2,7 @@ import { fmt, type LiveGame, useNow } from '@quiz/client';
 import {
   type CategoryMastery,
   categoryById,
+  EVENING,
   type GamePlayer,
   MASTERY_TIERS,
   MODES,
@@ -16,6 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, machineTag, RankBadge } from '../Avatar';
+import { BIG_MATCH } from './bigMatch';
 import { PowerupNotesLine, useNewPowerups } from './Powerups';
 import { PlayerMark } from './Scoreboard';
 import { SCORING_LINE, takeScoringHint } from './scoring';
@@ -92,7 +94,8 @@ export function Intro({ game }: { game: LiveGame }) {
         <Versus a={me} b={players.find((p) => p.id !== me.id)!} />
       ) : (
         <div className="mt-8 grid max-w-2xl grid-cols-4 gap-4 sm:gap-6">
-          {players.map((p, i) => (
+          {/* A class in a room: a dozen faces and how many more, not forty. */}
+          {(players.length > BIG_MATCH ? players.slice(0, BIG_MATCH - 1) : players).map((p, i) => (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 30, scale: 0.6 }}
@@ -110,6 +113,11 @@ export function Intro({ game }: { game: LiveGame }) {
               {p.mastery && <MasteryLine mastery={p.mastery} short />}
             </motion.div>
           ))}
+          {players.length > BIG_MATCH && (
+            <div className="grid size-16 place-items-center self-start justify-self-center rounded-full border border-line bg-white/5 font-display font-bold text-fg-2">
+              +{players.length - (BIG_MATCH - 1)}
+            </div>
+          )}
         </div>
       )}
       {game.rounds.length > 0 && <RoundsPlan game={game} />}
@@ -117,7 +125,10 @@ export function Intro({ game }: { game: LiveGame }) {
       <PowerupNotesLine powerups={fresh} className="mt-6 max-w-md" />
       {game.start.eliminationSchedule.length > 0 && (
         <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
-          <Skull className="size-4" /> Последният отпада след въпроси {game.start.eliminationSchedule.join(', ')}
+          <Skull className="size-4" />
+          {game.start.mode === 'evening'
+            ? `Последните ${Math.round(EVENING.share * 100)}% отпадат след ${EVENING.checkpoints.join(', ')} въпрос; финалът е за двама`
+            : `Последният отпада след въпроси ${game.start.eliminationSchedule.join(', ')}`}
         </p>
       )}
       <AnimatePresence mode="popLayout">

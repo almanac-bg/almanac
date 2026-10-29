@@ -11,7 +11,7 @@ let srv: TestServer;
 const DSN = 'http://public@127.0.0.1:9/1';
 
 before(async () => {
-  // PUBLIC_QUEUES as it ships (unset): only some ranked queues are open.
+  // PUBLIC_QUEUES as it ships (unset): every ranked queue is open.
   srv = await startServer({
     NODE_ENV: 'production',
     PUBLIC_QUEUES: '',
@@ -304,6 +304,20 @@ test('over HTTPS the session cookie is Secure and host-only by default; sessions
   const typo = await startServer({ PUBLIC_QUEUES: 'duel,royal' }).catch((err: Error) => err);
   assert.ok(typo instanceof Error, 'a typo in PUBLIC_QUEUES stops the server');
   assert.match(typo.message, /PUBLIC_QUEUES has royal/);
+  // A setting from before Трио joined Арена still starts the server, with Арена open in its place.
+  const old = await startServer({ PUBLIC_QUEUES: 'duel,trio' });
+  try {
+    const player = await register(old.url, 'staro_test');
+    const socket = connect(old.url, player.cookie);
+    const stats = next(socket, 'lobby:stats');
+    await connected(socket);
+    assert.deepEqual((await stats).modes, ['duel', 'squad']);
+    const closed = await emitAck(socket, 'queue:join', 'royale');
+    assert.match((closed as { error: string }).error, /„Дуел“ или „Арена“/);
+    socket.close();
+  } finally {
+    await old.stop();
+  }
 });
 
 test('health answers from the database', async () => {
@@ -321,16 +335,15 @@ test('browser crash reports are accepted (and never echo anything back)', async 
   assert.equal(res.status, 204);
 });
 
-test('at launch only Duel and Royale are open, and the lobby says so', async () => {
+test('as it ships every ranked queue is open, and the lobby says so; Трио is no more', async () => {
   const player = await register(srv.url, 'opashka_test');
   const socket = connect(srv.url, player.cookie);
   const stats = next(socket, 'lobby:stats');
   await connected(socket);
-  assert.deepEqual((await stats).modes, ['duel', 'royale']);
-  const closed = await emitAck(socket, 'queue:join', 'trio');
-  assert.equal(closed.ok, false);
-  assert.match(closed.error, /„Дуел“ или „Роял“/);
-  assert.ok((await emitAck(socket, 'queue:join', 'duel')).ok);
+  assert.deepEqual((await stats).modes, ['duel', 'teams', 'squad', 'royale']);
+  const gone = await emitAck(socket, 'queue:join', 'trio');
+  assert.deepEqual(gone, { ok: false, error: 'Непознат режим.' });
+  assert.ok((await emitAck(socket, 'queue:join', 'squad')).ok);
   socket.emit('queue:leave');
   socket.close();
 });

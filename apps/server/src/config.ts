@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, DEFAULT_OPEN_QUEUES, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
+import { BRAND, DEFAULT_OPEN_QUEUES, EVENING, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
 import { z } from 'zod';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
@@ -55,18 +55,36 @@ function httpsUrl(raw: string | undefined): string | null {
   return url?.protocol === 'https:' ? url.href.replace(/\/$/, '') : null;
 }
 
-/** PUBLIC_QUEUES=duel,royale,trio… ("all" opens every ranked queue). A typo stops the server: it would close a queue. */
+/**
+ * PUBLIC_QUEUES=duel,royale,squad… ("all", or unset: every ranked queue). A typo stops the server: it would close a
+ * queue. "trio" (merged into Арена) still reads as Арена, so an old setting doesn't keep the server down.
+ */
 function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
   if (!raw) return DEFAULT_OPEN_QUEUES;
   if (raw === 'all') return QUEUE_MODES;
-  const names = raw.split(',').map((m) => m.trim());
+  const names = [...new Set(raw.split(',').map((m) => (m.trim() === 'trio' ? 'squad' : m.trim())))];
   const unknown = names.filter((m) => !isQueueMode(m));
   if (unknown.length)
     throw new Error(
       `Invalid setting: PUBLIC_QUEUES has ${unknown.join(', ')}; use "all" or ${QUEUE_MODES.join(', ')}.`,
     );
   return names.filter(isQueueMode);
+}
+
+/**
+ * When the evening Роял starts, Sofia time: EVENING_AT=21:00 (the default), or with seconds for tests ("13:05:30");
+ * "off" turns it off. A typo stops the server.
+ */
+function eveningAt(): { hour: number; minute: number; second: number } | null {
+  const raw = process.env.EVENING_AT?.trim();
+  if (!raw) return { hour: EVENING.hour, minute: 0, second: 0 };
+  if (raw === 'off') return null;
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(raw);
+  const [hour, minute, second] = m ? [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)] : [NaN, NaN, NaN];
+  if (!(hour <= 23 && minute <= 59 && second <= 59))
+    throw new Error(`Invalid setting: EVENING_AT is "${raw}"; use HH:MM (Sofia time) or "off".`);
+  return { hour, minute, second };
 }
 
 export const config = {
@@ -85,6 +103,8 @@ export const config = {
   botFillBusyMs: Math.max(botFillMs ?? 0, (env.BOT_FILL_BUSY_SECONDS ?? 20) * 1000),
   /** Ranked queues players can join; the others stay closed until there are enough people for them. */
   openQueues: openQueues(),
+  /** When the evening Роял starts each day (null: never). */
+  eveningAt: eveningAt(),
   // Secure cookies whenever the site is served over HTTPS, unless COOKIE_SECURE says otherwise.
   cookieSecure: process.env.COOKIE_SECURE
     ? process.env.COOKIE_SECURE === 'true'

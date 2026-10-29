@@ -10,7 +10,9 @@ export type Requirement =
   | { level: number }
   | { achievement: string }
   | { season: RankTierId }
-  | { mastery: CategoryMastery };
+  | { mastery: CategoryMastery }
+  /** Held while you're the evening Роял's champion (a day after you win it). */
+  | { evening: 'champion' };
 
 /**
  * What a player has, for checking requirements. `seasonTier` is the best finished-season tier index (-1 = none);
@@ -21,6 +23,8 @@ export interface UnlockContext {
   achievements: ReadonlySet<string>;
   seasonTier: number;
   mastery: Partial<Record<CategoryId, number>>;
+  /** Won the evening Роял in the last EVENING.titleHours. */
+  eveningChampion: boolean;
 }
 
 export interface AvatarDef {
@@ -222,6 +226,13 @@ export const FRAMES: FrameDef[] = [
     req: { season: 'diamond' },
   },
   {
+    id: 'evening_star',
+    name: 'Вечерна звезда',
+    background: 'conic-gradient(#312e81,#818cf8,#f472b6,#fde68a,#312e81)',
+    animated: true,
+    req: { achievement: 'evening_3' },
+  },
+  {
     id: 'season_master',
     name: 'Сезон: Майстор',
     background: 'conic-gradient(#f0abfc,#e879f9,#fde047,#c026d3,#f0abfc)',
@@ -265,6 +276,8 @@ export const TITLES: TitleDef[] = [
   { id: 'season_gold', name: 'Златен сезон', req: { season: 'gold' } },
   { id: 'season_diamond', name: 'Диамантен ум', req: { season: 'diamond' } },
   { id: 'season_master', name: 'Сезонно майсторство', req: { season: 'master' } },
+  // Worn by the evening Роял's winner for a day.
+  { id: 'evening_champion', name: 'Шампион на вечерта', req: { evening: 'champion' } },
   // „Майстор · История“: one for each category and mastery tier.
   ...MASTERY_TITLES.map((t) => ({ id: t.id, name: t.name, req: { mastery: t.mastery } })),
 ];
@@ -335,6 +348,7 @@ export function meetsRequirement(req: Requirement, ctx: UnlockContext): boolean 
   if ('level' in req) return ctx.level >= req.level;
   if ('achievement' in req) return ctx.achievements.has(req.achievement);
   if ('mastery' in req) return (ctx.mastery[req.mastery.category] ?? -1) >= req.mastery.tier;
+  if ('evening' in req) return ctx.eveningChampion;
   return ctx.seasonTier >= tierIndex(req.season);
 }
 

@@ -80,6 +80,14 @@ export const FIRST_DAY = '2026-10-25';
 /** The day's number since the first, as the share text says it: "АЛМАНАХ №4". */
 export const dayNumber = (day: string) => daysBetween(FIRST_DAY, day) + 1;
 
+/** A Sofia wall-clock time on a day (a day key): what 21:00 there is as a timestamp, summer or winter. */
+export function sofiaTimeOn(day: string, hour: number, minute = 0, second = 0): number {
+  const { y, m, d } = parseDay(day);
+  const guess = Date.UTC(y, m - 1, d, hour, minute, second);
+  const first = guess - offsetAt(guess);
+  return guess - offsetAt(first);
+}
+
 export function dayEndsAt(day: string): number {
   const { y, m, d } = parseDay(day);
   return sofiaMidnight(y, m, d + 1);

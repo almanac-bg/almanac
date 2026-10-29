@@ -3,7 +3,7 @@ import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } f
 import { Lock, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
 import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
@@ -64,7 +64,9 @@ function LockedCard({ level }: { level: number }) {
 }
 
 function SubmitForm({ onSent }: { onSent: () => void }) {
-  const [draft, setDraft] = useState<QuestionDraft>(emptyDraft);
+  // From „Моите въпроси“ („Предложи в общата банка“): that question, to pick its category and difficulty for.
+  const proposed = (useLocation().state as { draft?: Partial<QuestionDraft> } | null)?.draft;
+  const [draft, setDraft] = useState<QuestionDraft>(() => ({ ...emptyDraft(), ...proposed }));
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState(false);
   const errors = useMemo(() => validateDraft(draft), [draft]);

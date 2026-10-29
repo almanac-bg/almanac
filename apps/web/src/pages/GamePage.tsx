@@ -11,6 +11,7 @@ import { EmoteBar } from '../components/game/EmoteBar';
 import { Intro } from '../components/game/Intro';
 import { EliminationBanner, Feed, othersStillIn, StreakBurst } from '../components/game/Moments';
 import { POWERUP_KEYS } from '../components/game/Powerups';
+import { PresenterScreen } from '../components/game/PresenterScreen';
 import { QuestionView } from '../components/game/QuestionView';
 import { RoundPick } from '../components/game/RoundPick';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
@@ -23,6 +24,8 @@ export function GamePage() {
   const game = useStore((s) => s.game);
   usePageTitle(game ? MODES[game.start.mode].name : null);
   if (!game) return <Navigate to="/" replace />;
+  // A room's host running it on a big screen: the whole match there, to its end.
+  if (game.start.presenter) return <PresenterScreen game={game} />;
   if (game.phase === 'ended' && game.end) return <Results game={game} />;
   return <Arena game={game} />;
 }

@@ -450,9 +450,11 @@ function drawFrom(
 export function pickRounds(
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
+  /** A number final (else a hard question closes the match: a room that turned it off). */
+  { final: numberFinal = true }: { final?: boolean } = {},
 ): { questions: PreparedQuestion[]; rounds: RoundPlan[] } | null {
   const used = new Set<string>();
-  const final = pickFinal('mixed', seen, rng);
+  const final = numberFinal ? pickFinal('mixed', seen, rng) : null;
   const categories = shuffle(
     CATEGORY_IDS.filter((c) => c !== final?.category),
     rng,

@@ -1,15 +1,25 @@
 import type { CategoryChoice } from './categories';
 import type { Difficulty } from './protocol';
 
-export type QueueModeId = 'duel' | 'teams' | 'trio' | 'squad' | 'royale';
-export type ModeId = 'solo' | 'daily' | 'challenge' | 'review' | QueueModeId | 'custom';
+export type QueueModeId = 'duel' | 'teams' | 'squad' | 'royale';
+/**
+ * `trio`: a queue of three, merged into Арена (3–5) on 2026-10-29; its matches stay in the players' history. `evening`:
+ * the evening Роял (EVENING), one big match a day at a set time.
+ */
+export type ModeId = 'solo' | 'daily' | 'challenge' | 'review' | QueueModeId | 'trio' | 'evening' | 'custom';
 
 export interface ModeDef {
   id: ModeId;
   name: string;
   /** Short badge text, e.g. "1 на 1". */
   short: string;
+  /** Seats in a match (the most it takes). */
   players: number;
+  /**
+   * The fewest a match may start with, once the wait for more is up (Арена: 3 of 5); bots make up the rest below it.
+   * Without it, bots fill every seat nobody took.
+   */
+  minPlayers?: number;
   questions: number;
   timeMs: number;
   /** Lowest scorer is knocked out at intervals until two remain. */
@@ -112,8 +122,8 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: true,
     final: true,
     rounds: false,
-    tagline: 'Двама срещу двама. Точките се събират.',
-    description: 'Класиран отборен мач. Отборите се балансират по рейтинг.',
+    tagline: 'Ти и приятел срещу друга двойка.',
+    description: 'Покани приятел и играйте заедно срещу друга двойка (или два бота). Точките на двамата се събират.',
     accent: ['#38bdf8', '#fb7185'],
   },
   trio: {
@@ -128,22 +138,24 @@ export const MODES: Record<ModeId, ModeDef> = {
     final: true,
     rounds: false,
     tagline: 'Трима влизат. Един взима короната.',
-    description: 'Класирана битка на трима — всеки срещу всеки.',
+    description: 'Класирана битка на трима — всеки срещу всеки. Вече е част от „Арена“.',
     accent: ['#c084fc', '#7c3aed'],
   },
   squad: {
     id: 'squad',
     name: 'Арена',
-    short: '5 играчи',
+    short: '3–5 играчи',
     players: 5,
-    questions: 12,
+    minPlayers: 3,
+    questions: 10,
     timeMs: 15_000,
     elimination: false,
     teams: false,
     final: true,
-    rounds: false,
-    tagline: 'Петима на арената. Всяка точка тежи.',
-    description: 'Класирана битка на петима в 12 въпроса.',
+    rounds: true,
+    tagline: 'До петима на арената. Последният избира.',
+    description:
+      'Класирана битка на трима до петима в три рунда: категорията на следващия избира последният. Финал с число.',
     accent: ['#fbbf24', '#f97316'],
   },
   royale: {
@@ -160,6 +172,23 @@ export const MODES: Record<ModeId, ModeDef> = {
     tagline: 'Осем влизат. Елиминации. Оцелява един.',
     description: 'На всеки няколко въпроса отпада последният, докато двама не излязат на финала.',
     accent: ['#34d399', '#06b6d4'],
+  },
+  evening: {
+    id: 'evening',
+    name: 'Вечерен Роял',
+    short: 'до 50',
+    players: 50,
+    minPlayers: 8,
+    questions: 15,
+    timeMs: 12_000,
+    elimination: true,
+    teams: false,
+    final: true,
+    rounds: false,
+    tagline: 'Всяка вечер в 21:00. Всички срещу всички.',
+    description:
+      'До 50 души наведнъж. След 3-ти, 6-и, 9-и и 12-и въпрос отпадат последните 30%, накрая двама играят финала с число.',
+    accent: ['#818cf8', '#f472b6'],
   },
   custom: {
     id: 'custom',
@@ -195,13 +224,47 @@ export const ROUNDS = {
   ] as const satisfies readonly (readonly Difficulty[])[],
 } as const;
 
-export const QUEUE_MODES: QueueModeId[] = ['duel', 'teams', 'trio', 'squad', 'royale'];
+export const QUEUE_MODES: QueueModeId[] = ['duel', 'teams', 'squad', 'royale'];
 
 /**
- * Ranked queues open to everyone. While few people play, fewer queues mean people meet each other instead of bots;
- * the server can open more (PUBLIC_QUEUES) and tells clients which are open in the lobby stats.
+ * „Вечерен Роял“: every day at `hour` (Sofia time) one big match, its lobby open `lobbyMinutes` before. Up to
+ * `maxPlayers` in a match (more make more matches); bots only make up to MODES.evening.minPlayers. After each
+ * `checkpoints` question the bottom `share` go out (at least one), after `finalTwoAfter` all but two, who play the last
+ * two questions. The winner wears „Шампион на вечерта“ for `titleHours`; `winsForFrame` wins earn a frame; the night's
+ * `top` stay on the home page until the next one.
  */
-export const DEFAULT_OPEN_QUEUES: QueueModeId[] = ['duel', 'royale'];
+export const EVENING = {
+  hour: 21,
+  lobbyMinutes: 5,
+  maxPlayers: 50,
+  checkpoints: [3, 6, 9, 12],
+  share: 0.3,
+  finalTwoAfter: 13,
+  titleHours: 24,
+  winsForFrame: 3,
+  top: 10,
+} as const;
+
+/**
+ * How many are knocked out after question `n` (1-based) with `active` still in: one at each question of `schedule` —
+ * or, in the evening Роял, the bottom EVENING.share at its checkpoints and all but the final two after
+ * EVENING.finalTwoAfter. Never below two.
+ */
+export function knockoutsAfter(mode: ModeId, schedule: readonly number[], n: number, active: number): number {
+  if (active <= 2) return 0;
+  if (mode === 'evening') {
+    if (n === EVENING.finalTwoAfter) return active - 2;
+    if (!(EVENING.checkpoints as readonly number[]).includes(n)) return 0;
+    return Math.min(active - 2, Math.max(1, Math.round(active * EVENING.share)));
+  }
+  return schedule.includes(n) ? 1 : 0;
+}
+
+/**
+ * Ranked queues open to everyone: all of them (the full review, 2026-10-28). The server can close some (PUBLIC_QUEUES)
+ * and tells clients which are open in the lobby stats.
+ */
+export const DEFAULT_OPEN_QUEUES: QueueModeId[] = QUEUE_MODES;
 
 export function isQueueMode(value: unknown): value is QueueModeId {
   return QUEUE_MODES.includes(value as QueueModeId);
@@ -218,16 +281,33 @@ export interface RoomSettings {
   maxPlayers: number;
   questions: number;
   timeMs: number;
+  /** One category (the host's pick), or a mix of them all. */
   category: CategoryChoice;
+  /** With the mix: in ROUNDS, whoever is last picks each round's category (10 questions: three rounds and the final). */
+  rounds: boolean;
+  /** The last question is a number to guess (when the bank has one). */
+  final: boolean;
   elimination: boolean;
   teams: boolean;
+  /** The host plays too; off, they run the game on a big screen („Само водя“) while the others answer on phones. */
+  hostPlays: boolean;
+  /**
+   * The host's own question set to play instead of the bank („Моите въпроси“): all its questions, in its order (the
+   * question count, categories and final don't apply).
+   */
+  set: { id: number; name: string; questions: number } | null;
 }
 
 export const ROOM_LIMITS = {
-  maxPlayers: [2, 8],
+  maxPlayers: [2, 40],
   questions: [5, 10, 15, 20],
   timeMs: [10_000, 15_000, 20_000, 30_000],
+  /** Knockouts one at a time only work for a few: with them on, a room takes at most this many. */
+  eliminationPlayers: 8,
 } as const;
+
+/** A match in ROUNDS has this many questions: the rounds, then the final. */
+export const ROUNDS_QUESTIONS = ROUNDS.size * ROUNDS.count + 1;
 
 /** Digits in a room's code: few enough to read out to a class, and with 900,000 codes too slow to guess one. */
 export const ROOM_CODE_DIGITS = 6;
@@ -237,8 +317,12 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   questions: 10,
   timeMs: 15_000,
   category: 'mixed',
+  rounds: false,
+  final: true,
   elimination: false,
   teams: false,
+  hostPlays: true,
+  set: null,
 };
 
 /**

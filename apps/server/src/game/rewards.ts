@@ -6,6 +6,7 @@ import {
   isQueueMode,
   levelFromXp,
   type MatchRewards,
+  MODES,
   newlyUnlocked,
   ordinal,
   RATED_GAMES_PER_PAIR,
@@ -20,6 +21,7 @@ import { recordAnswers } from '../answers';
 import { DUEL, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
+import { recordEvening } from '../evening';
 import { settleMastery } from '../mastery';
 import { advanceQuests } from '../quests';
 import { noteRecordPlay } from '../records';
@@ -142,10 +144,14 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
     for (const s of standings) {
       const p = game.participants.get(s.id)!;
       if (p.player.userId === null) continue;
+      // The evening Роял: each person's place, for the night's top, the champion and the wins that earn a frame (before
+      // the achievements below count them).
+      if (setup.eveningDay && !game.forfeited(p))
+        recordEvening(setup.eveningDay, p.player.userId, s.placement, s.score, playerCount);
       const r = rewardHuman(game, p, s, standings, deltas.get(s.id) ?? null, ratings.unrated.get(s.id) ?? null);
       // „Поправителен“ replays questions whose answers the player was shown: it says nothing about the questions, or
       // about how anyone plays (a run of known answers isn't one to replay against, nor play to check).
-      if (setup.mode !== 'review') {
+      if (setup.mode !== 'review' && !setup.questionSet) {
         recordAnswers(game.id, p.player.userId, p.log);
         recordRun({
           matchId: game.id,
@@ -199,6 +205,11 @@ function rewardHuman(
   // „Поправителен“: questions the player has seen answered. Its right answers pay, but it measures nobody's knowledge:
   // no skill, accuracy, streaks, quests or match feats from it.
   const review = setup.mode === 'review';
+  // A host's own set: questions nobody checked, which the host knows — played for the fun of it. It pays a room's
+  // placements, but measures nothing, and its right answers pay nothing (a set of easy ones would be an XP farm).
+  const ownSet = !!setup.questionSet;
+  // Either way, nothing here says what anyone knows.
+  const practice = review || ownSet;
   const daily = setup.dailyDay !== null;
   const challenge = setup.challengeId !== null;
   // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
@@ -226,7 +237,7 @@ function rewardHuman(
     p.correctByDifficulty.easy * XP.perCorrect.easy +
     p.correctByDifficulty.medium * XP.perCorrect.medium +
     p.correctByDifficulty.hard * XP.perCorrect.hard;
-  if (correctXp > 0) lines.push({ label: `Верни отговори (${p.correct})`, amount: correctXp });
+  if (correctXp > 0 && !ownSet) lines.push({ label: `Верни отговори (${p.correct})`, amount: correctXp });
   // A win by walkout pays for the part of the match that was played.
   const share = game.playedShare;
   const placementLine = (label: string, earned: number) => {
@@ -237,11 +248,13 @@ function rewardHuman(
   if (counts && setup.teams) {
     if (won && rivals.length > 0) placementLine('Отборна победа', Math.round(XP.teamWin * share));
   } else if (counts && multiplayer) {
+    // The evening Роял's fifty pay like a Роял's eight: a place among them is the reward, not a pile of XP.
+    const cap = setup.eveningDay ? MODES.royale.players - 1 : Infinity;
     const amount = won
       ? rivals.length
-        ? XP.winBase + XP.winPerOpponent * rivals.length
+        ? XP.winBase + XP.winPerOpponent * Math.min(rivals.length, cap)
         : 0
-      : XP.perOpponentBeaten * beaten;
+      : XP.perOpponentBeaten * Math.min(beaten, cap);
     placementLine(won ? 'Победа' : `${ordinal(s.placement)} място`, Math.round(amount * share));
   }
   if (counts && (solo || daily || challenge)) {
@@ -249,7 +262,7 @@ function rewardHuman(
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
   const full = game.questions.length;
-  if (counts && !review && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
+  if (counts && !practice && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
     lines.push({ label: 'Перфектен мач', amount: XP.perfect });
   }
   const today = dayKey();
@@ -282,7 +295,7 @@ function rewardHuman(
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
   // ── Daily quests ──
-  if (counts && !review) {
+  if (counts && !practice) {
     lines.push(
       ...advanceQuests(userId, {
         mode: setup.mode,
@@ -301,9 +314,9 @@ function rewardHuman(
   // ── Lifetime stats ──
   const counted = counts ? 1 : 0;
   // What a review run knew it knew from being told: its answers stay out of the player's accuracy and records.
-  const known = review ? 0 : 1;
+  const known = practice ? 0 : 1;
   const fastest =
-    p.fastestCorrectMs === null || review
+    p.fastestCorrectMs === null || practice
       ? before.fastest_correct_ms
       : Math.min(before.fastest_correct_ms ?? Infinity, p.fastestCorrectMs);
   run(
@@ -326,7 +339,7 @@ function rewardHuman(
     lines.reduce((sum, l) => sum + l.amount, 0),
     userId,
   );
-  for (const [category, c] of review ? [] : p.categories) {
+  for (const [category, c] of practice ? [] : p.categories) {
     run(
       `INSERT INTO category_stats (user_id, category, answered, correct, correct_ms) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (user_id, category) DO UPDATE SET answered = answered + excluded.answered,
@@ -349,11 +362,12 @@ function rewardHuman(
 
   // ── What the match taught: skill and mastery, „Моят алманах“, „Поправителен“ ──
   let mastery: CategoryMastery[] = [];
-  if (!review) {
+  if (!practice) {
     recordSkill(userId, p.log);
     mastery = settleMastery(userId, p.categories.keys());
   }
-  noteMatch(userId, p.log, review);
+  // A host's own questions aren't the bank's: nothing of them goes into the almanac or comes back to review.
+  if (!ownSet) noteMatch(userId, p.log, review);
 
   // ── Achievements ──
   const topScore = Math.max(...standings.map((x) => x.score));
@@ -384,7 +398,7 @@ function rewardHuman(
     topScorer: s.score === topScore && s.score > 0,
   };
   // A review run's feats were played on known answers: only what counts over time (levels, facts) can come of it.
-  const unlocked = settleAchievements(userId, review ? null : match);
+  const unlocked = settleAchievements(userId, practice ? null : match);
   lines.push(...unlocked.lines);
 
   const xpAfter = getUser(userId)!.xp;

@@ -3,10 +3,9 @@ import {
   BRAND,
   CATEGORIES,
   type CategoryChoice,
-  MIXED_CATEGORY,
   ROOM_LIMITS,
   type RoomPlayer,
-  type RoomSettings,
+  type RoomSettingsPatch,
   type RoomState,
   TEAMS,
   type TeamId,
@@ -22,9 +21,11 @@ import {
   Minus,
   Play,
   Plus,
+  Presentation,
   Send,
   Share2,
   Skull,
+  Target,
   UserMinus,
   Users,
 } from 'lucide-react';
@@ -57,13 +58,20 @@ export function RoomPage() {
   const inviteUrl = `${window.location.origin}/join/${room.code}`;
   const hasBots = room.players.some((p) => p.isBot);
   const teamsReady = !s.teams || new Set(room.players.map((p) => p.team)).size === 2;
-  const canStart = room.players.length >= 2 && teamsReady;
+  // „Само водя“: the host runs it on a big screen, so the players are everyone else.
+  const playing = s.hostPlays ? room.players : room.players.filter((p) => !p.isHost);
+  const canStart = (s.hostPlays ? playing.length >= 2 : playing.some((p) => !p.isBot)) && teamsReady;
   const startHint =
-    room.players.length < 2
-      ? 'Покани приятел или добави бот, за да започнеш.'
-      : !teamsReady
-        ? 'И двата отбора трябва да имат поне по един играч.'
-        : null;
+    !s.hostPlays && !playing.some((p) => !p.isBot)
+      ? 'Прати кода на играчите — играта започва, щом влезе поне един.'
+      : s.hostPlays && playing.length < 2
+        ? 'Покани приятел или добави бот, за да започнеш.'
+        : !teamsReady
+          ? 'И двата отбора трябва да имат поне по един играч.'
+          : null;
+  const crowded = room.players.length > ROOM_LIMITS.eliminationPlayers;
+  // „Микс“, „Избира последният“ (rounds) or one category the host picks.
+  const categoryMode = s.category !== 'mixed' ? 'one' : s.rounds ? 'rounds' : 'mixed';
   // Still in the room (they may have left while the dialog was open).
   const kickTarget = room.players.find((p) => p.id === kicking) ?? null;
 
@@ -107,7 +115,7 @@ export function RoomPage() {
     else setKicking(p.id);
   }
 
-  const update = (patch: Partial<RoomSettings>) => actions.roomSettings(patch);
+  const update = (patch: RoomSettingsPatch) => actions.roomSettings(patch);
 
   const startButton = (
     <Button size="lg" className="w-full" onClick={start} loading={starting} disabled={!canStart}>
@@ -200,36 +208,27 @@ export function RoomPage() {
             {!isHost && <span className="text-xs text-fg-3">Само домакинът ги променя</span>}
           </div>
 
-          <Setting label="Максимум играчи">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="secondary"
-                aria-label="По-малко"
-                disabled={!isHost || s.maxPlayers <= Math.max(ROOM_LIMITS.maxPlayers[0], room.players.length)}
-                onClick={() => update({ maxPlayers: s.maxPlayers - 1 })}
-              >
-                <Minus className="size-4" />
-              </Button>
-              <span className="w-6 text-center font-display text-xl font-bold">{s.maxPlayers}</span>
-              <Button
-                variant="secondary"
-                aria-label="Повече"
-                disabled={!isHost || s.maxPlayers >= ROOM_LIMITS.maxPlayers[1]}
-                onClick={() => update({ maxPlayers: s.maxPlayers + 1 })}
-              >
-                <Plus className="size-4" />
-              </Button>
-            </div>
-          </Setting>
+          <MaxPlayers
+            value={s.maxPlayers}
+            min={Math.max(ROOM_LIMITS.maxPlayers[0], room.players.length)}
+            max={s.elimination ? ROOM_LIMITS.eliminationPlayers : ROOM_LIMITS.maxPlayers[1]}
+            disabled={!isHost}
+            onChange={(maxPlayers) => update({ maxPlayers })}
+          />
 
-          <Setting label="Брой въпроси">
-            <Segmented
-              disabled={!isHost}
-              value={s.questions}
-              onChange={(questions) => update({ questions })}
-              options={ROOM_LIMITS.questions.map((n) => ({ value: n, label: n }))}
-            />
-          </Setting>
+          <QuestionSource room={room} isHost={isHost} onChange={(set) => update({ set })} />
+
+          {!s.set && (
+            <Setting label="Брой въпроси">
+              <Segmented
+                disabled={!isHost || s.rounds}
+                value={s.questions}
+                onChange={(questions) => update({ questions })}
+                options={ROOM_LIMITS.questions.map((n) => ({ value: n, label: n }))}
+              />
+              {s.rounds && <p className="mt-2 text-xs text-fg-3">Три рунда по три въпроса и финал.</p>}
+            </Setting>
+          )}
 
           <Setting label="Време за въпрос">
             <Segmented
@@ -240,21 +239,68 @@ export function RoomPage() {
             />
           </Setting>
 
-          <Setting label="Категория">
-            <select
-              aria-label="Категория"
+          {!s.set && (
+            <Setting label="Категории">
+              <Segmented
+                disabled={!isHost}
+                value={categoryMode}
+                onChange={(mode) =>
+                  update(
+                    mode === 'one'
+                      ? { category: s.category === 'mixed' ? CATEGORIES[0].id : s.category, rounds: false }
+                      : { category: 'mixed', rounds: mode === 'rounds' },
+                  )
+                }
+                options={[
+                  { value: 'mixed', label: 'Микс' },
+                  { value: 'rounds', label: 'Избира последният' },
+                  { value: 'one', label: 'Една' },
+                ]}
+              />
+              <p className="mt-2 text-xs text-fg-3">
+                {categoryMode === 'mixed'
+                  ? 'По малко от всичко.'
+                  : categoryMode === 'rounds'
+                    ? 'Преди всеки рунд последният по точки избира категорията от три.'
+                    : 'Всички въпроси от една категория:'}
+              </p>
+              {categoryMode === 'one' && (
+                <select
+                  aria-label="Категория"
+                  disabled={!isHost}
+                  value={s.category}
+                  onChange={(e) => update({ category: e.target.value as CategoryChoice })}
+                  className="field mt-2 h-11 w-full rounded-2xl pr-10 pl-3 text-sm disabled:opacity-70"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-ink-2">
+                      {c.icon} {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Setting>
+          )}
+
+          {!s.set && (
+            <Toggle
+              checked={s.final}
               disabled={!isHost}
-              value={s.category}
-              onChange={(e) => update({ category: e.target.value as CategoryChoice })}
-              className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm disabled:opacity-70"
-            >
-              {[MIXED_CATEGORY, ...CATEGORIES].map((c) => (
-                <option key={c.id} value={c.id} className="bg-ink-2">
-                  {c.icon} {c.name}
-                </option>
-              ))}
-            </select>
-          </Setting>
+              onChange={(final) => update({ final })}
+              icon={<Target className="size-4 text-amber-300" />}
+              title="Финал с число"
+              hint="Последният въпрос е число за въвеждане — година, височина, брой"
+            />
+          )}
+
+          <Toggle
+            checked={!s.hostPlays}
+            disabled={!isHost}
+            onChange={(presenting) => update({ hostPlays: !presenting })}
+            icon={<Presentation className="size-4 text-fuchsia-300" />}
+            title="Само водя"
+            hint="Играта е на твоя екран (проектор, телевизор), а играчите отговарят от телефоните си"
+          />
 
           <Toggle
             checked={s.teams}
@@ -267,11 +313,17 @@ export function RoomPage() {
 
           <Toggle
             checked={s.elimination}
-            disabled={!isHost || s.teams}
+            disabled={!isHost || s.teams || (crowded && !s.elimination)}
             onChange={(elimination) => update({ elimination })}
             icon={<Skull className="size-4 text-rose-300" />}
             title="Елиминации"
-            hint={s.teams ? 'Не важи при отборен мач' : 'Последният отпада на всеки няколко въпроса'}
+            hint={
+              s.teams
+                ? 'Не важи при отборен мач'
+                : crowded
+                  ? `До ${ROOM_LIMITS.eliminationPlayers} играчи`
+                  : `Последният отпада на всеки няколко въпроса (до ${ROOM_LIMITS.eliminationPlayers} играчи)`
+            }
           />
 
           {/* Wide screens start from here; narrower ones from the bar pinned to the bottom. */}
@@ -331,6 +383,113 @@ export function RoomPage() {
           </Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+/**
+ * Where the questions come from: the bank (АЛМАНАХ), or one of the host's own sets („Моите въпроси“) — all of it, in
+ * its order. The others see which.
+ */
+function QuestionSource({
+  room,
+  isHost,
+  onChange,
+}: {
+  room: RoomState;
+  isHost: boolean;
+  onChange: (setId: number | null) => void;
+}) {
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const { data } = useLoad(() => (isHost && !guest ? api.sets() : Promise.resolve(null)), String(isHost));
+  const current = room.settings.set;
+  const playable = (data?.sets ?? []).filter((x) => x.questions > 0 && !x.hidden);
+  return (
+    <Setting label="Въпроси">
+      {isHost && !guest ? (
+        <select
+          aria-label="Въпроси"
+          value={current?.id ?? ''}
+          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+          className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm"
+        >
+          <option value="" className="bg-ink-2">
+            От АЛМАНАХ
+          </option>
+          {playable.map((x) => (
+            <option key={x.id} value={x.id} className="bg-ink-2">
+              📝 {x.name} ({x.questions})
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className="text-sm text-fg-2">{current ? `📝 „${current.name}“ на домакина` : 'От АЛМАНАХ'}</p>
+      )}
+      <p className="mt-2 text-xs text-fg-3">
+        {current
+          ? `Всичките ${current.questions} въпроса, в реда на набора. Без XP за отговорите: въпросите са на домакина.`
+          : 'Или твои въпроси: '}
+        {!current && isHost && !guest && (
+          <Link to="/sets" className="font-semibold text-violet-300 hover:underline">
+            Моите въпроси →
+          </Link>
+        )}
+      </p>
+    </Setting>
+  );
+}
+
+/** How many the room takes: a slider for big jumps (a class), buttons for one more or less. */
+function MaxPlayers({
+  value,
+  min,
+  max,
+  disabled,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  disabled: boolean;
+  onChange: (n: number) => void;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+        Максимум играчи
+      </label>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="secondary"
+          aria-label="По-малко"
+          disabled={disabled || value <= min}
+          onClick={() => onChange(value - 1)}
+        >
+          <Minus className="size-4" />
+        </Button>
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          value={Math.min(Math.max(value, min), max)}
+          disabled={disabled}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="min-w-0 flex-1 accent-violet-400 disabled:opacity-60"
+        />
+        <Button
+          variant="secondary"
+          aria-label="Повече"
+          disabled={disabled || value >= max}
+          onClick={() => onChange(value + 1)}
+        >
+          <Plus className="size-4" />
+        </Button>
+        <span aria-hidden className="w-8 text-center font-display text-xl font-bold tabular-nums">
+          {value}
+        </span>
+      </div>
     </div>
   );
 }
@@ -400,12 +559,15 @@ function PlayerCard({
   isHost,
   teamButton,
   onKick,
+  presenting,
 }: {
   p: RoomPlayer;
   meId: number;
   isHost: boolean;
   teamButton?: React.ReactNode;
   onKick: (p: RoomPlayer) => void;
+  /** The host runs the game on a big screen („Само водя“) and doesn't play. */
+  presenting?: boolean;
 }) {
   const kickable = isHost && !p.isHost;
   return (
@@ -427,8 +589,15 @@ function PlayerCard({
           </span>
         )}
       </Avatar>
-      <div className="min-w-0 flex-1 text-sm">
-        <PlayerTag name={p.name} title={p.title} level={p.level} />
+      <div className={clsx('min-w-0 flex-1 text-sm', presenting && 'opacity-70')}>
+        {presenting ? (
+          <>
+            <p className="truncate font-semibold">{p.name}</p>
+            <p className="truncate text-xs text-fuchsia-300">Води на голям екран · не играе</p>
+          </>
+        ) : (
+          <PlayerTag name={p.name} title={p.title} level={p.level} />
+        )}
         {p.isBot && <span className="sr-only">бот</span>}
       </div>
       {p.isHost && <Crown className="size-4 shrink-0 text-amber-300" aria-label="Домакин" />}
@@ -485,7 +654,14 @@ function Seats({
     <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">
       <AnimatePresence initial={false}>
         {room.players.map((p) => (
-          <PlayerCard key={p.id} p={p} meId={meId} isHost={isHost} onKick={onKick} />
+          <PlayerCard
+            key={p.id}
+            p={p}
+            meId={meId}
+            isHost={isHost}
+            onKick={onKick}
+            presenting={p.isHost && !room.settings.hostPlays}
+          />
         ))}
       </AnimatePresence>
       {free > 0 && <FreeSeats count={free} className="min-h-[70px]" />}
@@ -534,6 +710,7 @@ function TeamColumns({
                       meId={meId}
                       isHost={isHost}
                       onKick={onKick}
+                      presenting={p.isHost && !room.settings.hostPlays}
                       teamButton={
                         isHost && (
                           <button

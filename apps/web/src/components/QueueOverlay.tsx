@@ -64,6 +64,10 @@ function Searching({
   const mode = MODES[queue.mode];
   const elapsed = Math.max(0, Math.floor((now - since) / 1000));
   const botsIn = queue.botFillMs != null ? Math.ceil(queue.botFillMs / 1000) : null;
+  const partner = queue.with?.[0] ?? null;
+  // Where a match may start smaller (Арена): with whoever came, bots only making up its minimum.
+  const enough = !!mode.minPlayers && queue.found >= mode.minPlayers;
+  const seconds = botsIn !== null ? plural(botsIn, 'секунда', 'секунди') : '';
 
   return (
     <div className="flex w-full max-w-md flex-col items-center text-center">
@@ -86,8 +90,13 @@ function Searching({
         {mode.name} · {mode.short}
       </div>
       <h2 id={titleId} className="mt-4 font-display text-2xl font-bold sm:text-3xl">
-        Търсим играчи…
+        {partner ? 'Търсим съперници…' : 'Търсим играчи…'}
       </h2>
+      {partner && (
+        <p className="mt-1 text-fg-2">
+          Ти и <b className="text-fg">{partner}</b> в един отбор
+        </p>
+      )}
       {/* The clock ticks every second: not read out (the seats and the bots below are). */}
       <p aria-hidden className="mt-2 font-mono text-lg text-fg-2 tabular-nums">
         {String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}
@@ -116,9 +125,15 @@ function Searching({
           <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-fg-2">
             <Bot aria-hidden className="size-3.5" />
             {/* "секунди" in full: "След 6 с … с ботове" read as two of the same word. */}
-            {botsIn > 0
-              ? `След ${plural(botsIn, 'секунда', 'секунди')} местата се попълват с ботове на твоето ниво`
-              : 'Ботовете влизат…'}
+            {botsIn <= 0
+              ? 'Започваме…'
+              : partner
+                ? `След ${seconds} играете срещу два бота на вашето ниво`
+                : enough
+                  ? `След ${seconds} започваме — вече сте ${queue.found}`
+                  : mode.minPlayers
+                    ? `След ${seconds} започваме — ботове на твоето ниво допълват до ${mode.minPlayers === 3 ? 'трима' : mode.minPlayers}`
+                    : `След ${seconds} местата се попълват с ботове на твоето ниво`}
           </p>
         )}
       </div>

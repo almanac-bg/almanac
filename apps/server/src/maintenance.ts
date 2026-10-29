@@ -8,6 +8,7 @@ import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
+import { retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests } from './guests';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
@@ -187,6 +188,8 @@ export function startMaintenance() {
       const told = tellRecordOwners();
       if (told) console.log(`📼 Owners of recordings told how they did: ${told}`);
       tellExpiredDuels();
+      // The evening champion's title is worn for a day.
+      retireChampionTitles();
       const weeks = settleGroupWeeks();
       if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {

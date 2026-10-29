@@ -20,6 +20,7 @@ const loaders = {
   notifications: () => import('./NotificationsPage'),
   profile: () => import('./ProfilePage'),
   room: () => import('./RoomPage'),
+  sets: () => import('./SetsPage'),
   submit: () => import('./SubmitPage'),
   unsubscribe: () => import('./UnsubscribePage'),
 };
@@ -90,6 +91,7 @@ export const ProfilePage = page('profile', 'ProfilePage');
 export const ResetPasswordPage = page('account', 'ResetPasswordPage');
 export const RoomPage = page('room', 'RoomPage');
 export const SettingsPage = page('account', 'SettingsPage');
+export const SetsPage = page('sets', 'SetsPage');
 export const SubmitPage = page('submit', 'SubmitPage');
 export const TermsPage = page('legal', 'TermsPage');
 export const UnsubscribePage = page('unsubscribe', 'UnsubscribePage');

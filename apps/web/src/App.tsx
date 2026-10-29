@@ -1,7 +1,7 @@
 import { actions, api, connectRealtime, disconnectRealtime, getState, setState, toast, useStore } from '@quiz/client';
 import { routeKind } from '@quiz/shared';
 import { MotionConfig } from 'motion/react';
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
@@ -13,9 +13,10 @@ import { NavBar } from './components/NavBar';
 import { PasswordConfirm } from './components/PasswordConfirm';
 import { QueueOverlay } from './components/QueueOverlay';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
+import { RoomNickname } from './components/RoomNickname';
 import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
-import { PageSpinner, Spinner } from './components/ui';
+import { Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
 import { markReturning } from './lib/returning';
@@ -38,6 +39,7 @@ import {
   prefetchPages,
   ResetPasswordPage,
   RoomPage,
+  SetsPage,
   SettingsPage,
   SubmitPage,
   TermsPage,
@@ -190,6 +192,9 @@ function SignedIn() {
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/groups/:id" element={<GroupsPage />} />
             <Route path="/groups/join/:code" element={<GroupsPage />} />
+            <Route path="/sets" element={<SetsPage />} />
+            <Route path="/sets/:id" element={<SetsPage />} />
+            <Route path="/sets/shared/:code" element={<SetsPage />} />
             <Route path="/submit" element={<SubmitPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/settings" element={<SettingsPage />} />
@@ -212,15 +217,18 @@ function PageLoading() {
   return <PageSpinner />;
 }
 
-/** Invite links: /join/123456 drops you straight into the room. */
+/** Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. */
 function JoinRoute() {
   const { code = '' } = useParams();
   const navigate = useNavigate();
   const connected = useStore((s) => s.connected);
+  const guest = useStore((s) => !!s.me?.isGuest);
   const tried = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!connected || tried.current) return;
+    if (guest || !connected || tried.current) return;
     tried.current = true;
     actions.joinRoom(code).then((res) => {
       if (res.ok) navigate('/room', { replace: true });
@@ -229,7 +237,22 @@ function JoinRoute() {
         navigate('/', { replace: true });
       }
     });
-  }, [connected, code, navigate]);
+  }, [guest, connected, code, navigate]);
 
-  return <PageSpinner />;
+  async function joinAs(nickname: string) {
+    setBusy(true);
+    const res = await actions.joinRoom(code, nickname);
+    setBusy(false);
+    if (res.ok) navigate('/room', { replace: true });
+    else setError(res.error);
+  }
+
+  if (!guest) return <PageSpinner />;
+  return (
+    <div className="mx-auto max-w-md">
+      <Card className="p-6 sm:p-8">
+        <RoomNickname code={code} busy={busy} error={error} onJoin={(n) => void joinAs(n)} />
+      </Card>
+    </div>
+  );
 }

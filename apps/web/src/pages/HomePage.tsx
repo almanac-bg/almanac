@@ -3,14 +3,16 @@ import { levelProgress, MODES, type QueueModeId, REVIEW, START_RATING, SUBMISSIO
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useStartReview } from '../components/almanac';
 import { useDuels, usePlayDuel } from '../components/duels';
 import { ChallengeCard } from '../components/home/ChallengeCard';
 import { CommunityCard } from '../components/home/CommunityCard';
 import { DailyCard } from '../components/home/DailyCard';
+import { DuoPicker } from '../components/home/DuoPicker';
 import { EmailNudge } from '../components/home/EmailNudge';
+import { EveningCard } from '../components/home/EveningCard';
 import { FriendsCard } from '../components/home/FriendsCard';
 import { ModeCard, RankInfo, SoloPicker } from '../components/home/ModeCard';
 import { useOpenQueues } from '../components/home/openQueues';
@@ -29,6 +31,12 @@ export function HomePage() {
   const room = useStore((s) => s.room);
   const [soloOpen, setSoloOpen] = useState(false);
   const [rankInfo, setRankInfo] = useState<{ mode: QueueModeId; open: boolean } | null>(null);
+  // Отбори is for two friends: first, who with.
+  const [duoOpen, setDuoOpen] = useState(false);
+  const queued = useStore((s) => !!s.queue);
+  useEffect(() => {
+    if (queued) setDuoOpen(false);
+  }, [queued]);
   const level = levelProgress(me.xp).level;
   // Brand-new players get pointed at one way in (two would leave them choosing again): a duel, which the gentle bots of
   // the first matches make a likely first win; Соло where no duel queue is open. The modes come right after who they
@@ -45,6 +53,7 @@ export function HomePage() {
   const ranked = useOpenQueues();
 
   async function queue(mode: QueueModeId) {
+    if (MODES[mode].teams) return setDuoOpen(true);
     const res = await actions.joinQueue(mode);
     if (!res.ok) toast({ kind: 'error', title: res.error });
   }
@@ -72,6 +81,7 @@ export function HomePage() {
       <DuelTurn />
       <ReviewTurn />
       <EmailNudge />
+      <EveningCard />
 
       {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
           From tablets up (md) the same pieces form a grid with the modes across the middle and "today" under them. */}
@@ -124,6 +134,7 @@ export function HomePage() {
       </div>
 
       <SoloPicker open={soloOpen} onClose={() => setSoloOpen(false)} />
+      <DuoPicker open={duoOpen} onClose={() => setDuoOpen(false)} />
       {rankInfo && (
         <RankInfo mode={rankInfo.mode} open={rankInfo.open} onClose={() => setRankInfo({ ...rankInfo, open: false })} />
       )}

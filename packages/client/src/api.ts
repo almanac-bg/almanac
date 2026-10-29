@@ -9,6 +9,7 @@ import type {
   DailyInfo,
   DailyPreview,
   DuelEntry,
+  EveningInfo,
   FriendsResponse,
   GroupInfo,
   GroupPreview,
@@ -27,14 +28,21 @@ import type {
   QuestionReportAction,
   QuestionReportGroup,
   QuestionReportReason,
+  QuestionSetInfo,
+  QuestionSetSummary,
   ReportGroup,
   ReportReason,
   SeasonInfo,
+  SetQuestion,
+  SharedSetPreview,
   SiteInfo,
   Submission,
   SubmissionStatus,
 } from '@quiz/shared';
 import { clientConfig } from './config';
+
+/** A set as its editor sends it: a name and its questions. */
+export type SetBody = { name: string; questions: SetQuestion[] };
 
 export interface QuestionReports {
   groups: QuestionReportGroup[];
@@ -155,6 +163,7 @@ export const api = {
   leaderboard: (board: LeaderboardBoard) => request<LeaderboardResponse>('GET', `/leaderboard/${board}`),
 
   daily: () => request<DailyInfo>('GET', '/daily'),
+  evening: () => request<EveningInfo>('GET', '/evening'),
   /** Today's questions as a link shows them (`code`: a player's link), signed in or not. */
   dailyPreview: (code?: string) =>
     request<DailyPreview>('GET', `/daily/preview${code ? `?code=${encodeURIComponent(code)}` : ''}`),
@@ -194,5 +203,17 @@ export const api = {
   deleteGroup: (id: number) => request<{ ok: true }>('DELETE', `/groups/${id}`),
   leaveGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/leave`),
   groupPreview: (code: string) => request<GroupPreview>('GET', `/groups/join/${encodeURIComponent(code)}`),
+
+  sets: () => request<{ sets: QuestionSetSummary[] }>('GET', '/sets'),
+  createSet: (set: SetBody) => request<{ id: number }>('POST', '/sets', set),
+  set: (id: number) => request<QuestionSetInfo>('GET', `/sets/${id}`),
+  saveSet: (id: number, set: SetBody) => request<QuestionSetInfo>('PUT', `/sets/${id}`, set),
+  deleteSet: (id: number) => request<{ ok: true }>('DELETE', `/sets/${id}`),
+  sharedSet: (code: string) => request<SharedSetPreview>('GET', `/sets/shared/${encodeURIComponent(code)}`),
+  copySet: (code: string) => request<{ id: number }>('POST', `/sets/shared/${encodeURIComponent(code)}/copy`),
+  reportSet: (code: string, details: string) =>
+    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/report`, { details }),
+  hideSet: (code: string, hidden: boolean) =>
+    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/hide`, { hidden }),
   joinGroup: (code: string) => request<{ id: number }>('POST', `/groups/join/${encodeURIComponent(code)}`),
 };
