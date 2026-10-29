@@ -1,4 +1,4 @@
-import { expect, me, playMatch, signUp, test, uniqueName } from './support';
+import { expect, gameMs, me, playMatch, signUp, test, uniqueName } from './support';
 
 test('a class: the teacher writes a set, runs it on a big screen, and a pupil joins by link under a name of their own', async ({
   page: teacher,
@@ -59,7 +59,9 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await expect(pupil).toHaveURL(/\/game$/);
   await expect(teacher).toHaveURL(/\/game$/);
   // The big screen: the set's question, large; the pupil answers on the phone.
-  await expect(teacher.getByRole('heading', { name: 'Коя е столицата на България?' })).toBeVisible({ timeout: 10_000 });
+  await expect(teacher.getByRole('heading', { name: 'Коя е столицата на България?' })).toBeVisible({
+    timeout: gameMs(10_000),
+  });
   const run = await playMatch(pupil);
   expect(run).toEqual({ answered: 2, total: 2 });
   await expect(teacher.getByRole('heading', { name: 'Край!' })).toBeVisible();

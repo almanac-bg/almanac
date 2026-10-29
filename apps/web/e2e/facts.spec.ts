@@ -1,5 +1,5 @@
 import { errors } from '@playwright/test';
-import { expect, playMatch, startAsGuest, startSolo, test } from './support';
+import { expect, gameMs, playMatch, startAsGuest, startSolo, test } from './support';
 
 test('a solo player stops on a "Знаеше ли?" fact to read it, and finds the facts again in the results', async ({
   page,
@@ -19,18 +19,18 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
   let question = '';
   for (let tries = 0; !(await resume.isVisible()); tries++) {
     expect(tries, 'never managed to stop on a fact').toBeLessThan(9);
-    await expect(answer.first()).toBeVisible({ timeout: 15_000 });
+    await expect(answer.first()).toBeVisible({ timeout: gameMs(15_000) });
     question = (await counter.textContent())!;
     if (await ordering.isVisible()) {
       // „Подреди“ (its items are named like answers): put in order and locked from the keyboard, then its fact.
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
-    } else await answer.first().click({ timeout: 2_500 });
-    await expect(page.getByText('Знаеше ли?')).toBeVisible({ timeout: 2_000 });
-    await stop.click({ timeout: 1_500 }).catch((error) => {
+    } else await answer.first().click({ timeout: gameMs(2_500) });
+    await expect(page.getByText('Знаеше ли?')).toBeVisible({ timeout: gameMs(2_000) });
+    await stop.click({ timeout: gameMs(1_500) }).catch((error) => {
       if (!(error instanceof errors.TimeoutError)) throw error;
     });
-    await expect(resume.or(answer.first())).toBeVisible({ timeout: 15_000 });
+    await expect(resume.or(answer.first())).toBeVisible({ timeout: gameMs(15_000) });
   }
 
   // Held: several reveals' worth of time later, still the same question, and the fact to read.

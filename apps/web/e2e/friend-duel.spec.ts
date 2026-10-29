@@ -1,4 +1,4 @@
-import { expect, me, playMatch, signUp, test, uniqueName } from './support';
+import { expect, gameMs, me, playMatch, signUp, test, uniqueName } from './support';
 
 test('a friend duel: one plays it now, the other later from the home page, and both see how it ended', async ({
   page: anna,
@@ -41,7 +41,7 @@ test('a friend duel: one plays it now, the other later from the home page, and b
     for (const name of ['История', 'Музика', 'Спорт']) await picker.getByRole('button', { name }).click();
     await picker.getByRole('button', { name: /^Играй/ }).click();
   }
-  await expect(boris.getByText(/^Въпрос 1 от 10$/)).toBeAttached({ timeout: 10_000 });
+  await expect(boris.getByText(/^Въпрос 1 от 10$/)).toBeAttached({ timeout: gameMs(10_000) });
   if (lost) await expect(boris.getByText('История', { exact: true }).first()).toBeVisible();
   expect((await playMatch(boris)).total).toBe(10);
 

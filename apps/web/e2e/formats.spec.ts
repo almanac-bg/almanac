@@ -1,4 +1,4 @@
-import { expect, signUp, startSolo, test, uniqueName } from './support';
+import { expect, gameMs, signUp, startSolo, test, uniqueName } from './support';
 
 test('a solo match plays a picture (whose it is shows with the answer) and „Подреди“, tapped into place', async ({
   page,
@@ -18,7 +18,7 @@ test('a solo match plays a picture (whose it is shows with the answer) and „П
   await page.mouse.move(0, 0);
 
   for (;;) {
-    await expect(open.or(lock).or(results).first()).toBeVisible({ timeout: 15_000 });
+    await expect(open.or(lock).or(results).first()).toBeVisible({ timeout: gameMs(15_000) });
     if (await results.isVisible()) break;
     const index = Number((await counter.textContent())!.match(/\d+/)![0]);
     if (done.has(index)) continue;
@@ -34,20 +34,22 @@ test('a solo match plays a picture (whose it is shows with the answer) and „П
       await expect(ordering.getByRole('button', { pressed: true })).toHaveCount(0);
       for (let i = 0; i < 4; i++) await ordering.getByRole('button', { pressed: false }).first().click();
       await lock.click();
-      await expect(page.getByRole('list', { name: 'Правилният ред', exact: true })).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByRole('list', { name: 'Правилният ред', exact: true })).toBeVisible({
+        timeout: gameMs(5_000),
+      });
       await expect(page.getByText(/^(\d от 4 на място|🎯 Всичко на място!)$/)).toBeVisible();
     } else if (await picture.isVisible()) {
       pictures++;
       expect(await picture.getAttribute('alt')).toBeTruthy();
       await expect(page.locator('main figcaption'), 'whose it is: not before the answer').toHaveCount(0);
-      await open.first().click({ timeout: 2_500 });
-      await expect(page.locator('main figcaption')).toContainText('обществено достояние', { timeout: 5_000 });
+      await open.first().click({ timeout: gameMs(2_500) });
+      await expect(page.locator('main figcaption')).toContainText('обществено достояние', { timeout: gameMs(5_000) });
     } else if (await lock.isVisible()) {
       const range = (await page.getByText(/^от .+ до .+$/).textContent())!;
       await page.keyboard.type(range.slice(3, range.indexOf(' до ')).replace(/[^\d]/g, ''));
       await page.keyboard.press('Enter');
     } else {
-      await open.first().click({ timeout: 2_500 });
+      await open.first().click({ timeout: gameMs(2_500) });
     }
   }
   expect(pictures).toBe(2);

@@ -2,6 +2,7 @@ import {
   expect,
   expectLobby,
   expectNoSideScroll,
+  gameMs,
   type Page,
   playMatch,
   signUp,
@@ -145,7 +146,7 @@ test('the question, its four answers and the clock fit a small phone and a phone
   ]) {
     await page.setViewportSize(size);
     const last = page.locator('button[data-answer="3"]');
-    await expect(last).toBeVisible({ timeout: 15_000 });
+    await expect(last).toBeVisible({ timeout: gameMs(15_000) });
     for (const element of [last, page.getByRole('timer')]) {
       const box = await element.boundingBox();
       expect(box, `${size.width}×${size.height}`).not.toBeNull();

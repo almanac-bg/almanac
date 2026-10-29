@@ -1,4 +1,4 @@
-import { expect, playMatch, startAsGuest, startSolo, test } from './support';
+import { expect, gameMs, playMatch, startAsGuest, startSolo, test } from './support';
 
 test.describe('with motion on', () => {
   // Everything else runs with reduced motion (playwright.config.ts): here the animations play, from the lazily loaded
@@ -43,18 +43,18 @@ test('a whole match from the keyboard: Tab to the category, Enter, then 1–4 to
   await page.mouse.move(0, 0);
   const answered = new Set<number>();
   for (;;) {
-    await expect(open.or(lock).or(ordering).or(results).first()).toBeVisible({ timeout: 15_000 });
+    await expect(open.or(lock).or(ordering).or(results).first()).toBeVisible({ timeout: gameMs(15_000) });
     if (await results.isVisible()) break;
     const [index] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
     if (answered.has(index)) {
-      await expect(counter).not.toHaveText(new RegExp(`^Въпрос ${index} `), { timeout: 15_000 });
+      await expect(counter).not.toHaveText(new RegExp(`^Въпрос ${index} `), { timeout: gameMs(15_000) });
       continue;
     }
     if (await ordering.isVisible()) {
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
       await expect(page.getByText('Редът е заключен.'), `order ${index}: the keys didn't lock it`).toBeAttached({
-        timeout: 2_000,
+        timeout: gameMs(2_000),
       });
     } else if (await lock.isVisible()) {
       const slider = page.getByRole('slider', { name: 'Твоят отговор', exact: true });
@@ -71,13 +71,13 @@ test('a whole match from the keyboard: Tab to the category, Enter, then 1–4 to
         await page.keyboard.type(range.slice(3, range.indexOf(' до ')).replace(/[^\d,]/g, ''));
       }
       await page.keyboard.press('Enter');
-      await expect(lock, `number ${index}: the keys didn't lock it`).toBeHidden({ timeout: 2_000 });
+      await expect(lock, `number ${index}: the keys didn't lock it`).toBeHidden({ timeout: gameMs(2_000) });
     } else {
       await page.keyboard.press('1');
       await expect(
         page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ }),
         `question ${index}: the key didn't answer it`,
-      ).toBeVisible({ timeout: 2_000 });
+      ).toBeVisible({ timeout: gameMs(2_000) });
     }
     answered.add(index);
   }

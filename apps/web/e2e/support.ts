@@ -4,6 +4,14 @@ import { type BrowserContext, test as base, expect, type Page } from '@playwrigh
 export type { Page };
 export { expect };
 
+/**
+ * A wait as long as the game's own clocks: the times written in the tests are for the default speed (E2E_TIME_SCALE
+ * 0.15: a 15-second question lasts 2.25 s), and a slower one (the other engines' 0.5 in CI) stretches them as much.
+ */
+export function gameMs(ms: number): number {
+  return Math.round(ms * Math.max(1, Number(process.env.E2E_TIME_SCALE ?? '0.15') / 0.15));
+}
+
 interface Fixtures {
   /** Another person: a fresh browser context (no cookies, no storage) on the same kind of device. */
   newPlayer: () => Promise<Page>;
@@ -179,11 +187,11 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
   for (;;) {
     // Between questions there's the countdown, the reveal or a round's pick; a 15-second question lasts 2.25 s at the
     // test speed.
-    await expect(open.or(lock).or(pick).or(results).first()).toBeVisible({ timeout: 15_000 });
+    await expect(open.or(lock).or(pick).or(results).first()).toBeVisible({ timeout: gameMs(15_000) });
     if (await results.isVisible()) break;
     if (await pick.isVisible()) {
-      await page.locator('[data-answer="0"]').click({ timeout: 2_000 });
-      await expect(pick).toBeHidden({ timeout: 5_000 });
+      await page.locator('[data-answer="0"]').click({ timeout: gameMs(2_000) });
+      await expect(pick).toBeHidden({ timeout: gameMs(5_000) });
       continue;
     }
     const [index, of] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
@@ -194,19 +202,19 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
       await expect(page.getByText('Редът е заключен.'), `order for question ${index} not taken`).toBeAttached({
-        timeout: 2_000,
+        timeout: gameMs(2_000),
       });
     } else if (await lock.isVisible()) {
       await giveNumber(page);
       // Locked in: the number stays on show, with nothing left to press.
-      await expect(lock, `number for question ${index} not taken`).toBeHidden({ timeout: 2_000 });
+      await expect(lock, `number for question ${index} not taken`).toBeHidden({ timeout: gameMs(2_000) });
     } else {
       // No longer than the question lasts: a click that waited on would land on the next question.
-      await open.first().click({ timeout: 2_500 });
+      await open.first().click({ timeout: gameMs(2_500) });
       await parkPointer();
       // The pick shows as "твоят избор" at once and stays until the next question comes up.
       const picked = page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ });
-      await expect(picked, `answer to question ${index} not taken`).toBeVisible({ timeout: 2_000 });
+      await expect(picked, `answer to question ${index} not taken`).toBeVisible({ timeout: gameMs(2_000) });
     }
     answered.add(index);
   }
@@ -221,7 +229,7 @@ async function giveNumber(page: Page) {
   const more = page.getByRole('button', { name: 'Повече', exact: true });
   if (await more.isVisible()) {
     await more.click();
-    await page.getByRole('button', { name: 'Заключи', exact: true }).click({ timeout: 2_000 });
+    await page.getByRole('button', { name: 'Заключи', exact: true }).click({ timeout: gameMs(2_000) });
     return;
   }
   // "от 1000 до 2026", "от 0,1 млн. до 50 млн.": the low end's digits (and comma), without its unit.

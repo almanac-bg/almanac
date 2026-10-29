@@ -1,4 +1,4 @@
-import { expect, me, playMatch, startAsGuest, test } from './support';
+import { expect, gameMs, me, playMatch, startAsGuest, test } from './support';
 
 // Both tests queue for a Дуел: one at a time, so they can't pair with each other's players.
 test.describe.configure({ mode: 'serial' });
@@ -55,7 +55,7 @@ test('level after the first round, one of the two picks the next category, and b
   const asked = (player: typeof anna) => player.getByRole('heading', { name: 'Избери категория', exact: true });
   await expect
     .poll(async () => (await asked(anna).isVisible()) || (await asked(boris).isVisible()), {
-      timeout: 30_000,
+      timeout: gameMs(30_000),
       intervals: [50],
     })
     .toBe(true);
@@ -70,7 +70,7 @@ test('level after the first round, one of the two picks the next category, and b
   const expected = browserName === 'chromium' ? [offered[1]] : offered;
   const category = new RegExp(`^\\S+ (${expected.join('|')})$`);
   await Promise.all(
-    [anna, boris].map((player) => expect(player.getByText(category).first()).toBeVisible({ timeout: 10_000 })),
+    [anna, boris].map((player) => expect(player.getByText(category).first()).toBeVisible({ timeout: gameMs(10_000) })),
   );
   const [annaCategory, borisCategory] = await Promise.all(
     [anna, boris].map((player) => player.getByText(category).first().textContent()),
@@ -97,7 +97,7 @@ test('a rematch: one asks from the results, the other accepts, and the same two 
 
   // A new match, the two of them again: its first question on both screens.
   for (const player of [anna, boris])
-    await expect(player.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: 15_000 });
+    await expect(player.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: gameMs(15_000) });
   const runs = await Promise.all([playMatch(anna), playMatch(boris)]);
   expect(runs.map((r) => r.answered)).toEqual([10, 10]);
   await expect(anna.getByText((await me(boris)).username, { exact: true }).first()).toBeVisible();

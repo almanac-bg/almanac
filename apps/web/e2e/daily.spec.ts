@@ -1,4 +1,4 @@
-import { expect, expectLobby, me, playMatch, startAsGuest, test } from './support';
+import { expect, expectLobby, gameMs, me, playMatch, startAsGuest, test } from './support';
 
 test("a newcomer's first tap plays the day's questions; a duel is the next thing to try", async ({ page }) => {
   await page.goto('/');
@@ -50,7 +50,7 @@ test('one attempt a day: walking out after the first question uses it, and nothi
   await page.getByRole('button', { name: /^Играй днешните/ }).click();
   await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false }).first()).toBeVisible({
-    timeout: 15_000,
+    timeout: gameMs(15_000),
   });
 
   await page.goBack();
