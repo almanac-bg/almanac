@@ -174,15 +174,25 @@ jobs:
   # Registry under the commit. deploy/deploy.sh pulls exactly that image: what runs is what was tested, nothing is built
   # on the server, and a commit that failed here has no image to deploy. The image holds only this repository's code;
   # the private question bank is mounted at run time (docker-compose.yml).
-  publish:
+  # The image for every server the docs recommend, x86 and ARM (a recovery onto an x86 server crash-looped on an
+  # ARM-only one): each built and started on its own kind of runner, then one tag for both.
+  image:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test, browsers, docker]
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    name: image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     env:
-      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: >-
@@ -200,3 +210,19 @@ jobs:
           exit 1
       - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - run: docker push "$IMAGE"
+
+  # ghcr.io/…:<commit>, what deploy/deploy.sh pulls: a list of the two, so each server gets its own.
+  publish:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+    steps:
+      - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - run: docker buildx imagetools create -t "$IMAGE" "$IMAGE-amd64" "$IMAGE-arm64"
+      - name: Both kinds are in it
+        run: |
+          docker buildx imagetools inspect "$IMAGE" | tee /dev/stderr | grep -q 'linux/amd64'
+          docker buildx imagetools inspect "$IMAGE" | grep -q 'linux/arm64'

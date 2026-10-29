@@ -74,5 +74,5 @@
 GitHub Actions (`.github/workflows/ci.yml`) при всеки push към `main` и всеки pull request пуска lint, typecheck,
 build, двата варианта на тестовете, проверката на заявките и браузърните тестове на Node 24 и 26, браузърните тестове
 и в WebKit и Firefox; после билдва Docker образа, проверява, че стартира, и прави пълен бекъп и възстановяване с
-Litestream. На `main`, щом всичко това мине, билдва образа за сървъра (ARM) и го публикува в GitHub Container Registry
+Litestream. На `main`, щом всичко това мине, билдва образа за сървъра (за x86 и за ARM, всеки на своя машина) и го публикува в GitHub Container Registry
 като `ghcr.io/almanac-bg/almanac:<commit>` — продукцията пуска точно него.

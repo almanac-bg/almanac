@@ -7,9 +7,12 @@
 //                                                            … vapid-keys >> .env, so the private key is never shown)
 //   node apps/server/dist/cli.mjs notice "<text>" [/link]  — a note to every player (e.g. 14 days before the terms
 //                                                            or the privacy policy change, as both promise)
+//   node apps/server/dist/cli.mjs check-bank               — whether this code loads the question bank (QUESTIONS_PATH):
+//                                                            deploy/deploy.sh asks before it switches to either
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
 import webpush from 'web-push';
 import { all, run } from './db';
+import { imageBank, numberBank, orderBank, questionBank } from './questions';
 import { guestsPaused, pauseGuests } from './settings';
 import { getUserByName } from './users';
 
@@ -21,7 +24,17 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin remove <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys';
+  'Usage: cli admin add <username> | admin remove <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank';
+
+if (area === 'check-bank') {
+  try {
+    const count = questionBank().length + imageBank().length + numberBank().length + orderBank().length;
+    console.log(`✅ The question bank loads: ${count} questions in play.`);
+    process.exit(0);
+  } catch (err) {
+    fail(`❌ The question bank doesn't load: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 if (area === 'vapid-keys') {
   const { publicKey, privateKey } = webpush.generateVAPIDKeys();

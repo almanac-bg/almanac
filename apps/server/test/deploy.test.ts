@@ -62,6 +62,8 @@ case "$1" in
     [ -f "$S/images/$(name "$2")" ] || exit 1
     cp "$S/images/$(name "$2")" "$S/images/$(name "$3")" ;;
   rmi) rm -f "$S/images/$(name "$2")" ;;
+  # The image checking the new question bank (deploy.sh): state/bank-refused, a bank it can't load.
+  run) [ -f "$S/bank-refused" ] && exit 1 ;;
   compose)
     shift
     echo "APP_RELEASE=\${APP_RELEASE:-} $*" >>"$S/compose.log"
@@ -157,6 +159,44 @@ test('the same image again with new questions: the app restarts on them, and the
     compose().join('\n'),
   );
   assert.equal(git(path.join(checkout, 'private'), 'rev-parse', 'HEAD'), git(bankWork, 'rev-parse', 'HEAD'));
+});
+
+test('new questions the code can’t load: nothing changes, and the bank goes back to what it was', () => {
+  const bank = path.join(checkout, 'private');
+  const before = git(bank, 'rev-parse', 'HEAD');
+  publishCommit(bankWork, 'questions.json', '[1,2,"broken"]');
+  fs.writeFileSync(path.join(state, 'bank-refused'), '');
+  try {
+    const r = run('deploy.sh');
+    assert.equal(r.status, 1);
+    assert.match(r.output, /doesn't load the new question bank: nothing changed/);
+    assert.equal(git(bank, 'rev-parse', 'HEAD'), before, 'the questions that run stay');
+    assert.deepEqual(compose(), [], 'nothing restarted');
+  } finally {
+    fs.rmSync(path.join(state, 'bank-refused'));
+    // The fix comes as the next commit.
+    publishCommit(bankWork, 'questions.json', '[1,2,3]');
+  }
+});
+
+test('new questions only, and the site stops answering: the questions go back, not the code', () => {
+  const bank = path.join(checkout, 'private');
+  const before = git(bank, 'rev-parse', 'HEAD');
+  const running = tagged('almanac:latest');
+  fs.writeFileSync(path.join(state, 'down'), '');
+  try {
+    const r = run('deploy.sh');
+    assert.equal(r.status, 1);
+    assert.match(r.output, /isn't answering on the new questions after 90 s: back to the questions before/);
+    assert.doesNotMatch(r.output, /rolled back to/, 'the code was fine before them');
+    assert.equal(git(bank, 'rev-parse', 'HEAD'), before);
+    assert.equal(tagged('almanac:latest'), running, 'the same image');
+    assert.equal(compose().at(-1)?.endsWith('up -d --no-deps --force-recreate app'), true, compose().join('\n'));
+  } finally {
+    fs.rmSync(path.join(state, 'down'));
+  }
+  // Back up: the questions of that commit go in with the next deploy.
+  assert.equal(run('deploy.sh').status, 0);
 });
 
 test('a deploy that isn’t answering after 90 s goes back by itself', () => {

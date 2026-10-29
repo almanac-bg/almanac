@@ -22,10 +22,19 @@ main() {
   }
 
   bank_before=$(git -C private rev-parse HEAD)
-  caddy_before=$(git rev-parse -q --verify HEAD:deploy/Caddyfile || echo none)
-  git merge --quiet --ff-only origin/main
   git -C private merge --quiet --ff-only origin/main
   bank_after=$(git -C private rev-parse HEAD)
+  # The new code on the new questions, in a container of its own, before anything switches: a bank it can't load (a
+  # slip in the file, a format the code doesn't know yet) leaves the game as it is, on the questions it has.
+  if [ "$bank_after" != "$bank_before" ] && ! docker run --rm -e DB_PATH=/tmp/check.db \
+    -e QUESTIONS_PATH=/app/private/questions.json -v "$PWD/private:/app/private:ro" "$image" \
+    node apps/server/dist/cli.mjs check-bank; then
+    git -C private reset --quiet --hard "$bank_before"
+    echo "$(date -u +%FT%TZ) $release doesn't load the new question bank: nothing changed, the bank is back where it was"
+    exit 1
+  fi
+  caddy_before=$(git rev-parse -q --verify HEAD:deploy/Caddyfile || echo none)
+  git merge --quiet --ff-only origin/main
 
   # What runs now becomes the way back — unless it's this very image again (a retry, or new questions only): then the
   # way back stays what it was.
@@ -55,6 +64,13 @@ main() {
   fi
 
   if ! healthy; then
+    # New questions only: the code was fine before them, so they go back, not the code.
+    if [ "$old_id" = "$new_id" ] && [ "$bank_after" != "$bank_before" ]; then
+      echo "$(date -u +%FT%TZ) $release isn't answering on the new questions after 90 s: back to the questions before"
+      git -C private reset --quiet --hard "$bank_before"
+      APP_RELEASE=$release docker compose up -d --no-deps --force-recreate app
+      exit 1
+    fi
     echo "$(date -u +%FT%TZ) $release isn't answering through Caddy after 90 s: going back to what ran before"
     deploy/rollback.sh
     exit 1
