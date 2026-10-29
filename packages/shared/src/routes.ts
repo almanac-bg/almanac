@@ -85,6 +85,21 @@ export function routeKind(path: string): 'public' | 'app' | 'unknown' {
   return APP_PATHS.some((re) => re.test(path)) ? 'app' : 'unknown';
 }
 
+/**
+ * Addresses as error reports and the server's log keep them, in a URL or anywhere in a line of text: the path alone (a
+ * query can carry a password-reset or unsubscribe token), and no part that names a player or opens something private —
+ * a profile, a room, a link to a challenge, a day's questions, a group or a set, a set's picture, the email-events
+ * secret. Numbers that only count (a group's or a set's id) stay.
+ */
+export function scrubPaths(text: string): string {
+  return text
+    .replace(/(\/[^\s?#]*)[?#][^\s"'`),;]*/g, '$1')
+    .replace(
+      /\/(profile|join|c|challenges|daily|groups\/join|sets\/shared|sets\/images|email-events)\/(?!(?:preview|link)(?![^/\s"'`):,;]))[^/\s"'`):,;]+/g,
+      '/$1/*',
+    );
+}
+
 /** A browser tab's title: "Настройки — АЛМАНАХ"; null is the home page's own. */
 export function pageTitle(title: string | null): string {
   return title ? `${title} — ${BRAND.name}` : PUBLIC_PAGES['/'].title;

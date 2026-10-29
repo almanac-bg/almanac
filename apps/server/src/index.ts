@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BRAND, MODES, PUBLIC_PAGES, pageTitle, ROOM_LIMITS, routeKind, type SiteInfo } from '@quiz/shared';
+import { BRAND, MODES, PUBLIC_PAGES, pageTitle, ROOM_LIMITS, routeKind, type SiteInfo, scrubPaths } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
@@ -11,7 +11,7 @@ import { dailyPreview } from './daily';
 import { db, isBusy } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
-import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
+import { flushLogs, forwardEnvelope, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
 import { bankProblem, IMAGE_PATH, imageDir, questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
@@ -20,6 +20,11 @@ import { siteInfo } from './site';
 import { seedSkillOnce } from './skill';
 import { catchUpTallies, keepTallies } from './tallies';
 import { network, throttled } from './throttle';
+
+// The log, off the server too (monitoring.ts → shipLogs), from the first line after the modules load: in production,
+// with Sentry set up, unless SENTRY_LOGS=off. (A migration's own line, written as the database opens, stays in the
+// container's log.)
+const stopLogs = config.production && config.sentryLogs ? shipLogs() : async () => {};
 
 questionBank(); // fail fast on a broken question file
 seedSkillOnce();
@@ -103,7 +108,7 @@ app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction)
   // Another writer (Litestream, the command line) held the database past busy_timeout: a busy moment for the player,
   // worth a report for us (it should take milliseconds).
   if (isBusy(err)) {
-    void reportError(err, `${req.method} ${req.route?.path ?? req.path}: the database stayed locked`);
+    void reportError(err, `${req.method} ${req.route?.path ?? scrubPaths(req.path)}: the database stayed locked`);
     res.status(503).json({ error: 'Сървърът е натоварен. Опитай след малко.' });
     return;
   }
@@ -113,7 +118,8 @@ app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction)
     res.status(status).json({ error: 'Невалидна заявка.' });
     return;
   }
-  void reportError(err, `${req.method} ${req.route?.path ?? req.path}`, { userId: res.locals.userId });
+  // A route's pattern when one matched; else the address itself, without the names or codes in it.
+  void reportError(err, `${req.method} ${req.route?.path ?? scrubPaths(req.path)}`, { userId: res.locals.userId });
   res.status(500).json({ error: 'Нещо се обърка. Опитай пак.' });
 });
 
@@ -478,7 +484,8 @@ function challengePage(html: string, id: string, signedOut: boolean): string | n
 // Last resort: a bug no guard caught. Report it, then exit (state may be broken); Docker restarts the server.
 for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
   process.on(event, (err) => {
-    void reportError(err, event).finally(() => process.exit(1));
+    // The report and the log lines waiting to go (this one among them) leave before the process does.
+    void Promise.all([reportError(err, event), flushLogs()]).finally(() => process.exit(1));
     setTimeout(() => process.exit(1), 3000).unref();
   });
 }
@@ -526,6 +533,7 @@ async function shutdown(signal: string) {
   db.prepare(
     "INSERT INTO settings (key, value) VALUES ('clean_shutdown', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   ).run(String(Date.now()));
+  await stopLogs();
   server.close(() => {
     db.close();
     process.exit(0);

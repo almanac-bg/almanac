@@ -3,17 +3,15 @@
  * then, after the page is up, and sends through our own server (/api/monitoring): the browser never contacts Sentry,
  * and no IP address or personal data goes with a report — only the account number.
  */
+import { scrubPaths } from '@quiz/shared';
+
 type Sentry = typeof import('./sentry');
 
 let sentry: Sentry | null = null;
 let userId: number | null = null;
 
-/**
- * Reports keep only the path of a link: query strings can carry secrets (password-reset and unsubscribe tokens), and
- * profile and room paths name a player or a private room.
- */
-const scrub = (url: unknown) =>
-  typeof url === 'string' ? url.split(/[?#]/)[0].replace(/\/(profile|join)\/[^/]+/g, '/$1/*') : url;
+/** Reports keep only the path of a link, without names or codes (scrubPaths). */
+const scrub = (url: unknown) => (typeof url === 'string' ? scrubPaths(url) : url);
 
 /** Noise nothing can be done about: other origins' scripts, browser quirks, a connection that dropped. */
 const IGNORED = ['Script error.', /ResizeObserver loop/, /^NetworkError/, /Failed to fetch/, /Load failed/];

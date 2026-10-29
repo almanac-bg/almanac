@@ -159,6 +159,8 @@ export const config = {
       : null,
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
+  /** With SENTRY_DSN in production, the server's log goes to the same project too (monitoring.ts → shipLogs); "off" doesn't. */
+  sentryLogs: process.env.SENTRY_LOGS !== 'off',
   /** Tags error reports with the deployed version (e.g. the git commit). */
   release: process.env.APP_RELEASE || null,
   /** Multiplies every in-game timer. Only for automated tests (e.g. 0.05). */

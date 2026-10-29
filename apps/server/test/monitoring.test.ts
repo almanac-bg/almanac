@@ -6,6 +6,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { format } from 'node:util';
 import { sleep } from './helpers';
 
 const received: { url: string; body: string }[] = [];
@@ -25,7 +26,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-monitoring-'));
 process.env.DB_PATH = path.join(tmp, 'monitoring.db');
 process.env.SENTRY_DSN = DSN;
 process.env.APP_RELEASE = 'test-release';
-const { forwardEnvelope, reportError, watchEventLoop } = await import('../src/monitoring');
+const { forwardEnvelope, reportError, scrubLog, shipLogs, watchEventLoop } = await import('../src/monitoring');
 
 after(() => {
   fake.close();
@@ -116,4 +117,85 @@ test('the browser tunnel passes on envelopes for our project only', async () => 
   await sleep(200);
   assert.equal(received.length, 1);
   assert.equal(received[0].url, '/api/42/envelope/');
+});
+
+/** The console's four methods replaced by a recorder (what stdout would have shown), for the length of `fn`. */
+async function recording(fn: () => Promise<void>) {
+  const methods = ['log', 'info', 'warn', 'error'] as const;
+  const originals = methods.map((m) => console[m]);
+  const said: string[] = [];
+  for (const m of methods) console[m] = (...args: unknown[]) => void said.push(format(...args));
+  try {
+    await fn();
+  } finally {
+    for (const [i, m] of methods.entries()) console[m] = originals[i];
+  }
+  return said;
+}
+
+type LogItem = { level: string; body: string; trace_id: string; attributes: Record<string, { value: string }> };
+const logItems = () =>
+  received.flatMap(({ body }) => {
+    const [, item, payload] = lines(body);
+    assert.equal(item.type, 'log');
+    assert.equal(item.item_count, payload.items.length);
+    assert.equal(item.content_type, 'application/vnd.sentry.items.log+json');
+    return payload.items as LogItem[];
+  });
+
+test('the server log goes to Sentry too, line by line as stdout shows it, without email or IP addresses, names or codes', async () => {
+  received.length = 0;
+  let stop: () => Promise<void> = async () => {};
+  const said = await recording(async () => {
+    stop = shipLogs();
+    console.log('🗓️  Unused accounts: %d warned', 2);
+    console.warn(
+      'to ivan@example.com from 203.0.113.5 and 2001:db8::7 at /profile/Иван?x=1, /c/AbC and /daily/preview',
+    );
+    console.error('💥 %s:', 'GET /api/x', new TypeError('boom'));
+    await stop();
+    console.log('after the stop: stdout only');
+  });
+  assert.equal(said.length, 4, 'stdout gets every line, as before');
+  assert.equal(said[0], '🗓️  Unused accounts: 2 warned');
+  assert.equal(received.length, 1, 'one envelope for the lot');
+  assert.equal(lines(received[0].body)[0].dsn, DSN);
+  const items = logItems();
+  assert.deepEqual(
+    items.map((i) => i.level),
+    ['info', 'warn', 'error'],
+  );
+  assert.equal(items[0].body, said[0]);
+  assert.equal(items[1].body, 'to [email] from [ip] and [ip] at /profile/*, /c/* and /daily/preview');
+  assert.match(items[2].body, /^💥 GET \/api\/x: TypeError: boom\n\s+at /, 'the stack, as stdout has it');
+  assert.match(items[0].trace_id, /^[0-9a-f]{32}$/);
+  assert.equal(new Set(items.map((i) => i.trace_id)).size, 1, "one run's lines read together");
+  assert.equal(items[0].attributes['sentry.release'].value, 'test-release');
+});
+
+test('a flood of log lines is capped at 300 a minute, with a line saying how many were held back', async () => {
+  received.length = 0;
+  await recording(async () => {
+    const stop = shipLogs();
+    for (let i = 0; i < 400; i++) console.log(`line ${i}`);
+    await stop();
+  });
+  const items = logItems();
+  const sent = items.filter((i) => i.body.startsWith('line '));
+  assert.ok(sent.length <= 300, `${sent.length} sent`);
+  assert.ok(
+    received.every(({ body }) => lines(body)[2].items.length <= 100),
+    'at most 100 to an envelope',
+  );
+  assert.equal(items.at(-1)?.body, `📡 ${400 - sent.length} log line(s) held back: more than 300 a minute.`);
+});
+
+test('what stays in a log line: times, versions, paths that only count', () => {
+  for (const line of [
+    'at 2026-10-29T18:45:12.000Z, 12:30:45 Sofia',
+    'Node v24.11.0, schema v27',
+    '/groups/12 and /sets/7 and /api/daily/link',
+  ])
+    assert.equal(scrubLog(line), line);
+  assert.equal(scrubLog('ECONNREFUSED 127.0.0.1:587'), 'ECONNREFUSED [ip]:587');
 });

@@ -1,3 +1,4 @@
+import { scrubPaths } from '@quiz/shared';
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
@@ -43,8 +44,8 @@ siteRouter.post('/client-errors', (req, res) => {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: it strips control characters on purpose (log forging)
     const line = (s: string) => s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
     const { kind, message, url, stack } = body.data;
-    // Only the path, and not whose profile or which room: the log keeps no names or codes.
-    const where = (url ?? '?').split(/[?#]/)[0].replace(/\/(profile|join)\/[^/]+/g, '/$1/*');
+    // Only the path, and not whose profile, which room or which link: the log keeps no names or codes.
+    const where = scrubPaths(url ?? '?');
     const trace = stack
       ? `\n${stack
           .split('\n')
