@@ -2,7 +2,7 @@ import { actions, fmt, type LiveGame } from '@quiz/client';
 import { type GamePlayer, ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Flame, Lock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
@@ -70,7 +70,7 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
           const place = order.indexOf(item);
           const placed = place >= 0;
           return (
-            <motion.li key={item} layout transition={{ type: 'spring', stiffness: 500, damping: 38 }}>
+            <m.li key={item} layout transition={{ type: 'spring', stiffness: 500, damping: 38 }}>
               <button
                 type="button"
                 aria-disabled={inert || undefined}
@@ -113,7 +113,7 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
                   <KeyHint className="shrink-0">{String(item + 1)}</KeyHint>
                 )}
               </button>
-            </motion.li>
+            </m.li>
           );
         })}
       </ol>
@@ -150,7 +150,7 @@ export function OrderReveal({ game, q, reveal }: { game: LiveGame; q: QuestionPa
           const yours = given?.indexOf(item) ?? -1;
           const hit = yours === place;
           return (
-            <motion.li
+            <m.li
               key={item}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -185,7 +185,7 @@ export function OrderReveal({ game, q, reveal }: { game: LiveGame; q: QuestionPa
                     {yours >= 0 ? `при теб ${yours + 1}.` : ''}
                   </span>
                 ))}
-            </motion.li>
+            </m.li>
           );
         })}
       </ol>
@@ -210,7 +210,7 @@ export function OrderReveal({ game, q, reveal }: { game: LiveGame; q: QuestionPa
 export function OrderSummary({ result }: { result: PlayerResult }) {
   const placed = result.order?.right ?? 0;
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 18 }}
@@ -245,7 +245,7 @@ export function OrderSummary({ result }: { result: PlayerResult }) {
           )}
         </>
       )}
-    </motion.div>
+    </m.div>
   );
 }
 

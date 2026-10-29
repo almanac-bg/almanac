@@ -2,7 +2,7 @@ import { actions, plural, useNow, useStore } from '@quiz/client';
 import { avatarEmoji, MODES, POWERUPS, type QueueStatus } from '@quiz/shared';
 import clsx from 'clsx';
 import { Bot, User, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { type RefObject, useId, useRef } from 'react';
 import { accentFill } from '../lib/accent';
 import { Avatar } from './Avatar';
@@ -22,7 +22,7 @@ export function QueueOverlay() {
   return (
     <AnimatePresence>
       {queue && (
-        <motion.div
+        <m.div
           ref={box}
           role="dialog"
           aria-modal
@@ -39,7 +39,7 @@ export function QueueOverlay() {
           <div className="grid min-h-full place-items-center p-6">
             <Searching queue={queue} cancel={cancel} titleId={titleId} />
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );
@@ -118,7 +118,7 @@ function Searching({
 
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         {Array.from({ length: queue.needed }, (_, i) => (
-          <motion.span
+          <m.span
             // biome-ignore lint/suspicious/noArrayIndexKey: one placeholder per seat; a seat is its position
             key={i}
             initial={false}
@@ -127,7 +127,7 @@ function Searching({
             style={i < queue.found ? { borderColor: mode.accent[0], boxShadow: `0 0 16px -4px ${mode.accent[0]}` } : {}}
           >
             {i === 0 ? <Emoji e={avatarEmoji(me.avatar)} /> : i < queue.found ? <User className="size-4" /> : '·'}
-          </motion.span>
+          </m.span>
         ))}
       </div>
       {/* Changes only when the server sends news (a seat filled), so it's read out then and stays quiet otherwise. One

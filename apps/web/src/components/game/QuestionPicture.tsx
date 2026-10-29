@@ -1,6 +1,6 @@
 import type { ImageCredit, QuestionImage } from '@quiz/shared';
 import clsx from 'clsx';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useState } from 'react';
 
 /**
@@ -59,7 +59,7 @@ export function QuestionPicture({
         />
       </div>
       {credit && (
-        <motion.figcaption
+        <m.figcaption
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="mt-1.5 truncate text-right text-xs text-fg-3"
@@ -76,7 +76,7 @@ export function QuestionPicture({
           ) : (
             creditText(credit)
           )}
-        </motion.figcaption>
+        </m.figcaption>
       )}
     </figure>
   );

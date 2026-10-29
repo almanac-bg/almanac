@@ -1,7 +1,7 @@
 import { actions, dropInvite, toast, useNow, useStore } from '@quiz/client';
 import type { Invite } from '@quiz/shared';
 import { Users } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Avatar } from './Avatar';
@@ -50,7 +50,7 @@ function InviteCard({ invite }: { invite: Invite }) {
   }
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, y: -24, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -88,6 +88,6 @@ function InviteCard({ invite }: { invite: Invite }) {
           <span aria-hidden>· {left} с</span>
         </Button>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

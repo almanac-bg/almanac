@@ -12,7 +12,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Skull } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
@@ -48,7 +48,7 @@ export function Intro({ game }: { game: LiveGame }) {
   const me = players.find((p) => p.id === game.start.youId)!;
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
@@ -58,7 +58,7 @@ export function Intro({ game }: { game: LiveGame }) {
       <p className="t-eyebrow text-fg-3">{game.start.duelWith ? 'Дуел с приятел' : mode.name}</p>
       {players.length === 1 ? (
         <div className="mt-8 flex flex-col items-center">
-          <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
+          <m.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="text-7xl">
             <Emoji
               e={
                 game.start.duelWith
@@ -70,7 +70,7 @@ export function Intro({ game }: { game: LiveGame }) {
                       : (category?.icon ?? '🎲')
               }
             />
-          </motion.span>
+          </m.span>
           <h1 className="mt-4 font-display text-3xl font-bold">
             {game.start.duelWith
               ? `Дуел с ${game.start.duelWith.username}`
@@ -101,7 +101,7 @@ export function Intro({ game }: { game: LiveGame }) {
         <div className="mt-8 grid max-w-2xl grid-cols-4 gap-4 sm:gap-6">
           {/* A class in a room: a dozen faces and how many more, not forty. */}
           {(players.length > BIG_MATCH ? players.slice(0, BIG_MATCH - 1) : players).map((p, i) => (
-            <motion.div
+            <m.div
               key={p.id}
               initial={{ opacity: 0, y: 30, scale: 0.6 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -116,7 +116,7 @@ export function Intro({ game }: { game: LiveGame }) {
                 {p.name}
               </span>
               {p.mastery && <MasteryLine mastery={p.mastery} short />}
-            </motion.div>
+            </m.div>
           ))}
           {players.length > BIG_MATCH && (
             <div className="grid size-16 place-items-center self-start justify-self-center rounded-full border border-line bg-tint/5 font-display font-bold text-fg-2">
@@ -137,7 +137,7 @@ export function Intro({ game }: { game: LiveGame }) {
         </p>
       )}
       <AnimatePresence mode="popLayout">
-        <motion.div
+        <m.div
           key={left}
           initial={{ scale: 2.2, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -146,9 +146,9 @@ export function Intro({ game }: { game: LiveGame }) {
           className="mt-10 animate-shimmer font-display text-8xl font-black text-gradient"
         >
           {left > 0 ? left : 'Старт!'}
-        </motion.div>
+        </m.div>
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -173,7 +173,7 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
   // level's room too (the rank under it says more about the opponent).
   const roomy = useMediaQuery('(min-width: 360px)');
   const side = (p: GamePlayer, dir: 1 | -1) => (
-    <motion.div
+    <m.div
       initial={{ x: -120 * dir, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 160, damping: 18, delay: 0.1 }}
@@ -203,7 +203,7 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
           ))}
         </span>
       )}
-    </motion.div>
+    </m.div>
   );
   return (
     <div className="mt-8 flex max-w-full items-start gap-3 sm:gap-10">
@@ -230,14 +230,14 @@ function RoundsPlan({ game }: { game: LiveGame }) {
 
 function VsMark() {
   return (
-    <motion.span
+    <m.span
       initial={{ scale: 4, opacity: 0, rotate: -15 }}
       animate={{ scale: 1, opacity: 1, rotate: 0 }}
       transition={{ delay: 0.45, type: 'spring', stiffness: 300, damping: 14 }}
       className="mt-8 shrink-0 font-display text-5xl font-black text-fuchsia-400 italic drop-shadow-[0_0_24px_rgb(232_121_249/0.7)] sm:text-6xl"
     >
       VS
-    </motion.span>
+    </m.span>
   );
 }
 
@@ -248,7 +248,7 @@ function TeamsVersus({ game }: { game: LiveGame }) {
     const members = game.start.players.filter((p) => p.team === team);
     const color = teamColor(team);
     return (
-      <motion.div
+      <m.div
         initial={{ x: -120 * dir, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 160, damping: 18, delay: 0.1 }}
@@ -262,7 +262,7 @@ function TeamsVersus({ game }: { game: LiveGame }) {
           {myTeam === team && <span className="ml-1.5 font-sans text-xs font-semibold text-fg-2">· твоят отбор</span>}
         </span>
         {members.map((p, i) => (
-          <motion.div
+          <m.div
             key={p.id}
             initial={{ opacity: 0, scale: 0.6 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -281,9 +281,9 @@ function TeamsVersus({ game }: { game: LiveGame }) {
               <span className="truncate">{p.name}</span>
               <LevelBadge level={p.level} />
             </span>
-          </motion.div>
+          </m.div>
         ))}
-      </motion.div>
+      </m.div>
     );
   };
   return (

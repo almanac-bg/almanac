@@ -145,7 +145,7 @@ function inMatch() {
   return { ...first, startsInMs: 0 };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   run++;
   mock.timers.reset();
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_800_000_000_000 + run * 3_600_000 });
@@ -153,7 +153,7 @@ beforeEach(() => {
   socket.sendBuffer = [];
   socket.sent = [];
   setState({ game: null, toasts: [], connected: false });
-  connectRealtime();
+  await connectRealtime();
 });
 
 test('a pick goes out once and shows as yours', () => {

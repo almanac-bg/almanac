@@ -1,6 +1,6 @@
 import { useStore } from '@quiz/client';
 import { ChevronRight } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { Link } from 'react-router';
 
 /** Shown on every other page while a match is still running (e.g. after the back button): one tap returns to it. */
@@ -9,7 +9,7 @@ export function ActiveMatchBar() {
   return (
     <AnimatePresence>
       {live && (
-        <motion.div
+        <m.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
@@ -26,7 +26,7 @@ export function ActiveMatchBar() {
             Мачът тече — върни се в играта
             <ChevronRight className="size-4" aria-hidden />
           </Link>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

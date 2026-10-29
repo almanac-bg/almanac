@@ -1,7 +1,7 @@
 import { actions, type LiveGame, useNow } from '@quiz/client';
 import { type CategoryId, categoryById, ROUNDS } from '@quiz/shared';
 import clsx from 'clsx';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { Emoji } from '../Emoji';
 import { Spinner } from '../ui';
 import { KeyHint } from './Powerups';
@@ -41,7 +41,7 @@ export function RoundPick({ game }: { game: LiveGame }) {
       : `Изостава с точките, затова избира категорията на следващите ${ROUNDS.size} въпроса.`;
 
   return (
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
@@ -81,7 +81,7 @@ export function RoundPick({ game }: { game: LiveGame }) {
           />
         ))}
       </div>
-    </motion.section>
+    </m.section>
   );
 }
 
@@ -121,7 +121,7 @@ function Tile({
     boxShadow: chosen ? `0 0 40px -8px ${cat.color}` : undefined,
   };
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08 * index }}
@@ -144,6 +144,6 @@ function Tile({
           {body}
         </div>
       )}
-    </motion.div>
+    </m.div>
   );
 }

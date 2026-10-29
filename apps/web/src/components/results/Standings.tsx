@@ -2,7 +2,7 @@ import { fmt, type LiveGame, ordinal, plural } from '@quiz/client';
 import { type FinalStanding, type GameEndPayload, type MatchRewards, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { ChartColumn, Share2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
 import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
@@ -32,7 +32,7 @@ export function ChallengeStanding({
 }) {
   const first = challenge.total <= 1;
   return (
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3, type: 'spring', stiffness: 180, damping: 20 }}
@@ -76,7 +76,7 @@ export function ChallengeStanding({
           </Button>
         </div>
       </Card>
-    </motion.section>
+    </m.section>
   );
 }
 
@@ -106,7 +106,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
           const p = game.players[s.id];
           const me = s.id === game.start.youId;
           return (
-            <motion.li
+            <m.li
               key={s.id}
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
@@ -116,14 +116,14 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
             >
               <span className="sr-only">{ordinal(s.placement)} място:</span>
               {s.placement === 1 && (
-                <motion.span
+                <m.span
                   initial={{ y: -20, opacity: 0, rotate: -20 }}
                   animate={{ y: 0, opacity: 1, rotate: 0 }}
                   transition={{ delay: 1, type: 'spring' }}
                   className="text-4xl drop-shadow-[0_0_16px_rgb(251_191_36/0.7)]"
                 >
                   <Emoji e="👑" />
-                </motion.span>
+                </m.span>
               )}
               <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 84 : 68} dim={s.left} />
               <div
@@ -162,7 +162,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
               >
                 <Emoji e={medals[s.placement]} />
               </div>
-            </motion.li>
+            </m.li>
           );
         })}
       </ol>
@@ -222,7 +222,7 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
           .filter((s) => game.players[s.id]?.team === team)
           .sort((a, b) => b.score - a.score);
         return (
-          <motion.div
+          <m.div
             key={team}
             initial={{ opacity: 0, x: team === 0 ? -30 : 30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -273,7 +273,7 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
                 })}
               </div>
             </Card>
-          </motion.div>
+          </m.div>
         );
       })}
     </section>

@@ -1,7 +1,7 @@
 import { api, errorMessage, timeAgo, toast } from '@quiz/client';
 import { type ModerationAction, REPORT_REASONS, type ReportGroup } from '@quiz/shared';
 import { Ban, Check, Flag, IdCard, PenLine } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
@@ -71,7 +71,7 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
   }
 
   return (
-    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
+    <m.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
       <Card className="p-5">
         <div className="flex flex-wrap items-center gap-3">
           <Avatar avatar={target.avatar} frame={target.frame} size={44} />
@@ -157,6 +157,6 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
           </div>
         )}
       </Card>
-    </motion.div>
+    </m.div>
   );
 }

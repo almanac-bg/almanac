@@ -2,7 +2,7 @@ import { api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/clien
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
@@ -193,7 +193,7 @@ function MySubmissions({ refresh }: { refresh: number }) {
               const cat = categoryById(s.category)!;
               const status = SUBMISSION_STATUS[s.status];
               return (
-                <motion.div
+                <m.div
                   key={s.id}
                   layout
                   initial={{ opacity: 0, y: -6 }}
@@ -232,7 +232,7 @@ function MySubmissions({ refresh }: { refresh: number }) {
                       </Button>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </AnimatePresence>

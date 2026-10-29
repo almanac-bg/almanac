@@ -2,7 +2,7 @@ import { actions, fmt, plural, toast, useStore } from '@quiz/client';
 import { levelProgress, MODES, type QueueModeId, REVIEW, START_RATING, SUBMISSION_RULES } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useStartReview } from '../components/almanac';
@@ -63,7 +63,7 @@ export function HomePage() {
     <div className="space-y-6">
       {room && (
         // A link (it goes somewhere), like the bar of a match in progress.
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+        <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <Link
             to="/room"
             className="glass focus-ring flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border-fuchsia-400/30 px-5 py-3 text-left"
@@ -76,7 +76,7 @@ export function HomePage() {
               Към стаята <ArrowRight aria-hidden className="size-4" />
             </span>
           </Link>
-        </motion.div>
+        </m.div>
       )}
 
       <DuelTurn />
@@ -164,7 +164,7 @@ function ReviewTurn() {
   const { busy, start } = useStartReview();
   if (due < REVIEW.min) return null;
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       className="flex items-center gap-3 rounded-2xl border border-emerald-300/30 bg-emerald-400/[0.08] px-4 py-3"
@@ -179,7 +179,7 @@ function ReviewTurn() {
       <Button size="sm" onClick={() => void start()} loading={busy}>
         Играй
       </Button>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -192,7 +192,7 @@ function DuelTurn() {
   if (!yours.length) return null;
   const [first] = yours;
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       className="flex items-center gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/[0.08] px-4 py-3"
@@ -206,6 +206,6 @@ function DuelTurn() {
       <Button size="sm" onClick={() => play(first.id)} loading={playing === first.id}>
         Играй
       </Button>
-    </motion.div>
+    </m.div>
   );
 }

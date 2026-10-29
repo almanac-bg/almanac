@@ -2,7 +2,7 @@ import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/clie
 import { BRAND, type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -160,7 +160,7 @@ function Friends() {
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
             <AnimatePresence initial={false}>
               {data.incoming.map((f) => (
-                <motion.div
+                <m.div
                   key={f.user.id}
                   layout
                   initial={{ opacity: 0, y: 8 }}
@@ -185,7 +185,7 @@ function Friends() {
                       </Button>
                     </div>
                   </Card>
-                </motion.div>
+                </m.div>
               ))}
             </AnimatePresence>
           </div>
@@ -366,7 +366,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
   }
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -416,6 +416,6 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
           <UserMinus className="size-4" />
         </button>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

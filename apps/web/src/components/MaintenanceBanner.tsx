@@ -1,5 +1,5 @@
 import { useStore } from '@quiz/client';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { Emoji } from './Emoji';
 
 /** While the server restarts for an update: running matches finish, new ones wait a minute or two. */
@@ -8,7 +8,7 @@ export function MaintenanceBanner() {
   return (
     <AnimatePresence>
       {message && (
-        <motion.div
+        <m.div
           role="status"
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
@@ -21,7 +21,7 @@ export function MaintenanceBanner() {
             </span>{' '}
             {message}
           </p>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

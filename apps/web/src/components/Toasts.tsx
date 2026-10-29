@@ -1,7 +1,7 @@
 import { dismissToast, type Toast, useStore } from '@quiz/client';
 import clsx from 'clsx';
 import { AlertTriangle, Info, Sparkles, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { Emoji } from './Emoji';
 
@@ -61,7 +61,7 @@ function ToastCard({ toast: t }: { toast: Toast }) {
 
   return (
     // Not a button itself: a tap (or a swipe, on a phone) clears it early; the × is the button for keyboards.
-    <motion.div
+    <m.div
       layout
       onClick={() => dismissToast(t.id)}
       onPointerEnter={pause}
@@ -106,6 +106,6 @@ function ToastCard({ toast: t }: { toast: Toast }) {
       >
         <X aria-hidden className="size-4" />
       </button>
-    </motion.div>
+    </m.div>
   );
 }

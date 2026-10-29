@@ -1,7 +1,7 @@
 import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { RANK_TIERS, seasonTitle } from '@quiz/shared';
 import confetti from 'canvas-confetti';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
 import { sfx } from '../lib/sound';
 import { Emoji } from './Emoji';
@@ -46,7 +46,7 @@ export function SeasonRecap() {
       </h2>
       {tier ? (
         <>
-          <motion.div
+          <m.div
             initial={{ scale: 0.4, rotate: -20, opacity: 0 }}
             animate={{ scale: 1, rotate: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.15 }}
@@ -57,7 +57,7 @@ export function SeasonRecap() {
             }}
           >
             <Emoji e="🏅" />
-          </motion.div>
+          </m.div>
           <p className="mt-4 text-fg-2">
             Достигна ранг <b style={{ color: accentText(tier.color) }}>{tier.name}</b>
           </p>

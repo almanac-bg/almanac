@@ -1,7 +1,7 @@
 import { useStore } from '@quiz/client';
 import clsx from 'clsx';
 import { Check, WifiOff } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 /** A blip shorter than this (or the first connect after a page load) isn't worth a banner. */
@@ -48,7 +48,7 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
     >
       <AnimatePresence mode="wait">
         {banner && (
-          <motion.p
+          <m.p
             key={banner}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -71,7 +71,7 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
                 Връзката е възстановена
               </>
             )}
-          </motion.p>
+          </m.p>
         )}
       </AnimatePresence>
     </div>

@@ -9,7 +9,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, EyeOff, Flag, Lightbulb, Pencil, RefreshCw, RotateCcw, Wrench } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { Emoji } from '../Emoji';
@@ -221,7 +221,7 @@ function QuestionReportCard({
   }
 
   return (
-    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
+    <m.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40 }}>
       <Card className="p-5">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -305,7 +305,7 @@ function QuestionReportCard({
           })
         }
       />
-    </motion.div>
+    </m.div>
   );
 }
 

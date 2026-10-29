@@ -2,7 +2,7 @@ import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from 
 import { categoryById, isQueueMode, MODES, REVIEW, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
@@ -225,12 +225,12 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
-      <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+      <m.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
           {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
           {solo && category && ` · ${category.name}`}
         </p>
-        <motion.h1
+        <m.h1
           ref={headlineRef}
           tabIndex={-1}
           initial={{ scale: 0.6, opacity: 0 }}
@@ -253,9 +253,9 @@ export function Results({ game }: { game: LiveGame }) {
           )}
         >
           {headline}
-        </motion.h1>
+        </m.h1>
         {winningTeam !== null && (
-          <motion.p
+          <m.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
@@ -263,7 +263,7 @@ export function Results({ game }: { game: LiveGame }) {
             style={{ color: teamColor(winningTeam), textShadow: `0 0 24px ${teamColor(winningTeam)}88` }}
           >
             {TEAMS[winningTeam].name} печелят!
-          </motion.p>
+          </m.p>
         )}
         {!end.noContest && (
           <p className="mt-3 text-fg-2">
@@ -316,7 +316,7 @@ export function Results({ game }: { game: LiveGame }) {
               : `${rivals} по време на мача — победата е твоя.`}
           </p>
         )}
-      </motion.header>
+      </m.header>
 
       {/* A guest's first results: what keeps them comes first, not after the rewards. */}
       <GuestNudge className="mx-auto mt-6 max-w-2xl">

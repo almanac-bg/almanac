@@ -2,7 +2,7 @@ import { fmt, type LiveGame } from '@quiz/client';
 import { MODES } from '@quiz/shared';
 import clsx from 'clsx';
 import { Flame, Skull, Volume2, VolumeX, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { accentFill } from '../../lib/accent';
 import { useCountUp } from '../../lib/hooks';
 import { useMuted } from '../../lib/sound';
@@ -75,14 +75,14 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
         )}
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {me && me.streak >= 2 && (
-            <motion.span
+            <m.span
               key={me.streak}
               initial={{ scale: 1.4 }}
               animate={{ scale: 1 }}
               className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-1 text-sm font-bold text-orange-300"
             >
               <Flame className="size-4" /> {me.streak}
-            </motion.span>
+            </m.span>
           )}
           <span className="font-display text-xl font-bold tabular-nums">
             <span aria-hidden>{fmt(score)}</span>

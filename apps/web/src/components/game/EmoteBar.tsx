@@ -2,7 +2,7 @@ import { actions } from '@quiz/client';
 import { emoteById } from '@quiz/shared';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useId, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { Emoji } from '../Emoji';
@@ -24,7 +24,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
     setTimeout(() => setCooldown(false), 800);
   }
   const buttons = emotes.map((id) => (
-    <motion.button
+    <m.button
       key={id}
       type="button"
       whileTap={{ scale: 0.8 }}
@@ -38,7 +38,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
       aria-label={`Реакция ${emoteById(id)?.emoji}`}
     >
       <Emoji e={emoteById(id)?.emoji ?? ''} />
-    </motion.button>
+    </m.button>
   ));
   // Phones (and phones held sideways, where a bar along the bottom would sit on the jokers): a button that opens the
   // tray in the page. Wider screens: a bar along the bottom.

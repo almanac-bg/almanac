@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Emoji } from './Emoji';
@@ -253,14 +253,14 @@ export function Modal({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onMouseDown={(e) => e.target === e.currentTarget && onClose()}
         >
-          <motion.div
+          <m.div
             ref={dialog}
             role="dialog"
             aria-modal
@@ -290,8 +290,8 @@ export function Modal({
               </h2>
             )}
             {children}
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       )}
     </AnimatePresence>,
     document.body,
@@ -332,7 +332,7 @@ export function Segmented<T extends string | number>({
           )}
         >
           {o.value === value && (
-            <motion.span
+            <m.span
               layoutId={`seg-${options.map((x) => x.value).join('-')}`}
               className="absolute inset-0 rounded-xl bg-tint/12 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
               transition={{ type: 'spring', stiffness: 500, damping: 38 }}
@@ -348,7 +348,7 @@ export function Segmented<T extends string | number>({
 export function ProgressBar({ value, className, gradient }: { value: number; className?: string; gradient?: string }) {
   return (
     <div className={clsx('h-2 overflow-hidden rounded-full bg-tint/8', className)}>
-      <motion.div
+      <m.div
         className="h-full rounded-full"
         style={{ background: gradient ?? 'linear-gradient(90deg,#a855f7,#22d3ee)' }}
         initial={{ width: 0 }}

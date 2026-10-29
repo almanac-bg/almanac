@@ -2,7 +2,7 @@ import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } 
 import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, ordinal, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { Clock, Gamepad2, Plus, RotateCcw, Save, Share2, Swords } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -133,7 +133,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <m.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="relative overflow-hidden p-5 sm:p-8">
           <div
             aria-hidden
@@ -224,7 +224,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
             </div>
           )}
         </Card>
-      </motion.div>
+      </m.div>
 
       <Board info={info} />
 

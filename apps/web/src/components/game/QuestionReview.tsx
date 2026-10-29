@@ -2,7 +2,7 @@ import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } fro
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Emoji } from '../Emoji';
@@ -58,7 +58,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
       </div>
       <AnimatePresence initial={false}>
         {open && (
-          <motion.ol
+          <m.ol
             id={listId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -74,7 +74,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
                 onReport={canReport && !ownQuestion(item) ? () => setReporting(item) : null}
               />
             ))}
-          </motion.ol>
+          </m.ol>
         )}
       </AnimatePresence>
       <ReportQuestion

@@ -27,7 +27,7 @@ import {
   UsersRound,
   Zap,
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Avatar } from '../components/Avatar';
@@ -193,7 +193,7 @@ export function AuthPage() {
       {/* Phones: brand, then the form (in reach without scrolling), then the pitch. Tablets and up: brand and pitch
         left, form right. */}
       <div className="relative isolate mx-auto grid min-h-dvh max-w-6xl content-center gap-6 px-4 py-6 sm:gap-10 sm:px-5 sm:py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center md:gap-x-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-16">
-        <motion.header
+        <m.header
           initial={drawn ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.2, 0.7, 0.2, 1] }}
@@ -220,9 +220,9 @@ export function AuthPage() {
             <span className="text-fg">Кой знае най-много?</span>
           </p>
           <ProofLine className={clsx('mt-3', linked && 'max-sm:hidden')} />
-        </motion.header>
+        </m.header>
 
-        <motion.div
+        <m.div
           initial={drawn ? false : { opacity: 0, y: 30, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
@@ -441,11 +441,11 @@ export function AuthPage() {
               )}
             </Card>
           </div>
-        </motion.div>
+        </m.div>
 
         <ul className="relative grid gap-3 sm:grid-cols-3 md:col-start-1 md:row-start-2 md:grid-cols-1 md:self-start lg:max-w-xl lg:grid-cols-3">
           {FEATURES.map((f, i) => (
-            <motion.li
+            <m.li
               key={f.title}
               initial={drawn ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -460,7 +460,7 @@ export function AuthPage() {
                 <div className="text-sm font-bold sm:mt-2 md:mt-0 lg:mt-2">{f.title}</div>
                 <div className="mt-0.5 text-xs text-fg-3">{f.body}</div>
               </div>
-            </motion.li>
+            </m.li>
           ))}
         </ul>
 

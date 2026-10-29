@@ -14,7 +14,7 @@ import {
   type ServerToClientEvents,
   type SoloPace,
 } from '@quiz/shared';
-import { io, type Socket } from 'socket.io-client';
+import type { io as connect, Socket } from 'socket.io-client';
 import { api } from './api';
 import { clientConfig, effect, preloadImage } from './config';
 import { getState, type LiveGame, patchGame, setState, toast } from './store';
@@ -22,6 +22,8 @@ import { getState, type LiveGame, patchGame, setState, toast } from './store';
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: GameSocket | null = null;
+/** The realtime library, loaded when a session connects (a signed-out visitor's first page never needs it). */
+let io: typeof connect | null = null;
 let seq = 0;
 
 /** What the player is told when the server didn't take an answer the screen showed as locked in. */
@@ -31,9 +33,10 @@ const REJECTED: Record<AnswerRejection, string> = {
 };
 const nameOf = (g: LiveGame, playerId: string) => g.players[playerId]?.name ?? 'Някой';
 
-/** The realtime connection, created on first use from the client config. */
+/** The realtime connection, created on first use from the client config (once connectRealtime has loaded it). */
 export function getSocket(): GameSocket {
   if (!socket) {
+    if (!io) throw new Error('The realtime connection is not loaded yet.');
     // WebSocket first: starting with HTTP long-polling costs four round trips before the lobby is live (about half a
     // second on a phone). Polling stays the fallback where a WebSocket is blocked.
     socket = io(clientConfig().baseUrl || undefined, {
@@ -46,8 +49,17 @@ export function getSocket(): GameSocket {
   return socket;
 }
 
-export const connectRealtime = () => getSocket().connect();
-export const disconnectRealtime = () => socket?.disconnect();
+/** Wanted connected: a sign-out while the library was still loading doesn't connect it afterwards. */
+let wanted = false;
+export async function connectRealtime() {
+  wanted = true;
+  io ??= (await import('socket.io-client')).io;
+  if (wanted) getSocket().connect();
+}
+export const disconnectRealtime = () => {
+  wanted = false;
+  socket?.disconnect();
+};
 
 /** After a reconnect the server re-sends live state right away; anything it doesn't re-send is gone. */
 let resyncTimer: ReturnType<typeof setTimeout> | undefined;

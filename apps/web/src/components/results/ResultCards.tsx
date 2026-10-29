@@ -28,7 +28,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowUp, Check, Share2 } from 'lucide-react';
-import { animate, motion } from 'motion/react';
+import { animate, m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { dailyLinkUrl, offBoardWhy } from '../../lib/daily';
@@ -112,7 +112,7 @@ export function DailyCard({
         </p>
       )}
       {daily.shieldEarned && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.1, type: 'spring', stiffness: 260, damping: 18 }}
@@ -124,7 +124,7 @@ export function DailyCard({
           <p className="text-sm text-sky-50">
             <b className="font-display">Имаш нов щит!</b> Ако пропуснеш ден, той ще запази серията.
           </p>
-        </motion.div>
+        </m.div>
       )}
       <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
       <div className="relative mt-4">
@@ -218,9 +218,9 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
       <div className="relative mt-5">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="flex items-center gap-2 font-semibold">
-            <motion.span key={p.level} initial={{ scale: 1.8 }} animate={{ scale: 1 }}>
+            <m.span key={p.level} initial={{ scale: 1.8 }} animate={{ scale: 1 }}>
               <LevelBadge level={p.level} className="text-sm" />
-            </motion.span>
+            </m.span>
             Ниво {p.level}
           </span>
           <span className="text-fg-3 tabular-nums">
@@ -234,20 +234,20 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
           />
         </div>
         {levelUp && (
-          <motion.div
+          <m.div
             key={levelUp}
             initial={{ opacity: 0, scale: 0.5, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="mt-4 rounded-2xl bg-[linear-gradient(110deg,rgb(168_85_247/0.25),rgb(34_211_238/0.2))] p-3 text-center font-extrabold"
           >
             <ArrowUp aria-hidden className="mb-1 inline size-5" /> Ново ниво {levelUp}!
-          </motion.div>
+          </m.div>
         )}
       </div>
 
       <ul className="relative mt-5 space-y-1.5 text-sm">
         {lines.map((line, i) => (
-          <motion.li
+          <m.li
             key={line.label}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -256,7 +256,7 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
           >
             <span className="min-w-0 text-fg-2">{line.label}</span>
             <span className="shrink-0 font-semibold tabular-nums">+{fmt(line.amount)}</span>
-          </motion.li>
+          </m.li>
         ))}
       </ul>
       {folded && (
@@ -300,7 +300,7 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
           const a = achievementById(id)!;
           const rarity = RARITIES[a.rarity];
           return (
-            <motion.div
+            <m.div
               key={id}
               initial={{ opacity: 0, rotateX: -90 }}
               animate={{ opacity: 1, rotateX: 0 }}
@@ -324,7 +324,7 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
                 </div>
                 <div className="text-fg-3">+{a.xp} XP</div>
               </div>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>
@@ -339,12 +339,12 @@ export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
       <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-emerald-400/20" />
       <h2 className="relative t-card">Майсторство</h2>
       <ul className="relative mt-4 space-y-3">
-        {mastery.map((m, i) => {
-          const tier = MASTERY_TIERS[m.tier];
-          const category = categoryById(m.category);
+        {mastery.map((earned, i) => {
+          const tier = MASTERY_TIERS[earned.tier];
+          const category = categoryById(earned.category);
           return (
-            <motion.li
-              key={m.category}
+            <m.li
+              key={earned.category}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 1 + i * 0.1, type: 'spring', stiffness: 260, damping: 18 }}
@@ -354,12 +354,12 @@ export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
                 <Emoji e={tier.icon} />
               </span>
               <div className="min-w-0">
-                <p className="text-lg font-extrabold">{masteryName(m)}</p>
+                <p className="text-lg font-extrabold">{masteryName(earned)}</p>
                 <p className="text-sm text-fg-2">
                   {category && <Emoji e={category.icon} />} Нова степен — и титла, която можеш да носиш.
                 </p>
               </div>
-            </motion.li>
+            </m.li>
           );
         })}
       </ul>
@@ -402,13 +402,13 @@ export function UnlockReveal({ rewards }: { rewards: MatchRewards }) {
 
   return (
     <Card className="flex items-center gap-5 overflow-hidden p-5 sm:p-6">
-      <motion.div
+      <m.div
         initial={{ scale: 0.3, rotate: -18, opacity: 0 }}
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 14, delay: 0.8 }}
       >
         <Avatar avatar={avatar} frame={frame} size={96} />
-      </motion.div>
+      </m.div>
       <div className="min-w-0 flex-1">
         <p className="t-eyebrow text-amber-300">Ново за теб</p>
         <p className="mt-1 text-lg font-extrabold">{name}</p>
@@ -442,7 +442,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
         {rewards.unlocks.map((u, i) => {
           const { icon, name } = unlockPreview(u);
           return (
-            <motion.span
+            <m.span
               key={`${u.kind}:${u.id}`}
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -451,7 +451,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
             >
               <Emoji e={icon} size="1.25rem" />
               {name}
-            </motion.span>
+            </m.span>
           );
         })}
       </div>

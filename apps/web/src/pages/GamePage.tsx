@@ -2,7 +2,7 @@ import { actions, type LiveGame, useStore } from '@quiz/client';
 import { MODES, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { DoorOpen } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { Emoji } from '../components/Emoji';
@@ -105,14 +105,14 @@ function Arena({ game }: { game: LiveGame }) {
             ) : game.question ? (
               <QuestionView key={`q${game.question.index}`} game={game} offline={offline} />
             ) : (
-              <motion.div
+              <m.div
                 key="wait"
                 className="grid place-items-center py-32 text-fg-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
                 Следващият въпрос идва…
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
           {!single && <EmoteBar emotes={game.start.emotes} offline={offline} />}

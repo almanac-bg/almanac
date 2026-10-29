@@ -1,7 +1,7 @@
 import { api, fmt, longDate } from '@quiz/client';
 import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
 import { Lock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Emoji } from '../components/Emoji';
@@ -77,7 +77,7 @@ export function AchievementsPage() {
           const rarity = RARITIES[a.rarity];
           const extras = rewardsFor(a.id);
           return (
-            <motion.div
+            <m.div
               key={a.id}
               layout
               initial={{ opacity: 0, y: 12 }}
@@ -143,7 +143,7 @@ export function AchievementsPage() {
                   )}
                 </div>
               </Card>
-            </motion.div>
+            </m.div>
           );
         })}
       </div>

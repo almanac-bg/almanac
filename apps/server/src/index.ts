@@ -147,6 +147,28 @@ if (fs.existsSync(config.webDist)) {
     `<script type="application/json" id="site">${jsonInHtml(siteInfo)}</script>`,
   ].filter(Boolean);
   const page = fs.readFileSync(indexHtml, 'utf8').replace('</head>', `${meta.join('')}</head>`);
+  /**
+   * A page drawn here with its styles inside it, for a first visit (a search engine, a link opened): the browser can
+   * show it without fetching the stylesheet first. The game's own pages keep the link (cached across visits).
+   */
+  const styled = (html: string) =>
+    html.replace(/<link rel="stylesheet" crossorigin href="\/assets\/([\w.-]+\.css)">/, (link, file: string) => {
+      const css = path.join(config.webDist, 'assets', file);
+      return fs.existsSync(css) ? `<style>${fs.readFileSync(css, 'utf8')}</style>` : link;
+    });
+  // A build file's brotli copy (made by the build at the strongest setting) to a browser that takes brotli: Caddy leaves
+  // an encoded response as it is, and only compresses the rest on the fly.
+  const assets = path.join(config.webDist, 'assets');
+  const brotli = new Set(fs.readdirSync(assets).filter((f) => f.endsWith('.br')));
+  app.use('/assets', (req, res, next) => {
+    const name = req.path.slice(1);
+    if (!brotli.has(`${name}.br`) || !/\bbr\b/.test(req.headers['accept-encoding'] ?? '')) return next();
+    res.vary('Accept-Encoding');
+    res.type(path.extname(name));
+    res.setHeader('content-encoding', 'br');
+    res.setHeader('cache-control', 'public, max-age=31536000, immutable');
+    res.sendFile(path.join(assets, `${name}.br`));
+  });
   // Build files carry a content hash in their name, so they can be cached for good. A missing one is a 404,
   // never the page (a tab from an older deploy then reloads instead of running HTML as JavaScript).
   app.use(
@@ -190,8 +212,8 @@ if (fs.existsSync(config.webDist)) {
         route,
         {
           html,
-          painted: pictured ? withApp(html, pictured.app, mark) : html,
-          returning: pictured?.returning ? withApp(html, pictured.returning, mark, true) : null,
+          painted: pictured ? styled(withApp(html, pictured.app, mark)) : html,
+          returning: pictured?.returning ? styled(withApp(html, pictured.returning, mark, true)) : null,
         },
       ];
     }),

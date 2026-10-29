@@ -1,7 +1,7 @@
 import { actions, type LiveGame } from '@quiz/client';
 import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Emoji } from '../Emoji';
 
@@ -166,14 +166,14 @@ export function ActivePowerups({ game }: { game: LiveGame }) {
   return (
     <>
       {chips.map((c) => (
-        <motion.span
+        <m.span
           key={c}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-xs font-bold text-amber-200"
         >
           {c}
-        </motion.span>
+        </m.span>
       ))}
     </>
   );
@@ -200,7 +200,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
   };
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -210,7 +210,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
         <ActivePowerups game={game} />
         <AnimatePresence>
           {hint && (
-            <motion.span
+            <m.span
               key={hint.id}
               role="status"
               initial={{ opacity: 0, y: 4 }}
@@ -219,7 +219,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               className="rounded-full border border-line bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2"
             >
               <Emoji e={POWERUPS.find((d) => d.id === hint.id)?.icon ?? ''} /> {hint.text}
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </div>
@@ -271,6 +271,6 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
           );
         })}
       </div>
-    </motion.div>
+    </m.div>
   );
 }

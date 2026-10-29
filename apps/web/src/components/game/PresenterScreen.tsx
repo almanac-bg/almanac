@@ -2,7 +2,7 @@ import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb, Users } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
@@ -140,7 +140,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                         style={{ borderColor: right ? '#34d399' : `${OPTION_COLORS[i]}66` }}
                       >
                         {picks !== null && playing > 0 && (
-                          <motion.span
+                          <m.span
                             aria-hidden
                             className="absolute inset-y-0 left-0"
                             style={{ background: right ? '#34d39933' : `${OPTION_COLORS[i]}22` }}
@@ -201,7 +201,7 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
     <div className="mt-8">
       <ol className="grid gap-3">
         {rows.map((item, place) => (
-          <motion.li
+          <m.li
             key={item}
             layout
             className={clsx(
@@ -225,7 +225,7 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
                 {orderValueText(answer.values[item], answer.unit)}
               </span>
             )}
-          </motion.li>
+          </m.li>
         ))}
       </ol>
       {!answer && <p className="mt-6 text-2xl text-fg-2">Подредете ги на телефоните си.</p>}
@@ -271,12 +271,12 @@ function TopFive({ game, standings }: { game: LiveGame; standings: Standing[] })
         {standings.slice(0, 5).map((s) => {
           const p = game.players[s.id];
           return (
-            <motion.li layout key={s.id} className="flex items-center gap-3">
+            <m.li layout key={s.id} className="flex items-center gap-3">
               <span className="w-7 font-display text-lg font-bold text-fg-3">{s.rank}</span>
               <Avatar avatar={p.avatar} frame={p.frame} size={40} />
               <span className="min-w-0 flex-1 truncate text-lg font-semibold">{p.name}</span>
               <span className="font-display text-xl font-bold tabular-nums">{fmt(s.score)}</span>
-            </motion.li>
+            </m.li>
           );
         })}
       </ol>
@@ -294,7 +294,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
         {standings.slice(0, 3).map((s, i) => {
           const p = game.players[s.id];
           return (
-            <motion.li
+            <m.li
               key={s.id}
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -305,7 +305,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
               <Avatar avatar={p.avatar} frame={p.frame} size={88} />
               <span className="font-display text-2xl font-bold [overflow-wrap:anywhere]">{p.name}</span>
               <span className="text-xl text-fg-2 tabular-nums">{fmt(s.score)} т.</span>
-            </motion.li>
+            </m.li>
           );
         })}
       </ol>

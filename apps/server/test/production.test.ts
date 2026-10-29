@@ -234,11 +234,16 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   // The proof line, from the bank the server has (300 test questions).
   assert.match(landing.html, /Над 300 въпроса, проверени по източници · 10 категории/);
   assert.match(landing.html, /Защо АЛМАНАХ/);
-  // Nothing drawn invisible, waiting for an entrance animation that only the browser would play.
-  assert.doesNotMatch(landing.html, /opacity:0/);
+  // Nothing drawn invisible, waiting for an entrance animation that only the browser would play (the page's own
+  // markup: the stylesheet, inlined, has its opacity:0 rules).
+  assert.doesNotMatch(landing.html.slice(landing.html.indexOf('<div id="root"')), /opacity:0/);
+  // A first visit gets the styles inside the page; the game, signed in, keeps the cached stylesheet.
+  assert.match(landing.html, /<style>\/\*! tailwindcss/);
+  assert.doesNotMatch(landing.html, /rel="stylesheet"/);
   assert.match(landing.vary ?? '', /cookie/i);
   const lobby = await get('/', session);
   assert.equal(lobby.root, '<div id="root">');
+  assert.match(lobby.html, /rel="stylesheet"/);
   assert.doesNotMatch(lobby.html, /Онлайн викторина/);
   // A device that has signed in before gets that version drawn (the form on "Вход"), so nothing flips as it hydrates.
   const back = await get('/', 'quiz_returning=1');
@@ -385,4 +390,20 @@ test('what the site says about itself: who runs it (configuration, not code), it
   assert.equal(legal.mailbox, null);
   // The test bank has 300 questions: the landing's "над 300 въпроса", rounded down to the hundred.
   assert.equal(legal.questions, 300);
+});
+
+const webDist = path.resolve(import.meta.dirname, '../../web/dist');
+
+test("a build file goes as its brotli copy to a browser that takes brotli, as itself to one that doesn't", {
+  skip: !fs.existsSync(path.join(webDist, 'assets')) && 'web app not built',
+}, async () => {
+  const js = fs.readdirSync(path.join(webDist, 'assets')).find((f) => f.startsWith('index-') && f.endsWith('.js'))!;
+  const br = await fetch(`${srv.url}/assets/${js}`, { headers: { 'accept-encoding': 'br' } });
+  assert.equal(br.headers.get('content-encoding'), 'br');
+  assert.match(br.headers.get('content-type') ?? '', /javascript/);
+  assert.match(br.headers.get('cache-control') ?? '', /max-age=31536000.*immutable/);
+  assert.match(br.headers.get('vary') ?? '', /Accept-Encoding/i);
+  assert.ok((await br.text()).length > 1000, 'decoded by the client like any brotli response');
+  const plain = await fetch(`${srv.url}/assets/${js}`, { headers: { 'accept-encoding': 'identity' } });
+  assert.equal(plain.headers.get('content-encoding'), null);
 });

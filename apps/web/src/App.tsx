@@ -1,6 +1,6 @@
 import { actions, api, connectRealtime, disconnectRealtime, getState, setState, toast, useStore } from '@quiz/client';
 import { routeKind } from '@quiz/shared';
-import { MotionConfig } from 'motion/react';
+import { LazyMotion, MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
@@ -54,6 +54,8 @@ const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/unsubscribe', '/priv
 /** …and the legal pages don't even ask: they read the same either way (and the server may have drawn them). */
 const LEGAL_PATHS = ['/privacy', '/terms'];
 
+const loadMotion = () => import('./lib/motionFeatures').then((r) => r.default);
+
 export function App() {
   const me = useStore((s) => s.me);
   const authChecked = useStore((s) => s.authChecked);
@@ -96,7 +98,7 @@ export function App() {
   useEffect(() => identify(userId ?? null), [userId]);
   useEffect(() => {
     if (!userId) return;
-    connectRealtime();
+    void connectRealtime();
     return () => {
       disconnectRealtime();
     };
@@ -121,35 +123,39 @@ export function App() {
 
   return (
     // Players who ask their system for less motion get it in every animation, not just the CSS ones.
-    <MotionConfig reducedMotion="user">
-      <Background />
-      <Toasts />
-      {me && !PUBLIC_PATHS.includes(pathname) ? (
-        <SignedIn />
-      ) : (
-        // The page itself (SignedIn has its header and tab bar around its own <main>).
-        <main>
-          {PUBLIC_PATHS.includes(pathname) ? (
-            <Suspense fallback={<PageLoading />}>
-              <Routes>
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/verify-email" element={<VerifyEmailPage />} />
-                <Route path="/unsubscribe" element={<UnsubscribePage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms" element={<TermsPage />} />
-              </Routes>
-            </Suspense>
-          ) : routeKind(pathname) === 'unknown' ? (
-            // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
-            <NotFoundPage standalone />
-          ) : (
-            <AuthPage />
-          )}
-        </main>
-      )}
-      {/* Renders nothing; inside the app (not beside it in main.tsx) so the tree is the one the server draws. */}
-      <ReloadForUpdate />
-    </MotionConfig>
+    // The light `m` components everywhere, their features loaded after the first screen (`strict`: a full `motion`
+    // component would bring them all back into the first download, so it's an error).
+    <LazyMotion features={loadMotion} strict>
+      <MotionConfig reducedMotion="user">
+        <Background />
+        <Toasts />
+        {me && !PUBLIC_PATHS.includes(pathname) ? (
+          <SignedIn />
+        ) : (
+          // The page itself (SignedIn has its header and tab bar around its own <main>).
+          <main>
+            {PUBLIC_PATHS.includes(pathname) ? (
+              <Suspense fallback={<PageLoading />}>
+                <Routes>
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
+                  <Route path="/unsubscribe" element={<UnsubscribePage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                </Routes>
+              </Suspense>
+            ) : routeKind(pathname) === 'unknown' ? (
+              // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
+              <NotFoundPage standalone />
+            ) : (
+              <AuthPage />
+            )}
+          </main>
+        )}
+        {/* Renders nothing; inside the app (not beside it in main.tsx) so the tree is the one the server draws. */}
+        <ReloadForUpdate />
+      </MotionConfig>
+    </LazyMotion>
   );
 }
 

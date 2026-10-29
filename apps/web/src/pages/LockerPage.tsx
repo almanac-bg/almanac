@@ -18,7 +18,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Lock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
@@ -77,14 +77,14 @@ export function LockerPage() {
         {/* Phones: one row (avatar beside the name), so the collection itself starts on the first screen. */}
         <Card className="relative flex items-center gap-4 overflow-hidden p-4 lg:sticky lg:top-24 lg:flex-col lg:gap-0 lg:self-start lg:p-8 lg:text-center">
           <div className="absolute -top-20 size-64 rounded-full glow text-violet-600/30" />
-          <motion.div
+          <m.div
             key={`${me.avatar}-${me.frame}`}
             initial={{ scale: 0.85, rotate: -6 }}
             animate={{ scale: 1, rotate: 0 }}
             className="shrink-0"
           >
             <Avatar avatar={me.avatar} frame={me.frame} size={wide ? 140 : 72} className="relative" />
-          </motion.div>
+          </m.div>
           <div className="relative min-w-0">
             <h1 className="flex items-center gap-2 t-section lg:mt-5 lg:justify-center">
               <span className="truncate">{me.username}</span> <LevelBadge level={level} />
@@ -271,7 +271,7 @@ function Item({
     // Lifts on hover, detected on a wrapper that stays put (so the lift can't flicker under a resting pointer). The
     // wrapper's column is the tile's: a long requirement line truncates instead of widening it past the screen.
     <div className="group/lift grid grid-cols-[minmax(0,1fr)]">
-      <motion.button
+      <m.button
         type="button"
         whileTap={clickable ? { scale: 0.96 } : undefined}
         // Locked: still a button, which says what it takes (a disabled one can't be reached or tapped).
@@ -300,7 +300,7 @@ function Item({
             <Check className="size-3" strokeWidth={3} />
           </span>
         )}
-      </motion.button>
+      </m.button>
       {!unlocked && (
         <LockedInfo name={name || 'Емоция'} req={req} open={info} onClose={() => setInfo(false)}>
           {children}

@@ -1,5 +1,5 @@
 import { type LiveGame, plural } from '@quiz/client';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
@@ -13,7 +13,7 @@ export function Feed({ game }: { game: LiveGame }) {
     <div className="pointer-events-none absolute -top-2 right-0 z-20 flex flex-col items-end gap-1.5 max-sm:max-w-[48%]">
       <AnimatePresence>
         {game.feed.map((f) => (
-          <motion.span
+          <m.span
             key={f.key}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -21,7 +21,7 @@ export function Feed({ game }: { game: LiveGame }) {
             className="max-w-full truncate rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
           >
             <Emoji e={f.icon} /> {f.text}
-          </motion.span>
+          </m.span>
         ))}
       </AnimatePresence>
     </div>
@@ -64,7 +64,7 @@ export function StreakBurst({ game }: { game: LiveGame }) {
   return (
     <AnimatePresence>
       {shown !== null && (
-        <motion.div
+        <m.div
           aria-hidden
           className="pointer-events-none fixed inset-x-0 top-[38%] z-40 flex justify-center"
           initial={{ opacity: 0 }}
@@ -73,15 +73,15 @@ export function StreakBurst({ game }: { game: LiveGame }) {
         >
           <div className="absolute inset-x-0 top-1/2 h-28 -translate-y-1/2 bg-[linear-gradient(90deg,transparent,rgb(249_115_22/0.35),transparent)] blur-xl" />
           {/* On a solid pill: it lands on the question or the answers, and text over text reads as neither. */}
-          <motion.p
+          <m.p
             initial={{ scale: 0.6 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 420, damping: 14 }}
             className="relative rounded-full border border-orange-400/50 bg-ink-2/95 px-6 py-3 font-display text-3xl font-black text-orange-200 shadow-[0_0_48px_-6px_rgb(249_115_22/0.75)] sm:px-8 sm:text-4xl"
           >
             <Emoji e="🔥" /> Серия {shown}!
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
       )}
     </AnimatePresence>
   );
@@ -109,7 +109,7 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
   return (
     <AnimatePresence>
       {shown.length > 0 && (
-        <motion.div
+        <m.div
           // Darkest behind the message, a light tint elsewhere: the reveal and the scores stay readable through it.
           className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-[radial-gradient(circle,rgb(76_5_25/0.8)_8rem,rgb(76_5_25/0.15)_24rem)]"
           initial={{ opacity: 0 }}
@@ -120,7 +120,7 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
             const p = game.players[id];
             const me = id === game.start.youId;
             return (
-              <motion.div
+              <m.div
                 key={id}
                 initial={{ scale: 1.6, opacity: 0, rotate: -6 }}
                 animate={{ scale: 1, opacity: 1, rotate: 0 }}
@@ -144,10 +144,10 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
                       : `${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели 👀`}
                   </p>
                 )}
-              </motion.div>
+              </m.div>
             );
           })}
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

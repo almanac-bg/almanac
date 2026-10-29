@@ -2,7 +2,7 @@ import { api, fmt, pct, useStore } from '@quiz/client';
 import { BRAND, dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
@@ -116,7 +116,7 @@ export function LeaderboardPage() {
               screens down), first place in the middle and raised. */}
           <ol className="grid grid-cols-3 items-end gap-2 sm:gap-3">
             {entries.slice(0, 3).map((e, i) => (
-              <motion.li
+              <m.li
                 key={e.user.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -150,7 +150,7 @@ export function LeaderboardPage() {
                     </div>
                   </Card>
                 </Link>
-              </motion.li>
+              </m.li>
             ))}
           </ol>
 

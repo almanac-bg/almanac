@@ -18,7 +18,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, CircleHelp, Trophy } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
@@ -275,7 +275,7 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
           wide columns in the dialog, not three cramped ones that split the word). */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]">
         {options.map((c, i) => (
-          <motion.button
+          <m.button
             key={c.id}
             type="button"
             initial={{ opacity: 0, y: 10 }}
@@ -295,7 +295,7 @@ export function SoloPicker({ open, onClose }: { open: boolean; onClose: () => vo
             <Emoji e={c.icon} className="size-6 sm:size-7" size="" />
             <span className="min-w-0 text-sm font-semibold break-words">{c.name}</span>
             {c.id === 'mixed' && <span className="ml-auto text-xs text-fg-3">по малко от всичко</span>}
-          </motion.button>
+          </m.button>
         ))}
       </div>
     </Modal>

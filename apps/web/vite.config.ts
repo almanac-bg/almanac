@@ -1,6 +1,9 @@
 // Relative import: the config is loaded by Node, which can't resolve the shared package's TS sources.
 
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -133,6 +136,31 @@ export default defineConfig({
       },
     },
     {
+      // Brotli copies of the build's text files at the strongest setting, made once here instead of compressed on the
+      // fly per request: the server sends them to browsers that take brotli (smaller than gzip by about a fifth).
+      name: 'brotli',
+      apply: 'build',
+      closeBundle() {
+        const dir = path.join(import.meta.dirname, 'dist', 'assets');
+        if (!fs.existsSync(dir)) return;
+        for (const name of fs.readdirSync(dir)) {
+          if (!/\.(js|css|svg|json)$/.test(name)) continue;
+          const file = path.join(dir, name);
+          const data = fs.readFileSync(file);
+          if (data.length < 1024) continue;
+          fs.writeFileSync(
+            `${file}.br`,
+            zlib.brotliCompressSync(data, {
+              params: {
+                [zlib.constants.BROTLI_PARAM_QUALITY]: 11,
+                [zlib.constants.BROTLI_PARAM_SIZE_HINT]: data.length,
+              },
+            }),
+          );
+        }
+      },
+    },
+    {
       // Both fonts are needed for the first screen, but the browser only finds them after the CSS has loaded. Fetched
       // early, the text doesn't flash in a fallback font.
       name: 'preload-fonts',
@@ -148,6 +176,9 @@ export default defineConfig({
     },
   ],
   build: {
+    // The art (src/emoji) stays in files of its own, however small: inlined, 34 of them made 160 KB of base64 in the
+    // first script (base64 hardly compresses), where each file is fetched only when shown and then cached for good.
+    assetsInlineLimit: (file) => (file.includes('/emoji/') ? false : undefined),
     // Public source maps: an error report then points at the real line of code (Sentry fetches them from the site).
     // The browser only downloads them when its developer tools are open.
     sourcemap: true,
@@ -157,11 +188,7 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 3 },
-            {
-              name: 'motion',
-              test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/,
-              priority: 2,
-            },
+            // Not motion: in one group, its lazily loaded features (lib/motionFeatures) came back into the first download.
             {
               name: 'realtime',
               test: /node_modules[\\/](socket\.io-client|socket\.io-parser|engine\.io-client|engine\.io-parser|@socket\.io)[\\/]/,

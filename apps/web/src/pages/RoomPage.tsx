@@ -30,7 +30,7 @@ import {
   UserMinus,
   Users,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
@@ -584,7 +584,7 @@ function PlayerCard({
 }) {
   const kickable = isHost && !p.isHost;
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -632,14 +632,14 @@ function PlayerCard({
           )}
         </div>
       )}
-    </motion.div>
+    </m.div>
   );
 }
 
 /** All the empty seats as one tile, instead of a column of "free" placeholders. */
 function FreeSeats({ count, className }: { count: number; className?: string }) {
   return (
-    <motion.div
+    <m.div
       layout
       className={clsx(
         'grid place-items-center rounded-2xl border border-dashed border-line px-3 text-center text-sm text-fg-3',
@@ -647,7 +647,7 @@ function FreeSeats({ count, className }: { count: number; className?: string }) 
       )}
     >
       Още {plural(count, 'свободно място', 'свободни места')}
-    </motion.div>
+    </m.div>
   );
 }
 

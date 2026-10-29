@@ -11,7 +11,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { Delete, Flame, Lock, Minus, Plus } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
@@ -264,7 +264,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
       <div className="relative mx-4 h-36 sm:mx-6">
         <div className="absolute inset-x-0 top-[96px] h-1 rounded-full bg-tint/10" />
         {ordered.map((g, i) => (
-          <motion.div
+          <m.div
             key={g.id}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -285,9 +285,9 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
             </span>
             {/* Down to the line: from the upper row, past the lower one. */}
             <span className="w-px bg-tint/40" style={{ height: row.get(g.id) ? 50 : 16 }} />
-          </motion.div>
+          </m.div>
         ))}
-        <motion.div
+        <m.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 18 }}
@@ -298,7 +298,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
           <span className="mt-1.5 rounded-full bg-amber-300 px-2 py-0.5 font-display text-sm font-bold whitespace-nowrap text-amber-950 tabular-nums">
             {numberText(answer, n)}
           </span>
-        </motion.div>
+        </m.div>
       </div>
       {closest.length > 0 && (
         <p className="text-center text-sm text-fg-2">
@@ -328,7 +328,7 @@ export function NumberSummary({ result, q, answer }: { result: PlayerResult; q: 
   const n = q.number!;
   const guess = result.number?.guess ?? null;
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 18 }}
@@ -365,6 +365,6 @@ export function NumberSummary({ result, q, answer }: { result: PlayerResult; q: 
           )}
         </>
       )}
-    </motion.div>
+    </m.div>
   );
 }

@@ -2,7 +2,7 @@ import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '
 import { answerPoints, type Crowd, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, m, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
@@ -53,7 +53,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   return (
     // The clock is already running: the last question gets out of the way at once (the next one waits for it to
     // leave), and the new one is readable within a fifth of a second, while it settles into place.
-    <motion.section
+    <m.section
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
@@ -85,13 +85,13 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         )}
         {q.elimination && (
           // MotionConfig only stills movement; this loop is opacity, so it stops here.
-          <motion.span
+          <m.span
             animate={reduceMotion ? undefined : { opacity: [1, 0.55, 1] }}
             transition={{ repeat: Infinity, duration: 1.4 }}
             className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-bold text-rose-300"
           >
             <Skull className="size-3.5" /> Елиминация след този въпрос
-          </motion.span>
+          </m.span>
         )}
         {watching && (
           <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
@@ -149,7 +149,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
 
       <AnimatePresence>
         {game.retryPrompt && !reveal && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -8, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -163,7 +163,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                 Грешно! Имаш още един опит <span className="text-amber-300">(за ½ точки)</span>
               </span>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -220,7 +220,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
               <RevealSummary key="sum" result={mine} />
             )
           ) : reveal ? null : game.myChoice !== null ? (
-            <motion.div
+            <m.div
               key="wait"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -228,7 +228,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             >
               <LockStatus game={game} offline={offline} />
               <ActivePowerups game={game} />
-            </motion.div>
+            </m.div>
           ) : (
             active && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
           )}
@@ -239,7 +239,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
       {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
       {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
-    </motion.section>
+    </m.section>
   );
 }
 
@@ -273,7 +273,7 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
   }
 
   return (
-    <motion.div
+    <m.div
       ref={ref}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -297,7 +297,7 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
           </Button>
         )}
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -327,7 +327,7 @@ function PauseAfterAnswer({ index }: { index: number }) {
 function CrowdNote({ crowd, kind }: { crowd: Crowd; kind: QuestionPayload['kind'] }) {
   const share = percent(crowd.known);
   return (
-    <motion.span
+    <m.span
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.35 }}
@@ -342,7 +342,7 @@ function CrowdNote({ crowd, kind }: { crowd: Crowd; kind: QuestionPayload['kind'
           : crowd.known < 0.1
             ? `Само ${share} знаят`
             : `${share} знаят`}
-    </motion.span>
+    </m.span>
   );
 }
 
@@ -355,14 +355,14 @@ function LockStatus({ game, offline }: { game: LiveGame; offline: boolean }) {
       </p>
     ) : (
       // Normally confirmed within a blink: only a slow link ever gets to see this.
-      <motion.p
+      <m.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
         className="inline-flex items-center gap-2 text-sm text-fg-2"
       >
         <Spinner className="size-3.5" /> Изпращаме отговора…
-      </motion.p>
+      </m.p>
     );
   }
   const playing = game.start.players.length - game.eliminated.length;
@@ -558,7 +558,7 @@ function AnswerButton({
     // The hover lift is on the button, the hover itself on this wrapper that stays put: lifting the button can't move
     // it out from under a resting pointer (which made it flicker between raised and lowered).
     <div className="group/lift grid">
-      <motion.button
+      <m.button
         type="button"
         layout
         data-answer={index}
@@ -643,9 +643,9 @@ function AnswerButton({
         {pickers.length > 0 && (
           <span aria-hidden className="flex -space-x-2">
             {pickers.slice(0, 4).map((p) => (
-              <motion.span key={p.id} initial={{ scale: 0 }} animate={{ scale: 1 }} title={p.name}>
+              <m.span key={p.id} initial={{ scale: 0 }} animate={{ scale: 1 }} title={p.name}>
                 <Avatar avatar={p.avatar} frame={p.frame} size={26} />
-              </motion.span>
+              </m.span>
             ))}
             {pickers.length > 4 && (
               <span className="grid size-[26px] place-items-center rounded-full bg-tint/15 text-xs font-bold">
@@ -654,14 +654,14 @@ function AnswerButton({
             )}
           </span>
         )}
-      </motion.button>
+      </m.button>
     </div>
   );
 }
 
 function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['results'][string] }) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 18 }}
@@ -701,6 +701,6 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
           )}
         </>
       )}
-    </motion.div>
+    </m.div>
   );
 }

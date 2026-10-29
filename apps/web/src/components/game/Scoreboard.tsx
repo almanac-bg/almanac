@@ -2,7 +2,7 @@ import { fmt, type LiveGame } from '@quiz/client';
 import { emoteById, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Skull } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { Fragment, useEffect, useRef } from 'react';
 import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
@@ -96,7 +96,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
 
   return (
     // Animated when the order changes, not the size (a size animation squeezes the row, which reads as a flicker).
-    <motion.li
+    <m.li
       layout="position"
       transition={{ type: 'spring', stiffness: 500, damping: 40 }}
       className={clsx(
@@ -107,13 +107,13 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
       <span className="w-5 text-center text-sm font-bold text-fg-3 tabular-nums">{out ? '' : s.rank}</span>
       <Avatar avatar={p.avatar} frame={p.frame} size={38} dim={out || !s.connected}>
         {answered && (
-          <motion.span
+          <m.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             className="absolute -right-1 -bottom-1 grid size-4.5 place-items-center rounded-full bg-emerald-400 text-ink"
           >
             <Check className="size-3" strokeWidth={4} />
-          </motion.span>
+          </m.span>
         )}
       </Avatar>
       <div className={clsx('min-w-0 flex-1 text-sm', out && 'opacity-50')}>
@@ -136,7 +136,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
         <div className="h-4">
           <AnimatePresence>
             {result && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
@@ -146,13 +146,13 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
                 )}
               >
                 {result.correct ? `+${fmt(result.points)}` : result.points < 0 ? `−${fmt(-result.points)}` : '✗'}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
       </div>
       <Reactions reactions={reactions} />
-    </motion.li>
+    </m.li>
   );
 }
 
@@ -161,7 +161,7 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
     <div className="pointer-events-none absolute top-0 left-10">
       <AnimatePresence>
         {reactions.map((r) => (
-          <motion.span
+          <m.span
             key={r.key}
             initial={{ opacity: 0, y: 10, scale: 0.4 }}
             animate={{ opacity: [0, 1, 1, 0], y: -46, scale: [0.4, 1.3, 1.1, 1] }}
@@ -169,7 +169,7 @@ function Reactions({ reactions }: { reactions: LiveGame['reactions'] }) {
             className="absolute text-2xl"
           >
             <Emoji e={emoteById(r.emote)?.emoji ?? ''} />
-          </motion.span>
+          </m.span>
         ))}
       </AnimatePresence>
     </div>
@@ -326,7 +326,7 @@ function Strip({ game }: { game: LiveGame }) {
               ? 'отпадна'
               : `${s.score} точки${answered ? ', отговори' : ''}`;
           return (
-            <motion.li
+            <m.li
               layout
               key={s.id}
               ref={me ? mine : undefined}
@@ -363,7 +363,7 @@ function Strip({ game }: { game: LiveGame }) {
               </span>
               {color && <span className="h-0.5 w-6 rounded-full" style={{ background: color }} aria-hidden />}
               <Reactions reactions={reactions} />
-            </motion.li>
+            </m.li>
           );
         })}
       </ul>

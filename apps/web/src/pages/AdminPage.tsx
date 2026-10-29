@@ -1,7 +1,7 @@
 import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@quiz/client';
 import { MODERATION, type QuestionDraft, type Submission, type SubmissionStatus } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -224,7 +224,7 @@ function PendingCard({
   }
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
@@ -301,7 +301,7 @@ function PendingCard({
           </div>
         )}
       </Card>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -330,7 +330,7 @@ function ReviewedCard({ submission }: { submission: Submission }) {
   const [s, setS] = useState(submission);
   const [editing, setEditing] = useState(false);
   return (
-    <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+    <m.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="space-y-4 p-5">
         <AuthorLine submission={s} />
         <QuestionPreview draft={toDraft(s)} compact />
@@ -360,6 +360,6 @@ function ReviewedCard({ submission }: { submission: Submission }) {
         onClose={() => setEditing(false)}
         onSaved={(d) => setS({ ...s, ...d })}
       />
-    </motion.div>
+    </m.div>
   );
 }
