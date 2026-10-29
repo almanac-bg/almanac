@@ -19,7 +19,16 @@ interface Q {
   items?: { text: string; value: number }[];
   direction?: 'asc' | 'desc';
   unit?: string;
-  image?: { file: string; w: number; h: number; alt: string; credit: string; license: string; sourceUrl: string };
+  image?: {
+    file: string;
+    w: number;
+    h: number;
+    alt: string;
+    credit: string;
+    license: string;
+    licenseVersion?: string;
+    sourceUrl: string;
+  };
   fact?: string;
   factSource?: string;
 }
@@ -280,7 +289,8 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
       const where = `${q.id}: ${q.q}`;
       assert.ok(q.q.length <= 60 && q.q.endsWith('?'), `${where} — a picture's question is short (≤ 60)`);
       for (const o of q.options) assert.ok(o.length <= 25, `${where} — option "${o}" over 25 (a 2×2 grid)`);
-      assert.match(image.license, /^(PD|CC0 1\.0|CC BY(-SA)? [1-4]\.[05])$/, `${where} — licence`);
+      assert.ok(['PD', 'CC0', 'CC BY', 'CC BY-SA'].includes(image.license), `${where} — licence`);
+      assert.ok(image.license === 'PD' || /^[1-4]\.[05]$/.test(image.licenseVersion ?? ''), `${where} — its version`);
       assert.ok(image.credit.trim() && new URL(image.sourceUrl).protocol === 'https:', `${where} — credit and source`);
       assert.ok(image.alt.trim().length >= 3 && image.alt.length <= 150, `${where} — alt text`);
       const answer = normalize(q.options[q.answer]);

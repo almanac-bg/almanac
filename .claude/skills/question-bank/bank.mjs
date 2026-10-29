@@ -230,13 +230,16 @@ const USER_AGENT = 'AlmanacBank/1.0 (https://almanac.bg)';
 const LARGE_SIDE = 1200;
 const MAX_BYTES = 150_000;
 
-/** A Commons licence as the bank writes it; null for one it doesn't take (the bank test has the same list). */
+/**
+ * A Commons licence as the bank writes it (`license`, and its version apart: the schema in questions.ts says why);
+ * null for one it doesn't take.
+ */
 function licence(short) {
   const s = short.trim();
-  if (/^(public domain|pd\b|pd-)/i.test(s)) return 'PD';
-  if (/^cc0/i.test(s)) return 'CC0 1.0';
+  if (/^(public domain|pd\b|pd-)/i.test(s)) return { license: 'PD' };
+  if (/^cc0/i.test(s)) return { license: 'CC0', licenseVersion: '1.0' };
   const m = s.match(/^cc[ -]by(-sa)?[ -]([1-4]\.[05])$/i);
-  return m ? `CC BY${m[1] ? '-SA' : ''} ${m[2]}` : null;
+  return m ? { license: `CC BY${m[1] ? '-SA' : ''}`, licenseVersion: m[2] } : null;
 }
 
 const plain = (html) =>
@@ -273,11 +276,12 @@ async function commonsFile(title) {
     return { error: `the licence «${short || '?'}» isn't one the bank takes` };
   const credit = plain(meta.Artist?.value ?? '').slice(0, 120) || (license === 'PD' ? 'неизвестен автор' : '');
   if (!credit) return { error: 'no author to credit' };
-  return { license, credit, page: info.descriptionurl, url: info.thumburl ?? info.url };
+  return { ...license, credit, page: info.descriptionurl, url: info.thumburl ?? info.url };
 }
 
 /**
- * A picture in the bank's two sizes, as WebP within MAX_BYTES: the longer side at most LARGE_SIDE, and half that.
+ * A picture in the bank's two sizes, as WebP within MAX_BYTES: the longer side at most LARGE_SIDE (less, for a photo
+ * too detailed to fit), and half that.
  * Drawn in a browser (its canvas writes WebP; nothing to install).
  */
 async function convert(browser, bytes) {
@@ -300,8 +304,13 @@ async function convert(browser, bytes) {
           }
           return null;
         };
-        const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
-        return { large: await encode(scale), small: await encode(scale / 2) };
+        // A detailed photo that won't fit at the full size gets a little smaller until it does.
+        for (let longest = side; longest >= side / 2; longest = Math.round(longest * 0.9)) {
+          const scale = Math.min(1, longest / Math.max(bitmap.width, bitmap.height));
+          const large = await encode(scale);
+          if (large) return { large, small: await encode(scale / 2) };
+        }
+        return { large: null, small: null };
       },
       { data: Buffer.from(bytes).toString('base64'), side: LARGE_SIDE, max: MAX_BYTES },
     );
@@ -568,11 +577,12 @@ switch (command) {
           alt,
           credit: credit ?? file.credit,
           license: file.license,
+          ...(file.licenseVersion && { licenseVersion: file.licenseVersion }),
           sourceUrl: file.page,
         };
         out.push({ ...q, image });
         console.log(
-          `${label}: ${name} ${large.w}×${large.h}, ${Math.round(large.bytes.length / 1024)} + ${Math.round(small.bytes.length / 1024)} KB · ${image.license} · ${image.credit}`,
+          `${label}: ${name} ${large.w}×${large.h}, ${Math.round(large.bytes.length / 1024)} + ${Math.round(small.bytes.length / 1024)} KB · ${image.license} ${image.licenseVersion ?? ''} · ${image.credit}`,
         );
         // Wikimedia asks for a gentle pace.
         await new Promise((resolve) => setTimeout(resolve, 400));

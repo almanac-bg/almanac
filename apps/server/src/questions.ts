@@ -56,8 +56,15 @@ const ImageSchema = z.object({
   alt: z.string().min(3).max(150),
   /** Whose it is (an author's name, or „неизвестен автор“). */
   credit: z.string().min(1).max(120),
-  /** Public domain, or a free licence with its version: CC0 1.0, CC BY 4.0, CC BY-SA 3.0… */
-  license: z.string().regex(/^(PD|CC0 1\.0|CC BY(-SA)? [1-4]\.[05])$/),
+  /**
+   * Public domain or a free licence, and its version (`licenseVersion`: CC BY-SA 3.0). Apart: the release before
+   * pictures played reads this file too (a rollback), and knows only the four.
+   */
+  license: z.enum(['PD', 'CC0', 'CC BY', 'CC BY-SA']),
+  licenseVersion: z
+    .string()
+    .regex(/^[1-4]\.[05]$/)
+    .optional(),
   sourceUrl: z.url({ protocol: /^https$/ }),
 });
 
@@ -248,7 +255,9 @@ export function questionImage(q: PreparedQuestion): QuestionImage | null {
 /** Whose a question's picture is, for the reveal (a host's own: nobody's to show). */
 export function imageCredit(q: PreparedQuestion): ImageCredit | null {
   const image = 'image' in q ? q.image : undefined;
-  return image && 'file' in image ? { credit: image.credit, license: image.license, sourceUrl: image.sourceUrl } : null;
+  if (!image || !('file' in image)) return null;
+  const license = image.licenseVersion ? `${image.license} ${image.licenseVersion}` : image.license;
+  return { credit: image.credit, license, sourceUrl: image.sourceUrl };
 }
 
 /**
