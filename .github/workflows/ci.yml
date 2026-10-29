@@ -61,7 +61,8 @@ jobs:
           retention-days: 14
 
   # The same browser tests in Safari's engine and in Firefox's (the test job runs them in Chrome): Playwright's own builds
-  # of WebKit and Firefox, on the production build, the game at 0.3 speed (their clicks take longer than Chrome's).
+  # of WebKit and Firefox, on the production build, the game at 0.5 speed (a question lasts 7.5 s: on the runner their
+  # clicks take far longer than Chrome's).
   browsers:
     runs-on: ubuntu-latest
     strategy:
@@ -83,7 +84,7 @@ jobs:
         working-directory: apps/web
         env:
           E2E_ENGINES: ${{ matrix.engine }}
-          E2E_TIME_SCALE: "0.3"
+          E2E_TIME_SCALE: "0.5"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

@@ -18,14 +18,14 @@ const LEGAL_CODE = /\/assets\/LegalPages-[^/]+\.js$/;
 
 /**
  * The browser's own complaints about a download a test failed on purpose, in each engine's words, and React's report
- * of the error it then caught (Firefox shows that as a bare "Error" from React's file; #520 is React drawing the page
+ * of the error it then caught (Firefox shows that as a bare "Error" or "JSHandle@object" from React's file; #520 is React drawing the page
  * itself when the server-drawn one couldn't hydrate without its code): expected.
  */
 function forgive(problems: string[]) {
   const expected = (p: string) =>
     /LegalPages|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520/.test(
       p,
-    ) || /^console: Error \(.*\/assets\/react-[^/]+\.js\)$/.test(p);
+    ) || /^console: (Error|JSHandle@object) \(.*\/assets\/react-[^/]+\.js\)$/.test(p);
   problems.splice(0, problems.length, ...problems.filter((p) => !expected(p)));
 }
 

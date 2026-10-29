@@ -20,13 +20,19 @@ interface Fixtures {
  */
 const WEBKIT_DROPPED = /^Fetch API cannot load .* due to access control checks\.$|^\S+ due to access control checks\.$/;
 
+/**
+ * Firefox's own console line when a navigation cuts short something the page started (the service worker's
+ * registration, which the app catches): the browser's report, in its "[JavaScript Error: …]" form, not the page's.
+ */
+const FIREFOX_NAVIGATED_AWAY = /^\[JavaScript Error: "InvalidStateError: Navigated away from page"\]$/;
+
 function watch(context: BrowserContext, problems: string[]) {
   context.on('weberror', (error) => {
     const message = error.error().message;
     if (!WEBKIT_DROPPED.test(message)) problems.push(`uncaught: ${message}`);
   });
   context.on('console', (message) => {
-    if (message.type() !== 'error') return;
+    if (message.type() !== 'error' || FIREFOX_NAVIGATED_AWAY.test(message.text())) return;
     const { url } = message.location();
     problems.push(`console: ${message.text()}${url ? ` (${url})` : ''}`);
   });

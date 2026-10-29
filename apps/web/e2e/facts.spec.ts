@@ -12,14 +12,20 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
   const stop = page.getByRole('button', { name: 'Спри, за да прочета', exact: true });
   const resume = page.getByRole('button', { name: 'Продължи', exact: true });
   const counter = page.getByText(/^Въпрос \d+ от \d+$/);
+  const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });
 
   // At the test speed the reveal lasts 0.6 s: a "Спри" that comes too late lets the next question come as usual
   // (which is the point: the match never waits for it), and the next reveal tries again.
   let question = '';
   for (let tries = 0; !(await resume.isVisible()); tries++) {
     expect(tries, 'never managed to stop on a fact').toBeLessThan(9);
-    await answer.first().click({ timeout: 15_000 });
+    await expect(answer.first()).toBeVisible({ timeout: 15_000 });
     question = (await counter.textContent())!;
+    if (await ordering.isVisible()) {
+      // „Подреди“ (its items are named like answers): put in order and locked from the keyboard, then its fact.
+      for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
+      await page.keyboard.press('Enter');
+    } else await answer.first().click({ timeout: 2_500 });
     await expect(page.getByText('Знаеше ли?')).toBeVisible({ timeout: 2_000 });
     await stop.click({ timeout: 1_500 }).catch((error) => {
       if (!(error instanceof errors.TimeoutError)) throw error;

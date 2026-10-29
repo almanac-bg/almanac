@@ -133,7 +133,7 @@ export default defineConfig({
       DB_PATH: path.join(outputDir, 'server', 'quiz.db'),
       APP_URL: baseURL,
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
-      // engines more (CI runs WebKit and Firefox at 0.3, as their clicks take longer than Chrome's).
+      // engines more (CI runs WebKit and Firefox at 0.5, as their clicks take longer than Chrome's).
       GAME_TIME_SCALE: timeScale,
       BOT_FILL_SECONDS: '1',
       BOT_FILL_BUSY_SECONDS: '1',

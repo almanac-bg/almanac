@@ -30,7 +30,9 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.goto('/');
   await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
   await expect(teacher).toHaveURL(/\/room$/);
-  await teacher.getByLabel('Въпроси', { exact: true }).selectOption({ label: '📝 Урок 5 (2)' });
+  // By its value, found by its text: engines differ on an option's label once it starts with an emoji.
+  const sets = teacher.getByLabel('Въпроси', { exact: true });
+  await sets.selectOption((await sets.locator('option', { hasText: 'Урок 5 (2)' }).getAttribute('value'))!);
   await expect(teacher.getByText('Всичките 2 въпроса, в реда на набора.', { exact: false })).toBeVisible();
   await teacher.getByRole('switch', { name: 'Само водя' }).click();
   await expect(teacher.getByText('Води на голям екран · не играе')).toBeVisible();
