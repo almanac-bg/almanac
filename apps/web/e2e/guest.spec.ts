@@ -47,9 +47,17 @@ test('a first match levels up: the new level comes first, on its own, then the r
   const moment = page.getByRole('dialog', { name: 'Ново от този мач', exact: true });
   await expect(moment).toBeVisible();
   await expect(moment.getByText('Ново ниво', { exact: true })).toBeVisible();
-  // A beat at a time (the level, then any avatar or frame it brought), to the page.
-  for (let beat = 0; beat < 6 && (await moment.isVisible()); beat++)
-    await moment.getByRole('button', { name: /^(Нататък|Към резултата)$/ }).click();
+  // A beat at a time (the level, then any avatar or frame it brought), to the page: each step leaves before the next
+  // comes in, and the last one's button (still on show while the dialog fades) is pressed once.
+  for (let beat = 0; ; beat++) {
+    expect(beat, 'never got to the results').toBeLessThan(6);
+    const button = moment.getByRole('button', { name: /^(Нататък|Към резултата)$/ });
+    const last = (await button.textContent()) === 'Към резултата';
+    const step = await button.elementHandle();
+    await button.click();
+    if (last) break;
+    await step!.waitForElementState('hidden');
+  }
   await expect(moment).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Награди', exact: true })).toBeVisible();
 });
