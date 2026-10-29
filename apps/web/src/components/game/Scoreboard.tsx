@@ -8,6 +8,7 @@ import { useCountUp, useSideScroll } from '../../lib/hooks';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, machineTag, PlayerTag } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { accentText } from './answers';
 import { BIG_MATCH, topAndYou } from './bigMatch';
 import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
@@ -63,7 +64,7 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
               style={{ background: `linear-gradient(90deg, ${color}26, transparent 80%)` }}
             >
               <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-              <span className="text-sm font-extrabold" style={{ color }}>
+              <span className="text-sm font-extrabold" style={{ color: accentText(color) }}>
                 {TEAMS[team].name}
               </span>
               {myTeam === team && <span className="text-xs font-semibold text-fg-3">· твоят отбор</span>}
@@ -110,7 +111,7 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
           <m.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="absolute -right-1 -bottom-1 grid size-4.5 place-items-center rounded-full bg-emerald-400 text-ink"
+            className="absolute -right-1 -bottom-1 grid size-4.5 place-items-center rounded-full bg-emerald-400 text-on-fill"
           >
             <Check className="size-3" strokeWidth={4} />
           </m.span>
@@ -385,7 +386,7 @@ export function PlayerMark({ me, tag }: { me: boolean; tag: string | null }) {
       aria-hidden
       className={clsx(
         'absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-md px-1 py-0.5 text-xs leading-none font-extrabold tracking-wide',
-        me ? 'bg-violet-600 text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-tint/20',
+        me ? 'bg-[#7c3aed] text-white' : 'bg-ink-2 text-fg-2 ring-1 ring-tint/20',
       )}
     >
       {me ? 'ТИ' : tag}

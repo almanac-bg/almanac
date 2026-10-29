@@ -37,6 +37,7 @@ import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { PlayerName } from '../FitName';
+import { accentText } from '../game/answers';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 import { DayField } from './DayField';
@@ -322,7 +323,7 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
                 <div className="text-xs text-fg-3">{a.description}</div>
               </div>
               <div className="shrink-0 text-right text-xs">
-                <div className="font-bold" style={{ color: rarity.color }}>
+                <div className="font-bold" style={{ color: accentText(rarity.color) }}>
                   {rarity.name}
                 </div>
                 <div className="text-fg-3">+{a.xp} XP</div>

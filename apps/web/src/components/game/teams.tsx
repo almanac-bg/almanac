@@ -2,6 +2,7 @@ import { fmt, type LiveGame } from '@quiz/client';
 import { type GamePlayer, type Standing, TEAMS, type TeamId } from '@quiz/shared';
 import clsx from 'clsx';
 import { useCountUp } from '../../lib/hooks';
+import { accentText } from './answers';
 
 export const teamColor = (team: TeamId) => TEAMS[team].color;
 
@@ -40,7 +41,7 @@ export function TeamScoreBar({
         myTeam === team ? 'font-extrabold' : 'font-semibold opacity-75',
       )}
     >
-      {!compact && <span style={{ color: teamColor(team) }}>{TEAMS[team].name}</span>}
+      {!compact && <span style={{ color: accentText(teamColor(team)) }}>{TEAMS[team].name}</span>}
       <span className={clsx(compact ? 'text-sm' : 'font-display text-base')}>{fmt(value)}</span>
     </span>
   );

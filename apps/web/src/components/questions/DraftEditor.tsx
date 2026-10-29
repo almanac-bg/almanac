@@ -136,7 +136,7 @@ export function DraftEditor({
                   title="Верен отговор"
                   className={clsx(
                     'focus-ring inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition-colors pointer-coarse:h-11',
-                    correct ? 'bg-emerald-400 text-ink' : 'bg-tint/5 text-fg-3 hover:bg-tint/10 hover:text-fg-2',
+                    correct ? 'bg-emerald-400 text-on-fill' : 'bg-tint/5 text-fg-3 hover:bg-tint/10 hover:text-fg-2',
                   )}
                 >
                   <Check className="size-3.5" strokeWidth={3} />

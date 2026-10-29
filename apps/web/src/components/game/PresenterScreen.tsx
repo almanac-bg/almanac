@@ -93,7 +93,11 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
           <section className="min-w-0">
             <p
               className="font-semibold"
-              style={{ color: game.start.questionSet ? undefined : categoryById(q.category)?.color }}
+              style={{
+                color: game.start.questionSet
+                  ? undefined
+                  : accentText(categoryById(q.category)?.color ?? 'currentColor'),
+              }}
             >
               {game.start.questionSet ? (
                 `📝 ${game.start.questionSet}`
@@ -149,7 +153,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                           />
                         )}
                         <span
-                          className="relative grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black text-ink"
+                          className="relative grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black text-on-fill"
                           style={{ background: right ? '#34d399' : OPTION_COLORS[i] }}
                         >
                           {right ? <Check className="size-7" /> : LETTERS[i]}

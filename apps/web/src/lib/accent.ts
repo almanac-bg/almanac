@@ -8,5 +8,5 @@ import type { CSSProperties } from 'react';
  */
 export function accentFill(mode: ModeDef): CSSProperties {
   const [a, b] = mode.accent;
-  return { background: `linear-gradient(90deg, ${a}, color-mix(in srgb, ${a}, ${b}))`, color: 'var(--color-ink)' };
+  return { background: `linear-gradient(90deg, ${a}, color-mix(in srgb, ${a}, ${b}))`, color: 'var(--color-on-fill)' };
 }

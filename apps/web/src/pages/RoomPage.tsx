@@ -34,6 +34,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
+import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
@@ -709,7 +710,7 @@ function TeamColumns({
             >
               <div className="mb-2 flex items-center gap-2 px-1">
                 <span className="size-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-                <span className="text-sm font-extrabold" style={{ color }}>
+                <span className="text-sm font-extrabold" style={{ color: accentText(color) }}>
                   {TEAMS[team].name}
                 </span>
                 <span className="ml-auto text-xs font-semibold text-fg-3">{members.length}</span>

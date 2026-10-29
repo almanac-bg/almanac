@@ -40,7 +40,7 @@ export const ABOVE_TAB_BAR = 'bottom-[calc(4rem+1px+env(safe-area-inset-bottom))
 function RequestBadge({ count }: { count: number }) {
   if (!count) return null;
   return (
-    <span className="grid min-w-4.5 place-items-center rounded-full bg-fuchsia-600 px-1 text-xs leading-4.5 font-bold text-white">
+    <span className="grid min-w-4.5 place-items-center rounded-full bg-[#a21caf] px-1 text-xs leading-4.5 font-bold text-white">
       {count}
     </span>
   );

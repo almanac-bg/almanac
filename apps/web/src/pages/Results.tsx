@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
 import { DuelCard, RematchButton } from '../components/duels';
 import { Emoji } from '../components/Emoji';
+import { accentText } from '../components/game/answers';
 import { QuestionReview } from '../components/game/QuestionReview';
 import { teamColor } from '../components/game/teams';
 import { burst } from '../components/results/confetti';
@@ -260,7 +261,7 @@ export function Results({ game }: { game: LiveGame }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
             className="mt-3 font-display text-xl font-bold"
-            style={{ color: teamColor(winningTeam), textShadow: `0 0 24px ${teamColor(winningTeam)}88` }}
+            style={{ color: accentText(teamColor(winningTeam)), textShadow: `0 0 24px ${teamColor(winningTeam)}88` }}
           >
             {TEAMS[winningTeam].name} печелят!
           </m.p>

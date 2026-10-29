@@ -54,7 +54,7 @@ export function LevelBadge({ level, className }: { level: number; className?: st
       title={`Ниво ${level}`}
       className={clsx(
         // A dark digit: white on this gradient is under 3:1.
-        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-xs leading-none font-extrabold text-ink shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
+        'inline-grid min-w-6 place-items-center rounded-lg bg-[linear-gradient(135deg,#a855f7,#22d3ee)] px-1.5 py-0.5 text-xs leading-none font-extrabold text-on-fill shadow-[0_2px_10px_-2px_rgb(168_85_247/0.7)]',
         className,
       )}
     >

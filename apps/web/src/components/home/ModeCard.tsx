@@ -25,6 +25,7 @@ import { accentFill } from '../../lib/accent';
 import { savedSoloPace, saveSoloPace } from '../../lib/soloPace';
 import { RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { accentText } from '../game/answers';
 import { FreshPowerupNotes } from '../game/Powerups';
 import { SCORING_LINE } from '../game/scoring';
 import { Button, buttonClass, Modal, Segmented } from '../ui';
@@ -213,7 +214,7 @@ export function RankInfo({ mode, open, onClose }: { mode: QueueModeId; open: boo
               className={clsx('rounded-xl border px-3 py-2', t.id === tier.id && 'ring-1 ring-tint/40')}
               style={{ borderColor: `${t.color}44`, background: `${t.color}10` }}
             >
-              <div className="flex items-center gap-1.5 font-bold" style={{ color: t.color }}>
+              <div className="flex items-center gap-1.5 font-bold" style={{ color: accentText(t.color) }}>
                 <span className="size-1.5 rounded-full" style={{ background: t.color }} />
                 {t.name}
                 {t.id === tier.id && (

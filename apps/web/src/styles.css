@@ -51,6 +51,12 @@
   --color-bad: #fb7185;
   --color-gold: #fbbf24;
 
+  /*
+   * Dark text on a bright fill that stays bright in both themes (a mode's colours, an answer's, the level badge): never
+   * flips, unlike ink — which is the page's own colour, near-white on the light theme.
+   */
+  --color-on-fill: #07060d;
+
   /* A tint over a surface (`bg-tint/5`, `border-tint/10`): light on the dark theme, ink on the light one. */
   --color-tint: #fff;
   /* A sunken panel's shade (`bg-sunk/20`). */
@@ -112,7 +118,8 @@
   --gradient-c: #0891b2;
   --field: #fff;
   --field-focus: #fff;
-  --accent-ink: 55%;
+  --accent-l-min: 0;
+  --accent-l-max: 0.5;
   --color-amber-50: oklch(27.9% 0.077 45.635);
   --color-amber-100: oklch(41.4% 0.112 45.904);
   --color-amber-200: oklch(47.3% 0.137 46.201);
@@ -213,7 +220,9 @@
   --gradient-c: #22d3ee;
   --field: rgb(0 0 0 / 0.3);
   --field-focus: rgb(0 0 0 / 0.4);
-  --accent-ink: 100%;
+  /* An accent as text (accentText): its lightness kept where it reads on this theme's backgrounds, 4.5:1 or more. */
+  --accent-l-min: 0.72;
+  --accent-l-max: 1;
   background: var(--color-ink);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;

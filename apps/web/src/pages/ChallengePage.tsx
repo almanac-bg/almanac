@@ -9,6 +9,7 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelCard } from '../components/duels';
 import { Emoji } from '../components/Emoji';
+import { accentText } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -143,11 +144,11 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           <div
             aria-hidden
             className="pointer-events-none absolute -top-28 -right-20 size-72 rounded-full opacity-15 glow"
-            style={{ color: ACCENT_TO }}
+            style={{ color: accentText(ACCENT_TO) }}
           />
 
           <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: ACCENT_FROM }}>
+            <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(ACCENT_FROM) }}>
               <Swords aria-hidden className="size-3.5" /> Предизвикателство
             </p>
             <Pill className={clsx('ml-auto', expired && 'text-fg-3')}>

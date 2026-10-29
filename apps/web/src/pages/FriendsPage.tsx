@@ -9,6 +9,7 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelButton, DuelRow, useDuels, usePlayDuel } from '../components/duels';
 import { Emoji } from '../components/Emoji';
+import { accentText } from '../components/game/answers';
 import { GroupsSection } from '../components/groups';
 import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
@@ -390,7 +391,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
             <LevelBadge level={user.level} />
           </div>
           <div className="flex items-center gap-1.5 truncate text-xs">
-            <span className="font-semibold" style={{ color: p.color }}>
+            <span className="font-semibold" style={{ color: accentText(p.color) }}>
               {p.label}
             </span>
             <span className="text-fg-3">· {titleName(user.title)}</span>

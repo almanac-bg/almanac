@@ -126,7 +126,7 @@ function RematchPicker({ friend, open, onClose }: { friend: PublicUser; open: bo
               <Emoji e={c.icon} />
               <span className="min-w-0 flex-1 truncate">{c.name}</span>
               {at >= 0 && (
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-violet-500 text-xs font-bold text-white">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-xs font-bold text-white">
                   {at + 1}
                   <span className="sr-only">-ви рунд</span>
                 </span>

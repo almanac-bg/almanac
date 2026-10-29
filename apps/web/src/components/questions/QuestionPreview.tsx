@@ -25,7 +25,7 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
       <div className={clsx('glass relative mt-3 overflow-hidden rounded-3xl', compact ? 'p-4' : 'p-5 sm:p-6')}>
         <div
           className="absolute -top-16 left-1/2 size-48 -translate-x-1/2 rounded-full opacity-25 glow"
-          style={{ color: cat.color }}
+          style={{ color: accentText(cat.color) }}
         />
         <p
           className={clsx(

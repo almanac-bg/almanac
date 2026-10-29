@@ -5,6 +5,7 @@ import { m } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Emoji } from '../components/Emoji';
+import { accentText } from '../components/game/answers';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, PageSpinner, ProgressBar, Segmented } from '../components/ui';
@@ -91,7 +92,7 @@ export function AchievementsPage() {
                 {done && (
                   <div
                     className="absolute -top-12 -right-12 size-36 rounded-full opacity-30 glow"
-                    style={{ color: rarity.color }}
+                    style={{ color: accentText(rarity.color) }}
                   />
                 )}
                 {/* Locked ones keep full contrast (the lock says it): faded text was hard to read. */}
@@ -111,7 +112,7 @@ export function AchievementsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <h2 className="font-semibold">{a.name}</h2>
-                      <span className="text-xs font-bold" style={{ color: rarity.color }}>
+                      <span className="text-xs font-bold" style={{ color: accentText(rarity.color) }}>
                         {rarity.name}
                       </span>
                     </div>

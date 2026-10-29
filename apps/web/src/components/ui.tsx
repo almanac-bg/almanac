@@ -15,7 +15,7 @@ const VARIANTS: Record<Variant, string> = {
   secondary: 'glass text-fg hover:bg-tint/10',
   ghost: 'text-fg-2 hover:text-fg hover:bg-tint/5',
   // rose-600, darker on hover: white on rose-500 is under 4:1.
-  danger: 'text-white bg-rose-600 hover:bg-rose-700 shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
+  danger: 'text-white bg-[#be123c] hover:bg-[#9f1239] shadow-[0_8px_28px_-10px_rgb(244_63_94/0.7)]',
   // A fixed dark brown, not the palette's (that one runs light on the light theme): the gold is the same on both.
   gold: 'text-[#451a03] bg-[linear-gradient(110deg,#fde68a,#f59e0b)] shadow-[0_8px_28px_-10px_rgb(245_158_11/0.8)] hover:brightness-105',
   // A game mode's own colours, given by the caller (style={accentFill(mode)}).

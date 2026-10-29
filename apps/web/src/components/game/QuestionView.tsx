@@ -115,7 +115,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       <div className="glass relative mt-4 overflow-hidden rounded-3xl p-6 short:mt-3 short:max-sm:p-4 tiny:mt-2 tiny:max-sm:p-3 sm:p-8 flat:mt-2 flat:p-3">
         <div
           className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 glow"
-          style={{ color: cat.color }}
+          style={{ color: accentText(cat.color) }}
         />
         {q.image && (
           <QuestionPicture image={q.image} credit={reveal?.credit} className="relative mb-4 short:mb-2 flat:mb-1.5" />
@@ -581,7 +581,7 @@ function AnswerButton({
           // Told apart by more than colour: the right answer is filled in, a wrong pick an outline with its text struck
           // through.
           state === 'correct'
-            ? 'border-emerald-300 bg-emerald-400 text-emerald-950 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
+            ? 'border-emerald-300 bg-emerald-400 text-on-fill shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
             : state === 'wrong'
               ? 'border-2 border-rose-400 bg-transparent'
               : // Not .glass: no backdrop blur on buttons that move with every question and reveal (a moving blurred

@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import type { LoadFailure } from '../../lib/load';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { accentText } from '../game/answers';
 import { MINORS_NOTICE } from '../LegalLinks';
 import { Button, Spinner } from '../ui';
 
@@ -89,7 +90,7 @@ export function NewcomerStart({
   const mode = MODES.daily;
   return (
     <div>
-      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
         <CalendarDays aria-hidden className="size-3.5" /> {mode.name}
       </p>
       <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
@@ -153,7 +154,7 @@ export function DailyLanding({
   const { sharer, number, players } = preview;
   return (
     <div>
-      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
         <CalendarDays aria-hidden className="size-3.5" /> {mode.name} №{number}
       </p>
       {sharer ? (
@@ -279,7 +280,7 @@ export function ChallengeLanding({
   const { creator, topScore, players, expired } = preview;
   return (
     <div>
-      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: mode.accent[0] }}>
+      <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
         <Swords aria-hidden className="size-3.5" /> Предизвикателство
         {expired && (
           <span className="ml-auto rounded-full bg-tint/10 px-2 py-0.5 text-xs text-fg-2 normal-case">Изтекло</span>

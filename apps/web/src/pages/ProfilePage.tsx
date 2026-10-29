@@ -35,6 +35,7 @@ import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { DuelButton, recordLine } from '../components/duels';
 import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
+import { accentText } from '../components/game/answers';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
@@ -178,7 +179,7 @@ export function ProfilePage() {
                   {t ? <Emoji e="🏅" size="1.5rem" /> : <span className="text-xl">—</span>}
                   <span className="text-sm">
                     <span className="block font-semibold">{seasonTitle(season)}</span>
-                    <span className="text-xs" style={{ color: t?.color }}>
+                    <span className="text-xs" style={{ color: t ? accentText(t.color) : undefined }}>
                       {t ? t.name : 'Без ранг'}
                     </span>
                   </span>

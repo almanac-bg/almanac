@@ -241,7 +241,7 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
               />
               <div className="relative flex items-start justify-between gap-3">
                 <div>
-                  <p className="t-card" style={{ color }}>
+                  <p className="t-card" style={{ color: accentText(color) }}>
                     {won && <Emoji e="👑" className="mr-1.5" />}
                     {TEAMS[team].name}
                   </p>
