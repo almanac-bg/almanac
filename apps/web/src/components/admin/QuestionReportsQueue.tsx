@@ -33,7 +33,8 @@ const sourceHost = (url: string) => {
 /** A player's question (in the database, so a moderator corrects it here); the bank's are fixed in its repo. */
 const isCommunity = (q: QuestionInfo) => q.id.startsWith('usr-');
 
-const draftOf = (q: QuestionInfo): QuestionDraft => ({
+/** A question as the editor takes it (a player's question, corrected by a moderator). */
+export const draftOf = (q: QuestionInfo): QuestionDraft => ({
   category: q.category,
   difficulty: q.difficulty,
   q: q.q,

@@ -7,6 +7,7 @@ import {
   type QuestionReportReason,
 } from '@quiz/shared';
 import { alertModerators } from './alerts';
+import { config } from './config';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
 import { logAction } from './modlog';
@@ -25,6 +26,41 @@ type Result = { ok: true } | { ok: false; error: string };
 
 const REASONS = new Set<string>(QUESTION_REPORT_REASONS.map((r) => r.id));
 const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ?', id);
+
+/**
+ * A player's question taken out of play, or back in it: its author hears so, and why (what the players flagged in
+ * the last month). The bank's questions have no author to tell.
+ */
+function tellAuthor(questionId: string, hidden: { byPlayers: boolean } | null) {
+  const row = one<{ author_id: number | null; q: string }>(
+    'SELECT author_id, q FROM questions WHERE id = ?',
+    questionId,
+  );
+  if (!row?.author_id) return;
+  const text = row.q.length > 70 ? `${row.q.slice(0, 70)}…` : row.q;
+  if (!hidden) {
+    notify(row.author_id, { icon: '✅', text: `Въпросът ти „${text}“ отново е в играта.`, link: '/submit' });
+    return;
+  }
+  const flagged = all<{ reason: string }>(
+    'SELECT DISTINCT reason FROM question_reports WHERE question_id = ? AND created_at > ?',
+    questionId,
+    Date.now() - 30 * 24 * 60 * 60_000,
+  ).map((r) => QUESTION_REPORT_REASONS.find((x) => x.id === r.reason)?.label ?? r.reason);
+  notify(row.author_id, {
+    icon: '🚩',
+    text: [
+      hidden.byPlayers
+        ? `Сигналите на играчите скриха въпроса ти „${text}“ от новите мачове, докато модератор го провери.`
+        : `Модератор скри въпроса ти „${text}“ от новите мачове.`,
+      flagged.length && `Сигнали: ${flagged.join('; ')}.`,
+      `Ако смяташ, че е грешка, пиши на ${config.operator.email}.`,
+    ]
+      .filter(Boolean)
+      .join(' '),
+    link: '/submit',
+  });
+}
 
 export function questionInfo(q: PlayableQuestion): QuestionInfo {
   const number = q.kind === 'number' ? q.number : null;
@@ -134,6 +170,7 @@ export function hideQuestion(adminId: number | null, questionId: string) {
   });
   reloadQuestionBank();
   redrawDailyWithout(questionId);
+  tellAuthor(questionId, { byPlayers: adminId === null });
 }
 
 /**
@@ -166,6 +203,7 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
   });
   if (action === 'hide') hideQuestion(adminId, questionId);
   else if (shown || action === 'fixed') reloadQuestionBank();
+  if (shown) tellAuthor(questionId, null);
   if (action === 'fixed') {
     for (const userId of reporters)
       notify(userId, { icon: '🛠️', text: 'Благодарим! Въпросът, за който сигнализира, е поправен.' });
@@ -188,5 +226,6 @@ export function unhideQuestion(questionId: string, adminId: number | null = null
   // From the hidden list (an undo from the log is logged as one already).
   if (adminId !== null) logAction({ adminId, action: 'unhide_question', target: questionId, undo: {} });
   reloadQuestionBank();
+  tellAuthor(questionId, null);
   return { ok: true };
 }

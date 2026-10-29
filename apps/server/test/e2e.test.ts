@@ -1494,6 +1494,20 @@ test('community questions', T, async () => {
     found = log.questions.some((q) => q.author === B.user.username);
   }
   assert.ok(found, 'approved questions are played, with author credit');
+
+  // Taken out of play and back: the author hears both, and why.
+  const questionId = mine.questionId;
+  assert.match(questionId, /^usr-\d+$/);
+  await api.send('POST', `/api/questions/${questionId}/report`, A.cookie, { reason: 'wrong' });
+  const hiddenNote = next(sb, 'notification');
+  await api.send('POST', `/api/admin/question-reports/${questionId}/resolve`, A.cookie, { action: 'hide' });
+  assert.match(
+    (await hiddenNote).item.text,
+    /Модератор скри въпроса ти .*Сигнали: Отговорът, отбелязан като верен, е грешен/,
+  );
+  const backNote = next(sb, 'notification');
+  await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
+  assert.match((await backNote).item.text, /отново е в играта/);
 });
 
 test('season settlement', T, async () => {

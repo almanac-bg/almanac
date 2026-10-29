@@ -1,7 +1,7 @@
 import { api, errorMessage, timeAgo, toast } from '@quiz/client';
 import type { PlayCheck } from '@quiz/shared';
 import clsx from 'clsx';
-import { Ban } from 'lucide-react';
+import { Ban, EyeOff, Pencil, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
@@ -9,7 +9,8 @@ import { Avatar, LevelBadge } from '../Avatar';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
 import { BanForm } from './Decisions';
-import { QuestionCard } from './QuestionReportsQueue';
+import { EditQuestionModal } from './EditQuestionModal';
+import { draftOf, QuestionCard } from './QuestionReportsQueue';
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} с`;
@@ -72,22 +73,107 @@ export function PlayCheckPanel() {
           </Card>
         ) : (
           data.questions.map((q) => (
-            <Card key={q.question.id} className="p-5">
-              <p className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-                <span className={clsx('rounded-full px-2.5 py-0.5 text-xs font-bold', VERDICT[q.verdict].className)}>
-                  {VERDICT[q.verdict].label}
-                </span>
-                <span className="text-fg-2">
-                  {percent(q.correctShare)} верни от {q.answered}
-                  {q.avgCorrectMs !== null && ` · верните средно за ${seconds(q.avgCorrectMs)}`}
-                </span>
-              </p>
-              <QuestionCard question={q.question} />
-            </Card>
+            <QuestionCheckCard
+              key={q.question.id}
+              check={q}
+              onDone={() =>
+                setData({ ...data, questions: data.questions.filter((x) => x.question.id !== q.question.id) })
+              }
+            />
           ))
         )}
       </section>
     </div>
+  );
+}
+
+type Check = PlayCheck['questions'][number];
+
+/**
+ * A question the answers disagree with, and what to do: hide it, or — once corrected (in the bank, or here for a
+ * player's question) — mark it fixed, which starts its numbers over (so it leaves this list until they say otherwise).
+ */
+function QuestionCheckCard({ check, onDone }: { check: Check; onDone: () => void }) {
+  const [question, setQuestion] = useState(check.question);
+  const [busy, setBusy] = useState<'hide' | 'fixed' | null>(null);
+  const [editing, setEditing] = useState(false);
+  const community = question.id.startsWith('usr-');
+
+  async function act(action: 'hide' | 'fixed') {
+    setBusy(action);
+    try {
+      await api.resolveQuestionReports(question.id, action);
+      toast({
+        kind: 'success',
+        title: action === 'hide' ? 'Въпросът е скрит от нови мачове' : 'Поправен: числата му започват отначало',
+      });
+      onDone();
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <p className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className={clsx('rounded-full px-2.5 py-0.5 text-xs font-bold', VERDICT[check.verdict].className)}>
+          {VERDICT[check.verdict].label}
+        </span>
+        <span className="text-fg-2">
+          {percent(check.correctShare)} верни от {check.answered}
+          {check.avgCorrectMs !== null && ` · верните средно за ${seconds(check.avgCorrectMs)}`}
+        </span>
+      </p>
+      <QuestionCard question={question} />
+      <div className="mt-4 flex flex-wrap gap-2">
+        {community && (
+          <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => setEditing(true)}>
+            <Pencil className="size-4" /> Редактирай
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={busy === 'fixed'}
+          disabled={!!busy}
+          onClick={() => act('fixed')}
+          title="След поправката: числата му започват отначало"
+        >
+          <Wrench className="size-4" /> Поправих го
+        </Button>
+        {question.hidden ? (
+          <span className="inline-flex items-center gap-1.5 self-center text-xs font-semibold text-amber-300">
+            <EyeOff className="size-4" /> Скрит от новите мачове
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-amber-300 hover:bg-amber-500/10"
+            loading={busy === 'hide'}
+            disabled={!!busy}
+            onClick={() => act('hide')}
+          >
+            <EyeOff className="size-4" /> Скрий въпроса
+          </Button>
+        )}
+      </div>
+      <EditQuestionModal
+        questionId={editing ? question.id : null}
+        draft={editing ? draftOf(question) : null}
+        onClose={() => setEditing(false)}
+        onSaved={(d) =>
+          setQuestion({
+            ...question,
+            ...d,
+            answerSource: d.answerSource || null,
+            fact: d.fact || null,
+            factSource: d.factSource || null,
+          })
+        }
+      />
+    </Card>
   );
 }
 
