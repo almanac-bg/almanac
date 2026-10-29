@@ -18,6 +18,7 @@ import { RoundPick } from '../components/game/RoundPick';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
 import { Button, Modal } from '../components/ui';
+import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
 import { Results } from './Results';
 
@@ -67,6 +68,7 @@ function useMatchKeys(paused: boolean) {
 }
 
 function Arena({ game }: { game: LiveGame }) {
+  const wide = useMediaQuery('(min-width: 1024px)');
   const [leaving, setLeaving] = useState(false);
   const offline = !useStore((s) => s.connected);
   const single = game.start.players.length === 1;
@@ -118,8 +120,9 @@ function Arena({ game }: { game: LiveGame }) {
           {!single && <EmoteBar emotes={game.start.emotes} offline={offline} />}
           <Feed game={game} />
         </div>
-        {!single && (
-          <aside className="hidden lg:block">
+        {/* Wide screens only: on a phone the strip above says it, and a hidden board would still redraw every tick. */}
+        {!single && wide && (
+          <aside>
             <Scoreboard game={game} />
           </aside>
         )}

@@ -1,6 +1,7 @@
 // The installed app's one offline behaviour: a page that can't be fetched at all (no connection) shows /offline.html
 // instead of the browser's error page. Nothing else is cached here — the app's files are cached by the browser already
 // (hashed, immutable), and pages always come from the network, so a deploy is picked up exactly as without a worker.
+// The build stamps the offline page's hash into this name (vite.config.ts → offline-cache-name).
 const CACHE = 'offline-v1';
 const OFFLINE = '/offline.html';
 

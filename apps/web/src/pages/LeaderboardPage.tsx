@@ -1,5 +1,5 @@
 import { api, fmt, pct, useStore } from '@quiz/client';
-import { BRAND, dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, titleName } from '@quiz/shared';
+import { BRAND, dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, TIME_ZONE, titleName } from '@quiz/shared';
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
 import { m } from 'motion/react';
@@ -63,7 +63,12 @@ export function LeaderboardPage() {
           {data?.season && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
               <Trophy className="size-3.5" /> Сезон {data.season.name} · завършва{' '}
-              {new Date(data.season.endsAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long' })}
+              {/* Sofia's date: the season ends at midnight there, which is still the evening before further west. */}
+              {new Date(data.season.endsAt - 1).toLocaleDateString('bg-BG', {
+                day: 'numeric',
+                month: 'long',
+                timeZone: TIME_ZONE,
+              })}
             </p>
           )}
           {board === 'daily' && (

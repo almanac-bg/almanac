@@ -19,10 +19,11 @@ const failure = (err: unknown): LoadFailure =>
  * A failed load retries by itself once the realtime connection is back (the drop that broke the socket usually broke
  * the request too); `retry()` tries again on demand.
  */
-export function useLoad<T>(load: () => Promise<T>, key = '', refresh: unknown = null) {
+export function useLoad<T>(load: () => Promise<T>, key = '', refresh: unknown = null, initial: T | null = null) {
+  // `initial`: what the page already holds for this key (the server put it there): shown at once, and still refreshed.
   const [state, setState] = useState<{ key: string; data: T | null; error: LoadFailure | null }>({
     key,
-    data: null,
+    data: initial,
     error: null,
   });
   const [attempt, setAttempt] = useState(0);

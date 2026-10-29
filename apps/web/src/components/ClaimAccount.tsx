@@ -1,10 +1,11 @@
 import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
 import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
-import { Eye, EyeOff, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { markReturning } from '../lib/returning';
 import { MINORS_NOTICE } from './LegalLinks';
+import { PasswordField } from './PasswordField';
 import { Button, Field, INPUT, Modal } from './ui';
 
 /**
@@ -23,7 +24,6 @@ export function ClaimAccountModal({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
-  const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The fields the error is about (when the check here found them): marked while the message shows.
   const [invalid, setInvalid] = useState<CredentialField[]>([]);
@@ -95,32 +95,16 @@ export function ClaimAccountModal({
             className={INPUT}
           />
         </Field>
-        <Field label="Парола" htmlFor={`${id}-password`}>
-          <div className="relative">
-            <input
-              id={`${id}-password`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={show ? 'text' : 'password'}
-              autoComplete="new-password"
-              aria-invalid={!!error && invalid.includes('password')}
-              aria-describedby={error && invalid.includes('password') ? `${id}-error` : undefined}
-              ref={passwordRef}
-              required
-              minLength={PASSWORD_MIN_LENGTH}
-              placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
-              className={`${INPUT} pr-12`}
-            />
-            <button
-              type="button"
-              onClick={() => setShow(!show)}
-              aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-              className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
-            >
-              {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
-            </button>
-          </div>
-        </Field>
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          invalid={!!error && invalid.includes('password')}
+          describedBy={error && invalid.includes('password') ? `${id}-error` : undefined}
+          inputRef={passwordRef}
+          minLength={PASSWORD_MIN_LENGTH}
+          placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
+        />
         {error && (
           <p id={`${id}-error`} role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {error}

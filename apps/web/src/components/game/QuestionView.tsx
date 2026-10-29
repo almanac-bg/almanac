@@ -560,7 +560,6 @@ function AnswerButton({
     <div className="group/lift grid">
       <m.button
         type="button"
-        layout
         data-answer={index}
         aria-keyshortcuts={String(index + 1)}
         // Not `disabled`: that would drop keyboard focus from the answer you just picked (to the top of the page).

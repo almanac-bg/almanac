@@ -29,20 +29,26 @@ import {
   AlmanacPage,
   ChallengePage,
   DailyPage,
+  FactsPage,
   FriendsPage,
   GamePage,
   GroupsPage,
+  HowToPlayPage,
   LeaderboardPage,
   LockerPage,
   NotificationsPage,
   PrivacyPage,
   ProfilePage,
   prefetchPages,
+  QuizCategoryPage,
+  QuizHubPage,
   ResetPasswordPage,
   RoomPage,
+  reloadForNewVersion,
   SetsPage,
   SettingsPage,
   SubmitPage,
+  TeachersPage,
   TermsPage,
   UnsubscribePage,
   VerifyEmailPage,
@@ -50,11 +56,32 @@ import {
 import { NotFoundPage } from './pages/NotFoundPage';
 
 /** Email links and legal pages work whether or not you're signed in. */
-const PUBLIC_PATHS = ['/reset-password', '/verify-email', '/unsubscribe', '/privacy', '/terms'];
+const PUBLIC_PATHS = [
+  '/reset-password',
+  '/verify-email',
+  '/unsubscribe',
+  '/privacy',
+  '/terms',
+  '/how-to-play',
+  '/quiz',
+  '/facts',
+  '/teachers',
+];
+/** Pages that look the same signed in or out (the legal ones, the guides): outside the game's frame. */
+const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path) || /^\/quiz\/[a-z]+$/.test(path);
 /** …and the legal pages don't even ask: they read the same either way (and the server may have drawn them). */
 const LEGAL_PATHS = ['/privacy', '/terms'];
 
-const loadMotion = () => import('./lib/motionFeatures').then((r) => r.default);
+// Needed, not extra: without them the light components stay as they start (some of them invisible). A file that
+// didn't arrive is most likely an older build's after a deploy: one reload gets the new one.
+const loadMotion = () =>
+  import('./lib/motionFeatures').then(
+    (r) => r.default,
+    (err: unknown) => {
+      reloadForNewVersion();
+      throw err;
+    },
+  );
 
 export function App() {
   const me = useStore((s) => s.me);
@@ -98,7 +125,8 @@ export function App() {
   useEffect(() => identify(userId ?? null), [userId]);
   useEffect(() => {
     if (!userId) return;
-    void connectRealtime();
+    // The realtime library is a file of its own: one that didn't arrive (an older build's) is a reload away.
+    connectRealtime().catch(reloadForNewVersion);
     return () => {
       disconnectRealtime();
     };
@@ -129,12 +157,12 @@ export function App() {
       <MotionConfig reducedMotion="user">
         <Background />
         <Toasts />
-        {me && !PUBLIC_PATHS.includes(pathname) ? (
+        {me && !isPublicPath(pathname) ? (
           <SignedIn />
         ) : (
           // The page itself (SignedIn has its header and tab bar around its own <main>).
           <main>
-            {PUBLIC_PATHS.includes(pathname) ? (
+            {isPublicPath(pathname) ? (
               <Suspense fallback={<PageLoading />}>
                 <Routes>
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -142,6 +170,11 @@ export function App() {
                   <Route path="/unsubscribe" element={<UnsubscribePage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/how-to-play" element={<HowToPlayPage />} />
+                  <Route path="/quiz" element={<QuizHubPage />} />
+                  <Route path="/quiz/:category" element={<QuizCategoryPage />} />
+                  <Route path="/facts" element={<FactsPage />} />
+                  <Route path="/teachers" element={<TeachersPage />} />
                 </Routes>
               </Suspense>
             ) : routeKind(pathname) === 'unknown' ? (

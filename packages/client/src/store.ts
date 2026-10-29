@@ -171,6 +171,14 @@ export const useStore = create<State>(() => ({
 export const setState = useStore.setState;
 export const getState = useStore.getState;
 
+/**
+ * Nobody's signed in any more (signed out here, or the server ended the session: expired, banned): nothing of theirs
+ * stays in memory — a match, a room, a queue, an invite or a rematch would otherwise show up for the next one.
+ */
+export function signedOut() {
+  setState({ me: null, room: null, game: null, queue: null, queueSince: 0, invites: [], rematch: null, evening: null });
+}
+
 let toastSeq = 0;
 /** Shows a toast; the screen that draws it dismisses it after `ttlMs` (see Toasts). */
 export function toast(t: Omit<Toast, 'id' | 'ttlMs'>, ttlMs = 4500) {

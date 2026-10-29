@@ -136,6 +136,22 @@ export default defineConfig({
       },
     },
     {
+      // The service worker keeps the offline page under a name that changes with it: a fixed name meant an edited page
+      // never reached installed apps (the worker only replaces its cache when its own file changes).
+      name: 'offline-cache-name',
+      apply: 'build',
+      closeBundle() {
+        const dist = path.join(import.meta.dirname, 'dist');
+        const worker = path.join(dist, 'sw.js');
+        if (!fs.existsSync(worker)) return;
+        const hash = createHash('sha256')
+          .update(fs.readFileSync(path.join(dist, 'offline.html')))
+          .digest('base64url')
+          .slice(0, 10);
+        fs.writeFileSync(worker, fs.readFileSync(worker, 'utf8').replace("'offline-v1'", `'offline-${hash}'`));
+      },
+    },
+    {
       // Brotli copies of the build's text files at the strongest setting, made once here instead of compressed on the
       // fly per request: the server sends them to browsers that take brotli (smaller than gzip by about a fifth).
       name: 'brotli',

@@ -17,7 +17,7 @@ import {
 import type { io as connect, Socket } from 'socket.io-client';
 import { api } from './api';
 import { clientConfig, effect, preloadImage } from './config';
-import { getState, type LiveGame, patchGame, setState, toast } from './store';
+import { getState, type LiveGame, patchGame, setState, signedOut, toast } from './store';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -146,7 +146,7 @@ function bind(s: GameSocket) {
     }
   });
   s.on('connect_error', (err) => {
-    if (err.message === 'unauthorized') setState({ me: null });
+    if (err.message === 'unauthorized') signedOut();
     // The server's cap on open tabs. Socket.IO doesn't retry a refusal like this on its own: say why, and try again in a
     // while (a tab may have been closed by then).
     if (err.message === 'too-many-connections') {
@@ -322,6 +322,9 @@ function bind(s: GameSocket) {
       return {
         phase: 'reveal',
         reveal,
+        // The pick that counted is the server's: one made in another tab of the same player was the one taken, and
+        // this tab's own tap (ignored) mustn't show as "твоят избор".
+        ...(mine && q?.index === reveal.index && q.kind === 'choice' ? { myChoice: mine.choice } : {}),
         resyncing: false,
         retryPrompt: false,
         standings: reveal.standings,

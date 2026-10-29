@@ -85,7 +85,10 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 // The landing page the server drew for a visitor without a session (lib/painted.ts): no need to ask who's signed in
 // before showing it. (The app still asks, in the background.)
-if (paintedSignedOut) setState({ authChecked: true, me: null });
+// A challenge link opened without a session (the server says so on the root, and put the preview in the page): the
+// same, so the challenge shows at once.
+if (paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1')
+  setState({ authChecked: true, me: null });
 upgradeReturning();
 
 const container = document.getElementById('root')!;

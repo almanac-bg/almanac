@@ -16,6 +16,7 @@ const loaders = {
   groups: () => import('./GroupsPage'),
   leaderboard: () => import('./LeaderboardPage'),
   legal: () => import('./LegalPages'),
+  guide: () => import('./GuidePages'),
   locker: () => import('./LockerPage'),
   notifications: () => import('./NotificationsPage'),
   profile: () => import('./ProfilePage'),
@@ -44,7 +45,7 @@ function load(loader: Loader): Promise<Module> {
  * row. Only for a page being shown: a background fetch that fails (prefetchPages) mustn't reload the app under the
  * player, taking whatever they were typing with it.
  */
-function reloadForNewVersion() {
+export function reloadForNewVersion() {
   if (!navigator.onLine) return;
   try {
     if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
@@ -94,6 +95,11 @@ export const SettingsPage = page('account', 'SettingsPage');
 export const SetsPage = page('sets', 'SetsPage');
 export const SubmitPage = page('submit', 'SubmitPage');
 export const TermsPage = page('legal', 'TermsPage');
+export const HowToPlayPage = page('guide', 'HowToPlayPage');
+export const QuizHubPage = page('guide', 'QuizHubPage');
+export const QuizCategoryPage = page('guide', 'QuizCategoryPage');
+export const FactsPage = page('guide', 'FactsPage');
+export const TeachersPage = page('guide', 'TeachersPage');
 export const UnsubscribePage = page('unsubscribe', 'UnsubscribePage');
 export const VerifyEmailPage = page('account', 'VerifyEmailPage');
 

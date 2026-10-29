@@ -275,7 +275,10 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
 
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {
   const app = fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src/App.tsx'), 'utf8');
-  const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) => m[1].replace(/:[a-z]+/g, 'x1'));
+  // A category's quiz is a public page for each real category (an unknown one is a 404): one stands for them.
+  const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) =>
+    m[1].replace('/quiz/:category', '/quiz/history').replace(/:[a-z]+/g, 'x1'),
+  );
   assert.ok(routes.length > 15, `found ${routes.length} routes`);
   for (const route of routes) assert.notEqual(routeKind(route), 'unknown', route);
 });

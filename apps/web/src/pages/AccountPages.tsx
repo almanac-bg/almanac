@@ -1,4 +1,4 @@
-import { api, disconnectRealtime, errorMessage, refreshMe, setState, toast, useStore } from '@quiz/client';
+import { api, disconnectRealtime, errorMessage, refreshMe, setState, signedOut, toast, useStore } from '@quiz/client';
 import { type MeUser, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
@@ -6,8 +6,6 @@ import {
   CheckCircle2,
   Disc3,
   Download,
-  Eye,
-  EyeOff,
   Flame,
   KeyRound,
   LogOut,
@@ -30,6 +28,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { BlockedSettings } from '../components/BlockedSettings';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
+import { PasswordField } from '../components/PasswordField';
 import { PushSettings } from '../components/PushSettings';
 import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { markReturning } from '../lib/returning';
@@ -38,50 +37,6 @@ import { setTheme, useThemeChoice } from '../lib/theme';
 import { usePageTitle } from '../lib/title';
 
 /** A labelled password input with a show/hide toggle (the label names the input alone, not the toggle). */
-function PasswordField({
-  label,
-  value,
-  onChange,
-  autoComplete,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoComplete: string;
-  placeholder?: string;
-}) {
-  const id = useId();
-  const [show, setShow] = useState(false);
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          type={show ? 'text' : 'password'}
-          autoComplete={autoComplete}
-          placeholder={placeholder}
-          required
-          className={`${INPUT} pr-12`}
-        />
-        <button
-          type="button"
-          onClick={() => setShow(!show)}
-          aria-label={show ? 'Скрий паролата' : 'Покажи паролата'}
-          className="focus-ring absolute top-1/2 right-0.5 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg"
-        >
-          {show ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /** Standalone screen used by the email links (works signed in or out). */
 
 // ─── /reset-password?token=… ─────────────────────────────────────────────────
@@ -244,7 +199,7 @@ export function SettingsPage() {
 /** Forget the session on this device: back to the sign-in page with nothing of the old account left in memory. */
 function clearSession() {
   disconnectRealtime();
-  setState({ me: null, room: null, game: null, queue: null, invites: [] });
+  signedOut();
 }
 
 const EMAIL_INPUT_ID = 'settings-email';

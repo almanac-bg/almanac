@@ -287,8 +287,13 @@ function Strip({ game }: { game: LiveGame }) {
   const myRank = game.standings.find((s) => s.id === game.start.youId)?.rank;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrolled when your place changes
   useEffect(() => {
-    // The middle, not just inside the edge: the row's far end fades out.
-    mine.current?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    // The middle, not just inside the edge: the row's far end fades out. The row scrolls itself only (scrollIntoView
+    // would scroll the page too, pulling the question away mid-match).
+    const row = strip.ref.current;
+    const item = mine.current;
+    if (!row || !item) return;
+    const offset = item.getBoundingClientRect().left - row.getBoundingClientRect().left;
+    row.scrollTo({ left: row.scrollLeft + offset - (row.clientWidth - item.clientWidth) / 2 });
   }, [myRank]);
   // Team games: group teammates together so the colors read as two blocks.
   const order = teams

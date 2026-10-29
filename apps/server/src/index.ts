@@ -231,7 +231,7 @@ if (fs.existsSync(config.webDist)) {
     const challenge = /^\/c\/([^/]+)$/.exec(req.path)?.[1];
     if (challenge) {
       // A link that never existed is a 404 (its page says so); an expired one still has a page to show.
-      const html = challengePage(page, challenge);
+      const html = challengePage(page, challenge, sessionTokenFromCookieHeader(req.headers.cookie) === null);
       res
         .status(html ? 200 : 404)
         .type('html')
@@ -414,7 +414,12 @@ function groupInvitePage(html: string, at: string, code: string): string {
  * A challenge link's page with its own title and preview text, so a link pasted into Messenger or Viber reads
  * "Мария те предизвиква…" with the score to beat, not the generic site description.
  */
-function challengePage(html: string, id: string): string | null {
+/**
+ * A challenge link's page: its own title and preview (link previews show it), and the preview itself in the page, so
+ * the app shows the challenge at once. Opened without a session (`signedOut`), the root says so: the app doesn't wait
+ * to ask who's signed in.
+ */
+function challengePage(html: string, id: string, signedOut: boolean): string | null {
   const preview = challengePreview(id);
   if (!preview) return null;
   const name = preview.creator?.username ?? 'Някой';
@@ -436,7 +441,12 @@ function challengePage(html: string, id: string): string | null {
     description,
     url: `${config.appUrl}/c/${encodeURIComponent(preview.id)}`,
     index: false,
-  });
+  })
+    .replace(
+      '</head>',
+      () => `<script type="application/json" id="challenge-preview">${jsonInHtml(preview)}</script></head>`,
+    )
+    .replace('<div id="root">', signedOut ? '<div id="root" data-signed-out="1">' : '<div id="root">');
 }
 
 // Last resort: a bug no guard caught. Report it, then exit (state may be broken); Docker restarts the server.

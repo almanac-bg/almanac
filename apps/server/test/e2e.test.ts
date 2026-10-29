@@ -2167,6 +2167,11 @@ test('website files are served with the right caching', {
   const shared = await (await fetch(`${srv.url}/c/${id}`)).text();
   assert.match(shared, new RegExp(`<title>${A.user.username} те предизвиква`));
   assert.match(shared, /property="og:description" content="Резултатът за биене: \d+ точки/);
+  // The app shows it at once: the preview is in the page, and without a session it doesn't wait to ask who's signed in.
+  assert.match(shared, new RegExp(`<script type="application/json" id="challenge-preview">\\{"id":"${id}"`));
+  assert.match(shared, /<div id="root" data-signed-out="1">/);
+  const signedIn = await (await fetch(`${srv.url}/c/${id}`, { headers: { cookie: A.cookie } })).text();
+  assert.match(signedIn, /<div id="root">/, 'with a session the app asks as usual');
   assert.match(
     await (await fetch(`${srv.url}/c/unknown-id`)).text(),
     new RegExp(`<title>${PUBLIC_PAGES['/'].title}</title>`),
