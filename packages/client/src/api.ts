@@ -27,6 +27,8 @@ import type {
   PlayerCard,
   PlayerSearchHit,
   ProfileStats,
+  PublicUser,
+  PushPrefs,
   QuestionDraft,
   QuestionInfo,
   QuestionReportAction,
@@ -125,6 +127,15 @@ export const api = {
   claim: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/account/claim', { username, password, email: email || undefined }),
   setReminders: (on: boolean) => request<{ user: MeUser }>('POST', '/account/reminders', { on }),
+  setBeatenMails: (on: boolean) => request<{ user: MeUser }>('POST', '/account/beaten-mails', { on }),
+  pushKey: () => request<{ key: string | null }>('GET', '/push/key'),
+  pushSubscribe: (subscription: PushSubscriptionJSON) =>
+    request<{ user: MeUser }>('POST', '/push/subscribe', subscription),
+  pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/push/unsubscribe', { endpoint }),
+  setPushPrefs: (prefs: PushPrefs) => request<{ user: MeUser }>('POST', '/push/prefs', prefs),
+  blocked: () => request<{ players: PublicUser[] }>('GET', '/blocks'),
+  block: (userId: number) => request<{ players: PublicUser[] }>('POST', `/blocks/${userId}`),
+  unblock: (userId: number) => request<{ players: PublicUser[] }>('DELETE', `/blocks/${userId}`),
   /** Whether others may play against your recorded matches. */
   setShareRuns: (on: boolean) => request<{ user: MeUser }>('POST', '/account/share-runs', { on }),
   /** From the reminder email's unsubscribe link (works signed out). */

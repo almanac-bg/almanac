@@ -14,6 +14,7 @@ import {
 import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
+import { push } from './push';
 import {
   imageBank,
   numberBank,
@@ -231,11 +232,9 @@ export function tellRecordOwners(now = Date.now()): number {
     for (const o of owners) {
       const xp = Math.min(o.won * RECORDS.xpPerWin, RECORDS.xpPerDay);
       if (xp > 0) run('UPDATE users SET xp = xp + ? WHERE id = ?', xp, o.owner_id);
-      notify(o.owner_id, {
-        icon: '📼',
-        text: `Записите на мачовете ти изиграха ${duels(o.games)} вчера: ${o.won ? `${wins(o.won)}, +${xp} XP` : 'без победа този път'}.`,
-        link: '/settings',
-      });
+      const text = `Записите на мачовете ти изиграха ${duels(o.games)} вчера: ${o.won ? `${wins(o.won)}, +${xp} XP` : 'без победа този път'}.`;
+      notify(o.owner_id, { icon: '📼', text, link: '/settings' });
+      push(o.owner_id, 'records', { title: '📼 Записите ти играха вчера', body: text, url: '/notifications' });
     }
     run('UPDATE record_plays SET told = 1 WHERE told = 0 AND played_at < ?', before);
     run(

@@ -1,5 +1,5 @@
 import { api, disconnectRealtime, errorMessage, refreshMe, setState, toast, useStore } from '@quiz/client';
-import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { type MeUser, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   Check,
@@ -18,6 +18,7 @@ import {
   Save,
   ShieldAlert,
   Sun,
+  Swords,
   Trash2,
   TriangleAlert,
   Volume2,
@@ -26,8 +27,10 @@ import {
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { BlockedSettings } from '../components/BlockedSettings';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
+import { PushSettings } from '../components/PushSettings';
 import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
@@ -219,8 +222,11 @@ export function SettingsPage() {
       ) : (
         <>
           <EmailSettings />
+          <PushSettings />
           <ReminderSettings />
+          <BeatenMailSettings />
           <RecordSettings />
+          <BlockedSettings />
         </>
       )}
       <ThemeSettings />
@@ -509,12 +515,29 @@ function RecordSettings() {
 }
 
 /** The opt-in evening email when the daily streak is about to break (needs a verified address to go to). */
-function ReminderSettings() {
+/** An optional email (the streak reminder; someone beating you on your link): consent asked, a confirmed email needed. */
+function MailOptIn({
+  field,
+  icon,
+  title,
+  hint,
+  confirmText,
+  onToast,
+  set,
+}: {
+  field: 'streakReminders' | 'beatenMails';
+  icon: (on: boolean) => ReactNode;
+  title: string;
+  hint: string;
+  confirmText: string;
+  onToast: { title: string; body: string };
+  set: (on: boolean) => Promise<{ user: MeUser }>;
+}) {
   const me = useStore((s) => s.me)!;
   const [busy, setBusy] = useState(false);
-  // The reminders are the one thing that rests on consent, and under 14 that's a parent's: asked where it's given.
+  // Optional emails rest on consent, and under 14 that's a parent's: asked where it's given.
   const [confirming, setConfirming] = useState(false);
-  const on = me.streakReminders;
+  const on = me[field];
   // Switching off always works; switching on needs somewhere to send the email.
   const blocked = !on && !me.email;
 
@@ -522,17 +545,12 @@ function ReminderSettings() {
     setConfirming(false);
     setBusy(true);
     try {
-      const { user } = await api.setReminders(!on);
+      const { user } = await set(!on);
       setState({ me: user });
       toast(
-        user.streakReminders
-          ? {
-              kind: 'success',
-              icon: '🔥',
-              title: 'Напомнянето е включено',
-              body: 'Ще ти пишем вечерта, ако серията ти е в опасност.',
-            }
-          : { kind: 'info', title: 'Напомнянето е изключено' },
+        user[field]
+          ? { kind: 'success', title: onToast.title, body: onToast.body }
+          : { kind: 'info', title: `${title}: изключено` },
       );
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
@@ -543,12 +561,11 @@ function ReminderSettings() {
 
   return (
     <SwitchCard
-      icon={<Flame className={clsx('size-5', on ? 'text-orange-300' : 'text-fg-3')} />}
-      title="Напомняне за серията"
+      icon={icon(on)}
+      title={title}
       hint={
         <>
-          Писмо вечерта, когато въпросите на деня още чакат, а серията ти ще прекъсне в полунощ. Най-много едно писмо на
-          ден; спираш го оттук или от линка във всяко писмо. Под 14 години — със съгласие на родител или настойник.
+          {hint} Спираш го оттук или от линка във всяко писмо. Под 14 години — със съгласие на родител или настойник.
           {blocked && <span className="sr-only"> Нужен е потвърден имейл.</span>}
         </>
       }
@@ -557,11 +574,8 @@ function ReminderSettings() {
       disabled={blocked}
       busy={busy}
     >
-      <Modal open={confirming} onClose={() => setConfirming(false)} title="Напомняне за серията">
-        <p className="text-sm text-fg-2">
-          Ще ти пишем вечерта, когато въпросите на деня още чакат — най-много веднъж на ден. Спираш го по всяко време
-          оттук или от линка в писмото.
-        </p>
+      <Modal open={confirming} onClose={() => setConfirming(false)} title={title}>
+        <p className="text-sm text-fg-2">{confirmText}</p>
         <p className="mt-3 text-sm text-fg">
           Потвърждаваш, че си над 14 години или имаш съгласие на родител или настойник.
         </p>
@@ -569,9 +583,7 @@ function ReminderSettings() {
           <Button variant="ghost" onClick={() => setConfirming(false)}>
             Отказ
           </Button>
-          <Button onClick={toggle}>
-            <Flame className="size-4" /> Потвърждавам, включи
-          </Button>
+          <Button onClick={toggle}>Потвърждавам, включи</Button>
         </div>
       </Modal>
       {blocked && (
@@ -581,7 +593,7 @@ function ReminderSettings() {
             {me.pendingEmail ? (
               <>
                 Отвори линка, който изпратихме до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b>,
-                и после включи напомнянето.
+                и после го включи.
               </>
             ) : (
               'Нужен е потвърден имейл — добави го по-горе.'
@@ -595,6 +607,34 @@ function ReminderSettings() {
         </div>
       )}
     </SwitchCard>
+  );
+}
+
+function ReminderSettings() {
+  return (
+    <MailOptIn
+      field="streakReminders"
+      icon={(on) => <Flame className={clsx('size-5', on ? 'text-orange-300' : 'text-fg-3')} />}
+      title="Напомняне за серията"
+      hint="Писмо вечерта, когато въпросите на деня още чакат, а серията ти ще прекъсне в полунощ. Най-много едно на ден."
+      confirmText="Ще ти пишем вечерта, когато въпросите на деня още чакат — най-много веднъж на ден. Спираш го по всяко време оттук или от линка в писмото."
+      onToast={{ title: 'Напомнянето е включено', body: 'Ще ти пишем вечерта, ако серията ти е в опасност.' }}
+      set={api.setReminders}
+    />
+  );
+}
+
+function BeatenMailSettings() {
+  return (
+    <MailOptIn
+      field="beatenMails"
+      icon={(on) => <Swords className={clsx('size-5', on ? 'text-rose-300' : 'text-fg-3')} />}
+      title="Писмо, когато те изпреварят"
+      hint="Когато някой те изпревари на твой линк с предизвикателство. Най-много едно писмо на ден."
+      confirmText="Ще ти пишем, когато някой те изпревари на твой линк с предизвикателство — най-много веднъж на ден. Спираш го по всяко време оттук или от линка в писмото."
+      onToast={{ title: 'Включено', body: 'Ще ти пишем, когато някой те изпревари на твой линк.' }}
+      set={api.setBeatenMails}
+    />
   );
 }
 

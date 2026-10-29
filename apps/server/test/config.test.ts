@@ -59,6 +59,8 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
     'EVENING_AT',
     'GAME_TIME_SCALE',
     'MAIL_OUTBOX',
+    'PUSH_OUTBOX',
+    'PUSH_QUIET',
     'NODE_ENV',
     'PORT',
     'UV_THREADPOOL_SIZE',

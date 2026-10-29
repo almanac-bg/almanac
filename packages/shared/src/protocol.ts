@@ -47,6 +47,10 @@ export interface MeUser extends PublicUser {
   isGuest: boolean;
   /** Opted in to the evening "your streak is about to break" email. */
   streakReminders: boolean;
+  /** The opt-in „X те изпревари на линка ти“ email (at most one a day). */
+  beatenMails: boolean;
+  /** What this player wants pushed to their devices (null: never set up); see PUSH. */
+  push: PushPrefs | null;
   /** Others may play against your recorded matches (a recording plays when nobody's there for a Дуел). */
   shareRuns: boolean;
   /** Season-end rewards the player hasn't seen yet. */
@@ -238,6 +242,41 @@ export const CROWD = {
   /** Answers a question needs before its shares are shown: fewer say more about who played than about the question. */
   minAnswers: 30,
 } as const;
+
+// ─── Web push ────────────────────────────────────────────────────────────────
+
+/** What can be pushed, each switched on or off by the player (the daily reminder has its time instead). */
+export const PUSH_KINDS = [
+  { id: 'streak', label: 'Серията в опасност', hint: 'Вечерта, ако серията ти ще прекъсне в полунощ' },
+  { id: 'duels', label: 'Твой ред в дуел', hint: 'Приятел те предизвика или чака да изиграеш реванша' },
+  { id: 'records', label: 'Записите на мачовете ти', hint: 'Как се е справил записът ти срещу други (сутрин)' },
+  { id: 'evening', label: 'Вечерен Роял', hint: 'Малко преди да започне' },
+  { id: 'groups', label: 'Седмицата в групите', hint: 'В неделя, последният ден от седмицата' },
+] as const;
+
+export type PushKind = (typeof PUSH_KINDS)[number]['id'];
+
+export interface PushPrefs {
+  /** The daily reminder: minutes after midnight, Sofia time (null: none). */
+  daily: number | null;
+  kinds: Record<PushKind, boolean>;
+}
+
+/** At most this many a day, and none at night (Sofia time): a game that wakes you up gets switched off. */
+export const PUSH = {
+  perDay: 2,
+  quietFrom: 22,
+  quietUntil: 9,
+  /** The daily reminder's choices: every half hour the quiet hours allow. */
+  dailyFrom: 9 * 60,
+  dailyTo: 21 * 60 + 30,
+  dailyStep: 30,
+} as const;
+
+export const defaultPushPrefs = (): PushPrefs => ({
+  daily: null,
+  kinds: { streak: true, duels: true, records: true, evening: false, groups: true },
+});
 
 /**
  * Соло's clock: the usual 15 s; 30 s (the speed bonus still counts against the usual clock, so a record can't be
@@ -556,6 +595,8 @@ export type Friendship = 'self' | 'none' | 'friends' | 'outgoing' | 'incoming';
 export interface ProfileStats {
   user: PublicUser & { createdAt: number };
   friendship: Friendship;
+  /** The viewer blocked this player (no friend requests either way, until unblocked). */
+  blocked: boolean;
   /** Your friend duels with them (null when you've had none, or it's your own profile). */
   duels: DuelRecord | null;
   overview: {

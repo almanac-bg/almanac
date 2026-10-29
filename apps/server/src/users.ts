@@ -49,6 +49,11 @@ export interface UserRow {
   share_runs: number;
   /** Secret in the reminder email's unsubscribe link. */
   reminder_key: string | null;
+  /** Opted in to the „X те изпревари на линка ти“ email; the day the last one went (one a day at most). */
+  beaten_mails: number;
+  beaten_mail_day: string | null;
+  /** What to send as web push (push.ts → PushPrefs), JSON; null: never set up. */
+  push_prefs: string | null;
   reminded_day: string | null;
   /** Last sign-in, or last time a session was extended (so within a couple of weeks of the last visit). */
   last_seen_at: number | null;

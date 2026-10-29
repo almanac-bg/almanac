@@ -28,7 +28,7 @@ import {
   titleName,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Flag, UserPlus } from 'lucide-react';
+import { ArrowRight, Ban, Check, Flag, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
@@ -119,6 +119,7 @@ export function ProfilePage() {
               <div className={clsx('flex flex-wrap items-center gap-2', HEADER_ACTIONS)}>
                 <FriendActions profile={data} onChange={setData} />
                 <ReportButton username={user.username} />
+                <BlockButton profile={data} onChange={setData} />
               </div>
             )
           )}
@@ -419,6 +420,56 @@ function FriendActions({ profile, onChange }: { profile: ProfileStats; onChange:
     <Button onClick={() => run(() => api.addFriend(user.username), 'Поканата е изпратена')} loading={busy}>
       <UserPlus className="size-4" /> Добави приятел
     </Button>
+  );
+}
+
+/** Blocks or unblocks this player: a blocked one is no friend, and neither can ask the other again. */
+function BlockButton({ profile, onChange }: { profile: ProfileStats; onChange: (p: ProfileStats) => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { user, blocked } = profile;
+
+  async function act() {
+    setBusy(true);
+    try {
+      await (blocked ? api.unblock(user.id) : api.block(user.id));
+      toast({ kind: 'info', title: blocked ? 'Профилът е отблокиран' : `${user.username} е блокиран профил` });
+      setOpen(false);
+      onChange(await api.profile(user.username));
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (blocked)
+    return (
+      <Button variant="ghost" onClick={act} loading={busy}>
+        <Ban className="size-4" /> Отблокирай
+      </Button>
+    );
+  return (
+    <>
+      <Button variant="ghost" className="text-fg-3" onClick={() => setOpen(true)}>
+        <Ban className="size-4" /> Блокирай
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Да блокирам ли ${user.username}?`}>
+        <p className="text-fg-2">
+          Профилът изчезва от приятелите ти (ако е там) и никой от двама ви не може да праща покана на другия. Можеш да
+          го отблокираш по всяко време от Настройки. Ако има нарушение, докладвай го — блокирането не стига до
+          модераторите.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Отказ
+          </Button>
+          <Button variant="danger" onClick={act} loading={busy}>
+            <Ban className="size-4" /> Блокирай
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 

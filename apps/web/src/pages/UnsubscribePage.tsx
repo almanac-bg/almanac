@@ -62,10 +62,10 @@ export function UnsubscribePage() {
       <EmailLinkPage>
         <div role="status" className="text-center">
           <CheckCircle2 className="mx-auto size-12 text-emerald-400" />
-          <h1 className="mt-3 t-section">Напомнянията са спрени</h1>
+          <h1 className="mt-3 t-section">Писмата са спрени</h1>
           <p className="mt-2 text-sm text-fg-2">
-            Няма да получаваш повече писма за серията. Ако ги искаш обратно, включи ги от Настройки → „Напомняне за
-            серията“.
+            Няма да получаваш повече напомняния за серията, нито писма, когато някой те изпревари на твой линк. Ако ги
+            искаш обратно, включи ги от Настройки.
           </p>
           {home}
         </div>
@@ -76,18 +76,18 @@ export function UnsubscribePage() {
   return (
     <EmailLinkPage>
       <BellOff className="size-8 text-violet-300" />
-      <h1 className="mt-3 t-section">Напомняния за серията</h1>
+      <h1 className="mt-3 t-section">Писма по желание</h1>
       <p className="mt-2 text-sm text-fg-2">
-        Тези писма идват вечерта, когато въпросите на деня още чакат, а серията ти ще прекъсне в полунощ. Не ги искаш?
-        Спри ги с един бутон — серията и профилът ти остават, както са.
+        Напомнянето за серията и писмото, когато някой те изпревари на твой линк, са по желание. Не ги искаш? Спри ги с
+        един бутон — серията и профилът ти остават, както са.
       </p>
       {typeof state === 'object' && (
         <p role="alert" className="mt-4 rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
-          {state.error} Отвори линка отново от последното писмо или спри напомнянията от Настройки.
+          {state.error} Отвори линка отново от последното писмо или спри писмата от Настройки.
         </p>
       )}
       <Button size="lg" className="mt-6 w-full" loading={state === 'working'} onClick={stop}>
-        <BellOff className="size-4.5" /> Спри напомнянията
+        <BellOff className="size-4.5" /> Спри писмата
       </Button>
       <Link
         to="/"

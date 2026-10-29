@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, TIME_ZONE } from '@quiz/shared';
+import { BRAND, ordinal, TIME_ZONE } from '@quiz/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
 import { reportError } from './monitoring';
@@ -24,12 +24,17 @@ if (!transport && config.production) {
  * quietly), never surfaced to the requester. Logs and reports never contain addresses or links (they hold live
  * tokens) — except in development without SMTP, where the console stands in for the inbox.
  */
-/** Replies to no-reply@ go nowhere (only the contact addresses take mail): every mail says where to write instead. */
-const noReply = () =>
-  `Писмото е изпратено автоматично и на него не може да се отговори. Пиши ни на ${config.operator.email}.`;
+/** Every mail is sent by the site itself; an answer to it reaches us (Reply-To), which the footer says. */
+const footerLine = () => `Писмото е изпратено автоматично от ${BRAND.domain}. Ако отговориш, писмото ти стига до нас.`;
 
 export function sendMail(message: Mail) {
-  const mail = { ...message, text: `${message.text}\n\n—\n${noReply()}` };
+  const mail = {
+    ...message,
+    text: `${message.text}\n\n—\n${footerLine()}`,
+    // An answer goes to a person, not to no-reply@; and out-of-office replies stay away from automatic mail.
+    replyTo: config.operator.email,
+    headers: { 'Auto-Submitted': 'auto-generated', ...message.headers },
+  };
   if (config.mailOutbox) {
     fs.mkdirSync(config.mailOutbox, { recursive: true });
     const name = `${Date.now()}-${randomBytes(3).toString('hex')}.json`;
@@ -50,16 +55,32 @@ export function sendMail(message: Mail) {
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function layout(title: string, intro: string, button: string, link: string, outro: string) {
-  return `<!doctype html><html lang="bg"><body style="margin:0;background:#0b0915;font-family:Arial,Helvetica,sans-serif;color:#f5f3ff">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" width="100%" style="max-width:480px;background:#15122a;border-radius:20px;padding:32px" cellpadding="0" cellspacing="0">
-<tr><td style="font-size:26px;font-weight:900;letter-spacing:1px;color:#c4b5fd">${BRAND.name}⚡</td></tr>
-<tr><td style="padding-top:20px;font-size:20px;font-weight:bold">${escapeHtml(title)}</td></tr>
-<tr><td style="padding-top:12px;font-size:15px;line-height:1.6;color:#d4d0ea">${intro}</td></tr>
-<tr><td style="padding:28px 0"><a href="${link}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 26px;border-radius:14px">${escapeHtml(button)}</a></td></tr>
-<tr><td style="font-size:13px;line-height:1.6;color:#8f89b2">${outro}<br><br>Ако бутонът не работи, отвори този линк:<br><a href="${link}" style="color:#a78bfa;word-break:break-all">${link}</a></td></tr>
-</table><p style="font-size:12px;line-height:1.6;color:#6b6590">${BRAND.domain} · ${escapeHtml(noReply())}</p></td></tr></table></body></html>`;
+/**
+ * The HTML of every mail. Written for the mail apps, not browsers: every text cell names its own colour (Gmail drops
+ * the <body>'s styles, and a greeting without one came out dark on dark), the card and the button are tables with
+ * `bgcolor` and cell padding (Outlook's Word engine ignores a link's padding and a table's radius), and the footer is
+ * light enough to read. `preheader`: the line inbox lists show after the subject (hidden in the mail itself).
+ */
+function layout(title: string, intro: string, button: string, link: string, outro: string, preheader = '') {
+  const font = 'font-family:Arial,Helvetica,sans-serif';
+  return `<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#0b0915">
+${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#0b0915">${escapeHtml(preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>` : ''}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b0915" style="background:#0b0915"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" bgcolor="#15122a" style="width:100%;max-width:480px;background:#15122a;border-radius:20px">
+<tr><td style="padding:32px 32px 0;${font};font-size:26px;font-weight:900;letter-spacing:1px;color:#c4b5fd">${BRAND.name}⚡</td></tr>
+<tr><td style="padding:20px 32px 0;${font};font-size:20px;font-weight:bold;color:#f5f3ff">${escapeHtml(title)}</td></tr>
+<tr><td style="padding:12px 32px 0;${font};font-size:15px;line-height:1.6;color:#d4d0ea">${intro}</td></tr>
+<tr><td style="padding:28px 32px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#7c3aed" style="background:#7c3aed;border-radius:14px">
+<a href="${link}" style="display:inline-block;padding:14px 26px;${font};font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:14px">${escapeHtml(button)}</a>
+</td></tr></table></td></tr>
+<tr><td style="padding:0 32px 32px;${font};font-size:13px;line-height:1.6;color:#b3aed0">${outro}<br><br>Ако бутонът не работи, отвори този линк:<br><a href="${link}" style="color:#c4b5fd;word-break:break-all">${link}</a></td></tr>
+</table>
+<p style="margin:16px 0 0;${font};font-size:12px;line-height:1.6;color:#a39fc0">${escapeHtml(footerLine())}</p>
+</td></tr></table></body></html>`;
 }
 
 export function verifyEmailMail(to: string, username: string, link: string): Mail {
@@ -144,14 +165,44 @@ export function streakReminderMail(
   const stop = 'Не искаш тези писма?';
   return {
     to,
-    subject: `🔥 Серията ти от ${streak} дни прекъсва в полунощ`,
+    subject: `🔥 ${streak} дни подред — днешните 10 въпроса още те чакат`,
     text: `Здравей, ${username}!\n\n${lead}${shield} Десет въпроса, около три минути:\n${config.appUrl}/daily\n\n${stop} Спри напомнянията: ${unsubscribe.page}`,
     html: layout(
       `Здравей, ${username}!`,
       escapeHtml(`${lead}${shield} Десет въпроса, около три минути.`),
       'Играй днешните',
       `${config.appUrl}/daily`,
-      `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#a78bfa">Спри напомнянията</a>.`,
+      `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#c4b5fd">Спри напомнянията</a>.`,
+      'Около три минути — и серията продължава. Прекъсва в полунощ.',
+    ),
+    headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+  };
+}
+
+/**
+ * Someone took the lead on the player's challenge link. Opt-in, at most one a day (challenges.ts), with the same
+ * unsubscribe link and headers as the streak reminder (it stops both).
+ */
+export function beatenMail(
+  to: string,
+  username: string,
+  beaten: { rival: string; score: number; place: number; link: string },
+  unsubscribe: { page: string; api: string },
+): Mail {
+  const lead = `${beaten.rival} изигра предизвикателството ти и събра ${beaten.score} точки — вече си на ${ordinal(beaten.place)} място.`;
+  const next = 'Виж класирането — или направи нов линк и си върни първото място.';
+  const stop = 'Писмото е по желание, най-много едно на ден. Не го искаш?';
+  return {
+    to,
+    subject: `⚔️ ${beaten.rival} те изпревари на линка ти`,
+    text: `Здравей, ${username}!\n\n${lead} ${next}\n${beaten.link}\n\n${stop} Спри тези писма: ${unsubscribe.page}`,
+    html: layout(
+      `Здравей, ${username}!`,
+      escapeHtml(`${lead} ${next}`),
+      'Виж класирането',
+      beaten.link,
+      `${escapeHtml(stop)} <a href="${unsubscribe.page}" style="color:#c4b5fd">Спри тези писма</a>.`,
+      `${beaten.score} точки на линка ти — можеш ли повече?`,
     ),
     headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
   };

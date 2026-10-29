@@ -1,7 +1,7 @@
 import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
 import { BRAND, type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
+import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
@@ -111,6 +111,8 @@ function Friends() {
   const version = useStore((s) => s.friendsVersion);
   const { data, error, retry, setData } = useLoad(() => api.friends(), '', version);
   const [removing, setRemoving] = useState<FriendEntry | null>(null);
+  // Declining a request asks once more: just no, or no and never again (blocked).
+  const [declining, setDeclining] = useState<FriendEntry | null>(null);
 
   async function mutate(fn: () => Promise<FriendsResponse>, success?: string) {
     try {
@@ -175,9 +177,9 @@ function Friends() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        aria-label="Откажи"
+                        aria-label={`Откажи поканата от ${f.user.username}`}
                         title="Откажи"
-                        onClick={() => mutate(() => api.removeFriend(f.user.id))}
+                        onClick={() => setDeclining(f)}
                       >
                         <X className="size-4" />
                       </Button>
@@ -228,6 +230,39 @@ function Friends() {
           </Card>
         </section>
       )}
+
+      <Modal open={!!declining} onClose={() => setDeclining(null)} title="Покана за приятелство">
+        <p className="text-fg-2">
+          Да откажа ли поканата от <b className="text-fg">{declining?.user.username}</b>? Ако не искаш да получаваш
+          покани от този профил, блокирай го — после може да се отблокира от Настройки.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button
+            variant="ghost"
+            className="text-rose-300 hover:bg-rose-500/10"
+            onClick={() => {
+              const target = declining!;
+              setDeclining(null);
+              void mutate(async () => {
+                await api.block(target.user.id);
+                return api.friends();
+              }, `${target.user.username} е блокиран профил`);
+            }}
+          >
+            <Ban className="size-4" /> Откажи и блокирай
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const target = declining!;
+              setDeclining(null);
+              void mutate(() => api.removeFriend(target.user.id));
+            }}
+          >
+            Откажи
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={!!removing} onClose={() => setRemoving(null)} title="Премахване от приятели">
         <p className="text-fg-2">

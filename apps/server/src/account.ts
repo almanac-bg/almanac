@@ -20,6 +20,7 @@ import { dropEmptyGroups, groupIdsOf } from './groups';
 import { earnedMastery } from './mastery';
 import { unreadNotifications } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
+import { pushPrefs } from './push';
 import { reloadQuestionBank } from './questions';
 import { questsInfo } from './quests';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
@@ -88,6 +89,8 @@ export function getMe(userId: number): MeUser | null {
     quests: questsInfo(userId, today),
     isGuest: row.is_guest === 1,
     streakReminders: row.streak_reminders === 1,
+    beatenMails: row.beaten_mails === 1,
+    push: pushPrefs(row),
     shareRuns: row.share_runs === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
@@ -198,6 +201,10 @@ export function exportAccount(userId: number) {
     questionSubmissions: rows('SELECT * FROM question_submissions WHERE user_id = ?'),
     reportsFiled: rows('SELECT * FROM reports WHERE reporter_id = ?'),
     reportsAboutYou: rows('SELECT reason, status, action, created_at, resolved_at FROM reports WHERE target_id = ?'),
+    pushDevices: rows('SELECT created_at FROM push_subscriptions WHERE user_id = ?'),
+    blocked: rows(
+      'SELECT u.username, b.created_at FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ?',
+    ),
     // Decisions about them, with their grounds (not which moderator took them).
     moderationDecisions: rows(
       'SELECT action, basis, reason, created_at, undone_at FROM moderation_log WHERE target_user_id = ? ORDER BY id',

@@ -714,6 +714,41 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE questions ADD COLUMN fact_source TEXT;
     `,
   },
+
+  // v26, reaching players (6c). `blocks`: who blocked whom (no friend requests either way). `beaten_mails`: the opt-in
+  // „X те изпревари на линка ти“ email, at most one a day (`beaten_mail_day`). Web push (push.ts): each device's
+  // subscription, what the player wants pushed (`push_prefs`, JSON), and what went out each day (`push_sent`, for the
+  // two-a-day cap and one of each kind). Older code leaves them alone.
+  {
+    compatible: `
+    CREATE TABLE blocks (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, blocked_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX blocks_blocked ON blocks(blocked_id);
+
+    ALTER TABLE users ADD COLUMN beaten_mails INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN beaten_mail_day TEXT;
+
+    CREATE TABLE push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
+    ALTER TABLE users ADD COLUMN push_prefs TEXT;
+    CREATE TABLE push_sent (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      day TEXT NOT NULL,
+      PRIMARY KEY (user_id, kind)
+    ) WITHOUT ROWID;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

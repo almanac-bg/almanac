@@ -1,7 +1,8 @@
-import type { FriendEntry, Friendship, FriendsResponse } from '@quiz/shared';
-import { all, one, run } from './db';
+import type { FriendEntry, Friendship, FriendsResponse, PublicUser } from '@quiz/shared';
+import { all, one, run, tx } from './db';
+import { notify } from './notifications';
 import { presence } from './notify';
-import { getUserByName, toPublicUser, type UserRow } from './users';
+import { getUser, getUserByName, toPublicUser, type UserRow } from './users';
 
 const MAX_FRIENDS = 200;
 /** Requests waiting for an answer; enough for any real use, too few for spamming strangers. */
@@ -32,6 +33,39 @@ export function friendship(me: number, other: number): Friendship {
 }
 
 export const areFriends = (a: number, b: number) => friendship(a, b) === 'friends';
+
+// ─── Blocking ────────────────────────────────────────────────────────────────
+
+/** Either of the two blocked the other: no requests between them (friendship, and with it duels and invites, is gone). */
+export const blockedBetween = (a: number, b: number) =>
+  !!one(
+    'SELECT 1 AS x FROM blocks WHERE (user_id = ? AND blocked_id = ?) OR (user_id = ? AND blocked_id = ?)',
+    a,
+    b,
+    b,
+    a,
+  );
+
+/** Blocks a player: they're no longer a friend (or a request either way), and can't ask again. */
+export function blockPlayer(userId: number, otherId: number): { ok: true } | { ok: false; error: string } {
+  if (userId === otherId) return { ok: false, error: 'Не можеш да блокираш себе си.' };
+  if (!getUser(otherId)) return { ok: false, error: 'Няма такъв играч.' };
+  const [a, b] = pair(userId, otherId);
+  tx(() => {
+    run('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created_at) VALUES (?, ?, ?)', userId, otherId, Date.now());
+    run('DELETE FROM friendships WHERE user_a = ? AND user_b = ?', a, b);
+  });
+  return { ok: true };
+}
+
+export const unblockPlayer = (userId: number, otherId: number) =>
+  Number(run('DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?', userId, otherId).changes) > 0;
+
+export const blockedPlayers = (userId: number): PublicUser[] =>
+  all<UserRow>(
+    'SELECT u.* FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.created_at DESC',
+    userId,
+  ).map(toPublicUser);
 
 export function friendIds(userId: number): number[] {
   return all<{ id: number }>(
@@ -90,6 +124,8 @@ export function requestFriend(userId: number, username: string): FriendResult {
   // Guests (no account yet) can't be added: they may be gone tomorrow.
   if (!other || other.is_guest) return { ok: false, error: 'Няма играч с това име.' };
   if (other.id === userId) return { ok: false, error: 'Не можеш да добавиш себе си.' };
+  // Whichever way the block goes, the answer is the same (it doesn't tell who blocked whom).
+  if (blockedBetween(userId, other.id)) return { ok: false, error: 'Не можеш да добавиш този играч.' };
   const state = friendship(userId, other.id);
   if (state === 'friends') return { ok: false, error: 'Вече сте приятели.' };
   if (state === 'outgoing') return { ok: false, error: 'Поканата вече е изпратена.' };
@@ -119,6 +155,14 @@ export function acceptFriend(userId: number, otherId: number): FriendResult {
   if (friendship(userId, otherId) !== 'incoming') return { ok: false, error: 'Няма такава покана.' };
   const [a, b] = pair(userId, otherId);
   run("UPDATE friendships SET status = 'accepted', accepted_at = ? WHERE user_a = ? AND user_b = ?", Date.now(), a, b);
+  // Whoever asked hears the answer (a request that just went quiet left them wondering).
+  const me = getUser(userId);
+  if (me)
+    notify(otherId, {
+      icon: '🤝',
+      text: `${me.username} прие поканата ти — вече сте приятели.`,
+      link: `/profile/${encodeURIComponent(me.username)}`,
+    });
   return { ok: true, otherId, accepted: true };
 }
 

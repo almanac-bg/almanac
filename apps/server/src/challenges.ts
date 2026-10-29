@@ -7,6 +7,7 @@ import {
   type DuelEntry,
   type DuelRecord,
   type DuelStanding,
+  dayKey,
   type MatchRewards,
   MODES,
   type MyChallenge,
@@ -15,10 +16,12 @@ import {
 import { config } from './config';
 import { cutShortError } from './daily';
 import { all, one, run } from './db';
+import { beatenMail, sendMail } from './mailer';
 import { notify, unreadAbout } from './notifications';
+import { push } from './push';
 import { type PreparedQuestion, pickDuelSet, pickMatch, recentFor, reorderOptions, withoutAuthors } from './questions';
 import { count } from './stats';
-import { NOT_BANNED, toPublicUser, type UserRow } from './users';
+import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
 const CHALLENGE_DAYS = 7;
@@ -297,15 +300,33 @@ export function recordChallengeResult(
       icon: beaten || (fresh > 1 && creatorPlace > 1) ? '⚔️' : '🔗',
       text:
         fresh > 1
-          ? `${fresh} души изиграха линка ти, последен ${player.username}. Води ${leader.username} с ${leader.score} точки${creatorPlace > 1 ? ` — ти си на ${ordinal(creatorPlace)} място` : ''}.`
+          ? `${fresh} души изиграха линка ти (най-скоро — ${player.username}). Води ${leader.username} с ${leader.score} точки${creatorPlace > 1 ? ` — ти си на ${ordinal(creatorPlace)} място` : ''}.`
           : beaten
             ? `${player.username} те изпревари на линка ти: ${score} точки — вече си на ${ordinal(creatorPlace)} място.`
             : `${player.username} изигра предизвикателството ти: ${score} точки, ${ordinal(rank)} място. Води ${leader.username}.`,
       link,
       replace: true,
     });
+    if (beaten) mailBeaten(creator, player.username, score, creatorPlace, id);
   }
   return { id, rank, total: boardSize(id), duel: null };
+}
+
+/** The creator asked to hear by email when someone takes the lead on their link: at most once a day. */
+function mailBeaten(creatorId: number, rival: string, score: number, place: number, id: string) {
+  const u = getUser(creatorId);
+  const today = dayKey();
+  if (!u?.beaten_mails || !u.email || u.email_bounced_at || !u.reminder_key || u.beaten_mail_day === today) return;
+  run('UPDATE users SET beaten_mail_day = ? WHERE id = ?', today, creatorId);
+  const query = `u=${u.id}&k=${encodeURIComponent(u.reminder_key)}`;
+  sendMail(
+    beatenMail(
+      u.email,
+      u.username,
+      { rival, score, place, link: `${config.appUrl}/c/${encodeURIComponent(id)}` },
+      { page: `${config.appUrl}/unsubscribe?${query}`, api: `${config.appUrl}/api/reminders/off?${query}` },
+    ),
+  );
 }
 
 // ─── Friend duels ─────────────────────────────────────────────────────────
@@ -413,6 +434,12 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
       text: `${me.username} те предизвика на дуел: ${score} точки за биене. Имаш ${DUEL.hours} часа да го изиграеш.`,
       link,
       replace: true,
+    });
+    push(friendId, 'duels', {
+      title: `⚔️ Твой ред: ${me.username} те предизвика`,
+      body: `${score} точки за биене. Имаш ${DUEL.hours} часа.`,
+      url: link,
+      tag: `duel-${c.id}`,
     });
   } else {
     const theirs = standing.outcome === 'won' ? 'lost' : standing.outcome === 'lost' ? 'won' : 'draw';

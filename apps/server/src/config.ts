@@ -126,6 +126,10 @@ export const config = {
   emailEventsSecret: process.env.EMAIL_EVENTS_SECRET || null,
   /** Tests: write every outgoing email as a JSON file into this directory. */
   mailOutbox: process.env.MAIL_OUTBOX || null,
+  /** Tests: pushes are written here (one JSON file each) instead of sent to the push services. */
+  pushOutbox: process.env.PUSH_OUTBOX || null,
+  /** Tests (at any hour): PUSH_QUIET=off lifts the night's silence. */
+  pushQuiet: process.env.PUSH_QUIET !== 'off',
   /**
    * On shutdown, how long running matches may play out before the process exits. A 15-question Royale takes about
    * five minutes; keep docker-compose's stop_grace_period above this. Development restarts immediately.
@@ -144,6 +148,14 @@ export const config = {
   },
   /** Where this site's source code is published; linked in the footer (the AGPL asks hosted copies to offer it). */
   sourceUrl: httpsUrl(process.env.SOURCE_URL),
+  /**
+   * Web push (push.ts): the VAPID key pair this site signs its pushes with (`cli.mjs vapid-keys` makes one). Unset: no
+   * push, and Settings doesn't offer it.
+   */
+  vapid:
+    process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY
+      ? { publicKey: process.env.VAPID_PUBLIC_KEY.trim(), privateKey: process.env.VAPID_PRIVATE_KEY.trim() }
+      : null,
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
   /** Tags error reports with the deployed version (e.g. the git commit). */

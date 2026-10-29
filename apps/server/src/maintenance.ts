@@ -9,12 +9,13 @@ import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, db, run } from './db';
-import { retireChampionTitles } from './evening';
+import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests } from './guests';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
+import { dailyReminderPushes, timedPushes } from './push';
 import { reloadQuestionBank } from './questions';
 import { pruneRecordPlays, tellRecordOwners } from './records';
 import { pruneRuns } from './runs';
@@ -197,6 +198,8 @@ export function startMaintenance() {
       const pictures = sweepPictures();
       if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
       if (moderatorDigest()) console.log('🛡️  Morning summary sent to the moderators');
+      const pushed = dailyReminderPushes() + timedPushes((u) => liveDailyStreak(u), eveningStartsAt(dayKey()));
+      if (pushed) console.log(`📲 Pushes sent: ${pushed}`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

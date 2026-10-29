@@ -51,13 +51,24 @@ import {
 } from '../emailAuth';
 import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
 import { eveningInfo } from '../evening';
-import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
+import {
+  acceptFriend,
+  blockedPlayers,
+  blockPlayer,
+  type FriendResult,
+  friendship,
+  listFriends,
+  removeFriend,
+  requestFriend,
+  unblockPlayer,
+} from '../friends';
 import { createGuest } from '../guests';
 import { activeBan, fileReport, nameProblem } from '../moderation';
 import { reportError } from '../monitoring';
 import { nameShape } from '../names';
 import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession, sendFriendsUpdate } from '../notify';
+import { PrefsSchema, push, pushEnabled, SubscriptionSchema, setPushPrefs, subscribe, unsubscribe } from '../push';
 import { reportQuestion } from '../questionReports';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import { guestsPaused } from '../settings';
@@ -508,6 +519,23 @@ api.post('/account/reminders', requireAuth, requireAccount, (req, res) => {
   res.json({ user: getMe(res.locals.userId) });
 });
 
+/** The „X те изпревари на линка ти“ email: opt-in, like the streak reminder (and stopped by the same link). */
+api.post('/account/beaten-mails', requireAuth, requireAccount, (req, res) => {
+  const body = parse(z.object({ on: z.boolean() }), req, res);
+  if (!body) return;
+  if (body.on && !getUser(res.locals.userId)!.email) {
+    res.status(400).json({ error: 'Първо добави и потвърди имейл.' });
+    return;
+  }
+  run(
+    'UPDATE users SET beaten_mails = ?, reminder_key = COALESCE(reminder_key, ?) WHERE id = ?',
+    body.on ? 1 : 0,
+    randomBytes(16).toString('base64url'),
+    res.locals.userId,
+  );
+  res.json({ user: getMe(res.locals.userId) });
+});
+
 /** Others may play against this player's recorded matches (a recording plays when nobody's there for a Дуел). */
 api.post('/account/share-runs', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ on: z.boolean() }), req, res);
@@ -529,7 +557,8 @@ api.post('/reminders/off', (req, res) => {
     res.status(400).json({ error: 'Линкът не е валиден.' });
     return;
   }
-  run('UPDATE users SET streak_reminders = 0 WHERE id = ?', user.id);
+  // Every optional mail: the streak reminder and the beaten-on-your-link note.
+  run('UPDATE users SET streak_reminders = 0, beaten_mails = 0 WHERE id = ?', user.id);
   res.json({ ok: true });
 });
 
@@ -743,6 +772,70 @@ api.delete('/friends/:id', requireAuth, (req, res) => {
   res.json(listFriends(res.locals.userId));
 });
 
+// ─── Web push ────────────────────────────────────────────────────────────────
+
+/** The key a device subscribes with (null: this site has no push set up). */
+api.get('/push/key', (_req, res) => {
+  res.json({ key: config.vapid?.publicKey ?? null });
+});
+
+/** This device gets pushes; the first one confirms it works. */
+api.post('/push/subscribe', requireAuth, requireAccount, (req, res) => {
+  if (!pushEnabled()) {
+    res.status(503).json({ error: 'Известията не са включени на този сайт.' });
+    return;
+  }
+  const sub = parse(SubscriptionSchema, req, res);
+  if (!sub) return;
+  if (throttled(`push-subscribe:${res.locals.userId}`, 20, 24 * 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Опитай утре.' });
+    return;
+  }
+  subscribe(res.locals.userId, sub);
+  push(res.locals.userId, 'hello', {
+    title: 'Известията работят ✓',
+    body: 'Ще идват само избраните в Настройки — най-много две на ден, нищо нощем.',
+    url: '/settings',
+  });
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+api.post('/push/unsubscribe', requireAuth, (req, res) => {
+  const body = parse(z.object({ endpoint: z.string().max(1000) }), req, res);
+  if (!body) return;
+  unsubscribe(res.locals.userId, body.endpoint);
+  res.json({ ok: true });
+});
+
+api.post('/push/prefs', requireAuth, requireAccount, (req, res) => {
+  const prefs = parse(PrefsSchema, req, res);
+  if (!prefs) return;
+  setPushPrefs(res.locals.userId, prefs);
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+/** Players this one blocked (Settings), and blocking or unblocking one (from a request, a profile, the list). */
+api.get('/blocks', requireAuth, requireAccount, (_req, res) => {
+  res.json({ players: blockedPlayers(res.locals.userId) });
+});
+
+api.post('/blocks/:id', requireAuth, requireAccount, (req, res) => {
+  const other = idParam(req);
+  const done = blockPlayer(res.locals.userId, other);
+  if (!done.ok) {
+    res.status(400).json({ error: done.error });
+    return;
+  }
+  sendFriendsUpdate(other);
+  sendFriendsUpdate(res.locals.userId);
+  res.json({ players: blockedPlayers(res.locals.userId) });
+});
+
+api.delete('/blocks/:id', requireAuth, requireAccount, (req, res) => {
+  unblockPlayer(res.locals.userId, idParam(req));
+  res.json({ players: blockedPlayers(res.locals.userId) });
+});
+
 // ─── Community questions ─────────────────────────────────────────────────────
 
 api.get('/submissions/mine', requireAuth, (_req, res) => {
@@ -849,6 +942,7 @@ function profileStats(u: UserRow, viewerId: number): ProfileStats {
   return {
     user: { ...toPublicUser(u), createdAt: u.created_at },
     friendship: friendship(viewerId, u.id),
+    blocked: !!one('SELECT 1 AS x FROM blocks WHERE user_id = ? AND blocked_id = ?', viewerId, u.id),
     duels: viewerId === u.id ? null : someDuels(duelRecord(viewerId, u.id)),
     overview: {
       gamesPlayed: u.games_played,
