@@ -1898,7 +1898,7 @@ test('a moderator gives the password again for changes, at most an hour after gi
   // A saved guest made a moderator. Saving set the password, so it counts as given then; an hour and more ago here.
   const guestM = await guest(srv.url);
   const claimed = await api.send('POST', '/api/account/claim', guestM.cookie, {
-    username: 'nov_moderator',
+    username: 'pazitel_test',
     password: 'secret123',
   });
   assert.equal(claimed.status, 200);
@@ -1907,7 +1907,7 @@ test('a moderator gives the password again for changes, at most an hour after gi
     .update(decodeURIComponent(M.cookie.split('=')[1]))
     .digest('base64url');
   srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
-  assert.equal(cli(srv.dbPath, 'admin', 'add', 'nov_moderator').status, 0);
+  assert.equal(cli(srv.dbPath, 'admin', 'add', 'pazitel_test').status, 0);
   const reject = () => api.send('POST', '/api/admin/submissions/999999/reject', M.cookie, { reason: '' });
 
   assert.equal((await api.get('/api/admin/summary', M.cookie)).status, 200, 'looking needs no password');
