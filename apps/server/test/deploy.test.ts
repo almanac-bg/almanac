@@ -62,7 +62,11 @@ case "$1" in
     [ -f "$S/images/$(name "$2")" ] || exit 1
     cp "$S/images/$(name "$2")" "$S/images/$(name "$3")" ;;
   rmi) rm -f "$S/images/$(name "$2")" ;;
-  compose) shift; echo "APP_RELEASE=\${APP_RELEASE:-} $*" >>"$S/compose.log" ;;
+  compose)
+    shift
+    echo "APP_RELEASE=\${APP_RELEASE:-} $*" >>"$S/compose.log"
+    # Caddy refusing a config: state/caddy-refuses.
+    [ "$1 $3 $5" = "exec caddy reload" ] && [ -f "$S/caddy-refuses" ] && exit 1 ;;
 esac
 exit 0
 `,
@@ -196,4 +200,34 @@ test('rollback: to what ran before; to a commit CI published, and only to one', 
   const nothing = run('rollback.sh');
   assert.equal(nothing.status, 1);
   assert.match(nothing.output, /No previous image to go back to/);
+});
+
+test('a changed Caddyfile is reloaded into Caddy; one it refuses fails the deploy, and an unchanged one is left alone', () => {
+  const reload = 'exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile';
+  fs.mkdirSync(path.join(work, 'deploy'), { recursive: true });
+  const withCaddy = publishCommit(work, 'deploy/Caddyfile', 'example.test {\n}\n');
+  published(withCaddy, 'sha256:caddy-1');
+  const changed = run('deploy.sh');
+  assert.equal(changed.status, 0, changed.output);
+  assert.ok(
+    compose().some((line) => line.endsWith(reload)),
+    compose().join('\n'),
+  );
+
+  const other = publishCommit(work, 'app.txt', 'v5');
+  published(other, 'sha256:caddy-2');
+  const same = run('deploy.sh');
+  assert.equal(same.status, 0, same.output);
+  assert.ok(!compose().some((line) => line.endsWith(reload)), 'the same Caddyfile: no reload');
+
+  const broken = publishCommit(work, 'deploy/Caddyfile', 'example.test {\n');
+  published(broken, 'sha256:caddy-3');
+  fs.writeFileSync(path.join(state, 'caddy-refuses'), '');
+  try {
+    const refused = run('deploy.sh');
+    assert.equal(refused.status, 1);
+    assert.match(refused.output, /Caddy refused the new deploy\/Caddyfile and kept the old one/);
+  } finally {
+    fs.rmSync(path.join(state, 'caddy-refuses'));
+  }
 });

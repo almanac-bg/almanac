@@ -22,6 +22,7 @@ main() {
   }
 
   bank_before=$(git -C private rev-parse HEAD)
+  caddy_before=$(git rev-parse -q --verify HEAD:deploy/Caddyfile || echo none)
   git merge --quiet --ff-only origin/main
   git -C private merge --quiet --ff-only origin/main
   bank_after=$(git -C private rev-parse HEAD)
@@ -44,6 +45,14 @@ main() {
     APP_RELEASE=$release docker compose up -d --no-deps --force-recreate app
   fi
   echo "$release" >.release
+  # Caddy reads its config once: a changed Caddyfile (mounted from the checkout) takes effect when told to, without
+  # dropping a connection. A config it refuses leaves the old one running, and the deploy says so.
+  if [ "$(git rev-parse -q --verify HEAD:deploy/Caddyfile || echo none)" != "$caddy_before" ]; then
+    docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile || {
+      echo "$(date -u +%FT%TZ) Caddy refused the new deploy/Caddyfile and kept the old one: fix it and deploy again"
+      exit 1
+    }
+  fi
 
   if ! healthy; then
     echo "$(date -u +%FT%TZ) $release isn't answering through Caddy after 90 s: going back to what ran before"
