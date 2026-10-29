@@ -180,7 +180,7 @@ export interface MatchSummary {
  * "В) …", "Г) …"), or on a number question a number in its range, typed on the keypad or slid to — and a round's
  * category, when this player is asked to pick one, the first on offer. Returns once the results are up.
  */
-export async function playMatch(page: Page): Promise<MatchSummary> {
+export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } = {}): Promise<MatchSummary> {
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
@@ -231,7 +231,24 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
     }
     answered.add(index);
   }
+  if (opts.moment !== 'keep') await passRewardMoment(page);
   return { answered: answered.size, total };
+}
+
+/**
+ * The rewards' moment before the results page (a new level, a new avatar: RewardMoment), when the match brought one:
+ * gone with Escape, as a player skips it. Returns whether there was one.
+ */
+export async function passRewardMoment(page: Page): Promise<boolean> {
+  const moment = page.getByRole('dialog', { name: 'Ново от този мач', exact: true });
+  const shown = await moment
+    .waitFor({ state: 'visible', timeout: 1_500 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return false;
+  await page.keyboard.press('Escape');
+  await expect(moment).toBeHidden();
+  return true;
 }
 
 /**

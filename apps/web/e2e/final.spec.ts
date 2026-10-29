@@ -1,4 +1,4 @@
-import { expect, gameMs, startAsGuest, startSolo, test } from './support';
+import { expect, gameMs, passRewardMoment, startAsGuest, startSolo, test } from './support';
 
 test('a solo match ends on a number, typed on the keyboard, shown on a line against the answer @desktop', async ({
   page,
@@ -38,6 +38,7 @@ test('a solo match ends on a number, typed on the keyboard, shown on a line agai
   // The reveal: a line with the answer on it, and how far off the number was.
   await expect(page.getByText(/^(точно|[+−].+|[×÷].+)$/).first()).toBeVisible({ timeout: gameMs(10_000) });
   await expect(page.getByRole('heading', { name: 'Награди', exact: true })).toBeVisible({ timeout: gameMs(15_000) });
+  await passRewardMoment(page);
   // The review says what was typed against the answer.
   await page.getByRole('button', { name: /Преглед на въпросите/ }).click();
   await expect(page.getByText(new RegExp(`^Ти: ${low} \\(`))).toBeVisible();

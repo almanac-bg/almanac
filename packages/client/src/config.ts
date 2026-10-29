@@ -1,8 +1,12 @@
 /** Moments the shared game logic signals; the website plays a sound (and, on phones, a buzz) for them. */
 export type Effect =
   | 'lock'
+  /** A new question comes in. */
+  | 'question'
   | 'correct'
   | 'wrong'
+  /** The question ended without an answer of yours: out of time, not wrong. */
+  | 'timeUp'
   | 'powerup'
   /** Someone else was knocked out ('knockedOut': you were). */
   | 'eliminated'

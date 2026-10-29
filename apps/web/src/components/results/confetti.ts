@@ -3,7 +3,8 @@ const CONFETTI_COLORS = ['#a78bfa', '#e879f9', '#22d3ee', '#fbbf24', '#34d399'];
 /** Confetti for a win: its library loads when there's one to celebrate, not with the game. */
 export function burst(power = 1) {
   void import('canvas-confetti').then(({ default: confetti }) => {
-    const opts = { colors: CONFETTI_COLORS, disableForReducedMotion: true };
+    // Gone in about two seconds: longer, it lay over the result it celebrates.
+    const opts = { colors: CONFETTI_COLORS, disableForReducedMotion: true, ticks: 120 };
     void confetti({
       ...opts,
       particleCount: Math.round(90 * power),

@@ -253,6 +253,7 @@ function bind(s: GameSocket) {
       });
     }
     const same = g.question?.index === question.index && g.phase === 'question' ? g : null;
+    if (!same) effect('question');
     // A resync after a reconnect says where you stand on the question (a fresh tab knows nothing of it): the server's
     // word goes.
     const mine = question.mine;
@@ -388,7 +389,11 @@ function bind(s: GameSocket) {
     const g = getState().game;
     if (!g) return;
     const mine = reveal.results[g.start.youId];
-    if (mine) effect(mine.correct ? 'correct' : 'wrong');
+    // No answer at all (no option, number or order in time) is the clock's, not a wrong answer.
+    const none =
+      mine &&
+      (mine.number ? mine.number.guess === null : mine.order ? mine.order.given === null : mine.choice === null);
+    if (mine) effect(mine.correct ? 'correct' : none ? 'timeUp' : 'wrong');
     // One on one: who leads now, if that changed (a tie leads nobody).
     if (before && g.start.players.length === 2) {
       const leader = (standings: typeof g.standings) =>

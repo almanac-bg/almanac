@@ -26,6 +26,7 @@ import {
   UnlocksCard,
   UnratedCard,
 } from '../components/results/ResultCards';
+import { RewardMoment, rewardSteps } from '../components/results/RewardMoment';
 import { ChallengeStanding, Podium, TeamResult } from '../components/results/Standings';
 import { Button, Card } from '../components/ui';
 import { matchShareText, shareText } from '../lib/share';
@@ -50,6 +51,9 @@ export function Results({ game }: { game: LiveGame }) {
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
   const rewards = end.rewards;
+  // A new level or a new avatar or frame: one beat at a time before the page (RewardMoment).
+  const [steps] = useState(() => rewardSteps(end.noContest ? null : rewards));
+  const [moment, setMoment] = useState(steps.length > 0);
   // A challenge link is played alone, but it has a board: first place over others is a win too. A friend duel is won
   // once the friend has played it too.
   const link = rewards?.challenge ?? null;
@@ -107,7 +111,7 @@ export function Results({ game }: { game: LiveGame }) {
     if (won || (single && perfect && !lostLink) || newBest) {
       sfx.win();
       burst(1.2);
-    }
+    } else if (!single) sfx.lose();
   }, [won, single, perfect, newBest, lostLink]);
 
   async function again() {
@@ -226,6 +230,7 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
+      <RewardMoment steps={steps} open={moment} onDone={() => setMoment(false)} />
       <m.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
           {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
@@ -323,13 +328,6 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       </m.header>
 
-      {/* A guest's first results: what keeps them comes first, not after the rewards. */}
-      <GuestNudge className="mx-auto mt-6 max-w-2xl">
-        {rewards
-          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
-          : undefined}
-      </GuestNudge>
-
       {/* The standings offer "+ Приятел" beside each person you played with. */}
       <FriendsProvider game={game}>
         {teamScores ? (
@@ -362,8 +360,8 @@ export function Results({ game }: { game: LiveGame }) {
       >
         {!rewardsCard ? null : rewards ? (
           <div className="space-y-4">
-            <UnlockReveal rewards={rewards} />
-            <RewardsCard rewards={rewards} quiet={lost} />
+            <UnlockReveal rewards={rewards} celebrated={steps.length > 0} />
+            <RewardsCard rewards={rewards} quiet={lost} celebrated={steps.length > 0} />
           </div>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
@@ -386,6 +384,13 @@ export function Results({ game }: { game: LiveGame }) {
           </div>
         )}
       </div>
+
+      {/* A guest's results: what keeps them, once they've seen what there is to keep (it stood before the podium). */}
+      <GuestNudge className="mx-auto mt-6 max-w-2xl">
+        {rewards
+          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
+          : undefined}
+      </GuestNudge>
 
       <LearnedToday items={game.history} added={rewards?.almanac?.added ?? 0} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}

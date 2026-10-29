@@ -1,7 +1,10 @@
 /**
  * The game's sounds, synthesized: no audio files to fetch or license. Each is a small instrument — a bell, a pluck, a
- * filtered burst of noise, a low thump — in one key (C major's pentatonic: C D E G A), through one master bus: a gain
- * and a compressor, so a chord of effects never clips and quiet ones aren't lost on a phone's speaker.
+ * filtered burst of noise, a low thump — in one key (C major's pentatonic: C D E G A), through one master bus: a gain,
+ * a compressor (a chord of effects never clips), and the gain back after it. Levels by role, measured offline: the big
+ * moments near −6 dBFS at their peak, an answer's feedback near −10, the taps and ticks near −18 — they were 27 dB
+ * apart, too quiet on a phone. A phone's speaker has nothing below ~300 Hz: what has to be felt there has a body in the
+ * mids too, the low thump on top for headphones.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -70,7 +73,10 @@ function audio(): AudioContext | null {
       compressor.release.value = 0.2;
       master = ctx.createGain();
       master.gain.value = 0.8;
-      master.connect(compressor).connect(ctx.destination);
+      // The compressor only brings the loud ones down: the gain after it brings them all up again (+8 dB).
+      const makeup = ctx.createGain();
+      makeup.gain.value = 2.5;
+      master.connect(compressor).connect(makeup).connect(ctx.destination);
     }
     // Suspended until a tap; „interrupted“ after a call on iOS: either way it has to be asked to run again.
     if (ctx.state !== 'running') void ctx.resume();
@@ -240,26 +246,36 @@ export const sfx = {
   /** The last seconds: a dry tick, higher with each of the last three (`left`: seconds to go). */
   tick: (left = 5) => {
     const urgent = left <= 3;
-    pluck(urgent ? [N.A5, N.C6, N.D6][3 - left] : N.G5, 0, 0.05, urgent ? 0.07 : 0.035, 'square');
+    pluck(urgent ? [N.A5, N.C6, N.D6][3 - left] : N.G5, 0, 0.05, urgent ? 0.16 : 0.13, 'square');
   },
   lock: () => {
-    noise(0, 0.05, 2500, 2500, 0.05, 'highpass');
-    pluck(N.G5, 0.01, 0.12, 0.09);
+    noise(0, 0.05, 2500, 2500, 0.07, 'highpass');
+    pluck(N.G5, 0.01, 0.12, 0.12);
   },
-  countdown: () => pluck(N.E5, 0, 0.16, 0.1, 'sine'),
+  /** A question coming in: a soft air past, under everything. */
+  question: () => noise(0, 0.22, 450, 2400, 0.2),
+  countdown: () => pluck(N.E5, 0, 0.16, 0.16, 'sine'),
   go: () => {
     noise(0, 0.18, 800, 5000, 0.04);
     bell(N.C6, 0, 0.35, 0.09);
     bell(N.G6, 0.07, 0.45, 0.07);
   },
   correct: () => {
-    for (const [i, f] of [N.C6, N.E6, N.G6].entries()) bell(f, i * 0.055, 0.5, 0.09);
+    for (const [i, f] of [N.C6, N.E6, N.G6].entries()) bell(f, i * 0.055, 0.5, 0.058);
   },
+  /** A miss: the sour slide, a dull knock in the mids a phone plays, and the low thump for headphones. */
   wrong: () => {
-    buzzDown(N.E4, N.C4, 0, 0.3, 0.055);
-    thump(0, 120, 60, 0.2, 0.15);
+    buzzDown(N.E4, N.C4, 0, 0.3, 0.08);
+    pluck(196, 0, 0.2, 0.12, 'triangle');
+    noise(0, 0.1, 260, 180, 0.16, 'lowpass');
+    thump(0, 120, 60, 0.2, 0.12);
   },
-  pop: () => pluck(N.C6, 0, 0.08, 0.07, 'sine'),
+  /** Out of time, not wrong: two notes stepping down, a clock's, not a buzzer's. */
+  timeUp: () => {
+    pluck(N.E5, 0, 0.14, 0.075, 'square');
+    pluck(N.A4, 0.12, 0.32, 0.09, 'triangle');
+  },
+  pop: () => pluck(N.C6, 0, 0.08, 0.12, 'sine'),
   powerup: () => {
     noise(0, 0.22, 500, 6000, 0.05);
     for (const [i, f] of [N.G5, N.C6, N.E6].entries()) pluck(f, 0.03 + i * 0.045, 0.14, 0.07);
@@ -267,13 +283,15 @@ export const sfx = {
   /** Someone else is out: a whoosh past, and a low note — theirs, not yours. */
   eliminated: () => {
     noise(0, 0.35, 3000, 300, 0.07);
-    pluck(N.A3, 0.05, 0.4, 0.09, 'sine');
+    pluck(N.E4, 0.05, 0.4, 0.12, 'triangle');
   },
-  /** You're out: a slow fall through the minor of the key, and the floor. */
+  /** You're out: a slow fall through the minor of the key, a heavy knock in the mids, and the floor. */
   knockedOut: () => {
-    buzzDown(N.A4, N.A3, 0, 0.45, 0.06);
-    buzzDown(N.E4, N.C4, 0.18, 0.6, 0.05);
-    thump(0.05, 140, 38, 0.6, 0.4);
+    buzzDown(N.A4, N.A3, 0, 0.45, 0.08);
+    buzzDown(N.E4, N.C4, 0.18, 0.6, 0.07);
+    pluck(N.A3, 0.02, 0.5, 0.16, 'triangle');
+    noise(0.02, 0.16, 300, 160, 0.14, 'lowpass');
+    thump(0.05, 140, 38, 0.6, 0.18);
   },
   /** A streak of right answers (3, 5, 10…): a rising run, higher the longer it gets. */
   streak: (length: number) => {
@@ -289,19 +307,23 @@ export const sfx = {
   },
   win: () => {
     for (const [i, f] of [N.C5, N.E5, N.G5, N.C6, N.G5, N.C6, N.E6].entries())
-      bell(f, i * 0.1, i === 6 ? 0.9 : 0.3, 0.09);
-    noise(0.6, 0.5, 2000, 9000, 0.03);
+      bell(f, i * 0.1, i === 6 ? 0.9 : 0.3, 0.12);
+    noise(0.6, 0.5, 2000, 9000, 0.04);
+  },
+  /** A match lost: three notes settling down, kind — it's a game, there's the next one. */
+  lose: () => {
+    for (const [i, f] of [N.E5, N.C5, N.A4].entries()) bell(f, i * 0.16, i === 2 ? 0.9 : 0.45, 0.05);
   },
   levelUp: () => {
-    for (const [i, f] of [N.G5, N.A5, N.C6, N.E6, N.G6].entries()) bell(f, i * 0.065, 0.5, 0.08);
+    for (const [i, f] of [N.G5, N.A5, N.C6, N.E6, N.G6].entries()) bell(f, i * 0.065, 0.5, 0.09);
   },
   achievement: () => {
-    bell(N.C6, 0, 0.4, 0.09);
-    bell(N.G6, 0.1, 0.7, 0.08);
+    bell(N.C6, 0, 0.4, 0.12);
+    bell(N.G6, 0.1, 0.7, 0.11);
   },
   /** An invite: two soft notes, a doorbell. */
   invite: () => {
-    bell(N.E6, 0, 0.35, 0.07);
-    bell(N.C6, 0.16, 0.55, 0.07);
+    bell(N.E6, 0, 0.35, 0.05);
+    bell(N.C6, 0.16, 0.55, 0.05);
   },
 };

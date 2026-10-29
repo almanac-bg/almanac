@@ -1,4 +1,4 @@
-import { expect, expectLobby, me, playMatch, startSolo, test } from './support';
+import { expect, expectLobby, me, playMatch, startAsGuest, startSolo, test } from './support';
 
 test('a newcomer plays a first solo match as a guest', async ({ page }) => {
   await page.goto('/');
@@ -38,4 +38,18 @@ test('results open at the top, however far down the lobby was when the match beg
   // The browser restored the lobby's scroll a moment after the results drew: give it that moment.
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('a first match levels up: the new level comes first, on its own, then the results', async ({ page }) => {
+  await startAsGuest(page);
+  await startSolo(page, 'Микс');
+  await playMatch(page, { moment: 'keep' });
+  const moment = page.getByRole('dialog', { name: 'Ново от този мач', exact: true });
+  await expect(moment).toBeVisible();
+  await expect(moment.getByText('Ново ниво', { exact: true })).toBeVisible();
+  // A beat at a time (the level, then any avatar or frame it brought), to the page.
+  for (let beat = 0; beat < 6 && (await moment.isVisible()); beat++)
+    await moment.getByRole('button', { name: /^(Нататък|Към резултата)$/ }).click();
+  await expect(moment).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Награди', exact: true })).toBeVisible();
 });

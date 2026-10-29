@@ -179,7 +179,16 @@ function AgainstSharer({
 const SHOWN_LINES = 3;
 
 /** XP and the level bar. `quiet`: a lost match — a level gained along the way gets its line, not confetti. */
-export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards; quiet?: boolean }) {
+/** `celebrated`: the level-up had its own moment already (RewardMoment) — the bar fills without another fanfare. */
+export function RewardsCard({
+  rewards,
+  quiet = false,
+  celebrated = false,
+}: {
+  rewards: MatchRewards;
+  quiet?: boolean;
+  celebrated?: boolean;
+}) {
   const [xp, setXp] = useState(rewards.xpBefore);
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [allLines, setAllLines] = useState(false);
@@ -200,13 +209,14 @@ export function RewardsCard({ rewards, quiet = false }: { rewards: MatchRewards;
         if (l > lastLevel) {
           lastLevel = l;
           setLevelUp(l);
+          if (celebrated) return;
           sfx.levelUp();
           if (!quiet) burst(0.7);
         }
       },
     });
     return () => controls.stop();
-  }, [rewards, quiet]);
+  }, [rewards, quiet, celebrated]);
 
   const p = levelProgress(Math.round(xp));
   return (
@@ -375,17 +385,17 @@ export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
  * A new avatar or frame, shown big at the top of the rewards: on you, springing in, with „Сложи го“ to wear it at once
  * (as the collection does). The rest of what was unlocked is listed in UnlocksCard.
  */
-export function UnlockReveal({ rewards }: { rewards: MatchRewards }) {
+export function UnlockReveal({ rewards, celebrated = false }: { rewards: MatchRewards; celebrated?: boolean }) {
   const me = useStore((s) => s.me);
   const unlock = rewards.unlocks.find((u) => u.kind === 'avatar' || u.kind === 'frame');
   const [state, setState] = useState<'idle' | 'saving' | 'worn'>('idle');
   useEffect(() => {
     // The level-up has a sound of its own already.
     const leveled = rewards.levelAfter > rewards.levelBefore;
-    if (!unlock || leveled) return;
+    if (!unlock || leveled || celebrated) return;
     const t = setTimeout(sfx.levelUp, 900);
     return () => clearTimeout(t);
-  }, [unlock, rewards.levelAfter, rewards.levelBefore]);
+  }, [unlock, rewards.levelAfter, rewards.levelBefore, celebrated]);
   if (!unlock || !me) return null;
   const { name } = unlockPreview(unlock);
   const avatar = unlock.kind === 'avatar' ? unlock.id : me.avatar;

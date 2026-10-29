@@ -19,8 +19,10 @@ window.history.scrollRestoration = 'manual';
 
 const SOUNDS: Partial<Record<Effect, () => void>> = {
   lock: sfx.lock,
+  question: sfx.question,
   correct: sfx.correct,
   wrong: sfx.wrong,
+  timeUp: sfx.timeUp,
   powerup: sfx.powerup,
   eliminated: sfx.eliminated,
   knockedOut: sfx.knockedOut,
@@ -36,6 +38,7 @@ const HAPTICS: Partial<Record<Effect, number | number[]>> = {
   lock: 12,
   correct: [18, 50, 18],
   wrong: 90,
+  timeUp: 60,
   knockedOut: [180, 70, 260],
 };
 
