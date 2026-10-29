@@ -14,7 +14,8 @@ process.env.DB_PATH = path.join(tmp, 'opponents.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { one, run } = await import('../src/db');
-const { isChoice, markSeen, questionById } = await import('../src/questions');
+const { isChoice, markSeen, pickMatch, questionById, recentFor } = await import('../src/questions');
+const { dailyQuestions } = await import('../src/daily');
 const { noteRecordPlay, pickRecord, RECORDS, tellRecordOwners } = await import('../src/records');
 const { claimChallengeAttempt, createDuel, DUEL, myDuels, recordChallengeResult, tellExpiredDuels } = await import(
   '../src/challenges'
@@ -113,6 +114,34 @@ test('not a recording with questions the player has seen, nor one whose question
   run('DELETE FROM runs');
   addRun(2, { at: Date.now() - (RECORDS.maxAgeDays + 1) * 24 * 60 * 60_000 });
   assert.equal(pickRecord(1, 1000), null, 'too old');
+});
+
+test("never today's daily, nor a link that may still be open: their questions are still to be played", () => {
+  run('DELETE FROM runs');
+  run('DELETE FROM seen_questions');
+  const day = 24 * 60 * 60_000;
+  addRun(2, { mode: 'daily' });
+  addRun(2, { mode: 'challenge', at: Date.now() - 2 * day });
+  assert.equal(pickRecord(1, 1000), null, "today's daily and a week-young link (or a friend duel) stay unplayed");
+  // Yesterday's daily is over, and so is a link past its week.
+  const yesterday = addRun(2, { mode: 'daily', at: dayEndsAt(shiftDay(dayKey(), -1)) - 60_000 });
+  assert.equal(pickRecord(1, 1000)?.runId, yesterday);
+  run('DELETE FROM runs WHERE id = ?', yesterday);
+  const expired = addRun(2, { mode: 'challenge', at: Date.now() - 8 * day });
+  assert.equal(pickRecord(1, 1000)?.runId, expired);
+  run('DELETE FROM runs');
+});
+
+test("today's daily questions are kept out of every other match until midnight", () => {
+  // Drawn by the first pick of the day, whoever's: a Соло at 00:01 can't take one of them first.
+  const seen = recentFor([1]);
+  const daily = dailyQuestions(dayKey(), 1).map((q) => q.id);
+  assert.equal(daily.length, 10);
+  for (const id of daily) assert.ok(seen.has(id), `${id} counts as seen`);
+  // A whole morning of Соло Микс on the small test bank: none of the day's ten comes up.
+  for (let i = 0; i < 30; i++)
+    for (const q of pickMatch(10, 'mixed', recentFor([1]), { final: true }))
+      assert.ok(!daily.includes(q.id), `${q.id} is one of today's`);
 });
 
 test("the next day, a recording's owner hears how it did, with XP for its wins (at most 50)", () => {

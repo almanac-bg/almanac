@@ -12,6 +12,7 @@ import {
   sofiaHour,
 } from '@quiz/shared';
 import { grantXp } from './account';
+import { CHALLENGE_DAYS } from './challenges';
 import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
@@ -61,6 +62,15 @@ export const RECORDS = {
  */
 const SOURCES = ['duel', 'daily', 'challenge'] as const;
 
+/**
+ * Only questions nobody can still meet elsewhere: never today's daily (whoever played it as a recording would play
+ * the day knowing the answers), nor a challenge link or friend duel that may still be open.
+ */
+const closed = (r: { mode: string; played_at: number }, now: number) =>
+  r.mode === 'duel' ||
+  (r.mode === 'daily' && dayKey(r.played_at) !== dayKey(now)) ||
+  (r.mode === 'challenge' && r.played_at < now - CHALLENGE_DAYS * 24 * 60 * 60_000);
+
 export interface RecordPick {
   runId: number;
   ownerId: number;
@@ -106,7 +116,9 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
     userId,
     RECORDS.candidates,
   );
+  const now = Date.now();
   const near = rows.filter((r) => {
+    if (!closed(r, now)) return false;
     const skill = (r.skill_answers ?? 0) >= SKILL.reliableAfter ? r.skill! : (r.rating ?? START_RATING);
     return Math.abs(skill - centre) <= RECORDS.skillBand;
   });

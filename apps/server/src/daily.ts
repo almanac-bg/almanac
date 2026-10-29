@@ -18,6 +18,7 @@ import { all, one, run } from './db';
 import { friendIds } from './friends';
 import { notify } from './notifications';
 import {
+  holdBackDaily,
   imageBank,
   numberBank,
   orderBank,
@@ -38,6 +39,15 @@ import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
  * code, a guest's), by a player who isn't banned.
  */
 const ON_BOARD = `COALESCE(d.own_set, u.is_guest) = 0 AND ${NOT_BANNED}`;
+
+// Held back from every other match until midnight (questions.ts → recentFor): drawn now if nobody has opened the day
+// yet, so a Соло at 00:01 can't take one of them first.
+let held = { day: '', ids: [] as string[] };
+holdBackDaily(() => {
+  const day = dayKey();
+  if (held.day !== day) held = { day, ids: dailySet(day).map((q) => q.id) };
+  return held.ids;
+});
 
 /**
  * Today's question set: drawn once a day, then frozen in the database. Questions with a "Знаеше ли?" fact come first,

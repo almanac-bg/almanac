@@ -25,7 +25,7 @@ import { count } from './stats';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
-const CHALLENGE_DAYS = 7;
+export const CHALLENGE_DAYS = 7;
 const DAY = 24 * 60 * 60 * 1000;
 /**
  * A friend duel: a challenge for one friend, who has a day to play it. Not rated (they play it at different times);

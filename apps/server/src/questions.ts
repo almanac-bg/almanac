@@ -826,14 +826,27 @@ export function markSeen(userId: number, questionIds: string[]) {
   });
 }
 
-/** When any of these players last saw each question they saw recently. */
+/**
+ * When any of these players last saw each question they saw recently — and today's daily questions as seen just now,
+ * by everyone: held back from every other pick until midnight, or a Соло could show one before its player's daily.
+ */
 export function recentFor(userIds: number[]): Map<string, number> {
-  if (!userIds.length) return new Map();
-  return new Map(
-    all<{ question_id: string; seen_at: number }>(
-      `SELECT question_id, MAX(seen_at) AS seen_at FROM seen_questions
-       WHERE user_id IN (${userIds.map(() => '?').join(',')}) GROUP BY question_id`,
-      ...userIds,
-    ).map((r) => [r.question_id, r.seen_at]),
+  const seen = new Map(
+    userIds.length
+      ? all<{ question_id: string; seen_at: number }>(
+          `SELECT question_id, MAX(seen_at) AS seen_at FROM seen_questions
+           WHERE user_id IN (${userIds.map(() => '?').join(',')}) GROUP BY question_id`,
+          ...userIds,
+        ).map((r) => [r.question_id, r.seen_at])
+      : [],
   );
+  const now = Date.now();
+  for (const id of todaysDaily()) seen.set(id, now);
+  return seen;
+}
+
+/** Today's daily questions (daily.ts draws them, and says how: holdBackDaily); none until it does. */
+let todaysDaily: () => readonly string[] = () => [];
+export function holdBackDaily(today: () => readonly string[]) {
+  todaysDaily = today;
 }
