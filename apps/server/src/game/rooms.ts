@@ -89,7 +89,7 @@ export class RoomManager {
     const room: Room = {
       code,
       hostUserId: userId,
-      settings: sanitize(patch, DEFAULT_ROOM_SETTINGS, 1),
+      settings: forAClass(sanitize(patch, DEFAULT_ROOM_SETTINGS, 1), patch, DEFAULT_ROOM_SETTINGS.hostPlays),
       members: [],
       bots: [],
       teams: new Map(),
@@ -155,7 +155,12 @@ export class RoomManager {
     const room = this.hostRoom(userId);
     if (!room) return;
     const wasTeams = room.settings.teams;
-    room.settings = sanitize(patch, room.settings, room.members.length + room.bots.length);
+    const wasPlaying = room.settings.hostPlays;
+    room.settings = forAClass(
+      sanitize(patch, room.settings, room.members.length + room.bots.length),
+      patch,
+      wasPlaying,
+    );
     // The host's own set (theirs, not hidden, with questions in it), or back to the bank (null).
     if (patch.set === null) room.settings.set = null;
     else if (typeof patch.set === 'number') {
@@ -404,6 +409,20 @@ function sanitize(patch: Record<string, unknown>, current: RoomSettings, occupie
     else next.maxPlayers = Math.min(next.maxPlayers, ROOM_LIMITS.eliminationPlayers);
   }
   return next;
+}
+
+/**
+ * „Само водя“ is how a class plays: turned on, the room opens to every seat it can have (a class of 25 met „Стаята е
+ * пълна“ at the 8th) — unless its size was chosen too, or knockouts keep it small.
+ */
+function forAClass(settings: RoomSettings, patch: Record<string, unknown>, wasPlaying: boolean): RoomSettings {
+  const opens =
+    wasPlaying &&
+    !settings.hostPlays &&
+    !settings.elimination &&
+    patch.maxPlayers === undefined &&
+    settings.maxPlayers === DEFAULT_ROOM_SETTINGS.maxPlayers;
+  return opens ? { ...settings, maxPlayers: ROOM_LIMITS.maxPlayers[1] } : settings;
 }
 
 /** A guest's name for a room: letters, digits, spaces and . - _ (2–20); null if it isn't one. */

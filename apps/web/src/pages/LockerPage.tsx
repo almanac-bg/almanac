@@ -216,8 +216,10 @@ export function LockerPage() {
             <>
               {/* The one place to read them at leisure: the match itself has no time for it. */}
               <p className="mb-4 max-w-2xl text-sm text-fg-2">
-                Всеки играе с всичките четири от първия си мач, освен във въпросите на деня и в линковете с
-                предизвикателство, където всички играят едно и също. Всеки коз е по веднъж на мач и по един на въпрос.
+                {/* From the list itself: „всичките четири“ outlived a коз that was taken out. */}
+                Всеки играе с {['', 'единствения', 'двата', 'трите', 'четирите', 'петте'][POWERUPS.length] ?? 'всички'}{' '}
+                от първия си мач, освен във въпросите на деня и в линковете с предизвикателство, където всички играят
+                едно и също. Всеки коз е по веднъж на мач и по един на въпрос.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {POWERUPS.map((p) => (

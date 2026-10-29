@@ -241,7 +241,7 @@ export function DuelRow({ duel, onPlay, playing }: { duel: DuelEntry; onPlay: ()
   const { friend } = duel;
   const line =
     duel.state === 'yours'
-      ? `${duel.theirs ? `${fmt(duel.theirs.score)} т. за биене` : 'Играй пръв'} · ${timeLeft(duel.expiresAt, now)}`
+      ? `${duel.theirs ? `${fmt(duel.theirs.score)} т. за биене` : 'Ти започваш'} · ${timeLeft(duel.expiresAt, now)}`
       : duel.state === 'theirs'
         ? `Чакаме — ${timeLeft(duel.expiresAt, now)}`
         : duel.state === 'expired'

@@ -242,7 +242,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'comeback',
     name: 'Голям обрат',
-    description: 'Спечели мач без отпадане, в който по средата си на последно място.',
+    description: 'Спечели мач (без отпадане), в който по средата беше на последно място.',
     icon: '🔄',
     rarity: 'epic',
     xp: 400,

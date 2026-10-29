@@ -131,7 +131,9 @@ export function DailyCard({
         <Button size="sm" onClick={() => text && shareText(text, 'Линкът и резултатът са копирани')} disabled={!text}>
           <Share2 className="size-4" /> Прати днешните въпроси
         </Button>
-        <p className="mt-2 text-xs text-fg-3">Който отвори линка, играе същите 10 — и ти казваме как се е справил.</p>
+        <p className="mt-2 text-xs text-fg-3">
+          Който отвори линка, играе същите 10 — и после виждаш как са се справили.
+        </p>
       </div>
     </Card>
   );
@@ -150,7 +152,8 @@ function AgainstSharer({
   of: number;
 }) {
   const me = useStore((s) => s.me);
-  const verdict = score > sharer.score ? 'Би го!' : score < sharer.score ? `${sharer.user.username} води` : 'Равни сте';
+  const verdict =
+    score > sharer.score ? 'Ти водиш!' : score < sharer.score ? `${sharer.user.username} води` : 'Равни сте';
   return (
     <div className="relative mt-4 rounded-2xl border border-line bg-sunk/20 p-3.5">
       <p className="t-eyebrow text-fg-3">По линка на {sharer.user.username}</p>

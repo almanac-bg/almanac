@@ -495,6 +495,44 @@ test('private room', T, async () => {
   sb.off('room:state', onState);
 });
 
+test(
+  '„Само водя“ opens a room to every seat (a class), unless its size was chosen or knockouts keep it small',
+  T,
+  async () => {
+    const host = connect(srv.url, A.cookie);
+    await connected(host);
+    const states: RoomState[] = [];
+    const onState = (st: RoomState | null) => st && states.push(st);
+    host.on('room:state', onState);
+    const seats = async () => {
+      await eventually(() => assert.ok(states.length));
+      return states.at(-1)!.settings.maxPlayers;
+    };
+    try {
+      assert.ok((await emitAck(host, 'room:create', { hostPlays: false })).ok);
+      assert.equal(await seats(), 40, 'made for a big screen');
+      states.length = 0;
+      assert.ok((await emitAck(host, 'room:create', {})).ok);
+      assert.equal(await seats(), 8, 'a room to play in');
+      states.length = 0;
+      host.emit('room:settings', { hostPlays: false });
+      await eventually(async () => assert.equal(await seats(), 40, 'switched to „Само водя“'));
+      states.length = 0;
+      assert.ok((await emitAck(host, 'room:create', { maxPlayers: 12 })).ok);
+      host.emit('room:settings', { hostPlays: false });
+      await eventually(async () => assert.equal(states.at(-1)?.settings.hostPlays, false));
+      assert.equal(await seats(), 12, 'its size was chosen');
+      states.length = 0;
+      assert.ok((await emitAck(host, 'room:create', { elimination: true, hostPlays: false })).ok);
+      assert.equal(await seats(), 8, 'knockouts are for a handful');
+      host.emit('room:leave');
+    } finally {
+      host.off('room:state', onState);
+      host.close();
+    }
+  },
+);
+
 test('a class: guests join under a name of their own, the host runs it on a big screen, in rounds', T, async () => {
   const pupils = await Promise.all([guest(srv.url), guest(srv.url)]);
   const [s1, s2] = pupils.map((g) => connect(srv.url, g.cookie));

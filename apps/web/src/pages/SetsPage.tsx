@@ -70,7 +70,7 @@ function SetList() {
           <h1 className="t-page">Моите въпроси</h1>
           <p className="mt-2 max-w-xl text-fg-2 text-pretty">
             Твои въпроси за частните ти стаи — урок, рожден ден, офисът. До {SETS.maxQuestions} в набор: с избор от
-            четири, вярно или невярно, или число.
+            четири, вярно или невярно, число или „Подреди“ — по желание със снимка.
           </p>
         </div>
         <Button onClick={() => void create()} loading={busy} disabled={data.sets.length >= SETS.perOwner}>

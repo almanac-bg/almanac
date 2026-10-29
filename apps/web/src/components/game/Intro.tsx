@@ -84,7 +84,7 @@ export function Intro({ game }: { game: LiveGame }) {
             <p className="mt-2 font-semibold text-amber-200">
               {game.start.duelWith.score !== null
                 ? `${fmt(game.start.duelWith.score)} точки за биене`
-                : `Играеш пръв — ${game.start.duelWith.username} има 24 часа да те бие`}
+                : `Ти започваш — ${game.start.duelWith.username} има 24 часа да те бие`}
             </p>
           )}
           <p className="mt-2 text-fg-3">
