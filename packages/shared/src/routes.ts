@@ -89,11 +89,19 @@ export function routeKind(path: string): 'public' | 'app' | 'unknown' {
  * Addresses as error reports and the server's log keep them, in a URL or anywhere in a line of text: the path alone (a
  * query can carry a password-reset or unsubscribe token), and no part that names a player or opens something private —
  * a profile, a room, a link to a challenge, a day's questions, a group or a set, a set's picture, the email-events
- * secret. Numbers that only count (a group's or a set's id) stay.
+ * secret. Numbers that only count (a group's or a set's id) stay. Linear in the text's length, whatever it holds (it
+ * reads request paths and browser reports, which anyone can send).
  */
 export function scrubPaths(text: string): string {
   return text
-    .replace(/(\/[^\s?#]*)[?#][^\s"'`),;]*/g, '$1')
+    .replace(/\S+/g, (word) => {
+      // A query or fragment after a path, up to the punctuation around it ("…/c/AbC?x=1)," keeps "),").
+      const slash = word.indexOf('/');
+      const query = word.search(/[?#]/);
+      if (slash === -1 || query < slash) return word;
+      const end = word.slice(query).search(/["'`),;]/);
+      return word.slice(0, query) + (end === -1 ? '' : word.slice(query + end));
+    })
     .replace(
       /\/(profile|join|c|challenges|daily|groups\/join|sets\/shared|sets\/images|email-events)\/(?!(?:preview|link)(?![^/\s"'`):,;]))[^/\s"'`):,;]+/g,
       '/$1/*',

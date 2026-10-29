@@ -295,13 +295,17 @@ const LOG_BATCH = 100;
 const LOG_FLUSH_MS = 5000;
 const LOG_CHARS = 8000;
 
-/** A log line as it leaves the server: no email or IP addresses, no names or codes in addresses. */
+/**
+ * A log line as it leaves the server: no email or IP addresses, no names or codes in addresses. Linear in the line's
+ * length, whatever it holds (a browser's report is anyone's text): an email starts only where a word does, and an IPv6
+ * address has at most eight groups.
+ */
 export function scrubLog(text: string): string {
   return scrubPaths(text)
-    .replace(/[^\s@<>"'`()[\]]+@[^\s@<>"'`()[\]]+\.[a-z]{2,}/gi, '[email]')
+    .replace(/(?<![^\s<>"'`()[\],;])[^\s@<>"'`()[\],;]+@[^\s@<>"'`()[\],;]+\.[a-z]{2,}/gi, '[email]')
     .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[ip]')
     .replace(
-      /\b[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7}\b|\b[0-9a-f]{1,4}(?::[0-9a-f]{1,4})*::(?:[0-9a-f]{1,4}\b(?::[0-9a-f]{1,4}\b)*)?/gi,
+      /(?<![0-9a-f:])(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7}|[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6}::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?)(?![0-9a-f:])/gi,
       '[ip]',
     );
 }

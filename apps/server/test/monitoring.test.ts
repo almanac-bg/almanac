@@ -199,3 +199,19 @@ test('what stays in a log line: times, versions, paths that only count', () => {
     assert.equal(scrubLog(line), line);
   assert.equal(scrubLog('ECONNREFUSED 127.0.0.1:587'), 'ECONNREFUSED [ip]:587');
 });
+
+test('scrubbing takes time in line with the text, whatever it holds (a browser report is anyone’s text)', () => {
+  const hostile = [
+    '/'.repeat(200_000),
+    '/c/'.repeat(70_000),
+    'a@'.repeat(100_000),
+    '1:'.repeat(100_000),
+    'a'.repeat(200_000),
+  ];
+  for (const text of hostile) {
+    const started = performance.now();
+    scrubLog(text);
+    const ms = performance.now() - started;
+    assert.ok(ms < 250, `${text.slice(0, 6)}… took ${ms.toFixed(0)} ms`);
+  }
+});
