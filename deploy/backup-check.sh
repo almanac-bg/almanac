@@ -3,7 +3,7 @@
 # the copy opens, is intact, has the accounts in it — and is current: the app stamps the time into the database every
 # 15 minutes (maintenance), so a copy whose stamp is more than an hour behind the live one means replication has
 # stopped (an expired key, a full bucket). A backup that is never restored isn't a backup. With a heartbeat URL as the
-# argument, a good run pings it and a failed one says why on its /fail (see README → Внедряване, step 10). Run from
+# argument, a good run pings it and a failed one says why on its /fail (see docs/self-hosting.md, step 10). Run from
 # cron as root.
 set -eu
 cd "$(dirname "$0")/.."

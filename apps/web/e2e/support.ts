@@ -14,8 +14,17 @@ interface Fixtures {
   pageProblems: string[];
 }
 
+/**
+ * WebKit's word for a request the page dropped (a navigation cut it short): "… due to access control checks", even for
+ * the page's own server, which no access control applies to. What made the request handles the failure.
+ */
+const WEBKIT_DROPPED = /^Fetch API cannot load .* due to access control checks\.$|^\S+ due to access control checks\.$/;
+
 function watch(context: BrowserContext, problems: string[]) {
-  context.on('weberror', (error) => problems.push(`uncaught: ${error.error().message}`));
+  context.on('weberror', (error) => {
+    const message = error.error().message;
+    if (!WEBKIT_DROPPED.test(message)) problems.push(`uncaught: ${message}`);
+  });
   context.on('console', (message) => {
     if (message.type() !== 'error') return;
     const { url } = message.location();
@@ -123,12 +132,16 @@ export async function signIn(page: Page, username: string, password: string) {
   await expectLobby(page);
 }
 
-/** Starts a solo match from the lobby in the given category ("Микс", "История"…). */
-export async function startSolo(page: Page, category: string) {
+/** Starts a solo match from the lobby in the given category ("Микс", "История"…), at a pace ("Без часовник"…). */
+export async function startSolo(page: Page, category: string, pace?: '15 с' | '30 с' | 'Без часовник') {
   await page.getByRole('button', { name: 'Играй Соло', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Избери категория', exact: true });
+  if (pace) await picker.getByRole('button', { name: pace, exact: true }).click();
   await picker.getByRole('button', { name: category }).click();
   await expect(page).toHaveURL(/\/game$/);
+  // Gone, not just going: its title is a round's „Избери категория“ to playMatch, which would answer the first
+  // question as a pick (WebKit takes a moment longer to close it).
+  await expect(picker).toBeHidden();
 }
 
 export interface MatchSummary {

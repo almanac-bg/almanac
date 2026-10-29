@@ -1,0 +1,41 @@
+name: Предложение
+description: Нещо, което да има в играта или в кода
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Благодарим! Идея, която още търси форма, е добре дошла и в
+        [Discussions](https://github.com/almanac-bg/almanac/discussions).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какво липсва или пречи
+      description: Кога ти потрябва и какво направи вместо това. Конкретният случай казва повече от решението.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Какво предлагаш
+      description: Как би изглеждало в играта (режим, екран, бутон) или в кода.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Други начини
+      description: Какво друго би решило същото, ако се сещаш.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Къде
+      options:
+        - Игра и режими
+        - Въпроси и факти
+        - Прогрес и награди
+        - Приятели, групи и стаи
+        - Сайтът (вид, телефон, достъпност)
+        - Код и разработка
+    validations:
+      required: true

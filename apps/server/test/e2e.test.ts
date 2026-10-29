@@ -2163,6 +2163,7 @@ test('website files are served with the right caching', {
 
   const gone = await fetch(`${srv.url}/assets/index-from-an-old-deploy.js`);
   assert.equal(gone.status, 404, 'a missing build file is a 404, not the page');
+  assert.equal(gone.headers.get('cache-control'), 'no-store', 'and never kept: the name can come back (a rollback)');
 
   // A shared challenge link previews as the challenge, not the generic site.
   const { id } = srv.db.prepare('SELECT id FROM challenges WHERE rival_id IS NULL LIMIT 1').get() as { id: string };

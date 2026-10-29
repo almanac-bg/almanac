@@ -1,4 +1,4 @@
-# Production: `docker compose up -d --build` on the server. See README → Deploying.
+# Production, on the server: deploy/deploy.sh runs the image CI published (docs/self-hosting.md, docs/operations.md).
 
 # Rotate container logs (Docker keeps them forever by default and the disk slowly fills up).
 x-logging: &logging

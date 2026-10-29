@@ -35,7 +35,7 @@ test('a solo match plays a picture (whose it is shows with the answer) and „П
       for (let i = 0; i < 4; i++) await ordering.getByRole('button', { pressed: false }).first().click();
       await lock.click();
       await expect(page.getByRole('list', { name: 'Правилният ред', exact: true })).toBeVisible({ timeout: 5_000 });
-      await expect(page.getByText(/^(\d от 4 на място|\s*Всичко на място!)$/)).toBeVisible();
+      await expect(page.getByText(/^(\d от 4 на място|🎯 Всичко на място!)$/)).toBeVisible();
     } else if (await picture.isVisible()) {
       pictures++;
       expect(await picture.getAttribute('alt')).toBeTruthy();

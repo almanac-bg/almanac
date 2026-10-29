@@ -1,5 +1,12 @@
-blank_issues_enabled: true
+# What the "New issue" page offers besides the forms: where a security problem, a question or an idea goes instead.
+blank_issues_enabled: false
 contact_links:
+  - name: Проблем със сигурността
+    url: https://github.com/almanac-bg/almanac/security/advisories/new
+    about: Поверително, не в публичен issue (виж SECURITY.md) — ще отговорим до няколко дни.
   - name: Грешен въпрос в играта
     url: https://almanac.bg
     about: Сигнализирай от прегледа на въпросите след мача (🚩) — модераторите виждат тези сигнали първи.
+  - name: Въпрос или идея за обсъждане
+    url: https://github.com/almanac-bg/almanac/discussions
+    about: Как работи нещо, предложение, което още не е готово за issue, или просто разговор за играта.

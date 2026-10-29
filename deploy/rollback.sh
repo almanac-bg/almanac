@@ -3,8 +3,8 @@
 # with a commit (`deploy/rollback.sh 5a20eb3`), to the image CI published for that one. The checkout stays where it
 # is: fix forward, or `git checkout <commit>` before the next deploy. A database the newer version migrated with
 # compatible steps only (see apps/server/src/db.ts) works with the older one as it is; after a breaking step the older
-# one refuses to start with it — then restore the copy taken before the migration (README → Връщане към предишна
-# версия).
+# one refuses to start with it — then restore the copy taken before the migration (docs/operations.md → Връщане към
+# предишна версия).
 set -eu
 cd "$(dirname "$0")/.."
 if [ $# -gt 0 ]; then

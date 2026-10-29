@@ -1,6 +1,6 @@
 # Streams every SQLite change to S3-compatible object storage within seconds (part of the standard deploy:
 # COMPOSE_PROFILES=backup). Any moment of the last 14 days can be restored (as far back as the daily copies on the
-# server reach: the copy off the server is never the shorter one). The commands are in the README
+# server reach: the copy off the server is never the shorter one). The commands are in docs/operations.md
 # ("Бекъпи"): a test restore next to the live database, and a full restore after losing the server.
 
 # A full snapshot every day; restores replay the changes since. Older than 14 days is dropped.

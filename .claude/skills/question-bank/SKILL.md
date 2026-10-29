@@ -18,7 +18,7 @@ from it. Every batch is verified independently before it goes in.
   relies on that): a new sample Geography question needs one too.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
-  spread, fact length/source/giveaways). README → „Добавяне на въпроси“ documents the format.
+  spread, fact length/source/giveaways). docs/questions.md documents the format.
 - The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `fill`, `facts`, `similar`,
   `giveaways`, `collect`, `image` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
   line per changed question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a
@@ -83,8 +83,8 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
 
 ## Number questions (match finals)
 
-`"kind": "number"`: the last question of almost every match, typed in and scored by closeness (README → „Добавяне на
-въпроси“ has the format). They're balanced on their own: the same number in every category (`bank.mjs stats` shows
+`"kind": "number"`: the last question of almost every match, typed in and scored by closeness (docs/questions.md has the
+format). They're balanced on their own: the same number in every category (`bank.mjs stats` shows
 them on a line of their own; the 40/40/20 split doesn't apply, a final is drawn from any difficulty). Write them like
 any batch (`add`, not `fill`), and also:
 

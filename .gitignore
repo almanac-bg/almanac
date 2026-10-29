@@ -17,7 +17,7 @@ test-results/
 playwright-report/
 blob-report/
 
-# The real question bank: a clone of the private almanac-questions repository (see README → Adding questions).
+# The real question bank: a clone of the private almanac-questions repository (see docs/questions.md).
 /private/
 
 # Claude Code settings for this checkout only (e.g. permission to deploy): personal, never in the public repo.

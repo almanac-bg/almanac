@@ -1,4 +1,4 @@
-import { expect, me, playMatch, test } from './support';
+import { expect, expectLobby, me, playMatch, startAsGuest, test } from './support';
 
 test("a newcomer's first tap plays the day's questions; a duel is the next thing to try", async ({ page }) => {
   await page.goto('/');
@@ -41,4 +41,34 @@ test("a friend opens someone's daily link, plays the same questions and sees how
       return ((await res.json()) as { fromMyLink: unknown[] }).fromMyLink.length;
     })
     .toBe(1);
+});
+
+test('one attempt a day: walking out after the first question uses it, and nothing offers it again', async ({
+  page,
+}) => {
+  await startAsGuest(page);
+  await page.getByRole('button', { name: /^Играй днешните/ }).click();
+  await expect(page).toHaveURL(/\/game$/);
+  await expect(page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false }).first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.goBack();
+  await page
+    .getByRole('dialog', { name: 'Да напуснеш ли мача?', exact: true })
+    .getByRole('button', { name: 'Напусни', exact: true })
+    .click();
+  await expectLobby(page);
+  // What was played counts as the day's run (its score so far): the card shows it, and offers no second go.
+  const used = page.getByText('Твоят резултат', { exact: true }).or(page.getByText(/^Днешният опит е използван\./));
+  await expect(used.first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Играй днешните/ })).toHaveCount(0);
+
+  // Nor the day's page, opened straight (as from a shared link's „Играй“): no match starts.
+  await page.goto('/daily');
+  await expect(
+    page.getByRole('button', { name: 'Прати днешните въпроси' }).or(page.getByText(/^Днешният опит е използван\./)),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/daily$/);
+  await expect(page.getByRole('button', { name: /^Играй днешните/ })).toHaveCount(0);
 });

@@ -79,3 +79,26 @@ test('level after the first round, one of the two picks the next category, and b
   const runs = await Promise.all([playMatch(anna), playMatch(boris)]);
   expect(runs.map((r) => r.total)).toEqual([10, 10]);
 });
+
+test('a rematch: one asks from the results, the other accepts, and the same two play again', async ({
+  page: anna,
+  newPlayer,
+}) => {
+  const boris = await newPlayer();
+  await Promise.all([startAsGuest(anna), startAsGuest(boris)]);
+  const play = (player: typeof anna) => player.getByRole('button', { name: 'Играй Дуел', exact: true }).click();
+  await Promise.all([play(anna), play(boris)]);
+  await Promise.all([playMatch(anna), playMatch(boris)]);
+
+  await anna.getByRole('button', { name: 'Реванш', exact: true }).first().click();
+  // (Role queries skip the copy that's hidden on a phone: the offer shows in the sticky bar there.)
+  await expect(boris.getByRole('status').filter({ hasText: /иска реванш!$/ })).toBeVisible();
+  await boris.getByRole('button', { name: 'Приеми', exact: true }).first().click();
+
+  // A new match, the two of them again: its first question on both screens.
+  for (const player of [anna, boris])
+    await expect(player.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: 15_000 });
+  const runs = await Promise.all([playMatch(anna), playMatch(boris)]);
+  expect(runs.map((r) => r.answered)).toEqual([10, 10]);
+  await expect(anna.getByText((await me(boris)).username, { exact: true }).first()).toBeVisible();
+});

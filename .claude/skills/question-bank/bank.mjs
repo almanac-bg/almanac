@@ -99,7 +99,9 @@ function load(name = 'private') {
   if (!BANKS[name]) fail(`unknown bank "${name}" (private or sample)`);
   const file = path.join(root, BANKS[name]);
   if (!fs.existsSync(file)) {
-    fail(`${BANKS[name]} is missing${name === 'private' ? ': clone almanac-questions into private/ (README)' : ''}`);
+    fail(
+      `${BANKS[name]} is missing${name === 'private' ? ': clone almanac-questions into private/ (docs/questions.md)' : ''}`,
+    );
   }
   const text = fs.readFileSync(file, 'utf8');
   const questions = JSON.parse(text);

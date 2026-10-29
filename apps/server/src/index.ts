@@ -189,6 +189,12 @@ if (fs.existsSync(config.webDist)) {
       immutable: true,
       fallthrough: false,
     }),
+    // …and that 404 is never kept: Safari holds on to one, and the same name can come back (a rollback, a retry once
+    // the deploy is through), when a remembered 404 would break the tab until it's closed.
+    (err: { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+      res.setHeader('cache-control', 'no-store');
+      res.status(err.status ?? 500).end();
+    },
   );
   // HEAD too: uptime monitors often check with it.
   const forPage = (req: Request) =>

@@ -4,7 +4,7 @@
 # CI hasn't passed has no image, and the deploy stops with the old code and the old question bank still in place. The
 # image that ran until now is kept as `almanac:previous` for deploy/rollback.sh; a deploy that isn't healthy within
 # 90 seconds goes back to it by itself. Run as root in the checkout, in a quiet hour: queues close while running
-# matches play out (see README → Обновяване).
+# matches play out (see docs/operations.md → Обновяване).
 set -eu
 
 # All of it is read before anything runs: the merge below may rewrite this very file, and sh reads a script as it goes.

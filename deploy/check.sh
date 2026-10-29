@@ -2,7 +2,7 @@
 # Daily: what an uptime check from outside can't see — the HTTPS certificate is being renewed, the disk has room,
 # every container runs, no reboot has been waiting for days. With a heartbeat URL as the argument, a good run pings
 # it; a failed one says why on the heartbeat's /fail (an alert at once, with the reason), and a run that never
-# happens is a missing ping (see README → Внедряване, step 10). Run from cron as root.
+# happens is a missing ping (see docs/self-hosting.md, step 10). Run from cron as root.
 set -eu
 cd "$(dirname "$0")/.."
 heartbeat=${1:-}
@@ -41,10 +41,18 @@ before=$(cat "$state" 2>/dev/null || echo "$restarts")
 echo "$restarts" >"$state"
 [ "$restarts" -le "$before" ] || fail "the app restarted by itself $((restarts - before)) time(s) since the last check"
 
-# Security updates reboot the server by themselves at night (README → step 1); one still waiting means that broke.
+# Security updates reboot the server by themselves at night (docs/self-hosting.md, step 1); one still waiting means that broke.
 if [ -f /var/run/reboot-required ]; then
   waiting=$((($(date +%s) - $(stat -c %Y /var/run/reboot-required)) / 86400))
   [ "$waiting" -lt 3 ] || fail "a reboot for updates has been waiting $waiting days: $(tr '\n' ' ' </var/run/reboot-required.pkgs 2>/dev/null)"
+fi
+
+# Cloudflare's ranges, as deploy/Caddyfile trusts them: one added there and missing here would make every visitor
+# through it share Cloudflare's address (the rate limits with it). Compared only when both lists came.
+if v4=$(curl -fsS -m 10 https://www.cloudflare.com/ips-v4) && v6=$(curl -fsS -m 10 https://www.cloudflare.com/ips-v6); then
+  published=$(printf '%s\n%s\n' "$v4" "$v6" | grep . | sort -u | tr '\n' ' ')
+  trusted=$(sed -n 's/^[[:space:]]*trusted_proxies static //p' deploy/Caddyfile | tr ' ' '\n' | grep . | sort -u | tr '\n' ' ')
+  [ "$published" = "$trusted" ] || fail "Cloudflare's IP ranges changed: deploy/Caddyfile trusts $trusted; published: $published"
 fi
 
 [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null

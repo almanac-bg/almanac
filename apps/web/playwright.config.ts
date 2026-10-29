@@ -11,7 +11,8 @@ import { defineConfig } from '@playwright/test';
  *
  * The browser: BROWSER_PATH points at any installed Chromium-based browser (Brave, Chromium, Edge…), e.g.
  *   BROWSER_PATH="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" npm run test:browser
- * Without it, the system's Google Chrome (as in CI). Playwright's own browser downloads aren't needed.
+ * Without it, the system's Google Chrome (as in CI). Playwright's own browser downloads aren't needed for that; for
+ * WebKit and Firefox (E2E_ENGINES below) they are.
  */
 
 const CI = !!process.env.CI;
@@ -31,6 +32,19 @@ if (!process.env.TEST_WORKER_INDEX) {
 }
 
 const browserPath = process.env.BROWSER_PATH;
+/** The game's speed in the tests (GAME_TIME_SCALE below): slower engines get more time, and the tests with it. */
+const timeScale = process.env.E2E_TIME_SCALE ?? '0.15';
+
+/**
+ * Safari's engine and Firefox's too, beside Chromium's: `E2E_ENGINES=webkit,firefox` adds their projects (CI runs each
+ * in a job of its own, with `--project`). Playwright's own builds of them: `npx playwright install webkit firefox`. On
+ * a Mac newer than Playwright's Firefox build, `E2E_FIREFOX=app` drives the installed Firefox instead.
+ */
+const engines = (process.env.E2E_ENGINES ?? '').split(',').filter(Boolean);
+const PHONE = { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
+const DESKTOP = { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false };
+/** The Chromium-based browser for the main projects: BROWSER_PATH's, or the system's Chrome. */
+const chromium = browserPath ? { launchOptions: { executablePath: browserPath } } : { channel: 'chrome' };
 
 export default defineConfig({
   testDir: './e2e',
@@ -41,13 +55,12 @@ export default defineConfig({
   // The tests mostly wait on the game's timers, not the CPU: four at once even on a small CI runner (one at a time,
   // the suite would take over a minute and a half).
   workers: CI ? 4 : undefined,
-  timeout: 60_000,
+  timeout: Math.round(60_000 * Math.max(1, Number(timeScale) / 0.15)),
   expect: { timeout: 10_000 },
   reporter: CI ? [['github'], ['list'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
 
   use: {
     baseURL,
-    ...(browserPath ? { launchOptions: { executablePath: browserPath } } : { channel: 'chrome' }),
     locale: 'bg-BG',
     timezoneId: 'Europe/Sofia',
     // The app honors it (MotionConfig, confetti): nothing slides around while the tests click and measure.
@@ -60,17 +73,48 @@ export default defineConfig({
 
   projects: [
     // Most players are on phones: every test runs on one (touch, a 375 px screen)…
-    {
-      name: 'phone',
-      grepInvert: /@desktop/,
-      use: { viewport: { width: 375, height: 812 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
-    },
+    { name: 'phone', grepInvert: /@desktop/, use: { ...chromium, ...PHONE } },
     // …and the ones tagged @desktop on a laptop.
-    {
-      name: 'desktop',
-      grep: /@desktop/,
-      use: { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
-    },
+    { name: 'desktop', grep: /@desktop/, use: { ...chromium, ...DESKTOP } },
+    ...(engines.includes('webkit')
+      ? [
+          // An iPhone's Safari, as far as an engine goes.
+          {
+            name: 'webkit-phone',
+            grepInvert: /@desktop/,
+            use: { browserName: 'webkit' as const, ...PHONE },
+          },
+          {
+            name: 'webkit-desktop',
+            grep: /@desktop/,
+            use: { browserName: 'webkit' as const, ...DESKTOP },
+          },
+        ]
+      : []),
+    ...(engines.includes('firefox')
+      ? [
+          // Firefox has no phone mode: a phone-sized window with touch.
+          {
+            name: 'firefox-phone',
+            grepInvert: /@desktop/,
+            use: {
+              browserName: 'firefox' as const,
+              ...PHONE,
+              isMobile: false,
+              ...(process.env.E2E_FIREFOX === 'app' && { channel: 'moz-firefox' }),
+            },
+          },
+          {
+            name: 'firefox-desktop',
+            grep: /@desktop/,
+            use: {
+              browserName: 'firefox' as const,
+              ...DESKTOP,
+              ...(process.env.E2E_FIREFOX === 'app' && { channel: 'moz-firefox' }),
+            },
+          },
+        ]
+      : []),
   ],
 
   webServer: {
@@ -88,8 +132,9 @@ export default defineConfig({
       // Inside the output folder, which Playwright empties before each run (and before starting the server).
       DB_PATH: path.join(outputDir, 'server', 'quiz.db'),
       APP_URL: baseURL,
-      // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s.
-      GAME_TIME_SCALE: '0.15',
+      // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
+      // engines more (CI runs WebKit and Firefox at 0.3, as their clicks take longer than Chrome's).
+      GAME_TIME_SCALE: timeScale,
       BOT_FILL_SECONDS: '1',
       BOT_FILL_BUSY_SECONDS: '1',
       BACKUP_DIR: 'off',
