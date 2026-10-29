@@ -5,7 +5,8 @@ import { numberText } from '../components/game/numbers';
 const storageKey = (day: string) => `quiz:daily-share:${day}`;
 
 /**
- * The day's result, Wordle-style: spoiler-free squares (⬛ a question left unanswered, ⬜ one never reached), the day's
+ * The day's result, Wordle-style: spoiler-free squares (⬛ a question left unanswered, ⬜ one never reached, 🟨 an order
+ * partly in place), the day's
  * number, the score, the place once the board has a crowd to place in, and the link that plays the same questions:
  *   ⚡ АЛМАНАХ №4 · 8/10
  *   🟩🟩🟥🟩⬛🟩🟩🟩🟩🟩
@@ -27,8 +28,12 @@ export function dailyShareText(d: {
 }): string {
   const squares = Array.from({ length: d.total }, (_, i) => {
     const item = d.history.find((h) => h.index === i);
-    const unanswered = item?.number ? item.number.guess === null : item?.choice === null;
-    return !item ? '⬜' : item.right ? '🟩' : unanswered ? '⬛' : '🟥';
+    const unanswered = item?.number
+      ? item.number.guess === null
+      : item?.order
+        ? item.order.given === null
+        : item?.choice === null;
+    return !item ? '⬜' : unanswered ? '⬛' : square(item);
   }).join('');
   const correct = d.history.filter((h) => h.right).length;
   const score = [`${fmt(d.score)} т.`];
@@ -58,8 +63,11 @@ function finalOff(guess: number, answer: number, n: Pick<NumberInput, 'unit' | '
 /** From how many players on the day's board the share text says the place. */
 const SHOW_PLACE_FROM = 10;
 
+/** Right or wrong as a square (🟨: an order with some of it in place). */
+const square = (h: ReviewItem) => (h.right ? '🟩' : h.order && h.order.placed > 0 ? '🟨' : '🟥');
+
 /** Right and wrong as squares, in order: what a match was like, without giving a question away. */
-const squares = (history: ReviewItem[]) => history.map((h) => (h.right ? '🟩' : '🟥')).join('');
+const squares = (history: ReviewItem[]) => history.map(square).join('');
 
 /**
  * A finished match as a few lines to send: what happened (a crown, a win, a place; right answers in a category for a

@@ -5,11 +5,13 @@ import {
   levelFromXp,
   type MeUser,
   newlyUnlocked,
+  setPictureUrl,
   type UnlockContext,
 } from '@quiz/shared';
 import { settleAchievements } from './achievements';
 import { factCount, reviewQueue } from './almanac';
 import { verifyPassword } from './auth';
+import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
 import { isChampion } from './evening';
@@ -157,6 +159,11 @@ export function exportAccount(userId: number) {
     questionSets: rows(
       'SELECT name, code, questions, hidden, created_at, updated_at FROM question_sets WHERE owner_id = ?',
     ).map((r) => ({ ...r, questions: JSON.parse(String(r.questions)) })),
+    // The pictures themselves are at their address (too big to put in here).
+    setPictures: rows('SELECT id, type, w, h, blocked, created_at FROM set_images WHERE owner_id = ?').map((r) => ({
+      ...r,
+      url: `${config.appUrl}${setPictureUrl(String(r.id))}`,
+    })),
     groupWeeksWon: rows(
       `SELECT g.name, w.week, w.score FROM group_weeks w JOIN player_groups g ON g.id = w.group_id
        WHERE w.winner_id = ?`,

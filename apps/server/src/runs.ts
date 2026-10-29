@@ -16,6 +16,8 @@ export interface RunAnswer {
   c: number | null;
   /** On a number question: the number given (null: none in time). */
   g?: number | null;
+  /** On an order question: the order given, as the bank orders the items (null: none in time). */
+  o?: number[] | null;
   ok: 0 | 1;
   /** How long it took; null for no answer in time. */
   t: number | null;
@@ -52,6 +54,7 @@ export function recordRun(
     i: a.index,
     c: a.choice,
     ...(a.closeness !== null && { g: a.guess }),
+    ...(a.placed !== null && { o: a.arranged }),
     ok: a.correct ? 1 : 0,
     t: a.timeMs,
     p: a.points,

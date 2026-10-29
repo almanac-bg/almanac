@@ -14,7 +14,7 @@ process.env.DB_PATH = path.join(tmp, 'opponents.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { one, run } = await import('../src/db');
-const { markSeen, questionById } = await import('../src/questions');
+const { isChoice, markSeen, questionById } = await import('../src/questions');
 const { noteRecordPlay, pickRecord, RECORDS, tellRecordOwners } = await import('../src/records');
 const { claimChallengeAttempt, createDuel, DUEL, myDuels, recordChallengeResult, tellExpiredDuels } = await import(
   '../src/challenges'
@@ -51,7 +51,7 @@ const ids = [
 function answers(changed = false) {
   return ids.map((q, i) => {
     const bank = questionById(q)!;
-    if (bank.kind === 'number') return { q, i, c: null, g: 1810, ok: 1, t: 9000, p: 800, k: null };
+    if (!isChoice(bank)) return { q, i, c: null, g: 1810, ok: 1, t: 9000, p: 800, k: null };
     const right = changed ? (bank.answer + 1) % 4 : bank.answer;
     if (i === 2) return { q, i, c: null, ok: 0, t: null, p: 0, k: null };
     return { q, i, c: i === 1 ? (right + 1) % 4 : right, ok: i === 1 ? 0 : 1, t: 2000 + i * 100, p: 900, k: null };
@@ -87,7 +87,7 @@ test('a Дуел alone plays a recording of someone of about the same skill — 
       assert.equal(i, 2);
       continue;
     }
-    if (q.kind === 'number' || bank.kind === 'number') {
+    if (!isChoice(q) || !isChoice(bank)) {
       assert.equal(recorded.value, 1810);
       continue;
     }

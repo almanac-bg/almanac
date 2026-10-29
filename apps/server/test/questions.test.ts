@@ -16,8 +16,25 @@ interface Q {
   options: string[];
   answer: number;
   number?: { answer: number; unit: string; min: number; max: number; step: number; scale: string; tolerance: number };
+  items?: { text: string; value: number }[];
+  direction?: 'asc' | 'desc';
+  unit?: string;
+  image?: { file: string; w: number; h: number; alt: string; credit: string; license: string; sourceUrl: string };
   fact?: string;
   factSource?: string;
+}
+
+/** A WebP's size, from its header (VP8, VP8L or VP8X). */
+function webpSize(b: Buffer): { w: number; h: number } | null {
+  if (b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WEBP') return null;
+  const chunk = b.toString('latin1', 12, 16);
+  if (chunk === 'VP8 ') return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+  if (chunk === 'VP8L') {
+    const bits = b.readUInt32LE(21);
+    return { w: (bits & 0x3fff) + 1, h: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  if (chunk === 'VP8X') return { w: b.readUIntLE(24, 3) + 1, h: b.readUIntLE(27, 3) + 1 };
+  return null;
 }
 
 const BANKS = [
@@ -104,13 +121,17 @@ const stems = (s: string) =>
 
 for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balanced } of BANKS) {
   const everything = JSON.parse(fs.readFileSync(file, 'utf8')) as Q[];
-  // The rules below are for four-option questions; number questions (a match's final) have their own further down.
-  // The other formats are checked by the server's schemas when it loads the bank.
-  const bank: Q[] = everything.filter((q) => (q.kind ?? 'choice') === 'choice');
+  // The rules below are for four-option questions (pictures with them, `withOptions`; their balance and spread for
+  // those without, `bank`); numbers, pictures and orders have their own further down. The server's schemas check the
+  // rest when it loads the bank.
+  const withOptions: Q[] = everything.filter((q) => (q.kind ?? 'choice') === 'choice');
+  const bank = withOptions.filter((q) => !q.image);
+  const pictures = withOptions.filter((q) => q.image);
   const numbers = everything.filter((q) => q.kind === 'number');
+  const orders = everything.filter((q) => q.kind === 'order');
 
   test(`${name}: every question is well-formed`, () => {
-    for (const q of bank) {
+    for (const q of withOptions) {
       const where = `${q.id}: ${q.q}`;
       assert.ok(CATEGORY_IDS.includes(q.category as never), `${where} — unknown category`);
       assert.ok(q.id.startsWith(`${PREFIX[q.category]}-`), `${where} — id prefix doesn't match category`);
@@ -126,10 +147,13 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
   test(`${name}: ids and question texts are unique`, () => {
     const ids = new Set<string>();
     const texts = new Map<string, string>();
-    for (const q of bank) {
+    for (const q of everything) {
       assert.ok(!ids.has(q.id), `duplicate id ${q.id}`);
       ids.add(q.id);
-      const key = normalize(q.q);
+    }
+    // „Чие е това знаме?“ is many questions: a picture's question is its text with its picture.
+    for (const q of withOptions) {
+      const key = `${normalize(q.q)} ${q.image?.file ?? ''}`;
       assert.ok(!texts.has(key), `duplicate question: ${q.id} and ${texts.get(key)}`);
       texts.set(key, q.id);
     }
@@ -189,15 +213,17 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
           .split(/[^\p{L}\p{N}]+/u)
           .filter((w) => w.length >= 5),
       );
-    for (const q of bank) {
-      if (q.fact === undefined) continue;
+    // A number question is a match's final, last: what its fact says comes after every other question (its own rules
+    // are further down).
+    for (const q of everything) {
+      if (q.fact === undefined || q.kind === 'number') continue;
       const where = `${q.id}: ${q.fact}`;
       assert.ok(q.fact.trim().length >= 20 && q.fact.length <= 200, `${where} — length (20–200)`);
       assert.match(q.fact, /[.!?…“"]$/, `${where} — a finished sentence`);
       assert.ok(q.factSource && new URL(q.factSource).protocol === 'https:', `${where} — needs an https source`);
       // Shown after its own question, but a later one in the same match may be about the same thing.
       const factWords = words(q.fact);
-      for (const other of bank) {
+      for (const other of withOptions) {
         if (other === q) continue;
         const answer = normalize(other.options[other.answer]);
         if (answer.length < 4 || !normalize(q.fact).includes(answer)) continue;
@@ -241,6 +267,73 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
         assert.ok(q.fact.trim().length >= 20 && q.fact.length <= 200, `${where} — fact length (20–200)`);
         assert.ok(q.factSource && new URL(q.factSource).protocol === 'https:', `${where} — fact needs an https source`);
       }
+    }
+  });
+
+  // A picture is the question: free to use (the licences IMAGE allows), in both sizes and light enough for a phone,
+  // described for screen readers without its answer, and short to read beside it.
+  test(`${name}: picture questions are well-formed, free to use, and their pictures are there`, () => {
+    const dir = path.join(path.dirname(file), 'images');
+    const files = new Map<string, string>();
+    for (const q of pictures) {
+      const image = q.image!;
+      const where = `${q.id}: ${q.q}`;
+      assert.ok(q.q.length <= 60 && q.q.endsWith('?'), `${where} — a picture's question is short (≤ 60)`);
+      for (const o of q.options) assert.ok(o.length <= 25, `${where} — option "${o}" over 25 (a 2×2 grid)`);
+      assert.match(image.license, /^(PD|CC0 1\.0|CC BY(-SA)? [1-4]\.[05])$/, `${where} — licence`);
+      assert.ok(image.credit.trim() && new URL(image.sourceUrl).protocol === 'https:', `${where} — credit and source`);
+      assert.ok(image.alt.trim().length >= 3 && image.alt.length <= 150, `${where} — alt text`);
+      const answer = normalize(q.options[q.answer]);
+      assert.ok(
+        answer.length < 4 || !normalize(image.alt).includes(answer),
+        `${where} — the alt text names the answer`,
+      );
+      assert.ok(!files.has(image.file), `${where} — the same picture as ${files.get(image.file)}`);
+      files.set(image.file, q.id);
+      for (const f of [image.file, image.file.replace(/\.webp$/, '-600.webp')]) {
+        const at = path.join(dir, f);
+        assert.ok(fs.existsSync(at), `${where} — ${f} isn't in ${path.relative(process.cwd(), dir)}`);
+        assert.ok(fs.statSync(at).size <= 150_000, `${where} — ${f} is over 150 KB`);
+      }
+      const size = webpSize(fs.readFileSync(path.join(dir, image.file)));
+      assert.deepEqual(size, { w: image.w, h: image.h }, `${where} — its size isn't what the bank says`);
+      assert.ok(Math.max(image.w, image.h) <= 1200, `${where} — over 1200 px`);
+    }
+  });
+
+  // Four things of a kind, far enough apart to be told apart, the way to order them in the question.
+  test(`${name}: order questions are well-formed`, () => {
+    const texts = new Set<string>();
+    for (const q of orders) {
+      const items = q.items!;
+      const where = `${q.id}: ${q.q}`;
+      assert.ok(q.q.trim().length >= 10 && q.q.length <= 110, `${where} — question length (10–110)`);
+      assert.ok(!texts.has(normalize(q.q) + items.map((i) => i.text).join()), `${where} — a duplicate`);
+      texts.add(normalize(q.q) + items.map((i) => i.text).join());
+      assert.equal(items.length, 4, `${where} — four items`);
+      assert.equal(new Set(items.map((i) => normalize(i.text))).size, 4, `${where} — items must differ`);
+      for (const i of items) assert.ok(i.text.trim() && i.text.length <= 30, `${where} — item "${i.text}" over 30`);
+      assert.ok(q.direction === 'asc' || q.direction === 'desc', `${where} — direction`);
+      assert.ok((q.unit ?? '').length <= 12, `${where} — unit`);
+      const values = items.map((i) => i.value).sort((a, b) => a - b);
+      for (let k = 1; k < values.length; k++) {
+        const gap = values[k] - values[k - 1];
+        assert.ok(
+          gap >= 3 || gap / Math.max(Math.abs(values[k]), Math.abs(values[k - 1])) >= 0.1,
+          `${where} — ${values[k - 1]} and ${values[k]} are too close to tell apart`,
+        );
+      }
+    }
+  });
+
+  // Pictures and orders are balanced on their own, as the numbers are: every category as many.
+  test(`${name}: pictures and orders are even across the categories`, { skip: !balanced }, () => {
+    for (const [format, questions] of [
+      ['picture', pictures],
+      ['order', orders],
+    ] as const) {
+      const counts = CATEGORY_IDS.map((c) => questions.filter((q) => q.category === c).length);
+      assert.equal(Math.min(...counts), Math.max(...counts), `${format} questions uneven: ${counts.join(' ')}`);
     }
   });
 

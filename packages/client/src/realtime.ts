@@ -15,7 +15,7 @@ import {
 } from '@quiz/shared';
 import { io, type Socket } from 'socket.io-client';
 import { api } from './api';
-import { clientConfig, effect } from './config';
+import { clientConfig, effect, preloadImage } from './config';
 import { getState, type LiveGame, patchGame, setState, toast } from './store';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -179,6 +179,7 @@ function bind(s: GameSocket) {
       return;
     }
     const prev = getState().game;
+    preloadImage(start.nextImage);
     if (prev?.start.gameId === start.gameId && start.startsInMs === 0) return resync(prev, start);
     const now = Date.now();
     setState({
@@ -195,6 +196,7 @@ function bind(s: GameSocket) {
         answered: [],
         myChoice: null,
         myGuess: null,
+        myOrder: null,
         removed: [],
         doubled: false,
         usedPowerups: start.usedPowerups,
@@ -232,7 +234,7 @@ function bind(s: GameSocket) {
     // word goes.
     const mine = question.mine;
     if (mine) {
-      const lost = mine.choice === null && mine.guess === null;
+      const lost = mine.choice === null && mine.guess === null && !mine.order;
       if (same && same.myChoice !== null && lost && question.remainingMs > 0) {
         toast({
           kind: 'error',
@@ -246,8 +248,9 @@ function bind(s: GameSocket) {
         question,
         deadline: now + question.remainingMs,
         answered: question.answered,
-        myChoice: mine.guess !== null ? -1 : mine.choice,
+        myChoice: mine.guess !== null || mine.order ? -1 : mine.choice,
         myGuess: mine.guess,
+        myOrder: mine.order ?? null,
         removed: mine.removed,
         doubled: mine.doubled,
         powerupThisQuestion: mine.powerupThisQuestion,
@@ -270,6 +273,7 @@ function bind(s: GameSocket) {
       answered: question.answered,
       myChoice: lockedIn ? (same?.myChoice ?? -1) : null,
       myGuess: lockedIn ? (same?.myGuess ?? null) : null,
+      myOrder: lockedIn ? (same?.myOrder ?? null) : null,
       removed: same?.removed ?? [],
       doubled: same?.doubled ?? false,
       powerupThisQuestion: same?.powerupThisQuestion ?? false,
@@ -287,7 +291,7 @@ function bind(s: GameSocket) {
   s.on('game:rejected', ({ index, reason }) => {
     const g = getState().game;
     if (!g?.question || g.question.index !== index) return;
-    if (g.phase === 'question') patchGame(() => ({ myChoice: null, myGuess: null }));
+    if (g.phase === 'question') patchGame(() => ({ myChoice: null, myGuess: null, myOrder: null }));
     toast({ kind: 'error', title: REJECTED[reason] });
   });
 
@@ -332,6 +336,19 @@ function bind(s: GameSocket) {
                         closeness: mine?.number?.closeness ?? 0,
                       }
                     : null,
+                order:
+                  q.order && reveal.answerOrder
+                    ? {
+                        items: q.order.items,
+                        right: reveal.answerOrder.order,
+                        given: mine?.order?.given ?? null,
+                        values: reveal.answerOrder.values,
+                        unit: reveal.answerOrder.unit,
+                        placed: mine?.order?.right ?? 0,
+                      }
+                    : null,
+                // From a server before pictures: none.
+                image: q.image ? { ...q.image, credit: reveal.credit ?? null } : null,
                 right: !!mine?.correct,
                 fact: reveal.fact ?? null,
                 // From a server before „X% знаят“: none.
@@ -340,6 +357,7 @@ function bind(s: GameSocket) {
             ],
       };
     });
+    preloadImage(reveal.nextImage);
     const g = getState().game;
     if (!g) return;
     const mine = reveal.results[g.start.youId];
@@ -358,7 +376,8 @@ function bind(s: GameSocket) {
     }));
   });
 
-  s.on('game:round', ({ round, category, pickedBy }) => {
+  s.on('game:round', ({ round, category, pickedBy, nextImage }) => {
+    preloadImage(nextImage);
     patchGame((g) => ({
       rounds: g.rounds.map((r, i) => (i === round ? { ...r, category, pickedBy } : r)),
       pick: g.pick?.round === round ? { ...g.pick, chosen: category } : g.pick,
@@ -507,7 +526,7 @@ async function ask<T extends object = object>(fn: () => Promise<AckResult<T>>): 
 
 const withTimeout = () => getSocket().timeout(8000);
 
-type MoveEvent = 'game:answer' | 'game:guess' | 'game:pick' | 'game:powerup' | 'game:react';
+type MoveEvent = 'game:answer' | 'game:guess' | 'game:order' | 'game:pick' | 'game:powerup' | 'game:react';
 
 /**
  * Sends a game move only over a live connection. Socket.IO would buffer a move made offline and replay it after the
@@ -596,6 +615,14 @@ export const actions = {
     if (!sendMove('game:answer', { index: g.question.index, choice })) return offlineToast('Отговорът не е изпратен.');
     effect('lock');
     patchGame(() => ({ myChoice: choice, retryPrompt: false }));
+  },
+  /** Your order, on an order question: the shown items' indices, first to last. */
+  arrange: (order: number[]) => {
+    const g = getState().game;
+    if (g?.question?.kind !== 'order' || g.phase !== 'question' || g.resyncing || g.myChoice !== null) return;
+    if (!sendMove('game:order', { index: g.question.index, order })) return offlineToast('Отговорът не е изпратен.');
+    effect('lock');
+    patchGame(() => ({ myChoice: -1, myOrder: [...order] }));
   },
   /** Your number, on a number question. */
   guess: (value: number) => {

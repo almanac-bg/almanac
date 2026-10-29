@@ -579,7 +579,7 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     name: 'Урок по история',
     author: A.user.username,
     questions: 3,
-    kinds: { choice: 1, truefalse: 1, number: 1 },
+    kinds: { choice: 1, truefalse: 1, number: 1, order: 0 },
     mine: null,
     hidden: false,
   });

@@ -7,7 +7,15 @@ import {
 } from '@quiz/shared';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
-import { type PlayableQuestion, questionById, reloadQuestionBank } from './questions';
+import {
+  imageCredit,
+  isChoice,
+  type PlayableQuestion,
+  questionById,
+  questionImage,
+  reloadQuestionBank,
+  rightOrderOf,
+} from './questions';
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -16,15 +24,19 @@ const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHER
 
 export function questionInfo(q: PlayableQuestion): QuestionInfo {
   const number = q.kind === 'number' ? q.number : null;
+  const image = questionImage(q);
+  const credit = imageCredit(q);
   return {
     id: q.id,
     category: q.category,
     difficulty: q.difficulty,
     q: q.q,
-    options: q.kind === 'number' ? [] : q.options,
-    answer: q.kind === 'number' ? -1 : q.answer,
+    options: isChoice(q) ? q.options : [],
+    answer: isChoice(q) ? q.answer : -1,
     number: number && { answer: number.answer, unit: number.unit },
-    author: (q.kind !== 'number' && q.author) || null,
+    order: q.kind === 'order' ? rightOrderOf(q) : null,
+    image: image && credit && { ...image, ...credit },
+    author: (isChoice(q) && q.author) || null,
     hidden: isHidden(q.id),
     fact: q.fact ?? null,
     factSource: q.factSource ?? null,

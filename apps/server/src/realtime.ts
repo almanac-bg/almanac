@@ -504,6 +504,12 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       if (game && typeof value === 'number') game.guess(game.playerIdFor(userId), int(index), value);
     });
 
+    on('game:order', (p) => {
+      const game = games.forUser(userId);
+      const { index, order } = obj(p);
+      if (game) game.arrange(game.playerIdFor(userId), int(index), order);
+    });
+
     on('game:pick', (p) => {
       const game = games.forUser(userId);
       const { round, category } = obj(p);

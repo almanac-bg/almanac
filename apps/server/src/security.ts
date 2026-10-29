@@ -10,8 +10,8 @@ const CONTENT_SECURITY_POLICY = [
   "script-src 'self'",
   // React and Motion animate through inline style attributes.
   "style-src 'self' 'unsafe-inline'",
-  // data: is the film-grain texture in the stylesheet.
-  "img-src 'self' data:",
+  // data: is the film-grain texture in the stylesheet; blob: a picture picked for a set, read before it's made smaller.
+  "img-src 'self' data: blob:",
   // Vite inlines the tiniest font subsets as data: URLs.
   "font-src 'self' data:",
   // The confetti library animates in a worker it creates from a blob: URL.

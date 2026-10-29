@@ -11,7 +11,9 @@ import { Button, Spinner } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
+import { OrderAnswer, OrderReveal, OrderSummary } from './OrderQuestion';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
+import { QuestionPicture } from './QuestionPicture';
 
 /** A question on screen: the clock, the points it's worth, the answers, your pick and how it went. */
 export function QuestionView({ game, offline }: { game: LiveGame; offline: boolean }) {
@@ -25,6 +27,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const mine = reveal?.results[youId];
   const reduceMotion = useReducedMotion();
   const number = q.kind === 'number';
+  const order = q.kind === 'order';
 
   // Who picked what, shown under each option at reveal.
   const pickers = useMemo(() => {
@@ -104,13 +107,17 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 glow"
           style={{ color: cat.color }}
         />
+        {q.image && (
+          <QuestionPicture image={q.image} credit={reveal?.credit} className="relative mb-4 short:mb-2 flat:mb-1.5" />
+        )}
         {/* Phones: the timer floats at the top right and the question wraps around it, instead of a narrow column of
             two-word lines beside it. Wider screens: side by side. */}
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
             <TimerRing deadline={game.deadline} duration={q.durationMs} stopped={!!reveal} />
-            {/* A number has no speed bonus: what it's worth is how close it is. */}
-            {!reveal && !number && <LivePoints game={game} q={q} />}
+            {/* A number has no speed bonus (what it's worth is how close it is), and an order's comes only with all of it
+                right. */}
+            {!reveal && !number && !order && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
             <h1 className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]">
@@ -146,8 +153,20 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           ) : (
             <NumberAnswer game={game} q={q} disabled={!active || offline} />
           )
+        ) : order ? (
+          reveal?.answerOrder ? (
+            <OrderReveal game={game} q={q} reveal={reveal} />
+          ) : (
+            <OrderAnswer game={game} q={q} disabled={!active || offline} />
+          )
         ) : (
-          <div className="grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5">
+          // Under a picture, two by two on a phone too: the picture takes the room a column of four would.
+          <div
+            className={clsx(
+              'grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5',
+              q.image && 'grid-cols-2 max-sm:gap-2',
+            )}
+          >
             {q.options.map((text, i) => (
               <AnswerButton
                 // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
@@ -162,6 +181,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                 offline={(offline || game.resyncing) && !reveal}
                 correct={reveal ? reveal.correct === i : null}
                 pickers={pickers[i] ?? []}
+                compact={!!q.image}
               />
             ))}
           </div>
@@ -173,6 +193,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           {reveal && mine ? (
             number && reveal.answerNumber !== undefined ? (
               <NumberSummary key="sum" result={mine} q={q} answer={reveal.answerNumber} />
+            ) : order ? (
+              <OrderSummary key="sum" result={mine} />
             ) : (
               <RevealSummary key="sum" result={mine} />
             )
@@ -187,10 +209,10 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
               <ActivePowerups game={game} />
             </motion.div>
           ) : (
-            active && !number && <PowerupBar key="pw" game={game} offline={offline} />
+            active && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
           )}
         </AnimatePresence>
-        {reveal?.crowd && <CrowdNote crowd={reveal.crowd} number={number} />}
+        {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
       </div>
       {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
       {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
@@ -255,7 +277,7 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
 }
 
 /** „62% знаят“: how everyone who played this question before did on it (once enough have). */
-function CrowdNote({ crowd, number }: { crowd: Crowd; number: boolean }) {
+function CrowdNote({ crowd, kind }: { crowd: Crowd; kind: QuestionPayload['kind'] }) {
   const share = percent(crowd.known);
   return (
     <motion.span
@@ -266,7 +288,13 @@ function CrowdNote({ crowd, number }: { crowd: Crowd; number: boolean }) {
       title={`От ${fmt(crowd.answers)} отговора досега`}
     >
       <Users aria-hidden className="size-3.5" />
-      {number ? `${share} бяха близо` : crowd.known < 0.1 ? `Само ${share} знаят` : `${share} знаят`}
+      {kind === 'number'
+        ? `${share} бяха близо`
+        : kind === 'order'
+          ? `${share} подредиха всичко`
+          : crowd.known < 0.1
+            ? `Само ${share} знаят`
+            : `${share} знаят`}
     </motion.span>
   );
 }
@@ -406,6 +434,7 @@ function AnswerButton({
   offline,
   correct,
   pickers,
+  compact = false,
 }: {
   index: number;
   text: string;
@@ -419,6 +448,8 @@ function AnswerButton({
   offline: boolean;
   correct: boolean | null;
   pickers: GamePlayer[];
+  /** Two by two under a picture, on a phone too. */
+  compact?: boolean;
 }) {
   const color = OPTION_COLORS[index];
   const revealed = correct !== null;
@@ -468,6 +499,7 @@ function AnswerButton({
         whileTap={liftable ? { scale: 0.97 } : undefined}
         className={clsx(
           'focus-ring group relative flex min-h-[3.75rem] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-[background,border-color,box-shadow,translate] duration-200 short:max-sm:min-h-12 short:max-sm:py-2 tiny:max-sm:min-h-11 tiny:max-sm:py-1.5 sm:min-h-[5.5rem] sm:gap-4 sm:p-5 large:min-h-28 flat:min-h-10 flat:p-2',
+          compact && 'max-sm:min-h-12 max-sm:gap-2 max-sm:px-2.5 max-sm:py-2 sm:min-h-16 sm:py-3',
           liftable && 'group-hover/lift:-translate-y-[3px] motion-reduce:group-hover/lift:translate-y-0',
           state === 'correct'
             ? 'border-emerald-400/70 bg-emerald-500/20 shadow-[0_0_40px_-8px_rgb(52_211_153/0.8)]'
@@ -492,7 +524,10 @@ function AnswerButton({
         />
         <span
           aria-hidden
-          className="grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold short:max-sm:size-8 flat:size-8"
+          className={clsx(
+            'grid size-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold short:max-sm:size-8 flat:size-8',
+            compact && 'max-sm:size-8',
+          )}
           style={{
             background: state === 'correct' ? '#34d399' : state === 'wrong' ? '#fb7185' : `${color}22`,
             color: state === 'correct' || state === 'wrong' ? '#0b0a14' : color,
@@ -506,7 +541,7 @@ function AnswerButton({
             LETTERS[index]
           )}
         </span>
-        <span className="flex-1 text-[15px] font-semibold sm:text-base large:text-lg">
+        <span className={clsx('flex-1 font-semibold sm:text-base large:text-lg', compact ? 'text-sm' : 'text-[15px]')}>
           <span className="sr-only">{LETTERS[index]}) </span>
           {keepTogether(text)}
           {status.length > 0 && <span className="sr-only"> — {status.join(' — ')}</span>}

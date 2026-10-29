@@ -17,6 +17,7 @@ import { NOTIFICATION_MAX_AGE_MS } from './notifications';
 import { reloadQuestionBank } from './questions';
 import { pruneRecordPlays, tellRecordOwners } from './records';
 import { pruneRuns } from './runs';
+import { sweepPictures } from './sets';
 import { count } from './stats';
 import type { UserRow } from './users';
 
@@ -192,6 +193,8 @@ export function startMaintenance() {
       retireChampionTitles();
       const weeks = settleGroupWeeks();
       if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
+      const pictures = sweepPictures();
+      if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

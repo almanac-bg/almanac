@@ -4,6 +4,7 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PICTURE_SIZES } from './components/game/QuestionPicture';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
@@ -35,12 +36,26 @@ const HAPTICS: Partial<Record<Effect, number | number[]>> = {
   knockedOut: [180, 70, 260],
 };
 
+/** Pictures being fetched ahead: held until they're in, so the fetch isn't dropped with an unreferenced image. */
+const preloading = new Set<HTMLImageElement>();
+
 // Same-origin API, httpOnly session cookie.
 configureClient({
   baseUrl: '',
   effect: (name) => {
     SOUNDS[name]?.();
     buzz(HAPTICS[name]);
+  },
+  // The size the question will show it at (PICTURE_SIZES): the same file the browser will want then.
+  preload: ({ src, srcSet }) => {
+    const img = new Image();
+    img.sizes = PICTURE_SIZES;
+    img.srcset = srcSet;
+    img.src = src;
+    preloading.add(img);
+    const done = () => preloading.delete(img);
+    img.onload = done;
+    img.onerror = done;
   },
 });
 

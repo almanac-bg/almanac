@@ -3,6 +3,7 @@ import { BookOpen } from 'lucide-react';
 import { Link } from 'react-router';
 import { keepTogether } from '../../lib/typography';
 import { numberText } from '../game/numbers';
+import { Thumbnail } from '../game/QuestionPicture';
 import { Card } from '../ui';
 
 /** How many facts the results show up front (the rest are in the review below). */
@@ -32,14 +33,21 @@ export function LearnedToday({ items, added }: { items: ReviewItem[]; added: num
       </div>
       <ul className="mt-4 space-y-4">
         {shown.map((item) => (
-          <li key={item.id}>
-            <p className="text-xs text-fg-3">
-              {keepTogether(item.q)} —{' '}
-              <span className="font-semibold text-emerald-300">
-                {item.number ? numberText(item.number.answer, item.number) : keepTogether(item.options[item.correct])}
-              </span>
-            </p>
-            <p className="mt-1 text-[15px] text-fg text-pretty">{item.fact}</p>
+          <li key={item.id} className="flex gap-3">
+            {item.image && <Thumbnail image={item.image} />}
+            <div className="min-w-0">
+              <p className="text-xs text-fg-3">
+                {keepTogether(item.q)} —{' '}
+                <span className="font-semibold text-emerald-300">
+                  {item.number
+                    ? numberText(item.number.answer, item.number)
+                    : item.order
+                      ? item.order.right.map((i) => item.order!.items[i]).join(' → ')
+                      : keepTogether(item.options[item.correct])}
+                </span>
+              </p>
+              <p className="mt-1 text-[15px] text-fg text-pretty">{item.fact}</p>
+            </div>
           </li>
         ))}
       </ul>

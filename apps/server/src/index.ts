@@ -12,7 +12,7 @@ import { db } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
 import { forwardEnvelope, publicDsn, reportError, watchEventLoop } from './monitoring';
-import { bankProblem, questionBank } from './questions';
+import { bankProblem, IMAGE_PATH, imageDir, questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
 import { sameSiteWrites, securityHeaders } from './security';
@@ -122,6 +122,19 @@ app.get('/.well-known/security.txt', (_req, res) => {
   ];
   res.type('text/plain').send(`${lines.join('\n')}\n`);
 });
+
+// The banks' pictures (questions.ts): a file's name changes with its content, so it's cached for good. Not for search
+// engines: a picture found on its own would be a question's answer out of its question.
+app.use(
+  IMAGE_PATH,
+  express.static(imageDir(), {
+    index: false,
+    maxAge: '1y',
+    immutable: true,
+    fallthrough: false,
+    setHeaders: (res) => res.setHeader('X-Robots-Tag', 'noindex'),
+  }),
+);
 
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {

@@ -270,6 +270,7 @@ export class RoomManager {
         category: own ? 'mixed' : room.settings.category,
         inRounds: !own && room.settings.rounds,
         final: room.settings.final,
+        pictures: !own && room.settings.pictures,
         ...(own && questions && { questions, questionSet: own.name }),
         presenter: hosting ? room.hostUserId : null,
         elimination: room.settings.elimination && !teams,
@@ -373,7 +374,7 @@ function sanitize(patch: Record<string, unknown>, current: RoomSettings, occupie
   const next = { ...current };
   const [minPlayers, maxPlayers] = ROOM_LIMITS.maxPlayers;
   const { maxPlayers: players, questions, timeMs } = patch;
-  for (const key of ['rounds', 'final', 'elimination', 'teams', 'hostPlays'] as const) {
+  for (const key of ['rounds', 'final', 'pictures', 'elimination', 'teams', 'hostPlays'] as const) {
     if (typeof patch[key] === 'boolean') next[key] = patch[key];
   }
   if (typeof players === 'number' && Number.isInteger(players)) {
@@ -383,8 +384,11 @@ function sanitize(patch: Record<string, unknown>, current: RoomSettings, occupie
     next.questions = questions;
   if (typeof timeMs === 'number' && (ROOM_LIMITS.timeMs as readonly number[]).includes(timeMs)) next.timeMs = timeMs;
   if (isCategoryChoice(patch.category)) next.category = patch.category;
-  // Picking rounds is with the mix of categories, ten questions long (ROUNDS_QUESTIONS).
+  // Picking rounds is with the mix of categories, ten questions long (ROUNDS_QUESTIONS); a round's questions are its
+  // category's, not pictures.
   if (next.category !== 'mixed') next.rounds = false;
+  if (patch.pictures === true) next.rounds = false;
+  else if (patch.rounds === true) next.pictures = false;
   if (next.rounds) next.questions = ROUNDS_QUESTIONS;
   if (next.teams) next.elimination = false;
   // Knockouts one at a time are for a handful of players: with them on the room takes at most that many, and with more

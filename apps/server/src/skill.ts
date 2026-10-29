@@ -1,4 +1,4 @@
-import { type CategoryId, type Difficulty, type PowerupId, START_RATING } from '@quiz/shared';
+import { type CategoryId, type Difficulty, ORDER, type PowerupId, START_RATING } from '@quiz/shared';
 import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionById } from './questions';
@@ -73,16 +73,23 @@ function savePlayer(userId: number, category: CategoryId | 'all', rating: number
 
 /**
  * One answer: the question's rating and the player's skill (overall and in its category) move. A number counts by how
- * close it was (`closeness`, 0–1), not just right or wrong.
+ * close it was (`closeness`, 0–1), an order by how much of it was in place, not just right or wrong.
  */
 function rate(
   userId: number,
-  a: { questionId: string; difficulty: Difficulty; category: CategoryId; correct: boolean; closeness?: number | null },
+  a: {
+    questionId: string;
+    difficulty: Difficulty;
+    category: CategoryId;
+    correct: boolean;
+    closeness?: number | null;
+    placed?: number | null;
+  },
 ) {
   const question = questionRating(a.questionId, a.difficulty);
   const overall = playerSkill(userId);
   const own = playerSkill(userId, a.category);
-  const right = a.closeness ?? (a.correct ? 1 : 0);
+  const right = a.closeness ?? (a.placed != null ? a.placed / ORDER.items : a.correct ? 1 : 0);
   const surprise = right - expectedRight(overall.rating, question.rating);
   run(
     `INSERT INTO question_skill (question_id, rating, answers) VALUES (?, ?, 1)

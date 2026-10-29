@@ -11,12 +11,17 @@ import { all, one, run } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { earnedMastery } from './mastery';
 import {
+  imageBank,
   inPlay,
+  isChoice,
   numberBank,
+  orderBank,
   type PlayableQuestion,
   type PreparedQuestion,
   questionBank,
+  questionImage,
   reorderOptions,
+  rightOrderOf,
 } from './questions';
 
 /**
@@ -29,17 +34,15 @@ import {
 const DAY_MS = 24 * 60 * 60_000;
 
 /** Facts there are to collect: questions in play with one, per category (worked out again when the bank changes). */
-let totals: { bank: readonly unknown[]; numbers: readonly unknown[]; byCategory: Map<CategoryId, number> } | null =
-  null;
+let totals: { banks: readonly (readonly PlayableQuestion[])[]; byCategory: Map<CategoryId, number> } | null = null;
 
 function factTotals() {
-  const bank = questionBank();
-  const numbers = numberBank();
-  if (totals?.bank !== bank || totals.numbers !== numbers) {
+  // A reload makes new arrays: the totals are worked out again only then.
+  const banks = [questionBank(), imageBank(), numberBank(), orderBank()];
+  if (!totals || banks.some((b, i) => b !== totals!.banks[i])) {
     const byCategory = new Map<CategoryId, number>();
-    for (const q of [...bank, ...numbers])
-      if (q.fact) byCategory.set(q.category, (byCategory.get(q.category) ?? 0) + 1);
-    totals = { bank, numbers, byCategory };
+    for (const q of banks.flat()) if (q.fact) byCategory.set(q.category, (byCategory.get(q.category) ?? 0) + 1);
+    totals = { banks, byCategory };
   }
   return totals.byCategory;
 }
@@ -90,11 +93,13 @@ function toFact(q: PlayableQuestion, at: number): AlmanacFact {
     id: q.id,
     category: q.category,
     q: q.q,
-    answer: q.kind === 'number' ? null : q.options[q.answer],
+    answer: isChoice(q) ? q.options[q.answer] : null,
     number:
       q.kind === 'number'
         ? { answer: q.number.answer, unit: q.number.unit, step: q.number.step, scale: q.number.scale }
         : null,
+    order: q.kind === 'order' ? rightOrderOf(q) : null,
+    image: questionImage(q),
     fact: q.fact!,
     learnedAt: at,
   };
@@ -164,8 +169,9 @@ export function reviewQueue(userId: number, now = Date.now()): ReviewQueue {
 }
 
 /**
- * A „Поправителен“ run: the questions due longest, up to REVIEW.size (those with options first, a number last); null
- * when fewer than REVIEW.min are due. A question no longer played (hidden, or gone from the bank) leaves the queue.
+ * A „Поправителен“ run: the questions due longest, up to REVIEW.size (those with options first — a picture not first,
+ * an order then a number last); null when fewer than REVIEW.min are due. A question no longer played (hidden, or gone
+ * from the bank) leaves the queue.
  */
 export function reviewQuestions(userId: number, now = Date.now()): PreparedQuestion[] | null {
   const due = all<{ question_id: string }>(
@@ -180,7 +186,9 @@ export function reviewQuestions(userId: number, now = Date.now()): PreparedQuest
     else if (picked.length < REVIEW.size) picked.push(q);
   }
   if (picked.length < REVIEW.min) return null;
-  const ordered = [...picked.filter((q) => q.kind !== 'number'), ...picked.filter((q) => q.kind === 'number')];
+  const place = (q: PlayableQuestion) =>
+    q.kind === 'number' ? 3 : q.kind === 'order' ? 2 : isChoice(q) && q.image ? 1 : 0;
+  const ordered = [...picked].sort((a, b) => place(a) - place(b));
   return reorderOptions(ordered, `review:${userId}:${now}`);
 }
 

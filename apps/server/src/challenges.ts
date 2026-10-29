@@ -48,6 +48,7 @@ export function createChallenge(creatorId: number): string {
   const id = randomBytes(6).toString('base64url');
   const questions = pickMatch(MODES.challenge.questions, 'mixed', recentFor([creatorId]), {
     final: MODES.challenge.final,
+    formats: MODES.challenge.formats,
   });
   const now = Date.now();
   run(
@@ -85,7 +86,9 @@ export function createDuel(
   if (categories.length && !mayPick(creatorId, rivalId)) {
     return { ok: false, error: 'Категориите избира загубилият последния ви дуел.' };
   }
-  const questions = pickDuelSet(recentFor([creatorId, rivalId]), categories);
+  const questions = pickDuelSet(recentFor([creatorId, rivalId]), categories, Math.random, {
+    formats: MODES.duel.formats,
+  });
   if (!questions) return { ok: false, error: 'Няма достатъчно въпроси за тези категории.' };
   const id = randomBytes(6).toString('base64url');
   const now = Date.now();

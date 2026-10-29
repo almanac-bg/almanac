@@ -6,6 +6,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { LETTERS } from '../game/answers';
+import { RightOrderList } from '../game/OrderQuestion';
+import { QuestionPicture } from '../game/QuestionPicture';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
 
@@ -65,6 +67,14 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
         {question.author && ` · от ${question.author}`}
       </p>
       <p className="mt-1 font-semibold">{question.q}</p>
+      {question.image && (
+        <QuestionPicture image={question.image} credit={question.image} maxHeight="12rem" className="mt-3 !mx-0" />
+      )}
+      {question.order && (
+        <div className="mt-3 rounded-xl bg-emerald-500/10 px-3 py-2">
+          <RightOrderList items={question.order.items} unit={question.order.unit} />
+        </div>
+      )}
       {question.number && (
         <p className="mt-3 rounded-xl bg-emerald-500/15 px-3 py-2 text-sm font-semibold text-emerald-200">
           🔢 {question.number.answer.toLocaleString('bg-BG')} {question.number.unit} ✓

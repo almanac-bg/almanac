@@ -1,5 +1,6 @@
 import type { CategoryChoice, CategoryId } from './categories';
 import type { PowerupId, UnlockRef } from './cosmetics';
+import type { ImageCredit, OrderDirection, QuestionImage } from './formats';
 import type { CategoryMastery } from './mastery';
 import type { ModeId, QueueModeId, RoomSettings, TeamId } from './modes';
 import type { NumberInput } from './numbers';
@@ -132,10 +133,17 @@ export interface QuestionPayload {
   category: CategoryId;
   difficulty: Difficulty;
   q: string;
-  /** Four options to pick from; none on a number question (`number` says what to type in). */
-  kind: 'choice' | 'number';
+  /**
+   * Four options to pick from (two in a host's true-or-false); none on a number question (`number` says what to type
+   * in) or an order question (`order` has the things to put in order).
+   */
+  kind: 'choice' | 'number' | 'order';
   options: string[];
   number: NumberInput | null;
+  /** „Подреди“: the four things, in the order they're shown, and which way to order them. */
+  order: { items: string[]; direction: OrderDirection } | null;
+  /** A picture the question is about. */
+  image: QuestionImage | null;
   /** The match's last question, its final (a number, when the bank has one). */
   final: boolean;
   /** Username of the player who wrote it, for community questions. */
@@ -153,6 +161,8 @@ export interface QuestionPayload {
     choice: number | null;
     /** The number you gave, on a number question. */
     guess: number | null;
+    /** Your order, on an order question (the shown items' indices, first to last). */
+    order?: number[] | null;
     removed: number[];
     doubled: boolean;
     retryArmed: boolean;
@@ -178,13 +188,24 @@ export interface PlayerResult {
    * least NUMBER.rightFrom).
    */
   number?: { guess: number | null; closeness: number };
+  /** On an order question: the order given (null: none in time) and how many items are in their right place. */
+  order?: { given: number[] | null; right: number };
 }
 
 export interface RevealPayload {
   index: number;
-  /** The right option; −1 on a number question (`answerNumber` has the number). */
+  /** The right option; −1 on a number or order question (`answerNumber` or `answerOrder` has the answer). */
   correct: number;
   answerNumber?: number;
+  /**
+   * The right order (the shown items' indices, first to last), each shown item's value and what the values count (none:
+   * a host's own question that has none to show).
+   */
+  answerOrder?: { order: number[]; values: number[] | null; unit: string };
+  /** Whose the question's picture is: with the answer, never before. */
+  credit?: ImageCredit | null;
+  /** The next question's picture, to fetch now so it's there when the question opens. */
+  nextImage?: Pick<QuestionImage, 'src' | 'srcSet'> | null;
   results: Record<string, PlayerResult>;
   standings: Standing[];
   eliminated: string[];
@@ -200,7 +221,10 @@ export interface RevealPayload {
 export interface Crowd {
   /** Share who got it right, 0–1: „62% знаят“. */
   known: number;
-  /** Share who picked each option, in this match's order; no answer in time is the rest. Null on a number question. */
+  /**
+   * Share who picked each option, in this match's order; no answer in time is the rest. Null on a number or order
+   * question (`known`: close enough, or all in order).
+   */
   picks: number[] | null;
   answers: number;
 }
@@ -237,6 +261,8 @@ export interface GameStartPayload {
   presenter?: boolean;
   /** A room playing its host's own set: its name (the questions have no category or difficulty of the bank's). */
   questionSet?: string | null;
+  /** The next question's picture (the first's, at the start), to fetch during the countdown. */
+  nextImage?: Pick<QuestionImage, 'src' | 'srcSet'> | null;
   /** Countdown before the first question (0 when re-syncing mid-game). */
   startsInMs: number;
 }
@@ -267,6 +293,8 @@ export interface RoundPayload {
   category: CategoryId;
   pickedBy: string | null;
   startsInMs: number;
+  /** The round's first question's picture, to fetch now (the reveal before the pick couldn't know it). */
+  nextImage?: Pick<QuestionImage, 'src' | 'srcSet'> | null;
 }
 
 export interface PowerupEvent {
@@ -486,6 +514,8 @@ export interface ClientToServerEvents {
   'duo:accept': (p: { inviteId: string }, ack: Ack) => void;
   'invite:decline': (p: { inviteId: string }) => void;
   'game:answer': (p: { index: number; choice: number }) => void;
+  /** Your order on an order question: the shown items' indices, first to last. */
+  'game:order': (p: { index: number; order: number[] }) => void;
   /** The number given on a number question. */
   'game:guess': (p: { index: number; value: number }) => void;
   /** The next round's category, from the ones offered (only whoever was asked to pick). */
@@ -695,10 +725,14 @@ export interface QuestionInfo {
   category: CategoryId;
   difficulty: Difficulty;
   q: string;
-  /** None on a number question (and `answer` is −1: `number` has its answer). */
+  /** None on a number or order question (and `answer` is −1: `number` or `order` has its answer). */
   options: string[];
   answer: number;
   number: { answer: number; unit: string } | null;
+  /** An order question's items in their right order. */
+  order: RightOrder | null;
+  /** Its picture, with whose it is. */
+  image: (QuestionImage & ImageCredit) | null;
   /** Username of a community question's author. */
   author: string | null;
   /** Hidden from new matches by a moderator. */
@@ -868,11 +902,21 @@ export interface AlmanacFact {
   id: string;
   category: CategoryId;
   q: string;
-  /** The right option; null on a number question (`number` has the answer and how to write it). */
+  /** The right option; null on a number or order question (`number` or `order` has the answer). */
   answer: string | null;
   number: (Pick<NumberInput, 'unit' | 'step' | 'scale'> & { answer: number }) | null;
+  /** An order question's items in their right order, with what each is ordered by. */
+  order: RightOrder | null;
+  /** The question's picture (a small one: the almanac is a list). */
+  image: QuestionImage | null;
   fact: string;
   learnedAt: number;
+}
+
+/** An order question's answer, as reviews and the almanac show it: the items first to last, with their numbers. */
+export interface RightOrder {
+  items: { text: string; value: number }[];
+  unit: string;
 }
 
 /** „Поправителен“: the missed questions coming back, and when. */
@@ -969,15 +1013,38 @@ export interface GroupPreview {
 
 // ─── „Моите въпроси“: a host's own question sets ─────────────────────────────
 
-/** One question of a host's own set: four options, true or false, or a number to give. */
+/** A host's own picture in a question of theirs: uploaded first (POST /api/sets/images), then saved with the set. */
+export interface SetImage {
+  /** What the upload answered with: a hash of the picture. */
+  id: string;
+  w: number;
+  h: number;
+  /** What's in it, for players who can't see it (without the answer). */
+  alt: string;
+}
+
+/** Where a set's picture is served. */
+export const setPictureUrl = (id: string) => `/api/sets/images/${id}`;
+
+/** One question of a host's own set: four options, true or false (either with a picture), a number, or an order. */
 export type SetQuestion =
-  | { kind: 'choice'; q: string; options: string[]; answer: number }
-  | { kind: 'truefalse'; q: string; answer: boolean }
+  | { kind: 'choice'; q: string; options: string[]; answer: number; image?: SetImage }
+  | { kind: 'truefalse'; q: string; answer: boolean; image?: SetImage }
   | {
       kind: 'number';
       q: string;
       /** The answer; `unit` after it („км“, „г.“); `tolerance`: how far off still scores (a guess that far scores 0). */
       number: { answer: number; unit: string; tolerance: number };
+    }
+  | {
+      kind: 'order';
+      q: string;
+      /**
+       * The four, first to last. A `value` (a year, a height) for each shows with the answer; given for all, they must
+       * go up or down in this order.
+       */
+      items: { text: string; value: number | null }[];
+      unit: string;
     };
 
 export const SETS = {
@@ -988,6 +1055,11 @@ export const SETS = {
   question: [5, 200],
   option: [1, 60],
   unit: 12,
+  /** Pictures one host keeps (in all their sets), how big a side may be, and what one may weigh. */
+  images: 200,
+  imageSide: 1200,
+  imageBytes: 150_000,
+  imageAlt: 150,
 } as const;
 
 /** A set as its owner keeps and edits it. */
@@ -1015,8 +1087,8 @@ export interface SharedSetPreview {
   name: string;
   author: string | null;
   questions: number;
-  /** The kinds in it, for the preview: „12 с избор, 3 вярно/невярно, 2 с число“. */
-  kinds: { choice: number; truefalse: number; number: number };
+  /** The kinds in it, for the preview: „12 с избор, 3 вярно/невярно, 2 с число, 1 за подреждане“. */
+  kinds: { choice: number; truefalse: number; number: number; order: number };
   /** The viewer's own set (they can edit it rather than copy it). */
   mine: number | null;
   /** Hidden by a moderator (only its owner and moderators still see it). */

@@ -13,16 +13,21 @@ import {
   type GameEndPayload,
   type GamePlayer,
   type GameStartPayload,
+  IMAGE,
+  isOrder,
   knockoutsAfter,
   type MatchRewards,
   type ModeId,
   NUMBER,
   numberPoints,
+  ORDER,
+  orderPoints,
   ordinal,
   type PickPayload,
   type PlayerResult,
   POWERUPS,
   type PowerupId,
+  placedRight,
   type QuestionPayload,
   ROUNDS,
   type RoundInfo,
@@ -38,9 +43,15 @@ import { config } from '../config';
 import { reportError } from '../monitoring';
 import {
   bankOption,
+  bankOrder,
+  imageCredit,
+  isChoice,
   type NumberQuestion,
+  type OrderQuestion,
+  orderOf,
   type PreparedQuestion,
   questionAuthor,
+  questionImage,
   type RoundPlan,
   shuffle,
 } from '../questions';
@@ -147,9 +158,10 @@ export interface GameSetup {
 export type RecordScript = (RecordedAnswer | null)[];
 
 export interface RecordedAnswer {
-  /** The option picked (as shown in this match), or the number given. */
+  /** The option picked (as shown in this match), the number given, or the order (of the items as shown here). */
   choice?: number;
   value?: number;
+  order?: number[];
   timeMs: number;
   powerup: PowerupId | null;
   /** Right on "Втори шанс"'s second try. */
@@ -192,8 +204,11 @@ export interface Participant {
   lastAtHalfway: boolean;
   lastReactionAt: number;
   // Per-question state, reset by nextQuestion():
-  /** `value`: the number given on a number question (`choice` is −1 there). */
-  answer: { choice: number; value?: number; timeMs: number; retried: boolean } | null;
+  /**
+   * `value`: the number given on a number question; `order`: the order given on an order question (the shown items'
+   * indices, first to last). `choice` is −1 on both.
+   */
+  answer: { choice: number; value?: number; order?: number[]; timeMs: number; retried: boolean } | null;
   doubled: boolean;
   removed: number[];
   powerupThisQuestion: boolean;
@@ -216,7 +231,13 @@ export interface AnswerLogEntry {
   /** On a number question: the number given (null: none in time), and how close it was (0–1). */
   guess: number | null;
   closeness: number | null;
-  /** A number counts as right once it's close (NUMBER.rightFrom). */
+  /**
+   * On an order question: the order given, as the bank orders the items (null: none in time, or the question changed),
+   * and how many items were in their right place.
+   */
+  arranged: number[] | null;
+  placed: number | null;
+  /** A number counts as right once it's close (NUMBER.rightFrom); an order once all of it is right. */
   correct: boolean;
   /** Null: no answer in time. */
   timeMs: number | null;
@@ -234,6 +255,8 @@ interface BotMove {
   joker: PowerupId | null;
   /** Its number, on a number question. */
   guess: number | null;
+  /** Its order, on an order question. */
+  order: number[] | null;
 }
 
 /** `pick`: before a round, while its category is picked and shown. */
@@ -344,7 +367,7 @@ export class Game {
       };
       if (this.phase !== 'question' || index !== this.index) return reject('late');
       const q = this.questions[this.index];
-      if (q.kind === 'number' || !Number.isInteger(choice) || choice < 0 || choice >= q.options.length) return;
+      if (!isChoice(q) || !Number.isInteger(choice) || choice < 0 || choice >= q.options.length) return;
       if (p.removed.includes(choice)) return reject('removed');
       const limit = this.limitMs;
       const elapsed = this.elapsed();
@@ -387,6 +410,25 @@ export class Game {
     });
   }
 
+  /** The order given on an order question: the shown items' indices, first to last. */
+  arrange(playerId: string, index: number, order: unknown) {
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      const reject = (reason: AnswerRejection) => {
+        if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
+      };
+      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      const q = this.questions[this.index];
+      if (q.kind !== 'order' || !isOrder(order, q.items.length)) return;
+      const elapsed = this.elapsed();
+      if (elapsed > this.limitMs + GRACE_MS) return reject('late');
+      p.answer = { choice: -1, order: [...order], timeMs: Math.min(elapsed, this.limitMs), retried: false };
+      this.toGame('game:answered', { playerId });
+      this.maybeRevealEarly();
+    });
+  }
+
   /** The next round's category, from the ones on offer: only whoever was asked to pick, while they're asked. */
   pick(playerId: string, round: number, category: CategoryId) {
     this.guard(() => {
@@ -404,9 +446,9 @@ export class Game {
       if (!p.powerups.includes(powerup) || p.usedPowerups.has(powerup) || p.powerupThisQuestion) return;
       const userId = p.player.userId!;
       const q = this.questions[this.index];
-      // A number has no options to take away and no wrong pick to retry; and the final is played bare. With only two
-      // options (true or false, in a host's own set), 50/50 or a second try would give the answer away.
-      if (q.kind === 'number') return;
+      // A number or an order has no options to take away and no wrong pick to retry (and the final is played bare).
+      // With only two options (true or false, in a host's own set), 50/50 or a second try would give the answer away.
+      if (!isChoice(q)) return;
       if ((powerup === 'fifty' || powerup === 'retry') && q.options.length < 4) return;
       if (q.difficulty === 'easy' && POWERUPS.find((d) => d.id === powerup)?.notOnEasy) return;
 
@@ -533,6 +575,7 @@ export class Game {
               mine: {
                 choice: p.answer && p.answer.choice >= 0 ? p.answer.choice : null,
                 guess: p.answer?.value ?? null,
+                order: p.answer?.order ?? null,
                 removed: p.removed,
                 doubled: p.doubled,
                 retryArmed: p.retryArmed,
@@ -629,8 +672,20 @@ export class Game {
     this.phase = 'question';
     this.questionStartedAt = gameClock.now();
     const q = this.questions[this.index];
-    this.limitMs = q.kind === 'number' ? Math.max(NUMBER.timeMs, this.setup.timeMs) : this.setup.timeMs;
-    this.readMs = readingMs(q.q, q.kind === 'number' ? [] : q.options);
+    const image = questionImage(q);
+    // A number or an order takes longer to give than a tap; a picture is quicker to know than a question to read
+    // (in a room, though, the host's clock is everyone's).
+    this.limitMs =
+      q.kind === 'number'
+        ? Math.max(NUMBER.timeMs, this.setup.timeMs)
+        : q.kind === 'order'
+          ? Math.max(ORDER.timeMs, this.setup.timeMs)
+          : image && !this.setup.roomCode
+            ? Math.min(IMAGE.timeMs, this.setup.timeMs)
+            : this.setup.timeMs;
+    this.readMs =
+      readingMs(q.q, isChoice(q) ? q.options : q.kind === 'order' ? q.items.map((i) => i.text) : []) +
+      (image ? IMAGE.readExtraMs : 0);
     for (const p of this.participants.values()) {
       p.answer = null;
       p.doubled = false;
@@ -688,7 +743,13 @@ export class Game {
     this.picking = null;
     this.clearTimers();
     this.settleRound(round, category, by);
-    this.toGame('game:round', { round, category, pickedBy: by, startsInMs: ROUND_CARD_MS });
+    this.toGame('game:round', {
+      round,
+      category,
+      pickedBy: by,
+      startsInMs: ROUND_CARD_MS,
+      nextImage: this.nextImage(),
+    });
     this.later(ROUND_CARD_MS, () => this.advance());
   }
 
@@ -747,6 +808,7 @@ export class Game {
 
     const q = this.questions[this.index];
     const number = q.kind === 'number' ? q.number : null;
+    const order = q.kind === 'order' ? orderOf(q) : null;
     const results: Record<string, PlayerResult> = {};
     for (const p of this.participants.values()) {
       if (!this.isActive(p)) continue;
@@ -760,7 +822,14 @@ export class Game {
 
       const guess = number ? (p.answer?.value ?? null) : null;
       const close = number ? (guess === null ? 0 : closeness(guess, number)) : null;
-      const correct = q.kind === 'number' ? (close ?? 0) >= NUMBER.rightFrom : p.answer?.choice === q.answer;
+      const given = order ? (p.answer?.order ?? null) : null;
+      const placed = order ? placedRight(given, order) : null;
+      const correct =
+        q.kind === 'number'
+          ? (close ?? 0) >= NUMBER.rightFrom
+          : q.kind === 'order'
+            ? placed === ORDER.items
+            : p.answer?.choice === q.answer;
       let points = 0;
       // Tie-breaks compare total time, so a question left unanswered costs the whole clock.
       p.answerMs += p.answer?.timeMs ?? this.limitMs;
@@ -771,8 +840,9 @@ export class Game {
         p.correctByDifficulty[q.difficulty]++;
         cat.correct++;
         p.bestStreak = Math.max(p.bestStreak, p.streak);
-        // A number is about how close, not how fast: its time stays out of the fastest and average right answers.
-        if (!number) {
+        // A number is about how close, not how fast, and an order takes four taps: their time stays out of the fastest
+        // and average right answers.
+        if (!number && !order) {
           p.correctMs += timeMs;
           cat.correctMs += timeMs;
           p.fastestCorrectMs = p.fastestCorrectMs === null ? timeMs : Math.min(p.fastestCorrectMs, timeMs);
@@ -784,6 +854,17 @@ export class Game {
       if (number) {
         // Closer scores more, right or not; no speed bonus, no streak bonus.
         points = guess === null ? 0 : numberPoints(guess, number);
+      } else if (order) {
+        // Each item in its place scores, right or not; all of them also the speed and streak bonus.
+        points = p.answer
+          ? orderPoints({
+              right: placed ?? 0,
+              timeMs: p.answer.timeMs,
+              limitMs: this.limitMs,
+              readMs: this.readMs,
+              streak: p.streak,
+            })
+          : 0;
       } else if (correct && p.answer) {
         points = answerPoints({
           timeMs: p.answer.timeMs,
@@ -804,9 +885,11 @@ export class Game {
           index: this.index,
           category: q.category,
           difficulty: q.difficulty,
-          choice: q.kind !== 'number' && p.answer ? bankOption(q, p.answer.choice) : null,
+          choice: isChoice(q) && p.answer ? bankOption(q, p.answer.choice) : null,
           guess,
           closeness: close,
+          arranged: q.kind === 'order' && given ? bankOrder(q, given) : null,
+          placed,
           correct,
           timeMs: p.answer?.timeMs ?? null,
           points,
@@ -814,7 +897,7 @@ export class Game {
           retried: !!p.answer?.retried && correct,
         });
       results[p.player.id] = {
-        choice: number ? null : (p.answer?.choice ?? null),
+        choice: isChoice(q) ? (p.answer?.choice ?? null) : null,
         correct,
         points,
         timeMs: p.answer?.timeMs ?? null,
@@ -822,6 +905,7 @@ export class Game {
         doubled: p.doubled,
         retried: !!p.answer?.retried && correct,
         ...(close !== null && { number: { guess, closeness: close } }),
+        ...(placed !== null && { order: { given, right: placed } }),
       };
     }
 
@@ -849,8 +933,14 @@ export class Game {
     const nextInMs = REVEAL_MS + (eliminated.length ? ELIMINATION_EXTRA_MS : 0);
     this.toGame('game:reveal', {
       index: this.index,
-      correct: q.kind === 'number' ? -1 : q.answer,
+      correct: isChoice(q) ? q.answer : -1,
       ...(number && { answerNumber: number.answer }),
+      ...(q.kind === 'order' &&
+        order && {
+          answerOrder: { order, values: q.hideValues ? null : q.items.map((i) => i.value), unit: q.unit ?? '' },
+        }),
+      credit: imageCredit(q),
+      nextImage: this.nextImage(),
       results,
       standings: this.standings(),
       eliminated,
@@ -860,6 +950,15 @@ export class Game {
     });
     this.botReactions(results);
     this.later(nextInMs, () => this.advance());
+  }
+
+  /** The next question's picture, to fetch while this one's answer is shown (unknown while its round isn't picked). */
+  private nextImage(): { src: string; srcSet: string } | null {
+    const next = this.index + 1;
+    if (this.rounds.some((r) => r.category === null && next >= r.from && next < r.from + r.size)) return null;
+    const q = this.questions[next];
+    const image = q ? questionImage(q) : null;
+    return image && { src: image.src, srcSet: image.srcSet };
   }
 
   /** The question's crowd shares, or none if they can't be had: a reveal never waits on them. */
@@ -1007,7 +1106,8 @@ export class Game {
     const knows = Math.random() < chance;
     const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
     const afterMs = Math.max(900, fraction * this.limitMs);
-    if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance) };
+    if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance), order: null };
+    if (q.kind === 'order') return { knows, afterMs, joker: null, guess: null, order: this.botOrder(q, knows, chance) };
     const playable = (id: PowerupId) =>
       p.powerups.includes(id) &&
       !p.usedPowerups.has(id) &&
@@ -1018,7 +1118,7 @@ export class Game {
         : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
           ? 'double'
           : null;
-    return { knows, afterMs, joker, guess: null };
+    return { knows, afterMs, joker, guess: null, order: null };
   }
 
   /**
@@ -1033,10 +1133,26 @@ export class Game {
     return snapNumber(raw, n);
   }
 
+  /**
+   * A bot's order: the right one if it knows it; else the right one with neighbours swapped — once by a bot that nearly
+   * knows, up to three times by one that barely does (a person who half-knows a chronology mixes up close ones).
+   */
+  private botOrder(q: OrderQuestion, knows: boolean, chance: number): number[] {
+    const right = orderOf(q);
+    if (knows) return right;
+    const order = [...right];
+    const swaps = chance > 0.5 ? 1 : chance > 0.25 ? 2 : 3;
+    for (let n = 0; n < swaps || order.every((item, i) => item === right[i]); n++) {
+      const i = Math.floor(Math.random() * (order.length - 1));
+      [order[i], order[i + 1]] = [order[i + 1], order[i]];
+    }
+    return order;
+  }
+
   /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
   private botChoice(p: Participant, knows: boolean): number {
     const q = this.questions[this.index];
-    if (q.kind === 'number') return -1;
+    if (!isChoice(q)) return -1;
     if (knows) return q.answer;
     const wrong = q.options.map((_, i) => i).filter((i) => i !== q.answer && !p.removed.includes(i));
     if (p.removed.length) return Math.random() < 0.5 ? q.answer : wrong[0];
@@ -1045,9 +1161,11 @@ export class Game {
 
   /** A bot's answer as it made up its mind (botMove), with the time it took. */
   private botAnswer(p: Participant, move: BotMove): NonNullable<Participant['answer']> {
-    return move.guess !== null
-      ? { choice: -1, value: move.guess, timeMs: move.afterMs, retried: false }
-      : { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
+    return move.order !== null
+      ? { choice: -1, order: move.order, timeMs: move.afterMs, retried: false }
+      : move.guess !== null
+        ? { choice: -1, value: move.guess, timeMs: move.afterMs, retried: false }
+        : { choice: this.botChoice(p, move.knows), timeMs: move.afterMs, retried: false };
   }
 
   private scheduleBots() {
@@ -1058,12 +1176,14 @@ export class Game {
       const move = this.botMove(p);
       p.move = move;
       if (!move) continue;
-      const { joker, guess } = move;
+      const { joker, guess, order } = move;
       if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
       this.later(move.afterMs, () =>
-        guess !== null
-          ? this.guess(p.player.id, index, guess)
-          : this.answer(p.player.id, index, this.botChoice(p, move.knows)),
+        order !== null
+          ? this.arrange(p.player.id, index, order)
+          : guess !== null
+            ? this.guess(p.player.id, index, guess)
+            : this.answer(p.player.id, index, this.botChoice(p, move.knows)),
       );
     }
   }
@@ -1082,10 +1202,7 @@ export class Game {
     const recorded = p.script![index];
     if (!recorded || index !== this.index || this.phase !== 'question' || p.answer || !this.isActive(p)) return;
     if (recorded.powerup && !p.powerupThisQuestion) this.usePowerup(p.player.id, index, recorded.powerup);
-    p.answer =
-      recorded.value !== undefined
-        ? { choice: -1, value: recorded.value, timeMs: recorded.timeMs, retried: false }
-        : { choice: recorded.choice!, timeMs: recorded.timeMs, retried: recorded.retried };
+    p.answer = recordedAnswer(recorded);
     this.toGame('game:answered', { playerId: p.player.id });
     this.maybeRevealEarly();
   }
@@ -1127,11 +1244,7 @@ export class Game {
         if (!this.isActive(p) || p.answer) continue;
         if (p.script) {
           const recorded = p.script[this.index];
-          if (recorded)
-            p.answer =
-              recorded.value !== undefined
-                ? { choice: -1, value: recorded.value, timeMs: recorded.timeMs, retried: false }
-                : { choice: recorded.choice!, timeMs: recorded.timeMs, retried: recorded.retried };
+          if (recorded) p.answer = recordedAnswer(recorded);
           continue;
         }
         if (!p.brain) continue;
@@ -1241,12 +1354,14 @@ export class Game {
       category: q.category,
       difficulty: q.difficulty,
       q: q.q,
-      kind: q.kind === 'number' ? 'number' : 'choice',
-      options: q.kind === 'number' ? [] : q.options,
+      kind: q.kind === 'number' || q.kind === 'order' ? q.kind : 'choice',
+      options: isChoice(q) ? q.options : [],
       number:
         q.kind === 'number'
           ? { unit: q.number.unit, min: q.number.min, max: q.number.max, step: q.number.step, scale: q.number.scale }
           : null,
+      order: q.kind === 'order' ? { items: q.items.map((i) => i.text), direction: q.direction } : null,
+      image: questionImage(q),
       // „Поправителен“ has no final: just the questions coming back.
       final: this.index === this.questions.length - 1 && this.questions.length > 1 && this.setup.mode !== 'review',
       author: questionAuthor(q.id),
@@ -1280,6 +1395,7 @@ export class Game {
       rounds: this.rounds,
       duelWith: this.setup.duelWith ?? null,
       questionSet: this.setup.questionSet ?? null,
+      nextImage: this.nextImage(),
       startsInMs,
     };
   }
@@ -1391,6 +1507,13 @@ export class Game {
 
 /** Not a person: a bot, or a recording played back. */
 const machine = (p: Participant) => !!(p.brain || p.script);
+
+/** A recording's answer as the match takes it. */
+function recordedAnswer(r: RecordedAnswer): NonNullable<Participant['answer']> {
+  if (r.order) return { choice: -1, order: r.order, timeMs: r.timeMs, retried: false };
+  if (r.value !== undefined) return { choice: -1, value: r.value, timeMs: r.timeMs, retried: false };
+  return { choice: r.choice!, timeMs: r.timeMs, retried: r.retried };
+}
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));

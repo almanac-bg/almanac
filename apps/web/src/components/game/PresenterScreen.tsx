@@ -9,6 +9,8 @@ import { Avatar } from '../Avatar';
 import { Button } from '../ui';
 import { LETTERS, OPTION_COLORS } from './answers';
 import { numberText } from './numbers';
+import { orderValueText } from './OrderQuestion';
+import { QuestionPicture } from './QuestionPicture';
 
 /**
  * „Само водя“: a room's host runs the match on a big screen (a projector, a TV) while everyone answers on their phones.
@@ -105,52 +107,62 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 />
               </div>
             )}
-            {q.kind === 'number' ? (
-              <NumberReveal game={game} />
-            ) : (
-              <ul className="mt-8 grid gap-4 md:grid-cols-2">
-                {q.options.map((text, i) => {
-                  const picks = reveal ? Object.values(reveal.results).filter((r) => r.choice === i).length : null;
-                  const right = reveal?.correct === i;
-                  return (
-                    <li
-                      // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
-                      key={i}
-                      className={clsx(
-                        'relative flex items-center gap-4 overflow-hidden rounded-3xl border-2 p-5 transition-opacity',
-                        reveal && !right && 'opacity-50',
-                      )}
-                      style={{ borderColor: right ? '#34d399' : `${OPTION_COLORS[i]}66` }}
-                    >
-                      {picks !== null && playing > 0 && (
-                        <motion.span
-                          aria-hidden
-                          className="absolute inset-y-0 left-0"
-                          style={{ background: right ? '#34d39933' : `${OPTION_COLORS[i]}22` }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(picks / playing) * 100}%` }}
-                        />
-                      )}
-                      <span
-                        className="relative grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black text-ink"
-                        style={{ background: right ? '#34d399' : OPTION_COLORS[i] }}
+            {/* A picture beside the options on a wide screen, so the room reads both, and the fact still fits. */}
+            <div className={clsx(q.image && 'mt-6 xl:grid xl:grid-cols-2 xl:items-start xl:gap-8')}>
+              {q.image && (
+                <QuestionPicture image={q.image} credit={reveal?.credit} maxHeight="50svh" className="!mx-0" />
+              )}
+              {q.kind === 'number' ? (
+                <NumberReveal game={game} />
+              ) : q.kind === 'order' ? (
+                <OrderOnScreen game={game} />
+              ) : (
+                <ul className={clsx('grid gap-4', q.image ? 'mt-6 xl:mt-0' : 'mt-8 md:grid-cols-2')}>
+                  {q.options.map((text, i) => {
+                    const picks = reveal ? Object.values(reveal.results).filter((r) => r.choice === i).length : null;
+                    const right = reveal?.correct === i;
+                    return (
+                      <li
+                        // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
+                        key={i}
+                        className={clsx(
+                          'relative flex items-center gap-4 overflow-hidden rounded-3xl border-2 p-5 transition-opacity',
+                          reveal && !right && 'opacity-50',
+                        )}
+                        style={{ borderColor: right ? '#34d399' : `${OPTION_COLORS[i]}66` }}
                       >
-                        {right ? <Check className="size-7" /> : LETTERS[i]}
-                      </span>
-                      <span className="relative min-w-0 flex-1 text-[clamp(1.1rem,2vw,1.75rem)] font-semibold">
-                        {keepTogether(text)}
-                      </span>
-                      {picks !== null && (
-                        <span className="relative font-display text-3xl font-black tabular-nums">{picks}</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                        {picks !== null && playing > 0 && (
+                          <motion.span
+                            aria-hidden
+                            className="absolute inset-y-0 left-0"
+                            style={{ background: right ? '#34d39933' : `${OPTION_COLORS[i]}22` }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(picks / playing) * 100}%` }}
+                          />
+                        )}
+                        <span
+                          className="relative grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black text-ink"
+                          style={{ background: right ? '#34d399' : OPTION_COLORS[i] }}
+                        >
+                          {right ? <Check className="size-7" /> : LETTERS[i]}
+                        </span>
+                        <span className="relative min-w-0 flex-1 text-[clamp(1.1rem,2vw,1.75rem)] font-semibold">
+                          {keepTogether(text)}
+                        </span>
+                        {picks !== null && (
+                          <span className="relative font-display text-3xl font-black tabular-nums">{picks}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
             <p className="mt-6 text-lg text-fg-2" aria-live="polite">
               {reveal
-                ? `${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} познаха`
+                ? `${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} ${
+                    q.kind === 'order' ? 'подредиха всичко' : 'познаха'
+                  }`
                 : `Отговориха ${game.answered.length} от ${playing}`}
             </p>
             {reveal?.fact && (
@@ -165,6 +177,48 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
       ) : (
         <p className="grid flex-1 place-items-center text-2xl text-fg-3">Следващият въпрос идва…</p>
       )}
+    </div>
+  );
+}
+
+/** An order question: its four things while it's open, then the right order with each one's number. */
+function OrderOnScreen({ game }: { game: LiveGame }) {
+  const q = game.question!;
+  const reveal = game.reveal?.index === q.index ? game.reveal : null;
+  const answer = reveal?.answerOrder;
+  const rows = answer ? answer.order : q.order!.items.map((_, i) => i);
+  return (
+    <div className="mt-8">
+      <ol className="grid gap-3">
+        {rows.map((item, place) => (
+          <motion.li
+            key={item}
+            layout
+            className={clsx(
+              'flex items-center gap-4 rounded-3xl border-2 p-4',
+              answer ? 'border-emerald-400/50' : 'border-line',
+            )}
+          >
+            <span
+              className={clsx(
+                'grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black',
+                answer ? 'bg-amber-300 text-amber-950' : 'border-2 border-dashed border-white/25 text-fg-2',
+              )}
+            >
+              {answer ? place + 1 : LETTERS[item]}
+            </span>
+            <span className="min-w-0 flex-1 text-[clamp(1.1rem,2vw,1.75rem)] font-semibold">
+              {keepTogether(q.order!.items[item])}
+            </span>
+            {answer?.values && (
+              <span className="font-display text-2xl font-bold text-amber-200 tabular-nums">
+                {orderValueText(answer.values[item], answer.unit)}
+              </span>
+            )}
+          </motion.li>
+        ))}
+      </ol>
+      {!answer && <p className="mt-6 text-2xl text-fg-2">Подредете ги на телефоните си.</p>}
     </div>
   );
 }

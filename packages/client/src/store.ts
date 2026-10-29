@@ -6,12 +6,14 @@ import type {
   GameEndPayload,
   GamePlayer,
   GameStartPayload,
+  ImageCredit,
   Invite,
   LobbyStats,
   MeUser,
   NumberInput,
   PickPayload,
   PowerupId,
+  QuestionImage,
   QuestionPayload,
   QueueStatus,
   RematchState,
@@ -49,6 +51,20 @@ export interface ReviewItem {
   number:
     | (Pick<NumberInput, 'unit' | 'step' | 'scale'> & { answer: number; guess: number | null; closeness: number })
     | null;
+  /**
+   * On an order question: its items as shown, the right order and yours (the items' indices, first to last; null: none
+   * in time), each item's value and what the values count, and how many you had in place.
+   */
+  order: {
+    items: string[];
+    right: number[];
+    given: number[] | null;
+    values: number[] | null;
+    unit: string;
+    placed: number;
+  } | null;
+  /** The question's picture, and whose it is. */
+  image: (QuestionImage & { credit: ImageCredit | null }) | null;
   right: boolean;
   /** "Знаеше ли?" behind the answer, when the question has one. */
   fact: string | null;
@@ -73,6 +89,8 @@ export interface LiveGame {
   myChoice: number | null;
   /** Your number, on a number question. */
   myGuess: number | null;
+  /** Your order, on an order question, once sent (the shown items' indices, first to last). */
+  myOrder: number[] | null;
   removed: number[];
   doubled: boolean;
   usedPowerups: PowerupId[];

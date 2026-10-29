@@ -148,6 +148,7 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
   const results = page.getByRole('heading', { name: 'Награди', exact: true });
+  const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });
   const counter = page.getByText(/^Въпрос \d+ от \d+$/);
   const answered = new Set<number>();
   let total = 0;
@@ -169,7 +170,14 @@ export async function playMatch(page: Page): Promise<MatchSummary> {
     const [index, of] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
     total = of;
     expect(answered.has(index), `question ${index} offered twice`).toBe(false);
-    if (await lock.isVisible()) {
+    if (await ordering.isVisible()) {
+      // „Подреди“: А, Б, В, Г in that order (1–4, as for options), Enter locks it.
+      for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
+      await page.keyboard.press('Enter');
+      await expect(page.getByText('Редът е заключен.'), `order for question ${index} not taken`).toBeAttached({
+        timeout: 2_000,
+      });
+    } else if (await lock.isVisible()) {
       await giveNumber(page);
       // Locked in: the number stays on show, with nothing left to press.
       await expect(lock, `number for question ${index} not taken`).toBeHidden({ timeout: 2_000 });

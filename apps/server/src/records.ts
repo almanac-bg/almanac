@@ -2,8 +2,11 @@ import {
   dayEndsAt,
   dayKey,
   type GamePlayer,
+  isOrder,
   levelFromXp,
   MODES,
+  ORDER,
+  placedRight,
   START_RATING,
   shiftDay,
   sofiaHour,
@@ -12,7 +15,10 @@ import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
 import {
+  imageBank,
   numberBank,
+  orderBank,
+  orderOf,
   type PlayableQuestion,
   type PreparedQuestion,
   questionBank,
@@ -104,7 +110,9 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
   });
   if (!near.length) return null;
   const seen = recentFor([userId]);
-  const playable = new Map<string, PlayableQuestion>([...questionBank(), ...numberBank()].map((q) => [q.id, q]));
+  const playable = new Map<string, PlayableQuestion>(
+    [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [q.id, q]),
+  );
   const ordered = shuffle(near, rng).sort((a, b) => Number(b.mode === 'duel') - Number(a.mode === 'duel'));
   for (const r of ordered) {
     const pick = fromRun(r, playable, seen, rng);
@@ -134,6 +142,20 @@ function fromRun(
       if (answered && typeof a.g !== 'number') return null;
       questions.push(q);
       script.push(answered ? { value: a.g!, timeMs: a.t!, powerup: a.k, retried: false } : null);
+      continue;
+    }
+    if (q.kind === 'order') {
+      // Changed since: the order (as the bank orders the items) no longer means what it meant.
+      if (
+        answered &&
+        (!isOrder(a.o, q.items.length) || (a.ok === 1) !== (placedRight(a.o, orderOf(q)) === ORDER.items))
+      )
+        return null;
+      const shown = shuffle([0, 1, 2, 3], rng);
+      questions.push({ ...q, items: shown.map((i) => q.items[i]) });
+      script.push(
+        answered ? { order: a.o!.map((i) => shown.indexOf(i)), timeMs: a.t!, powerup: null, retried: false } : null,
+      );
       continue;
     }
     // Changed since: the pick (as the bank orders the options) no longer means what it meant.

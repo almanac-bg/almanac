@@ -1,14 +1,15 @@
 import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@quiz/client';
-import { SETS, type SetQuestion } from '@quiz/shared';
+import { SETS, type SetImage, type SetQuestion, setPictureUrl } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowLeft, ArrowUp, Flag, Link2, Plus, Send, Trash2 } from 'lucide-react';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, Send, Trash2 } from 'lucide-react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
 import { LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { shrinkPicture } from '../lib/pictures';
 import { usePageTitle } from '../lib/title';
 import { NotFoundPage } from './NotFoundPage';
 
@@ -116,15 +117,28 @@ function SetList() {
  * keeps each one itself while they're moved around.
  */
 type Draft = { key: number } & (
-  | { kind: 'choice'; q: string; options: string[]; answer: number }
-  | { kind: 'truefalse'; q: string; answer: boolean }
+  | { kind: 'choice'; q: string; options: string[]; answer: number; image?: SetImage }
+  | { kind: 'truefalse'; q: string; answer: boolean; image?: SetImage }
   | { kind: 'number'; q: string; answer: string; unit: string; tolerance: string }
+  | { kind: 'order'; q: string; items: { text: string; value: string }[]; unit: string }
 );
+
+const blankItems = () => Array.from({ length: 4 }, () => ({ text: '', value: '' }));
 
 let nextKey = 0;
 const blank = (): Draft => ({ key: nextKey++, kind: 'choice', q: '', options: ['', '', '', ''], answer: 0 });
 
+const numberText = (n: number) => String(n).replace('.', ',');
+
 function toDraft(q: SetQuestion): Draft {
+  if (q.kind === 'order')
+    return {
+      key: nextKey++,
+      kind: 'order',
+      q: q.q,
+      items: q.items.map((i) => ({ text: i.text, value: i.value === null ? '' : numberText(i.value) })),
+      unit: q.unit,
+    };
   if (q.kind !== 'number') return { ...q, key: nextKey++ };
   return {
     key: nextKey++,
@@ -148,6 +162,18 @@ const parseNumber = (s: string) => {
 function toBody(name: string, drafts: Draft[]): { body: SetBody } | { error: string } {
   const questions: SetQuestion[] = [];
   for (const [i, { key: _, ...d }] of drafts.entries()) {
+    if (d.kind === 'order') {
+      const values = d.items.map((item) => (item.value.trim() ? parseNumber(item.value) : null));
+      if (d.items.some((item, j) => item.value.trim() && values[j] === null))
+        return { error: `Въпрос ${i + 1}: числата за подреждане трябва да са числа.` };
+      questions.push({
+        kind: 'order',
+        q: d.q,
+        items: d.items.map((item, j) => ({ text: item.text, value: values[j] })),
+        unit: d.unit,
+      });
+      continue;
+    }
     if (d.kind !== 'number') {
       questions.push(d);
       continue;
@@ -349,10 +375,13 @@ function QuestionCard({
   onPropose: (() => void) | null;
 }) {
   const id = useId();
+  // A picture stays with the question between the kinds that can have one.
+  const image = 'image' in d ? d.image : undefined;
   const kind = (k: Draft['kind']) => {
     if (k === d.kind) return;
-    if (k === 'choice') onChange({ key: d.key, kind: 'choice', q: d.q, options: ['', '', '', ''], answer: 0 });
-    else if (k === 'truefalse') onChange({ key: d.key, kind: 'truefalse', q: d.q, answer: true });
+    if (k === 'choice') onChange({ key: d.key, kind: 'choice', q: d.q, options: ['', '', '', ''], answer: 0, image });
+    else if (k === 'truefalse') onChange({ key: d.key, kind: 'truefalse', q: d.q, answer: true, image });
+    else if (k === 'order') onChange({ key: d.key, kind: 'order', q: d.q, items: blankItems(), unit: '' });
     else onChange({ key: d.key, kind: 'number', q: d.q, answer: '', unit: '', tolerance: '' });
   };
   return (
@@ -379,6 +408,7 @@ function QuestionCard({
             { value: 'choice', label: '4 отговора' },
             { value: 'truefalse', label: 'Вярно/невярно' },
             { value: 'number', label: 'Число' },
+            { value: 'order', label: 'Подреди' },
           ]}
         />
       </div>
@@ -390,10 +420,20 @@ function QuestionCard({
         value={d.q}
         rows={2}
         maxLength={SETS.question[1]}
-        placeholder={d.kind === 'truefalse' ? 'Твърдение, напр. „Дунав се влива в Черно море.“' : 'Въпросът'}
+        placeholder={
+          d.kind === 'truefalse'
+            ? 'Твърдение, напр. „Дунав се влива в Черно море.“'
+            : d.kind === 'order'
+              ? 'Напр. „Подреди от най-ранното към най-късното:“'
+              : 'Въпросът'
+        }
         onChange={(e) => onChange({ ...d, q: e.target.value })}
         className="field mt-3 w-full resize-y rounded-2xl p-3 text-[15px]"
       />
+      {(d.kind === 'choice' || d.kind === 'truefalse') && (
+        <PictureField index={index} image={d.image} onChange={(next) => onChange({ ...d, image: next })} />
+      )}
+      {d.kind === 'order' && <OrderFields draft={d} onChange={onChange} />}
       {d.kind === 'choice' && (
         <fieldset className="mt-3 space-y-2">
           <legend className="sr-only">Отговори; отбележи верния</legend>
@@ -479,6 +519,154 @@ function QuestionCard({
         </button>
       )}
     </Card>
+  );
+}
+
+/**
+ * A picture over the question: picked from the device, made small enough here (lib/pictures), uploaded, then kept with
+ * the set when it's saved. With a line for players who can't see it.
+ */
+function PictureField({
+  index,
+  image,
+  onChange,
+}: {
+  index: number;
+  image?: SetImage;
+  onChange: (image: SetImage | undefined) => void;
+}) {
+  const id = useId();
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const small = await shrinkPicture(file);
+      if (!small) {
+        toast({ kind: 'error', title: 'Тази снимка не става — опитай с друга (JPEG, PNG или WebP).' });
+        return;
+      }
+      const up = await api.uploadSetPicture(small);
+      onChange({ id: up.id, w: up.w, h: up.h, alt: image?.alt ?? '' });
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err) });
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = '';
+    }
+  }
+
+  if (image)
+    return (
+      <div className="mt-3 flex flex-wrap gap-3">
+        <img
+          src={setPictureUrl(image.id)}
+          alt={`Снимката към въпрос ${index + 1}`}
+          width={image.w}
+          height={image.h}
+          className="h-24 w-auto max-w-40 rounded-xl border border-line object-cover"
+        />
+        <div className="min-w-48 flex-1 space-y-2">
+          <label htmlFor={`${id}-alt`} className="block text-xs font-semibold text-fg-2">
+            Какво има на снимката — за незрящите, без да издава отговора
+          </label>
+          <input
+            id={`${id}-alt`}
+            value={image.alt}
+            maxLength={SETS.imageAlt}
+            placeholder="Напр. „Каменна крепост на хълм над река“"
+            onChange={(e) => onChange({ ...image, alt: e.target.value })}
+            className={clsx(INPUT, 'h-11')}
+          />
+          <Button size="sm" variant="ghost" onClick={() => onChange(undefined)}>
+            <ImageOff className="size-4" /> Махни снимката
+          </Button>
+        </div>
+      </div>
+    );
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        tabIndex={-1}
+        aria-hidden
+        className="sr-only"
+        onChange={(e) => void pick(e.target.files?.[0])}
+      />
+      <Button size="sm" variant="ghost" className="mt-2" loading={busy} onClick={() => input.current?.click()}>
+        <ImagePlus className="size-4" /> Снимка към въпроса
+      </Button>
+    </>
+  );
+}
+
+/**
+ * „Подреди“: the four as they go, first to last (a match shuffles them), each with a number shown with the answer if
+ * the host likes (a year, a height) — for all four, or for none.
+ */
+function OrderFields({
+  draft: d,
+  onChange,
+}: {
+  draft: Extract<Draft, { kind: 'order' }>;
+  onChange: (d: Draft) => void;
+}) {
+  const id = useId();
+  const setItem = (i: number, patch: Partial<{ text: string; value: string }>) =>
+    onChange({ ...d, items: d.items.map((item, j) => (j === i ? { ...item, ...patch } : item)) });
+  return (
+    <fieldset className="mt-3 space-y-2">
+      <legend className="mb-2 text-xs text-fg-3">
+        Напиши ги в правилния ред — в мача се разбъркват. Число към всяко (година, височина) е по желание: показва се с
+        отговора.
+      </legend>
+      {d.items.map((item, i) => (
+        <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: four fixed places, first to last
+          key={i}
+          className="flex items-center gap-2"
+        >
+          <span className="w-5 shrink-0 text-right font-display font-bold text-fg-3">{i + 1}.</span>
+          {/* Sized by their boxes: the inputs themselves are full width. */}
+          <div className="min-w-0 flex-1">
+            <input
+              value={item.text}
+              maxLength={SETS.option[1]}
+              aria-label={`Подреди — ${i + 1}.`}
+              onChange={(e) => setItem(i, { text: e.target.value })}
+              className={clsx(INPUT, 'h-11')}
+            />
+          </div>
+          <div className="w-24 shrink-0">
+            <input
+              value={item.value}
+              inputMode="decimal"
+              placeholder="число"
+              aria-label={`Число към ${i + 1}. (по желание)`}
+              onChange={(e) => setItem(i, { value: e.target.value })}
+              className={clsx(INPUT, 'h-11 px-3 tabular-nums')}
+            />
+          </div>
+        </div>
+      ))}
+      <div className="pt-1 sm:w-1/2">
+        <label htmlFor={`${id}-unit`} className="mb-1.5 block text-xs font-semibold text-fg-2">
+          Мерна единица на числата (по желание)
+        </label>
+        <input
+          id={`${id}-unit`}
+          value={d.unit}
+          maxLength={SETS.unit}
+          placeholder="м, км², души…"
+          onChange={(e) => onChange({ ...d, unit: e.target.value })}
+          className={clsx(INPUT, 'h-11')}
+        />
+      </div>
+    </fieldset>
   );
 }
 
@@ -580,6 +768,8 @@ function SharedSet({ code }: { code: string }) {
     data.kinds.choice && `${data.kinds.choice} с избор`,
     data.kinds.truefalse && `${data.kinds.truefalse} вярно/невярно`,
     data.kinds.number && `${data.kinds.number} с число`,
+    // From a server before „Подреди“ in sets: none.
+    data.kinds.order && `${data.kinds.order} за подреждане`,
   ].filter(Boolean);
   return (
     <div className="mx-auto max-w-md space-y-4">

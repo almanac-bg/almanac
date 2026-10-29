@@ -79,13 +79,15 @@ export function onPasswordNeeded(ask: () => Promise<boolean>) {
   askForPassword = ask;
 }
 
+/** `body`: JSON, or a file (a Blob goes as it is, with its own type). */
 async function request<T>(method: string, path: string, body?: unknown, again = true): Promise<T> {
   let res: Response;
+  const file = typeof Blob !== 'undefined' && body instanceof Blob;
   try {
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined ? {} : { 'content-type': file ? body.type : 'application/json' },
+      body: body === undefined ? undefined : file ? body : JSON.stringify(body),
       credentials: 'same-origin',
     });
   } catch {
@@ -209,6 +211,8 @@ export const api = {
   set: (id: number) => request<QuestionSetInfo>('GET', `/sets/${id}`),
   saveSet: (id: number, set: SetBody) => request<QuestionSetInfo>('PUT', `/sets/${id}`, set),
   deleteSet: (id: number) => request<{ ok: true }>('DELETE', `/sets/${id}`),
+  /** A picture for a question of a set (a WebP or a JPEG, made small enough first): its id and size. */
+  uploadSetPicture: (picture: Blob) => request<{ id: string; w: number; h: number }>('POST', '/sets/images', picture),
   sharedSet: (code: string) => request<SharedSetPreview>('GET', `/sets/shared/${encodeURIComponent(code)}`),
   copySet: (code: string) => request<{ id: number }>('POST', `/sets/shared/${encodeURIComponent(code)}/copy`),
   reportSet: (code: string, details: string) =>

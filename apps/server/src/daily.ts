@@ -11,13 +11,16 @@ import {
   daysBetween,
   MODES,
   STREAK_SHIELDS,
+  weekStart,
 } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { friendIds } from './friends';
 import { notify } from './notifications';
 import {
+  imageBank,
   numberBank,
+  orderBank,
   type PreparedQuestion,
   pickMatch,
   questionBank,
@@ -52,11 +55,16 @@ function dailySet(day: string): PreparedQuestion[] {
   );
   // The picks take the lowest first.
   const order = new Map(
-    [...questionBank(), ...numberBank()].map((q) => [q.id, (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0)]),
+    [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [
+      q.id,
+      (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0),
+    ]),
   );
   // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
   const questions = pickMatch(MODES.daily.questions, 'mixed', order, {
     final: MODES.daily.final,
+    // A picture every day; „Подреди“ on Mondays.
+    formats: { ...MODES.daily.formats, order: weekStart(day) === day },
     rng: seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
   });
   run(

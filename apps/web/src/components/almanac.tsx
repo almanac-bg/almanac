@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { keepTogether } from '../lib/typography';
 import { numberText } from './game/numbers';
+import { Thumbnail } from './game/QuestionPicture';
 import { Button, Card } from './ui';
 
 /** A category's mastery tier, as a small badge: „🥈 Експерт“. */
@@ -26,15 +27,22 @@ export function TierBadge({ tier, className }: { tier: number; className?: strin
 /** One fact of the almanac: its question and answer, small, then the fact itself. */
 export function FactItem({ fact }: { fact: AlmanacFact }) {
   return (
-    <>
-      <p className="text-xs text-fg-3">
-        {keepTogether(fact.q)} —{' '}
-        <span className="font-semibold text-emerald-300">
-          {fact.number ? numberText(fact.number.answer, fact.number) : keepTogether(fact.answer ?? '')}
-        </span>
-      </p>
-      <p className="mt-1 text-[15px] text-fg text-pretty">{fact.fact}</p>
-    </>
+    <div className="flex gap-3">
+      {fact.image && <Thumbnail image={fact.image} />}
+      <div className="min-w-0">
+        <p className="text-xs text-fg-3">
+          {keepTogether(fact.q)} —{' '}
+          <span className="font-semibold text-emerald-300">
+            {fact.number
+              ? numberText(fact.number.answer, fact.number)
+              : fact.order
+                ? fact.order.items.map((i) => i.text).join(' → ')
+                : keepTogether(fact.answer ?? '')}
+          </span>
+        </p>
+        <p className="mt-1 text-[15px] text-fg text-pretty">{fact.fact}</p>
+      </div>
+    </div>
   );
 }
 

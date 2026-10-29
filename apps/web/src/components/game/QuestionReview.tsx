@@ -8,6 +8,8 @@ import { keepTogether } from '../../lib/typography';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
 import { numberText, offText } from './numbers';
+import { RightOrderList } from './OrderQuestion';
+import { QuestionPicture } from './QuestionPicture';
 
 /** A question from a room host's own set („Моите въпроси“), not the bank. */
 const ownQuestion = (item: ReviewItem) => item.id.startsWith('set-');
@@ -99,7 +101,33 @@ function ReviewRow({
           {item.index + 1}. {ownQuestion(item) ? '📝 От набора на домакина' : `${category?.icon} ${category?.name}`}
         </p>
         <p className="mt-0.5 font-semibold">{keepTogether(item.q)}</p>
-        {item.number ? (
+        {item.image && (
+          <QuestionPicture image={item.image} credit={item.image.credit} maxHeight="9rem" className="mt-2 !mx-0" />
+        )}
+        {item.order ? (
+          <>
+            <RightOrderList
+              items={item.order.right.map((i) => ({
+                text: item.order!.items[i],
+                value: item.order!.values?.[i] ?? null,
+              }))}
+              unit={item.order.unit}
+              given={item.order.right.map((i, place) => item.order!.given?.[place] === i)}
+            />
+            <p className={clsx('mt-1 text-sm', item.right ? 'text-fg-2' : 'text-rose-300/90')}>
+              {item.order.given === null
+                ? 'Без отговор'
+                : item.right
+                  ? 'Ти: всичко на място'
+                  : `Ти: ${item.order.placed} от ${item.order.items.length} на място`}
+            </p>
+            {item.crowd && (
+              <p className="mt-1 text-xs text-fg-3">
+                {percent(item.crowd.known)} от всички подредиха всичко (от {fmt(item.crowd.answers)} отговора)
+              </p>
+            )}
+          </>
+        ) : item.number ? (
           <>
             <p className="mt-1.5 text-sm text-emerald-300">✓ {numberText(item.number.answer, item.number)}</p>
             <p className={clsx('text-sm', item.right ? 'text-fg-2' : 'text-rose-300/90')}>

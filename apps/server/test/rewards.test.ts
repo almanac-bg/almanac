@@ -34,7 +34,7 @@ const getRatingOf = (userId: number) =>
   one<{ rating: number }>("SELECT rating FROM season_ratings WHERE user_id = ? AND mode = 'duel'", userId)?.rating ??
   null;
 const { buildHuman } = await import('../src/game/registry');
-const { pickQuestions } = await import('../src/questions');
+const { isChoice, pickQuestions } = await import('../src/questions');
 const { createGuest } = await import('../src/guests');
 const { questsInfo } = await import('../src/quests');
 const { dailyQuestions, redrawDailyWithout } = await import('../src/daily');
@@ -81,7 +81,7 @@ const player = (userId: number): GamePlayer => ({
 /** The open question, which in these matches always has options. */
 function choiceAt(game: InstanceType<typeof Game>) {
   const q = game.questions[game.index];
-  assert.ok(q.kind !== 'number');
+  assert.ok(isChoice(q));
   return q;
 }
 

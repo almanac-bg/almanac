@@ -20,7 +20,7 @@ from it. Every batch is verified independently before it goes in.
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
   spread, fact length/source/giveaways). README → „Добавяне на въпроси“ documents the format.
 - The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `fill`, `facts`, `similar`,
-  `giveaways`, `collect` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
+  `giveaways`, `collect`, `image` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
   line per changed question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a
   one-off fix, editing that question's line directly is fine.
 - Agents doing this work never send personal data anywhere: no names or email addresses in User-Agent headers,
@@ -98,6 +98,31 @@ any batch (`add`, not `fill`), and also:
   before it comes. `bank.mjs giveaways new.json` lists every bank question or fact that names the number with even one
   shared key word: most are coincidences (1992 in a football question), judge each. The bank test catches the clear
   ones. The fact mustn't name another question's answer either (a human's 46 chromosomes beside the dog's).
+
+## Picture questions and „Подреди“
+
+Both play in matches (4e): up to two pictures a match between Q2 and Q8 and one in the daily, one order question in
+Дуел/Арена's third round, Solo, links, rooms and Monday's daily. Each format is balanced on its own, like numbers:
+every category the same number (`stats` shows each with its easy/medium/hard split; aim 40/40/20 within it). A match
+skips any a player saw in the last 30 days, so a small pool wears out fast: the target is 40 pictures and 20 orders
+per category. Give writers `briefs/formats-write.md` and checkers `briefs/formats-check.md` (the first batch's, 2026-10-29,
+with a work folder each); the rules:
+
+- **Pictures:** a question with options plus `image`. Only free licences (public domain, CC0, CC BY, CC BY-SA);
+  artworks only if the artist died 70+ years ago; no film stills, posters, covers, logos, banknotes or game screenshots;
+  portraits only of public figures; no legible text in the picture that names the answer (signatures, captions, signs).
+  Question ≤ 60 characters, options ≤ 25 (a 2×2 grid on a phone). `alt` describes the picture without the answer.
+  Draft each with `commons` (the exact Commons file title) and `alt`, optionally `credit` (a cleaner author name than
+  Commons gives — "неизвестен автор", a name in Cyrillic); then `bank.mjs image draft.json out.json [bank]` fetches
+  the licence, author and a 1200 px rendering, writes `images/<hash>.webp` and `-600.webp` next to the bank (WebP ≤
+  150 KB, made in a browser: `BROWSER_PATH` or Playwright's Chromium) and the questions with their `image` to
+  `out.json` for `add`. Commit `private/images/` with the bank. A picture may show what another question asks in words
+  (Saturn's rings, the bag of a гайда): grep the bank for what's *visible*, not just the answer.
+- **„Подреди“:** `kind: "order"`, four `items` (`text` ≤ 30, `value`), `direction` (`asc`/`desc`), `unit` (empty for
+  years). The question states the direction; values are exact, sourced, at least 3 units (or 10%) apart, and the same
+  order under every source. The reveal shows every value: none of them may be another question's answer (grep each),
+  and qualifiers belong in the wording („като книга за първи път“, „описани научно“).
+- The checker looks at every picture itself and fetches every value: the same independent step as any batch.
 
 ## Writing "Знаеше ли?" facts
 

@@ -16,8 +16,17 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { one, run } = await import('../src/db');
 const { expectedRight, playerSkill, questionRating, recordSkill, seedSkillOnce, SKILL } = await import('../src/skill');
 const { pruneRuns, recordRun, RUN_KEEP_DAYS } = await import('../src/runs');
-const { bankProblem, numberBank, pickQuestions, questionBank, questionById, reloadQuestionBank, waitingFormats } =
-  await import('../src/questions');
+const {
+  bankProblem,
+  imageBank,
+  numberBank,
+  orderBank,
+  pickQuestions,
+  questionBank,
+  questionById,
+  questionsWithoutImages,
+  reloadQuestionBank,
+} = await import('../src/questions');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -35,6 +44,8 @@ const entry = (q: Q, correct: boolean, powerup: PowerupId | null = null) => ({
   choice: correct ? q.answer : (q.answer + 1) % 4,
   guess: null,
   closeness: null,
+  arranged: null,
+  placed: null,
   correct,
   timeMs: 3000,
   points: correct ? 900 : 0,
@@ -85,6 +96,8 @@ test('a number counts by how close it was: near the answer, about as much as a r
     choice: null,
     guess: n.number.answer,
     closeness,
+    arranged: null,
+    placed: null,
     correct: closeness >= 0.8,
     timeMs: 9000,
     points: Math.round(1000 * closeness),
@@ -160,10 +173,31 @@ test('a run keeps every answer with the option as the bank orders it; a year on,
   assert.ok(one("SELECT 1 AS x FROM runs WHERE match_id = 'match-2'"), 'a recent one stays');
 });
 
-test('the bank holds number, order and picture questions; matches play only what the game can show', () => {
+test('the bank holds number, order and picture questions; a picture whose file is missing is held back', () => {
   const file = process.env.QUESTIONS_PATH!;
   const good = fs.readFileSync(file, 'utf8');
   const bank = JSON.parse(good);
+  const images = path.join(path.dirname(file), 'images');
+  fs.mkdirSync(images, { recursive: true });
+  for (const name of ['9f2c1a0b3d4e5f60.webp', '9f2c1a0b3d4e5f60-600.webp'])
+    fs.writeFileSync(path.join(images, name), '');
+  const picture = (id: string, name: string) => ({
+    id,
+    category: 'geography',
+    difficulty: 'easy',
+    q: 'Чие е това знаме?',
+    options: ['А', 'Б', 'В', 'Г'],
+    answer: 0,
+    image: {
+      file: name,
+      w: 1200,
+      h: 800,
+      alt: 'Знаме с три ивици',
+      credit: 'Wikimedia Commons',
+      license: 'PD',
+      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Example.svg',
+    },
+  });
   bank.push(
     {
       id: 'history-n1',
@@ -189,40 +223,32 @@ test('the bank holds number, order and picture questions; matches play only what
       ],
       direction: 'asc',
     },
-    {
-      id: 'geography-i1',
-      category: 'geography',
-      difficulty: 'easy',
-      q: 'Чие е това знаме?',
-      options: ['А', 'Б', 'В', 'Г'],
-      answer: 0,
-      image: {
-        file: '9f2c1a.webp',
-        w: 1200,
-        h: 800,
-        alt: 'Знаме с три ивици',
-        credit: 'Wikimedia Commons',
-        license: 'PD',
-        sourceUrl: 'https://commons.wikimedia.org/wiki/File:Example.svg',
-      },
-    },
+    picture('geography-i1', '9f2c1a0b3d4e5f60.webp'),
+    picture('geography-i2', '0000000000000000.webp'),
   );
   fs.writeFileSync(file, JSON.stringify(bank));
   try {
     reloadQuestionBank();
-    assert.deepEqual(waitingFormats(), { order: 1, image: 1 });
     assert.ok(
       numberBank().some((q) => q.id === 'history-n1'),
       'numbers are played (finals)',
     );
-    const ids = new Set(questionBank().map((q) => q.id));
-    assert.ok(!ids.has('history-o1') && !ids.has('geography-i1'), 'orders and pictures not yet');
-    assert.ok(!pickQuestions(30, 'geography', new Map()).some((q) => q.id === 'geography-i1'));
-    const pictured = questionById('geography-i1');
-    assert.equal(pictured?.kind !== 'number' && pictured?.image?.license, 'PD', 'but known by id');
+    assert.deepEqual(
+      orderBank().map((q) => q.id),
+      ['history-o1'],
+    );
+    assert.deepEqual(
+      imageBank().map((q) => q.id),
+      ['geography-i1'],
+      'a picture is played when its file is there',
+    );
+    assert.deepEqual(questionsWithoutImages(), ['geography-i2']);
+    assert.ok(questionById('geography-i2'), 'still known by id (reports, the almanac)');
+    // Questions with options are drawn without pictures: a match places those itself.
+    assert.ok(!pickQuestions(30, 'geography', new Map()).some((q) => q.id.startsWith('geography-i')));
 
     // A broken one says which, and why.
-    bank.push({ ...bank.at(-3), id: 'history-n2', number: { ...bank.at(-3).number, answer: 3000 } });
+    bank.push({ ...bank.at(-4), id: 'history-n2', number: { ...bank.at(-4).number, answer: 3000 } });
     fs.writeFileSync(file, JSON.stringify(bank));
     reloadQuestionBank();
     assert.match(bankProblem() ?? '', /history-n2: number.*outside min–max/);

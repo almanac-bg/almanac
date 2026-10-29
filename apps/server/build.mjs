@@ -28,7 +28,13 @@ await build({
 
 // The question banks are read from disk next to the bundle (see questions.ts): the public sample always, and the
 // private bank when this checkout has it.
-fs.mkdirSync(path.join(out, 'data'), { recursive: true });
+// Their pictures go next to them (both banks' in one folder: the files are named by their content).
+fs.mkdirSync(path.join(out, 'data/images'), { recursive: true });
 fs.copyFileSync(path.join(root, 'src/data/questions.sample.json'), path.join(out, 'data/questions.sample.json'));
+fs.cpSync(path.join(root, 'src/data/images'), path.join(out, 'data/images'), { recursive: true });
 const privateBank = path.resolve(root, '../../private/questions.json');
-if (fs.existsSync(privateBank)) fs.copyFileSync(privateBank, path.join(out, 'data/questions.json'));
+if (fs.existsSync(privateBank)) {
+  fs.copyFileSync(privateBank, path.join(out, 'data/questions.json'));
+  const privateImages = path.resolve(root, '../../private/images');
+  if (fs.existsSync(privateImages)) fs.cpSync(privateImages, path.join(out, 'data/images'), { recursive: true });
+}

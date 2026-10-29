@@ -2,6 +2,7 @@ import type { LiveGame } from '@quiz/client';
 import { useEffect, useState } from 'react';
 import { LETTERS } from './answers';
 import { numberText } from './numbers';
+import { orderValueText } from './OrderQuestion';
 
 /**
  * What a screen reader hears during a match: each question as it opens (with its options, so 1–4 can answer it right
@@ -17,10 +18,14 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
   const opening = q
     ? `${q.final ? 'Финал. ' : ''}Въпрос ${q.index + 1} от ${q.total}${
         q.elimination ? ' — след него най-слабият отпада' : ''
-      }: ${q.q} ${
+      }: ${q.image ? `Картина: ${q.image.alt}. ` : ''}${q.q} ${
         q.number
           ? `Напиши число между ${numberText(q.number.min, q.number)} и ${numberText(q.number.max, q.number)}.`
-          : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ')
+          : q.order
+            ? `Подреди, като ги избереш едно след друго (1 до 4), после Enter: ${q.order.items
+                .map((o, i) => `${LETTERS[i]}) ${o}.`)
+                .join(' ')}`
+            : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ')
       }`
     : null;
   useEffect(() => {
@@ -29,10 +34,19 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
 
   let outcome: string | null = null;
   if (q && reveal) {
+    const answerOrder = reveal.answerOrder;
     const right =
       q.number && reveal.answerNumber !== undefined
         ? `Отговорът е ${numberText(reveal.answerNumber, q.number)}.`
-        : `Верният отговор е ${LETTERS[reveal.correct]}) ${q.options[reveal.correct]}.`;
+        : q.order && answerOrder
+          ? `Правилният ред: ${answerOrder.order
+              .map((i) =>
+                answerOrder.values
+                  ? `${q.order!.items[i]} (${orderValueText(answerOrder.values[i], answerOrder.unit)})`
+                  : q.order!.items[i],
+              )
+              .join(', ')}.`
+          : `Верният отговор е ${LETTERS[reveal.correct]}) ${q.options[reveal.correct]}.`;
     const mine = reveal.results[youId];
     const guess = mine?.number?.guess ?? null;
     const parts = [
@@ -42,9 +56,13 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
           ? guess === null
             ? `Времето изтече. ${right}`
             : `${right} Ти написа ${numberText(guess, q.number)}: +${mine.points} точки.`
-          : mine.correct
-            ? `Вярно! +${mine.points} точки.`
-            : `${mine.choice === null ? 'Времето изтече.' : 'Грешно.'}${mine.points < 0 ? ` Минус ${-mine.points} точки.` : ''} ${right}`,
+          : q.order && answerOrder
+            ? !mine.order?.given
+              ? `Времето изтече. ${right}`
+              : `${mine.correct ? 'Всичко на място!' : `${mine.order.right} от 4 на място.`} +${mine.points} точки. ${right}`
+            : mine.correct
+              ? `Вярно! +${mine.points} точки.`
+              : `${mine.choice === null ? 'Времето изтече.' : 'Грешно.'}${mine.points < 0 ? ` Минус ${-mine.points} точки.` : ''} ${right}`,
       ...reveal.eliminated.map((id) =>
         id === youId ? 'Ти отпадна от мача.' : `${game.players[id]?.name ?? 'Играч'} отпада.`,
       ),

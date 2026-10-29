@@ -662,6 +662,26 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX evening_wins ON evening_results(user_id) WHERE placement = 1;
     `,
   },
+
+  // v24, pictures in a host's own sets: `set_images` keeps each picture its uploader put in a question (sets.ts), by
+  // the hash of its content (`id`), until no set uses it; `blocked` by a moderator who hid a set it's in. Its uploader
+  // gone, it goes too, from copies of their sets as well. Older code leaves it alone.
+  {
+    compatible: `
+    CREATE TABLE set_images (
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      bytes BLOB NOT NULL,
+      w INTEGER NOT NULL,
+      h INTEGER NOT NULL,
+      blocked INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (owner_id, id)
+    );
+    CREATE INDEX set_images_id ON set_images(id);
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

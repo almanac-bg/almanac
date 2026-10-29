@@ -1,4 +1,5 @@
 import type { CategoryChoice } from './categories';
+import type { Formats } from './formats';
 import type { Difficulty } from './protocol';
 
 export type QueueModeId = 'duel' | 'teams' | 'squad' | 'royale';
@@ -30,6 +31,11 @@ export interface ModeDef {
   final: boolean;
   /** Played in ROUNDS: whoever is behind picks the next round's category. */
   rounds: boolean;
+  /**
+   * Picture questions a match may hold, and whether one is an order question (four taps want a longer clock than
+   * Роял's rhythm allows; the daily has one on Mondays).
+   */
+  formats: Formats;
   tagline: string;
   description: string;
   accent: [string, string];
@@ -47,6 +53,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 2, order: true },
     tagline: 'Тренирай ума. Гони рекорда си.',
     description: '10 въпроса от категория по избор. Само ти и часовникът.',
     accent: ['#22d3ee', '#6366f1'],
@@ -62,6 +69,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 1, order: false },
     tagline: 'Едни и същи 10 въпроса за цяла България. Един опит.',
     description: 'Без козове. Класирането се нулира в полунощ.',
     accent: ['#fde047', '#f97316'],
@@ -77,6 +85,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 1, order: true },
     tagline: 'Твоите 10 въпроса. Кой ще те бие?',
     description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без козове.',
     accent: ['#a5b4fc', '#8b5cf6'],
@@ -92,6 +101,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: false,
     rounds: false,
+    formats: { images: 0, order: false },
     tagline: 'Сгрешеното се връща. Този път го знаеш.',
     description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
     accent: ['#fcd34d', '#10b981'],
@@ -107,6 +117,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: true,
+    formats: { images: 2, order: true },
     tagline: 'Лице в лице. Печели по-бързият ум.',
     description: 'Три рунда по три въпроса: категорията на всеки следващ избира изоставащият. Финал с число.',
     accent: ['#f472b6', '#e11d48'],
@@ -122,6 +133,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: true,
     final: true,
     rounds: false,
+    formats: { images: 2, order: true },
     tagline: 'Ти и приятел срещу друга двойка.',
     description: 'Покани приятел и играйте заедно срещу друга двойка (или два бота). Точките на двамата се събират.',
     accent: ['#38bdf8', '#fb7185'],
@@ -137,6 +149,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 2, order: true },
     tagline: 'Трима влизат. Един взима короната.',
     description: 'Класирана битка на трима — всеки срещу всеки. Вече е част от „Арена“.',
     accent: ['#c084fc', '#7c3aed'],
@@ -153,6 +166,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: true,
+    formats: { images: 2, order: true },
     tagline: 'До петима на арената. Последният избира.',
     description:
       'Класирана битка на трима до петима в три рунда: категорията на следващия избира последният. Финал с число.',
@@ -169,6 +183,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 2, order: false },
     tagline: 'Осем влизат. Елиминации. Оцелява един.',
     description: 'На всеки няколко въпроса отпада последният, докато двама не излязат на финала.',
     accent: ['#34d399', '#06b6d4'],
@@ -185,6 +200,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: true,
     rounds: false,
+    formats: { images: 2, order: false },
     tagline: 'Всяка вечер в 21:00. Всички срещу всички.',
     description:
       'До 50 души наведнъж. След 3-ти, 6-и, 9-и и 12-и въпрос отпадат последните 30%, накрая двама играят финала с число.',
@@ -201,6 +217,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     teams: false,
     final: false,
     rounds: false,
+    formats: { images: 2, order: true },
     tagline: 'Твоите приятели. Твоите правила.',
     description: 'Покани приятели с код, настрой играта и добави ботове.',
     accent: ['#e879f9', '#22d3ee'],
@@ -287,6 +304,8 @@ export interface RoomSettings {
   rounds: boolean;
   /** The last question is a number to guess (when the bank has one). */
   final: boolean;
+  /** „Картини“: every question about a picture, as far as the bank has them (not with rounds). */
+  pictures: boolean;
   elimination: boolean;
   teams: boolean;
   /** The host plays too; off, they run the game on a big screen („Само водя“) while the others answer on phones. */
@@ -319,6 +338,7 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   category: 'mixed',
   rounds: false,
   final: true,
+  pictures: false,
   elimination: false,
   teams: false,
   hostPlays: true,

@@ -1,6 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CATEGORY_IDS, type CategoryChoice, type CategoryId, type Difficulty, ROUNDS } from '@quiz/shared';
+import {
+  CATEGORY_IDS,
+  type CategoryChoice,
+  type CategoryId,
+  type Difficulty,
+  type Formats,
+  IMAGE,
+  type ImageCredit,
+  type QuestionImage,
+  type RightOrder,
+  ROUNDS,
+  rightOrder,
+  TEXT_ONLY,
+} from '@quiz/shared';
 import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';
@@ -30,23 +43,28 @@ const common = {
   reviewBy: z.iso.date().optional(),
 };
 
-/** A picture over the question (a flag, a landmark, a painting), with its licence: free licences only. */
+/**
+ * A picture over the question (a flag, a landmark, a painting), with its licence: free licences only. The file is in
+ * `images/` next to the bank, its longer side IMAGE.side, with one half the size beside it (`<name>-600.webp`); its name
+ * is a hash of its content, so it says nothing about the answer.
+ */
 const ImageSchema = z.object({
-  /** The file under the site's image store; its name says nothing about the answer. */
-  file: z.string().regex(/^[\w-]+\.(webp|jpg|png)$/),
+  file: z.string().regex(/^[0-9a-f]{16}\.webp$/),
   w: z.number().int().positive(),
   h: z.number().int().positive(),
   /** What's in it, for screen readers (without giving the answer away). */
-  alt: z.string().min(3),
-  credit: z.string().min(1),
-  license: z.enum(['PD', 'CC0', 'CC BY', 'CC BY-SA']),
+  alt: z.string().min(3).max(150),
+  /** Whose it is (an author's name, or „неизвестен автор“). */
+  credit: z.string().min(1).max(120),
+  /** Public domain, or a free licence with its version: CC0 1.0, CC BY 4.0, CC BY-SA 3.0… */
+  license: z.string().regex(/^(PD|CC0 1\.0|CC BY(-SA)? [1-4]\.[05])$/),
   sourceUrl: z.url({ protocol: /^https$/ }),
 });
 
 const needsFactSource = (q: { fact?: string; factSource?: string }) => !q.fact || !!q.factSource;
 const factSourceIssue = { message: 'a fact needs its source (factSource)', path: ['factSource'] };
 
-/** Four options, one right: what every match plays today. With an image, it waits until the game shows images. */
+/** Four options, one right; with a picture, the question is about it (a match places those itself: pickMatch). */
 const QuestionSchema = z
   .object({
     ...common,
@@ -84,7 +102,7 @@ const NumberQuestionSchema = z
   })
   .refine(needsFactSource, factSourceIssue);
 
-/** "Подреди": four things put in order by a number each has (a year, a height…). Not played yet either. */
+/** „Подреди“: four things put in order by a number each has (a year, a height…), shown with the answer. */
 const OrderQuestionSchema = z
   .object({
     ...common,
@@ -94,26 +112,53 @@ const OrderQuestionSchema = z
       .length(4)
       .refine((items) => new Set(items.map((i) => i.value)).size === 4, { message: 'two items share a value' }),
     direction: z.enum(['asc', 'desc']),
+    /** What the values count („м“, „км²“); none for years. */
+    unit: z.string().max(12).optional(),
   })
   .refine(needsFactSource, factSourceIssue);
 
 export type NumberQuestion = z.infer<typeof NumberQuestionSchema>;
-export type OrderQuestion = z.infer<typeof OrderQuestionSchema>;
+/** `hideValues`: a host's own order question without numbers to show with the answer (its values are just places). */
+export type OrderQuestion = z.infer<typeof OrderQuestionSchema> & { hideValues?: boolean };
+
+type BankImage = z.infer<typeof ImageSchema>;
+
+/** A host's own picture in a question of their set (sets.ts): one size, served by the API, nobody's credit to show. */
+export interface HostImage {
+  url: string;
+  w: number;
+  h: number;
+  alt: string;
+}
 
 /** Four options, one right. */
-export type Question = z.infer<typeof QuestionSchema> & {
+export type Question = Omit<z.infer<typeof QuestionSchema>, 'image'> & {
+  image?: BankImage | HostImage;
   /** Username of the player who submitted it (community questions only). */
   author?: string | null;
 };
 
-/** A question a match can play: four options, or a number. */
-export type PlayableQuestion = Question | NumberQuestion;
+/** A question a match can play: four options (perhaps with a picture), a number, or four things to order. */
+export type PlayableQuestion = Question | NumberQuestion | OrderQuestion;
 
 /**
  * A question as one match plays it: one with options has them shuffled for the match (`answer` points into the
- * shuffled options); a number question is as the bank has it.
+ * shuffled options), an order question its items; a number question is as the bank has it.
  */
 export type PreparedQuestion = PlayableQuestion;
+
+/** An order question's right order: its items' indices (as this match shows them), first to last. */
+export const orderOf = (q: OrderQuestion) =>
+  rightOrder(
+    q.items.map((i) => i.value),
+    q.direction,
+  );
+
+/** An order question's answer as reviews and the almanac show it: the items in their right order, with their numbers. */
+export const rightOrderOf = (q: OrderQuestion): RightOrder => ({
+  items: orderOf(q).map((i) => q.items[i]),
+  unit: q.unit ?? '',
+});
 
 /**
  * The real question bank is private (`private/questions.json` at the repository root; it isn't part of the public
@@ -129,7 +174,9 @@ const QUESTIONS_PATH = process.env.QUESTIONS_PATH ?? PRIVATE_BANK.find((file) =>
 
 let everything: Map<string, PlayableQuestion> | null = null;
 let bank: Question[] | null = null;
+let images: Question[] | null = null;
 let numbers: NumberQuestion[] | null = null;
+let orders: OrderQuestion[] | null = null;
 let playable: Map<string, PlayableQuestion> | null = null;
 
 /** Every question by id, hidden ones included (for moderation and reports). */
@@ -147,14 +194,61 @@ export function inPlay(id: string): PlayableQuestion | undefined {
 /** An option as shown in a match, as the bank orders them (null if the question has changed since it was drawn). */
 export function bankOption(q: Question, shown: number): number | null {
   const now = questionById(q.id);
-  const index = now?.kind === 'number' ? -1 : (now?.options.indexOf(q.options[shown]) ?? -1);
+  if (!now || now.kind === 'number' || now.kind === 'order') return null;
+  const index = now.options.indexOf(q.options[shown]);
   return index < 0 ? null : index;
+}
+
+/**
+ * An order as given in a match (the shown items' indices), as the bank orders the items: what a run keeps, so a
+ * replay with the items shuffled anew means the same. Null if the question has changed since.
+ */
+export function bankOrder(q: OrderQuestion, given: readonly number[]): number[] | null {
+  const now = questionById(q.id);
+  if (now?.kind !== 'order') return null;
+  const order = given.map((shown) => now.items.findIndex((i) => i.text === q.items[shown]?.text));
+  return order.some((i) => i < 0) ? null : order;
 }
 
 /** Who wrote a question, as the bank has it now (community questions only): a rename or a deletion shows at once. */
 export function questionAuthor(id: string): string | null {
   const q = questionById(id);
-  return (q?.kind !== 'number' && q?.author) || null;
+  return (q && isChoice(q) && q.author) || null;
+}
+
+/** A question with options to pick from. */
+export const isChoice = (q: PlayableQuestion): q is Question => q.kind !== 'number' && q.kind !== 'order';
+
+/** Where the banks' pictures are: `images/` next to the bank file. */
+export const imageDir = () => path.join(path.dirname(QUESTIONS_PATH), 'images');
+
+/** The URL path pictures are served under (index.ts), cached for good: a file's name changes with its content. */
+export const IMAGE_PATH = '/qimg';
+
+/** A picture's small version, beside it. */
+export const smallImage = (file: string) => file.replace(/\.webp$/, '-600.webp');
+
+/** A question's picture as a player gets it (none if it has none). */
+export function questionImage(q: PreparedQuestion): QuestionImage | null {
+  const image = 'image' in q ? q.image : undefined;
+  if (!image) return null;
+  if ('url' in image)
+    return { src: image.url, srcSet: `${image.url} ${image.w}w`, w: image.w, h: image.h, alt: image.alt };
+  // The small one is half the size (bank.mjs image).
+  const src = `${IMAGE_PATH}/${smallImage(image.file)}`;
+  return {
+    src,
+    srcSet: `${src} ${Math.round(image.w / 2)}w, ${IMAGE_PATH}/${image.file} ${image.w}w`,
+    w: image.w,
+    h: image.h,
+    alt: image.alt,
+  };
+}
+
+/** Whose a question's picture is, for the reveal (a host's own: nobody's to show). */
+export function imageCredit(q: PreparedQuestion): ImageCredit | null {
+  const image = 'image' in q ? q.image : undefined;
+  return image && 'file' in image ? { credit: image.credit, license: image.license, sourceUrl: image.sourceUrl } : null;
 }
 
 /**
@@ -163,24 +257,36 @@ export function questionAuthor(id: string): string | null {
  */
 export const withoutAuthors = (questions: PreparedQuestion[]): PreparedQuestion[] =>
   questions.map((q) => {
-    if (q.kind === 'number') return q;
+    if (!isChoice(q)) return q;
     const { author: _author, ...rest } = q;
     return rest;
   });
 
 /**
  * Questions with options matches draw from: built-in ones from the JSON file plus approved community questions, minus
- * hidden ones.
+ * hidden ones and those with a picture (imageBank: a match places those itself).
  */
 export function questionBank(): Question[] {
-  if (!bank) ({ everything, bank, numbers, playable } = loadBank());
+  if (!bank) ({ everything, bank, images, numbers, orders, playable } = loadBank());
   return bank;
+}
+
+/** Questions about a picture, minus hidden ones and any whose picture is missing. */
+export function imageBank(): Question[] {
+  questionBank();
+  return images!;
 }
 
 /** Number questions finals draw from, minus hidden ones. */
 export function numberBank(): NumberQuestion[] {
   questionBank();
   return numbers!;
+}
+
+/** Order questions („Подреди“), minus hidden ones. */
+export function orderBank(): OrderQuestion[] {
+  questionBank();
+  return orders!;
 }
 
 /** The last reload's error, while the bank on disk can't be read (the one loaded before keeps the game going). */
@@ -194,7 +300,7 @@ export const bankProblem = () => reloadFailure;
  */
 export function reloadQuestionBank() {
   try {
-    ({ everything, bank, numbers, playable } = loadBank());
+    ({ everything, bank, images, numbers, orders, playable } = loadBank());
     reloadFailure = null;
   } catch (err) {
     reloadFailure = err instanceof Error ? err.message : String(err);
@@ -234,18 +340,26 @@ function readBankFile(): { choice: Question[]; number: NumberQuestion[]; order: 
   return read;
 }
 
-/** Questions in the formats the game doesn't play yet, by format (kept for the next version). */
-let waiting = { order: 0, image: 0 };
-export const waitingFormats = () => waiting;
+/** Questions held back: those whose picture isn't there (a bad pull of the private bank). */
+let missingImages: string[] = [];
+export const questionsWithoutImages = () => missingImages;
 
 function loadBank(): {
   everything: Map<string, PlayableQuestion>;
   bank: Question[];
+  images: Question[];
   numbers: NumberQuestion[];
+  orders: OrderQuestion[];
   playable: Map<string, PlayableQuestion>;
 } {
   const file = readBankFile();
-  waiting = { order: file.order.length, image: file.choice.filter((q) => q.image).length };
+  const dir = imageDir();
+  const present = (q: Question) =>
+    !!q.image &&
+    'file' in q.image &&
+    fs.existsSync(path.join(dir, q.image.file)) &&
+    fs.existsSync(path.join(dir, smallImage(q.image.file)));
+  missingImages = file.choice.filter((q) => q.image && !present(q)).map((q) => q.id);
   const builtIn = file.choice;
   const community = all<{
     id: string;
@@ -263,26 +377,35 @@ function loadBank(): {
     all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
   );
   const everything = new Map<string, PlayableQuestion>(
-    [...builtIn, ...community, ...file.number].map((q) => [q.id, q]),
+    [...builtIn, ...community, ...file.number, ...file.order].map((q) => [q.id, q]),
   );
-  // Until the game shows pictures, a question with one is held back (it may need the picture to be answered).
   const bank = [...builtIn, ...community].filter((q) => !hidden.has(q.id) && !q.image);
+  const images = builtIn.filter((q) => q.image && !hidden.has(q.id) && present(q));
   const numbers = file.number.filter((q) => !hidden.has(q.id));
+  const orders = file.order.filter((q) => !hidden.has(q.id));
   console.log(
-    `📚 ${builtIn.length} built-in + ${community.length} community questions, ${file.number.length} number questions${
-      hidden.size ? `, ${hidden.size} hidden` : ''
-    }${
-      waiting.order + waiting.image
-        ? ` (waiting for the game to play them: ${waiting.order} order, ${waiting.image} with an image)`
-        : ''
-    }`,
+    `📚 ${builtIn.length - images.length} built-in + ${community.length} community questions, ${images.length} with a picture, ${
+      file.number.length
+    } number, ${file.order.length} order${hidden.size ? `, ${hidden.size} hidden` : ''}`,
   );
+  if (missingImages.length) {
+    const message = `Held back, their picture isn't in ${dir}: ${missingImages.slice(0, 10).join(', ')}`;
+    console.warn(`📚 ${message}`);
+    void reportError(new Error(message), 'question pictures');
+  }
   if (QUESTIONS_PATH === SAMPLE_BANK) {
     (config.production ? console.warn : console.log)(
       '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
     );
   }
-  return { everything, bank, numbers, playable: new Map([...bank, ...numbers].map((q) => [q.id, q])) };
+  return {
+    everything,
+    bank,
+    images,
+    numbers,
+    orders,
+    playable: new Map<string, PlayableQuestion>([...bank, ...images, ...numbers, ...orders].map((q) => [q.id, q])),
+  };
 }
 
 export type Rng = () => number;
@@ -312,15 +435,31 @@ export function seededRng(seed: string): Rng {
   };
 }
 
-/** A question with its options in an order of their own (`answer` follows the right one). */
-function shuffled(q: Question, rng: Rng): Question {
+/** A question with its options in an order of their own (`answer` follows the right one); an order question's items. */
+function shuffled<Q extends PreparedQuestion>(q: Q, rng: Rng): Q {
+  if (q.kind === 'number') return q;
+  if (q.kind === 'order') return { ...q, items: shuffle(q.items, rng) };
+  const c = q as Question;
   const order = shuffle([0, 1, 2, 3], rng);
-  return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
+  return { ...c, options: order.map((i) => c.options[i]), answer: order.indexOf(c.answer) } as Q;
 }
 
 /** Unseen first (in random order), then the ones seen longest ago (or lowest in `seen`, whatever it ranks by). */
 const leastSeenFirst = <T extends { id: string }>(pool: T[], seen: ReadonlyMap<string, number>, rng: Rng) =>
   shuffle(pool, rng).sort((a, b) => (seen.get(a.id) ?? 0) - (seen.get(b.id) ?? 0));
+
+/**
+ * A picture or order question (or a final in a match of one category) nobody in the match has seen for this long can
+ * come again: there are fewer of them, and the same one every few matches would wear them out.
+ */
+const REPEAT_MS = 30 * 24 * 60 * 60_000;
+
+/**
+ * Unseen (or seen REPEAT_MS ago or more), least seen first. A ranking that isn't a time (the daily's, by how often each
+ * was played) is far below any time: everything in it counts as unseen.
+ */
+const notRecent = <T extends { id: string }>(pool: T[], seen: ReadonlyMap<string, number>, rng: Rng, now: number) =>
+  leastSeenFirst(pool, seen, rng).filter((q) => !seen.has(q.id) || seen.get(q.id)! <= now - REPEAT_MS);
 
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
 /**
@@ -333,16 +472,18 @@ const RAMP_BLUR = 1.25;
 /**
  * Picks `count` questions: ones none of the players has seen first, then the ones seen longest ago, with a 40/40/20
  * easy/medium/hard mix ordered so the match ramps up. `seen` maps question ids to when any of the players last saw them.
+ * `pool`: what to draw from (the bank's questions without a picture; a room of pictures draws from those).
  */
 export function pickQuestions(
   count: number,
   category: CategoryChoice,
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
+  pool: readonly Question[] = questionBank(),
 ): Question[] {
-  const pool = questionBank().filter((q) => category === 'mixed' || q.category === category);
+  const ofCategory = pool.filter((q) => category === 'mixed' || q.category === category);
   // Shuffled first, so unseen questions (and ones seen in the same match) come in random order; the sort is stable.
-  const ordered = leastSeenFirst(pool, seen, rng);
+  const ordered = leastSeenFirst(ofCategory, seen, rng);
 
   const hard = Math.round(count * 0.2);
   const easy = Math.round(count * 0.4);
@@ -373,15 +514,69 @@ export function pickQuestions(
 }
 
 /**
- * A number question nobody in the match has seen for this long can be a final again in a match of one category: a
- * category has only a few, and the same one every few runs is no final.
+ * Puts the first of `candidates` that fits in place of a question between `from` and `to` (indices into `questions`,
+ * none of `taken`): one of its own difficulty if there is, else a neighbour's (easy for medium…), so the match still
+ * ramps up. Returns the index it took, or null.
  */
-const FINAL_REPEAT_MS = 30 * 24 * 60 * 60_000;
+function placeOne(
+  questions: PreparedQuestion[],
+  candidates: readonly PreparedQuestion[],
+  from: number,
+  to: number,
+  taken: Set<number>,
+  rng: Rng,
+): number | null {
+  const free: number[] = [];
+  for (let i = Math.max(0, from); i <= Math.min(to, questions.length - 1); i++) if (!taken.has(i)) free.push(i);
+  if (!free.length) return null;
+  for (const gap of [0, 1]) {
+    for (const c of candidates) {
+      if (questions.some((q) => q.id === c.id)) continue;
+      const fits = free.filter(
+        (i) => Math.abs(DIFFICULTY_ORDER[questions[i].difficulty] - DIFFICULTY_ORDER[c.difficulty]) === gap,
+      );
+      if (!fits.length) continue;
+      const at = fits[Math.floor(rng() * fits.length)];
+      questions[at] = shuffled(c, rng);
+      taken.add(at);
+      return at;
+    }
+  }
+  return null;
+}
+
+/**
+ * A match's picture and order questions, in place of some of its questions with options: the pictures between Q2 and
+ * Q8 (IMAGE: never the opener, whose picture there'd be no reveal to fetch during), the order question in the second
+ * half. Only ones none of the players has seen for REPEAT_MS: when there are none, the match simply has fewer.
+ */
+function placeFormats(
+  questions: PreparedQuestion[],
+  category: CategoryChoice,
+  seen: ReadonlyMap<string, number>,
+  formats: Formats,
+  rng: Rng,
+  now: number,
+) {
+  const inCategory = (q: PlayableQuestion) => category === 'mixed' || q.category === category;
+  const taken = new Set<number>();
+  if (formats.order && questions.length >= 5) {
+    const candidates = notRecent(orderBank().filter(inCategory), seen, rng, now);
+    placeOne(questions, candidates, Math.floor(questions.length / 2), questions.length - 1, taken, rng);
+  }
+  const pictures = Math.min(formats.images, questions.length >= IMAGE.fullMatch ? IMAGE.perMatch : 1);
+  if (pictures > 0 && questions.length >= 2) {
+    const candidates = notRecent(imageBank().filter(inCategory), seen, rng, now);
+    for (let n = 0; n < pictures; n++) {
+      if (placeOne(questions, candidates, IMAGE.first, IMAGE.last, taken, rng) === null) break;
+    }
+  }
+}
 
 /**
  * A match's final: a number question, unseen first, then the one seen longest ago. In a match of one category only one
- * not seen for FINAL_REPEAT_MS; null when there's none (the match then ends on a question with options). `not`:
- * categories the match plays otherwise.
+ * not seen for REPEAT_MS; null when there's none (the match then ends on a question with options). `not`: categories
+ * the match plays otherwise.
  */
 export function pickFinal(
   category: CategoryChoice,
@@ -394,20 +589,34 @@ export function pickFinal(
   );
   const [first] = leastSeenFirst(pool, seen, rng);
   if (!first) return null;
-  if (category !== 'mixed' && (seen.get(first.id) ?? 0) > (opts.now ?? Date.now()) - FINAL_REPEAT_MS) return null;
+  if (category !== 'mixed' && (seen.get(first.id) ?? 0) > (opts.now ?? Date.now()) - REPEAT_MS) return null;
   return first;
 }
 
-/** A match's `count` questions, as pickQuestions picks them, the last one its final when it has one (pickFinal). */
+/**
+ * A match's `count` questions, as pickQuestions picks them, with its pictures and order question (`formats`) in place
+ * of some, the last one its final when it has one (pickFinal). `pictures`: a room of pictures — every question one, as
+ * far as the bank has them (the rest with options).
+ */
 export function pickMatch(
   count: number,
   category: CategoryChoice,
   seen: ReadonlyMap<string, number>,
-  opts: { final: boolean; rng?: Rng },
+  opts: { final: boolean; formats?: Formats; pictures?: boolean; rng?: Rng; now?: number },
 ): PreparedQuestion[] {
   const rng = opts.rng ?? Math.random;
   const final = opts.final ? pickFinal(category, seen, rng) : null;
-  return final ? [...pickQuestions(count - 1, category, seen, rng), final] : pickQuestions(count, category, seen, rng);
+  const body = count - (final ? 1 : 0);
+  let questions: PreparedQuestion[];
+  if (opts.pictures) {
+    const drawn = pickQuestions(body, category, seen, rng, imageBank());
+    const rest = pickQuestions(body - drawn.length, category, seen, rng);
+    questions = [...drawn, ...rest].sort((a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]);
+  } else {
+    questions = pickQuestions(body, category, seen, rng);
+    placeFormats(questions, category, seen, opts.formats ?? TEXT_ONLY, rng, opts.now ?? Date.now());
+  }
+  return final ? [...questions, final] : questions;
 }
 
 /** One round of a match in ROUNDS: drawn (`category`), or picked from `offers` when it comes. */
@@ -416,17 +625,22 @@ export interface RoundPlan {
   size: number;
   category: CategoryId | null;
   /** The categories on offer and the questions each would bring (drawn up front: the match never waits on the bank). */
-  offers: { category: CategoryId; questions: Question[] }[];
+  offers: { category: CategoryId; questions: PreparedQuestion[] }[];
 }
 
-/** `difficulties.length` questions of one category, unseen first, none of `used` (which they join). */
+/**
+ * `difficulties.length` questions of one category, unseen first, none of `used` (which they join). Round `round` of
+ * ROUNDS (`from`: its first question's index) may hold a picture (the first two rounds) or an order question (the
+ * third), as `formats` allow.
+ */
 function drawFrom(
   category: CategoryId,
   difficulties: readonly Difficulty[],
   seen: ReadonlyMap<string, number>,
   used: Set<string>,
   rng: Rng,
-): Question[] | null {
+  round?: { index: number; from: number; formats: Formats; now: number },
+): PreparedQuestion[] | null {
   const pool = leastSeenFirst(
     questionBank().filter((q) => q.category === category && !used.has(q.id)),
     seen,
@@ -438,8 +652,23 @@ function drawFrom(
     if (!q) return null;
     picked.push(q);
   }
-  for (const q of picked) used.add(q.id);
-  return picked.map((q) => shuffled(q, rng));
+  const questions: PreparedQuestion[] = picked.map((q) => shuffled(q, rng));
+  if (round) {
+    const { index, from, formats, now } = round;
+    const fresh = <T extends PlayableQuestion>(bank: T[]) =>
+      notRecent(
+        bank.filter((q) => q.category === category && !used.has(q.id)),
+        seen,
+        rng,
+        now,
+      );
+    const taken = new Set<number>();
+    if (index === ROUNDS.count - 1 && formats.order) placeOne(questions, fresh(orderBank()), 0, 2, taken, rng);
+    else if (index < Math.min(2, formats.images))
+      placeOne(questions, fresh(imageBank()), IMAGE.first - from, IMAGE.last - from, taken, rng);
+  }
+  for (const q of questions) used.add(q.id);
+  return questions;
 }
 
 /**
@@ -450,8 +679,12 @@ function drawFrom(
 export function pickRounds(
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
-  /** A number final (else a hard question closes the match: a room that turned it off). */
-  { final: numberFinal = true }: { final?: boolean } = {},
+  /** `final`: a number final (else a hard question closes the match: a room that turned it off). */
+  {
+    final: numberFinal = true,
+    formats = TEXT_ONLY,
+    now = Date.now(),
+  }: { final?: boolean; formats?: Formats; now?: number } = {},
 ): { questions: PreparedQuestion[]; rounds: RoundPlan[] } | null {
   const used = new Set<string>();
   const final = numberFinal ? pickFinal('mixed', seen, rng) : null;
@@ -464,7 +697,12 @@ export function pickRounds(
     const offers: RoundPlan['offers'] = [];
     while (offers.length < wanted && next < categories.length) {
       const category = categories[next++];
-      const questions = drawFrom(category, ROUNDS.difficulty[round], seen, used, rng);
+      const questions = drawFrom(category, ROUNDS.difficulty[round], seen, used, rng, {
+        index: round,
+        from: round * ROUNDS.size,
+        formats,
+        now,
+      });
       if (questions) offers.push({ category, questions });
     }
     return offers;
@@ -491,12 +729,13 @@ export function pickRounds(
 /**
  * A friend duel's questions: ROUNDS of three, each on one category — `categories` if given (a rematch picked by whoever
  * lost the last one), else drawn — and a final from a category of its own. Nobody picks while it's played: the two
- * play it at different times.
+ * play it at different times. Pictures and an order question as in a live Дуел (`formats`).
  */
 export function pickDuelSet(
   seen: ReadonlyMap<string, number>,
   categories: readonly CategoryId[] = [],
   rng: Rng = Math.random,
+  { formats = TEXT_ONLY, now = Date.now() }: { formats?: Formats; now?: number } = {},
 ): PreparedQuestion[] | null {
   const used = new Set<string>();
   const drawn = shuffle(
@@ -506,11 +745,16 @@ export function pickDuelSet(
   const played: CategoryId[] = [];
   const questions: PreparedQuestion[] = [];
   for (let r = 0; r < ROUNDS.count; r++) {
-    let round: Question[] | null = null;
+    let round: PreparedQuestion[] | null = null;
     while (!round) {
       const category = categories[r] ?? drawn.shift();
       if (!category) return null;
-      round = drawFrom(category, ROUNDS.difficulty[r], seen, used, rng);
+      round = drawFrom(category, ROUNDS.difficulty[r], seen, used, rng, {
+        index: r,
+        from: r * ROUNDS.size,
+        formats,
+        now,
+      });
       if (round) played.push(category);
       else if (categories[r]) return null;
     }
@@ -522,13 +766,14 @@ export function pickDuelSet(
 }
 
 /**
- * The same questions with the options in an order of their own for this seed (e.g. a day and a player): a set everyone
- * plays stays the same, but "the answers were Б, А, Г…" gives nothing away. The seed is mixed with this server's own
- * secret: the code is public, and without it one player's order would convert into anyone else's.
+ * The same questions with the options (and an order question's items) in an order of their own for this seed (e.g. a
+ * day and a player): a set everyone plays stays the same, but "the answers were Б, А, Г…" gives nothing away. The seed
+ * is mixed with this server's own secret: the code is public, and without it one player's order would convert into
+ * anyone else's.
  */
 export function reorderOptions(questions: PreparedQuestion[], seed: string): PreparedQuestion[] {
   const secret = installationSecret('option-order');
-  return questions.map((q) => (q.kind === 'number' ? q : shuffled(q, seededRng(`${secret}:${seed}:${q.id}`))));
+  return questions.map((q) => shuffled(q, seededRng(`${secret}:${seed}:${q.id}`)));
 }
 
 /**

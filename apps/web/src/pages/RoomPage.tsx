@@ -17,6 +17,7 @@ import {
   Check,
   Copy,
   Crown,
+  Image as ImageIcon,
   LogOut,
   Minus,
   Play,
@@ -290,6 +291,17 @@ export function RoomPage() {
               icon={<Target className="size-4 text-amber-300" />}
               title="Финал с число"
               hint="Последният въпрос е число за въвеждане — година, височина, брой"
+            />
+          )}
+
+          {!s.set && (
+            <Toggle
+              checked={s.pictures}
+              disabled={!isHost}
+              onChange={(pictures) => update({ pictures })}
+              icon={<ImageIcon className="size-4 text-emerald-300" />}
+              title="Картини"
+              hint="Въпроси със снимка: знамена, места, картини, животни (докъдето стигнат — после обикновени)"
             />
           )}
 

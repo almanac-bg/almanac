@@ -178,6 +178,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': server,
+      '/qimg': server,
       '/socket.io': { target: server, ws: true },
     },
   },

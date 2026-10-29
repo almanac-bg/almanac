@@ -97,9 +97,11 @@ export interface NewGame {
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
   /** A friend duel: who it's against. */
   duelWith?: GameSetup['duelWith'];
-  /** Overrides the mode's own ROUNDS and number final (a room's settings). */
+  /** Overrides the mode's own ROUNDS, number final and formats (a room's settings). */
   inRounds?: boolean;
   final?: boolean;
+  /** A room of pictures: every question about one, as far as the bank has them. */
+  pictures?: boolean;
   /** A room's host who runs it on a big screen instead of playing. */
   presenter?: number | null;
   /** A room playing its host's own set (its name; `questions` are the set's). */
@@ -235,10 +237,12 @@ export class GameRegistry {
       (opts.inRounds ?? def.rounds) &&
       opts.category === 'mixed' &&
       opts.questionCount === ROUNDS_QUESTIONS
-        ? pickRounds(seen, Math.random, { final })
+        ? pickRounds(seen, Math.random, { final, formats: def.formats })
         : null;
     const questions =
-      opts.questions ?? inRounds?.questions ?? pickMatch(opts.questionCount, opts.category, seen, { final });
+      opts.questions ??
+      inRounds?.questions ??
+      pickMatch(opts.questionCount, opts.category, seen, { final, formats: def.formats, pictures: opts.pictures });
     if (questions.length < opts.questionCount) throw new StartError('Няма достатъчно въпроси за тази категория.');
 
     const room = (id: string) => `game:${id}`;

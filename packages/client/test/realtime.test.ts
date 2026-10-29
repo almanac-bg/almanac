@@ -116,6 +116,8 @@ const question = (index: number, over: Partial<QuestionPayload> = {}): QuestionP
   kind: 'choice',
   options: ['А', 'Б', 'В', 'Г'],
   number: null,
+  order: null,
+  image: null,
   final: false,
   author: null,
   durationMs: 15_000,

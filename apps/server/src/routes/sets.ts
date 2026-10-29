@@ -1,8 +1,20 @@
-import { type Request, type Response, Router } from 'express';
+import { SETS } from '@quiz/shared';
+import express, { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth';
 import { fileReport } from '../moderation';
-import { copySet, createSet, deleteSet, getSet, hideSet, mySets, saveSet, sharedPreview } from '../sets';
+import {
+  copySet,
+  createSet,
+  deleteSet,
+  getSet,
+  hideSet,
+  mySets,
+  pictureFile,
+  saveSet,
+  sharedPreview,
+  uploadPicture,
+} from '../sets';
 import { throttled } from '../throttle';
 import { getUser, isAdmin } from '../users';
 import { idParam, parse, requireAccount } from './common';
@@ -58,6 +70,53 @@ setsRouter.put('/sets/:id', requireAuth, requireAccount, (req, res) => {
 setsRouter.delete('/sets/:id', requireAuth, requireAccount, (req, res) => {
   deleteSet(idParam(req), res.locals.userId);
   res.json({ ok: true });
+});
+
+/**
+ * A picture for a question: made small enough in the browser (a WebP or a JPEG, without a photo's metadata), checked
+ * and kept here. Saved with a set, it's that set's; one no set uses goes after a day (sweepPictures).
+ */
+setsRouter.post(
+  '/sets/images',
+  requireAuth,
+  requireAccount,
+  express.raw({ type: ['image/webp', 'image/jpeg'], limit: SETS.imageBytes }),
+  (req, res) => {
+    if (throttled(`set-image:${res.locals.userId}`, 120, 60 * 60_000)) {
+      res.status(429).json({ error: 'Твърде много снимки наведнъж. Изчакай малко.' });
+      return;
+    }
+    if (!Buffer.isBuffer(req.body)) {
+      res.status(400).json({ error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' });
+      return;
+    }
+    const up = uploadPicture(res.locals.userId, req.body);
+    if (!up.ok) {
+      res.status(400).json({ error: up.error });
+      return;
+    }
+    res.json({ id: up.id, w: up.w, h: up.h });
+  },
+);
+
+/**
+ * A set's picture, for the rooms that play it and its editor. Its address is a hash nobody guesses; cached for a day
+ * only, so one a moderator blocks soon stops showing, and never by a shared cache.
+ */
+setsRouter.get('/sets/images/:id', (req, res) => {
+  const id = String(req.params.id);
+  const file = /^[0-9a-f]{16}$/.test(id) ? pictureFile(id) : undefined;
+  if (!file) {
+    res.status(404).json({ error: 'Няма такава снимка.' });
+    return;
+  }
+  res.set({
+    'Content-Type': file.type,
+    'Cache-Control': 'private, max-age=86400',
+    'X-Robots-Tag': 'noindex',
+    'Content-Security-Policy': "default-src 'none'",
+  });
+  res.send(Buffer.from(file.bytes));
 });
 
 /** A share link as another host sees it. */

@@ -16,8 +16,15 @@
 //                                                                       candidates; the rest → <file>.spares.json
 //   node .claude/skills/question-bank/bank.mjs collect <dir> <out> [slug...]  a workflow's checked batches
 //                                                                       (<dir>/<slug>/verified.json) → <out>.json for `add`
+//   node .claude/skills/question-bank/bank.mjs image <draft.json> <out.json> [bank]  picture questions: each draft's
+//                                                                       Commons file (`commons`) fetched with its licence
+//                                                                       and author, saved in the bank's images/ in its two
+//                                                                       sizes, and the question written to <out.json> with
+//                                                                       its `image` (for `add`). Needs a browser to convert
+//                                                                       them: BROWSER_PATH, or Playwright's own Chromium.
 //
 // bank: "private" (private/questions.json, the default) or "sample" (apps/server/src/data/questions.sample.json).
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -47,6 +54,7 @@ const KEYS = [
   'number',
   'items',
   'direction',
+  'unit',
   'image',
   'fact',
   'factSource',
@@ -71,8 +79,18 @@ function fail(message) {
 }
 
 const kindOf = (q) => q.kind ?? 'choice';
-/** A question's answer as text: its right option, or its number as Bulgarian writes it ("6,5"). */
-const answerOf = (q) => (kindOf(q) === 'number' ? String(q.number.answer).replace('.', ',') : q.options[q.answer]);
+/** Its format as the balance counts it: a picture question is balanced on its own, like numbers and orders. */
+const formatOf = (q) => (q.image ? 'image' : kindOf(q));
+/** The right order of an order question's items (their texts). */
+const ordered = (q) =>
+  [...q.items].sort((a, b) => (q.direction === 'asc' ? a.value - b.value : b.value - a.value)).map((i) => i.text);
+/** A question's answer as text: its right option, its number as Bulgarian writes it ("6,5"), or its order. */
+const answerOf = (q) =>
+  kindOf(q) === 'number'
+    ? String(q.number.answer).replace('.', ',')
+    : kindOf(q) === 'order'
+      ? ordered(q).join(' → ')
+      : q.options[q.answer];
 
 const line = (q) => JSON.stringify(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
 const serialize = (questions) => `[\n${questions.map((q) => `  ${line(q)}`).join(',\n')}\n]\n`;
@@ -141,7 +159,7 @@ const stems = (text) =>
  * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over.
  * Questions with options only: number questions are balanced on their own (numberBalance). */
 function balance(all) {
-  const questions = all.filter((q) => kindOf(q) === 'choice');
+  const questions = all.filter((q) => formatOf(q) === 'choice');
   const rows = Object.entries(PREFIX).map(([category, prefix]) => {
     const qs = questions.filter((q) => q.category === category);
     const count = Object.fromEntries(DIFFICULTIES.map((d) => [d, qs.filter((q) => q.difficulty === d).length]));
@@ -161,14 +179,19 @@ function balance(all) {
 }
 
 /**
- * Number questions (a match's final, one a match): every category the same number of them; the difficulty split
- * doesn't apply, since a final is drawn from any difficulty.
+ * Number, picture and order questions, each format on its own: every category the same number of them. Numbers ignore
+ * the difficulty split (a final is drawn from any difficulty); pictures and orders take a match's place by difficulty,
+ * so their split is shown too.
  */
-function numberBalance(questions) {
-  const counts = Object.keys(PREFIX).map((category) => ({
-    category,
-    total: questions.filter((q) => kindOf(q) === 'number' && q.category === category).length,
-  }));
+function formatBalance(questions, format) {
+  const counts = Object.keys(PREFIX).map((category) => {
+    const qs = questions.filter((q) => formatOf(q) === format && q.category === category);
+    return {
+      category,
+      total: qs.length,
+      split: DIFFICULTIES.map((d) => qs.filter((q) => q.difficulty === d).length).join('/'),
+    };
+  });
   const size = Math.max(...counts.map((c) => c.total));
   return { counts, size };
 }
@@ -199,6 +222,94 @@ function append(bank, added) {
   }
 }
 
+// ─── Pictures (the `image` command) ─────────────────────────────────────────
+
+/** No personal data in requests (the skill's rule): who's asking is the game. */
+const USER_AGENT = 'AlmanacBank/1.0 (https://almanac.bg)';
+/** The bank's sizes (IMAGE in packages/shared/src/formats.ts): the longer side, and the most a file may weigh. */
+const LARGE_SIDE = 1200;
+const MAX_BYTES = 150_000;
+
+/** A Commons licence as the bank writes it; null for one it doesn't take (the bank test has the same list). */
+function licence(short) {
+  const s = short.trim();
+  if (/^(public domain|pd\b|pd-)/i.test(s)) return 'PD';
+  if (/^cc0/i.test(s)) return 'CC0 1.0';
+  const m = s.match(/^cc[ -]by(-sa)?[ -]([1-4]\.[05])$/i);
+  return m ? `CC BY${m[1] ? '-SA' : ''} ${m[2]}` : null;
+}
+
+const plain = (html) =>
+  html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** A Commons file's licence, author, page and a 1200 px rendering; or why it can't go in. */
+async function commonsFile(title) {
+  const query = new URLSearchParams({
+    action: 'query',
+    titles: title,
+    prop: 'imageinfo',
+    iiprop: 'url|size|extmetadata',
+    iiurlwidth: String(LARGE_SIDE),
+    format: 'json',
+  });
+  const res = await fetch(`https://commons.wikimedia.org/w/api.php?${query}`, {
+    headers: { 'User-Agent': USER_AGENT },
+  });
+  if (!res.ok) return { error: `Commons answered ${res.status}` };
+  const page = Object.values((await res.json()).query?.pages ?? {})[0];
+  const info = page?.imageinfo?.[0];
+  if (!info) return { error: 'no such file on Commons' };
+  const meta = info.extmetadata ?? {};
+  const short = meta.LicenseShortName?.value ?? '';
+  const license = licence(short);
+  if (!license || (meta.NonFree?.value && meta.NonFree.value !== 'false'))
+    return { error: `the licence «${short || '?'}» isn't one the bank takes` };
+  const credit = plain(meta.Artist?.value ?? '').slice(0, 120) || (license === 'PD' ? 'неизвестен автор' : '');
+  if (!credit) return { error: 'no author to credit' };
+  return { license, credit, page: info.descriptionurl, url: info.thumburl ?? info.url };
+}
+
+/**
+ * A picture in the bank's two sizes, as WebP within MAX_BYTES: the longer side at most LARGE_SIDE, and half that.
+ * Drawn in a browser (its canvas writes WebP; nothing to install).
+ */
+async function convert(browser, bytes) {
+  const page = await browser.newPage();
+  try {
+    return await page.evaluate(
+      async ({ data, side, max }) => {
+        const blob = new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))]);
+        const bitmap = await createImageBitmap(blob);
+        const encode = async (scale) => {
+          const w = Math.max(1, Math.round(bitmap.width * scale));
+          const h = Math.max(1, Math.round(bitmap.height * scale));
+          const canvas = new OffscreenCanvas(w, h);
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(bitmap, 0, 0, w, h);
+          for (const quality of [0.86, 0.8, 0.72, 0.64, 0.56, 0.48]) {
+            const out = await canvas.convertToBlob({ type: 'image/webp', quality });
+            if (out.size <= max) return { w, h, bytes: [...new Uint8Array(await out.arrayBuffer())] };
+          }
+          return null;
+        };
+        const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+        return { large: await encode(scale), small: await encode(scale / 2) };
+      },
+      { data: Buffer.from(bytes).toString('base64'), side: LARGE_SIDE, max: MAX_BYTES },
+    );
+  } finally {
+    await page.close();
+  }
+}
+
 const [command, ...args] = process.argv.slice(2);
 switch (command) {
   case 'stats': {
@@ -215,10 +326,15 @@ switch (command) {
     console.log(
       `balanced: ${size} per category (${target.easy}/${target.medium}/${target.hard}), ${missing ? `${missing} questions to add` : 'reached'}`,
     );
-    const numbers = numberBalance(questions);
-    if (numbers.size) {
+    for (const [format, title] of [
+      ['number', 'number questions (finals)'],
+      ['image', 'picture questions (easy/medium/hard)'],
+      ['order', 'order questions (easy/medium/hard)'],
+    ]) {
+      const { counts, size: most } = formatBalance(questions, format);
+      if (!most) continue;
       console.log(
-        `number questions (finals): ${numbers.counts.map((c) => `${c.category} ${c.total}${c.total < numbers.size ? ` (+${numbers.size - c.total})` : ''}`).join(' · ')}`,
+        `${title}: ${counts.map((c) => `${c.category} ${c.total}${format === 'number' ? '' : ` ${c.split}`}${c.total < most ? ` (+${most - c.total})` : ''}`).join(' · ')}`,
       );
     }
     break;
@@ -245,7 +361,7 @@ switch (command) {
     // Checked candidates (e.g. collect's .tids.json, written with a spare or two per difficulty) → exactly what each
     // category and difficulty lacks for balance, in the file's order; the rest wait in <file>.spares.json.
     const candidates = readJson(args[0]);
-    if (candidates.some((q) => kindOf(q) !== 'choice')) fail('fill takes questions with options only');
+    if (candidates.some((q) => formatOf(q) !== 'choice')) fail('fill takes questions with options only');
     const bank = load(args[1]);
     const { rows } = balance(bank.questions);
     const lacking = Object.fromEntries(rows.map((r) => [r.category, { ...r.short }]));
@@ -408,6 +524,68 @@ switch (command) {
     console.log(`${kept.length} kept → ${out}.json (with tids: ${out}.tids.json, for similar and giveaways)`);
     break;
   }
+  case 'image': {
+    const [draftFile, outFile, bankName = 'private'] = args;
+    if (!outFile) fail('image <draft.json> <out.json> [bank]');
+    if (!BANKS[bankName]) fail(`unknown bank "${bankName}" (private or sample)`);
+    const drafts = readJson(draftFile);
+    const dir = path.join(root, path.dirname(BANKS[bankName]), 'images');
+    fs.mkdirSync(dir, { recursive: true });
+    const { chromium } = await import('playwright-core');
+    const browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH || undefined });
+    const out = [];
+    try {
+      for (const [i, d] of drafts.entries()) {
+        const label = `#${i + 1} ${d.q}`;
+        if (!d.commons || !d.alt) {
+          console.log(`${label}: needs commons and alt — left out`);
+          continue;
+        }
+        const file = await commonsFile(d.commons);
+        if (file.error) {
+          console.log(`${label}: ${file.error} — left out`);
+          continue;
+        }
+        const res = await fetch(file.url, { headers: { 'User-Agent': USER_AGENT } });
+        if (!res.ok) {
+          console.log(`${label}: the file answered ${res.status} — left out`);
+          continue;
+        }
+        const { large, small } = await convert(browser, new Uint8Array(await res.arrayBuffer()));
+        if (!large || !small) {
+          console.log(`${label}: won't fit in ${MAX_BYTES / 1000} KB — left out`);
+          continue;
+        }
+        const largeBytes = Buffer.from(large.bytes);
+        const name = createHash('sha256').update(largeBytes).digest('hex').slice(0, 16);
+        fs.writeFileSync(path.join(dir, `${name}.webp`), largeBytes);
+        fs.writeFileSync(path.join(dir, `${name}-600.webp`), Buffer.from(small.bytes));
+        const { commons: _, alt, credit, ...q } = d;
+        const image = {
+          file: `${name}.webp`,
+          w: large.w,
+          h: large.h,
+          alt,
+          credit: credit ?? file.credit,
+          license: file.license,
+          sourceUrl: file.page,
+        };
+        out.push({ ...q, image });
+        console.log(
+          `${label}: ${name} ${large.w}×${large.h}, ${Math.round(large.bytes.length / 1024)} + ${Math.round(small.bytes.length / 1024)} KB · ${image.license} · ${image.credit}`,
+        );
+        // Wikimedia asks for a gentle pace.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    } finally {
+      await browser.close();
+    }
+    fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
+    console.log(`${out.length} of ${drafts.length} → ${outFile} (pictures in ${path.relative(root, dir)})`);
+    break;
+  }
   default:
-    fail('commands: stats · show · add · fill · facts · similar · giveaways · collect (see the top of this file)');
+    fail(
+      'commands: stats · show · add · fill · facts · similar · giveaways · collect · image (see the top of this file)',
+    );
 }

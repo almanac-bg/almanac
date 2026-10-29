@@ -3,7 +3,7 @@ import { CROWD, type Crowd, type Difficulty, type PlayCheck } from '@quiz/shared
 import { all, one, run } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionInfo } from './questionReports';
-import { bankOption, type PreparedQuestion, questionById } from './questions';
+import { bankOption, isChoice, type PreparedQuestion, questionById } from './questions';
 import { getUser, toPublicUser } from './users';
 
 /** How long each person's answers are kept: enough to see a pattern, not a history of everything they ever played. */
@@ -34,7 +34,8 @@ export function recordAnswers(matchId: string, userId: number, log: AnswerLogEnt
       a.correct ? 1 : 0,
       a.correct ? (a.timeMs ?? 0) : 0,
     );
-    if (a.closeness !== null) continue;
+    // A number or an order has no option to count.
+    if (a.closeness !== null || a.placed !== null) continue;
     // Column names from a fixed list, never from the answer itself.
     const column = a.choice === null ? 'unanswered' : PICK_COLUMNS[a.choice];
     if (column) run(`UPDATE question_stats SET ${column} = ${column} + 1 WHERE question_id = ?`, a.questionId);
@@ -61,8 +62,8 @@ interface StatsRow {
 export function crowdFor(q: PreparedQuestion): Crowd | null {
   const r = one<StatsRow>('SELECT * FROM question_stats WHERE question_id = ?', q.id);
   if (!r) return null;
-  // A number is right once it's close: its share is the only one there is.
-  if (q.kind === 'number')
+  // A number is right once it's close, an order once all of it is: that share is the only one there is.
+  if (!isChoice(q))
     return r.answered >= CROWD.minAnswers ? { known: r.correct / r.answered, picks: null, answers: r.answered } : null;
   const bank = [r.pick0, r.pick1, r.pick2, r.pick3];
   const answers = bank.reduce((sum, n) => sum + n, 0) + r.unanswered;
@@ -161,8 +162,9 @@ function questionsToCheck(): PlayCheck['questions'] {
   const out: PlayCheck['questions'] = [];
   for (const r of rows) {
     const q = questionById(r.question_id);
-    // A number counts as right once it's close: its share says nothing about the label the way a pick does.
-    if (!q || q.kind === 'number') continue;
+    // A number counts as right once it's close, an order once all of it is: their share says nothing about the label
+    // the way a pick does.
+    if (!q || !isChoice(q)) continue;
     const share = r.correct / r.answered;
     const [low, high] = EXPECTED_CORRECT[q.difficulty];
     const verdict = share < LIKELY_WRONG_BELOW ? 'wrong' : share < low ? 'harder' : share > high ? 'easier' : null;

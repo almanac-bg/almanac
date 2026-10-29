@@ -1,6 +1,6 @@
 import type { SiteInfo } from '@quiz/shared';
 import { config } from './config';
-import { questionBank } from './questions';
+import { imageBank, numberBank, orderBank, questionBank } from './questions';
 
 /**
  * What every page says about the site (see SiteInfo): taken once at startup, like the pages the server draws from it,
@@ -11,5 +11,7 @@ export const siteInfo: SiteInfo = {
   ...config.operator,
   sourceUrl: config.sourceUrl,
   release: config.release,
-  questions: Math.floor(questionBank().length / 100) * 100,
+  // Every format in play: with options, with a picture, a number, an order.
+  questions:
+    Math.floor((questionBank().length + imageBank().length + numberBank().length + orderBank().length) / 100) * 100,
 };

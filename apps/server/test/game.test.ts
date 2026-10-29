@@ -28,7 +28,7 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
-const { numberBank, pickQuestions, pickRounds } = await import('../src/questions');
+const { isChoice, numberBank, pickQuestions, pickRounds } = await import('../src/questions');
 const { BOT_MAX_RATING, makeBots } = await import('../src/game/bots');
 
 const COUNTDOWN = 3_500;
@@ -135,7 +135,7 @@ function setup(opts: {
   const q = () => game.questions[game.index];
   const answerOf = () => {
     const now = q();
-    if (now.kind === 'number') throw new Error('a number question has no option to pick');
+    if (!isChoice(now)) throw new Error('only a question with options has an option to pick');
     return now.answer;
   };
   return {
@@ -512,7 +512,7 @@ test('bots made up their minds when the question opened: once every person has a
   // pace 0.3: the bot would answer three seconds in; the person answers after one.
   const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
   const first = g.game.questions[0];
-  assert.ok(first.kind !== 'number');
+  assert.ok(isChoice(first));
   advance(1_000);
   g.right(1);
   advance(600 + 50);
@@ -546,7 +546,7 @@ test('a bot that zoned out keeps nobody waiting once the people have answered', 
 test('the speed bonus waits out the reading window: no gain from tapping before the question is read', () => {
   const g = setup({ humans: [1, 2] });
   const first = g.game.questions[0];
-  assert.ok(first.kind !== 'number');
+  assert.ok(isChoice(first));
   const read = readingMs(first.q, first.options);
   assert.equal(g.of<QuestionPayload>('game:question')[0].readMs, read, 'the options are read too');
   assert.ok(read > readingMs(first.q) && read <= 4_500);
@@ -757,7 +757,7 @@ test("a recording plays its owner's answers: the same pick, at the same time, wi
   const questions = [...pickQuestions(9, 'mixed', new Map()), yearQuestion()];
   const right = (i: number) => {
     const q = questions[i];
-    assert.ok(q.kind !== 'number');
+    assert.ok(isChoice(q));
     return q.answer;
   };
   const wrong = (i: number) => (right(i) + 1) % 4;

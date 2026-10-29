@@ -26,7 +26,7 @@ process.env.DB_PATH = path.join(tmp, 'collection.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { all, one, run } = await import('../src/db');
-const { questionById, reloadQuestionBank, reorderOptions } = await import('../src/questions');
+const { isChoice, questionById, reloadQuestionBank, reorderOptions } = await import('../src/questions');
 const { crowdFor, recordAnswers } = await import('../src/answers');
 const { almanacCategory, almanacOverview, factCount, learn, noteMatch, reviewQueue, reviewQuestions } = await import(
   '../src/almanac'
@@ -60,9 +60,11 @@ function logged(questionId: string, correct: boolean, choice: number | null = nu
     index: 0,
     category: q.category,
     difficulty: q.difficulty,
-    choice: q.kind === 'number' ? null : (choice ?? (correct ? q.answer : (q.answer + 1) % 4)),
+    choice: !isChoice(q) ? null : (choice ?? (correct ? q.answer : (q.answer + 1) % 4)),
     guess: q.kind === 'number' ? (correct ? q.number.answer : q.number.min) : null,
     closeness: q.kind === 'number' ? (correct ? 1 : 0) : null,
+    arranged: null,
+    placed: null,
     correct,
     timeMs: 3000,
     points: correct ? 900 : 0,
@@ -76,7 +78,7 @@ const DAY = 24 * 60 * 60_000;
 test('„X% знаят“: each option’s share in the match’s own order, only once enough have answered', () => {
   const player = account();
   const bank = questionById('history-5')!;
-  assert.ok(bank.kind !== 'number');
+  assert.ok(isChoice(bank));
   // 20 right, 6 on the next option, 3 on the one after, one with no answer: 30 in all.
   const log = [
     ...Array.from({ length: 20 }, () => logged('history-5', true)),
@@ -85,7 +87,7 @@ test('„X% знаят“: each option’s share in the match’s own order, onl
   ];
   recordAnswers('m', player, log);
   const shown = reorderOptions([bank], 'crowd-test')[0];
-  assert.ok(shown.kind !== 'number');
+  assert.ok(isChoice(shown));
   assert.equal(crowdFor(shown), null, `fewer than ${CROWD.minAnswers}`);
   recordAnswers('m', player, [{ ...logged('history-5', false), choice: null, timeMs: null }]);
   const crowd = crowdFor(shown)!;

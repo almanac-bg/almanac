@@ -1,15 +1,18 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   type QuestionSetInfo,
   type QuestionSetSummary,
   type RoomSettings,
   SETS,
+  type SetImage,
   type SetQuestion,
   type SharedSetPreview,
+  setPictureUrl,
 } from '@quiz/shared';
 import { z } from 'zod';
-import { all, one, run } from './db';
-import { type PreparedQuestion, shuffle } from './questions';
+import { all, one, run, tx } from './db';
+import type { HostImage, PreparedQuestion } from './questions';
+import { shuffle } from './questions';
 
 /**
  * „Моите въпроси“: a host's own question sets (SETS), for their private rooms — a teacher's quiz on the lesson, an
@@ -37,6 +40,34 @@ const text = (min: number, max: number, what: string) =>
     .pipe(z.string().min(min, `${what}: поне ${min} знака.`).max(max, `${what}: най-много ${max} знака.`));
 
 const QuestionText = text(SETS.question[0], SETS.question[1], 'Въпросът');
+const Unit = z
+  .string()
+  .transform((s) => s.trim())
+  .pipe(z.string().max(SETS.unit, `Мерната единица е до ${SETS.unit} знака.`));
+const Amount = z.number().finite().min(-1e12).max(1e12);
+
+/** A picture as a question holds it: its size and what it shows are checked against the upload when it's saved. */
+const ImageRef = z
+  .object({
+    id: z.string().regex(/^[0-9a-f]{16}$/),
+    w: z.number().int(),
+    h: z.number().int(),
+    alt: z
+      .string()
+      .transform((s) => s.normalize('NFC').replace(/\s+/gu, ' ').trim())
+      .pipe(z.string().max(SETS.imageAlt, `Описанието на снимката е до ${SETS.imageAlt} знака.`)),
+  })
+  .optional();
+
+/** Values for all four or none; given, they go up or down in the order the host put them. */
+const inOrder = (values: (number | null)[]) => {
+  if (values.every((v) => v === null)) return true;
+  if (values.some((v) => v === null)) return false;
+  const v = values as number[];
+  const up = v.every((x, i) => i === 0 || x > v[i - 1]);
+  const down = v.every((x, i) => i === 0 || x < v[i - 1]);
+  return up || down;
+};
 
 const SetQuestionSchema = z.discriminatedUnion('kind', [
   z
@@ -45,23 +76,37 @@ const SetQuestionSchema = z.discriminatedUnion('kind', [
       q: QuestionText,
       options: z.array(text(SETS.option[0], SETS.option[1], 'Отговорът')).length(4, 'Въпросът иска четири отговора.'),
       answer: z.number().int().min(0).max(3),
+      image: ImageRef,
     })
     .refine((q) => new Set(q.options.map((o) => o.toLocaleLowerCase('bg'))).size === 4, {
       message: 'Двата отговора на един въпрос са еднакви.',
     }),
-  z.object({ kind: z.literal('truefalse'), q: QuestionText, answer: z.boolean() }),
+  z.object({ kind: z.literal('truefalse'), q: QuestionText, answer: z.boolean(), image: ImageRef }),
   z.object({
     kind: z.literal('number'),
     q: QuestionText,
     number: z.object({
-      answer: z.number().finite().min(-1e12).max(1e12),
-      unit: z
-        .string()
-        .transform((s) => s.trim())
-        .pipe(z.string().max(SETS.unit, `Мерната единица е до ${SETS.unit} знака.`)),
+      answer: Amount,
+      unit: Unit,
       tolerance: z.number().finite().positive('Отклонението трябва да е над нула.').max(1e12),
     }),
   }),
+  z
+    .object({
+      kind: z.literal('order'),
+      q: QuestionText,
+      items: z
+        .array(z.object({ text: text(SETS.option[0], SETS.option[1], 'Всяко от четирите'), value: Amount.nullable() }))
+        .length(4, 'За подреждане трябват четири неща.'),
+      unit: Unit,
+    })
+    .refine((q) => new Set(q.items.map((i) => i.text.toLocaleLowerCase('bg'))).size === 4, {
+      message: 'Две от нещата за подреждане са еднакви.',
+    })
+    .refine((q) => inOrder(q.items.map((i) => i.value)), {
+      message:
+        'Числата трябва да са дадени за всичките четири (или за нито едно) и да растат или намаляват по реда им.',
+    }),
 ]);
 
 export const SetSchema = z.object({
@@ -78,6 +123,149 @@ const owned = (id: number, userId: number) => {
   const row = getRow(id);
   return row && row.owner_id === userId ? row : undefined;
 };
+
+// ─── Pictures ───────────────────────────────────────────────────────────────
+
+/**
+ * A picture as uploaded: what it is and its size, read from the file itself (a WebP or a JPEG, as a browser's canvas
+ * makes them: nothing animated). Null for anything else, or a file cut short. The editor makes them small enough
+ * itself (SETS.imageSide, SETS.imageBytes): the server only checks.
+ */
+export function readPicture(b: Buffer): { type: 'image/webp' | 'image/jpeg'; w: number; h: number } | null {
+  const size = b.length >= 30 && b.toString('latin1', 0, 4) === 'RIFF' ? webpSize(b) : jpegSize(b);
+  if (!size) return null;
+  const { w, h } = size;
+  if (w < 16 || h < 16 || w > SETS.imageSide || h > SETS.imageSide) return null;
+  return { type: b[0] === 0xff ? 'image/jpeg' : 'image/webp', w, h };
+}
+
+function webpSize(b: Buffer): { w: number; h: number } | null {
+  if (b.toString('latin1', 8, 12) !== 'WEBP' || b.readUInt32LE(4) + 8 !== b.length) return null;
+  const chunk = b.toString('latin1', 12, 16);
+  if (chunk === 'VP8 ') {
+    if (b[23] !== 0x9d || b[24] !== 0x01 || b[25] !== 0x2a) return null;
+    return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+  }
+  if (chunk === 'VP8L') {
+    if (b[20] !== 0x2f) return null;
+    const bits = b.readUInt32LE(21);
+    return { w: (bits & 0x3fff) + 1, h: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  // Extended: only a still picture without EXIF or XMP (a canvas makes none; a phone's photo might say where it was).
+  if (chunk === 'VP8X') {
+    if (b[20] & (0x02 | 0x04 | 0x08)) return null;
+    return { w: b.readUIntLE(24, 3) + 1, h: b.readUIntLE(27, 3) + 1 };
+  }
+  return null;
+}
+
+function jpegSize(b: Buffer): { w: number; h: number } | null {
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8 || b[b.length - 2] !== 0xff || b[b.length - 1] !== 0xd9)
+    return null;
+  let i = 2;
+  while (i + 9 < b.length) {
+    if (b[i] !== 0xff) return null;
+    const marker = b[i + 1];
+    // EXIF and the like (APP1–APP15): a canvas writes none, and a photo's could say where it was taken.
+    if (marker >= 0xe1 && marker <= 0xef) return null;
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc)
+      return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
+/** A picture's id: a hash of its content (the same picture twice is one). */
+const pictureId = (b: Buffer) => createHash('sha256').update(b).digest('hex').slice(0, 16);
+
+/** Keeps a picture a host uploads for a question of theirs, up to SETS.images of them. */
+export function uploadPicture(userId: number, bytes: Buffer): Result<{ id: string; w: number; h: number }> {
+  if (bytes.length > SETS.imageBytes) return { ok: false, error: 'Снимката е твърде голяма.' };
+  const pic = readPicture(bytes);
+  if (!pic) return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
+  const id = pictureId(bytes);
+  if (one('SELECT 1 AS x FROM set_images WHERE owner_id = ? AND id = ?', userId, id))
+    return { ok: true, id, w: pic.w, h: pic.h };
+  const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM set_images WHERE owner_id = ?', userId)!.n;
+  if (count >= SETS.images)
+    return { ok: false, error: `Можеш да пазиш до ${SETS.images} снимки — махни някоя от наборите си.` };
+  run(
+    'INSERT INTO set_images (owner_id, id, type, bytes, w, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    userId,
+    id,
+    pic.type,
+    bytes,
+    pic.w,
+    pic.h,
+    Date.now(),
+  );
+  return { ok: true, id, w: pic.w, h: pic.h };
+}
+
+/** A picture to serve: none once a moderator has blocked it (or no set has kept it). */
+export const pictureFile = (id: string) =>
+  one<{ type: string; bytes: Uint8Array }>(
+    'SELECT type, bytes FROM set_images WHERE id = ? AND blocked = 0 LIMIT 1',
+    id,
+  );
+
+/** The pictures (by id) there are to play, with their real size. */
+function picturesOf(ids: string[]): Map<string, { w: number; h: number }> {
+  if (!ids.length) return new Map();
+  return new Map(
+    all<{ id: string; w: number; h: number }>(
+      `SELECT id, MAX(w) AS w, MAX(h) AS h FROM set_images WHERE blocked = 0 AND id IN (${ids.map(() => '?').join(',')})
+       GROUP BY id`,
+      ...ids,
+    ).map((r) => [r.id, { w: r.w, h: r.h }]),
+  );
+}
+
+const imageIds = (questions: SetQuestion[]) => questions.flatMap((q) => ('image' in q && q.image ? [q.image.id] : []));
+
+/**
+ * A set's questions as they're kept: each picture's size as uploaded. Null (with which question) when a picture isn't
+ * there to use: never uploaded, or blocked.
+ */
+function withPictures(questions: SetQuestion[]): Result<{ questions: SetQuestion[] }> {
+  const known = picturesOf(imageIds(questions));
+  const out: SetQuestion[] = [];
+  for (const [i, q] of questions.entries()) {
+    if (!('image' in q) || !q.image) {
+      out.push(q);
+      continue;
+    }
+    const size = known.get(q.image.id);
+    if (!size) return { ok: false, error: `Въпрос ${i + 1}: снимката я няма — сложи я отново.` };
+    out.push({ ...q, image: { ...q.image, ...size } });
+  }
+  return { ok: true, questions: out };
+}
+
+/**
+ * Pictures no set has used for a day go (an upload left behind by an editor closed before saving, a question changed
+ * since): `SETS.images` is about what a host keeps, not what they ever tried. Returns how many went.
+ */
+export function sweepPictures(now = Date.now()): number {
+  const used = new Set(
+    all<{ id: string }>(
+      `SELECT DISTINCT json_extract(q.value, '$.image.id') AS id FROM question_sets s, json_each(s.questions) q
+       WHERE json_extract(q.value, '$.image.id') IS NOT NULL`,
+    ).map((r) => r.id),
+  );
+  let swept = 0;
+  tx(() => {
+    for (const r of all<{ owner_id: number; id: string }>(
+      'SELECT owner_id, id FROM set_images WHERE created_at < ?',
+      now - 24 * 60 * 60_000,
+    )) {
+      if (used.has(r.id)) continue;
+      run('DELETE FROM set_images WHERE owner_id = ? AND id = ?', r.owner_id, r.id);
+      swept++;
+    }
+  });
+  return swept;
+}
 
 function info(row: SetRow): QuestionSetInfo {
   return {
@@ -120,6 +308,8 @@ export function getSet(id: number, userId: number): QuestionSetInfo | null {
 export function createSet(userId: number, body: unknown, copiedFrom: number | null = null): Result<{ id: number }> {
   const parsed = parseSet(body);
   if (!parsed.ok) return parsed;
+  const pictured = withPictures(parsed.set.questions);
+  if (!pictured.ok) return pictured;
   const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM question_sets WHERE owner_id = ?', userId)!.n;
   if (count >= SETS.perOwner) return { ok: false, error: `Можеш да имаш най-много ${SETS.perOwner} набора.` };
   const now = Date.now();
@@ -130,7 +320,7 @@ export function createSet(userId: number, body: unknown, copiedFrom: number | nu
       userId,
       parsed.set.name,
       newCode(),
-      JSON.stringify(parsed.set.questions),
+      JSON.stringify(pictured.questions),
       copiedFrom,
       now,
       now,
@@ -143,10 +333,12 @@ export function saveSet(id: number, userId: number, body: unknown): Result<{ set
   if (!owned(id, userId)) return { ok: false, error: 'Няма такъв набор.' };
   const parsed = parseSet(body);
   if (!parsed.ok) return parsed;
+  const pictured = withPictures(parsed.set.questions);
+  if (!pictured.ok) return pictured;
   run(
     'UPDATE question_sets SET name = ?, questions = ?, updated_at = ? WHERE id = ?',
     parsed.set.name,
-    JSON.stringify(parsed.set.questions),
+    JSON.stringify(pictured.questions),
     Date.now(),
     id,
   );
@@ -173,6 +365,7 @@ export function sharedPreview(code: string, viewerId: number, admin = false): Sh
       choice: questions.filter((q) => q.kind === 'choice').length,
       truefalse: questions.filter((q) => q.kind === 'truefalse').length,
       number: questions.filter((q) => q.kind === 'number').length,
+      order: questions.filter((q) => q.kind === 'order').length,
     },
     mine: row.owner_id === viewerId ? row.id : null,
     hidden: row.hidden === 1,
@@ -187,9 +380,19 @@ export function copySet(code: string, userId: number): Result<{ id: number }> {
   return createSet(userId, { name: row.name, questions: questionsOf(row) }, row.id);
 }
 
-/** A moderator hides a set a report held up about (or shows it again): it can't be played or copied meanwhile. */
+/**
+ * A moderator hides a set a report held up about (or shows it again): it can't be played or copied meanwhile, and its
+ * pictures aren't served (copies of it show those questions without them).
+ */
 export function hideSet(code: string, hidden: boolean): boolean {
-  return Number(run('UPDATE question_sets SET hidden = ? WHERE code = ?', hidden ? 1 : 0, code).changes) > 0;
+  const row = one<SetRow>('SELECT * FROM question_sets WHERE code = ?', code);
+  if (!row) return false;
+  tx(() => {
+    run('UPDATE question_sets SET hidden = ? WHERE id = ?', hidden ? 1 : 0, row.id);
+    for (const id of imageIds(questionsOf(row)))
+      run('UPDATE set_images SET blocked = ? WHERE id = ?', hidden ? 1 : 0, id);
+  });
+  return true;
 }
 
 /** A set its owner can play in a room: theirs, not hidden, with questions in it. */
@@ -224,16 +427,45 @@ function numberSpec(n: { answer: number; unit: string; tolerance: number }) {
 export function prepareSet(id: number, userId: number): PreparedQuestion[] | null {
   const row = owned(id, userId);
   if (!row || row.hidden) return null;
+  const questions = questionsOf(row);
+  // A picture blocked or gone since (its uploader left): the question plays without it.
+  const pictures = picturesOf(imageIds(questions));
+  const picture = (image: SetImage | undefined): { image?: HostImage } => {
+    const size = image && pictures.get(image.id);
+    return image && size
+      ? { image: { url: setPictureUrl(image.id), ...size, alt: image.alt || 'Снимка към въпроса' } }
+      : {};
+  };
   const common = (i: number) => ({
     id: `set-${row.id}-${i}`,
     category: 'general' as const,
     difficulty: 'medium' as const,
   });
-  return questionsOf(row).map((q, i): PreparedQuestion => {
+  return questions.map((q, i): PreparedQuestion => {
     if (q.kind === 'number') return { ...common(i), kind: 'number', q: q.q, number: numberSpec(q.number) };
+    if (q.kind === 'order') {
+      // Without numbers, its places are its values.
+      const numbered = q.items.every((item) => item.value !== null);
+      const up = !numbered || (q.items[1].value as number) > (q.items[0].value as number);
+      return {
+        ...common(i),
+        kind: 'order',
+        q: q.q,
+        items: shuffle(q.items.map((item, place) => ({ text: item.text, value: numbered ? item.value! : place }))),
+        direction: up ? 'asc' : 'desc',
+        unit: q.unit,
+        hideValues: !numbered,
+      };
+    }
     if (q.kind === 'truefalse')
-      return { ...common(i), q: q.q, options: ['Вярно', 'Невярно'], answer: q.answer ? 0 : 1 };
+      return { ...common(i), q: q.q, options: ['Вярно', 'Невярно'], answer: q.answer ? 0 : 1, ...picture(q.image) };
     const order = shuffle([0, 1, 2, 3]);
-    return { ...common(i), q: q.q, options: order.map((o) => q.options[o]), answer: order.indexOf(q.answer) };
+    return {
+      ...common(i),
+      q: q.q,
+      options: order.map((o) => q.options[o]),
+      answer: order.indexOf(q.answer),
+      ...picture(q.image),
+    };
   });
 }
