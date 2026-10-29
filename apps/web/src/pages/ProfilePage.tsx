@@ -29,7 +29,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, Ban, Check, Flag, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { DuelButton, recordLine } from '../components/duels';
@@ -84,7 +84,7 @@ export function ProfilePage() {
           <Avatar avatar={user.avatar} frame={user.frame} size={roomy ? 112 : 72} className="sm:row-span-2" />
           <div className="min-w-0 sm:self-end">
             <p className="text-sm font-semibold text-violet-300">{titleName(user.title)}</p>
-            <FitName name={user.username} className="font-display text-2xl leading-tight font-bold sm:text-4xl" />
+            <FitName name={user.username} className="text-2xl leading-tight font-extrabold sm:text-4xl" />
             <p className="mt-1 text-sm text-fg-3">
               Играе от {longDate(user.createdAt)} · {data.achievements.length}/
               {availableAchievements(openQueues, (id) => data.achievements.some((a) => a.id === id)).length} постижения
@@ -146,7 +146,14 @@ export function ProfilePage() {
             value={o.questionsAnswered ? `${pct(o.correctAnswers, o.questionsAnswered)}%` : '—'}
             hint={o.questionsAnswered ? `${fmt(o.correctAnswers)} от ${fmt(o.questionsAnswered)} верни` : undefined}
           />
-          <Stat label="Най-дълга серия" value={`🔥 ${o.bestStreak}`} />
+          <Stat
+            label="Най-дълга серия"
+            value={
+              <>
+                <Emoji e="🔥" /> {o.bestStreak}
+              </>
+            }
+          />
           <Stat
             label="Най-бърз верен отговор"
             value={o.fastestCorrectMs !== null ? seconds(o.fastestCorrectMs) : '—'}
@@ -155,12 +162,31 @@ export function ProfilePage() {
           <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
           <Stat
             label="Факти в алманаха"
-            value={`📖 ${fmt(data.almanac.facts)}`}
+            value={
+              <>
+                <Emoji e="📖" /> {fmt(data.almanac.facts)}
+              </>
+            }
             hint={`от ${fmt(data.almanac.total)}`}
             to={isMe ? '/almanac' : undefined}
           />
-          <Stat label="Дневна серия" value={`🗓️ ${o.dailyStreak}`} hint={`Най-дълга: ${o.bestDailyStreak}`} />
-          <Stat label="Одобрени въпроси" value={`✍️ ${o.questionsApproved}`} />
+          <Stat
+            label="Дневна серия"
+            value={
+              <>
+                <Emoji e="🗓️" /> {o.dailyStreak}
+              </>
+            }
+            hint={`Най-дълга: ${o.bestDailyStreak}`}
+          />
+          <Stat
+            label="Одобрени въпроси"
+            value={
+              <>
+                <Emoji e="✍️" /> {o.questionsApproved}
+              </>
+            }
+          />
         </div>
       </section>
 
@@ -550,7 +576,7 @@ function ReportButton({ username }: { username: string }) {
 }
 
 /** A number with what it is; `to`: where its details are (your own almanac). */
-function Stat({ label, value, hint, to }: { label: string; value: string; hint?: string; to?: string }) {
+function Stat({ label, value, hint, to }: { label: string; value: ReactNode; hint?: string; to?: string }) {
   const body = (
     <>
       <div className="text-xs font-semibold text-fg-3">{label}</div>

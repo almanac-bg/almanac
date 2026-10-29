@@ -34,6 +34,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
+import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
@@ -437,7 +438,15 @@ function QuestionSource({
           ))}
         </select>
       ) : (
-        <p className="text-sm text-fg-2">{current ? `📝 „${current.name}“ на домакина` : 'От АЛМАНАХ'}</p>
+        <p className="text-sm text-fg-2">
+          {current ? (
+            <>
+              <Emoji e="📝" /> „{current.name}“ на домакина
+            </>
+          ) : (
+            'От АЛМАНАХ'
+          )}
+        </p>
       )}
       <p className="mt-2 text-xs text-fg-3">
         {current

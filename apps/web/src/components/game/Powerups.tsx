@@ -158,21 +158,21 @@ function blockedBy(game: LiveGame, p: PowerupDef): string | null {
 
 /** Chips for козове already working on this question. */
 export function ActivePowerups({ game }: { game: LiveGame }) {
-  const chips: string[] = [];
+  const chips: { e: string; text: string }[] = [];
   // The bet's downside stays in view until the answer: "or nothing" is easy to miss under an icon.
-  if (game.doubled) chips.push('💰 ×2 точки · грешка −500');
-  if (game.retryArmed && !game.retryPrompt) chips.push('🔁 „Втори шанс“ е активен');
+  if (game.doubled) chips.push({ e: '💰', text: '×2 точки · грешка −500' });
+  if (game.retryArmed && !game.retryPrompt) chips.push({ e: '🔁', text: '„Втори шанс“ е активен' });
   if (!chips.length) return null;
   return (
     <>
       {chips.map((c) => (
         <m.span
-          key={c}
+          key={c.text}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-xs font-bold text-amber-200"
         >
-          {c}
+          <Emoji e={c.e} /> {c.text}
         </m.span>
       ))}
     </>

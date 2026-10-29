@@ -236,7 +236,13 @@ export function OrderSummary({ result }: { result: PlayerResult }) {
               result.correct ? 'bg-amber-400/20 text-amber-200' : 'bg-tint/10 text-fg-2',
             )}
           >
-            {result.correct ? '🎯 Всичко на място!' : `${placed} от ${ORDER.items} на място`}
+            {result.correct ? (
+              <>
+                <Emoji e="🎯" /> Всичко на място!
+              </>
+            ) : (
+              `${placed} от ${ORDER.items} на място`
+            )}
           </span>
           {result.streak >= 2 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-1 text-sm font-bold text-orange-300">

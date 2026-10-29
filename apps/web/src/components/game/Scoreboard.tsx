@@ -241,7 +241,7 @@ function DuelBar({ game }: { game: LiveGame }) {
         <span className="text-xs font-bold text-fg-3 tabular-nums">
           {gap > 0 ? `+${fmt(gap)}` : gap < 0 ? `−${fmt(-gap)}` : 'равни'}
         </span>
-        <span className="min-w-0 truncate font-display font-bold tabular-nums">
+        <span className="min-w-0 truncate font-extrabold tabular-nums">
           {fmt(theirs.score)} {them.name}
         </span>
       </div>

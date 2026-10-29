@@ -290,11 +290,15 @@ export function Results({ game }: { game: LiveGame }) {
                   newBest ? 'bg-amber-400/15 text-amber-200' : 'bg-tint/5 text-fg-2',
                 )}
               >
-                {newBest
-                  ? `🏆 Нов личен рекорд! (беше ${fmt(best)})`
-                  : best === 0
-                    ? `Рекорд за побиване: ${fmt(mine.score)}`
-                    : `Личен рекорд: ${fmt(best)}`}
+                {newBest ? (
+                  <>
+                    <Emoji e="🏆" /> Нов личен рекорд! (беше {fmt(best)})
+                  </>
+                ) : best === 0 ? (
+                  `Рекорд за побиване: ${fmt(mine.score)}`
+                ) : (
+                  `Личен рекорд: ${fmt(best)}`
+                )}
               </span>
             )}
             {end.mode === 'evening' && mine.placement === 1 && (

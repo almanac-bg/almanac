@@ -45,7 +45,7 @@ export function setTheme(choice: ThemeChoice) {
   for (const fn of listeners) fn();
 }
 
-/** Follows the device's own setting while the choice is „Като системата“. */
+/** Follows the device's own setting while the choice is „Системна“. */
 export function watchSystemTheme() {
   const query = lightQuery();
   const change = () => {

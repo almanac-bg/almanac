@@ -12,7 +12,16 @@
       html { background: #07060d; }
       body {
         margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
-        font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #f5f3ff; text-align: center;
+        font: 16px/1.5 'Segoe UI', Roboto, Arial, sans-serif; color: #f5f3ff; text-align: center;
+      }
+      /* As the device is set (the page can't read the game's own choice offline). No system-ui: Apple's sets Bulgarian
+         with its own letter forms. */
+      @media (prefers-color-scheme: light) {
+        html { background: #f4f3f9; }
+        body { color: #16131f; }
+        .logo { color: #6d28d9; text-shadow: none; }
+        p { color: #4a4462; }
+        a { background: #7c3aed; }
       }
       .logo { font-weight: 900; font-size: 28px; letter-spacing: -0.02em; color: #e9d5ff; text-shadow: 0 0 28px rgb(168 85 247 / 0.55); }
       h1 { margin: 24px 0 8px; font-size: 22px; }

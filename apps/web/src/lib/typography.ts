@@ -4,5 +4,12 @@
  * carry these spaces already; questions and answers are shown through this.
  */
 export function keepTogether(text: string): string {
-  return text.replace(/(\d) (?=[\p{L}%°])/gu, '$1 ').replace(/\b([IVXLC]+) (?=век|в\.)/g, '$1 ');
+  return (
+    text
+      .replace(/(\d) (?=[\p{L}%°])/gu, '$1 ')
+      .replace(/\b([IVXLC]+) (?=век|в\.)/g, '$1 ')
+      // „най-“ and „по-“ stay with their word („Кой е най-“ / „едрият…“ broke there): a word joiner after the hyphen,
+      // which is invisible and forbids the break.
+      .replace(/(^|[^\p{L}])(най|по)-(?=\p{L})/giu, '$1$2-\u2060')
+  );
 }

@@ -34,6 +34,19 @@ function parse(text: string): number | null {
  * The answer to a number question: typed on a keypad of its own (the phone's keyboard would cover half the screen) or
  * the keyboard's digits, or slid to on a small range, then locked in. Once it's in, the number stays on show.
  */
+/**
+ * A number in the display face with its unit in the text one: the display face's Bulgarian letters read „57 дни“ as
+ * „57 gnu“.
+ */
+function Figure({ value, n }: { value: number; n: Parameters<typeof numberText>[1] }) {
+  return (
+    <>
+      {numberText(value, { ...n, unit: '' })}
+      {n.unit && <span className="font-sans font-extrabold">{n.unit}</span>}
+    </>
+  );
+}
+
 export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: QuestionPayload; disabled: boolean }) {
   const n = q.number!;
   const locked = game.myChoice !== null;
@@ -99,11 +112,11 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
         {shown === null ? (
           <span className="text-fg-3">{text || '?'}</span>
         ) : locked ? (
-          numberText(shown, n)
+          <Figure value={shown} n={n} />
         ) : (
           <>
             <span>{slider ? numberText(shown, { ...n, unit: '' }) : text}</span>
-            {n.unit && <span className="text-xl font-semibold text-fg-2">{n.unit}</span>}
+            {n.unit && <span className="font-sans text-xl font-semibold text-fg-2">{n.unit}</span>}
           </>
         )}
       </output>
@@ -295,7 +308,7 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
           style={{ left: at(answer) }}
         >
           <span className="size-5 rotate-45 rounded-[4px] bg-amber-300 shadow-[0_0_18px_rgb(252_211_77/0.8)]" />
-          <span className="mt-1.5 rounded-full bg-amber-300 px-2 py-0.5 font-display text-sm font-bold whitespace-nowrap text-amber-950 tabular-nums">
+          <span className="mt-1.5 rounded-full bg-amber-300 px-2 py-0.5 font-sans text-sm font-extrabold whitespace-nowrap text-amber-950 tabular-nums">
             {numberText(answer, n)}
           </span>
         </m.div>

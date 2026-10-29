@@ -18,7 +18,7 @@ export function Feed({ game }: { game: LiveGame }) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
-            className="max-w-full truncate rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200 backdrop-blur"
+            className="max-w-full truncate rounded-full border border-amber-300/30 bg-ink-2/95 px-3 py-1 text-xs font-semibold text-amber-200"
           >
             <Emoji e={f.icon} /> {f.text}
           </m.span>
@@ -77,7 +77,7 @@ export function StreakBurst({ game }: { game: LiveGame }) {
             initial={{ scale: 0.6 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 420, damping: 14 }}
-            className="relative rounded-full border border-orange-400/50 bg-ink-2/95 px-6 py-3 font-display text-3xl font-black text-orange-200 shadow-[0_0_48px_-6px_rgb(249_115_22/0.75)] sm:px-8 sm:text-4xl"
+            className="relative rounded-full border border-orange-400/50 bg-ink-2/95 px-6 py-3 text-3xl font-black text-orange-200 shadow-[0_0_48px_-6px_rgb(249_115_22/0.75)] sm:px-8 sm:text-4xl"
           >
             <Emoji e="🔥" /> Серия {shown}!
           </m.p>
@@ -131,17 +131,20 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
                 <Avatar avatar={p.avatar} frame={p.frame} size={110} dim />
                 {/* On a plate of its own: over the answers, bare text ran into them. */}
                 <div className="mx-4 mt-4 rounded-3xl border border-rose-400/40 bg-ink-2/95 px-6 py-4 shadow-2xl">
-                  <p className="font-display text-4xl font-black text-rose-300">
-                    {me ? 'Отпадна!' : `${p.name} отпада!`}
-                  </p>
+                  <p className="text-4xl font-black text-rose-300">{me ? 'Отпадна!' : `${p.name} отпада!`}</p>
                   <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
                 </div>
                 {me && alive > 0 && (
                   // Within the screen on a phone (it can take two lines there).
                   <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">
-                    {othersStillIn(game) === 0
-                      ? 'Останаха само ботове — финалът им се решава веднага.'
-                      : `${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели 👀`}
+                    {othersStillIn(game) === 0 ? (
+                      'Останаха само ботове — финалът им се решава веднага.'
+                    ) : (
+                      <>
+                        {`${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели`}{' '}
+                        <Emoji e="👀" />
+                      </>
+                    )}
                   </p>
                 )}
               </m.div>

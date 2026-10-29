@@ -61,7 +61,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
           aria-controls={open ? trayId : undefined}
           className="focus-ring grid size-12 shrink-0 place-items-center rounded-full border border-line bg-ink-2/90 text-fg-2 hover:text-fg"
         >
-          {open ? <X className="size-5" /> : <span className="text-2xl">😀</span>}
+          {open ? <X className="size-5" /> : <Emoji e="😀" size={24} />}
         </button>
       </div>
       <div className="fixed inset-x-0 bottom-0 z-30 hidden pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] sm:block flat:hidden">

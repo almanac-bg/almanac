@@ -33,6 +33,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   // answers — unless a field of its own (a number to type) has taken it already.
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    // From its top: a page scrolled down to tap a low answer (a phone held sideways) left the next question's heading
+    // under the top bar. A screen that didn't move stays as it is.
+    if (window.scrollY > 0) window.scrollTo({ top: 0 });
     const focused = document.activeElement;
     if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
     heading.current?.focus({ preventScroll: true });
@@ -691,7 +694,15 @@ function RevealSummary({ result }: { result: NonNullable<LiveGame['reveal']>['re
       ) : (
         <>
           <span className="font-display text-2xl font-bold text-rose-300">
-            {result.choice === null ? 'Времето изтече ⏱️' : 'Грешно 😬'}
+            {result.choice === null ? (
+              <>
+                Времето изтече <Emoji e="⏱️" />
+              </>
+            ) : (
+              <>
+                Грешно <Emoji e="😬" />
+              </>
+            )}
           </span>
           {result.points < 0 && (
             <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-sm font-bold text-rose-300">

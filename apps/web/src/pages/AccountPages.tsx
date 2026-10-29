@@ -406,7 +406,8 @@ function ThemeSettings() {
           options={[
             { value: 'dark', label: 'Тъмна' },
             { value: 'light', label: 'Светла' },
-            { value: 'system', label: 'Като системата' },
+            // Short enough for the three to share one row on a phone („Като системата“ wrapped onto a row of its own).
+            { value: 'system', label: 'Системна' },
           ]}
         />
       </div>

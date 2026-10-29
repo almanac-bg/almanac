@@ -29,19 +29,23 @@
     <meta property="og:image:alt" content="%BRAND_NAME% — 10 въпроса на деня, една класация за цяла България" />
     <meta name="twitter:card" content="summary_large_image" />
     <style>
+      /* The first frame, before the app's styles: the theme theme.js has put on <html>, and no system-ui (Apple's sets
+         Bulgarian with its own letter forms). */
       html { background: #07060d; }
+      html[data-theme='light'] { background: #f4f3f9; }
       .boot {
         min-height: 100dvh;
         display: grid;
         place-content: center;
         grid-auto-flow: column;
         gap: 0.15em;
-        font: 900 clamp(2rem, 9vw, 3.5rem) / 1 system-ui, sans-serif;
+        font: 900 clamp(2rem, 9vw, 3.5rem) / 1 'Segoe UI', Roboto, Arial, sans-serif;
         letter-spacing: -0.02em;
         color: #e9d5ff;
         text-shadow: 0 0 32px rgb(168 85 247 / 0.55);
         animation: boot-pulse 1.6s ease-in-out infinite alternate;
       }
+      [data-theme='light'] .boot { color: #6d28d9; text-shadow: none; }
       @keyframes boot-pulse { from { opacity: 0.55; } to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .boot { animation: none; } }
     </style>
@@ -49,7 +53,7 @@
   <body>
     <!-- Painted instantly while the app's code downloads; React replaces it. Between the markers the server may put
          the page itself, already drawn (see src/lib/painted.ts). -->
-    <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span>⚡</div><!--/app--></div>
+    <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span><svg aria-hidden="true" viewBox="13 5 38 54" style="height:0.9em;width:auto;align-self:center"><path d="M36 6 14 36h14l-4 22 26-32H36l4-20z" fill="#fbbf24"/></svg></div><!--/app--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

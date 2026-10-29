@@ -100,15 +100,21 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
               }}
             >
               {game.start.questionSet ? (
-                `📝 ${game.start.questionSet}`
+                <>
+                  <Emoji e="📝" /> {game.start.questionSet}
+                </>
               ) : (
                 <>
                   <Emoji e={categoryById(q.category)?.icon ?? ''} /> {categoryById(q.category)?.name}
                 </>
               )}
-              {q.final && <span className="ml-3 text-amber-200">🎯 Финал</span>}
+              {q.final && (
+                <span className="ml-3 text-amber-200">
+                  <Emoji e="🎯" /> Финал
+                </span>
+              )}
             </p>
-            <h1 className="mt-3 font-display text-[clamp(1.75rem,3.6vw,3.25rem)] leading-tight font-bold text-balance">
+            <h1 className="mt-3 text-[clamp(1.75rem,3.6vw,3.25rem)] leading-tight font-extrabold text-balance">
               {keepTogether(q.q)}
             </h1>
             {!reveal && (
@@ -307,7 +313,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
             >
               <Emoji e={medals[i]} size="3rem" />
               <Avatar avatar={p.avatar} frame={p.frame} size={88} />
-              <span className="font-display text-2xl font-bold [overflow-wrap:anywhere]">{p.name}</span>
+              <span className="text-2xl font-extrabold [overflow-wrap:anywhere]">{p.name}</span>
               <span className="text-xl text-fg-2 tabular-nums">{fmt(s.score)} т.</span>
             </m.li>
           );

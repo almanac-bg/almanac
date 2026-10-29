@@ -10,8 +10,9 @@ type Size = 'sm' | 'md' | 'lg' | 'field';
 
 const VARIANTS: Record<Variant, string> = {
   // Starts at purple-600: white on the lighter #a855f7 was under 4:1 where long labels begin.
+  // Disabled, a plain fill: a faded gradient still looked like the button to press (a „Подреди“ not yet complete).
   primary:
-    'text-white bg-[linear-gradient(110deg,#9333ea,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110',
+    'text-white bg-[linear-gradient(110deg,#9333ea,#7c3aed_45%,#db2777)] shadow-[0_8px_32px_-8px_rgb(168_85_247/0.65),inset_0_1px_0_rgb(255_255_255/0.25)] hover:brightness-110 disabled:bg-none disabled:bg-tint/10 disabled:text-fg-2 disabled:shadow-none',
   secondary: 'glass text-fg hover:bg-tint/10',
   ghost: 'text-fg-2 hover:text-fg hover:bg-tint/5',
   // rose-600, darker on hover: white on rose-500 is under 4:1.
