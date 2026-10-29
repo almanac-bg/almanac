@@ -19,7 +19,8 @@ export function EmailNudge() {
     }
   });
   // A guest adds an email while saving the account (the profile card asks for that instead).
-  if (me.isGuest || me.email || me.pendingEmail || dismissed || me.xp === 0) return null;
+  // After a few matches: on the first days it only stood between a newcomer and the game.
+  if (me.isGuest || me.email || me.pendingEmail || dismissed || me.stats.games < 5) return null;
   return (
     // Phones: icon, text and close on the first row, the button under the text. Wider: all in one row.
     <div className="glass grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-2xl border-violet-400/30 py-2 pr-1.5 pl-4 sm:flex sm:pl-5">

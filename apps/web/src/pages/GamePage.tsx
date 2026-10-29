@@ -92,13 +92,16 @@ function Arena({ game }: { game: LiveGame }) {
       <div
         className={clsx(
           // Wider screens: the match sits a little lower than the very top, rather than pinned under the bar.
-          'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 pb-28 short:pt-2 sm:px-6 md:pt-[6vh] flat:pt-2',
+          // On a phone a column the question fills, so its answers can sit at the bottom (QuestionView).
+          'mx-auto grid w-full max-w-6xl flex-1 content-start gap-6 px-4 pt-4 max-sm:flex max-sm:flex-col short:pt-2 sm:px-6 md:pt-[6vh] flat:pt-2',
+          // Room under the answers for the emotes' button; a match alone has none, only the phone's own edge.
+          single ? 'pb-[max(1.5rem,env(safe-area-inset-bottom))]' : 'pb-28',
           !single && 'lg:grid-cols-[minmax(0,1fr)_320px]',
           // Room for the spectator bar under the last answer.
           meEliminated && 'max-sm:pb-40',
         )}
       >
-        <div className="relative min-w-0">
+        <div className="relative min-w-0 max-sm:flex max-sm:flex-1 max-sm:flex-col">
           <AnimatePresence mode="wait">
             {game.phase === 'countdown' ? (
               <Intro key="intro" game={game} />

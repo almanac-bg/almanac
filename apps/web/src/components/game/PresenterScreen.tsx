@@ -3,11 +3,14 @@ import { categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb, Users } from 'lucide-react';
 import { m } from 'motion/react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { burst } from '../results/confetti';
 import { Button } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { numberText } from './numbers';
@@ -31,6 +34,20 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     actions.closeGame();
     navigate('/room');
   };
+  // The room's speakers carry the match as the phones do for each player: the last seconds ticking, everyone in, the
+  // answer.
+  const left = q && !reveal && !end ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  useEffect(() => {
+    if (left !== null && left > 0 && left <= 5) sfx.tick(left);
+  }, [left]);
+  const allIn = !!q && !reveal && playing > 0 && game.answered.length >= playing;
+  useEffect(() => {
+    if (allIn) sfx.lock();
+  }, [allIn]);
+  const revealed = reveal?.index ?? null;
+  useEffect(() => {
+    if (revealed !== null) sfx.correct();
+  }, [revealed]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-ink px-6 py-5 lg:px-12 lg:py-8">
@@ -90,7 +107,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
         </div>
       ) : q ? (
         <div className="mt-6 grid flex-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <section className="min-w-0">
+          <section className="flex min-w-0 flex-col">
             <p
               className="font-semibold"
               style={{
@@ -118,15 +135,28 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
               {keepTogether(q.q)}
             </h1>
             {!reveal && (
-              <div className="mt-6 h-2 overflow-hidden rounded-full bg-tint/10">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)] transition-[width] duration-300 ease-linear"
-                  style={{ width: `${Math.max(0, (game.deadline - now) / q.durationMs) * 100}%` }}
-                />
+              // The seconds as a number the back row reads, beside the bar.
+              <div className="mt-6 flex items-center gap-5">
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-tint/10">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)] transition-[width] duration-300 ease-linear"
+                    style={{ width: `${Math.max(0, (game.deadline - now) / q.durationMs) * 100}%` }}
+                  />
+                </div>
+                <span
+                  className={clsx(
+                    'w-24 text-right font-display text-6xl font-black tabular-nums',
+                    left !== null && left <= 5 && 'text-rose-500',
+                  )}
+                >
+                  {left}
+                </span>
               </div>
             )}
             {/* A picture beside the options on a wide screen, so the room reads both, and the fact still fits. */}
-            <div className={clsx(q.image && 'mt-6 xl:grid xl:grid-cols-2 xl:items-start xl:gap-8')}>
+            <div
+              className={clsx('flex flex-1 flex-col', q.image && 'mt-6 xl:grid xl:grid-cols-2 xl:items-start xl:gap-8')}
+            >
               {q.image && (
                 <QuestionPicture image={q.image} credit={reveal?.credit} maxHeight="50svh" className="!mx-0" />
               )}
@@ -135,7 +165,10 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
               ) : q.kind === 'order' ? (
                 <OrderOnScreen game={game} />
               ) : (
-                <ul className={clsx('grid gap-4', q.image ? 'mt-6 xl:mt-0' : 'mt-8 md:grid-cols-2')}>
+                // The rest of the screen's height, the four answers large enough for the back row.
+                <ul
+                  className={clsx('grid flex-1 auto-rows-fr gap-4', q.image ? 'mt-6 xl:mt-0' : 'mt-8 md:grid-cols-2')}
+                >
                   {q.options.map((text, i) => {
                     const picks = reveal ? Object.values(reveal.results).filter((r) => r.choice === i).length : null;
                     const right = reveal?.correct === i;
@@ -144,7 +177,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                         // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
                         key={i}
                         className={clsx(
-                          'relative flex items-center gap-4 overflow-hidden rounded-3xl border-2 p-5 transition-opacity',
+                          'relative flex items-center gap-5 overflow-hidden rounded-3xl border-2 p-6 transition-opacity',
                           reveal && !right && 'opacity-50',
                         )}
                         style={{ borderColor: right ? '#34d399' : `${OPTION_COLORS[i]}66` }}
@@ -159,12 +192,12 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                           />
                         )}
                         <span
-                          className="relative grid size-12 shrink-0 place-items-center rounded-2xl font-display text-2xl font-black text-on-fill"
+                          className="relative grid size-16 shrink-0 place-items-center rounded-2xl font-display text-3xl font-black text-on-fill"
                           style={{ background: right ? '#34d399' : OPTION_COLORS[i] }}
                         >
                           {right ? <Check className="size-7" /> : LETTERS[i]}
                         </span>
-                        <span className="relative min-w-0 flex-1 text-[clamp(1.1rem,2vw,1.75rem)] font-semibold">
+                        <span className="relative min-w-0 flex-1 text-[clamp(1.25rem,2.6vw,3rem)] leading-tight font-bold">
                           {keepTogether(text)}
                         </span>
                         {picks !== null && (
@@ -294,33 +327,67 @@ function TopFive({ game, standings }: { game: LiveGame; standings: Standing[] })
   );
 }
 
-/** The end: the first three on a podium, then everyone else's place. */
+/** The end: a podium — third, second, then first, a beat apart, to the room's speakers — then everyone else's place. */
 function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStanding[] }) {
   const medals = ['🥇', '🥈', '🥉'];
+  const top = standings.slice(0, 3);
+  const count = top.length;
+  // When each one comes up (the third first); the rest after the winner.
+  const beat = (place: number) => 0.6 + (count - 1 - place) * 1.2;
+  useEffect(() => {
+    const timers = Array.from({ length: count }, (_, place) =>
+      setTimeout(
+        () => {
+          if (place > 0) return sfx.pop();
+          sfx.win();
+          burst(1.4);
+        },
+        (0.6 + (count - 1 - place) * 1.2) * 1000,
+      ),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [count]);
+  // Left to right: second, first, third — each on a stand of its place's height.
+  const order = [1, 0, 2].filter((place) => top[place]);
+  const stands = [
+    'h-44 lg:h-72 bg-[linear-gradient(180deg,#fcd34d,#f59e0b)]',
+    'h-32 lg:h-52 bg-[linear-gradient(180deg,#e5e7eb,#9ca3af)]',
+    'h-24 lg:h-36 bg-[linear-gradient(180deg,#f0b27a,#c2773f)]',
+  ];
   return (
-    <div className="mt-8 flex-1">
+    <div className="mt-6 flex flex-1 flex-col">
       <h1 className="text-center font-display text-4xl font-black text-gradient lg:text-6xl">Край!</h1>
-      <ol className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
-        {standings.slice(0, 3).map((s, i) => {
+      {/* Standing on the screen's bottom edge, as a podium does. */}
+      <ol className="mx-auto mt-auto flex w-full max-w-5xl items-end justify-center gap-6 pt-8">
+        {order.map((place) => {
+          const s = top[place];
           const p = game.players[s.id];
           return (
             <m.li
               key={s.id}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + (2 - i) * 0.4 }}
-              className="glass flex flex-col items-center gap-3 rounded-3xl p-6 text-center"
+              transition={{ delay: beat(place), type: 'spring', stiffness: 220, damping: 18 }}
+              className="flex w-1/3 max-w-xs flex-col items-center text-center"
             >
-              <Emoji e={medals[i]} size="3rem" />
-              <Avatar avatar={p.avatar} frame={p.frame} size={88} />
-              <span className="text-2xl font-extrabold [overflow-wrap:anywhere]">{p.name}</span>
+              <Emoji e={medals[place]} size="3rem" />
+              <Avatar avatar={p.avatar} frame={p.frame} size={place === 0 ? 120 : 88} />
+              <span className="mt-2 text-2xl font-extrabold [overflow-wrap:anywhere]">{p.name}</span>
               <span className="text-xl text-fg-2 tabular-nums">{fmt(s.score)} т.</span>
+              <div className={clsx('mt-4 grid w-full justify-center rounded-t-3xl pt-3', stands[place])}>
+                <span className="font-display text-5xl font-black text-on-fill">{place + 1}</span>
+              </div>
             </m.li>
           );
         })}
       </ol>
       {standings.length > 3 && (
-        <ol className="mx-auto mt-8 grid max-w-5xl gap-x-8 gap-y-2 text-lg sm:grid-cols-2 lg:grid-cols-3">
+        <m.ol
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: beat(0) + 0.8 }}
+          className="mx-auto mt-8 grid max-w-5xl gap-x-8 gap-y-2 text-lg sm:grid-cols-2 lg:grid-cols-3"
+        >
           {standings.slice(3).map((s) => (
             <li key={s.id} className="flex items-center gap-3">
               <span className="w-14 text-fg-3">{ordinal(s.placement)}</span>
@@ -328,7 +395,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
               <span className="tabular-nums text-fg-2">{fmt(s.score)}</span>
             </li>
           ))}
-        </ol>
+        </m.ol>
       )}
     </div>
   );

@@ -61,7 +61,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
       transition={{ y: { type: 'spring', stiffness: 260, damping: 26 }, opacity: { duration: 0.15 } }}
-      className="mx-auto max-w-3xl"
+      // On a phone the screen is a column: the question on top, the answers at the bottom, where the thumb is.
+      className="mx-auto w-full max-w-3xl max-sm:flex max-sm:flex-1 max-sm:flex-col"
     >
       <div className="flex flex-wrap items-center gap-2">
         {q.final && (
@@ -150,98 +151,100 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         </div>
       </div>
 
-      <AnimatePresence>
-        {game.retryPrompt && !reveal && (
-          <m.div
-            initial={{ opacity: 0, y: -8, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-4 overflow-hidden"
-          >
-            <div className="flex items-center gap-3 rounded-2xl border border-amber-300/40 bg-amber-400/12 px-4 py-3 text-amber-100">
-              <span className="text-xl">
-                <Emoji e="🔁" />
-              </span>
-              <span className="text-sm font-semibold sm:text-base">
-                Грешно! Имаш още един опит <span className="text-amber-300">(за ½ точки)</span>
-              </span>
-            </div>
-          </m.div>
-        )}
-      </AnimatePresence>
-
-      <div className="relative mt-4 short:mt-3 tiny:mt-2 flat:mt-2">
-        {number ? (
-          reveal?.answerNumber !== undefined ? (
-            <NumberLine game={game} q={q} reveal={reveal} />
-          ) : (
-            <NumberAnswer game={game} q={q} disabled={!active || offline} />
-          )
-        ) : order ? (
-          reveal?.answerOrder ? (
-            <OrderReveal game={game} q={q} reveal={reveal} />
-          ) : (
-            <OrderAnswer game={game} q={q} disabled={!active || offline} />
-          )
-        ) : (
-          // Under a picture, two by two on a phone too: the picture takes the room a column of four would.
-          <div
-            className={clsx(
-              'grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5',
-              q.image && 'grid-cols-2 max-sm:gap-2',
-            )}
-          >
-            {q.options.map((text, i) => (
-              <AnswerButton
-                // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
-                key={i}
-                index={i}
-                text={text}
-                selected={game.myChoice === i}
-                locked={game.myChoice !== null}
-                removed={game.removed.includes(i)}
-                disabled={!active || offline}
-                watching={watching}
-                offline={(offline || game.resyncing) && !reveal}
-                correct={reveal ? reveal.correct === i : null}
-                pickers={pickers[i] ?? []}
-                compact={!!q.image}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
-        <AnimatePresence mode="wait">
-          {reveal && mine ? (
-            number && reveal.answerNumber !== undefined ? (
-              <NumberSummary key="sum" result={mine} q={q} answer={reveal.answerNumber} />
-            ) : order ? (
-              <OrderSummary key="sum" result={mine} />
-            ) : (
-              <RevealSummary key="sum" result={mine} />
-            )
-          ) : reveal ? null : game.myChoice !== null ? (
+      <div className="max-sm:mt-auto">
+        <AnimatePresence>
+          {game.retryPrompt && !reveal && (
             <m.div
-              key="wait"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-wrap items-center gap-2"
+              initial={{ opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 overflow-hidden"
             >
-              <LockStatus game={game} offline={offline} />
-              <ActivePowerups game={game} />
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-300/40 bg-amber-400/12 px-4 py-3 text-amber-100">
+                <span className="text-xl">
+                  <Emoji e="🔁" />
+                </span>
+                <span className="text-sm font-semibold sm:text-base">
+                  Грешно! Имаш още един опит <span className="text-amber-300">(за ½ точки)</span>
+                </span>
+              </div>
             </m.div>
-          ) : (
-            active && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
           )}
         </AnimatePresence>
-        {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
+
+        <div className="relative mt-4 short:mt-3 tiny:mt-2 flat:mt-2">
+          {number ? (
+            reveal?.answerNumber !== undefined ? (
+              <NumberLine game={game} q={q} reveal={reveal} />
+            ) : (
+              <NumberAnswer game={game} q={q} disabled={!active || offline} />
+            )
+          ) : order ? (
+            reveal?.answerOrder ? (
+              <OrderReveal game={game} q={q} reveal={reveal} />
+            ) : (
+              <OrderAnswer game={game} q={q} disabled={!active || offline} />
+            )
+          ) : (
+            // Under a picture, two by two on a phone too: the picture takes the room a column of four would.
+            <div
+              className={clsx(
+                'grid gap-3 short:max-sm:gap-2 tiny:max-sm:gap-1.5 sm:grid-cols-2 flat:gap-1.5',
+                q.image && 'grid-cols-2 max-sm:gap-2',
+              )}
+            >
+              {q.options.map((text, i) => (
+                <AnswerButton
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the four answers are fixed slots (А–Г)
+                  key={i}
+                  index={i}
+                  text={text}
+                  selected={game.myChoice === i}
+                  locked={game.myChoice !== null}
+                  removed={game.removed.includes(i)}
+                  disabled={!active || offline}
+                  watching={watching}
+                  offline={(offline || game.resyncing) && !reveal}
+                  correct={reveal ? reveal.correct === i : null}
+                  pickers={pickers[i] ?? []}
+                  compact={!!q.image}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
+          <AnimatePresence mode="wait">
+            {reveal && mine ? (
+              number && reveal.answerNumber !== undefined ? (
+                <NumberSummary key="sum" result={mine} q={q} answer={reveal.answerNumber} />
+              ) : order ? (
+                <OrderSummary key="sum" result={mine} />
+              ) : (
+                <RevealSummary key="sum" result={mine} />
+              )
+            ) : reveal ? null : game.myChoice !== null ? (
+              <m.div
+                key="wait"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <LockStatus game={game} offline={offline} />
+                <ActivePowerups game={game} />
+              </m.div>
+            ) : (
+              active && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
+            )}
+          </AnimatePresence>
+          {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
+        </div>
+        {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
+        {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
+        {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
+        {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
       </div>
-      {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
-      {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
-      {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
-      {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
     </m.section>
   );
 }

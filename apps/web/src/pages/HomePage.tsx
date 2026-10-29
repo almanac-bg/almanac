@@ -1,5 +1,14 @@
-import { actions, fmt, plural, toast, useStore } from '@quiz/client';
-import { levelProgress, MODES, type QueueModeId, REVIEW, START_RATING, SUBMISSION_RULES } from '@quiz/shared';
+import { actions, fmt, plural, toast, useNow, useStore } from '@quiz/client';
+import {
+  EVENING,
+  levelProgress,
+  MODES,
+  type QueueModeId,
+  REVIEW,
+  START_RATING,
+  SUBMISSION_RULES,
+  sofiaHour,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { m } from 'motion/react';
@@ -45,6 +54,12 @@ export function HomePage() {
   const newcomer = level === 1;
   // Someone who has played before and not yet today: the day's questions first, on phones (wider screens show more).
   const dailyFirst = !me.daily.played && me.stats.games > 0;
+  // The evening Роял on top from an hour before until that evening's matches are over; the rest of the day a line
+  // under everything (it led the page all day, a day away, ahead of the day's questions and the modes).
+  const now = useNow(60_000);
+  const eveningNear = sofiaHour(now) >= EVENING.hour - 1 && sofiaHour(now) <= EVENING.hour;
+  // Wider screens: the day's questions beside who you are while they wait to be played (they were two screens down).
+  const dailyBeside = dailyFirst && level > 2;
   // The first levels have nobody to add yet: on wide screens the profile runs across the top on its own (a short row,
   // so the modes are on the first screen too) and the friends go further down.
   const starter = level <= 2;
@@ -82,7 +97,7 @@ export function HomePage() {
       <DuelTurn />
       <ReviewTurn />
       <EmailNudge />
-      <EveningCard />
+      {eveningNear && <EveningCard />}
 
       {/* Phones read top to bottom: who you are, what to play, today's daily and quests, then friends and the rest.
           From tablets up (md) the same pieces form a grid with the modes across the middle and "today" under them. */}
@@ -127,11 +142,25 @@ export function HomePage() {
           </div>
         </section>
 
-        <DailyCard className={clsx('md:col-start-1 md:row-start-3', dailyFirst && 'max-md:order-first')} />
-        <QuestsCard className="md:col-start-2 md:row-start-3" />
+        <DailyCard
+          className={clsx(
+            dailyBeside ? 'md:col-start-2 md:row-start-1' : 'md:col-start-1 md:row-start-3',
+            dailyFirst && 'max-md:order-first',
+          )}
+        />
+        <QuestsCard className={dailyBeside ? 'md:col-start-1 md:row-start-3' : 'md:col-start-2 md:row-start-3'} />
         <ChallengeCard className={clsx('md:col-start-1 md:row-start-4', !community && !starter && 'md:col-span-2')} />
-        <FriendsCard className={starter ? 'md:col-start-2 md:row-start-4' : 'md:col-start-2 md:row-start-1'} />
+        <FriendsCard
+          className={
+            starter
+              ? 'md:col-start-2 md:row-start-4'
+              : dailyBeside
+                ? 'md:col-start-2 md:row-start-3'
+                : 'md:col-start-2 md:row-start-1'
+          }
+        />
         {community && <CommunityCard className="md:col-start-2 md:row-start-4" />}
+        {!eveningNear && <EveningCard compact className="md:col-span-2 md:row-start-5" />}
       </div>
 
       <SoloPicker open={soloOpen} onClose={() => setSoloOpen(false)} />
