@@ -269,7 +269,7 @@ function rewardHuman(
   const claimDaily = counts && before.last_daily_bonus !== today;
   if (claimDaily) {
     lines.push({ label: 'Първи мач за деня', amount: XP.daily });
-    countActive(before.created_at, today);
+    countActive(before.created_at, today, before.games_played === 0);
   }
 
   // ── Daily challenge (recorded even after leaving: one attempt per day) ──

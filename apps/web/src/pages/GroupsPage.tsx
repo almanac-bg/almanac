@@ -1,7 +1,7 @@
 import { api, errorMessage, fmt, plural, toast, useStore } from '@quiz/client';
 import { BRAND, GROUPS, type GroupEntry, type GroupInfo, shiftDay } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeft, ArrowRight, Link2, LogOut, Pencil, Share2, Trash2, UserMinus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Flag, Link2, LogOut, Pencil, Share2, Trash2, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
@@ -133,6 +133,7 @@ function GroupView({ id }: { id: number }) {
   const [renaming, setRenaming] = useState(false);
   const [removing, setRemoving] = useState<{ id: number; username: string } | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function change(call: () => Promise<GroupInfo>, done?: string) {
@@ -309,12 +310,20 @@ function GroupView({ id }: { id: number }) {
         <Button variant="ghost" onClick={() => setLeaving(true)}>
           <LogOut className="size-4" /> Напусни групата
         </Button>
-        {g.isOwner && (
+        {g.isOwner ? (
           <Button variant="ghost" className="text-rose-300" onClick={() => setDeleting(true)}>
             <Trash2 className="size-4" /> Изтрий групата
           </Button>
+        ) : (
+          !me.isGuest && (
+            <Button variant="ghost" onClick={() => setReporting(true)}>
+              <Flag className="size-4" /> Сигнал за името
+            </Button>
+          )
         )}
       </div>
+
+      <ReportGroup groupId={id} open={reporting} onClose={() => setReporting(false)} />
 
       <RenameGroup
         open={renaming}
@@ -347,7 +356,7 @@ function GroupView({ id }: { id: number }) {
           ? 'Групата остава за другите: ще я поеме този, който е в нея най-отдавна.'
           : g.members > 1
             ? 'Можеш да влезеш отново с линк за покана.'
-            : 'Ти си последният в групата: тя ще изчезне заедно с класациите си.'}
+            : 'В групата си само ти: тя ще изчезне заедно с класациите си.'}
       </Confirm>
       <Confirm
         open={deleting}
@@ -398,6 +407,48 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
     >
       <UserMinus className="size-4" />
     </button>
+  );
+}
+
+/** A member tells the moderators the group's name breaks the rules (they rename it; its owner hears why). */
+function ReportGroup({ groupId, open, onClose }: { groupId: number; open: boolean; onClose: () => void }) {
+  const [details, setDetails] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function send() {
+    setBusy(true);
+    try {
+      await api.reportGroup(groupId, details);
+      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще прегледа името на групата.' });
+      setDetails('');
+      onClose();
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Сигнал за името на групата">
+      <p className="text-sm text-fg-2">Какво не е наред с името — обидно, неподходящо? (по желание)</p>
+      <textarea
+        value={details}
+        maxLength={400}
+        rows={3}
+        aria-label="Подробности"
+        onChange={(e) => setDetails(e.target.value)}
+        className="field mt-3 w-full rounded-2xl p-3 text-sm"
+      />
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          Отказ
+        </Button>
+        <Button onClick={() => void send()} loading={busy}>
+          Изпрати
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

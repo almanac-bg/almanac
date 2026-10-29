@@ -1,39 +1,41 @@
 import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@quiz/client';
-import type { QuestionDraft, Submission, SubmissionStatus } from '@quiz/shared';
+import { MODERATION, type QuestionDraft, type Submission, type SubmissionStatus } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
+import { EditQuestionModal } from '../components/admin/EditQuestionModal';
 import { LaunchStatsPanel } from '../components/admin/LaunchStatsPanel';
+import { ModerationLogPanel } from '../components/admin/ModerationLog';
 import { PlayCheckPanel } from '../components/admin/PlayCheckPanel';
+import { PlayersPanel } from '../components/admin/PlayersPanel';
 import { QuestionReportsQueue } from '../components/admin/QuestionReportsQueue';
 import { ReportsQueue } from '../components/admin/ReportsQueue';
 import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
-import { cleanDraft, draftsEqual, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
+import {
+  cleanDraft,
+  draftsEqual,
+  hasErrors,
+  SUBMISSION_STATUS,
+  toDraft,
+  validateDraft,
+} from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
-const toDraft = (s: Submission): QuestionDraft => ({
-  category: s.category,
-  difficulty: s.difficulty,
-  q: s.q,
-  options: [...s.options],
-  answer: s.answer,
-});
-
-type Section = 'questions' | 'flags' | 'reports' | 'play' | 'stats';
+type Section = 'questions' | 'flags' | 'reports' | 'players' | 'log' | 'play' | 'stats';
+const SECTIONS: Section[] = ['questions', 'flags', 'reports', 'players', 'log', 'play', 'stats'];
 
 export function AdminPage() {
   usePageTitle('Модерация');
   const me = useStore((s) => s.me)!;
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');
-  const section: Section =
-    tab === 'reports' || tab === 'flags' || tab === 'play' || tab === 'stats' ? tab : 'questions';
+  const section: Section = SECTIONS.find((x) => x === tab) ?? 'questions';
   const [counts, setCounts] = useState<{
     pendingQuestions: number;
     openReports: number;
@@ -67,6 +69,8 @@ export function AdminPage() {
             { value: 'questions', label: <>Въпроси{badge(counts?.pendingQuestions)}</> },
             { value: 'flags', label: <>Сигнали{badge(counts?.questionReports)}</> },
             { value: 'reports', label: <>Доклади{badge(counts?.openReports)}</> },
+            { value: 'players', label: 'Играчи' },
+            { value: 'log', label: 'Дневник' },
             { value: 'play', label: 'Игра' },
             { value: 'stats', label: 'Статистика' },
           ]}
@@ -79,6 +83,8 @@ export function AdminPage() {
         <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />
       )}
       {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />}
+      {section === 'players' && <PlayersPanel />}
+      {section === 'log' && <ModerationLogPanel />}
       {section === 'play' && <PlayCheckPanel />}
       {section === 'stats' && <LaunchStatsPanel />}
     </div>
@@ -177,6 +183,7 @@ function PendingCard({
   onReviewed: (id: number, pending: number) => void;
 }) {
   const original = useMemo(() => toDraft(submission), [submission]);
+  const { data: similar } = useLoad(() => api.similarQuestions(submission.id), String(submission.id));
   const [draft, setDraft] = useState<QuestionDraft>(original);
   const [editing, setEditing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -229,7 +236,23 @@ function PendingCard({
         {editing ? (
           <DraftEditor draft={draft} onChange={setDraft} errors={errors} compact />
         ) : (
-          <QuestionPreview draft={draft} compact />
+          <>
+            <QuestionPreview draft={draft} compact />
+            <Sources draft={draft} />
+          </>
+        )}
+
+        {similar && similar.similar.length > 0 && (
+          <div className="rounded-2xl border border-amber-300/25 bg-amber-400/[0.06] p-3 text-sm">
+            <p className="font-semibold text-amber-200">Прилича на въпроси в играта</p>
+            <ul className="mt-1.5 space-y-1 text-fg-2">
+              {similar.similar.map((q) => (
+                <li key={q.id}>
+                  <code className="text-xs text-fg-3">{q.id}</code> {q.q} → <b>{q.answer}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {rejecting ? (
@@ -237,17 +260,24 @@ function PendingCard({
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              maxLength={300}
+              maxLength={MODERATION.reasonMax}
               // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Откажи", so focus moves to it
               autoFocus
-              placeholder="Причина (по желание) — авторът ще я види"
+              placeholder="Защо — авторът ще го прочете, за да напише следващия по-добре"
+              aria-label="Причина за отказа"
               className="field h-10 w-full rounded-xl px-3 text-sm"
             />
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
                 Назад
               </Button>
-              <Button size="sm" variant="danger" onClick={reject} loading={busy === 'reject'}>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={reject}
+                loading={busy === 'reject'}
+                disabled={reason.trim().length < MODERATION.reasonMin}
+              >
                 <X className="size-4" /> Отхвърли
               </Button>
             </div>
@@ -275,19 +305,61 @@ function PendingCard({
   );
 }
 
-function ReviewedCard({ submission: s }: { submission: Submission }) {
+/** Where the answer and the fact can be checked. */
+function Sources({ draft }: { draft: QuestionDraft }) {
+  if (!draft.answerSource && !draft.factSource) return null;
+  return (
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-3">
+      {draft.answerSource ? (
+        <a href={draft.answerSource} target="_blank" rel="noreferrer noopener" className="text-violet-300 underline">
+          Източник на отговора
+        </a>
+      ) : (
+        <span className="text-amber-300">Без източник на отговора</span>
+      )}
+      {draft.fact?.trim() && draft.factSource && (
+        <a href={draft.factSource} target="_blank" rel="noreferrer noopener" className="text-violet-300 underline">
+          Източник на факта
+        </a>
+      )}
+    </p>
+  );
+}
+
+function ReviewedCard({ submission }: { submission: Submission }) {
+  const [s, setS] = useState(submission);
+  const [editing, setEditing] = useState(false);
   return (
     <motion.div layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="space-y-4 p-5">
         <AuthorLine submission={s} />
         <QuestionPreview draft={toDraft(s)} compact />
+        <Sources draft={s} />
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
           {s.reviewedAt && <span>Прегледан {timeAgo(s.reviewedAt)}</span>}
+          {s.played && (
+            <span>
+              {s.played.answered
+                ? `Изигран ${s.played.answered} пъти · ${Math.round((100 * s.played.correct) / s.played.answered)}% верни`
+                : 'Още не е попаднал в мач'}
+            </span>
+          )}
           {s.status === 'rejected' && (
             <span className="text-rose-300">{s.reason ? `Причина: ${s.reason}` : 'Без посочена причина'}</span>
           )}
+          {s.questionId && (
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+              <Pencil className="size-4" /> Поправи
+            </Button>
+          )}
         </div>
       </Card>
+      <EditQuestionModal
+        questionId={editing ? s.questionId : null}
+        draft={editing ? s : null}
+        onClose={() => setEditing(false)}
+        onSaved={(d) => setS({ ...s, ...d })}
+      />
     </motion.div>
   );
 }

@@ -429,7 +429,7 @@ export function AuthPage() {
                       {guest}
                     </>
                   )}
-                  <Consent minors={mode === 'register'} />
+                  <Consent />
                 </>
               )}
             </Card>
@@ -548,22 +548,22 @@ function AboutGame({ cta }: { cta: ReactNode }) {
   );
 }
 
-/** Playing as a guest also accepts the terms, so the line sits under every way in; under signing up, the age note too. */
-function Consent({ minors }: { minors?: boolean }) {
+/** Playing as a guest also accepts the terms, so the line (and the age note) sits under every way in. */
+function Consent() {
   return (
     <div className="mt-5 space-y-1.5 text-center text-xs text-fg-3">
       <p>
         Като играеш, приемаш{' '}
         <Link to="/terms" className="text-violet-300 hover:underline">
           Условията за ползване
-        </Link>{' '}
-        и{' '}
+        </Link>
+        . Как пазим данните ти — в{' '}
         <Link to="/privacy" className="text-violet-300 hover:underline">
           Политиката за поверителност
         </Link>
         .
       </p>
-      {minors && <p>{MINORS_NOTICE}</p>}
+      <p>{MINORS_NOTICE}</p>
     </div>
   );
 }

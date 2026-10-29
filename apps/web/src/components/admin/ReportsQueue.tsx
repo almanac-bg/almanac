@@ -1,22 +1,16 @@
 import { api, errorMessage, timeAgo, toast } from '@quiz/client';
 import { type ModerationAction, REPORT_REASONS, type ReportGroup } from '@quiz/shared';
-import { Ban, Check, Flag, PenLine } from 'lucide-react';
+import { Ban, Check, Flag, IdCard, PenLine } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
 import { Avatar, LevelBadge } from '../Avatar';
 import { LoadError } from '../LoadError';
-import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
+import { Button, Card, EmptyState, Spinner } from '../ui';
+import { BanForm, RenameForm } from './Decisions';
 
 const reasonLabel = (id: string) => REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
-
-const BAN_OPTIONS: { value: string; label: string }[] = [
-  { value: '1', label: '1 ден' },
-  { value: '7', label: '7 дни' },
-  { value: '30', label: '30 дни' },
-  { value: 'forever', label: 'Завинаги' },
-];
 
 export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
   const { data, error, retry, setData } = useLoad(() => api.adminReports());
@@ -61,7 +55,6 @@ export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
 function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (groups: ReportGroup[]) => void }) {
   const { target, reports } = group;
   const [mode, setMode] = useState<'idle' | 'rename' | 'ban'>('idle');
-  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function decide(decision: ModerationAction, message: string) {
@@ -93,6 +86,12 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
               <p className="text-xs text-rose-300">Профилът е спрян в момента</p>
             )}
           </div>
+          <Link
+            to={`/admin?tab=players&player=${target.id}`}
+            className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-fg-2 hover:bg-tint/10 pointer-coarse:h-11"
+          >
+            <IdCard className="size-4" /> Подробно
+          </Link>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/15 px-3 py-1 text-sm font-bold text-rose-300">
             <Flag className="size-3.5" /> {reports.length}
           </span>
@@ -111,38 +110,26 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
             </li>
           ))}
         </ul>
+        {reports.some((r) => r.details?.startsWith('Група „')) && (
+          <p className="mt-2 text-xs text-fg-3">
+            Доклад за име на група: групата се преименува от „Подробно“ (групите на собственика).
+          </p>
+        )}
 
         {mode === 'rename' && (
-          <form
-            noValidate
-            className="mt-4 flex flex-wrap gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void decide({ action: 'rename', username: name }, `Името е сменено на „${name.trim()}“`);
-            }}
-          >
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ново име"
-              // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Смени името", so focus moves to it
-              autoFocus
-              required
-              // The height of the small buttons beside it (taller on touch screens, like them).
-              className="field h-9 min-w-0 flex-1 rounded-xl px-3 text-sm pointer-coarse:h-11"
-            />
-            <Button size="sm" type="submit" loading={busy}>
-              Смени
-            </Button>
-            <Button size="sm" variant="ghost" type="button" onClick={() => setMode('idle')}>
-              Отказ
-            </Button>
-          </form>
+          <RenameForm
+            busy={busy}
+            onCancel={() => setMode('idle')}
+            onRename={(rename) =>
+              void decide({ action: 'rename', ...rename }, `Името е сменено на „${rename.username}“`)
+            }
+          />
         )}
         {mode === 'ban' && (
           <BanForm
             busy={busy}
-            onBan={(decision, message) => void decide(decision, message)}
+            defaultBasis={reports.some((r) => r.reason === 'cheating') ? 'cheating' : ''}
+            onBan={(ban, message) => void decide({ action: 'ban', ...ban }, message)}
             onCancel={() => setMode('idle')}
           />
         )}
@@ -171,50 +158,5 @@ function ReportCard({ group, onResolved }: { group: ReportGroup; onResolved: (gr
         )}
       </Card>
     </motion.div>
-  );
-}
-
-/** How long, and why: the decision to stop a profile (from a report, or from the answer log's check). */
-export function BanForm({
-  busy,
-  onBan,
-  onCancel,
-}: {
-  busy: boolean;
-  onBan: (decision: Extract<ModerationAction, { action: 'ban' }>, message: string) => void;
-  onCancel: () => void;
-}) {
-  const [days, setDays] = useState('7');
-  const [reason, setReason] = useState('');
-  return (
-    <form
-      className="mt-4 space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onBan(
-          { action: 'ban', days: days === 'forever' ? null : Number(days), reason },
-          days === 'forever'
-            ? 'Профилът е спрян завинаги'
-            : `Профилът е спрян за ${BAN_OPTIONS.find((o) => o.value === days)!.label}`,
-        );
-      }}
-    >
-      <Segmented value={days} onChange={setDays} options={BAN_OPTIONS} />
-      <input
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        placeholder="Причина (играчът ще я види при вход)"
-        maxLength={200}
-        className="field h-10 w-full rounded-xl px-3 text-sm"
-      />
-      <div className="flex gap-2">
-        <Button size="sm" variant="danger" type="submit" loading={busy}>
-          <Ban className="size-4" /> Спри профила
-        </Button>
-        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
-          Отказ
-        </Button>
-      </div>
-    </form>
   );
 }

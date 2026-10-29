@@ -119,3 +119,36 @@ test('an account unused for three years gets an email a month before it is delet
   assert.ok(getUser(12), 'kept: in use again');
   assert.ok(getUser(14));
 });
+
+test('moderators get one email a day about what waits, from 09:00, and an alert at most once a day per thing', async () => {
+  const { alertModerators, moderatorDigest } = await import('../src/alerts');
+  run(
+    `INSERT INTO users (id, username, username_key, password_hash, created_at, email, email_key, is_admin)
+     VALUES (20, 'moderator', 'moderator', 'x', 0, 'mod@example.test', 'mod@example.test', 1)`,
+  );
+  const toModerator = () =>
+    fs
+      .readdirSync(process.env.MAIL_OUTBOX!)
+      .map((f) => JSON.parse(fs.readFileSync(path.join(process.env.MAIL_OUTBOX!, f), 'utf8')))
+      .filter((m) => m.to === 'mod@example.test');
+  // 08:00 and 10:00 in Sofia (UTC+2 in winter).
+  const early = Date.UTC(2026, 10, 2, 6);
+  const later = Date.UTC(2026, 10, 2, 8);
+
+  assert.equal(moderatorDigest(later), false, 'nothing waiting, no mail');
+  run(
+    `INSERT INTO question_submissions (user_id, category, difficulty, q, options, answer, status, created_at)
+     VALUES (20, 'general', 'easy', 'Въпрос?', '["а","б","в","г"]', 0, 'pending', 0)`,
+  );
+  run("DELETE FROM settings WHERE key = 'mod_digest_day'");
+  assert.equal(moderatorDigest(early), false, 'not before nine');
+  assert.equal(moderatorDigest(later), true);
+  assert.equal(moderatorDigest(later + 60 * 60_000), false, 'once a day');
+  const [digest] = toModerator();
+  assert.match(digest.text, /Предложени въпроси: 1/);
+
+  alertModerators('question:x', 'Сигнали', ['…'], later);
+  alertModerators('question:x', 'Сигнали', ['…'], later + 60_000);
+  alertModerators('question:y', 'Сигнали', ['…'], later);
+  assert.equal(toModerator().length, 3, 'one alert per question per day');
+});

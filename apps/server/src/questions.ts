@@ -378,10 +378,21 @@ function loadBank(): {
     options: string;
     answer: number;
     author: string | null;
+    fact: string | null;
+    fact_source: string | null;
+    answer_source: string | null;
   }>(
-    `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, u.username AS author
+    `SELECT q.id, q.category, q.difficulty, q.q, q.options, q.answer, q.fact, q.fact_source, q.answer_source,
+       u.username AS author
      FROM questions q LEFT JOIN users u ON u.id = q.author_id`,
-  ).map((r): Question => ({ ...r, options: JSON.parse(r.options) as string[] }));
+  ).map(
+    ({ fact, fact_source, answer_source, ...r }): Question => ({
+      ...r,
+      options: JSON.parse(r.options) as string[],
+      ...(fact && { fact, factSource: fact_source ?? undefined }),
+      ...(answer_source && { answerSource: answer_source }),
+    }),
+  );
   const hidden = new Set(
     all<{ question_id: string }>('SELECT question_id FROM hidden_questions').map((r) => r.question_id),
   );

@@ -1,6 +1,7 @@
 import { api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/client';
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
-import { Lock, Send } from 'lucide-react';
+import clsx from 'clsx';
+import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -8,9 +9,16 @@ import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { LoadError } from '../components/LoadError';
 import { DraftEditor } from '../components/questions/DraftEditor';
-import { cleanDraft, emptyDraft, hasErrors, SUBMISSION_STATUS, validateDraft } from '../components/questions/draft';
+import {
+  cleanDraft,
+  emptyDraft,
+  hasErrors,
+  SUBMISSION_STATUS,
+  toDraft,
+  validateDraft,
+} from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
-import { Button, Card, EmptyState, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -106,25 +114,64 @@ function SubmitForm({ onSent }: { onSent: () => void }) {
         <p className="mb-3 t-eyebrow text-fg-3">Преглед</p>
         <QuestionPreview draft={draft} />
         <p className="mt-4 text-xs text-fg-3">
-          Съвет: един безспорно верен отговор и три правдоподобни грешни. Без въпроси, чийто отговор се променя с
-          времето.
+          Съвет: един безспорно верен отговор и три правдоподобни грешни, от един вид (все градове, все години). Без
+          въпроси, чийто отговор се променя с времето, и без думи във въпроса, които издават отговора.
         </p>
       </div>
     </div>
   );
 }
 
+/** How many may wait at once (as the server counts it): a few until one is approved, one at a time after many turned down. */
+function pendingLimit(items: Submission[]) {
+  const approved = items.filter((s) => s.status === 'approved').length;
+  const rejected = items.filter((s) => s.status === 'rejected').length;
+  if (rejected >= SUBMISSION_RULES.rejectedLimit && rejected > approved) return SUBMISSION_RULES.maxPendingRejected;
+  return approved ? SUBMISSION_RULES.maxPending : SUBMISSION_RULES.maxPendingNew;
+}
+
 function MySubmissions({ refresh }: { refresh: number }) {
-  const { data, error, retry } = useLoad(() => api.mySubmissions(), '', refresh);
+  const { data, error, retry, setData } = useLoad(() => api.mySubmissions(), '', refresh);
   const items: Submission[] | null = data?.submissions ?? null;
+  const [editing, setEditing] = useState<Submission | null>(null);
 
   const approved = items?.filter((s) => s.status === 'approved').length ?? 0;
+  const pending = items?.filter((s) => s.status === 'pending').length ?? 0;
+  const limit = items ? pendingLimit(items) : 0;
 
   return (
     <section>
-      <SectionTitle aside={items && items.length > 0 && <span className="text-sm text-fg-3">{approved} одобрени</span>}>
+      <SectionTitle
+        aside={
+          items &&
+          items.length > 0 && (
+            <span className="text-sm text-fg-3">
+              {plural(approved, 'одобрен', 'одобрени')} ·{' '}
+              <span className={clsx(pending >= limit && 'text-amber-300')}>
+                чакат {pending} от {limit}
+              </span>
+            </span>
+          )
+        }
+      >
         Моите предложения
       </SectionTitle>
+      {items && pending >= limit && (
+        <p className="mb-3 text-sm text-fg-2">
+          {limit === 1
+            ? 'Един въпрос чака преглед. След него можеш да изпратиш следващия.'
+            : `Стигна до ${limit} чакащи въпроса. Когато модератор ги прегледа, можеш да изпратиш още.`}{' '}
+          {limit === SUBMISSION_RULES.maxPendingNew && 'След първия одобрен може да чакат повече наведнъж.'}
+        </p>
+      )}
+      <EditSubmission
+        submission={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(changed) =>
+          data && setData({ submissions: data.submissions.map((s) => (s.id === changed.id ? changed : s)) })
+        }
+        onWithdrawn={(id) => data && setData({ submissions: data.submissions.filter((s) => s.id !== id) })}
+      />
       {error && !items ? (
         <LoadError title="Предложенията ти не се заредиха" error={error} onRetry={retry} />
       ) : !items ? (
@@ -167,10 +214,24 @@ function MySubmissions({ refresh }: { refresh: number }) {
                     {s.status === 'rejected' && s.reason && (
                       <p className="mt-1 text-xs text-rose-300">Причина: {s.reason}</p>
                     )}
+                    {s.played && (
+                      <p className="mt-1 text-xs text-fg-3">
+                        {s.played.answered
+                          ? `Изигран ${plural(s.played.answered, 'път', 'пъти')} · ${Math.round((100 * s.played.correct) / s.played.answered)}% верни`
+                          : 'Още не е попаднал в мач'}
+                      </p>
+                    )}
                   </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>
-                    {status.label}
-                  </span>
+                  <div className="flex w-full items-center justify-between gap-2 pl-13 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:pl-0">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                      {status.label}
+                    </span>
+                    {s.status === 'pending' && (
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(s)}>
+                        <Pencil className="size-4" /> Промени
+                      </Button>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
@@ -178,5 +239,106 @@ function MySubmissions({ refresh }: { refresh: number }) {
         </Card>
       )}
     </section>
+  );
+}
+
+/** A question still waiting, changed or taken back by its author. */
+function EditSubmission({
+  submission,
+  onClose,
+  onSaved,
+  onWithdrawn,
+}: {
+  submission: Submission | null;
+  onClose: () => void;
+  onSaved: (s: Submission) => void;
+  onWithdrawn: (id: number) => void;
+}) {
+  return (
+    <Modal open={!!submission} onClose={onClose} title="Промени предложението" className="max-w-2xl">
+      {submission && (
+        <EditForm
+          key={submission.id}
+          submission={submission}
+          onClose={onClose}
+          onSaved={onSaved}
+          onWithdrawn={onWithdrawn}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function EditForm({
+  submission,
+  onClose,
+  onSaved,
+  onWithdrawn,
+}: {
+  submission: Submission;
+  onClose: () => void;
+  onSaved: (s: Submission) => void;
+  onWithdrawn: (id: number) => void;
+}) {
+  const [draft, setDraft] = useState(() => toDraft(submission));
+  const [showErrors, setShowErrors] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'withdraw' | null>(null);
+  const [sure, setSure] = useState(false);
+  const errors = useMemo(() => validateDraft(draft), [draft]);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (hasErrors(errors)) {
+      setShowErrors(true);
+      return;
+    }
+    setBusy('save');
+    try {
+      const { submission: saved } = await api.editSubmission(submission.id, cleanDraft(draft));
+      toast({ kind: 'success', title: 'Промените са запазени.' });
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err, 'Промените не се запазиха.') });
+      setBusy(null);
+    }
+  }
+
+  async function withdraw() {
+    if (!sure) {
+      setSure(true);
+      return;
+    }
+    setBusy('withdraw');
+    try {
+      await api.withdrawSubmission(submission.id);
+      toast({ kind: 'info', title: 'Въпросът е оттеглен.' });
+      onWithdrawn(submission.id);
+      onClose();
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err, 'Въпросът не се оттегли.') });
+      setBusy(null);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-6">
+      <DraftEditor draft={draft} onChange={setDraft} errors={showErrors ? errors : {}} compact />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="text-rose-300 hover:bg-rose-500/10"
+          onClick={withdraw}
+          loading={busy === 'withdraw'}
+        >
+          <Trash2 className="size-4" /> {sure ? 'Да, оттегли го' : 'Оттегли въпроса'}
+        </Button>
+        <Button type="submit" loading={busy === 'save'}>
+          <Check className="size-4" /> Запази
+        </Button>
+      </div>
+    </form>
   );
 }

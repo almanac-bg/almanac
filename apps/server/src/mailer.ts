@@ -156,3 +156,43 @@ export function streakReminderMail(
     headers: { 'List-Unsubscribe': `<${unsubscribe.api}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
   };
 }
+
+const longDateTime = (ts: number) =>
+  new Intl.DateTimeFormat('bg-BG', { dateStyle: 'long', timeStyle: 'short', timeZone: TIME_ZONE }).format(ts);
+
+/**
+ * To a player whose profile a moderator stopped: for how long, on what basis and why, and where to appeal (the Terms'
+ * §3а promise: a decision explained, and a way to contest it).
+ */
+export function banMail(
+  to: string,
+  username: string,
+  ban: { until: number | null; basis: string; reason: string },
+): Mail {
+  const how = ban.until === null ? 'за постоянно' : `до ${longDateTime(ban.until)}`;
+  const lead = `Модератор спря профила ти „${username}“ ${how}.`;
+  const why = `Основание: ${ban.basis}. Причина: ${ban.reason}`;
+  const appeal = `Ако смяташ, че решението е грешно, отговори ни на ${config.operator.email} до 6 месеца и ще го прегледаме отново.`;
+  return {
+    to,
+    subject: `Профилът ти в ${BRAND.name} е спрян`,
+    text: `Здравей, ${username}!\n\n${lead}\n${why}\n\n${appeal}\n\nУсловията за ползване: ${config.appUrl}/terms`,
+    html: layout(
+      `Здравей, ${username}!`,
+      `${escapeHtml(lead)}<br><br>${escapeHtml(why)}`,
+      'Условията за ползване',
+      `${config.appUrl}/terms`,
+      escapeHtml(appeal),
+    ),
+  };
+}
+
+/** To a moderator: something waits for them (`now`: an alert that can't wait for the morning summary). */
+export function moderatorMail(to: string, subject: string, lines: string[], link: string): Mail {
+  return {
+    to,
+    subject,
+    text: `${lines.join('\n')}\n\n${link}`,
+    html: layout(subject, lines.map(escapeHtml).join('<br>'), 'Към модерацията', link, 'Писмо за модераторите.'),
+  };
+}

@@ -27,6 +27,7 @@ export function LegalLinks({ className = '' }: { className?: string }) {
       <Link to="/privacy" className="inline-flex min-h-11 items-center hover:text-fg-2">
         Политика за поверителност
       </Link>
+      <Contact />
       {source && (
         <a href={source} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center hover:text-fg-2">
           Изходен код
@@ -36,5 +37,20 @@ export function LegalLinks({ className = '' }: { className?: string }) {
         © {new Date().getFullYear()} {BRAND.name}
       </span>
     </nav>
+  );
+}
+
+/** The contact point (for players, and for notices about illegal content), as the terms name it. */
+function Contact() {
+  const email = useSite()?.email;
+  const address = email?.match(/^([^\s@<>"']+)@([^\s@<>"']+)$/);
+  if (!address) return null;
+  return (
+    <a
+      href={`mailto:${encodeURIComponent(address[1])}@${encodeURIComponent(address[2])}`}
+      className="inline-flex min-h-11 items-center hover:text-fg-2"
+    >
+      Контакт
+    </a>
   );
 }

@@ -1,7 +1,7 @@
 import { DIFFICULTY_LABEL } from '@quiz/client';
 import { categoryById, type QuestionDraft } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check } from 'lucide-react';
+import { Check, Lightbulb } from 'lucide-react';
 import { Emoji } from '../Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
 
@@ -67,6 +67,14 @@ export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; comp
           );
         })}
       </div>
+      {draft.fact?.trim() && (
+        <p className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 text-sm text-fg-2 text-pretty">
+          <span className="font-bold text-amber-200">
+            <Lightbulb aria-hidden className="mb-0.5 inline size-4" /> Знаеше ли?{' '}
+          </span>
+          {draft.fact.trim()}
+        </p>
+      )}
     </div>
   );
 }

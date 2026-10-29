@@ -13,6 +13,7 @@ import {
 } from '@quiz/shared';
 import { all, one, run, tx } from './db';
 import { notify } from './notifications';
+import { count } from './stats';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /**
@@ -120,6 +121,7 @@ export function joinGroup(userId: number, code: string): Result<{ id: number }> 
   if (memberCount(g.id) >= GROUPS.maxMembers) return { ok: false, error: FULL_ERROR };
   if (groupIdsOf(userId).length >= GROUPS.perPlayer) return { ok: false, error: TOO_MANY };
   run('INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, ?)', g.id, userId, Date.now());
+  count('link_uses:group');
   return { ok: true, id: g.id };
 }
 

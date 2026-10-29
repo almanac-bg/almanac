@@ -1,7 +1,14 @@
 import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast } from '@quiz/client';
-import { categoryById, QUESTION_REPORT_REASONS, type QuestionInfo, type QuestionReportGroup } from '@quiz/shared';
+import {
+  categoryById,
+  QUESTION_REPORT_REASONS,
+  type QuestionDraft,
+  type QuestionInfo,
+  type QuestionReportAction,
+  type QuestionReportGroup,
+} from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, EyeOff, Flag, Lightbulb, RotateCcw } from 'lucide-react';
+import { Check, EyeOff, Flag, Lightbulb, Pencil, RefreshCw, RotateCcw, Wrench } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
@@ -11,8 +18,31 @@ import { RightOrderList } from '../game/OrderQuestion';
 import { QuestionPicture } from '../game/QuestionPicture';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
+import { EditQuestionModal } from './EditQuestionModal';
 
 const reasonLabel = (id: string) => QUESTION_REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
+
+const sourceHost = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
+/** A player's question (in the database, so a moderator corrects it here); the bank's are fixed in its repo. */
+const isCommunity = (q: QuestionInfo) => q.id.startsWith('usr-');
+
+const draftOf = (q: QuestionInfo): QuestionDraft => ({
+  category: q.category,
+  difficulty: q.difficulty,
+  q: q.q,
+  options: q.options,
+  answer: q.answer,
+  answerSource: q.answerSource ?? '',
+  fact: q.fact ?? '',
+  factSource: q.factSource ?? '',
+});
 
 /** Questions players flagged as wrong, the most reported first; hiding one takes it out of new matches at once. */
 export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
@@ -37,6 +67,7 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
   }
   return (
     <div className="space-y-4">
+      <ReloadBank />
       {data.groups.length === 0 ? (
         <Card>
           <EmptyState icon="✅" title="Няма сигнали за въпроси" body="Играчите не са открили грешки — засега." />
@@ -44,8 +75,9 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
       ) : (
         <>
           <p className="text-fg-2">
-            Сигнали от играчите за грешни или неясни въпроси. „Скрий“ спира въпроса за нови мачове веднага; вградените
-            въпроси се поправят в <code>questions.json</code> по номера им.
+            Сигнали от играчите за грешни или неясни въпроси. „Скрий“ спира въпроса за нови мачове веднага. Въпросите на
+            играчите се поправят тук („Редактирай“); тези от банката — в <code>questions.json</code> по номера им, после
+            „Презареди банката“. „Поправих го“ връща въпроса в играта, нулира числата му и благодари на сигнализиралите.
           </p>
           <AnimatePresence initial={false}>
             {data.groups.map((g) => (
@@ -55,6 +87,29 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
         </>
       )}
       {data.hidden.length > 0 && <HiddenQuestions questions={data.hidden} onChange={update} />}
+    </div>
+  );
+}
+
+/** After a fix pulled into the bank on the server: the game reads it again without a restart. */
+function ReloadBank() {
+  const [busy, setBusy] = useState(false);
+  async function reload() {
+    setBusy(true);
+    try {
+      await api.reloadBank();
+      toast({ kind: 'success', title: 'Банката е заредена наново' });
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex justify-end">
+      <Button size="sm" variant="ghost" onClick={reload} loading={busy}>
+        <RefreshCw className="size-4" /> Презареди банката
+      </Button>
     </div>
   );
 }
@@ -96,6 +151,19 @@ export function QuestionCard({ question, children }: { question: QuestionInfo; c
           </li>
         ))}
       </ol>
+      {question.answerSource && (
+        <p className="mt-2 text-xs text-fg-3">
+          Отговорът се проверява в{' '}
+          <a
+            href={question.answerSource}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-violet-300 underline"
+          >
+            {sourceHost(question.answerSource)}
+          </a>
+        </p>
+      )}
       {question.fact && (
         <p className="mt-3 rounded-xl bg-amber-400/[0.07] px-3 py-2 text-sm text-fg-2">
           <Lightbulb aria-hidden className="mb-0.5 inline size-4 text-amber-200" /> {question.fact}
@@ -126,15 +194,22 @@ function QuestionReportCard({
   group: QuestionReportGroup;
   onResolved: (r: QuestionReports) => void;
 }) {
-  const [busy, setBusy] = useState<'dismiss' | 'hide' | null>(null);
+  const [busy, setBusy] = useState<QuestionReportAction | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [question, setQuestion] = useState(group.question);
 
-  async function decide(action: 'dismiss' | 'hide') {
+  async function decide(action: QuestionReportAction) {
     setBusy(action);
     try {
       const r = await api.resolveQuestionReports(group.question.id, action);
       toast({
         kind: 'success',
-        title: action === 'hide' ? 'Въпросът е скрит от нови мачове' : 'Сигналите са затворени',
+        title:
+          action === 'hide'
+            ? 'Въпросът е скрит от нови мачове'
+            : action === 'fixed'
+              ? 'Поправен: числата му започват отначало, а сигнализиралите получават благодарност'
+              : 'Сигналите са затворени',
       });
       onResolved(r);
     } catch (e) {
@@ -149,7 +224,7 @@ function QuestionReportCard({
       <Card className="p-5">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <QuestionCard question={group.question} />
+            <QuestionCard question={question} />
           </div>
           <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-bold text-amber-300">
             <Flag className="size-3.5" /> {group.reports.length}
@@ -178,18 +253,57 @@ function QuestionReportCard({
           >
             <Check className="size-4" /> Въпросът е наред
           </Button>
+          {isCommunity(question) && (
+            <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => setEditing(true)}>
+              <Pencil className="size-4" /> Редактирай
+            </Button>
+          )}
           <Button
             size="sm"
-            variant="ghost"
-            className="text-amber-300 hover:bg-amber-500/10"
-            loading={busy === 'hide'}
+            variant="secondary"
+            loading={busy === 'fixed'}
             disabled={!!busy}
-            onClick={() => decide('hide')}
+            onClick={() => decide('fixed')}
+            title={
+              isCommunity(question)
+                ? 'След редакцията: числата му започват отначало, сигнализиралите получават благодарност'
+                : 'След поправката в банката (и „Презареди банката“): числата му започват отначало'
+            }
           >
-            <EyeOff className="size-4" /> Скрий въпроса
+            <Wrench className="size-4" /> Поправих го
           </Button>
+          {question.hidden ? (
+            <span className="inline-flex items-center gap-1.5 self-center text-xs font-semibold text-amber-300">
+              <EyeOff className="size-4" /> Скрит от новите мачове, докато решиш
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-amber-300 hover:bg-amber-500/10"
+              loading={busy === 'hide'}
+              disabled={!!busy}
+              onClick={() => decide('hide')}
+            >
+              <EyeOff className="size-4" /> Скрий въпроса
+            </Button>
+          )}
         </div>
       </Card>
+      <EditQuestionModal
+        questionId={editing ? question.id : null}
+        draft={editing ? draftOf(question) : null}
+        onClose={() => setEditing(false)}
+        onSaved={(d) =>
+          setQuestion({
+            ...question,
+            ...d,
+            answerSource: d.answerSource || null,
+            fact: d.fact || null,
+            factSource: d.factSource || null,
+          })
+        }
+      />
     </motion.div>
   );
 }

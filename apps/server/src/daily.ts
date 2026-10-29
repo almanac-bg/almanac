@@ -152,6 +152,7 @@ export function claimDailyAttempt(
     link && link.user_id !== userId ? link.user_id : null,
   );
   count('daily_runs');
+  if (link && link.user_id !== userId) count('link_uses:daily');
   return { ok: true, day };
 }
 
@@ -332,6 +333,7 @@ export function recordDailyResult(
     userId,
     day,
   );
+  if (played) count('daily_finished');
   const u = getUser(userId)!;
   const entry = one<{ own_set: number | null; via: number | null }>(
     'SELECT own_set, via FROM daily_results WHERE user_id = ? AND day = ?',

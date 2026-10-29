@@ -3,6 +3,7 @@ import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
 import { eraseAccount } from './account';
+import { moderatorDigest } from './alerts';
 import { pruneAnswers } from './answers';
 import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
@@ -195,6 +196,7 @@ export function startMaintenance() {
       if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
       const pictures = sweepPictures();
       if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
+      if (moderatorDigest()) console.log('🛡️  Morning summary sent to the moderators');
       if (sofiaHour() >= SNAPSHOT_HOUR) {
         const file = await snapshot();
         if (file) console.log(`💾 Backup saved: ${file}`);

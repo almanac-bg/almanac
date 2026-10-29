@@ -682,6 +682,38 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX set_images_id ON set_images(id);
     `,
   },
+
+  // v25, moderation (modlog.ts): `moderation_log` keeps every moderator's (or the game's own) decision, its basis and
+  // reason, and what it takes to undo it; a ban keeps its basis (`users.ban_basis`). A question proposed by a player
+  // carries the source of its answer, and may carry a fact with its source — kept with the question once approved.
+  // Older code leaves them alone.
+  {
+    compatible: `
+    CREATE TABLE moderation_log (
+      id INTEGER PRIMARY KEY,
+      admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      action TEXT NOT NULL,
+      target_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      target TEXT,
+      basis TEXT,
+      reason TEXT,
+      undo TEXT,
+      created_at INTEGER NOT NULL,
+      undone_at INTEGER,
+      undone_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE INDEX moderation_log_time ON moderation_log(created_at);
+    CREATE INDEX moderation_log_user ON moderation_log(target_user_id, created_at);
+
+    ALTER TABLE users ADD COLUMN ban_basis TEXT;
+    ALTER TABLE question_submissions ADD COLUMN answer_source TEXT;
+    ALTER TABLE question_submissions ADD COLUMN fact TEXT;
+    ALTER TABLE question_submissions ADD COLUMN fact_source TEXT;
+    ALTER TABLE questions ADD COLUMN answer_source TEXT;
+    ALTER TABLE questions ADD COLUMN fact TEXT;
+    ALTER TABLE questions ADD COLUMN fact_source TEXT;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

@@ -20,8 +20,12 @@ import type {
   Loadout,
   MeUser,
   ModerationAction,
+  ModerationBasis,
+  ModerationLogEntry,
   MyChallenge,
   PlayCheck,
+  PlayerCard,
+  PlayerSearchHit,
   ProfileStats,
   QuestionDraft,
   QuestionInfo,
@@ -35,6 +39,7 @@ import type {
   SeasonInfo,
   SetQuestion,
   SharedSetPreview,
+  SimilarQuestion,
   SiteInfo,
   Submission,
   SubmissionStatus,
@@ -155,6 +160,25 @@ export const api = {
   adminReports: () => request<{ groups: ReportGroup[] }>('GET', '/admin/reports'),
   resolveReports: (userId: number, decision: ModerationAction) =>
     request<{ ok: true; groups: ReportGroup[] }>('POST', `/admin/reports/${userId}/resolve`, decision),
+  adminPlayers: (query: string) =>
+    request<{ players: PlayerSearchHit[] }>('GET', `/admin/players?q=${encodeURIComponent(query)}`),
+  adminPlayer: (id: number) => request<{ card: PlayerCard }>('GET', `/admin/players/${id}`),
+  banPlayer: (id: number, ban: { days: number | null; basis: ModerationBasis; reason: string; annul?: boolean }) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban`, ban),
+  /** Lifts a ban (`days` null) or moves its end. */
+  changeBan: (id: number, days: number | null, reason: string) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason }),
+  renamePlayer: (id: number, rename: { username: string; basis: ModerationBasis; reason: string }) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/rename`, rename),
+  annulResults: (id: number, reason: string) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/annul`, { reason }),
+  dismissPlayerReports: (id: number) => request<{ card: PlayerCard }>('POST', `/admin/players/${id}/dismiss`),
+  renameGroupByModerator: (groupId: number, basis: ModerationBasis, reason: string) =>
+    request<{ ok: true }>('POST', `/admin/groups/${groupId}/rename`, { basis, reason }),
+  moderationLog: (before?: number) =>
+    request<{ entries: ModerationLogEntry[] }>('GET', `/admin/log${before ? `?before=${before}` : ''}`),
+  undoModeration: (id: number) => request<{ ok: true; entries: ModerationLogEntry[] }>('POST', `/admin/log/${id}/undo`),
+  reloadBank: () => request<{ ok: true }>('POST', '/admin/bank/reload'),
 
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
@@ -192,12 +216,22 @@ export const api = {
     request<{ ok: true; pending: number }>('POST', `/admin/submissions/${id}/approve`, { edits }),
   rejectSubmission: (id: number, reason: string) =>
     request<{ ok: true; pending: number }>('POST', `/admin/submissions/${id}/reject`, { reason }),
+  /** The author changes one still waiting, or takes it back. */
+  editSubmission: (id: number, draft: QuestionDraft) =>
+    request<{ submission: Submission }>('PUT', `/submissions/${id}`, draft),
+  withdrawSubmission: (id: number) => request<{ ok: true }>('DELETE', `/submissions/${id}`),
+  similarQuestions: (id: number) => request<{ similar: SimilarQuestion[] }>('GET', `/admin/submissions/${id}/similar`),
+  /** A player's question already in the game, corrected by a moderator. */
+  editCommunityQuestion: (questionId: string, draft: QuestionDraft) =>
+    request<{ ok: true }>('PUT', `/admin/questions/${encodeURIComponent(questionId)}`, draft),
 
   almanac: () => request<AlmanacOverview>('GET', '/almanac'),
   almanacCategory: (category: CategoryId) => request<AlmanacCategoryPage>('GET', `/almanac/${category}`),
 
   groups: () => request<{ groups: GroupSummary[] }>('GET', '/groups'),
   createGroup: (name: string) => request<{ id: number }>('POST', '/groups', { name }),
+  /** A member reports the group's name. */
+  reportGroup: (id: number, details: string) => request<{ ok: true }>('POST', `/groups/${id}/report`, { details }),
   group: (id: number) => request<GroupInfo>('GET', `/groups/${id}`),
   renameGroup: (id: number, name: string) => request<GroupInfo>('PATCH', `/groups/${id}`, { name }),
   newGroupLink: (id: number) => request<GroupInfo>('POST', `/groups/${id}/code`),

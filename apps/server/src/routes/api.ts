@@ -10,17 +10,15 @@ import {
   type ModeId,
   type ProfileStats,
   type QueueModeId,
-  type SubmissionStatus,
   seasonEndsAt,
   seasonKey,
   seasonName,
 } from '@quiz/shared';
-import express, { type NextFunction, type Request, type Response, Router } from 'express';
+import express, { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, settleAccount, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
 import { factCount, factsInAll } from '../almanac';
-import { playCheck } from '../answers';
 import {
   confirmSession,
   createSession,
@@ -55,51 +53,37 @@ import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';
 import { eveningInfo } from '../evening';
 import { acceptFriend, type FriendResult, friendship, listFriends, removeFriend, requestFriend } from '../friends';
 import { createGuest } from '../guests';
-import { activeBan, fileReport, nameProblem, openReportCount, openReports, resolveReports } from '../moderation';
+import { activeBan, fileReport, nameProblem } from '../moderation';
 import { reportError } from '../monitoring';
 import { nameShape } from '../names';
 import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession, sendFriendsUpdate } from '../notify';
-import {
-  hiddenQuestions,
-  openQuestionReportCount,
-  openQuestionReports,
-  reportQuestion,
-  resolveQuestionReports,
-  unhideQuestion,
-} from '../questionReports';
+import { reportQuestion } from '../questionReports';
 import { getRatings, markSeasonRewardsSeen, seasonHistory, seasonInfo } from '../seasons';
 import { guestsPaused } from '../settings';
 import { siteInfo } from '../site';
-import { count, launchStats } from '../stats';
-import {
-  approveSubmission,
-  DraftSchema,
-  listSubmissions,
-  mySubmissions,
-  pendingCount,
-  rejectSubmission,
-  submitQuestion,
-} from '../submissions';
+import { count } from '../stats';
+import { DraftSchema, editSubmission, mySubmissions, submitQuestion, withdrawSubmission } from '../submissions';
 import { network, throttled, wideNetwork } from '../throttle';
 import {
   emailKey,
   getUser,
   getUserByLogin,
   getUserByName,
-  isAdmin,
   NOT_BANNED,
   nameTaken,
   toPublicUser,
   type UserRow,
   usernameKey,
 } from '../users';
+import { adminRouter } from './admin';
 import { idParam, parse, requireAccount } from './common';
 import { progress } from './progress';
 import { setsRouter } from './sets';
 
 export const api = Router();
 api.use(progress);
+api.use(adminRouter);
 api.use(setsRouter);
 
 const Credentials = z
@@ -133,31 +117,6 @@ const Token = z.string().min(10, BROKEN_LINK).max(200, BROKEN_LINK);
 function sameSecret(a: string, b: string) {
   const [x, y] = [Buffer.from(a), Buffer.from(b)];
   return x.length === y.length && timingSafeEqual(x, y);
-}
-
-function requireAdmin(_req: Request, res: Response, next: NextFunction) {
-  const user = getUser(res.locals.userId);
-  if (!user || !isAdmin(user)) {
-    res.status(403).json({ error: 'Само за модератори.' });
-    return;
-  }
-  next();
-}
-
-/** How long a password given at sign-in, or again (POST /auth/confirm), covers what an admin changes. */
-const RECENT_PASSWORD_MS = 60 * 60_000;
-
-/**
- * For what an admin changes (bans, names, questions): the password given within the last hour, so a session left open
- * on a shared computer or copied from one can't do it. The app asks for the password and tries again (`confirm`).
- */
-function requireRecentPassword(_req: Request, res: Response, next: NextFunction) {
-  const confirmedAt = res.locals.confirmedAt as number | null;
-  if (!confirmedAt || Date.now() - confirmedAt > RECENT_PASSWORD_MS) {
-    res.status(403).json({ error: 'Потвърди паролата си, за да продължиш.', confirm: true });
-    return;
-  }
-  next();
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -676,6 +635,7 @@ api.get('/challenges/:id/preview', (req, res) => {
     return;
   }
   const preview = challengePreview(challengeId(req));
+  if (preview) count('link_opens:challenge');
   if (!preview) {
     res.status(404).json({ error: 'Няма такова предизвикателство.' });
     return;
@@ -704,7 +664,10 @@ api.get('/daily/preview', (req, res) => {
     res.status(429).json({ error: 'Твърде много заявки.' });
     return;
   }
-  res.json(dailyPreview(typeof req.query.code === 'string' ? req.query.code.slice(0, 16) : null));
+  const code = typeof req.query.code === 'string' ? req.query.code.slice(0, 16) : null;
+  const preview = dailyPreview(code);
+  if (code && preview.sharer) count('link_opens:daily');
+  res.json(preview);
 });
 
 /** The player's link to today's questions, to send around; made once they've played today. */
@@ -797,28 +760,25 @@ api.post('/submissions', requireAuth, requireAccount, (req, res) => {
   res.status(201).json({ submission: result.submission });
 });
 
-api.get('/admin/submissions', requireAuth, requireAdmin, (req, res) => {
-  const status = z
-    .enum(['pending', 'approved', 'rejected'])
-    .catch('pending')
-    .parse(req.query.status) as SubmissionStatus;
-  res.json({ submissions: listSubmissions(status), pending: pendingCount() });
+/** The author changes a question while it waits. */
+api.put('/submissions/:id', requireAuth, requireAccount, (req, res) => {
+  const draft = parse(DraftSchema, req, res);
+  if (!draft) return;
+  const result = editSubmission(res.locals.userId, idParam(req), draft);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ submission: result.submission });
 });
 
-api.get('/admin/stats', requireAuth, requireAdmin, (_req, res) => {
-  res.json(launchStats());
-});
-
-api.get('/admin/play-check', requireAuth, requireAdmin, (_req, res) => {
-  res.json(playCheck());
-});
-
-api.get('/admin/summary', requireAuth, requireAdmin, (_req, res) => {
-  res.json({
-    pendingQuestions: pendingCount(),
-    openReports: openReportCount(),
-    questionReports: openQuestionReportCount(),
-  });
+/** …or takes it back. */
+api.delete('/submissions/:id', requireAuth, requireAccount, (req, res) => {
+  if (!withdrawSubmission(res.locals.userId, idParam(req))) {
+    res.status(404).json({ error: 'Няма чакащо предложение с този номер.' });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 api.post('/questions/:id/report', requireAuth, requireAccount, (req, res) => {
@@ -834,77 +794,6 @@ api.post('/questions/:id/report', requireAuth, requireAccount, (req, res) => {
     return;
   }
   res.json({ ok: true });
-});
-
-api.get('/admin/question-reports', requireAuth, requireAdmin, (_req, res) => {
-  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
-});
-
-api.post('/admin/question-reports/:id/resolve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const body = parse(z.object({ action: z.enum(['dismiss', 'hide']) }), req, res);
-  if (!body) return;
-  const result = resolveQuestionReports(res.locals.userId, String(req.params.id), body.action);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
-});
-
-api.post('/admin/hidden-questions/:id/unhide', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const result = unhideQuestion(String(req.params.id));
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ groups: openQuestionReports(), hidden: hiddenQuestions() });
-});
-
-api.get('/admin/reports', requireAuth, requireAdmin, (_req, res) => {
-  res.json({ groups: openReports() });
-});
-
-const Decision = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('dismiss') }),
-  z.object({ action: z.literal('rename'), username: z.string().max(40) }),
-  z.object({
-    action: z.literal('ban'),
-    days: z.number().int().min(1).max(3650).nullable(),
-    reason: z.string().max(200).default(''),
-  }),
-]);
-
-api.post('/admin/reports/:id/resolve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const decision = parse(Decision, req, res);
-  if (!decision) return;
-  const result = resolveReports(res.locals.userId, idParam(req), decision);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ ok: true, groups: openReports() });
-});
-
-api.post('/admin/submissions/:id/approve', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const body = parse(z.object({ edits: DraftSchema.nullable().optional() }), req, res);
-  if (!body) return;
-  const result = approveSubmission(res.locals.userId, idParam(req), body.edits ?? null);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ ok: true, pending: pendingCount() });
-});
-
-api.post('/admin/submissions/:id/reject', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const body = parse(z.object({ reason: z.string().max(300).default('') }), req, res);
-  if (!body) return;
-  const result = rejectSubmission(res.locals.userId, idParam(req), body.reason);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ ok: true, pending: pendingCount() });
 });
 
 // ─── Profiles & leaderboards ─────────────────────────────────────────────────

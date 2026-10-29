@@ -11,8 +11,10 @@ import {
 } from '@quiz/shared';
 import { z } from 'zod';
 import { all, one, run, tx } from './db';
+import { logAction } from './modlog';
 import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
+import { count } from './stats';
 
 /**
  * „Моите въпроси“: a host's own question sets (SETS), for their private rooms — a teacher's quiz on the lesson, an
@@ -356,6 +358,7 @@ export function sharedPreview(code: string, viewerId: number, admin = false): Sh
     code,
   );
   if (!row || (row.hidden && !admin && row.owner_id !== viewerId)) return null;
+  if (row.owner_id !== viewerId) count('link_opens:set');
   const questions = questionsOf(row);
   return {
     name: row.name,
@@ -377,20 +380,25 @@ export function copySet(code: string, userId: number): Result<{ id: number }> {
   const row = one<SetRow>('SELECT * FROM question_sets WHERE code = ? AND hidden = 0', code);
   if (!row) return { ok: false, error: 'Този набор вече не е достъпен.' };
   if (row.owner_id === userId) return { ok: true, id: row.id };
-  return createSet(userId, { name: row.name, questions: questionsOf(row) }, row.id);
+  const copied = createSet(userId, { name: row.name, questions: questionsOf(row) }, row.id);
+  if (copied.ok) count('link_uses:set');
+  return copied;
 }
 
 /**
  * A moderator hides a set a report held up about (or shows it again): it can't be played or copied meanwhile, and its
  * pictures aren't served (copies of it show those questions without them).
  */
-export function hideSet(code: string, hidden: boolean): boolean {
+export function hideSet(code: string, hidden: boolean, adminId: number | null = null): boolean {
   const row = one<SetRow>('SELECT * FROM question_sets WHERE code = ?', code);
   if (!row) return false;
   tx(() => {
     run('UPDATE question_sets SET hidden = ? WHERE id = ?', hidden ? 1 : 0, row.id);
     for (const id of imageIds(questionsOf(row)))
       run('UPDATE set_images SET blocked = ? WHERE id = ?', hidden ? 1 : 0, id);
+    // A moderator's (an undo from the log is logged as one already).
+    if (adminId !== null)
+      logAction({ adminId, action: hidden ? 'hide_set' : 'unhide_set', userId: row.owner_id, target: code, undo: {} });
   });
   return true;
 }

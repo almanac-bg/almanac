@@ -146,6 +146,7 @@ export function claimChallengeAttempt(id: string, userId: number): { ok: true } 
     Date.now(),
   );
   count('challenge_runs');
+  if (userId !== challenge.creator_id) count('link_uses:challenge');
   return { ok: true };
 }
 

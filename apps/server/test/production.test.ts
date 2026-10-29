@@ -381,6 +381,7 @@ test('what the site says about itself: who runs it (configuration, not code), it
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
   assert.equal(legal.backups, 'Примерни бекъпи');
   assert.equal(legal.inbox, null, 'unset: the policy leaves the line out');
+  assert.equal(legal.mailbox, null);
   // The test bank has 300 questions: the landing's "над 300 въпроса", rounded down to the hundred.
   assert.equal(legal.questions, 300);
 });

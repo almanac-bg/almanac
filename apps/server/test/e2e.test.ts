@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import {
+  dayKey,
   type GameStartPayload,
   type PowerupEvent,
   PUBLIC_PAGES,
@@ -14,6 +15,7 @@ import {
   type RevealPayload,
   type RoomState,
   SEASON_REWARD_XP,
+  seasonKey,
 } from '@quiz/shared';
 import {
   type Account,
@@ -1403,7 +1405,20 @@ test('community questions', T, async () => {
     q: 'Тестов общностен въпрос за реките?',
     options: ['Верен ✓ общ', 'Грешен a', 'Грешен b', 'Грешен c'],
     answer: 0,
+    answerSource: 'https://bg.wikipedia.org/wiki/Река',
   };
+  const { answerSource: _, ...unsourced } = draft;
+  assert.equal(
+    (await api.send('POST', '/api/submissions', B.cookie, unsourced)).status,
+    400,
+    'a question comes with where its answer is checked',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/submissions', B.cookie, { ...draft, fact: 'Тази река тече на север към морето.' }))
+      .status,
+    400,
+    'and a fact with its own source',
+  );
   const sub = await api.send('POST', '/api/submissions', B.cookie, draft);
   assert.equal(sub.status, 201, sub.body.error);
   assert.equal((await api.send('POST', '/api/submissions', B.cookie, draft)).status, 400, 'duplicates are rejected');
@@ -1429,6 +1444,46 @@ test('community questions', T, async () => {
   assert.match(mine.q, /редактиран/);
   const achievements = (await api.get('/api/achievements', B.cookie)).body.achievements;
   assert.ok(achievements.find((a: { id: string }) => a.id === 'author_1').unlockedAt, 'author_1 unlocked');
+
+  // The author edits or takes back one still waiting; the moderator says why one is rejected.
+  const second = await api.send('POST', '/api/submissions', B.cookie, {
+    ...draft,
+    q: 'Втори тестов въпрос за планините?',
+  });
+  assert.equal(second.status, 201, second.body.error);
+  const secondId = second.body.submission.id;
+  const changed = await api.send('PUT', `/api/submissions/${secondId}`, B.cookie, {
+    ...draft,
+    q: 'Втори тестов въпрос за високите планини?',
+    fact: 'Планините растат с няколко милиметра всяка година.',
+    factSource: 'https://bg.wikipedia.org/wiki/Планина',
+  });
+  assert.equal(changed.status, 200, changed.body.error);
+  assert.equal(changed.body.submission.fact, 'Планините растат с няколко милиметра всяка година.');
+  assert.equal(
+    (await api.send('PUT', `/api/submissions/${secondId}`, A.cookie, draft)).status,
+    400,
+    "not someone else's",
+  );
+  const similar = (await api.get(`/api/admin/submissions/${secondId}/similar`, A.cookie)).body.similar;
+  assert.ok(Array.isArray(similar));
+  const reject = (reason: string) =>
+    api.send('POST', `/api/admin/submissions/${secondId}/reject`, A.cookie, { reason });
+  assert.equal((await reject('')).status, 400, 'a rejection says why');
+  const rejectNote = next(sb, 'notification');
+  assert.equal((await reject('Отговорът не е еднозначен.')).status, 200);
+  assert.match((await rejectNote).item.text, /Отговорът не е еднозначен/);
+  assert.equal(
+    (await api.send('PUT', `/api/submissions/${secondId}`, B.cookie, draft)).status,
+    400,
+    'a reviewed one stays as it was',
+  );
+  const third = await api.send('POST', '/api/submissions', B.cookie, {
+    ...draft,
+    q: 'Трети тестов въпрос за езерата?',
+  });
+  assert.equal((await api.send('DELETE', `/api/submissions/${third.body.submission.id}`, B.cookie)).status, 200);
+  assert.equal((await api.get('/api/submissions/mine', B.cookie)).body.submissions.length, 2, 'withdrawn: gone');
 
   let found = false;
   for (let i = 0; i < 4 && !found; i++) {
@@ -1674,26 +1729,57 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
 
   const resolve = (body: object) => api.send('POST', `/api/admin/reports/${D.user.id}/resolve`, A.cookie, body);
   assert.equal(
-    (await resolve({ action: 'rename', username: 'kurva_1' })).status,
+    (await resolve({ action: 'rename', username: 'kurva_1', basis: 'name', reason: 'Името обижда другите играчи.' }))
+      .status,
     400,
     "moderators can't pick offensive names either",
   );
   assert.equal(
-    (await resolve({ action: 'rename', username: 'm\u0430ria_test' })).status,
+    (
+      await resolve({
+        action: 'rename',
+        username: 'm\u0430ria_test',
+        basis: 'name',
+        reason: 'Името обижда другите играчи.',
+      })
+    ).status,
     400,
     'or a name that passes for another player',
   );
-  assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч' })).status, 200);
+  const grounds = { basis: 'name', reason: 'Името обижда другите играчи.' };
+  assert.equal(
+    (await resolve({ action: 'rename', username: 'Мирен_играч' })).status,
+    400,
+    'a decision names its basis and a reason the player reads',
+  );
+  assert.equal(
+    (await resolve({ action: 'rename', username: 'Мирен_играч', basis: 'name', reason: 'лошо' })).status,
+    400,
+  );
+  assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч', ...grounds })).status, 200);
+  const renamed = (await api.get('/api/notifications', D.cookie)).body.notifications[0];
+  assert.match(
+    renamed.text,
+    /Мирен_играч.*Неподходящо име.*Името обижда/,
+    'the player is told why, and where to appeal',
+  );
   assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
   assert.equal((await api.get('/api/admin/reports', A.cookie)).body.groups.length, 0, 'reports close when resolved');
 
   await api.send('POST', '/api/reports', B.cookie, { username: 'Мирен_играч', reason: 'cheating' });
-  assert.equal((await resolve({ action: 'ban', days: 7, reason: 'Нечестна игра' })).status, 200);
+  assert.equal(
+    (await resolve({ action: 'ban', days: 7, basis: 'cheating', reason: 'Отговаря с програма.' })).status,
+    200,
+  );
   assert.equal((await api.get('/api/me', D.cookie)).body.user, null, 'a ban logs the player out');
   const login = await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' });
   assert.equal(login.status, 403);
-  assert.match(login.body.error, /спрян до .*Нечестна игра/);
-  assert.equal((await resolve({ action: 'ban', days: null, reason: '' })).status, 200, 'permanent bans');
+  assert.match(login.body.error, /спрян до .*Нечестна игра.*Отговаря с програма.*Ако смяташ, че е грешка/);
+  assert.equal(
+    (await resolve({ action: 'ban', days: null, basis: 'cheating', reason: 'Пак отговаря с програма.' })).status,
+    200,
+    'permanent bans',
+  );
   assert.match(
     (await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' })).body.error,
     /за постоянно/,
@@ -1726,6 +1812,136 @@ test('a moderator gives the password again for changes, at most an hour after gi
 
   srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
   assert.equal((await reject()).status, 403, 'an hour later it asks again');
+});
+
+test('every moderation decision is logged with its grounds, and can be undone', T, async () => {
+  const E = await register(srv.url, 'izmamnik_test');
+  const act = (what: string, body: object = {}) =>
+    api.send('POST', `/api/admin/players/${E.user.id}/${what}`, A.cookie, body);
+  const card = async () => (await api.get(`/api/admin/players/${E.user.id}`, A.cookie)).body.card;
+  const log = async () => (await api.get('/api/admin/log', A.cookie)).body.entries;
+  const undo = (id: number) => api.send('POST', `/api/admin/log/${id}/undo`, A.cookie);
+
+  assert.equal((await api.get('/api/admin/players?q=izmam', B.cookie)).status, 403, 'moderators only');
+  const found = (await api.get('/api/admin/players?q=izmam', A.cookie)).body.players;
+  assert.deepEqual(
+    found.map((p: { user: { username: string } }) => p.user.username),
+    ['izmamnik_test'],
+    'found by part of the name',
+  );
+  assert.deepEqual((await api.get('/api/admin/players?q=%25', A.cookie)).body.players, [], "LIKE's wildcards are text");
+
+  // This season's results: a rating, a daily on the board, a place in the evening Роял.
+  const season = seasonKey();
+  const day = dayKey();
+  srv.db
+    .prepare(
+      "INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins) VALUES (?, ?, 'duel', 1500, 1520, 12, 10)",
+    )
+    .run(E.user.id, season);
+  srv.db
+    .prepare(
+      'INSERT INTO daily_results (user_id, day, started_at, finished_at, score, correct, time_ms, own_set) VALUES (?, ?, ?, ?, 9000, 10, 30000, 0)',
+    )
+    .run(E.user.id, day, Date.now(), Date.now());
+  srv.db
+    .prepare('INSERT INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, 1, 9000, 30)')
+    .run(day, E.user.id);
+  const value = (sql: string) => Object.values(srv.db.prepare(sql).get(E.user.id) as object)[0];
+  const results = () => ({
+    rating: value('SELECT COUNT(*) AS n FROM season_ratings WHERE user_id = ?'),
+    daily: value('SELECT own_set FROM daily_results WHERE user_id = ?'),
+    evening: value('SELECT COUNT(*) AS n FROM evening_results WHERE user_id = ?'),
+  });
+  const before = results();
+
+  assert.equal((await act('ban', { days: 30, basis: 'cheating' })).status, 400, 'a ban names a reason');
+  assert.equal((await act('ban', { days: 30, reason: 'Отговаря с програма.' })).status, 400, 'and a basis');
+  const banned = await act('ban', { days: 30, basis: 'cheating', reason: 'Отговаря с програма.', annul: true });
+  assert.equal(banned.status, 200, banned.body.error);
+  assert.equal(banned.body.card.ban.basis, 'cheating');
+  assert.deepEqual(results(), { rating: 0, daily: 1, evening: 0 }, 'results annulled');
+  const [annulled, ban] = await log();
+  assert.equal(annulled.action, 'annul');
+  assert.equal(ban.action, 'ban');
+  assert.equal(ban.admin, A.user.username);
+  assert.equal(ban.user.username, 'izmamnik_test');
+  assert.equal(ban.basis, 'cheating');
+  assert.match(ban.reason, /30 дни\. Отговаря с програма\./);
+  assert.ok(ban.canUndo && annulled.canUndo);
+  assert.deepEqual(
+    (await card()).log.map((e: { action: string }) => e.action),
+    ['annul', 'ban'],
+    "the player's card has their history",
+  );
+
+  assert.equal((await act('ban-change', { days: 3, reason: 'кратко' })).status, 400);
+  assert.ok(
+    (await act('ban-change', { days: 3, reason: 'Първо нарушение, по-кратко.' })).body.card.ban.until <
+      Date.now() + 4 * 86_400_000,
+  );
+  assert.equal((await act('ban-change', { days: null, reason: 'Беше грешка в играта.' })).body.card.ban, null);
+  // The ban logged them out: the note waits for their next sign-in.
+  const unbanned = srv.db
+    .prepare('SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 1')
+    .get(E.user.id) as { text: string };
+  assert.match(unbanned.text, /можеш да играеш отново/);
+
+  // Undone in any order: each puts back what it changed.
+  const [unban] = await log();
+  assert.equal((await undo(unban.id)).status, 200);
+  assert.ok((await card()).ban, 'the unban undone: banned again');
+  assert.equal((await undo(unban.id)).status, 400, 'once');
+  assert.equal((await undo(ban.id)).status, 200);
+  assert.equal((await card()).ban, null, 'the ban undone: as before it');
+  assert.equal((await undo(annulled.id)).status, 200);
+  assert.deepEqual(results(), before, 'the results back');
+  const entries = await log();
+  assert.ok(entries.find((e: { id: number }) => e.id === ban.id).undoneBy === A.user.username);
+
+  // A rename, undone while the old name is free.
+  assert.equal(
+    (await act('rename', { username: 'chesten_test', basis: 'name', reason: 'Името подвежда играчите.' })).status,
+    200,
+  );
+  const [rename] = await log();
+  assert.equal((await undo(rename.id)).status, 200);
+  assert.equal((await card()).user.username, 'izmamnik_test');
+
+  // A group's name: reported by a member, renamed by a moderator, undone.
+  const signedIn = await api.send('POST', '/api/auth/login', '', { username: 'izmamnik_test', password: 'secret123' });
+  assert.equal(signedIn.status, 200, 'with the ban undone, they sign in again');
+  const group = await api.send('POST', '/api/groups', signedIn.cookie!, { name: 'Измамници' });
+  assert.equal(group.status, 200, group.body.error);
+  const groupId = group.body.id;
+  assert.equal(
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, {})).status,
+    404,
+    'only its members report a group',
+  );
+  const code = (srv.db.prepare('SELECT code FROM player_groups WHERE id = ?').get(groupId) as { code: string }).code;
+  await api.send('POST', `/api/groups/join/${code}`, B.cookie);
+  assert.equal((await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { details: 'обидно' })).status, 200);
+  const report = (await api.get('/api/admin/reports', A.cookie)).body.groups.find(
+    (g: { target: { username: string } }) => g.target.username === 'izmamnik_test',
+  );
+  assert.match(report.reports[0].details, new RegExp(`Група „Измамници“ \\(№${groupId}\\): обидно`));
+  assert.equal(
+    (
+      await api.send('POST', `/api/admin/groups/${groupId}/rename`, A.cookie, {
+        basis: 'name',
+        reason: 'Името обижда другите.',
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await card()).groups[0].name, `Група ${groupId}`);
+  const [renameGroup] = await log();
+  assert.equal(renameGroup.action, 'rename_group');
+  assert.equal((await undo(renameGroup.id)).status, 200);
+  assert.equal((await card()).groups[0].name, 'Измамници');
+  assert.equal((await act('dismiss')).status, 200);
+  await api.send('POST', `/api/groups/${groupId}/leave`, B.cookie);
 });
 
 test('data export and account deletion', T, async () => {
@@ -1816,6 +2032,42 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
   assert.equal(restored.body.hidden.length, 0, 'a hide can be undone');
   const exported = (await api.get('/api/account/export', B.cookie)).body as { questionReportsFiled: unknown[] };
   assert.equal(exported.questionReportsFiled.length, 1, 'reports are part of the data export');
+});
+
+test('flags from three settled players hide a question until checked; „Поправен“ starts it over', T, async () => {
+  const id = 'history-7';
+  const F = await register(srv.url, 'signal_test');
+  const flag = (cookie: string) => api.send('POST', `/api/questions/${id}/report`, cookie, { reason: 'wrong' });
+  const hidden = async () =>
+    (await api.get('/api/admin/question-reports', A.cookie)).body.hidden.map((q: { id: string }) => q.id);
+
+  await flag(A.cookie);
+  await flag(B.cookie);
+  await flag(F.cookie);
+  assert.deepEqual(await hidden(), [], 'an account made today does not count yet');
+  srv.db.prepare('UPDATE users SET created_at = ? WHERE id = ?').run(Date.now() - 2 * 86_400_000, F.user.id);
+  await flag(F.cookie);
+  assert.deepEqual(await hidden(), [id], 'three settled players hide it');
+  const [auto] = (await api.get('/api/admin/log', A.cookie)).body.entries;
+  assert.equal(auto.action, 'auto_hide_question');
+  assert.equal(auto.admin, null, 'the game did it');
+  assert.equal(auto.target, id);
+
+  srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
+  const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });
+  assert.equal(fixed.status, 200, fixed.body.error);
+  assert.equal(fixed.body.groups.length, 0);
+  assert.deepEqual(
+    fixed.body.hidden.map((q: { id: string }) => q.id),
+    [],
+    'back in play',
+  );
+  assert.equal(
+    srv.db.prepare('SELECT 1 AS x FROM question_stats WHERE question_id = ?').get(id),
+    undefined,
+    'its numbers start over',
+  );
+  assert.match((await api.get('/api/notifications', F.cookie)).body.notifications[0].text, /поправен/);
 });
 
 const webDist = path.resolve(import.meta.dirname, '../../web/dist');

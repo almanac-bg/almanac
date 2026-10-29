@@ -140,6 +140,7 @@ export const config = {
     hosting: process.env.HOSTING_PROVIDER || null,
     backups: process.env.BACKUP_PROVIDER || null,
     inbox: process.env.INBOX_PROVIDER || null,
+    mailbox: process.env.MAILBOX_PROVIDER || null,
   },
   /** Where this site's source code is published; linked in the footer (the AGPL asks hosted copies to offer it). */
   sourceUrl: httpsUrl(process.env.SOURCE_URL),

@@ -38,6 +38,7 @@ export interface UserRow {
   email_bounced_at: number | null;
   banned_until: number | null;
   ban_reason: string | null;
+  ban_basis: string | null;
   /** Created by "Играй като гост": no password until claimed with a name and password. */
   is_guest: number;
   /** Earned every 7 days of daily streak (at most 2); a missed day uses one up instead of breaking the streak. */

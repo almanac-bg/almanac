@@ -198,6 +198,10 @@ export function exportAccount(userId: number) {
     questionSubmissions: rows('SELECT * FROM question_submissions WHERE user_id = ?'),
     reportsFiled: rows('SELECT * FROM reports WHERE reporter_id = ?'),
     reportsAboutYou: rows('SELECT reason, status, action, created_at, resolved_at FROM reports WHERE target_id = ?'),
+    // Decisions about them, with their grounds (not which moderator took them).
+    moderationDecisions: rows(
+      'SELECT action, basis, reason, created_at, undone_at FROM moderation_log WHERE target_user_id = ? ORDER BY id',
+    ),
     questionReportsFiled: rows('SELECT * FROM question_reports WHERE user_id = ?'),
     recentlySeenQuestions: rows(
       'SELECT question_id, seen_at FROM seen_questions WHERE user_id = ? ORDER BY seen_at DESC',
@@ -234,6 +238,8 @@ export function eraseAccount(userId: number) {
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
     // Reports they filed stay for the record, but their words go with them.
     run('UPDATE reports SET details = NULL WHERE reporter_id = ?', userId);
+    // Decisions about them name them (an old name, a reason): they go too. A moderator's own stay, unsigned.
+    run('DELETE FROM moderation_log WHERE target_user_id = ?', userId);
     run('DELETE FROM users WHERE id = ?', userId);
     // A group they were the last in goes with them.
     dropEmptyGroups(groups);

@@ -13,13 +13,27 @@ export const emptyDraft = (): QuestionDraft => ({
   q: '',
   options: ['', '', '', ''],
   answer: -1,
+  answerSource: '',
+  fact: '',
+  factSource: '',
 });
 
 export interface DraftErrors {
   q?: string;
   options?: string;
   answer?: string;
+  answerSource?: string;
+  fact?: string;
+  factSource?: string;
 }
+
+const isHttps = (text: string) => {
+  try {
+    return new URL(text).protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 /** Mirrors the server's rules so mistakes show up before submitting. */
 export function validateDraft(d: QuestionDraft): DraftErrors {
@@ -37,15 +51,48 @@ export function validateDraft(d: QuestionDraft): DraftErrors {
     errors.options = 'Отговорите трябва да са различни.';
 
   if (d.answer < 0 || d.answer > 3) errors.answer = 'Отбележи верния отговор.';
+
+  const source = d.answerSource?.trim() ?? '';
+  if (!source) errors.answerSource = 'Посочи къде се проверява верният отговор.';
+  else if (!isHttps(source)) errors.answerSource = 'Източникът трябва да е линк (https://…).';
+
+  const [fMin, fMax] = SUBMISSION_RULES.fact;
+  const fact = d.fact?.trim() ?? '';
+  const factSource = d.factSource?.trim() ?? '';
+  if (fact) {
+    if (fact.length < fMin) errors.fact = `„Знаеше ли?“ е поне ${fMin} знака.`;
+    else if (fact.length > fMax) errors.fact = `„Знаеше ли?“ е до ${fMax} знака.`;
+    if (!isHttps(factSource)) errors.factSource = 'Фактът иска линк към източник (https://…).';
+  }
   return errors;
 }
 
 export const hasErrors = (e: DraftErrors) => Object.keys(e).length > 0;
 
-export const cleanDraft = (d: QuestionDraft): QuestionDraft => ({
-  ...d,
-  q: d.q.trim(),
-  options: d.options.map((o) => o.trim()),
+/** Trimmed, as the server takes it: no fact means no fact source either. */
+export const cleanDraft = (d: QuestionDraft): QuestionDraft => {
+  const fact = d.fact?.trim();
+  return {
+    category: d.category,
+    difficulty: d.difficulty,
+    q: d.q.trim(),
+    options: d.options.map((o) => o.trim()),
+    answer: d.answer,
+    answerSource: d.answerSource?.trim() ?? '',
+    ...(fact && { fact, factSource: d.factSource?.trim() ?? '' }),
+  };
+};
+
+/** A question as its editor holds it: every field a string, so the inputs stay controlled. */
+export const toDraft = (d: QuestionDraft): QuestionDraft => ({
+  category: d.category,
+  difficulty: d.difficulty,
+  q: d.q,
+  options: [...d.options],
+  answer: d.answer,
+  answerSource: d.answerSource ?? '',
+  fact: d.fact ?? '',
+  factSource: d.factSource ?? '',
 });
 
 export const draftsEqual = (a: QuestionDraft, b: QuestionDraft) =>

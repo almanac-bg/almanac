@@ -668,6 +668,11 @@ export interface QuestionDraft {
   q: string;
   options: string[];
   answer: number;
+  /** Where the answer can be checked (an https page): what a moderator checks it against. */
+  answerSource?: string;
+  /** A „Знаеше ли?“ for it, with where it can be checked. */
+  fact?: string;
+  factSource?: string;
 }
 
 export interface Submission extends QuestionDraft {
@@ -677,13 +682,29 @@ export interface Submission extends QuestionDraft {
   createdAt: number;
   reviewedAt: number | null;
   author: PublicUser;
+  /** An approved one's id in the game (a moderator corrects it there). */
+  questionId: string | null;
+  /** An approved one, as played so far: how many answered it and how many got it right. */
+  played: { answered: number; correct: number } | null;
+}
+
+/** A question in the game that looks like a proposed one (for the moderator: a duplicate, or one it gives away). */
+export interface SimilarQuestion {
+  id: string;
+  q: string;
+  answer: string;
 }
 
 export const SUBMISSION_RULES = {
   minLevel: 3,
+  /** Waiting at once: a few until a first one is approved, more after; one at a time after many rejected. */
   maxPending: 10,
+  maxPendingNew: 3,
+  maxPendingRejected: 1,
+  rejectedLimit: 5,
   question: [10, 150],
   option: [1, 45],
+  fact: [20, 200],
   /** XP the author gets when a question is approved. */
   approvedXp: 100,
 } as const;
@@ -692,6 +713,7 @@ export const REPORT_REASONS = [
   { id: 'name', label: 'Обидно потребителско име' },
   { id: 'behavior', label: 'Обидно поведение' },
   { id: 'cheating', label: 'Измама или нечестна игра' },
+  { id: 'illegal', label: 'Незаконно съдържание' },
   { id: 'other', label: 'Друго' },
 ] as const;
 
@@ -703,10 +725,94 @@ export interface ReportGroup {
   reports: { id: number; reason: ReportReason; details: string | null; createdAt: number; reporter: string | null }[];
 }
 
+/** What a ban or a forced rename rests on: the rules in the Terms (§3), named to the player with the reason. */
+export const MODERATION_BASES = [
+  { id: 'abuse', label: 'Обиди, тормоз или заплахи' },
+  { id: 'name', label: 'Неподходящо име' },
+  { id: 'content', label: 'Неподходящо или незаконно съдържание' },
+  { id: 'cheating', label: 'Нечестна игра: програми, втори профили, грешки в играта' },
+  { id: 'spam', label: 'Спам' },
+  { id: 'other', label: 'Друго нарушение на условията' },
+] as const;
+
+export type ModerationBasis = (typeof MODERATION_BASES)[number]['id'];
+
+export const MODERATION = {
+  /** A reason a player is told is at least this long: „нарушение“ alone tells them nothing. */
+  reasonMin: 10,
+  reasonMax: 300,
+  /** Flags on a question from this many players (with accounts at least `flaggerAgeDays` old) hide it until checked. */
+  autoHideFlags: 3,
+  flaggerAgeDays: 1,
+  /** This many open reports or flags about one player or question bring a moderator an email at once. */
+  alertAt: 3,
+  /** The moderators' morning summary (Sofia time). */
+  digestHour: 9,
+} as const;
+
 export type ModerationAction =
   | { action: 'dismiss' }
-  | { action: 'rename'; username: string }
-  | { action: 'ban'; days: number | null; reason: string };
+  | { action: 'rename'; username: string; basis: ModerationBasis; reason: string }
+  | { action: 'ban'; days: number | null; basis: ModerationBasis; reason: string; annul?: boolean };
+
+/** What the moderation log keeps (each with what undoing it takes, when it can be undone). */
+export type ModerationLogAction =
+  | 'ban'
+  | 'unban'
+  | 'ban_change'
+  | 'rename'
+  | 'annul'
+  | 'dismiss_reports'
+  | 'hide_question'
+  | 'auto_hide_question'
+  | 'unhide_question'
+  | 'fix_question'
+  | 'dismiss_flags'
+  | 'edit_question'
+  | 'approve'
+  | 'reject'
+  | 'hide_set'
+  | 'unhide_set'
+  | 'rename_group'
+  | 'reload_bank';
+
+export interface ModerationLogEntry {
+  id: number;
+  action: ModerationLogAction;
+  /** Who did it; null: the game itself (a question hidden by its players' flags). */
+  admin: string | null;
+  /** The player it was about, and/or what (a question's id, a set's or group's name), with where to see it. */
+  user: PublicUser | null;
+  target: string | null;
+  link: string | null;
+  basis: ModerationBasis | null;
+  reason: string | null;
+  createdAt: number;
+  undoneAt: number | null;
+  undoneBy: string | null;
+  /** It can be undone (not yet undone, and the action keeps what that takes). */
+  canUndo: boolean;
+}
+
+/** A player as a moderator sees them (the „Играчи“ tab). */
+export interface PlayerCard {
+  user: PublicUser & { isGuest: boolean; createdAt: number; lastSeenAt: number | null; hasEmail: boolean };
+  ban: { until: number; basis: ModerationBasis | null; reason: string | null } | null;
+  gamesPlayed: number;
+  reports: { open: number; resolved: number; filed: number };
+  submissions: { pending: number; approved: number; rejected: number };
+  /** Groups they made and sets they share: what a report about them is often about. */
+  groups: { id: number; name: string; members: number }[];
+  sets: { code: string; name: string; hidden: boolean }[];
+  log: ModerationLogEntry[];
+}
+
+export interface PlayerSearchHit {
+  user: PublicUser;
+  isGuest: boolean;
+  banned: boolean;
+  createdAt: number;
+}
 
 /** What a player can flag about a question. */
 export const QUESTION_REPORT_REASONS = [
@@ -740,6 +846,8 @@ export interface QuestionInfo {
   /** Its "Знаеше ли?" and where that can be checked (moderators judge reports about it). */
   fact: string | null;
   factSource: string | null;
+  /** Where its answer is checked (a player's question, and a bank question that has one). */
+  answerSource: string | null;
 }
 
 /** Open reports about one question, for the moderation queue. */
@@ -748,7 +856,8 @@ export interface QuestionReportGroup {
   reports: { id: number; reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
 }
 
-export type QuestionReportAction = 'dismiss' | 'hide';
+/** `fixed`: corrected (its numbers start over, and whoever flagged it is thanked). */
+export type QuestionReportAction = 'dismiss' | 'hide' | 'fixed';
 
 /** What the answer log says, for moderators: play no person could manage, and questions whose label is off. */
 export interface PlayCheck {
@@ -887,6 +996,8 @@ export interface SiteInfo {
   backups: string | null;
   /** Forwards mail sent to the contact address, if a service does. */
   inbox: string | null;
+  /** Where mail to the contact address ends up (the mailbox the forwarder delivers to). */
+  mailbox: string | null;
   /** Where this site's source code is published (offered in the footer, as the AGPL asks of hosted copies). */
   sourceUrl: string | null;
   /** The commit this server runs (the source offer links that exact version). */

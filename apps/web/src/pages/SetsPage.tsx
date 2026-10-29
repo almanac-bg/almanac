@@ -809,7 +809,7 @@ function SharedSet({ code }: { code: string }) {
         )}
       </div>
       <Modal open={reporting} onClose={() => setReporting(false)} title="Сигнал за набор">
-        <p className="text-sm text-fg-2">Какво не е наред — обидно съдържание, нещо неподходящо?</p>
+        <p className="text-sm text-fg-2">Какво не е наред — обидно, неподходящо или незаконно съдържание?</p>
         <textarea
           value={details}
           maxLength={400}

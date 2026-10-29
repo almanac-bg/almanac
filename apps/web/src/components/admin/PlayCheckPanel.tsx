@@ -8,8 +8,8 @@ import { useLoad } from '../../lib/load';
 import { Avatar, LevelBadge } from '../Avatar';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
+import { BanForm } from './Decisions';
 import { QuestionCard } from './QuestionReportsQueue';
-import { BanForm } from './ReportsQueue';
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} с`;
@@ -134,15 +134,13 @@ function SuspectCard({
         <BanForm
           busy={busy}
           onCancel={() => setBanning(false)}
-          onBan={async (decision, message) => {
+          defaultBasis="cheating"
+          onBan={async (ban, message) => {
             setBusy(true);
             try {
-              await api.resolveReports(user.id, decision);
+              await api.banPlayer(user.id, ban);
               toast({ kind: 'success', title: message });
-              onBanned(
-                user.id,
-                decision.days === null ? Number.MAX_SAFE_INTEGER : Date.now() + decision.days * 86_400_000,
-              );
+              onBanned(user.id, ban.days === null ? Number.MAX_SAFE_INTEGER : Date.now() + ban.days * 86_400_000);
               setBanning(false);
             } catch (e) {
               toast({ kind: 'error', title: errorMessage(e) });

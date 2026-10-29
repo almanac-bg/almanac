@@ -17,7 +17,7 @@ import {
 } from '../sets';
 import { throttled } from '../throttle';
 import { getUser, isAdmin } from '../users';
-import { idParam, parse, requireAccount } from './common';
+import { idParam, parse, requireAccount, requireAdmin, requireRecentPassword } from './common';
 
 /** „Моите въпроси“: a host's own question sets for their rooms, and the links they're shared by. */
 export const setsRouter = Router();
@@ -162,14 +162,10 @@ setsRouter.post('/sets/shared/:code/report', requireAuth, requireAccount, (req, 
 });
 
 /** A moderator hides a set a report held up about (or shows it again). */
-setsRouter.post('/sets/shared/:code/hide', requireAuth, (req, res) => {
-  if (!admin(res)) {
-    res.status(403).json({ error: 'Само за модератори.' });
-    return;
-  }
+setsRouter.post('/sets/shared/:code/hide', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
   const body = parse(z.object({ hidden: z.boolean() }), req, res);
   if (!body) return;
-  if (!hideSet(shareCode(req), body.hidden)) {
+  if (!hideSet(shareCode(req), body.hidden, res.locals.userId)) {
     res.status(404).json({ error: 'Няма такъв набор.' });
     return;
   }

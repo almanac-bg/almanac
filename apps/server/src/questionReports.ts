@@ -1,12 +1,16 @@
 import {
+  MODERATION,
   QUESTION_REPORT_REASONS,
   type QuestionInfo,
   type QuestionReportAction,
   type QuestionReportGroup,
   type QuestionReportReason,
 } from '@quiz/shared';
+import { alertModerators } from './alerts';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
+import { logAction } from './modlog';
+import { notify } from './notifications';
 import {
   imageCredit,
   isChoice,
@@ -40,12 +44,18 @@ export function questionInfo(q: PlayableQuestion): QuestionInfo {
     hidden: isHidden(q.id),
     fact: q.fact ?? null,
     factSource: q.factSource ?? null,
+    answerSource: q.answerSource ?? null,
   };
 }
 
-/** A player flags a mistake. Repeating it while the first report is open just updates it. */
+/**
+ * A player flags a mistake. Repeating it while the first report is open just updates it. Enough flags from players
+ * with accounts older than a day (MODERATION) take the question out of new matches until a moderator looks: a wrong
+ * answer taught to everyone is worse than a good question missed for a day.
+ */
 export function reportQuestion(userId: number, questionId: string, reason: string, details: string): Result {
-  if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
+  const q = questionById(questionId);
+  if (!q) return { ok: false, error: 'Няма такъв въпрос.' };
   if (!REASONS.has(reason)) return { ok: false, error: 'Избери причина.' };
   run(
     `INSERT INTO question_reports (question_id, user_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)
@@ -56,6 +66,21 @@ export function reportQuestion(userId: number, questionId: string, reason: strin
     details.trim().slice(0, 500),
     Date.now(),
   );
+  const flags = one<{ all: number; settled: number }>(
+    `SELECT COUNT(*) AS "all", SUM(u.created_at < ?) AS settled FROM question_reports r JOIN users u ON u.id = r.user_id
+     WHERE r.question_id = ? AND r.status = 'open'`,
+    Date.now() - MODERATION.flaggerAgeDays * 24 * 60 * 60_000,
+    questionId,
+  )!;
+  if ((flags.settled ?? 0) >= MODERATION.autoHideFlags && !isHidden(questionId)) {
+    hideQuestion(null, questionId);
+    alertModerators(`question:${questionId}`, `Въпрос, скрит от сигналите на играчите: ${questionId}`, [
+      `„${q.q}“`,
+      `${flags.all} сигнала. Скрит е от новите мачове, докато някой го провери (в „Сигнали“; в „Дневник“ — отмяна).`,
+    ]);
+  } else if (flags.all >= MODERATION.alertAt) {
+    alertModerators(`question:${questionId}`, `${flags.all} сигнала за въпрос ${questionId}`, [`„${q.q}“`]);
+  }
   return { ok: true };
 }
 
@@ -93,28 +118,57 @@ export function openQuestionReports(): QuestionReportGroup[] {
   return [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
 }
 
-/** Closes a question's open reports; `hide` also takes it out of new matches right away. */
+/** Takes a question out of new matches (`adminId` null: its players' flags did), logged so it can be undone. */
+export function hideQuestion(adminId: number | null, questionId: string) {
+  run(
+    'INSERT OR IGNORE INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, ?, ?)',
+    questionId,
+    adminId,
+    Date.now(),
+  );
+  logAction({
+    adminId,
+    action: adminId === null ? 'auto_hide_question' : 'hide_question',
+    target: questionId,
+    undo: {},
+  });
+  reloadQuestionBank();
+  redrawDailyWithout(questionId);
+}
+
+/**
+ * Closes a question's open reports: `dismiss` (nothing wrong), `hide` (out of new matches), or `fixed` (it was
+ * corrected: what players did on the old wording no longer says anything about it, so its numbers start over, and
+ * whoever flagged it is thanked).
+ */
 export function resolveQuestionReports(adminId: number, questionId: string, action: QuestionReportAction): Result {
   if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
+  const reporters = all<{ user_id: number }>(
+    "SELECT user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
+    questionId,
+  ).map((r) => r.user_id);
+  let shown = false;
   tx(() => {
-    if (action === 'hide') {
-      run(
-        'INSERT OR IGNORE INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, ?, ?)',
-        questionId,
-        adminId,
-        Date.now(),
-      );
-    }
     run(
       "UPDATE question_reports SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",
       Date.now(),
       adminId,
       questionId,
     );
+    // Fixed, or the flags were wrong: back in play if they hid it.
+    if (action !== 'hide')
+      shown = Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes) > 0;
+    if (action === 'fixed') {
+      run('DELETE FROM question_stats WHERE question_id = ?', questionId);
+      run('DELETE FROM question_skill WHERE question_id = ?', questionId);
+      logAction({ adminId, action: 'fix_question', target: questionId });
+    } else if (action === 'dismiss') logAction({ adminId, action: 'dismiss_flags', target: questionId });
   });
-  if (action === 'hide') {
-    reloadQuestionBank();
-    redrawDailyWithout(questionId);
+  if (action === 'hide') hideQuestion(adminId, questionId);
+  else if (shown || action === 'fixed') reloadQuestionBank();
+  if (action === 'fixed') {
+    for (const userId of reporters)
+      notify(userId, { icon: '🛠️', text: 'Благодарим! Въпросът, за който сигнализира, е поправен.' });
   }
   return { ok: true };
 }
@@ -127,10 +181,12 @@ export function hiddenQuestions(): QuestionInfo[] {
     .map(questionInfo);
 }
 
-export function unhideQuestion(questionId: string): Result {
+export function unhideQuestion(questionId: string, adminId: number | null = null): Result {
   if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) {
     return { ok: false, error: 'Въпросът не е скрит.' };
   }
+  // From the hidden list (an undo from the log is logged as one already).
+  if (adminId !== null) logAction({ adminId, action: 'unhide_question', target: questionId, undo: {} });
   reloadQuestionBank();
   return { ok: true };
 }

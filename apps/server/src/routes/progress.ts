@@ -3,7 +3,10 @@ import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { almanacCategory, almanacOverview } from '../almanac';
 import { requireAuth, userIdFromRequest } from '../auth';
+import { one } from '../db';
 import { createGroup, groupInfo, groupPreview, joinGroup, leaveGroup, manageGroup, myGroups } from '../groups';
+import { fileReport } from '../moderation';
+import { count } from '../stats';
 import { network, throttled } from '../throttle';
 import { idParam, parse, requireAccount } from './common';
 
@@ -68,6 +71,7 @@ progress.get('/groups/join/:code', (req, res) => {
     res.status(404).json({ error: 'Линкът към групата вече не е валиден. Поискай нов.' });
     return;
   }
+  if (preview.memberOf === null) count('link_opens:group');
   res.json(preview);
 });
 
@@ -117,5 +121,32 @@ progress.delete('/groups/:id', requireAuth, (req, res) => {
 
 progress.post('/groups/:id/leave', requireAuth, (req, res) => {
   leaveGroup(idParam(req), res.locals.userId);
+  res.json({ ok: true });
+});
+
+/**
+ * A group's name breaks the rules: a member reports it, as a report about its owner with the group in it (the
+ * moderator renames it from the owner's card).
+ */
+progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
+  const body = parse(z.object({ details: z.string().max(400).default('') }), req, res);
+  if (!body) return;
+  const id = idParam(req);
+  const group = one<{ name: string; owner: string | null }>(
+    `SELECT g.name, u.username AS owner FROM player_groups g LEFT JOIN users u ON u.id = g.owner_id
+     WHERE g.id = ? AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?)`,
+    id,
+    res.locals.userId,
+  );
+  if (!group?.owner) {
+    res.status(404).json({ error: 'Няма такава група.' });
+    return;
+  }
+  const details = `Група „${group.name}“ (№${id})${body.details.trim() ? `: ${body.details.trim()}` : ''}`;
+  const filed = fileReport(res.locals.userId, group.owner, 'name', details);
+  if (!filed.ok) {
+    res.status(400).json({ error: filed.error });
+    return;
+  }
   res.json({ ok: true });
 });
