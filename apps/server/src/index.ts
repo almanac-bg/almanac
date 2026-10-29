@@ -2,7 +2,17 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BRAND, MODES, PUBLIC_PAGES, pageTitle, ROOM_LIMITS, routeKind, type SiteInfo, scrubPaths } from '@quiz/shared';
+import {
+  BRAND,
+  MODES,
+  PUBLIC_PAGES,
+  pageTitle,
+  ROOM_CODE_DIGITS,
+  ROOM_LIMITS,
+  routeKind,
+  type SiteInfo,
+  scrubPaths,
+} from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
@@ -376,18 +386,20 @@ function withHead(
   head: { title?: string; description?: string; url?: string; index: boolean; data?: object },
 ): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  // Every insert by a function: a replacement string reads `$&`, `$'`, `$1`… in a player's text (a group's name) as
+  // patterns — one name put the whole page into its own head four times.
   let out = html;
   if (head.title) {
     const title = esc(head.title);
     out = out
-      .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
-      .replace(/(<meta property="og:title" content=")[^"]*/, `$1${title}`);
+      .replace(/<title>[^<]*<\/title>/, () => `<title>${title}</title>`)
+      .replace(/(<meta property="og:title" content=")[^"]*/, (_, tag) => tag + title);
   }
   if (head.description) {
     const description = esc(head.description);
     out = out
-      .replace(/(<meta name="description" content=")[^"]*/, `$1${description}`)
-      .replace(/(<meta property="og:description" content=")[^"]*/, `$1${description}`);
+      .replace(/(<meta name="description" content=")[^"]*/, (_, tag) => tag + description)
+      .replace(/(<meta property="og:description" content=")[^"]*/, (_, tag) => tag + description);
   }
   const extra = [
     head.index
@@ -395,12 +407,12 @@ function withHead(
       : '<meta name="robots" content="noindex" />',
   ];
   if (head.url) {
-    out = out.replace(/(<meta property="og:url" content=")[^"]*/, `$1${esc(head.url)}`);
+    out = out.replace(/(<meta property="og:url" content=")[^"]*/, (_, tag) => tag + esc(head.url!));
     // Only on pages to be listed: a canonical address on a "noindex" page is a mixed signal.
     if (head.index) extra.push(`<link rel="canonical" href="${esc(head.url)}" />`);
   }
   if (head.data) extra.push(`<script type="application/ld+json">${jsonInHtml(head.data)}</script>`);
-  return out.replace('</head>', `${extra.join('')}</head>`);
+  return out.replace('</head>', () => `${extra.join('')}</head>`);
 }
 
 const points = (n: number) => new Intl.NumberFormat('bg-BG').format(n);
@@ -426,9 +438,15 @@ function dailyPage(html: string, at: string, code: string | null): string {
 
 /** A room's invite link (/join/<code>): who's inviting, while the room is open. */
 function joinPage(html: string, at: string, code: string): string {
-  const room = realtime.roomPreview(code);
+  // Only a room's code goes into the title: /join/<any text> would preview that text under the site's name.
+  const isCode = new RegExp(`^\\d{${ROOM_CODE_DIGITS}}$`).test(code);
+  const room = isCode ? realtime.roomPreview(code) : null;
   return withHead(html, {
-    title: room ? `${room.host} те кани в стая ${code} — ${BRAND.name}` : `Покана за стая ${code} — ${BRAND.name}`,
+    title: room
+      ? `${room.host} те кани в стая ${code} — ${BRAND.name}`
+      : isCode
+        ? `Покана за стая ${code} — ${BRAND.name}`
+        : `Покана за стая — ${BRAND.name}`,
     description: `До ${ROOM_LIMITS.maxPlayers[1]} играчи, без регистрация: влизаш с един тап.`,
     url: `${config.appUrl}${at}`,
     index: false,

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
 import { BRAND, PUBLIC_PAGES, routeKind, type SiteInfo } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
@@ -188,6 +189,20 @@ test('a link to a screen of the game previews as that screen: the day, a room in
   const join = await preview('/join/123456');
   assert.match(join.title ?? '', /Покана за стая 123456/);
   for (const page of [daily, join]) assert.deepEqual([page.robots, page.robotsTags], ['noindex', 1]);
+  // Only a room's code reaches a preview: any other text would show under the site's name.
+  assert.equal((await preview('/join/FREE-iPhone-at-scam.example')).title, 'Покана за стая — АЛМАНАХ');
+  // A player's text with `$` patterns in it is text, not a pattern: the page once ended up in its own head four times.
+  const owner = await register(srv.url, 'grupa_test');
+  const name = "Клас $` $& $'";
+  const made = await http(srv.url).send('POST', '/api/groups', owner.cookie, { name });
+  assert.equal(made.status, 200, made.body.error);
+  const db = new DatabaseSync(srv.dbPath, { readOnly: true });
+  const { code } = db.prepare('SELECT code FROM player_groups WHERE id = ?').get(made.body.id) as { code: string };
+  db.close();
+  const html = await (await fetch(`${srv.url}/groups/join/${code}`)).text();
+  assert.equal(html.match(/<!doctype/gi)?.length, 1, 'the page once ended up in its own head');
+  assert.equal(html.match(/<title>/g)?.length, 1);
+  assert.ok(html.includes('Клас $` $&#38; $&#39;'), 'the name as typed, escaped');
 });
 
 test('search engines get the public pages in a sitemap and, on the home page only, the site name', {
