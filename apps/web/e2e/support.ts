@@ -203,8 +203,11 @@ export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } =
     // test speed.
     await expect(open.or(lock).or(pick).or(results).or(goOn).first()).toBeVisible({ timeout: gameMs(15_000) });
     if (await results.isVisible()) break;
-    if (await goOn.isVisible()) {
-      await goOn.click({ timeout: gameMs(2_000) });
+    // Only with no question open: a held reveal fading out keeps its button for a moment beside the next question.
+    const answerable = (await open.first().isVisible()) || (await lock.isVisible()) || (await ordering.isVisible());
+    if (!answerable && (await goOn.isVisible())) {
+      // It may go by itself meanwhile (a hold's own end): that's no failure.
+      await goOn.click({ timeout: gameMs(2_000) }).catch(() => {});
       await expect(goOn).toBeHidden({ timeout: gameMs(5_000) });
       continue;
     }
