@@ -355,7 +355,7 @@ function Strip({ game }: { game: LiveGame }) {
               <span className="sr-only">
                 {me ? 'Ти' : p.name}
                 {machineTag(p) && ` (${machineTag(p)!.toLowerCase()})`}: {status}
-                {danger.has(s.id) && ', отпада при следващото отпадане'}
+                {danger.has(s.id) && ', в зоната за отпадане'}
               </span>
               <div
                 className="relative rounded-full"

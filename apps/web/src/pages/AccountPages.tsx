@@ -59,7 +59,7 @@ export function ResetPasswordPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (password.length < PASSWORD_MIN_LENGTH)
-      return setError(`Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`);
+      return setError(`Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} знака.`);
     if (password !== confirm) return setError('Паролите не съвпадат.');
     setBusy(true);
     setError(null);
@@ -88,7 +88,7 @@ export function ResetPasswordPage() {
             value={password}
             onChange={setPassword}
             autoComplete="new-password"
-            placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
+            placeholder={`поне ${PASSWORD_MIN_LENGTH} знака`}
           />
           <PasswordField label="Повтори паролата" value={confirm} onChange={setConfirm} autoComplete="new-password" />
           {error && (
@@ -99,7 +99,7 @@ export function ResetPasswordPage() {
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Запази и влез
           </Button>
-          <p className="text-xs text-fg-3">Всички други устройства ще бъдат отписани.</p>
+          <p className="text-xs text-fg-3">Ще излезеш от профила на всички други устройства.</p>
         </form>
       )}
     </EmailLinkPage>
@@ -563,7 +563,7 @@ function MailOptIn({
       <Modal open={confirming} onClose={() => setConfirming(false)} title={title}>
         <p className="text-sm text-fg-2">{confirmText}</p>
         <p className="mt-3 text-sm text-fg">
-          Потвърждаваш, че си над 14 години или имаш съгласие на родител или настойник.
+          Потвърждаваш, че имаш навършени 14 години или имаш съгласие на родител или настойник.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirming(false)}>
@@ -907,14 +907,14 @@ function PasswordSettings() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (next.length < PASSWORD_MIN_LENGTH)
-      return setError(`Новата парола трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`);
+      return setError(`Новата парола трябва да е поне ${PASSWORD_MIN_LENGTH} знака.`);
     setBusy(true);
     setError(null);
     try {
       await api.changePassword(current, next);
       setCurrent('');
       setNext('');
-      toast({ kind: 'success', title: 'Паролата е сменена', body: 'Другите устройства са отписани.' });
+      toast({ kind: 'success', title: 'Паролата е сменена', body: 'Излезе от профила на другите устройства.' });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -935,7 +935,7 @@ function PasswordSettings() {
           value={next}
           onChange={setNext}
           autoComplete="new-password"
-          placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
+          placeholder={`поне ${PASSWORD_MIN_LENGTH} знака`}
         />
         {error && (
           <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">

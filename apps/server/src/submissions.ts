@@ -16,6 +16,7 @@ import { all, one, run, tx } from './db';
 import { logAction } from './modlog';
 import { notify } from './notifications';
 import { questionBank, reloadQuestionBank } from './questions';
+import { sentence } from './statements';
 import { getUser, toPublicUser, type UserRow } from './users';
 
 const [qMin, qMax] = SUBMISSION_RULES.question;
@@ -31,11 +32,11 @@ export const DraftSchema = z
     q: z
       .string()
       .trim()
-      .min(qMin, `Въпросът трябва да е поне ${qMin} символа.`)
-      .max(qMax, `Въпросът може да е най-много ${qMax} символа.`),
+      .min(qMin, `Въпросът трябва да е поне ${qMin} знака.`)
+      .max(qMax, `Въпросът може да е най-много ${qMax} знака.`),
     options: z
       .array(
-        z.string().trim().min(oMin, 'Попълни всички отговори.').max(oMax, `Отговорите могат да са до ${oMax} символа.`),
+        z.string().trim().min(oMin, 'Попълни всички отговори.').max(oMax, `Отговорите могат да са до ${oMax} знака.`),
       )
       .length(4, 'Трябват точно 4 отговора.'),
     answer: z.number().int().min(0).max(3),
@@ -380,7 +381,7 @@ export function rejectSubmission(
   });
   notify(row.user_id, {
     icon: '📝',
-    text: `Въпросът ти „${truncate(row.q)}“ не беше одобрен. Причина: ${why}`,
+    text: `Въпросът ти „${truncate(row.q)}“ не беше одобрен. Причина: ${sentence(why)}`,
     link: '/submit',
   });
   return { ok: true };

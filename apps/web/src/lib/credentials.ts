@@ -17,11 +17,10 @@ export function credentialsProblems(
   const problems: { field: CredentialField; message: string }[] = [];
   if (newAccount) {
     if (!name) problems.push({ field: 'username', message: 'Избери потребителско име.' });
-    else if (name.length < 3) problems.push({ field: 'username', message: 'Името трябва да е поне 3 символа.' });
-    if (!password)
-      problems.push({ field: 'password', message: `Избери парола — поне ${PASSWORD_MIN_LENGTH} символа.` });
+    else if (name.length < 3) problems.push({ field: 'username', message: 'Името трябва да е поне 3 знака.' });
+    if (!password) problems.push({ field: 'password', message: `Избери парола — поне ${PASSWORD_MIN_LENGTH} знака.` });
     else if (password.length < PASSWORD_MIN_LENGTH)
-      problems.push({ field: 'password', message: `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.` });
+      problems.push({ field: 'password', message: `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} знака.` });
     else if (name && password.toLowerCase() === name.toLowerCase())
       problems.push({ field: 'password', message: 'Паролата не може да е същата като името.' });
   } else {

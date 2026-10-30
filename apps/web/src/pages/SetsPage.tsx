@@ -33,7 +33,7 @@ export function SetsPage() {
     return (
       <div className="mx-auto max-w-xl space-y-6">
         <h1 className="t-page">Моите въпроси</h1>
-        <GuestNudge>Собствени въпроси за стаите си прави профилът: запази своя с име и парола.</GuestNudge>
+        <GuestNudge>Свои въпроси за стаите правят играчите с профил: запази своя с име и парола.</GuestNudge>
       </div>
     );
   if (code !== undefined) return <SharedSet code={code} />;
@@ -79,7 +79,7 @@ function SetList() {
         <div>
           <h1 className="t-page">Моите въпроси</h1>
           <p className="mt-2 max-w-xl text-fg-2 text-pretty">
-            Твои въпроси за частните ти стаи — урок, рожден ден, офисът. До {SETS.maxQuestions} в набор: с избор от
+            Твои въпроси за частните ти стаи — урок, рожден ден, офис. До {SETS.maxQuestions} в набор: с избор от
             четири, вярно или невярно, число или „Подреди“ — по желание със снимка.
           </p>
         </div>

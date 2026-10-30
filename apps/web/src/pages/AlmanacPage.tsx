@@ -37,8 +37,7 @@ function Overview() {
         </h1>
         <ProgressBar value={data.total ? data.facts / data.total : 0} className="mt-4 max-w-md" />
         <p className="mt-3 max-w-xl text-sm text-fg-2 text-pretty">
-          Всеки „Знаеше ли?“ зад въпрос, който познаеш — или на който спреш да прочетеш, когато играеш самостоятелно, —
-          остава тук.
+          Тук остава всеки „Знаеше ли?“ от въпрос, който познаеш, и всеки, който спреш да прочетеш в „Соло“.
         </p>
       </header>
 

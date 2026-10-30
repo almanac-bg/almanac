@@ -131,7 +131,7 @@ export class EveningLobby {
         for (const id of ids) {
           this.io
             .to(`user:${id}`)
-            .emit('notice', { kind: 'error', message: 'Вечерният Роял не можа да започне. Извинявай!' });
+            .emit('notice', { kind: 'error', message: 'Вечерният Роял не можа да започне. Съжаляваме!' });
         }
       }
     }

@@ -109,7 +109,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             transition={{ repeat: Infinity, duration: 1.4 }}
             className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-bold text-rose-300"
           >
-            <Skull className="size-3.5" /> Елиминация след този въпрос
+            <Skull className="size-3.5" /> Отпадане след този въпрос
           </m.span>
         )}
         {out && (

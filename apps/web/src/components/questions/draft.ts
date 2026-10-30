@@ -41,12 +41,12 @@ export function validateDraft(d: QuestionDraft): DraftErrors {
   const [qMin, qMax] = SUBMISSION_RULES.question;
   const [oMin, oMax] = SUBMISSION_RULES.option;
   const q = d.q.trim();
-  if (q.length < qMin) errors.q = `Въпросът трябва да е поне ${qMin} символа.`;
-  else if (q.length > qMax) errors.q = `Въпросът може да е най-много ${qMax} символа.`;
+  if (q.length < qMin) errors.q = `Въпросът трябва да е поне ${qMin} знака.`;
+  else if (q.length > qMax) errors.q = `Въпросът може да е най-много ${qMax} знака.`;
 
   const options = d.options.map((o) => o.trim());
   if (options.some((o) => o.length < oMin)) errors.options = 'Попълни всички отговори.';
-  else if (options.some((o) => o.length > oMax)) errors.options = `Отговорите могат да са до ${oMax} символа.`;
+  else if (options.some((o) => o.length > oMax)) errors.options = `Отговорите могат да са до ${oMax} знака.`;
   else if (new Set(options.map((o) => o.toLowerCase())).size !== 4)
     errors.options = 'Отговорите трябва да са различни.';
 

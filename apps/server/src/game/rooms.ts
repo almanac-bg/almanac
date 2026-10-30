@@ -124,7 +124,7 @@ export class RoomManager {
     if (room.kicked.has(userId)) return { ok: false, error: 'Домакинът те премахна от тази стая.' };
     // Either way round, and without saying who blocked whom.
     if (blockedBetween(room.hostUserId, userId)) return { ok: false, error: 'Не можеш да влезеш в тази стая.' };
-    if (room.game) return { ok: false, error: 'Играта в тази стая вече е започнала.' };
+    if (room.game) return { ok: false, error: 'Мачът в тази стая вече е започнал.' };
     if (room.members.length + room.bots.length >= room.settings.maxPlayers)
       return { ok: false, error: 'Стаята е пълна.' };
     let name: string | null = null;
@@ -327,7 +327,7 @@ export class RoomManager {
     const room = this.byUser.get(userId);
     if (!room) return { ok: false, error: 'Не си в стая.' };
     if (room.hostUserId !== userId) return { ok: false, error: 'Само домакинът може да започне играта.' };
-    if (room.game) return { ok: false, error: 'Играта вече тече.' };
+    if (room.game) return { ok: false, error: 'Мачът вече тече.' };
     // Someone whose connection just dropped is still listed for a few seconds, but only players who are here play —
     // and the host only if they play along (else they run it on a big screen).
     const hosting = !room.settings.hostPlays;

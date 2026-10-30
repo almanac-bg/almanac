@@ -8,7 +8,7 @@ test("a newcomer's first tap plays the day's questions; a duel is the next thing
 
   await expect(page.getByText('Въпросите на деня', { exact: true }).first()).toBeVisible();
   // A guest is off the day's board, and sees where it would stand on it (once the day has a few runs to place it in).
-  await expect(page.getByRole('heading', { name: /^(Щеше да си днес|Днешното класиране)$/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^(Щеше да си|Днешното класиране)$/ })).toBeVisible();
   await expect(page.getByText(/Запази профила/).first()).toBeVisible();
   expect((await me(page)).isGuest).toBe(true);
   await expect(page.getByRole('button', { name: 'Играй Дуел', exact: true })).toBeVisible();

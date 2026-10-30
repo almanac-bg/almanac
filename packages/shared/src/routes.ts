@@ -1,6 +1,6 @@
 // With its extension: the web build's config loads this file in Node (for the sitemap), which needs it.
 import { BRAND } from './brand.ts';
-import { CATEGORIES } from './categories.ts';
+import { CATEGORIES, type CategoryId } from './categories.ts';
 
 /**
  * The site's addresses, in one place for the server (status codes, titles in the page, what search engines may
@@ -8,6 +8,23 @@ import { CATEGORIES } from './categories.ts';
  */
 
 /** Pages for everyone, search engines included: each has its own title and description in the page itself. */
+/**
+ * What each category's questions are about, in a few words: its page's description and lead (one template with the
+ * name swapped in made ten near-duplicate pages, which search engines rank weakly).
+ */
+export const CATEGORY_ABOUT: Record<CategoryId, string> = {
+  general: 'всичко по малко — от всекидневието до световните рекорди',
+  science: 'физика, химия, космос, изобретения и откриватели',
+  history: 'ханове и царе, Възраждането, Освобождението и XX век — у нас и по света',
+  geography: 'столици, планини, реки, знамена и места по света и у нас',
+  movies: 'филми, сериали, актьори и наградите им',
+  music: 'песни, изпълнители, групи и инструменти — от народната музика до попа',
+  sports: 'футбол, олимпийски игри, рекорди и шампиони',
+  technology: 'компютри, интернет, изобретения и видеоигри',
+  literature: 'книги, писатели и поети, картини и художници',
+  nature: 'животни, растения, човешкото тяло и рекордите на природата',
+};
+
 export const PUBLIC_PAGES: Record<string, { title: string; description: string }> = {
   '/': {
     title: `${BRAND.name} — онлайн викторина на български: 10 въпроса на деня`,
@@ -35,7 +52,7 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
       `/quiz/${c.id}`,
       {
         title: `Викторина: ${c.name} — въпроси с отговори — ${BRAND.name}`,
-        description: `Въпроси от „${c.name}“ с верните отговори — опитай, после играй с часовник и класация в ${BRAND.name}.`,
+        description: `Викторина „${c.name}“: ${CATEGORY_ABOUT[c.id]}. Въпроси с верните отговори — опитай, после играй с часовник и класация в ${BRAND.name}.`,
       },
     ]),
   ),

@@ -131,7 +131,7 @@ export function DailyCard({ className }: { className?: string }) {
                     <Share2 className="size-4" />
                   </Button>
                   <Button variant="secondary" onClick={() => navigate('/leaderboard?board=daily')}>
-                    Класиране <ArrowRight className="size-4" />
+                    Класация <ArrowRight className="size-4" />
                   </Button>
                 </div>
               </div>

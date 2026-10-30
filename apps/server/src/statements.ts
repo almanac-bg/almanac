@@ -15,7 +15,8 @@ import { getUser } from './users';
 export const basisLabel = (basis: string | null) => MODERATION_BASES.find((b) => b.id === basis)?.label ?? null;
 
 /** A sentence a moderator typed, ended as one. */
-const sentence = (text: string) => (/[.!?…“"]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
+/** Free text put inside a message ends as a sentence: „Причина: обидно име Ако смяташ…“ ran on into the next one. */
+export const sentence = (text: string) => (/[.!?…“"]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 
 export const HUMAN = 'Решението е взето от модератор — човек, не автоматично.';
 

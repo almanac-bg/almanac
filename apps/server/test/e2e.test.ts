@@ -139,7 +139,7 @@ test(
       api.send('POST', '/api/auth/register', '', { username, password, email });
     const short = await signUp('kratka_p', 'sedem77');
     assert.equal(short.status, 400);
-    assert.match(short.body.error, /поне 8 символа/);
+    assert.match(short.body.error, /поне 8 знака/);
     assert.match((await signUp('obshta_p', 'password1')).body.error, /най-често използваните/);
     assert.match((await signUp('ednakvi1', 'ednakvi1')).body.error, /същата като името/);
 

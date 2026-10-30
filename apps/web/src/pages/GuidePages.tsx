@@ -2,6 +2,7 @@ import { fmt } from '@quiz/client';
 import {
   BRAND,
   CATEGORIES,
+  CATEGORY_ABOUT,
   type CategoryId,
   categoryById,
   EVENING,
@@ -13,6 +14,7 @@ import {
   QUEUE_MODES,
   RANK_TIERS,
   READING,
+  REVIEW,
   ROOM_CODE_DIGITS,
   ROOM_LIMITS,
   ROUNDS,
@@ -72,7 +74,29 @@ const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; quest
 const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG')} с`;
 
 /** The guides' frame: the name home, the guides' own links, the page, a way into the game, the legal links. */
-function GuideLayout({ title, lead, children }: { title: string; lead: ReactNode; children: ReactNode }) {
+/** What a guide page leads on to: the day's questions, unless the page has a better next step of its own. */
+interface GuideCta {
+  to: string;
+  label: string;
+  note?: string;
+}
+const DAILY_CTA: GuideCta = {
+  to: '/daily',
+  label: 'Играй въпросите на деня',
+  note: 'Безплатно, без регистрация и без реклами.',
+};
+
+function GuideLayout({
+  title,
+  lead,
+  cta = DAILY_CTA,
+  children,
+}: {
+  title: string;
+  lead: ReactNode;
+  cta?: GuideCta;
+  children: ReactNode;
+}) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -103,10 +127,10 @@ function GuideLayout({ title, lead, children }: { title: string; lead: ReactNode
         <div className="mt-3 text-[15px] leading-relaxed text-fg-2">{lead}</div>
         <div className="mt-8 space-y-10 text-[15px] leading-relaxed text-fg-2 [&_b]:text-fg">{children}</div>
         <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-line pt-6">
-          <Link to="/" className={buttonClass({ variant: 'gold', size: 'lg' })}>
-            Играй въпросите на деня <ArrowRight aria-hidden className="size-5" />
+          <Link to={cta.to} className={buttonClass({ variant: 'gold', size: 'lg' })}>
+            {cta.label} <ArrowRight aria-hidden className="size-5" />
           </Link>
-          <span className="text-sm text-fg-3">Безплатно, без регистрация и без реклами.</span>
+          {cta.note && <span className="text-sm text-fg-3">{cta.note}</span>}
         </div>
       </Card>
       <LegalLinks className="mt-6 justify-center" />
@@ -141,21 +165,21 @@ export function HowToPlayPage() {
     >
       <Section title="Въпросите на деня">
         <p>
-          Всеки ден — <b>{MODES.daily.questions} въпроса, едни и същи за цяла България</b>, и една класация до полунощ.
-          Имаш един опит. Играеш ли всеки ден, трупаш серия; на всеки {STREAK_SHIELDS.every} дни получаваш щит (до{' '}
-          {STREAK_SHIELDS.max}), който пази серията, ако пропуснеш ден.
+          Всеки ден — <b>{MODES.daily.questions}&nbsp;въпроса, едни и същи за цяла България</b>, и една класация до
+          полунощ. Имаш един опит. Играеш ли всеки ден, трупаш серия; на всеки {STREAK_SHIELDS.every}&nbsp;дни получаваш
+          щит (до {STREAK_SHIELDS.max}), който пази серията, ако пропуснеш ден.
         </p>
       </Section>
 
       <Section title="Как се смятат точките">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            Верен отговор: <b>{SCORING.base} точки</b>.
+            Верен отговор: <b>{SCORING.base}&nbsp;точки</b>.
           </li>
           <li>
-            Бонус за бързина: до <b>{SCORING.speed} точки</b>. Започва да намалява едва след като въпросът е прочетен
-            (от {seconds(READING.minMs)} до {seconds(READING.maxMs)} според дължината му), така че по-бързото четене не
-            носи предимство.
+            Бонус за бързина: до <b>{SCORING.speed}&nbsp;точки</b>. Започва да намалява едва след като въпросът е
+            прочетен (от {seconds(READING.minMs)} до {seconds(READING.maxMs)} според дължината му), така че по-бързото
+            четене не носи предимство.
           </li>
           <li>
             Серия от верни отговори: +{SCORING.streakStep} за всеки следващ, до +{SCORING.streakMax}.
@@ -165,7 +189,8 @@ export function HowToPlayPage() {
 
       <Section title="Козовете">
         <p>
-          Всеки коз е по веднъж на мач и по един на въпрос. Във въпросите на деня и в линковете всички играят без тях.
+          Всеки коз се играе веднъж на мач — и най-много един на въпрос. Във въпросите на деня и в линковете всички
+          играят без тях.
         </p>
         <ul className="space-y-2">
           {POWERUPS.map((p) => (
@@ -187,26 +212,28 @@ export function HowToPlayPage() {
             </li>
           ))}
           <li>
-            <b>{MODES.evening.name}</b> — всяка вечер в {EVENING.hour}:00, до {EVENING.maxPlayers} души; входът се
-            отваря {EVENING.lobbyMinutes} минути преди това. Победителят на мач с поне {EVENING.titleFrom} души носи
-            титлата „Шампион на вечерта“. Отпадналият може да отговаря до края — за XP и алманаха, извън класирането.
+            <b>{MODES.evening.name}</b> — всяка вечер в {EVENING.hour}:00, до&nbsp;{EVENING.maxPlayers}&nbsp;души;
+            входът се отваря {EVENING.lobbyMinutes}&nbsp;минути преди това. Победителят на мач с поне{' '}
+            {EVENING.titleFrom}&nbsp;души носи титлата „Шампион на вечерта“. Отпадналият може да отговаря до края — за
+            XP и алманаха, извън класирането.
           </li>
         </ul>
       </Section>
 
       <Section title="Рундове и финал с число">
         <p>
-          Дуел и Арена се играят в {ROUNDS.count} рунда по {ROUNDS.size} въпроса. Преди всеки следващ рунд изоставащият
-          избира категорията от {ROUNDS.offer} за {seconds(ROUNDS.pickMs)}. Последният въпрос е <b>финал с число</b>:
-          пишеш година, височина или брой, и точките са според това колко близо си — до {NUMBER.points}, плюс{' '}
-          {NUMBER.exactBonus} за точния отговор. Финалът се брои ×{NUMBER.finalTimes}, така че може да обърне мача.
+          Дуел и Арена се играят в {ROUNDS.count}&nbsp;рунда по&nbsp;{ROUNDS.size}&nbsp;въпроса. Преди всеки следващ
+          рунд изоставащият има {seconds(ROUNDS.pickMs)} да избере категорията от&nbsp;
+          {ROUNDS.offer === 3 ? 'три' : ROUNDS.offer}. Последният въпрос е <b>финал с число</b>: пишеш година, височина
+          или брой, а точките зависят от това колко близо си — до&nbsp;{NUMBER.points}, плюс {NUMBER.exactBonus} за
+          точния отговор. Финалът се брои ×{NUMBER.finalTimes}, така че може да обърне мача.
         </p>
       </Section>
 
       <Section title="Картини и „Подреди“">
         <p>
           Някои въпроси са за картина — за тях имаш {seconds(IMAGE.timeMs)}. В „Подреди“ нареждаш четири неща по реда
-          им: всяко на място носи {ORDER.perItem} точки, а всички на място — и бонус за бързина.
+          им: всяко на място носи {ORDER.perItem}&nbsp;точки, а всички на място — и бонус за бързина.
         </p>
       </Section>
 
@@ -215,6 +242,41 @@ export function HowToPlayPage() {
           Всеки мач носи опит (XP): качваш нива и отключваш аватари, рамки и титли. Класираните мачове местят рейтинга
           ти, а с него и ранга: {RANK_TIERS.map((t) => t.name).join(', ')}. Сезонът е един месец; в края му идва награда
           според най-високия ранг в режим, в който имаш поне {SEASON_MIN_GAMES} мача.
+        </p>
+      </Section>
+
+      <Section title="Гост и профил">
+        <p>
+          Можеш да играеш веднага, като гост: прогресът се пази на това устройство. С име и парола (профил) той е твой
+          на всяко устройство, а с него идват приятелите, класациите и групите. Нов профил влиза в класацията на
+          въпросите на деня от следващия ден — иначе втори профил, направен за секунди, би бил класиран до основния.
+        </p>
+      </Section>
+
+      <Section title="Стаи, класове и свои въпроси">
+        <p>
+          Частна стая се прави с профил: каниш с код от {ROOM_CODE_DIGITS} цифри или линк, до&nbsp;
+          {ROOM_LIMITS.maxPlayers[1]}&nbsp;души, с твоите настройки. С „Само водя“ мачът върви на голям екран, а
+          играчите отговарят от телефоните си — за час в клас или за парти. В „Моите въпроси“ пишеш свои набори
+          (до&nbsp;
+          {SETS.maxQuestions}&nbsp;въпроса) и ги играете в стаята. Повече — в{' '}
+          <Link to="/teachers" className="text-violet-300 underline">
+            {BRAND.name} в час
+          </Link>
+          .
+        </p>
+      </Section>
+
+      <Section title="Моят алманах, „Поправителен“ и групи">
+        <p>
+          Всеки „Знаеше ли?“ от въпрос, който познаеш, остава в „Моят алманах“. Сгрешените въпроси се връщат в
+          „Поправителен“ след {REVIEW.afterDays.join(', ').replace(/, (\d+)$/, ' и $1')} дни, докато ги запомниш. Група
+          (клас, офис, семейство) има линк за покана и седмична класация на въпросите на деня. Примерни въпроси по
+          категории има във{' '}
+          <Link to="/quiz" className="text-violet-300 underline">
+            викторините
+          </Link>
+          .
         </p>
       </Section>
     </GuideLayout>
@@ -232,7 +294,7 @@ export function QuizHubPage() {
       lead={
         <>
           Опитай въпроси от всяка категория — с верния отговор и факт „Знаеше ли?“ към тях. В играта те чакат
-          {total ? ` над ${fmt(total)}` : ' още много'} въпроса, с часовник и класация.
+          {total ? ` над ${fmt(total)}` : ' още много'}&nbsp;въпроса, с часовник и класация.
         </>
       }
     >
@@ -246,7 +308,7 @@ export function QuizHubPage() {
               <Emoji e={c.icon} className="size-8 shrink-0" size="" />
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-fg">{c.name}</span>
-                <span className="text-sm text-fg-3">{byCategory(c.id).length} въпроса с отговори</span>
+                <span className="text-sm text-fg-3">{byCategory(c.id).length}&nbsp;въпроса с отговори</span>
               </span>
               <ArrowRight aria-hidden className="size-4 text-fg-3" />
             </Link>
@@ -264,7 +326,7 @@ export function QuizHubPage() {
                 <Emoji e={h.icon} className="size-8 shrink-0" size="" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-fg">{h.name}</span>
-                  <span className="text-sm text-fg-3">{h.questions.length} въпроса с отговори</span>
+                  <span className="text-sm text-fg-3">{h.questions.length}&nbsp;въпроса с отговори</span>
                 </span>
                 <ArrowRight aria-hidden className="size-4 text-fg-3" />
               </Link>
@@ -294,8 +356,10 @@ export function QuizCategoryPage() {
       title={title!}
       lead={
         <>
-          {holiday ? holiday.lead : `${questions.length} въпроса от категория „${c!.name}“ в ${BRAND.name}.`} Натисни
-          отговор, за да видиш дали е верен — или отвори отговора направо.
+          {holiday
+            ? holiday.lead
+            : keepTogether(`„${c!.name}“: ${CATEGORY_ABOUT[c!.id]}. ${questions.length} въпроса с отговори.`)}{' '}
+          Натисни отговор, за да видиш дали е верен — или отвори отговора направо.
         </>
       }
     >
@@ -306,7 +370,7 @@ export function QuizCategoryPage() {
           return (
             <li key={q.id} className="rounded-2xl border border-line bg-tint/[0.02] p-4 sm:p-5">
               <h2 className="font-semibold text-fg">
-                <span className="text-fg-3">{i + 1}.</span> {q.q}
+                <span className="text-fg-3">{i + 1}.</span> {keepTogether(q.q)}
               </h2>
               <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                 {q.options.map((o, k) => {
@@ -327,7 +391,7 @@ export function QuizCategoryPage() {
                         )}
                       >
                         <span className="font-display font-bold text-fg-3">{LETTERS[k]}</span>
-                        <span className="min-w-0 flex-1">{o}</span>
+                        <span className="min-w-0 flex-1">{keepTogether(o)}</span>
                         {done && isRight && <Check aria-label="верен" className="size-4 text-emerald-300" />}
                         {done && !isRight && choice === k && <X aria-label="грешен" className="size-4 text-rose-300" />}
                       </button>
@@ -339,7 +403,7 @@ export function QuizCategoryPage() {
               <details open={done || undefined} className="mt-3 text-sm">
                 <summary className="cursor-pointer font-semibold text-violet-300">Отговор</summary>
                 <p className="mt-2">
-                  Верният отговор е <b>{q.options[q.answer]}</b>.
+                  Верен отговор: <b>{keepTogether(q.options[q.answer])}</b>.
                   {q.fact && (
                     <>
                       {' '}
@@ -412,9 +476,11 @@ export function FactsPage() {
         return (
           <Section key={c.id} title={`${c.name}`}>
             <ul className="space-y-3">
+              {/* The question first: a fact is written to follow it, and alone it often says nothing („Оранжев.“ —
+                  of what?). */}
               {facts.map((q) => (
                 <li key={q.id}>
-                  <b>{q.options[q.answer]}.</b> {keepTogether(q.fact ?? '')}{' '}
+                  <b>{keepTogether(q.q)}</b> {keepTogether(q.options[q.answer])}. {keepTogether(q.fact ?? '')}{' '}
                   {q.factSource && (
                     <a
                       href={q.factSource}
@@ -442,6 +508,8 @@ export function TeachersPage() {
   return (
     <GuideLayout
       title={`${BRAND.name} в час`}
+      // A teacher came to run a class, not to play the day's questions: the room is a profile away.
+      cta={{ to: '/', label: 'Създай стая за класа', note: 'С безплатен профил — после „Създай стая“ и „Само водя“.' }}
       lead={
         <>
           Викторина за цял клас: учениците влизат с код от телефоните си, а въпросите и класирането са на голям екран.
@@ -452,8 +520,8 @@ export function TeachersPage() {
       <Section title="Стая за класа">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            До <b>{ROOM_LIMITS.maxPlayers[1]} души</b> в една стая; учениците влизат с код от {ROOM_CODE_DIGITS} цифри
-            или с линк.
+            До <b>{ROOM_LIMITS.maxPlayers[1]}&nbsp;души</b> в една стая; учениците влизат с код от&nbsp;
+            {ROOM_CODE_DIGITS} цифри или с линк.
           </li>
           <li>
             <b>Без регистрация за учениците:</b> влизат като гости и си избират име за стаята. Профил е нужен само на
@@ -474,8 +542,8 @@ export function TeachersPage() {
 
       <Section title="Вашите въпроси">
         <p>
-          В „Моите въпроси“ правите свои набори — до {SETS.maxQuestions} въпроса в набор, с картини и въпроси „Подреди“
-          — и ги играете в стаята си. Набор може да се сподели с линк с колега.
+          В „Моите въпроси“ правите свои набори — до&nbsp;{SETS.maxQuestions}&nbsp;въпроса в набор, с картини и въпроси
+          „Подреди“ — и ги играете в стаята си. Можете да споделите набор с колега чрез линк.
         </p>
       </Section>
 

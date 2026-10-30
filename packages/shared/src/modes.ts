@@ -71,7 +71,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 1, order: false },
     tagline: 'Едни и същи 10 въпроса за цяла България. Един опит.',
-    description: 'Без козове. Класирането се нулира в полунощ.',
+    description: 'Без козове. Класацията се нулира в полунощ.',
     accent: ['#fde047', '#f97316'],
   },
   challenge: {
@@ -184,7 +184,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     final: true,
     rounds: false,
     formats: { images: 2, order: false },
-    tagline: 'Осем влизат. Елиминации. Оцелява един.',
+    tagline: 'Осем влизат. Последният отпада. Оцелява един.',
     description: 'На всеки няколко въпроса отпада последният, докато двама не излязат на финала.',
     accent: ['#34d399', '#06b6d4'],
   },

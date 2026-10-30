@@ -299,16 +299,23 @@ test('question picking: unseen first, then what the players saw longest ago', ()
 });
 
 test('Bulgarian ordinals', () => {
-  assert.deepEqual([1, 2, 3, 4, 7, 8, 11, 12, 21].map(ordinal), [
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 21, 100, 1000].map(ordinal), [
     '1-во',
     '2-ро',
     '3-то',
     '4-то',
+    '5-о',
+    '6-о',
     '7-мо',
     '8-мо',
-    '11-то',
-    '12-то',
+    '9-о',
+    '10-о',
+    '11-о',
+    '12-о',
+    '20-о',
     '21-во',
+    '100-но',
+    '1000-но',
   ]);
 });
 

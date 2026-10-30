@@ -255,7 +255,7 @@ if (fs.existsSync(config.webDist)) {
         ...meta,
         url: `${config.appUrl}${route === '/' ? '/' : route}`,
         index: true,
-        data: route === '/' ? siteData() : undefined,
+        data: structuredData(route),
       });
       const pictured = drawn.get(route);
       const mark = route === '/' ? 'signed-out' : '';
@@ -372,16 +372,40 @@ function withApp(html: string, app: string, painted: 'signed-out' | '', returnin
  * result instead of the bare domain) and who runs it. Only the WebSite type: a game's own type (VideoGame) asks for
  * ratings, and without them Search Console would list it as an error.
  */
-function siteData() {
+/**
+ * What a search engine may show beside a public page: on the home page the site and its mark (WebSite, Organization),
+ * on the quiz pages where they sit (a BreadcrumbList: АЛМАНАХ › Викторини › История). Nothing claimed that isn't so:
+ * no FAQ or Quiz markup, which isn't what these pages are.
+ */
+function structuredData(route: string): object | undefined {
+  const home = `${config.appUrl}/`;
+  const name = (path: string) => PUBLIC_PAGES[path]?.title.replace(` — ${BRAND.name}`, '') ?? BRAND.name;
+  if (route === '/')
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          name: BRAND.name,
+          alternateName: [BRAND.domain, 'Almanac'],
+          url: home,
+          inLanguage: 'bg',
+          description: PUBLIC_PAGES['/'].description,
+          ...(config.operator.name && { publisher: { '@type': 'Person', name: config.operator.name } }),
+        },
+        { '@type': 'Organization', name: BRAND.name, url: home, logo: `${config.appUrl}/icon-512.png` },
+      ],
+    };
+  if (route !== '/quiz' && !route.startsWith('/quiz/')) return undefined;
+  const trail = [
+    { name: BRAND.name, url: home },
+    { name: name('/quiz'), url: `${config.appUrl}/quiz` },
+    ...(route === '/quiz' ? [] : [{ name: name(route), url: `${config.appUrl}${route}` }]),
+  ];
   return {
     '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: BRAND.name,
-    alternateName: [BRAND.domain, 'Almanac'],
-    url: `${config.appUrl}/`,
-    inLanguage: 'bg',
-    description: PUBLIC_PAGES['/'].description,
-    ...(config.operator.name && { publisher: { '@type': 'Person', name: config.operator.name } }),
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((t, i) => ({ '@type': 'ListItem', position: i + 1, name: t.name, item: t.url })),
   };
 }
 

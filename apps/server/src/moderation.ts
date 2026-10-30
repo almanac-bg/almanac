@@ -26,7 +26,16 @@ import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { hideQuestion, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { copiesOf, hideSet } from './sets';
-import { basisLabel, confirmNotice, HUMAN, type Outcome, tellPlayer, tellReporters, tellReversal } from './statements';
+import {
+  basisLabel,
+  confirmNotice,
+  HUMAN,
+  type Outcome,
+  sentence,
+  tellPlayer,
+  tellReporters,
+  tellReversal,
+} from './statements';
 import {
   GUEST_NAME,
   getUser,
@@ -60,7 +69,7 @@ export function activeBan(user: Pick<UserRow, 'banned_until' | 'ban_reason' | 'b
   return [
     `Профилът е спрян ${banEnd(user.banned_until)}.`,
     basis && `Основание: ${basis}.`,
-    user.ban_reason && `Причина: ${user.ban_reason}`,
+    user.ban_reason && `Причина: ${sentence(user.ban_reason)}`,
     HUMAN,
     `Ако смяташ, че е грешка, пиши на ${config.operator.email} до 6 месеца; можеш да се обърнеш и към орган за извънсъдебно решаване на спорове или към съда.`,
     'На същия адрес можеш да поискаш данните си или изтриване на профила.',

@@ -43,7 +43,7 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
   await expect(counter).toHaveText(new RegExp(`^Въпрос ${next} от`));
 
   await playMatch(page);
-  await expect(page.getByRole('heading', { name: 'Научи днес', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Днес научи', exact: true })).toBeVisible();
   // Three up front, the other seven in the review below.
   await expect(page.getByText('Още 7 — в прегледа на въпросите по-долу.')).toBeVisible();
 });

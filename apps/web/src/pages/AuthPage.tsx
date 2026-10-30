@@ -25,8 +25,8 @@ import { usePageTitle } from '../lib/title';
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
   { icon: '🗓️', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класиране до полунощ' },
-  { icon: '🔗', title: 'Предизвикай приятел', body: 'Пращаш линк, играе същите въпроси, когато може' },
-  { icon: '⚔️', title: 'Дуели и Роял', body: 'Битки в реално време, до 8 играчи' },
+  { icon: '🔗', title: 'Предизвикай приятел', body: 'Пращаш линк — приятелят играе същите въпроси, когато може' },
+  { icon: '⚔️', title: 'Дуел, Арена, Роял', body: 'Битки в реално време — от 1 на 1 до 50 души вечер' },
 ];
 
 /** The modes the page below the first screen describes, in the order a newcomer meets them. */
@@ -373,7 +373,7 @@ export function AuthPage() {
                       describedBy={error && invalid.includes('password') ? `${id}-error` : undefined}
                       inputRef={passwordRef}
                       minLength={PASSWORD_MIN_LENGTH}
-                      placeholder={mode === 'register' ? `поне ${PASSWORD_MIN_LENGTH} символа` : '••••••••'}
+                      placeholder={mode === 'register' ? `поне ${PASSWORD_MIN_LENGTH} знака` : '••••••••'}
                     />
                     {mode === 'login' && (
                       <button

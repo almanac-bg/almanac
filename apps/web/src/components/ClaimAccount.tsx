@@ -103,7 +103,7 @@ export function ClaimAccountModal({
           describedBy={error && invalid.includes('password') ? `${id}-error` : undefined}
           inputRef={passwordRef}
           minLength={PASSWORD_MIN_LENGTH}
-          placeholder={`поне ${PASSWORD_MIN_LENGTH} символа`}
+          placeholder={`поне ${PASSWORD_MIN_LENGTH} знака`}
         />
         {error && (
           <p id={`${id}-error`} role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200">

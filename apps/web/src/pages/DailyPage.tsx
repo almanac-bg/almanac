@@ -174,7 +174,10 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                 </Button>
                 <p className="mt-3 text-sm text-fg-3">
                   {MODE.questions} въпроса, около три минути, без козове. Един опит до полунощ
-                  {info.total > 0 ? ` · днес вече играха ${plural(info.total, 'човек', 'души')}` : ''}.
+                  {info.total > 0
+                    ? ` · днес вече ${info.total === 1 ? 'игра' : 'играха'} ${plural(info.total, 'човек', 'души')}`
+                    : ''}
+                  .
                 </p>
               </>
             )}

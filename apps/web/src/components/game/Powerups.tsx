@@ -116,7 +116,7 @@ export function PowerupNotes({ powerups, className }: { powerups: PowerupDef[]; 
           </li>
         ))}
       </ul>
-      <p className="mt-2.5 text-xs text-fg-3">Всеки коз е по веднъж на мач и по един на въпрос.</p>
+      <p className="mt-2.5 text-xs text-fg-3">Всеки коз се играе веднъж на мач — и най-много един на въпрос.</p>
     </div>
   );
 }

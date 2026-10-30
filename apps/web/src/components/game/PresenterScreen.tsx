@@ -1,5 +1,5 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
-import { categoryById, type FinalStanding, type Standing } from '@quiz/shared';
+import { BRAND, categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Lightbulb, Pause, Users } from 'lucide-react';
 import { m } from 'motion/react';
@@ -119,7 +119,9 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
             <p className="mt-6 font-display text-[clamp(5rem,15vw,12rem)] leading-none font-black text-gradient">
               {Math.max(0, Math.ceil((game.countdownEndsAt - now) / 1000)) || 'Старт!'}
             </p>
-            <p className="mt-6 text-xl text-fg-2">Отговаряте от телефоните си.</p>
+            <p className="mt-6 text-xl text-fg-2">
+              Отговаряте от телефоните си — на <b className="text-fg">{BRAND.domain}</b>.
+            </p>
           </div>
         </div>
       ) : game.phase === 'pick' && game.pick ? (

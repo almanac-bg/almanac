@@ -409,7 +409,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
           </Button>
         )}
         {/* Online or not: you play now, they within a day. */}
-        <DuelButton size="sm" friend={user} title={`Играеш сега, ${user.username} — до 24 часа`} />
+        <DuelButton size="sm" friend={user} title={`Играеш сега, а ${user.username} има 24 часа`} />
         <button
           type="button"
           onClick={onRemove}

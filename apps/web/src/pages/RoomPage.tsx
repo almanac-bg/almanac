@@ -127,7 +127,7 @@ export function RoomPage() {
 
   const startButton = (
     <Button size="lg" className="w-full" onClick={start} loading={starting} disabled={!canStart}>
-      <Play className="size-5" /> Започни играта
+      <Play className="size-5" /> Започни мача
     </Button>
   );
 
@@ -151,6 +151,10 @@ export function RoomPage() {
           </button>
           <p className="mt-1 text-sm text-fg-3" aria-live="polite">
             {copied ? 'Линкът е копиран — прати го на приятели!' : 'Натисни кода, за да копираш линк за покана.'}
+          </p>
+          {/* Where to type it, for a class reading the code off a projector: the site's own address. */}
+          <p className="mt-2 text-fg-2 sm:text-lg">
+            На телефона: <b className="text-fg">{BRAND.domain}</b> → „Имам код за стая“ → {room.code}
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
@@ -359,7 +363,7 @@ export function RoomPage() {
             disabled={!isHost || s.teams || (crowded && !s.elimination)}
             onChange={(elimination) => update({ elimination })}
             icon={<Skull className="size-4 text-rose-300" />}
-            title="Елиминации"
+            title="Отпадане"
             hint={
               s.teams
                 ? 'Не важи при отборен мач'

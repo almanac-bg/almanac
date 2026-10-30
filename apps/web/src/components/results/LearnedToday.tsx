@@ -22,7 +22,7 @@ export function LearnedToday({ items, added }: { items: ReviewItem[]; added: num
     <Card className="mt-4 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="t-card">
-          <Lightbulb aria-hidden className="mb-1 inline size-5 text-amber-200" /> Научи днес
+          <Lightbulb aria-hidden className="mb-1 inline size-5 text-amber-200" /> Днес научи
         </h2>
         {added > 0 && (
           <Link

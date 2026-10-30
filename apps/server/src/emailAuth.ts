@@ -19,7 +19,7 @@ export type Result<T extends object = object> = ({ ok: true } & T) | { ok: false
 export const EmailSchema = z.email('Невалиден имейл.').max(254);
 export const PasswordSchema = z
   .string()
-  .min(PASSWORD_MIN_LENGTH, `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} символа.`)
+  .min(PASSWORD_MIN_LENGTH, `Паролата трябва да е поне ${PASSWORD_MIN_LENGTH} знака.`)
   .max(200)
   .refine((p) => !isCommonPassword(p), 'Тази парола е сред най-често използваните — избери по-необичайна.');
 

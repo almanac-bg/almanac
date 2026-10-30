@@ -35,7 +35,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
         'focus-ring grid size-11 shrink-0 place-items-center rounded-xl text-2xl',
         (cooldown || offline) && 'opacity-50',
       )}
-      aria-label={`Реакция: ${emoteById(id)?.name ?? ''}`}
+      aria-label={`Емоция: ${emoteById(id)?.name ?? ''}`}
     >
       <Emoji e={emoteById(id)?.emoji ?? ''} />
     </m.button>
@@ -56,7 +56,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          aria-label="Реакции"
+          aria-label="Емоции"
           aria-expanded={open}
           aria-controls={open ? trayId : undefined}
           className="focus-ring grid size-12 shrink-0 place-items-center rounded-full border border-line bg-ink-2/90 text-fg-2 hover:text-fg"

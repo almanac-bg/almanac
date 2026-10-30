@@ -87,7 +87,7 @@ export function DailyCard({
       <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-amber-400/25" />
       {placeShown(runs) ? (
         <>
-          <h2 className="relative t-card">{daily.offBoard ? 'Щеше да си днес' : 'Твоето място днес'}</h2>
+          <h2 className="relative t-card">{daily.offBoard ? 'Щеше да си' : 'Твоето място днес'}</h2>
           <div className="relative mt-3 flex items-baseline gap-2">
             <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
             <span className="text-fg-2">от {fmt(runs)} днес</span>

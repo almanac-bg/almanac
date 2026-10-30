@@ -428,7 +428,7 @@ export function Results({ game }: { game: LiveGame }) {
               className="min-w-0 flex-1 whitespace-nowrap max-sm:px-4 sm:flex-none"
               onClick={dailyBoard}
             >
-              <ChartColumn className="size-5" /> Класиране за деня
+              <ChartColumn className="size-5" /> Класация за деня
             </Button>
           ) : duel ? (
             // A duel plays once: what follows is a rematch, once it's decided; until then, home.

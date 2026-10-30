@@ -4,11 +4,12 @@ import clsx from 'clsx';
 import { type ReactNode, useId } from 'react';
 import { Link } from 'react-router';
 import { useSite } from '../../lib/site';
+import { keepTogether } from '../../lib/typography';
 import { Emoji } from '../Emoji';
 import { LegalLinks } from '../LegalLinks';
 import { SampleQuestion } from './SampleQuestion';
 
-const ABOUT_MODES: ModeId[] = ['daily', 'challenge', 'duel', 'royale', 'solo', 'custom'];
+const ABOUT_MODES: ModeId[] = ['daily', 'challenge', 'duel', 'squad', 'teams', 'royale', 'evening', 'solo', 'custom'];
 
 const WHY: { icon: string; title: string; text: string }[] = [
   {
@@ -61,7 +62,7 @@ export function ProofLine({ className }: { className?: string }) {
   const questions = useSite()?.questions;
   // One string: the drawn page holds the sentence whole (no markers between its parts).
   const line = `${questions ? `Над ${fmt(questions)} въпроса, проверени по източници` : 'Въпроси, проверени по източници'} · ${CATEGORIES.length} категории · безплатно · без реклами`;
-  return <p className={clsx('text-sm text-fg-3', className)}>{line}</p>;
+  return <p className={clsx('text-sm text-fg-3', className)}>{keepTogether(line)}</p>;
 }
 
 /**

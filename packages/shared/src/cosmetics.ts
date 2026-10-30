@@ -346,7 +346,7 @@ export const FRAMES: FrameDef[] = [
 export const TITLES: TitleDef[] = [
   { id: 'rookie', name: 'Нова искра', req: { level: 1 } },
   { id: 'curious', name: 'Любопитен ум', req: { level: 3 } },
-  { id: 'enthusiast', name: 'Куиз страст', req: { level: 5 } },
+  { id: 'enthusiast', name: 'Страст към викторините', req: { level: 5 } },
   { id: 'buff', name: 'Ерудиция', req: { level: 8 } },
   { id: 'knowitall', name: 'Всезнание', req: { level: 12 } },
   { id: 'mastermind', name: 'Гениален ум', req: { level: 18 } },
@@ -357,7 +357,7 @@ export const TITLES: TitleDef[] = [
   { id: 'wisdom', name: 'Вековна мъдрост', req: { level: 45 } },
   { id: 'legend', name: 'Жива легенда', req: { level: 50 } },
   { id: 'keeper', name: 'Пазител на знанието', req: { level: 55 } },
-  { id: 'walking', name: 'Ходеща енциклопедия', req: { level: 65 } },
+  { id: 'walking', name: 'Жива енциклопедия', req: { level: 65 } },
   { id: 'deathless', name: 'Безсмъртен ум', req: { level: 75 } },
   { id: 'chronicler', name: 'Летописец', req: { level: 85 } },
   { id: 'almanac', name: 'Жив алманах', req: { level: 100 } },

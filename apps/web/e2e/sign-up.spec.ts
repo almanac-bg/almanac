@@ -12,7 +12,7 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
 
   // Everything at once, and the first field to fix has the focus.
   await submit.click();
-  await expect(error).toHaveText('Избери потребителско име. Избери парола — поне 8 символа.');
+  await expect(error).toHaveText('Избери потребителско име. Избери парола — поне 8 знака.');
   await expect(name).toHaveAttribute('aria-invalid', 'true');
   await expect(password).toHaveAttribute('aria-invalid', 'true');
   await expect(name).toBeFocused();
@@ -20,12 +20,12 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
   await name.fill('ab');
   await password.fill('parola-123');
   await submit.click();
-  await expect(error).toHaveText('Името трябва да е поне 3 символа.');
+  await expect(error).toHaveText('Името трябва да е поне 3 знака.');
 
   await name.fill('abc');
   await password.fill('123');
   await submit.click();
-  await expect(error).toHaveText('Паролата трябва да е поне 8 символа.');
+  await expect(error).toHaveText('Паролата трябва да е поне 8 знака.');
   await expect(password).toHaveAttribute('aria-invalid', 'true');
   await expect(name).toHaveAttribute('aria-invalid', 'false');
   await expect(password).toBeFocused();

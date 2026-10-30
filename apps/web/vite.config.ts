@@ -14,12 +14,17 @@ const server = process.env.API_URL ?? 'http://localhost:3001';
 
 const origin = `https://${BRAND.domain}`;
 
-/** For search engines: the public pages (the rest of the game is noindex), and where the sitemap is. */
+/**
+ * For search engines: the public pages (the rest of the game is noindex), and where the sitemap is. A date only where
+ * it's known, the legal pages': one date on every page said that a change of the terms changed them all (and a search
+ * engine stops trusting dates that are always the same).
+ */
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${Object.keys(PUBLIC_PAGES)
   .map(
-    (path) => `  <url><loc>${origin}${path}</loc>${path === '/' ? '' : `<lastmod>${LEGAL.updatedIso}</lastmod>`}</url>`,
+    (path) =>
+      `  <url><loc>${origin}${path}</loc>${path === '/privacy' || path === '/terms' ? `<lastmod>${LEGAL.updatedIso}</lastmod>` : ''}</url>`,
   )
   .join('\n')}
 </urlset>

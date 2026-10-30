@@ -103,6 +103,7 @@ export function verifyEmailMail(to: string, username: string, link: string): Mai
       'Потвърди имейла',
       link,
       'Линкът е валиден 24 часа. Ако заявката не е от теб, просто игнорирай това писмо.',
+      'Един клик — и паролата ти може да се възстанови.',
     ),
   };
 }
@@ -123,6 +124,7 @@ export function emailChangedMail(to: string, username: string, removed: boolean)
       'Към настройките',
       `${config.appUrl}/settings`,
       escapeHtml(advice),
+      'Ако промяната не е от теб, отговори на това писмо.',
     ),
   };
 }
@@ -139,6 +141,7 @@ export function resetPasswordMail(to: string, username: string, link: string): M
       'Избери нова парола',
       link,
       'Линкът е валиден 1 час и може да се използва веднъж. Ако заявката не е от теб, игнорирай това писмо — старата ти парола остава.',
+      'Линкът важи 1 час.',
     ),
   };
 }
@@ -159,7 +162,14 @@ export function inactiveAccountMail(to: string, username: string, deleteOn: numb
     to,
     subject: `Профилът ти в ${BRAND.name} ще бъде изтрит след месец`,
     text: `Здравей, ${username}!\n\n${lead}\n\n${keep}\n${config.appUrl}/`,
-    html: layout(`Здравей, ${username}!`, escapeHtml(lead), 'Влез в профила', `${config.appUrl}/`, escapeHtml(keep)),
+    html: layout(
+      `Здравей, ${username}!`,
+      escapeHtml(lead),
+      'Влез в профила',
+      `${config.appUrl}/`,
+      escapeHtml(keep),
+      'Влез веднъж и профилът остава.',
+    ),
   };
 }
 

@@ -108,7 +108,7 @@ export function NewcomerStart({
       <Button size="lg" variant="secondary" className="w-full" disabled={busy} onClick={onGuest}>
         <Zap aria-hidden className="size-5" /> Играй като гост
       </Button>
-      <p className="mt-2.5 text-center text-sm text-fg-3">Дуели, Роял, Соло — прогресът се пази и без профил.</p>
+      <p className="mt-2.5 text-center text-sm text-fg-3">Дуели, Роял, Соло — прогресът се пази и без регистрация.</p>
       <div className="mt-4 flex flex-wrap justify-center gap-x-1 text-sm">
         <button
           type="button"
@@ -220,7 +220,7 @@ export function DailyLanding({
           <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
           <p className="mt-1.5 text-sm text-fg-3">
             Около три минути, един опит до полунощ. Без регистрация
-            {players > 0 ? ` · днес вече играха ${players === 1 ? '1 човек' : `${fmt(players)} души`}` : ''}.
+            {players > 0 ? ` · днес вече ${players === 1 ? 'игра 1 човек' : `играха ${fmt(players)} души`}` : ''}.
           </p>
         </>
       )}

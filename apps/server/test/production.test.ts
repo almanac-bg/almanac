@@ -211,7 +211,7 @@ test('a link to a screen of the game previews as that screen: the day, a room in
   assert.ok(html.includes('Клас $` $&#38; $&#39;'), 'the name as typed, escaped');
 });
 
-test('search engines get the public pages in a sitemap and, on the home page only, the site name', {
+test('search engines get the public pages in a sitemap, the site and its mark on the home page, and where a quiz page sits', {
   skip: !built,
 }, async () => {
   const text = async (route: string) => (await fetch(`${srv.url}${route}`)).text();
@@ -228,12 +228,26 @@ test('search engines get the public pages in a sitemap and, on the home page onl
 
   const data = (html: string) =>
     [...html.matchAll(/<script type="application\/ld\+json">([^<]*)<\/script>/g)].map((m) => JSON.parse(m[1]));
-  const [site, ...more] = data(await text('/'));
+  // A date only on the pages whose date is known (the legal ones).
+  assert.equal([...sitemap.matchAll(/<lastmod>/g)].length, 2);
+  const [home, ...more] = data(await text('/'));
   assert.equal(more.length, 0);
+  const [site, org] = home['@graph'];
   assert.equal(site['@type'], 'WebSite');
   assert.equal(site.name, BRAND.name);
   assert.equal(site.url, 'https://almanac.test/');
   assert.equal(site.publisher.name, 'Тест Тестов');
+  assert.deepEqual([org['@type'], org.logo], ['Organization', 'https://almanac.test/icon-512.png']);
+  const [crumbs] = data(await text('/quiz/history'));
+  assert.equal(crumbs['@type'], 'BreadcrumbList');
+  assert.deepEqual(
+    crumbs.itemListElement.map((i: { position: number; item: string }) => [i.position, i.item]),
+    [
+      [1, 'https://almanac.test/'],
+      [2, 'https://almanac.test/quiz'],
+      [3, 'https://almanac.test/quiz/history'],
+    ],
+  );
   for (const route of ['/privacy', '/settings', '/no-such-page']) assert.deepEqual(data(await text(route)), [], route);
 });
 
@@ -254,7 +268,7 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.match(landing.html, /Онлайн викторина с приятели и цяла България/);
   assert.match(landing.html, /Играй като гост/);
   // The proof line, from the bank the server has (300 test questions).
-  assert.match(landing.html, /Над 300 въпроса, проверени по източници · 10 категории/);
+  assert.match(landing.html, /Над 300\sвъпроса, проверени по източници · 10\sкатегории/);
   assert.match(landing.html, /Защо АЛМАНАХ/);
   // Nothing drawn invisible, waiting for an entrance animation that only the browser would play (the page's own
   // markup: the stylesheet, inlined, has its opacity:0 rules).
