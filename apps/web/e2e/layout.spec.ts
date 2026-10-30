@@ -143,6 +143,9 @@ test('without JavaScript the landing page and the legal pages are there in full'
   await page.getByRole('link', { name: 'Политика за поверителност', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
   await expect(page.getByText('Тест Тестов', { exact: true })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Писмата до нас:' })).toHaveText(
+    'Писмата до нас: Тест Поща — пощата, в която пристигат писмата, изпратени до адреса за контакт, и от която им отговаряме.',
+  );
   await context.close();
 });
 

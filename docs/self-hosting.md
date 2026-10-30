@@ -176,13 +176,19 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    писма на месец са безплатни, после 0,25 € на 1000): Transactional Email → добави домейна `almanac.bg` и сложи в
    Cloudflare записите, които дава (DKIM, DMARC; SPF — виж т. 3). После IAM → приложение (напр. `almanac-smtp`) с
    политика **TransactionalEmailEmailFullAccess** за проекта и API ключ за него. В `.env`:
-   `SMTP_URL=smtp://<Project ID>:<Secret key>@smtp.tem.scaleway.com:587`. Ключът важи най-много година: сложи си
+   `SMTP_URL=smtp://<Project ID>:<Secret key>@smtp.tem.scaleway.com:587?requireTLS=true` (без `requireTLS` връзката
+   се шифрова само ако никой по пътя не скрие, че сървърът го предлага). Ключът важи най-много година: сложи си
    напомняне да го подновиш (неизпратен имейл стига и до Sentry).
-2. **Получаване — Cloudflare Email Routing** (безплатно): включи го и пренасочи `privacy@almanac.bg` към пощата си;
-   Cloudflare сам добавя MX записите си.
-3. **SPF е един запис за целия домейн**, затова обедини двата: `v=spf1 include:_spf.mx.cloudflare.net
-   include:_spf.tem.scaleway.com ~all` (провери в Scaleway дали показва точно този `include`). Ако Scaleway поиска и
-   свой MX, остави този на Cloudflare: писмата до теб минават през него.
+2. **Получаване — пощенска кутия на домейна.** almanac.bg ползва Proton Mail (платен план със собствен домейн, от
+   Швейцария): Settings → Domain names → добави домейна и сложи в Cloudflare записите, които дава (TXT за
+   потвърждение, двата MX, трите DKIM `CNAME` като DNS only), после създай адресите `privacy@`, `abuse@` и
+   `postmaster@`. Отговаряш от същия адрес, без да се вижда личната ти поща. В `.env`: `MAILBOX_PROVIDER`, без
+   `INBOX_PROVIDER`. Безплатният вариант е Cloudflare Email Routing: пренасочва адресите към пощата ти (Cloudflare сам
+   слага MX записите си); тогава `INBOX_PROVIDER` е Cloudflare, а `MAILBOX_PROVIDER` е пощата ти.
+3. **SPF е един запис за целия домейн**, затова обедини двата: `v=spf1 include:_spf.protonmail.ch
+   include:_spf.tem.scaleway.com ~all` (с Email Routing — `include:_spf.mx.cloudflare.net` вместо този на Proton;
+   провери в Scaleway дали показва точно този `include`). Ако Scaleway поиска и свой MX, не го слагай: MX записите са
+   на пощата, която получава писмата до теб.
 4. **Отчети за недоставени писма** (по желание, но препоръчително): адрес, от който писмата се връщат или който ги
    маркира като спам, вече не получава напомняния, а в Настройки пише защо. Сложи в `.env`
    `EMAIL_EVENTS_SECRET=$(openssl rand -hex 24)`. В Scaleway: Topics and Events → тема (fr-par) → абонамент от тип
@@ -190,4 +196,5 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    Transactional Email → Webhooks → нов webhook за домейна с тази тема и събитията `email_dropped`,
    `email_mailbox_not_found`, `email_spam` и `email_blocklisted`.
 
-Използвай порт **587**: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и 465 на нови сървъри.
+Използвай порт **587** с `?requireTLS=true`: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и
+465 на нови сървъри.

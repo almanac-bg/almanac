@@ -147,6 +147,9 @@ export default defineConfig({
       BACKUP_DIR: 'off',
       OPERATOR_NAME: 'Тест Тестов',
       OPERATOR_ADDRESS: 'ул. Примерна 1, София',
+      // Mail that arrives straight in a mailbox, with nothing forwarding it (the policy says so).
+      INBOX_PROVIDER: '',
+      MAILBOX_PROVIDER: 'Тест Поща',
       DRAIN_SECONDS: '0',
       // The public sample bank, as in CI, even where the private one is checked out: the same questions everywhere
       // (every Geography question there has a "Знаеше ли?" fact, which facts.spec relies on).
