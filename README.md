@@ -94,7 +94,7 @@ packages/client   Ядрото на клиента: API заявки, състо
 apps/web          React 19 + Vite + Tailwind 4 + Motion
   e2e/                    Браузърните тестове (Playwright)
 deploy/           Caddyfile (HTTPS и страницата при обновяване), litestream.yml (бекъпите) и скриптовете на сървъра:
-                  deploy.sh, rollback.sh, pull-image.sh, check.sh и backup-check.sh (docs/operations.md)
+                  deploy.sh, rollback.sh, pull-image.sh, check.sh, backup-check.sh и audit.sh (docs/operations.md)
 scripts/          github-setup.sh (настройките на хранилището в GitHub), subset-fonts.mjs (шрифтовете),
                   licenses.mjs (/licenses.txt)
 ```
