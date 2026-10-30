@@ -1,4 +1,14 @@
-import { actions, api, connectRealtime, disconnectRealtime, getState, setState, toast, useStore } from '@quiz/client';
+import {
+  ApiError,
+  actions,
+  api,
+  connectRealtime,
+  disconnectRealtime,
+  getState,
+  setState,
+  toast,
+  useStore,
+} from '@quiz/client';
 import { routeKind } from '@quiz/shared';
 import { LazyMotion, MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef, useState } from 'react';
@@ -6,6 +16,7 @@ import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
 import { ConnectionBanner } from './components/ConnectionBanner';
+import { PageBoundary } from './components/ErrorBoundary';
 import { Invites } from './components/Invites';
 import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
@@ -17,7 +28,7 @@ import { RoomDoor, RoomNickname } from './components/RoomNickname';
 import { SeasonRecap } from './components/SeasonRecap';
 import { SecondFactorPrompt } from './components/SecondFactor';
 import { Toasts } from './components/Toasts';
-import { Card, PageSpinner, Spinner } from './components/ui';
+import { Button, Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
 import { markReturning } from './lib/returning';
@@ -111,17 +122,53 @@ export function App() {
   // The page the server drew is the app's own now.
   useEffect(paintingDone, []);
 
+  // Who's signed in. Only an answer says so: no connection, or a server restarting (a deploy), is no answer — the app
+  // keeps asking (1, 2, 4… s, and at once when the device is back online or the tab comes back) rather than show a
+  // signed-in player the signed-out landing.
+  const [unanswered, setUnanswered] = useState(false);
+  const askAgain = useRef<() => void>(() => {});
   useEffect(() => {
     // A sign-in made while this was on its way (the drawn landing page is live at once) is newer: keep it.
     const before = getState().me;
     const settle = (user: typeof before) => {
       if (getState().me === before) setState({ me: user });
+      setState({ authChecked: true });
+      setUnanswered(false);
     };
-    api
-      .me()
-      .then(({ user }) => settle(user))
-      .catch(() => settle(null))
-      .finally(() => setState({ authChecked: true }));
+    let stopped = false;
+    let delay = 1000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = () => {
+      clearTimeout(timer);
+      api
+        .me()
+        .then(({ user }) => settle(user))
+        .catch((err: unknown) => {
+          if (stopped) return;
+          // A refusal that asking again won't change: signed out, as far as this page can tell.
+          const status = err instanceof ApiError ? err.status : 0;
+          if (status >= 400 && status < 500 && status !== 429) return settle(null);
+          setUnanswered(true);
+          timer = setTimeout(ask, delay);
+          delay = Math.min(delay * 2, 16_000);
+        });
+    };
+    const soon = () => {
+      if (document.visibilityState === 'visible' && !getState().authChecked) {
+        delay = 1000;
+        ask();
+      }
+    };
+    askAgain.current = soon;
+    ask();
+    window.addEventListener('online', soon);
+    document.addEventListener('visibilitychange', soon);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      window.removeEventListener('online', soon);
+      document.removeEventListener('visibilitychange', soon);
+    };
   }, []);
 
   // One realtime connection per signed-in session.
@@ -129,9 +176,28 @@ export function App() {
   useEffect(() => identify(userId ?? null), [userId]);
   useEffect(() => {
     if (!userId) return;
-    // The realtime library is a file of its own: one that didn't arrive (an older build's) is a reload away.
-    connectRealtime().catch(reloadForNewVersion);
+    // The realtime library is a file of its own: one that didn't arrive (an older build's) is a reload away — or,
+    // offline, asked for again once the device is back online or the tab comes back.
+    let missing = false;
+    const connect = () =>
+      connectRealtime().then(
+        () => {
+          missing = false;
+        },
+        () => {
+          missing = true;
+          reloadForNewVersion();
+        },
+      );
+    const again = () => {
+      if (missing && document.visibilityState === 'visible') void connect();
+    };
+    void connect();
+    window.addEventListener('online', again);
+    document.addEventListener('visibilitychange', again);
     return () => {
+      window.removeEventListener('online', again);
+      document.removeEventListener('visibilitychange', again);
       disconnectRealtime();
     };
   }, [userId]);
@@ -148,7 +214,17 @@ export function App() {
     return (
       <div className="grid min-h-dvh place-items-center">
         <Background />
-        <Spinner className="size-8 text-violet-400" />
+        {unanswered ? (
+          <div role="status" className="flex flex-col items-center gap-4 px-6 text-center">
+            <Spinner className="size-8 text-violet-400" />
+            <p className="text-fg-2">Свързваме се със сървъра…</p>
+            <Button variant="secondary" onClick={() => askAgain.current()}>
+              Опитай пак
+            </Button>
+          </div>
+        ) : (
+          <Spinner className="size-8 text-violet-400" />
+        )}
       </div>
     );
   }
@@ -167,20 +243,22 @@ export function App() {
           // The page itself (SignedIn has its header and tab bar around its own <main>).
           <main>
             {isPublicPath(pathname) ? (
-              <Suspense fallback={<PageLoading />}>
-                <Routes>
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/verify-email" element={<VerifyEmailPage />} />
-                  <Route path="/unsubscribe" element={<UnsubscribePage />} />
-                  <Route path="/privacy" element={<PrivacyPage />} />
-                  <Route path="/terms" element={<TermsPage />} />
-                  <Route path="/how-to-play" element={<HowToPlayPage />} />
-                  <Route path="/quiz" element={<QuizHubPage />} />
-                  <Route path="/quiz/:category" element={<QuizCategoryPage />} />
-                  <Route path="/facts" element={<FactsPage />} />
-                  <Route path="/teachers" element={<TeachersPage />} />
-                </Routes>
-              </Suspense>
+              <PageBoundary>
+                <Suspense fallback={<PageLoading />}>
+                  <Routes>
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
+                    <Route path="/unsubscribe" element={<UnsubscribePage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/how-to-play" element={<HowToPlayPage />} />
+                    <Route path="/quiz" element={<QuizHubPage />} />
+                    <Route path="/quiz/:category" element={<QuizCategoryPage />} />
+                    <Route path="/facts" element={<FactsPage />} />
+                    <Route path="/teachers" element={<TeachersPage />} />
+                  </Routes>
+                </Suspense>
+              </PageBoundary>
             ) : routeKind(pathname) === 'unknown' ? (
               // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
               <NotFoundPage standalone />
@@ -216,36 +294,38 @@ function SignedIn() {
       {!inGame && <MaintenanceBanner />}
       {!inGame && <ActiveMatchBar />}
       <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 cramped:pb-8 sm:px-6 md:pb-16'}>
-        <Suspense fallback={<PageLoading />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/game" element={<GamePage />} />
-            <Route path="/room" element={<RoomPage />} />
-            <Route path="/join/:code" element={<JoinRoute />} />
-            <Route path="/c/:id" element={<ChallengePage />} />
-            <Route path="/daily" element={<DailyPage />} />
-            <Route path="/daily/:code" element={<DailyPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/profile/:username" element={<ProfilePage />} />
-            <Route path="/achievements" element={<AchievementsPage />} />
-            <Route path="/locker" element={<LockerPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/leaderboard" element={<LeaderboardPage />} />
-            <Route path="/friends" element={<FriendsPage />} />
-            <Route path="/almanac" element={<AlmanacPage />} />
-            <Route path="/almanac/:category" element={<AlmanacPage />} />
-            <Route path="/groups" element={<GroupsPage />} />
-            <Route path="/groups/:id" element={<GroupsPage />} />
-            <Route path="/groups/join/:code" element={<GroupsPage />} />
-            <Route path="/sets" element={<SetsPage />} />
-            <Route path="/sets/:id" element={<SetsPage />} />
-            <Route path="/sets/shared/:code" element={<SetsPage />} />
-            <Route path="/submit" element={<SubmitPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
+        <PageBoundary>
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/game" element={<GamePage />} />
+              <Route path="/room" element={<RoomPage />} />
+              <Route path="/join/:code" element={<JoinRoute />} />
+              <Route path="/c/:id" element={<ChallengePage />} />
+              <Route path="/daily" element={<DailyPage />} />
+              <Route path="/daily/:code" element={<DailyPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/:username" element={<ProfilePage />} />
+              <Route path="/achievements" element={<AchievementsPage />} />
+              <Route path="/locker" element={<LockerPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/friends" element={<FriendsPage />} />
+              <Route path="/almanac" element={<AlmanacPage />} />
+              <Route path="/almanac/:category" element={<AlmanacPage />} />
+              <Route path="/groups" element={<GroupsPage />} />
+              <Route path="/groups/:id" element={<GroupsPage />} />
+              <Route path="/groups/join/:code" element={<GroupsPage />} />
+              <Route path="/sets" element={<SetsPage />} />
+              <Route path="/sets/:id" element={<SetsPage />} />
+              <Route path="/sets/shared/:code" element={<SetsPage />} />
+              <Route path="/submit" element={<SubmitPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </PageBoundary>
         {!inGame && <LegalLinks className="mt-16 justify-center" />}
       </main>
       {!inGame && <QueueOverlay />}

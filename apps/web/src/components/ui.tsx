@@ -91,6 +91,21 @@ export function PageSpinner() {
   );
 }
 
+/**
+ * A page that belongs to where the player is (a room, a match) while the server hasn't said yet whether they still are:
+ * after a reload or a blip it does within moments (Store.settled). Not a redirect to the lobby in the meantime.
+ */
+export function Restoring({ what }: { what: string }) {
+  return (
+    <div role="status" className="grid min-h-[70dvh] place-items-center text-center">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner className="size-8 text-violet-400" />
+        <p className="text-fg-2">Връщаме те {what}…</p>
+      </div>
+    </div>
+  );
+}
+
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div {...rest} className={clsx('glass rounded-3xl', className)}>

@@ -4,8 +4,10 @@ import { Check, WifiOff } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
-/** A blip shorter than this (or the first connect after a page load) isn't worth a banner. */
+/** A blip shorter than this isn't worth a banner. */
 const GRACE_MS = 1500;
+/** Nor is the first connection after a page load, on a slow line, unless it takes this long. */
+const FIRST_GRACE_MS = 5000;
 
 /**
  * A lost connection, said plainly on every page (the header's dot on the avatar is easy to miss, and the match screen
@@ -18,6 +20,9 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
   const stalled = useStore((s) => s.connected && s.stalled);
   const [banner, setBanner] = useState<'offline' | 'restored' | null>(null);
   const shown = useRef(false);
+  // Connected once since the page loaded: from then on a drop is a drop.
+  const once = useRef(false);
+  if (connected) once.current = true;
 
   useEffect(() => {
     if (explained) {
@@ -26,10 +31,13 @@ export function ConnectionBanner({ explained = false }: { explained?: boolean })
     }
     if (!connected) {
       setBanner((b) => (b === 'restored' ? null : b));
-      const show = setTimeout(() => {
-        shown.current = true;
-        setBanner('offline');
-      }, GRACE_MS);
+      const show = setTimeout(
+        () => {
+          shown.current = true;
+          setBanner('offline');
+        },
+        once.current ? GRACE_MS : FIRST_GRACE_MS,
+      );
       return () => clearTimeout(show);
     }
     if (!shown.current) return;

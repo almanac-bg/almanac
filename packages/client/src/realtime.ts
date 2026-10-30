@@ -58,11 +58,24 @@ const RECONNECT = { delayMs: 1000, jitter: 0.5 };
  */
 const AFTER_RESTART = { delayMs: 2500, jitter: 1 };
 
+/**
+ * The realtime library, a file of its own: fetched when someone signs in or plays as a guest (while that request is on
+ * its way), not only after — on a slow line it sat on the path to the first connection.
+ */
+let library: Promise<typeof import('socket.io-client')> | null = null;
+export function loadRealtime() {
+  library ??= import('socket.io-client').catch((err: unknown) => {
+    library = null; // to be asked for again
+    throw err;
+  });
+  return library;
+}
+
 /** Wanted connected: a sign-out while the library was still loading doesn't connect it afterwards. */
 let wanted = false;
 export async function connectRealtime() {
   wanted = true;
-  io ??= (await import('socket.io-client')).io;
+  io ??= (await loadRealtime()).io;
   if (wanted) getSocket().connect();
 }
 export const disconnectRealtime = () => {
@@ -72,6 +85,13 @@ export const disconnectRealtime = () => {
 
 /** After a reconnect the server re-sends live state right away; anything it doesn't re-send is gone. */
 let resyncTimer: ReturnType<typeof setTimeout> | undefined;
+let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * How long after a (re)connect the server has to say again where the player is — the room or queue it kept their place
+ * in, the match on screen — before what the page still shows from before counts as gone.
+ */
+export const RESTORE_MS = 2500;
 /** After a mid-match resync: if no question follows, the one on screen closed while we were away. */
 let staleQuestionTimer: ReturnType<typeof setTimeout> | undefined;
 /** The match you walked out of: if the server still sends it (the leave crossed a reconnect), leave it again. */
@@ -128,8 +148,20 @@ function bind(s: GameSocket) {
   s.on('connect', () => {
     crowded = false;
     s.io.reconnectionDelay(RECONNECT.delayMs).randomizationFactor(RECONNECT.jitter);
-    const { game } = getState();
-    setState({ connected: true, queue: null, room: null, maintenance: null });
+    const { game, room, queue } = getState();
+    // A room or a queue the server kept the place in comes back at once (room:state, queue:status): not cleared here,
+    // which sent a player on /room to the lobby on every blip. What doesn't come back within RESTORE_MS is gone.
+    setState({ connected: true, settled: false, maintenance: null });
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(() => {
+      const now = getState();
+      setState({
+        settled: true,
+        ...(room && now.room === room && { room: null }),
+        ...(queue && now.queue === queue && { queue: null }),
+      });
+    }, RESTORE_MS);
+    (restoreTimer as { unref?: () => void }).unref?.();
     if (game && game.phase !== 'ended') {
       clearTimeout(resyncTimer);
       resyncTimer = setTimeout(() => {

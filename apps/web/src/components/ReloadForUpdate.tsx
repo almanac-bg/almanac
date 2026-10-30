@@ -34,7 +34,8 @@ function reload(latest: string) {
 /**
  * A deploy since this tab loaded: the server runs a newer game than this page's code, and the two may no longer
  * understand each other. The page reloads into the new version at a moment that costs nothing: not in a match, a room
- * or a queue, and not over typed text (then on the next page change, or once the tab is in the background).
+ * or a queue, and never over typed text — not even in a tab in the background, which is where a set half written
+ * waits while its author looks something up (then on the next page change, or once the text is sent or cleared).
  */
 export function ReloadForUpdate() {
   const latest = useStore((s) => s.lobby?.build ?? null);
@@ -47,7 +48,7 @@ export function ReloadForUpdate() {
   useEffect(() => {
     if (!outdated || busy) return;
     const t = setTimeout(() => {
-      if (idle() && (document.hidden || !holdsTypedText())) reload(latest);
+      if (idle() && !holdsTypedText()) reload(latest);
     }, 2000);
     return () => clearTimeout(t);
   }, [outdated, busy, latest, pathname]);
@@ -55,7 +56,7 @@ export function ReloadForUpdate() {
   useEffect(() => {
     if (!outdated) return;
     const hidden = () => {
-      if (document.hidden && idle()) reload(latest);
+      if (document.hidden && idle() && !holdsTypedText()) reload(latest);
     };
     document.addEventListener('visibilitychange', hidden);
     return () => document.removeEventListener('visibilitychange', hidden);

@@ -17,15 +17,17 @@ import { QuestionView } from '../components/game/QuestionView';
 import { RoundPick } from '../components/game/RoundPick';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, Restoring } from '../components/ui';
 import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
 import { Results } from './Results';
 
 export function GamePage() {
   const game = useStore((s) => s.game);
+  const settled = useStore((s) => s.settled);
   usePageTitle(game ? MODES[game.start.mode].name : null);
-  if (!game) return <Navigate to="/" replace />;
+  // After a reload mid-match the server sends it again within moments: no trip through the lobby meanwhile.
+  if (!game) return settled ? <Navigate to="/" replace /> : <Restoring what="в мача" />;
   // A room's host running it on a big screen: the whole match there, to its end.
   if (game.start.presenter) return <PresenterScreen game={game} />;
   if (game.phase === 'ended' && game.end) return <Results game={game} />;

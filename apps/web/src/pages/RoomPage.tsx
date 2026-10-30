@@ -42,20 +42,22 @@ import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
-import { Button, Card, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
+import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
 export function RoomPage() {
   usePageTitle('Частна стая');
   const room = useStore((s) => s.room);
+  // After a reload or a blip the server sends the room again within moments (it kept the seat): no trip to the lobby.
+  const settled = useStore((s) => s.settled);
   const me = useStore((s) => s.me)!;
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [kicking, setKicking] = useState<string | null>(null);
 
-  if (!room) return <Navigate to="/" replace />;
+  if (!room) return settled ? <Navigate to="/" replace /> : <Restoring what="в стаята" />;
 
   const isHost = room.hostId === `u${me.id}`;
   const s = room.settings;

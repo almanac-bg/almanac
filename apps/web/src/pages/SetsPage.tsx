@@ -19,6 +19,7 @@ import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { ReportReasons } from '../components/ReportReasons';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
+import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
 import { shrinkPicture } from '../lib/pictures';
 import { usePageTitle } from '../lib/title';
@@ -219,11 +220,18 @@ function SetEditor({ id }: { id: number }) {
 
   useEffect(() => {
     if (!data) return;
-    setName(data.name);
-    setDrafts(data.questions.map(toDraft));
-    setSaved(content(data.name, data.questions.map(toDraft)));
-  }, [data]);
+    const base = content(data.name, data.questions.map(toDraft));
+    // Changes this tab had made and not saved (a reload, a deploy, a match in between): back, if the set is as it was.
+    const kept = loadDraft<{ name: string; drafts: Draft[] }>(`set:${id}`, base);
+    setName(kept?.name ?? data.name);
+    setDrafts(kept?.drafts ?? data.questions.map(toDraft));
+    setSaved(base);
+    if (kept) toast({ kind: 'info', title: 'Върнахме незапазените ти промени', body: 'Запази ги, за да останат.' });
+  }, [data, id]);
   const dirty = !!data && content(name, drafts) !== saved;
+  useEffect(() => {
+    if (data) keepDraft(`set:${id}`, saved, dirty ? { name, drafts } : null);
+  }, [data, id, saved, dirty, name, drafts]);
 
   // Unsaved work isn't lost to a closed tab without a word.
   useEffect(() => {

@@ -18,12 +18,12 @@ const LEGAL_CODE = /\/assets\/LegalPages-[^/]+\.js$/;
 
 /**
  * The browser's own complaints about a download a test failed on purpose, in each engine's words, and React's report
- * of the error it then caught (Firefox shows that as a bare "Error" or "JSHandle@object" from React's file; #520 is React drawing the page
- * itself when the server-drawn one couldn't hydrate without its code): expected.
+ * of the error it then caught (Firefox shows that as a bare "Error" or "JSHandle@object" from React's file; #520 and
+ * #422 are React drawing the page itself when the server-drawn one couldn't hydrate without its code): expected.
  */
 function forgive(problems: string[]) {
   const expected = (p: string) =>
-    /LegalPages|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520/.test(
+    /LegalPages|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520|#422/.test(
       p,
     ) || /^console: (Error|JSHandle@object) \(.*\/assets\/react-[^/]+\.js\)$/.test(p);
   problems.splice(0, problems.length, ...problems.filter((p) => !expected(p)));
@@ -90,18 +90,23 @@ test('a page whose code won’t download: one reload to fetch it again, then a w
   let loads = 0;
   page.on('load', () => loads++);
   await page.getByRole('link', { name: 'Политика за поверителност', exact: true }).first().click();
-  await expect(page.getByRole('heading', { name: 'Нещо се обърка', exact: true })).toBeVisible({ timeout: 15_000 });
+  // Said in the page, as what it is (not a bug of ours): the rest of the app stays.
+  await expect(page.getByRole('heading', { name: 'Страницата не се зареди', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   // A moment more: no second reload comes.
   await page.waitForTimeout(1_500);
   expect(loads, 'reloaded once to try again').toBe(1);
 
-  // The deploy is through: the way out leads home, and from there the page opens (in WebKit, in a new tab only).
+  // The deploy is through: „Опитай пак“ asks for the page anew. WebKit keeps a module that failed to load for the
+  // page's life, so there the way out is the reload, home, and from there the page opens in a new tab only.
   await page.unroute(LEGAL_CODE);
-  await page.getByRole('button', { name: 'Презареди', exact: true }).click();
-  await expect(page).toHaveURL(/\/$/);
   if (browserName !== 'webkit') {
-    await page.getByRole('link', { name: 'Политика за поверителност', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Опитай пак', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
+  } else {
+    await page.getByRole('button', { name: 'Презареди', exact: true }).click();
+    await expect(page).toHaveURL(/\/$/);
   }
   forgive(pageProblems);
 });

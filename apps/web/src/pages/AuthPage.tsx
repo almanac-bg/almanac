@@ -1,4 +1,4 @@
-import { api, errorMessage, plural, setState, toast } from '@quiz/client';
+import { api, errorMessage, loadRealtime, plural, setState, toast } from '@quiz/client';
 import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, UsersRound } from 'lucide-react';
@@ -104,6 +104,8 @@ export function AuthPage() {
     }
     setError(null);
     setBusy(true);
+    // The realtime library comes while the sign-in is on its way: the lobby connects the moment it opens.
+    void loadRealtime().catch(() => {});
     try {
       const { user, emailNotSent } =
         mode === 'login'
@@ -130,6 +132,7 @@ export function AuthPage() {
     setGuestBusy(true);
     try {
       // From a room's link: a guest only for the room (a pupil in a class), erased within an hour of leaving.
+      void loadRealtime().catch(() => {}); // as for a sign-in
       const { user } = await api.guest(!!roomCode);
       // Same render as signing in, so the signed-in app opens straight on the right page.
       if (landing) navigate(landing.to, { replace: true, state: landing.state });

@@ -99,9 +99,18 @@ export function onSecondFactorNeeded(ask: () => Promise<boolean>) {
   askForCode = ask;
 }
 
+/**
+ * How long a request may take, answer and all: a link that died without a word (a tunnel, a switch of networks) would
+ * otherwise keep a button spinning until the system gives up on it, minutes later. A picture going up gets longer.
+ */
+export const REQUEST_TIMEOUT_MS = { default: 15_000, upload: 60_000 } as const;
+
+const timeout = (ms: number) => (typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined);
+
 /** `body`: JSON, or a file (a Blob goes as it is, with its own type). */
 async function request<T>(method: string, path: string, body?: unknown, again = true): Promise<T> {
   let res: Response;
+  let data: Record<string, unknown>;
   const file = typeof Blob !== 'undefined' && body instanceof Blob;
   try {
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
@@ -109,11 +118,20 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
       headers: body === undefined ? {} : { 'content-type': file ? body.type : 'application/json' },
       body: body === undefined ? undefined : file ? body : JSON.stringify(body),
       credentials: 'same-origin',
+      signal: timeout(file ? REQUEST_TIMEOUT_MS.upload : REQUEST_TIMEOUT_MS.default),
     });
-  } catch {
+    // The answer is read under the same clock: one that stops half way is no answer.
+    const text = await res.text();
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
+    }
+  } catch (err) {
+    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError'))
+      throw new ApiError('Сървърът не отговаря. Опитай пак след малко.', 0);
     throw new ApiError('Няма връзка със сървъра. Провери интернета си.', 0);
   }
-  const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.confirm && again && askForPassword) {
     asking ??= askForPassword().finally(() => {
       asking = null;
@@ -126,7 +144,7 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
     });
     if (await askingCode) return request<T>(method, path, body, false);
   }
-  if (!res.ok) throw new ApiError(data.error ?? 'Нещо се обърка. Опитай пак.', res.status);
+  if (!res.ok) throw new ApiError((data.error as string | undefined) ?? 'Нещо се обърка. Опитай пак.', res.status);
   return data as T;
 }
 

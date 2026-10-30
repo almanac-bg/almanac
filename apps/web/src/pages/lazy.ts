@@ -57,21 +57,39 @@ export function reloadForNewVersion() {
   window.location.reload();
 }
 
+/** Pages whose code didn't arrive: asked for anew only when the player says to (retryFailedPages). */
+const failed = new Set<() => void>();
+
+/**
+ * „Опитай пак“ on a page whose code didn't arrive: its next mount imports the file anew. (A failed import stays failed
+ * in the component React made for it; and a new one on every render would ask again in a loop, since a page that
+ * suspends while it first mounts is rendered from scratch each time.)
+ */
+export function retryFailedPages() {
+  for (const forget of failed) forget();
+  failed.clear();
+}
+
 function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeof loaders)[L]>>) {
-  const Lazy = lazy(() =>
-    load(loader).then(
-      (mod) => ({ default: mod[name as string] }),
-      (err: unknown) => {
-        reloadForNewVersion();
-        throw err;
-      },
-    ),
-  );
+  let Lazy: ComponentType | null = null;
+  const loading = () =>
+    (Lazy ??= lazy(() =>
+      load(loader).then(
+        (mod) => ({ default: mod[name as string] }),
+        (err: unknown) => {
+          failed.add(() => {
+            Lazy = null;
+          });
+          reloadForNewVersion();
+          throw err;
+        },
+      ),
+    ));
   // biome-ignore lint/correctness/noComponentHookFactories: made once per page when this module loads, never in a render, so each page's component stays the same
   function Page(props: object) {
     // Decided once per mount: a page whose code is here already renders at once (no "loading" in between, and a page
     // the server drew hydrates as it is); otherwise it loads. Never switched while mounted, which would remount it.
-    const [Component] = useState<ComponentType>(() => ready.get(loader)?.[name as string] ?? Lazy);
+    const [Component] = useState<ComponentType>(() => ready.get(loader)?.[name as string] ?? loading());
     return createElement(Component, props);
   }
   return Page;

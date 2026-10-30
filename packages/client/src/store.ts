@@ -134,6 +134,11 @@ interface State {
    * that died without closing, as in a tunnel. The socket itself only notices when its ping times out.
    */
   stalled: boolean;
+  /**
+   * The server has had its moment, since this page loaded or the link came back, to say where the player is (a room, a
+   * queue, a match): until then, none of them being here doesn't mean they're gone (RESTORE_MS).
+   */
+  settled: boolean;
   lobby: LobbyStats | null;
   queue: QueueStatus | null;
   /** The evening Роял's lobby, as the server last said (sent to those in it; the home card loads it too). */
@@ -162,6 +167,7 @@ export const useStore = create<State>(() => ({
   authChecked: false,
   connected: false,
   stalled: false,
+  settled: false,
   lobby: null,
   queue: null,
   queueSince: 0,

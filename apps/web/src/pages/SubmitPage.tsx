@@ -3,7 +3,7 @@ import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } f
 import clsx from 'clsx';
 import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
@@ -19,6 +19,7 @@ import {
 } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
+import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -75,7 +76,14 @@ function LockedCard({ level }: { level: number }) {
 function SubmitForm({ onSent }: { onSent: () => void }) {
   // From „Моите въпроси“ („Предложи в общата банка“): that question, to pick its category and difficulty for.
   const proposed = (useLocation().state as { draft?: Partial<QuestionDraft> } | null)?.draft;
-  const [draft, setDraft] = useState<QuestionDraft>(() => ({ ...emptyDraft(), ...proposed }));
+  // What was being written and not sent (a reload, a deploy in between) comes back, unless another one was brought.
+  const [draft, setDraft] = useState<QuestionDraft>(() => ({
+    ...emptyDraft(),
+    ...(proposed ?? loadDraft<QuestionDraft>('submit', '')),
+  }));
+  useEffect(() => {
+    keepDraft('submit', '', JSON.stringify(draft) === JSON.stringify(emptyDraft()) ? null : draft);
+  }, [draft]);
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState(false);
   const errors = useMemo(() => validateDraft(draft), [draft]);
