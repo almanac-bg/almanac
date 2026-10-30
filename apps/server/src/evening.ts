@@ -25,28 +25,45 @@ export function eveningStartsAt(day: string): number | null {
   return at ? sofiaTimeOn(day, at.hour, at.minute, at.second) : null;
 }
 
-/** Each person's place in an evening match. Call inside the match's transaction. */
-export function recordEvening(day: string, userId: number, placement: number, score: number, players: number) {
+/**
+ * Each person's place in an evening match, of `players` (bots too) and `people` of them. Call inside the match's
+ * transaction.
+ */
+export function recordEvening(
+  day: string,
+  userId: number,
+  placement: number,
+  score: number,
+  players: number,
+  people: number,
+) {
   run(
-    `INSERT INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO evening_results (day, user_id, placement, score, players, people) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (day, user_id) DO UPDATE SET placement = excluded.placement, score = excluded.score,
-       players = excluded.players`,
+       players = excluded.players, people = excluded.people`,
     day,
     userId,
     placement,
     score,
     players,
+    people,
   );
 }
 
-/** The latest evening that has been played (started before `now`): its top and how many played. */
+/** A place in a match with people enough to count (EVENING.titleFrom): a row from before `people` was kept counts. */
+const AMONG_PEOPLE = `COALESCE(people, players) >= ${EVENING.titleFrom}`;
+
+/**
+ * The latest evening that has been played (started before `now`): its top (places in matches of people enough) and
+ * how many played.
+ */
 export function lastNight(now = Date.now()): EveningNight | null {
   const today = dayKey(now);
   const start = eveningStartsAt(today);
   const day = start !== null && now >= start ? today : shiftDay(today, -1);
   const rows = all<UserRow & { placement: number; score: number; players: number }>(
     `SELECT u.*, r.placement, r.score, r.players FROM evening_results r JOIN users u ON u.id = r.user_id
-     WHERE r.day = ? AND ${NOT_BANNED} ORDER BY r.placement, r.score DESC LIMIT ?`,
+     WHERE r.day = ? AND ${AMONG_PEOPLE} AND ${NOT_BANNED} ORDER BY r.placement, r.score DESC LIMIT ?`,
     day,
     EVENING.top,
   );
@@ -59,7 +76,10 @@ export function lastNight(now = Date.now()): EveningNight | null {
   };
 }
 
-/** Who holds „Шампион на вечерта“ now: whoever won an evening that started under EVENING.titleHours ago. */
+/**
+ * Who holds „Шампион на вечерта“ now: whoever won an evening match of people enough, started under EVENING.titleHours
+ * ago.
+ */
 export function champions(now = Date.now()): number[] {
   const since = now - EVENING.titleHours * 60 * 60_000;
   const days = [dayKey(now), shiftDay(dayKey(now), -1)].filter((d) => {
@@ -68,15 +88,19 @@ export function champions(now = Date.now()): number[] {
   });
   if (!days.length) return [];
   return all<{ user_id: number }>(
-    `SELECT user_id FROM evening_results WHERE placement = 1 AND day IN (${days.map(() => '?').join(',')})`,
+    `SELECT user_id FROM evening_results WHERE placement = 1 AND ${AMONG_PEOPLE} AND day IN (${days.map(() => '?').join(',')})`,
     ...days,
   ).map((r) => r.user_id);
 }
 
 export const isChampion = (userId: number, now = Date.now()) => champions(now).includes(userId);
 
+/** Evening wins toward the frame: against people enough. */
 export const eveningWins = (userId: number) =>
-  one<{ n: number }>('SELECT COUNT(*) AS n FROM evening_results WHERE user_id = ? AND placement = 1', userId)!.n;
+  one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM evening_results WHERE user_id = ? AND placement = 1 AND ${AMONG_PEOPLE}`,
+    userId,
+  )!.n;
 
 /** The champion's title is worn for a day: whoever still wears it after that goes back to their best level's title. */
 export function retireChampionTitles(now = Date.now()): number {

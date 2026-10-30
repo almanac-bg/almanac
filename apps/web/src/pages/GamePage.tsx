@@ -145,7 +145,7 @@ function Arena({ game }: { game: LiveGame }) {
         >
           {watching ? (
             <p className="text-balance text-rose-200">
-              <Emoji e="💀" /> Отпадна — гледаш като зрител
+              <Emoji e="💀" /> Отпадна — отговаряй до края: за XP и алманаха, извън класирането
             </p>
           ) : (
             <p className="text-balance text-rose-200">

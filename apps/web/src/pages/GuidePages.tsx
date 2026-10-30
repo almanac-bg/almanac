@@ -184,7 +184,8 @@ export function HowToPlayPage() {
           ))}
           <li>
             <b>{MODES.evening.name}</b> — всяка вечер в {EVENING.hour}:00, до {EVENING.maxPlayers} души; входът се
-            отваря {EVENING.lobbyMinutes} минути преди това. Победителят носи титлата „Шампион на вечерта“.
+            отваря {EVENING.lobbyMinutes} минути преди това. Победителят на мач с поне {EVENING.titleFrom} души носи
+            титлата „Шампион на вечерта“. Отпадналият може да отговаря до края — за XP и алманаха, извън класирането.
           </li>
         </ul>
       </Section>
@@ -194,7 +195,7 @@ export function HowToPlayPage() {
           Дуел и Арена се играят в {ROUNDS.count} рунда по {ROUNDS.size} въпроса. Преди всеки следващ рунд изоставащият
           избира категорията от {ROUNDS.offer} за {seconds(ROUNDS.pickMs)}. Последният въпрос е <b>финал с число</b>:
           пишеш година, височина или брой, и точките са според това колко близо си — до {NUMBER.points}, плюс{' '}
-          {NUMBER.exactBonus} за точния отговор.
+          {NUMBER.exactBonus} за точния отговор. Финалът се брои ×{NUMBER.finalTimes}, така че може да обърне мача.
         </p>
       </Section>
 

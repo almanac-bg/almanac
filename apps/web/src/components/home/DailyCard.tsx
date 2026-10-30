@@ -13,7 +13,7 @@ import clsx from 'clsx';
 import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { dailyLinkUrl, offBoardLine } from '../../lib/daily';
+import { dailyLinkUrl, offBoardLine, placeShown } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
 import { Avatar } from '../Avatar';
@@ -114,7 +114,7 @@ export function DailyCard({ className }: { className?: string }) {
                   <div className="text-xs text-fg-3">Твоят резултат</div>
                   <div className="text-2xl font-bold">
                     {fmt(info.played.score)}{' '}
-                    {!info.offBoard && (
+                    {!info.offBoard && placeShown(info.total) && (
                       <span className="text-base font-semibold text-amber-300">
                         #{info.played.rank} <span className="text-fg-3">от {info.total}</span>
                       </span>

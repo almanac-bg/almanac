@@ -187,6 +187,8 @@ export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } =
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
   const results = page.getByRole('heading', { name: 'Награди', exact: true });
+  // Соло without a clock: each answer waits for „Продължи“.
+  const goOn = page.getByRole('button', { name: 'Продължи', exact: true });
   const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });
   const counter = page.getByText(/^Въпрос \d+ от \d+$/);
   const answered = new Set<number>();
@@ -199,8 +201,13 @@ export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } =
   for (;;) {
     // Between questions there's the countdown, the reveal or a round's pick; a 15-second question lasts 2.25 s at the
     // test speed.
-    await expect(open.or(lock).or(pick).or(results).first()).toBeVisible({ timeout: gameMs(15_000) });
+    await expect(open.or(lock).or(pick).or(results).or(goOn).first()).toBeVisible({ timeout: gameMs(15_000) });
     if (await results.isVisible()) break;
+    if (await goOn.isVisible()) {
+      await goOn.click({ timeout: gameMs(2_000) });
+      await expect(goOn).toBeHidden({ timeout: gameMs(5_000) });
+      continue;
+    }
     if (await pick.isVisible()) {
       await page.locator('[data-answer="0"]').click({ timeout: gameMs(2_000) });
       await expect(pick).toBeHidden({ timeout: gameMs(5_000) });

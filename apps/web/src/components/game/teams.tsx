@@ -1,5 +1,5 @@
 import { fmt, type LiveGame } from '@quiz/client';
-import { type GamePlayer, type Standing, TEAMS, type TeamId } from '@quiz/shared';
+import { type GamePlayer, type Standing, TEAMS, type TeamId, teamPoints } from '@quiz/shared';
 import clsx from 'clsx';
 import { useCountUp } from '../../lib/hooks';
 import { accentText } from './answers';
@@ -8,14 +8,14 @@ export const teamColor = (team: TeamId) => TEAMS[team].color;
 
 export const myTeamOf = (game: LiveGame): TeamId | null => game.players[game.start.youId]?.team ?? null;
 
-/** Live team totals (sum of member scores), indexed by team. */
+/** Live team totals, indexed by team: the members' scores summed, as the server counts them (teamPoints). */
 export function teamTotals(standings: Standing[], players: Record<string, GamePlayer>): [number, number] {
-  const totals: [number, number] = [0, 0];
-  for (const s of standings) {
-    const team = players[s.id]?.team;
-    if (team === 0 || team === 1) totals[team] += s.score;
-  }
-  return totals;
+  return teamPoints(
+    standings.flatMap((s) => {
+      const team = players[s.id]?.team;
+      return team === 0 || team === 1 ? [[team, s.score] as const] : [];
+    }),
+  );
 }
 
 /** "Сините 2 450 ▬▬▬▬▬▬ 1 980 Червените" with your team emphasized. */

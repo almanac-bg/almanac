@@ -1,4 +1,5 @@
 import { api, ordinal } from '@quiz/client';
+import { DAILY_FIELD } from '@quiz/shared';
 
 /**
  * Where a run off the day's board would stand on it, and when the player joins the board (DailyInfo.offBoard): a guest
@@ -6,8 +7,12 @@ import { api, ordinal } from '@quiz/client';
  * account costs seconds, so one made today could be there only to read the answers off for another.
  */
 export function offBoardLine(d: { guest: boolean; madeToday: boolean; rank: number; total: number }) {
+  if (!placeShown(d.total + 1)) return offBoardWhy(d);
   return `Щеше да си на ${ordinal(d.rank)} място от ${d.total + 1}. ${offBoardWhy(d)}`;
 }
+
+/** Whether a day with this many runs (the player's among them) says a place (DAILY_FIELD.placeFrom). */
+export const placeShown = (runs: number) => runs >= DAILY_FIELD.placeFrom;
 
 /** offBoardLine without the place: when the place is shown on its own. */
 export function offBoardWhy(d: { guest: boolean; madeToday: boolean }) {

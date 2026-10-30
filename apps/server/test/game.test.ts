@@ -53,8 +53,9 @@ const player = (id: string, userId: number | null): GamePlayer => ({
 });
 
 /**
- * Bots that always answer right ('strong') or always wrong ('weak') once Math.random is pinned to 0.5. A weak one knows
- * an unplayed easy question 43% of the time, a medium one 19% (expectedRight at 750 against 800 and 1000).
+ * Bots that always answer right ('strong') or always wrong ('weak') once Math.random is pinned to 0.5. A weak one gets
+ * an unplayed easy question right 43% of the time, a medium one 19% (expectedRight at 750 against 800 and 1000), a
+ * quarter of that by guessing: it knows the easy one 24% of the time, the medium one never.
  */
 const bot = (id: string, kind: 'strong' | 'weak', favourites: { strong?: CategoryId[]; rating?: number } = {}) => ({
   player: { ...player(id, null), rating: favourites.rating ?? 1000, strong: favourites.strong ?? [] },
@@ -80,6 +81,8 @@ function setup(opts: {
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
   /** A room's host running it on a big screen, by user id. */
   presenter?: number;
+  /** A number final's weight (a set made before it counted double: 1). */
+  finalTimes?: number;
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -110,6 +113,7 @@ function setup(opts: {
       bots: opts.bots ?? [],
       records: opts.records ?? [],
       presenter: opts.presenter ?? null,
+      finalTimes: opts.finalTimes,
     },
     {
       toGame: (event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
@@ -187,6 +191,45 @@ test('leaving after being knocked out keeps that place; walking out mid-game ran
   assert.equal(g.game.phase, 'ended');
   assert.equal(g.placement('u1'), 3, 'knocked out 3rd-to-last stays ahead of the forfeit');
   assert.equal(g.placement('u2'), 4);
+});
+
+test('knocked out, a person answers on („Играй до края“): logged and judged, for no points and no place', () => {
+  // Four players, eliminations after questions 4 and 8. u1 never answers at first, so goes out first.
+  const g = setup({ humans: [1, 2], bots: [bot('b1', 'strong'), bot('b2', 'strong')], elimination: true });
+  for (let i = 0; i < 4; i++) {
+    g.right(2);
+    advance(TIME + 5_000);
+  }
+  const u1 = g.game.participants.get('u1')!;
+  assert.equal(u1.eliminatedAt, 4);
+  advance(2_000); // the knockout's longer reveal
+  assert.equal(g.game.phase, 'question');
+  const [score, correct, faced] = [u1.score, u1.correct, u1.faced];
+  const logged = u1.log.length;
+  const index = g.game.index;
+  g.right(1);
+  // Only u1 hears it was taken: the race's „answered“ marks are for those still in it.
+  const marks = g.events.filter(
+    (e) => e.event === 'game:answered' && (e.payload as { playerId: string }).playerId === 'u1',
+  );
+  assert.deepEqual(
+    marks.map((e) => e.to),
+    ['u1'],
+  );
+  g.right(2);
+  advance(1_000);
+  const result = g.reveals().find((r) => r.index === index)!.results.u1;
+  assert.deepEqual([result.correct, result.points], [true, 0]);
+  assert.deepEqual([u1.score, u1.correct, u1.faced], [score, correct, faced], 'the match’s tallies stand');
+  assert.equal(u1.log.length, logged + 1);
+  assert.deepEqual([u1.log.at(-1)!.correct, u1.log.at(-1)!.out, u1.log.at(-1)!.points], [true, true, 0]);
+  // A question let go by is no miss: nothing logged.
+  advance(4_000);
+  assert.equal(g.game.index, index + 1);
+  g.right(2);
+  advance(TIME + 1_000);
+  assert.ok(g.reveals().some((r) => r.index === index + 1));
+  assert.equal(u1.log.length, logged + 1);
 });
 
 test('whoever walks out first ranks last, and the last one standing wins at once', () => {
@@ -402,7 +445,7 @@ function botJokers(g: ReturnType<typeof setup>, botId: string) {
 }
 
 test('bots play 50/50 when they are unsure, never on an easy question, once, and the others only see that it was played', () => {
-  // Luck pinned at 0.3: a weak bot knows the easy ones, not the rest; it reaches for 50/50, and the toss lands right.
+  // Luck pinned at 0.3: a weak bot knows none of them; it reaches for 50/50, and the toss lands right.
   mock.method(Math, 'random', () => 0.3);
   const g = setup({ humans: [1], bots: [bot('b1', 'weak')] });
   playOut(g);
@@ -414,6 +457,19 @@ test('bots play 50/50 when they are unsure, never on an easy question, once, and
   assert.equal('removed' in fifty.payload, false, 'which answers went is nobody else’s business');
   const reveal = g.reveals().find((r) => r.index === fifty.question.index)!;
   assert.equal(reveal.results.b1.correct, true, 'two answers left, and the coin came down right');
+});
+
+test('a bot that doesn’t know guesses: a weak one gets a hard question right as often as a random tap', () => {
+  const hard = pickQuestions(30, 'mixed', new Map()).filter((q) => q.difficulty === 'hard');
+  assert.ok(hard.length >= 3);
+  // Luck pinned at 0.1: 750 against 1200 is a 7% chance to be right — below a tap's 25%, so it never knows and always
+  // guesses (after 50/50 on the first), landing on the first of the options left: the answer leads them. Before, a bot
+  // that didn't know was always wrong.
+  mock.method(Math, 'random', () => 0.1);
+  const g = setup({ humans: [1], bots: [bot('b1', 'weak')], questions: hard.slice(0, 3) });
+  playOut(g);
+  assert.equal(g.reveals().length, 3);
+  assert.ok(g.reveals().every((r) => r.results.b1.correct));
 });
 
 test('bots bet "Двойно или нищо" when they know, never on an easy question, once', () => {
@@ -703,7 +759,7 @@ test('bots give a number too: the more they know, the closer', () => {
   assert.ok(b1.number!.closeness > b2.number!.closeness);
 });
 
-test('a match ends on its final: the last question says so', () => {
+test('a match ends on its final: the last question says so, and its number counts double', () => {
   const g = setup({ humans: [1], questions: [...pickQuestions(9, 'mixed', new Map()), yearQuestion()] });
   for (let i = 0; i < 9; i++) {
     g.right(1);
@@ -715,6 +771,27 @@ test('a match ends on its final: the last question says so', () => {
     [false, false, false, false, false, false, false, false, false, true],
   );
   assert.equal(questions[9].kind, 'number');
+  // The final counts double: the exact number, 1250 as any other question, is worth 2500 here.
+  g.guess(1, 1800);
+  advance(600 + 50);
+  assert.equal(questions[9].times, NUMBER.finalTimes, 'and says so');
+  assert.equal(g.reveals().at(-1)!.results.u1.points, (NUMBER.points + NUMBER.exactBonus) * NUMBER.finalTimes);
+
+  // A day's questions or a link made before the final counted double keep it single: the same rules for all who play it.
+  const before = setup({
+    humans: [1],
+    daily: true,
+    finalTimes: 1,
+    questions: [...pickQuestions(9, 'mixed', new Map()), yearQuestion()],
+  });
+  for (let i = 0; i < 9; i++) {
+    before.right(1);
+    advance(600 + 4_000 + 100);
+  }
+  assert.equal(before.of<QuestionPayload>('game:question')[9].times, 1);
+  before.guess(1, 1800);
+  advance(600 + 50);
+  assert.equal(before.reveals().at(-1)!.results.u1.points, NUMBER.points + NUMBER.exactBonus);
 });
 
 // ─── Rounds ────────────────────────────────────────────────────────────────

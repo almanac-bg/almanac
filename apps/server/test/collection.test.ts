@@ -36,7 +36,7 @@ const { bestMastery, currentTier, forgetMasteryCutoffs, masteryCutoffs, settleMa
 );
 const groups = await import('../src/groups');
 const { recordDailyResult } = await import('../src/daily');
-const { champions, lastNight, recordEvening, retireChampionTitles } = await import('../src/evening');
+const { champions, eveningWins, lastNight, recordEvening, retireChampionTitles } = await import('../src/evening');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -70,6 +70,8 @@ function logged(questionId: string, correct: boolean, choice: number | null = nu
     points: correct ? 900 : 0,
     powerup: null,
     retried: false,
+    slow: false,
+    out: false,
   };
 }
 
@@ -216,10 +218,68 @@ test('„Поправителен“ plays the longest-due first, at most ten, a
   reloadQuestionBank();
 });
 
+test('„Поправителен“ keeps at most 30: a near miss stays out, a fact takes a place first, an overdue one gives way', () => {
+  const player = account();
+  const now = Date.UTC(2026, 10, 2, 12);
+  const queued = () =>
+    all<{ question_id: string }>('SELECT question_id FROM review_queue WHERE user_id = ?', player).map(
+      (r) => r.question_id,
+    );
+  // A number half-way close and an order with two in place say the player nearly knew it.
+  noteMatch(
+    player,
+    [
+      { ...logged('music-n0', false), closeness: 0.6 },
+      { ...logged('music-0', false), placed: 2 },
+    ],
+    false,
+    now,
+  );
+  assert.deepEqual(queued(), []);
+
+  // Thirty misses without a fact (odd questions in the fixture bank): full.
+  const odd = (category: string) => Array.from({ length: 15 }, (_, i) => `${category}-${2 * i + 1}`);
+  noteMatch(
+    player,
+    [...odd('history'), ...odd('music')].map((id) => logged(id, false)),
+    false,
+    now,
+  );
+  assert.equal(queued().length, REVIEW.keep);
+
+  // The next day, none of them due yet: another without a fact waits outside; one with a fact takes a place.
+  noteMatch(player, [logged('sports-1', false), logged('sports-0', false)], false, now + DAY);
+  assert.equal(queued().length, REVIEW.keep);
+  assert.ok(!queued().includes('sports-1'));
+  assert.ok(queued().includes('sports-0'));
+  // Once they're overdue (the player didn't come back for them), a fresh miss is the better moment.
+  noteMatch(player, [logged('sports-3', false)], false, now + 4 * DAY);
+  assert.equal(queued().length, REVIEW.keep);
+  assert.ok(queued().includes('sports-3'));
+  assert.ok(queued().includes('sports-0'), 'not in place of the one with a fact');
+  // Missed again, one already there just starts over: no place taken.
+  noteMatch(player, [logged('sports-3', false)], false, now + 5 * DAY);
+  assert.equal(queued().length, REVIEW.keep);
+
+  // In a run, a near miss is that step again (not back to the first).
+  run("UPDATE review_queue SET step = 1 WHERE user_id = ? AND question_id = 'sports-0'", player);
+  run("INSERT INTO review_queue (user_id, question_id, step, due_at) VALUES (?, 'music-n0', 1, ?)", player, now);
+  const at = now + 6 * DAY;
+  noteMatch(player, [{ ...logged('music-n0', false), closeness: 0.6 }, logged('sports-0', false)], true, at);
+  const step = (id: string) =>
+    one<{ step: number; due_at: number }>(
+      'SELECT step, due_at FROM review_queue WHERE user_id = ? AND question_id = ?',
+      player,
+      id,
+    );
+  assert.deepEqual({ ...step('music-n0') }, { step: 1, due_at: at + REVIEW.afterDays[1] * DAY });
+  assert.deepEqual({ ...step('sports-0') }, { step: 0, due_at: at + REVIEW.afterDays[0] * DAY });
+});
+
 test('category mastery: fixed skill while few are ranked, the top 50/20/5% after; once earned, kept', () => {
   forgetMasteryCutoffs();
   const player = account();
-  const skill = (userId: number, rating: number, answers = 40) =>
+  const skill = (userId: number, rating: number, answers = MASTERY.minAnswers + 10) =>
     run(
       `INSERT INTO player_skill (user_id, category, rating, answers) VALUES (?, 'history', ?, ?)
        ON CONFLICT (user_id, category) DO UPDATE SET rating = excluded.rating, answers = excluded.answers`,
@@ -402,8 +462,11 @@ test('how the day went for everyone: shown once enough have played', () => {
 test('the evening champion wears the title a day; then it goes back to their level’s best', () => {
   const day = '2026-11-02';
   const [winner, second] = [account('Шампион'), account('Втори')];
-  recordEvening(day, winner, 1, 9000, 14);
-  recordEvening(day, second, 2, 8000, 14);
+  recordEvening(day, winner, 1, 9000, 14, 14);
+  recordEvening(day, second, 2, 8000, 14, 14);
+  // Another match that night, one person among bots: first there, but no champion, and not in the night's top.
+  const alone = account('Сам');
+  recordEvening(day, alone, 1, 9500, 8, 1);
   run("UPDATE users SET title = 'evening_champion', xp = 0 WHERE id = ?", winner);
   const during = sofiaTimeOn(day, 22);
   assert.deepEqual(champions(during), [winner]);
@@ -414,6 +477,8 @@ test('the evening champion wears the title a day; then it goes back to their lev
       [2, 'Втори'],
     ],
   );
+  assert.equal(eveningWins(alone), 0, 'nor a win toward the frame');
+  assert.equal(eveningWins(winner), 1);
   assert.equal(retireChampionTitles(during), 0, 'still theirs');
   const next = sofiaTimeOn(shiftDay(day, 1), 21, 0, 1);
   assert.deepEqual(champions(next), [], 'a day on');

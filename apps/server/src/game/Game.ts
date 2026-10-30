@@ -39,6 +39,7 @@ import {
   type Standing,
   snapNumber,
   type TeamId,
+  teamPoints,
 } from '@quiz/shared';
 import { config } from '../config';
 import { reportError } from '../monitoring';
@@ -159,7 +160,18 @@ export interface GameSetup {
   eveningDay?: string | null;
   /** Соло's clock (SOLO_PACES): 'normal' unless the player chose otherwise. */
   pace?: SoloPace;
+  /**
+   * How many times over a number final counts: NUMBER.finalTimes, unless the set was made before it did (a day's
+   * questions, a link: everyone who plays the same questions plays them by the same rules).
+   */
+  finalTimes?: number;
 }
+
+/**
+ * The day (Sofia) the final began to count NUMBER.finalTimes over: a day's questions, a link or a friend duel made
+ * before it keep it single. (Done with once no such set is open: a week on.)
+ */
+export const FINAL_TIMES_FROM = '2026-10-31';
 
 /** A recorded answer to each of a match's questions (null: none in time), in the match's own option order. */
 export type RecordScript = (RecordedAnswer | null)[];
@@ -254,6 +266,16 @@ export interface AnswerLogEntry {
   powerup: PowerupId | null;
   /** Right on "Втори шанс"'s second try (half the points). */
   retried: boolean;
+  /**
+   * Given after the usual clock (Соло's longer paces): time enough to look the answer up, so it says nothing about what
+   * the player knows (rewards.ts → measured).
+   */
+  slow: boolean;
+  /**
+   * Given after being knocked out („Играй до края“): it says what the player knows and pays XP, but scores nothing and
+   * stays out of the match's tallies (rewards.ts → knowledgeOf).
+   */
+  out: boolean;
 }
 
 interface BotMove {
@@ -296,6 +318,19 @@ export class Game {
   get pace(): SoloPace {
     return this.setup.mode === 'solo' ? (this.setup.pace ?? 'normal') : 'normal';
   }
+
+  /** At the match's last question, its final. „Поправителен“ has none: just the questions coming back. */
+  private get atFinal(): boolean {
+    return this.index === this.questions.length - 1 && this.questions.length > 1 && this.setup.mode !== 'review';
+  }
+
+  /** How many times over the open question's points count: a number final's NUMBER.finalTimes (finalTimes). */
+  private get times(): number {
+    return this.atFinal && this.questions[this.index]?.kind === 'number'
+      ? (this.setup.finalTimes ?? NUMBER.finalTimes)
+      : 1;
+  }
+
   /** A run played alone, paused before its next question until its player is back. */
   held = false;
   /** A run played alone whose player stopped on the fact (each stop gets a number, so an old timer can't end a new one). */
@@ -354,7 +389,7 @@ export class Game {
     // The questions after which someone goes out: the evening Роял's checkpoints, or one at a time spread to the end.
     this.schedule =
       setup.mode === 'evening'
-        ? [...EVENING.checkpoints, EVENING.finalTwoAfter]
+        ? [...EVENING.cuts.map((c) => c.after), EVENING.finalTwoAfter]
         : setup.elimination && !setup.teams
           ? eliminationSchedule(this.participants.size, setup.questions.length)
           : [];
@@ -381,7 +416,7 @@ export class Game {
   answer(playerId: string, index: number, choice: number) {
     this.guard(() => {
       const p = this.participants.get(playerId);
-      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      if (!p || !this.mayAnswer(p) || p.answer || this.phase === 'ended') return;
       // The client drew the pick as locked in: say why it wasn't taken, so it can unlock it and tell the player.
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
@@ -402,7 +437,7 @@ export class Game {
         return;
       }
       p.answer = { choice, timeMs: Math.min(elapsed, limit), retried: p.firstWrong !== null };
-      this.toGame('game:answered', { playerId });
+      this.answered(p);
       this.maybeRevealEarly();
     });
   }
@@ -411,7 +446,7 @@ export class Game {
   guess(playerId: string, index: number, value: number) {
     this.guard(() => {
       const p = this.participants.get(playerId);
-      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      if (!p || !this.mayAnswer(p) || p.answer || this.phase === 'ended') return;
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
@@ -426,7 +461,7 @@ export class Game {
         timeMs: Math.min(elapsed, this.limitMs),
         retried: false,
       };
-      this.toGame('game:answered', { playerId });
+      this.answered(p);
       this.maybeRevealEarly();
     });
   }
@@ -435,7 +470,7 @@ export class Game {
   arrange(playerId: string, index: number, order: unknown) {
     this.guard(() => {
       const p = this.participants.get(playerId);
-      if (!p || !this.isActive(p) || p.answer || this.phase === 'ended') return;
+      if (!p || !this.mayAnswer(p) || p.answer || this.phase === 'ended') return;
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
@@ -445,7 +480,7 @@ export class Game {
       const elapsed = this.elapsed();
       if (elapsed > this.limitMs + GRACE_MS) return reject('late');
       p.answer = { choice: -1, order: [...order], timeMs: Math.min(elapsed, this.limitMs), retried: false };
-      this.toGame('game:answered', { playerId });
+      this.answered(p);
       this.maybeRevealEarly();
     });
   }
@@ -875,7 +910,10 @@ export class Game {
     const order = q.kind === 'order' ? orderOf(q) : null;
     const results: Record<string, PlayerResult> = {};
     for (const p of this.participants.values()) {
-      if (!this.isActive(p)) continue;
+      if (!this.isActive(p)) {
+        if (this.playsOn(p) && p.answer) results[p.player.id] = this.answeredOn(p, q);
+        continue;
+      }
       // A "Втори шанс" miss with no second pick stands as the answer.
       if (!p.answer && p.firstWrong !== null) p.answer = { choice: p.firstWrong, timeMs: this.limitMs, retried: false };
       p.faced++;
@@ -884,16 +922,7 @@ export class Game {
       p.categories.set(q.category, cat);
       cat.answered++;
 
-      const guess = number ? (p.answer?.value ?? null) : null;
-      const close = number ? (guess === null ? 0 : closeness(guess, number)) : null;
-      const given = order ? (p.answer?.order ?? null) : null;
-      const placed = order ? placedRight(given, order) : null;
-      const correct =
-        q.kind === 'number'
-          ? (close ?? 0) >= NUMBER.rightFrom
-          : q.kind === 'order'
-            ? placed === ORDER.items
-            : p.answer?.choice === q.answer;
+      const { guess, close, given, placed, correct } = this.judge(p, q);
       let points = 0;
       // Tie-breaks compare total time, so a question left unanswered costs the whole clock.
       p.answerMs += Math.min(p.answer?.timeMs ?? this.scoreLimitMs, this.scoreLimitMs);
@@ -916,8 +945,8 @@ export class Game {
         p.streak = 0;
       }
       if (number) {
-        // Closer scores more, right or not; no speed bonus, no streak bonus.
-        points = guess === null ? 0 : numberPoints(guess, number);
+        // Closer scores more, right or not; no speed bonus, no streak bonus. As the final, twice that.
+        points = guess === null ? 0 : numberPoints(guess, number) * this.times;
       } else if (order) {
         // Each item in its place scores, right or not; all of them also the speed and streak bonus.
         points = p.answer
@@ -961,6 +990,8 @@ export class Game {
           points,
           powerup: p.powerupNow,
           retried: !!p.answer?.retried && correct,
+          slow: !!p.answer && p.answer.timeMs > this.scoreLimitMs,
+          out: false,
         });
       results[p.player.id] = {
         choice: isChoice(q) ? (p.answer?.choice ?? null) : null,
@@ -1015,7 +1046,70 @@ export class Game {
       crowd: this.crowdOf(q),
     });
     this.botReactions(results);
+    // Соло without a clock has no clock on its answers either: each one waits for „Продължи“ (a hold the player ends),
+    // up to the untimed question's own limit, rather than moving on after a few seconds.
+    if (this.pace === 'untimed' && this.alone && !this.hooks.draining()) {
+      const player = this.humans[0];
+      const seq = ++this.readingSeq;
+      this.reading = seq;
+      if (player) this.later(UNTIMED_MS, () => this.resume(player.player.id, seq));
+    }
     this.revealTimer = this.later(nextInMs, () => this.advance());
+  }
+
+  /** How a player's answer to the open question came out: the number or order given, how close, and whether it's right. */
+  private judge(p: Participant, q: PreparedQuestion) {
+    const number = q.kind === 'number' ? q.number : null;
+    const order = q.kind === 'order' ? orderOf(q) : null;
+    const guess = number ? (p.answer?.value ?? null) : null;
+    const close = number ? (guess === null ? 0 : closeness(guess, number)) : null;
+    const given = order ? (p.answer?.order ?? null) : null;
+    const placed = order ? placedRight(given, order) : null;
+    const correct =
+      q.kind === 'number'
+        ? (close ?? 0) >= NUMBER.rightFrom
+        : q.kind === 'order'
+          ? placed === ORDER.items
+          : p.answer?.choice === q.answer;
+    return { guess, close, given, placed, correct };
+  }
+
+  /**
+   * An answer from someone knocked out („Играй до края“): judged and logged like any (what they know, XP, the almanac),
+   * for no points, and outside the match's tallies and streaks.
+   */
+  private answeredOn(p: Participant, q: PreparedQuestion): PlayerResult {
+    const answer = p.answer!;
+    const { guess, close, given, placed, correct } = this.judge(p, q);
+    p.log.push({
+      questionId: q.id,
+      index: this.index,
+      category: q.category,
+      difficulty: q.difficulty,
+      choice: isChoice(q) ? bankOption(q, answer.choice) : null,
+      guess,
+      closeness: close,
+      arranged: q.kind === 'order' && given ? bankOrder(q, given) : null,
+      placed,
+      correct,
+      timeMs: Math.min(answer.timeMs, this.scoreLimitMs),
+      points: 0,
+      powerup: null,
+      retried: false,
+      slow: answer.timeMs > this.scoreLimitMs,
+      out: true,
+    });
+    return {
+      choice: isChoice(q) ? answer.choice : null,
+      correct,
+      points: 0,
+      timeMs: answer.timeMs,
+      streak: 0,
+      doubled: false,
+      retried: false,
+      ...(close !== null && { number: { guess, closeness: close } }),
+      ...(placed !== null && { order: { given, right: placed } }),
+    };
   }
 
   /** The next question's picture, to fetch while this one's answer is shown (unknown while its round isn't picked). */
@@ -1112,16 +1206,22 @@ export class Game {
 
   // ─── Teams ───────────────────────────────────────────────────────────────
 
-  /** Team totals, winner first. A team that walked out loses; ties go to more correct answers, then faster total time. */
+  /**
+   * Team totals (teamPoints: unequal sides by their average), winner first. A team that walked out loses; ties go to
+   * more correct answers, then faster total time (per member).
+   */
   teamScores(): { team: TeamId; score: number }[] {
+    const all = [...this.participants.values()].filter((p) => p.player.team !== null);
+    const points = teamPoints(all.map((p) => [p.player.team!, p.score] as const));
     const totals = ([0, 1] as TeamId[]).map((team) => {
-      const members = [...this.participants.values()].filter((p) => p.player.team === team);
+      const members = all.filter((p) => p.player.team === team);
+      const per = (n: number) => n / Math.max(1, members.length);
       return {
         team,
         gone: members.every((p) => p.left),
-        score: members.reduce((s, p) => s + p.score, 0),
-        correct: members.reduce((s, p) => s + p.correct, 0),
-        time: members.reduce((s, p) => s + p.answerMs, 0),
+        score: points[team],
+        correct: per(members.reduce((s, p) => s + p.correct, 0)),
+        time: per(members.reduce((s, p) => s + p.answerMs, 0)),
       };
     });
     totals.sort(
@@ -1146,7 +1246,7 @@ export class Game {
   // ─── Bots ────────────────────────────────────────────────────────────────
 
   /**
-   * How likely a bot is to know this question's answer: as likely as a person of its skill (expectedRight against the
+   * How likely a bot is to get this question right: as likely as a person of its skill (expectedRight against the
    * question's measured rating), better in its strong categories and worse in its weak ones.
    */
   private knowChance(brain: BotBrain, q: PreparedQuestion): number {
@@ -1169,7 +1269,10 @@ export class Game {
     const q = this.questions[this.index];
     if (Math.random() < 0.04) return null; // zoned out — lets the clock run down
     const chance = this.knowChance(brain, q);
-    const knows = Math.random() < chance;
+    // With options, a person who doesn't know still guesses: a quarter of those come out right. So a bot knows a bit
+    // less often than it's right (as often as such a person, in all) — and never less often than a random tap.
+    const guessed = isChoice(q) ? 1 / q.options.length : 0;
+    const knows = Math.random() < Math.max(0, (chance - guessed) / (1 - guessed));
     const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
     const afterMs = Math.max(900, fraction * this.limitMs);
     if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance), order: null };
@@ -1178,8 +1281,9 @@ export class Game {
       p.powerups.includes(id) &&
       !p.usedPowerups.has(id) &&
       !(q.difficulty === 'easy' && POWERUPS.find((d) => d.id === id)?.notOnEasy);
+    // 50/50 kept for a question past the easy ones, as a person would.
     const joker =
-      !knows && playable('fifty') && q.options.length === 4 && Math.random() < 0.35
+      !knows && playable('fifty') && q.difficulty !== 'easy' && q.options.length === 4 && Math.random() < 0.35
         ? 'fifty'
         : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
           ? 'double'
@@ -1215,14 +1319,14 @@ export class Game {
     return order;
   }
 
-  /** A bot's pick: the answer if it knows it; else a wrong one — or, once 50/50 has left two, a coin toss. */
+  /** A bot's pick: the answer if it knows it; else a guess among the options left (two, after 50/50). */
   private botChoice(p: Participant, knows: boolean): number {
     const q = this.questions[this.index];
     if (!isChoice(q)) return -1;
     if (knows) return q.answer;
     const wrong = q.options.map((_, i) => i).filter((i) => i !== q.answer && !p.removed.includes(i));
-    if (p.removed.length) return Math.random() < 0.5 ? q.answer : wrong[0];
-    return wrong[Math.floor(Math.random() * wrong.length)];
+    const left = [q.answer, ...wrong];
+    return left[Math.floor(Math.random() * left.length)];
   }
 
   /** A bot's answer as it made up its mind (botMove), with the time it took. */
@@ -1337,6 +1441,24 @@ export class Game {
     return p.eliminatedAt === null && !p.left;
   }
 
+  /**
+   * Knocked out and still here („Играй до края“): a person answers on, outside the race — for XP, the almanac and what
+   * they know, not for points or a place.
+   */
+  playsOn(p: Participant) {
+    return p.eliminatedAt !== null && !p.left && p.player.userId !== null && !p.script;
+  }
+
+  private mayAnswer(p: Participant) {
+    return this.isActive(p) || this.playsOn(p);
+  }
+
+  /** Who has answered: to everyone — or, from someone knocked out, to that player alone (no part of the race). */
+  private answered(p: Participant) {
+    if (this.isActive(p)) this.toGame('game:answered', { playerId: p.player.id });
+    else this.emit.toUser(p.player.userId!, 'game:answered', { playerId: p.player.id });
+  }
+
   /** Walked out while still in the game (leaving after being knocked out isn't a forfeit). */
   forfeited(p: Participant) {
     return p.left && p.eliminatedAt === null;
@@ -1428,15 +1550,16 @@ export class Game {
           : null,
       order: q.kind === 'order' ? { items: q.items.map((i) => i.text), direction: q.direction } : null,
       image: questionImage(q),
-      // „Поправителен“ has no final: just the questions coming back.
-      final: this.index === this.questions.length - 1 && this.questions.length > 1 && this.setup.mode !== 'review',
+      final: this.atFinal,
+      times: this.times,
       author: questionAuthor(q.id),
       durationMs: this.limitMs,
       remainingMs: Math.max(0, this.limitMs - this.elapsed()),
       speedMs: this.pace === 'untimed' ? null : this.scoreLimitMs,
       readMs: this.readMs,
       elimination: this.schedule.includes(this.index + 1),
-      answered: [...this.participants.values()].filter((p) => p.answer).map((p) => p.player.id),
+      // The race's: one knocked out who answers on isn't in it.
+      answered: [...this.participants.values()].filter((p) => p.answer && this.isActive(p)).map((p) => p.player.id),
     };
   }
 

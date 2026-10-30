@@ -1,6 +1,7 @@
 import {
   type CategoryMastery,
   DAILY_XP,
+  type Difficulty,
   dayKey,
   type FinalStanding,
   isQueueMode,
@@ -33,7 +34,7 @@ import { tallyMatchPlayer } from '../tallies';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
-import type { Game, Participant } from './Game';
+import type { AnswerLogEntry, Game, Participant } from './Game';
 
 const XP = {
   played: 20,
@@ -144,18 +145,21 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       );
     }
 
+    const people = [...game.participants.values()].filter((p) => !p.player.isBot && !p.player.record).length;
     for (const s of standings) {
       const p = game.participants.get(s.id)!;
       if (p.player.userId === null) continue;
       // The evening Роял: each person's place, for the night's top, the champion and the wins that earn a frame (before
       // the achievements below count them).
       if (setup.eveningDay && !game.forfeited(p))
-        recordEvening(setup.eveningDay, p.player.userId, s.placement, s.score, playerCount);
+        recordEvening(setup.eveningDay, p.player.userId, s.placement, s.score, playerCount, people);
       const r = rewardHuman(game, p, s, standings, deltas.get(s.id) ?? null, ratings.unrated.get(s.id) ?? null);
       // „Поправителен“ replays questions whose answers the player was shown: it says nothing about the questions, or
       // about how anyone plays (a run of known answers isn't one to replay against, nor play to check).
-      if (setup.mode !== 'review' && !setup.questionSet) {
-        recordAnswers(game.id, p.player.userId, p.log);
+      // Nor does a Соло without a clock (every answer could be looked up), or one's answers past the usual clock.
+      const untimed = setup.mode === 'solo' && game.pace === 'untimed';
+      if (setup.mode !== 'review' && !setup.questionSet && !untimed) {
+        recordAnswers(game.id, p.player.userId, knowledgeOf(p).log);
         recordRun({
           matchId: game.id,
           userId: p.player.userId,
@@ -211,8 +215,14 @@ function rewardHuman(
   // A host's own set: questions nobody checked, which the host knows — played for the fun of it. It pays a room's
   // placements, but measures nothing, and its right answers pay nothing (a set of easy ones would be an XP farm).
   const ownSet = !!setup.questionSet;
+  // Соло without a clock: time to look every answer up. Its right answers pay half, and it measures nothing.
+  const untimed = solo && game.pace === 'untimed';
   // Either way, nothing here says what anyone knows.
-  const practice = review || ownSet;
+  const practice = review || ownSet || untimed;
+  // What it does say (without Соло's answers past the usual clock); and the race alone, for its feats (without the
+  // answers given after a knockout).
+  const k = knowledgeOf(p);
+  const race = knowledgeOf(p, false);
   const daily = setup.dailyDay !== null;
   const challenge = setup.challengeId !== null;
   // In ranked queues bots only fill seats nobody else took; in a private room the host picks them, so beating bots
@@ -241,7 +251,17 @@ function rewardHuman(
     p.correctByDifficulty.easy * XP.perCorrect.easy +
     p.correctByDifficulty.medium * XP.perCorrect.medium +
     p.correctByDifficulty.hard * XP.perCorrect.hard;
-  if (correctXp > 0 && !ownSet) lines.push({ label: `Верни отговори (${p.correct})`, amount: correctXp });
+  if (correctXp > 0 && !ownSet)
+    lines.push(
+      untimed
+        ? { label: `Верни отговори без часовник (${p.correct})`, amount: Math.round(correctXp / 2) }
+        : { label: `Верни отговори (${p.correct})`, amount: correctXp },
+    );
+  // Knocked out and answering on („Играй до края“): those right pay as in the race (none of them a look-up).
+  const playedOn = p.log.filter((e) => e.out && e.correct && !e.slow);
+  const playedOnXp = playedOn.reduce((sum, e) => sum + XP.perCorrect[e.difficulty], 0);
+  if (playedOnXp > 0 && !ownSet)
+    lines.push({ label: `Верни след отпадането (${playedOn.length})`, amount: playedOnXp });
   // A win by walkout pays for the part of the match that was played.
   const share = game.playedShare;
   const placementLine = (label: string, earned: number) => {
@@ -266,7 +286,7 @@ function rewardHuman(
     if (amount > 0) lines.push({ label: 'Бонус за резултат', amount });
   }
   const full = game.questions.length;
-  if (counts && !practice && full >= XP.perfectFrom && p.faced === full && p.correct === full) {
+  if (counts && !practice && full >= XP.perfectFrom && race.faced === full && race.correct === full) {
     lines.push({ label: 'Перфектен мач', amount: XP.perfect });
   }
   const today = dayKey();
@@ -298,19 +318,32 @@ function rewardHuman(
   if (duelWon && counts && payDuelWin(userId, challengeResult!.duel!.friend.id))
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
+  // „Моят алманах“ and „Поправителен“ (before the quests: one counts the facts added). A host's own questions aren't the
+  // bank's: nothing of them goes into the almanac or comes back to review.
+  const factsAdded = ownSet ? 0 : noteMatch(userId, p.log, review);
+
   // ── Daily quests ──
-  if (counts && !practice) {
+  // Practice counts for none of them — except „Поправителен“ for its own quest: playing it is the point.
+  if (counts && (!practice || review)) {
+    const measured = !practice;
+    const finals = k.log.filter((e) => e.closeness !== null).map((e) => e.closeness!);
     lines.push(
       ...advanceQuests(userId, {
         mode: setup.mode,
         // A friend duel is a match against a person, played at different times: it counts as one, and its win as a win.
         multiplayer: multiplayer || !!challengeResult?.duel,
         won: realWin || duelWon,
-        correct: p.correct,
-        hardCorrect: p.correctByDifficulty.hard,
-        bestStreak: p.bestStreak,
+        correct: measured ? k.correct : 0,
+        hardCorrect: measured ? k.correctByDifficulty.hard : 0,
+        bestStreak: measured ? race.bestStreak : 0,
         jokers: p.usedPowerups.size,
-        correctByCategory: new Map([...p.categories].map(([category, c]) => [category, c.correct])),
+        correctByCategory: measured
+          ? new Map([...k.categories].map(([category, c]) => [category, c.correct]))
+          : new Map(),
+        facts: measured ? factsAdded : 0,
+        ordersRight: measured ? k.log.filter((e) => e.placed !== null && e.correct).length : 0,
+        finalCloseness: measured && finals.length && !review ? Math.max(...finals) : null,
+        friendDuel: !!challengeResult?.duel,
       }),
     );
   }
@@ -319,7 +352,7 @@ function rewardHuman(
   const counted = counts ? 1 : 0;
   // What a review run knew it knew from being told: its answers stay out of the player's accuracy and records.
   const known = practice ? 0 : 1;
-  const fastest = p.fastestCorrectMs === null || practice ? null : p.fastestCorrectMs;
+  const fastest = k.fastestCorrectMs === null || practice ? null : k.fastestCorrectMs;
   // Added to what the row holds as it's written, not to `before`: a match never overwrites what another write put there
   // meanwhile (the command line, or a step above that touches the row).
   run(
@@ -333,12 +366,12 @@ function rewardHuman(
     counted,
     multiplayer ? counted : 0,
     realWin ? 1 : 0,
-    p.faced * known,
-    p.correct * known,
-    p.bestStreak * known,
+    k.faced * known,
+    k.correct * known,
+    race.bestStreak * known,
     fastest,
     fastest,
-    p.correctMs * known,
+    k.correctMs * known,
     p.usedPowerups.size,
     solo && counts ? s.score : 0,
     setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0,
@@ -346,7 +379,7 @@ function rewardHuman(
     lines.reduce((sum, l) => sum + l.amount, 0),
     userId,
   );
-  for (const [category, c] of practice ? [] : p.categories) {
+  for (const [category, c] of practice ? [] : k.categories) {
     run(
       `INSERT INTO category_stats (user_id, category, answered, correct, correct_ms) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (user_id, category) DO UPDATE SET answered = answered + excluded.answered,
@@ -367,14 +400,12 @@ function rewardHuman(
     rating = { before: Math.round(old), after: Math.round(old + ratingDelta) };
   }
 
-  // ── What the match taught: skill and mastery, „Моят алманах“, „Поправителен“ ──
+  // ── What the match taught: skill and mastery ──
   let mastery: CategoryMastery[] = [];
   if (!practice) {
-    recordSkill(userId, p.log);
-    mastery = settleMastery(userId, p.categories.keys());
+    recordSkill(userId, k.log);
+    mastery = settleMastery(userId, k.categories.keys());
   }
-  // A host's own questions aren't the bank's: nothing of them goes into the almanac or comes back to review.
-  if (!ownSet) noteMatch(userId, p.log, review);
 
   // ── Achievements ──
   const topScore = Math.max(...standings.map((x) => x.score));
@@ -390,8 +421,8 @@ function rewardHuman(
     elimination: setup.elimination,
     fastestHardCorrectMs: p.fastestHardCorrectMs,
     questions: game.questions.length,
-    faced: p.faced,
-    correct: p.correct,
+    faced: race.faced,
+    correct: race.correct,
     lastAtHalfway: p.lastAtHalfway,
     winMargin: won && runnerUp ? s.score - runnerUp.score : null,
     beatLevelGap: Math.max(
@@ -427,6 +458,78 @@ function rewardHuman(
     almanac: { added: factsSince(userId, game.startedAt), total: factCount(userId) },
     mastery,
   };
+}
+
+/** What a match says about what a player knows (see knowledgeOf). */
+interface Knowledge {
+  log: AnswerLogEntry[];
+  faced: number;
+  correct: number;
+  correctByDifficulty: Record<Difficulty, number>;
+  categories: Participant['categories'];
+  bestStreak: number;
+  correctMs: number;
+  fastestCorrectMs: number | null;
+}
+
+/**
+ * What a match says about what a player knows: all of it, as the match counted it, and the answers given after being
+ * knocked out („Играй до края“) too (`playedOn` false: the race alone, for the match's feats) — except Соло's answers
+ * given past the usual clock (at 30 s, the second 15 s are time to look an answer up: right or wrong, it says nothing),
+ * which are left out of skill, mastery, accuracy, records, quests and feats, and break a streak. They still score and
+ * pay.
+ */
+function knowledgeOf(p: Participant, playedOn = true): Knowledge {
+  const leftOut = (e: AnswerLogEntry) => e.slow || (e.out && !playedOn);
+  // The match's own counters are the race's: they do, as long as none of the race's answers is left out and none after.
+  if (!p.log.some((e) => e.slow || (e.out && playedOn)))
+    return {
+      log: playedOn ? p.log : p.log.filter((e) => !e.out),
+      faced: p.faced,
+      correct: p.correct,
+      correctByDifficulty: p.correctByDifficulty,
+      categories: p.categories,
+      bestStreak: p.bestStreak,
+      correctMs: p.correctMs,
+      fastestCorrectMs: p.fastestCorrectMs,
+    };
+  const k: Knowledge = {
+    log: p.log.filter((e) => !leftOut(e)),
+    faced: 0,
+    correct: 0,
+    correctByDifficulty: { easy: 0, medium: 0, hard: 0 },
+    categories: new Map(),
+    bestStreak: 0,
+    correctMs: 0,
+    fastestCorrectMs: null,
+  };
+  let streak = 0;
+  for (const e of p.log) {
+    if (leftOut(e)) {
+      streak = 0;
+      continue;
+    }
+    k.faced++;
+    const cat = k.categories.get(e.category) ?? { answered: 0, correct: 0, correctMs: 0 };
+    k.categories.set(e.category, cat);
+    cat.answered++;
+    if (!e.correct || e.timeMs === null) {
+      streak = 0;
+      continue;
+    }
+    k.correct++;
+    k.correctByDifficulty[e.difficulty]++;
+    cat.correct++;
+    streak++;
+    k.bestStreak = Math.max(k.bestStreak, streak);
+    // As the match counts them: a number's or an order's time stays out of the fastest and average right answers.
+    if (e.closeness === null && e.placed === null) {
+      k.correctMs += e.timeMs;
+      cat.correctMs += e.timeMs;
+      k.fastestCorrectMs = Math.min(k.fastestCorrectMs ?? e.timeMs, e.timeMs);
+    }
+  }
+  return k;
 }
 
 /**

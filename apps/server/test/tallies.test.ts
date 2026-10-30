@@ -158,6 +158,8 @@ function answer(questionId: string, difficulty: Difficulty, correct: boolean): A
     points: correct ? 900 : 0,
     powerup: null,
     retried: false,
+    slow: false,
+    out: false,
   };
 }
 

@@ -14,8 +14,11 @@ export const MASTERY_TIERS = [
 export type MasteryTierId = (typeof MASTERY_TIERS)[number]['id'];
 
 export const MASTERY = {
-  /** Answers in a category before a player is ranked in it (and counted among those ranked). */
-  minAnswers: 30,
+  /**
+   * Answers in a category before a player is ranked in it (and counted among those ranked). A tier is kept for good, so
+   * not from a first lucky streak: skill moves fast over the first answers.
+   */
+  minAnswers: 60,
   /**
    * Players ranked in a category before its tiers go by share (`top`: the best half, fifth, twentieth); until then a
    * fixed skill (`fixed`) decides, since a share of a handful of players means little.

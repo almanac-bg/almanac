@@ -27,6 +27,7 @@ import {
   snapNumber,
   sofiaMidnight,
   sofiaTimeOn,
+  teamPoints,
   xpToReach,
 } from '@quiz/shared';
 import { writeFixtureQuestions } from './helpers';
@@ -160,18 +161,20 @@ test('unlock requirements', () => {
   );
 });
 
-test('the evening Роял: the bottom 30% go out at its checkpoints, and all but two after the 13th', () => {
+test('the evening Роял: the bottom 20% go out after the 4th, 30% at the later cuts, all but two after the 13th', () => {
   const left: number[] = [];
   let active = 50;
   for (let n = 1; n <= 13; n++) {
-    active -= knockoutsAfter('evening', [], n, active);
-    if ([3, 6, 9, 12, 13].includes(n)) left.push(active);
+    const out = knockoutsAfter('evening', [], n, active);
+    if (n < 4) assert.equal(out, 0, 'nobody out in the first three');
+    active -= out;
+    if ([4, 7, 10, 12, 13].includes(n)) left.push(active);
   }
-  assert.deepEqual(left, [35, 24, 17, 12, 2]);
-  // A small evening (the bots make it 8) still ends on two, one at a time where 30% is less than one.
+  assert.deepEqual(left, [40, 28, 20, 14, 2]);
+  // A small evening (the bots make it 8) still ends on two, one at a time where a share is less than one.
   const small: number[] = [];
   active = 8;
-  for (const n of [3, 6, 9, 12, 13]) {
+  for (const n of [4, 7, 10, 12, 13]) {
     active -= knockoutsAfter('evening', [], n, active);
     small.push(active);
   }
@@ -179,6 +182,30 @@ test('the evening Роял: the bottom 30% go out at its checkpoints, and all bu
   assert.equal(knockoutsAfter('royale', [4, 6], 4, 8), 1);
   assert.equal(knockoutsAfter('royale', [4, 6], 5, 8), 0);
   assert.equal(knockoutsAfter('royale', [4, 6], 6, 2), 0, 'never below two');
+});
+
+test('teams of equal size add their points up; unequal ones count the smaller side as if it were as large', () => {
+  assert.deepEqual(
+    teamPoints([
+      [0, 1000],
+      [0, 500],
+      [1, 800],
+      [1, 800],
+    ]),
+    [1500, 1600],
+  );
+  // Three against two: 3 × 900 = 2700 against 2 × 1200 = 2400 summed, but 1200 a head beats 900.
+  assert.deepEqual(
+    teamPoints([
+      [0, 900],
+      [0, 900],
+      [0, 900],
+      [1, 1200],
+      [1, 1200],
+    ]),
+    [2700, 3600],
+  );
+  assert.deepEqual(teamPoints([[1, 700]]), [0, 700], 'an empty side scores nothing');
 });
 
 test('21:00 in Sofia is the same wall-clock time across the clock changes', () => {

@@ -106,12 +106,28 @@ function toFact(q: PlayableQuestion, at: number): AlmanacFact {
 }
 
 /**
- * A missed question (back to the first step, if it was coming back already) returns REVIEW.afterDays[0] days later.
- * In „Поправителен“ (`review`), one got right moves on to the next step, or is done after the last.
+ * How an answer counts for „Поправителен“: right; a near miss (a number at least half-way close, an order with two
+ * items or more in place), which says the player nearly knew it; or a miss.
  */
-function reschedule(userId: number, questionId: string, right: boolean, review: boolean, at: number) {
+function outcome(a: AnswerLogEntry): 'right' | 'near' | 'missed' {
+  if (a.correct) return 'right';
+  if (a.closeness !== null) return a.closeness >= REVIEW.nearCloseness ? 'near' : 'missed';
+  if (a.placed !== null) return a.placed >= REVIEW.nearPlaced ? 'near' : 'missed';
+  return 'missed';
+}
+
+/**
+ * A missed question (back to the first step, if it was coming back already) returns REVIEW.afterDays[0] days later,
+ * if there's room for it (REVIEW.keep). In „Поправителен“ (`review`), one got right moves on to the next step, or is
+ * done after the last; a near miss comes back after the same step again.
+ */
+function reschedule(userId: number, a: AnswerLogEntry, review: boolean, at: number) {
+  const result = outcome(a);
+  const questionId = a.questionId;
   if (!review) {
-    if (right) return;
+    if (result !== 'missed') return;
+    const known = one('SELECT 1 AS x FROM review_queue WHERE user_id = ? AND question_id = ?', userId, questionId);
+    if (!known && !makeRoom(userId, questionId, at)) return;
     run(
       `INSERT INTO review_queue (user_id, question_id, step, due_at) VALUES (?, ?, 0, ?)
        ON CONFLICT (user_id, question_id) DO UPDATE SET step = 0, due_at = excluded.due_at`,
@@ -126,7 +142,8 @@ function reschedule(userId: number, questionId: string, right: boolean, review: 
     userId,
     questionId,
   );
-  const step = right ? (entry?.step ?? 0) + 1 : 0;
+  const was = entry?.step ?? 0;
+  const step = result === 'right' ? was + 1 : result === 'near' ? was : 0;
   if (step >= REVIEW.afterDays.length) {
     run('DELETE FROM review_queue WHERE user_id = ? AND question_id = ?', userId, questionId);
     return;
@@ -142,11 +159,36 @@ function reschedule(userId: number, questionId: string, right: boolean, review: 
 }
 
 /**
+ * Room in a full queue for a new miss: it takes the place of the weakest one there — a question without a fact before
+ * one with (a fact is what the second try teaches), and of those the one left waiting longest — when it's stronger: it
+ * has a fact and that one doesn't, or that one is overdue already (the player didn't come back for it, and a fresh
+ * miss is the better moment). Otherwise the new miss stays out: it'll come up again. False when there's no room.
+ */
+function makeRoom(userId: number, questionId: string, at: number): boolean {
+  const queued = all<{ question_id: string; due_at: number }>(
+    'SELECT question_id, due_at FROM review_queue WHERE user_id = ?',
+    userId,
+  );
+  if (queued.length < REVIEW.keep) return true;
+  const withFact = (id: string) => !!inPlay(id)?.fact;
+  // Gone from play: weakest of all (reviewQuestions would drop it anyway).
+  const ranked = queued
+    .map((e) => ({ ...e, fact: inPlay(e.question_id) ? (withFact(e.question_id) ? 2 : 1) : 0 }))
+    .sort((x, y) => x.fact - y.fact || x.due_at - y.due_at);
+  const newFact = withFact(questionId) ? 2 : 1;
+  // A queue over the limit (from before there was one) gives up as many as it takes.
+  const out = ranked.slice(0, queued.length - REVIEW.keep + 1);
+  if (out.some((e) => !(e.fact < newFact || (e.fact === newFact && e.due_at <= at)))) return false;
+  for (const e of out) run('DELETE FROM review_queue WHERE user_id = ? AND question_id = ?', userId, e.question_id);
+  return true;
+}
+
+/**
  * After a match: what the player got right is theirs, what they missed comes back in „Поправителен“ (a review run
  * moves its questions along). Returns how many facts the match added. Call inside the match's transaction.
  */
 export function noteMatch(userId: number, log: AnswerLogEntry[], review: boolean, at = Date.now()): number {
-  for (const a of log) reschedule(userId, a.questionId, a.correct, review, at);
+  for (const a of log) reschedule(userId, a, review, at);
   return learn(
     userId,
     log.filter((a) => a.correct).map((a) => a.questionId),

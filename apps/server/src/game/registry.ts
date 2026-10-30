@@ -110,6 +110,8 @@ export interface NewGame {
   eveningDay?: string | null;
   /** Соло's clock. */
   pace?: GameSetup['pace'];
+  /** A number final's weight, for a set made before it counted double. */
+  finalTimes?: number;
   humans: HumanEntry[];
   bots: Bot[];
 }
@@ -280,6 +282,7 @@ export class GameRegistry {
         questionSet: opts.questionSet ?? null,
         eveningDay: opts.eveningDay ?? null,
         pace: opts.pace ?? 'normal',
+        finalTimes: opts.finalTimes,
       },
       emitter,
       {

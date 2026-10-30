@@ -6,6 +6,7 @@ import {
   EMOTES,
   FRAMES,
   type Loadout,
+  MASTERY,
   MASTERY_TIERS,
   masteryTitleId,
   meetsRequirement,
@@ -347,7 +348,7 @@ function LockedInfo({
       {open && 'achievement' in req && <AchievementSteps id={req.achievement} />}
       {open && 'mastery' in req && (
         <p className="mt-4 text-sm text-fg-2">
-          Степента се мери спрямо останалите играчи, след поне 30 отговора в категорията.
+          Степента се мери спрямо останалите играчи, след поне {MASTERY.minAnswers} отговора в категорията.
         </p>
       )}
     </Modal>

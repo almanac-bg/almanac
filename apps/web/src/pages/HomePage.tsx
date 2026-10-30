@@ -20,7 +20,7 @@ import { Emoji } from '../components/Emoji';
 import { ChallengeCard } from '../components/home/ChallengeCard';
 import { CommunityCard } from '../components/home/CommunityCard';
 import { DailyCard } from '../components/home/DailyCard';
-import { DuoPicker } from '../components/home/DuoPicker';
+import { DuoPicker, useDuoNeed } from '../components/home/DuoPicker';
 import { EmailNudge } from '../components/home/EmailNudge';
 import { EveningCard } from '../components/home/EveningCard';
 import { FriendsCard } from '../components/home/FriendsCard';
@@ -67,6 +67,8 @@ export function HomePage() {
   const community = level >= SUBMISSION_RULES.minLevel || me.isAdmin;
   // Only the ranked queues the server has open (a closed one would only refuse the player).
   const ranked = useOpenQueues();
+  // Отбори is two friends: its card says so before the tap, and how many of them could play now.
+  const duoNeed = useDuoNeed(ranked.some((id) => MODES[id].teams));
 
   async function queue(mode: QueueModeId) {
     if (MODES[mode].teams) return setDuoOpen(true);
@@ -135,6 +137,7 @@ export function HomePage() {
                 searching={lobby?.queues[id] ?? 0}
                 rating={me.ratings[id] ?? START_RATING}
                 starter={newcomer && id === 'duel'}
+                need={MODES[id].teams ? duoNeed : undefined}
                 onRankInfo={() => setRankInfo({ mode: id, open: true })}
                 onPlay={() => queue(id)}
               />
@@ -187,7 +190,7 @@ function queueSpan(i: number, n: number) {
   );
 }
 
-/** „Поправителен“ ready: the missed questions that came back, a tap from playing them. */
+/** „Поправителен“ ready: a run of the missed questions that came back (how many it plays, not the pile), a tap away. */
 function ReviewTurn() {
   const due = useStore((s) => s.me?.almanac.due ?? 0);
   const { busy, start } = useStartReview();
@@ -203,7 +206,9 @@ function ReviewTurn() {
       </span>
       <p className="min-w-0 flex-1 text-sm">
         <b>Поправителен:</b>{' '}
-        <span className="text-fg-2">{plural(due, 'сгрешен въпрос се върна', 'сгрешени въпроса се върнаха')}</span>
+        <span className="text-fg-2">
+          {plural(Math.min(due, REVIEW.size), 'въпрос за нов опит', 'въпроса за нов опит')}
+        </span>
       </p>
       <Button size="sm" onClick={() => void start()} loading={busy}>
         Играй

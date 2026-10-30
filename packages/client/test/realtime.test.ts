@@ -133,6 +133,7 @@ const question = (index: number, over: Partial<QuestionPayload> = {}): QuestionP
   order: null,
   image: null,
   final: false,
+  times: 1,
   author: null,
   durationMs: 15_000,
   remainingMs: 15_000,

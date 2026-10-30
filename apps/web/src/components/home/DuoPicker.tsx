@@ -10,9 +10,30 @@ import { PlayerName } from '../FitName';
 import { PRESENCE } from '../presence';
 import { Button, Modal, Spinner } from '../ui';
 
+/** A friend who could say yes now: online, in a room or in a queue (not mid-match or away). */
+const available = (f: FriendEntry) => f.presence === 'online' || f.presence === 'room' || f.presence === 'queue';
+
+/**
+ * What Отбори needs, for its card on the home page — said before the tap rather than after it: a profile, a friend,
+ * and one of them online now. `ready`: someone could play now.
+ */
+export function useDuoNeed(open: boolean): { text: string; ready: boolean } {
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const version = useStore((s) => s.friendsVersion);
+  const asks = open && !guest;
+  const { data } = useLoad(() => (asks ? api.friends() : Promise.resolve(null)), String(asks), version);
+  if (guest) return { text: 'Нужни са профил и приятел', ready: false };
+  if (!data) return { text: 'Играе се с приятел', ready: true };
+  if (!data.friends.length) return { text: 'Нужен е приятел', ready: false };
+  const online = data.friends.filter(available).length;
+  return online
+    ? { text: `С приятел · ${online} онлайн`, ready: true }
+    : { text: 'С приятел · никой не е онлайн', ready: false };
+}
+
 /**
  * Отбори is played by two friends together: pick who to ask. Once they say yes, the two of you wait in the queue as a
- * pair (against another pair, or two bots).
+ * pair (against another pair of people or bots).
  */
 export function DuoPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
   const guest = useStore((s) => !!s.me?.isGuest);
@@ -35,7 +56,7 @@ export function DuoPicker({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Modal open={open} onClose={onClose} title="Отбори: с кого играеш?">
       <p className="text-sm text-fg-2">
-        Двама приятели в един отбор срещу друга двойка (или два бота). Покани някого — щом приеме, търсим съперници.
+        Двама приятели в един отбор срещу друга двойка (хора или ботове). Покани някого — щом приеме, търсим съперници.
       </p>
       {guest ? (
         <GuestNudge className="mt-4">
@@ -56,7 +77,7 @@ export function DuoPicker({ open, onClose }: { open: boolean; onClose: () => voi
       ) : (
         <ul className="-mx-2 mt-4 max-h-[50vh] divide-y divide-line overflow-y-auto px-2">
           {friends.map((f) => {
-            const free = f.presence === 'online' || f.presence === 'room' || f.presence === 'queue';
+            const free = available(f);
             const sent = asked.has(f.user.id);
             return (
               <li key={f.user.id} className="flex items-center gap-3 py-2.5">

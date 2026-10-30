@@ -127,6 +127,9 @@ export function createDuel(
 }
 
 /** The link's questions in this player's own option order. */
+/** When a link or a friend duel was made (null: there's no such). */
+export const challengeMadeAt = (id: string) => getChallenge(id)?.created_at ?? null;
+
 export function challengeQuestions(id: string, userId: number): PreparedQuestion[] {
   return reorderOptions(JSON.parse(getChallenge(id)!.questions), `challenge:${id}:${userId}`);
 }

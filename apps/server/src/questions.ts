@@ -594,9 +594,9 @@ function placeFormats(
 }
 
 /**
- * A match's final: a number question, unseen first, then the one seen longest ago. In a match of one category only one
- * not seen for REPEAT_MS; null when there's none (the match then ends on a question with options). `not`: categories
- * the match plays otherwise.
+ * A match's final: a number question, unseen first, then the one seen longest ago — but only one not seen for
+ * REPEAT_MS. Its reveal shows the exact number, so a regular would remember it: null when there's none (the match then
+ * ends on a question with options). `not`: categories the match plays otherwise.
  */
 export function pickFinal(
   category: CategoryChoice,
@@ -609,7 +609,8 @@ export function pickFinal(
   );
   const [first] = leastSeenFirst(pool, seen, rng);
   if (!first) return null;
-  if (category !== 'mixed' && (seen.get(first.id) ?? 0) > (opts.now ?? Date.now()) - REPEAT_MS) return null;
+  const at = seen.get(first.id);
+  if (at !== undefined && at > (opts.now ?? Date.now()) - REPEAT_MS) return null;
   return first;
 }
 
@@ -625,7 +626,7 @@ export function pickMatch(
   opts: { final: boolean; formats?: Formats; pictures?: boolean; rng?: Rng; now?: number },
 ): PreparedQuestion[] {
   const rng = opts.rng ?? Math.random;
-  const final = opts.final ? pickFinal(category, seen, rng) : null;
+  const final = opts.final ? pickFinal(category, seen, rng, { now: opts.now }) : null;
   const body = count - (final ? 1 : 0);
   let questions: PreparedQuestion[];
   if (opts.pictures) {
@@ -707,7 +708,7 @@ export function pickRounds(
   }: { final?: boolean; formats?: Formats; now?: number } = {},
 ): { questions: PreparedQuestion[]; rounds: RoundPlan[] } | null {
   const used = new Set<string>();
-  const final = numberFinal ? pickFinal('mixed', seen, rng) : null;
+  const final = numberFinal ? pickFinal('mixed', seen, rng, { now }) : null;
   const categories = shuffle(
     CATEGORY_IDS.filter((c) => c !== final?.category),
     rng,
@@ -780,7 +781,7 @@ export function pickDuelSet(
     }
     questions.push(...round);
   }
-  let closing: PreparedQuestion | null = pickFinal('mixed', seen, rng, { not: played });
+  let closing: PreparedQuestion | null = pickFinal('mixed', seen, rng, { not: played, now });
   while (!closing && drawn.length) closing = drawFrom(drawn.shift()!, ['hard'], seen, used, rng)?.[0] ?? null;
   return closing ? [...questions, closing] : null;
 }

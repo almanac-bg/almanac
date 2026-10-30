@@ -13,6 +13,7 @@ import {
   achievementById,
   type CategoryMastery,
   categoryById,
+  DAILY_FIELD,
   type DailySharer,
   dayKey,
   levelFromXp,
@@ -31,7 +32,7 @@ import { ArrowUp, Check, Share2 } from 'lucide-react';
 import { animate, m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { dailyLinkUrl, offBoardWhy } from '../../lib/daily';
+import { dailyLinkUrl, offBoardWhy, placeShown } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
@@ -79,15 +80,28 @@ export function DailyCard({
     if (text) rememberDailyShare(text, day);
   }, [text, day]);
   const madeToday = !!me && dayKey(me.createdAt) === day;
+  const runs = daily.offBoard ? daily.total + 1 : daily.total;
 
   return (
     <Card className="relative overflow-hidden p-6">
       <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-amber-400/25" />
-      <h2 className="relative t-card">{daily.offBoard ? 'Щеше да си днес' : 'Твоето място днес'}</h2>
-      <div className="relative mt-3 flex items-baseline gap-2">
-        <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
-        <span className="text-fg-2">от {fmt(daily.offBoard ? daily.total + 1 : daily.total)} днес</span>
-      </div>
+      {placeShown(runs) ? (
+        <>
+          <h2 className="relative t-card">{daily.offBoard ? 'Щеше да си днес' : 'Твоето място днес'}</h2>
+          <div className="relative mt-3 flex items-baseline gap-2">
+            <span className="font-display text-5xl font-black text-amber-300">#{daily.rank}</span>
+            <span className="text-fg-2">от {fmt(runs)} днес</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <h2 className="relative t-card">Днешното класиране</h2>
+          <p className="relative mt-2 text-fg-2 text-pretty">
+            Засега са го изиграли {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом станат поне{' '}
+            {DAILY_FIELD.placeFrom}.
+          </p>
+        </>
+      )}
       {daily.offBoard && (
         <p className="relative mt-2 text-sm text-fg-2">{offBoardWhy({ guest: !!me?.isGuest, madeToday })}</p>
       )}
@@ -178,7 +192,7 @@ function AgainstSharer({
 /** Lines shown before "още": the biggest ones; the rest is a tap away. */
 const SHOWN_LINES = 3;
 
-/** XP and the level bar. `quiet`: a lost match — a level gained along the way gets its line, not confetti. */
+/** XP and the level bar. `quiet`: a lost match (or one mostly missed) — a level gained gets its line, not confetti. */
 /** `celebrated`: the level-up had its own moment already (RewardMoment) — the bar fills without another fanfare. */
 export function RewardsCard({
   rewards,

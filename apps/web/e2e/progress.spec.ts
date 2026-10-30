@@ -13,15 +13,15 @@ test('„Моят алманах“ keeps the facts a run taught, and the missed
 
   await page.goto('/almanac');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(new RegExp(`^${right} от \\d+ факта$`));
+  // Every miss waits, except a final's number guessed half-way close or nearer (nearly known).
   const missed = 10 - right;
-  if (missed > 0)
-    await expect(
-      page.getByText(
-        new RegExp(
-          `^${missed} ${missed === 1 ? 'сгрешен въпрос чака' : 'сгрешени въпроса чакат'}: следващият се връща`,
-        ),
-      ),
-    ).toBeVisible();
+  const waiting = page.getByText(
+    /(сгрешен въпрос чака|сгрешени въпроса чакат): следващият се връща|^Сгрешеното се връща/,
+  );
+  await expect(waiting).toBeVisible();
+  const queued = Number((await waiting.textContent())!.match(/^(\d+) /)?.[1] ?? 0);
+  expect(queued).toBeLessThanOrEqual(missed);
+  expect(queued).toBeGreaterThanOrEqual(missed - 1);
   await page.getByRole('link', { name: /^География/ }).click();
   await expect(page).toHaveURL(/\/almanac\/geography$/);
   await expect(page.getByText(new RegExp(`^${right} от \\d+ факта`))).toBeVisible();

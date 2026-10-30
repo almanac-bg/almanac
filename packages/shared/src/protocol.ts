@@ -154,6 +154,8 @@ export interface QuestionPayload {
   image: QuestionImage | null;
   /** The match's last question, its final (a number, when the bank has one). */
   final: boolean;
+  /** Its points count this many times over: a number final NUMBER.finalTimes; any other question 1. */
+  times: number;
   /** Username of the player who wrote it, for community questions. */
   author: string | null;
   durationMs: number;
@@ -284,12 +286,21 @@ export const defaultPushPrefs = (): PushPrefs => ({
 
 /**
  * Соло's clock: the usual 15 s; 30 s (the speed bonus still counts against the usual clock, so a record can't be
- * bought with time); or none (base points and streaks, no speed bonus) — to read and think at leisure.
+ * bought with time; an answer past 15 s doesn't count for skill and mastery); or none (base points, each answer waits
+ * for „Продължи“) — to read and think at leisure, as practice.
  */
 export const SOLO_PACES = [
   { id: 'normal', label: '15 с', hint: 'С бонус за бързина' },
-  { id: 'relaxed', label: '30 с', hint: 'Двойно време, бонусът за бързина — както при 15 с' },
-  { id: 'untimed', label: 'Без часовник', hint: 'Без бонус за бързина' },
+  {
+    id: 'relaxed',
+    label: '30 с',
+    hint: 'Двойно време. Бонусът за бързина и майсторството — както при 15 с: отговор след 15-ата секунда не се брои.',
+  },
+  {
+    id: 'untimed',
+    label: 'Без часовник',
+    hint: 'За упражнение: всеки отговор чака „Продължи“. Не се брои за майсторство, задачи и постижения, а верните носят половин XP.',
+  },
 ] as const;
 
 export type SoloPace = (typeof SOLO_PACES)[number]['id'];
@@ -419,7 +430,11 @@ export interface DailyField {
   histogram: number[];
 }
 
-export const DAILY_FIELD = { minPlayers: 20 } as const;
+/**
+ * `minPlayers`: the day's runs it takes to show how everyone did. `placeFrom`: to say a place at all — „#1 от 1“ is no
+ * place, whatever the score.
+ */
+export const DAILY_FIELD = { minPlayers: 20, placeFrom: 5 } as const;
 
 /**
  * `pair`: these two already played their rated games today (the win-trading guard). `guest`: guests play people
@@ -1223,10 +1238,19 @@ export interface AlmanacCategoryPage {
 
 /**
  * „Поправителен“: a missed question comes back `afterDays[0]` days later, then (right) `afterDays[1]`, then
- * `afterDays[2]`; right then too, it's learned for good. Wrong at any step, it starts over. A run plays up to `size`
- * of those due, once at least `min` are.
+ * `afterDays[2]`; right then too, it's learned for good. Wrong at any step, it starts over; nearly right (a number
+ * `nearCloseness` close, an order with `nearPlaced` items in place) is that step again. A run plays up to `size` of
+ * those due, once at least `min` are. At most `keep` are coming back at a time — a pile of hundreds is a debt, not
+ * practice (almanac.ts → makeRoom) — and a near miss outside a run never enters.
  */
-export const REVIEW = { afterDays: [3, 7, 21], size: 10, min: 3 } as const;
+export const REVIEW = {
+  afterDays: [3, 7, 21],
+  size: 10,
+  min: 3,
+  keep: 30,
+  nearCloseness: 0.5,
+  nearPlaced: 2,
+} as const;
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
 

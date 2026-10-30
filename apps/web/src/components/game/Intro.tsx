@@ -24,6 +24,14 @@ import { PlayerMark } from './Scoreboard';
 import { SCORING_LINE, takeScoringHint } from './scoring';
 import { myTeamOf, teamColor } from './teams';
 
+/** The evening's cuts, from EVENING: „Последните 20% отпадат след 4-ия въпрос, 30% — след 7-ия, 10-ия и 12-ия…“. */
+const EVENING_CUTS_LINE = (() => {
+  const [first, ...rest] = EVENING.cuts;
+  const pct = (share: number) => `${Math.round(share * 100)}%`;
+  const after = rest.map((c) => `${c.after}-ия`);
+  return `Последните ${pct(first.share)} отпадат след ${first.after}-ия въпрос, ${pct(rest[0].share)} — след ${after.slice(0, -1).join(', ')} и ${after.at(-1)}; финалът е за двама`;
+})();
+
 /** Before the first question: the countdown, and who plays whom. */
 export function Intro({ game }: { game: LiveGame }) {
   // Козове this player meets for the first time: named here, where nothing is ticking yet.
@@ -132,7 +140,7 @@ export function Intro({ game }: { game: LiveGame }) {
         <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
           <Skull className="size-4" />
           {game.start.mode === 'evening'
-            ? `Последните ${Math.round(EVENING.share * 100)}% отпадат след ${EVENING.checkpoints.join(', ')} въпрос; финалът е за двама`
+            ? EVENING_CUTS_LINE
             : `Последният отпада след въпроси ${game.start.eliminationSchedule.join(', ')}`}
         </p>
       )}
@@ -214,9 +222,22 @@ function Versus({ a, b }: { a: GamePlayer; b: GamePlayer }) {
   );
 }
 
-/** A match in rounds: the first round's category now, who picks the others, and the final. */
+/**
+ * A match in rounds: the first round's category now, who picks the others, and the final. Against a recording, all of
+ * them: picked when it was played.
+ */
 function RoundsPlan({ game }: { game: LiveGame }) {
   const first = categoryById(game.rounds[0].category ?? '');
+  if (game.start.players.some((p) => p.record)) {
+    const names = game.rounds.map((r) => categoryById(r.category ?? '')?.name).filter(Boolean);
+    return (
+      <p className="mt-6 max-w-md text-sm text-balance text-fg-2">
+        Рундовете са като в записания мач:{' '}
+        <span className="font-semibold text-fg">{names.join(', ').replace(/, ([^,]*)$/, ' и $1')}</span>. Накрая — финал
+        с число.
+      </p>
+    );
+  }
   return (
     <p className="mt-6 max-w-md text-sm text-balance text-fg-2">
       Рунд 1:{' '}

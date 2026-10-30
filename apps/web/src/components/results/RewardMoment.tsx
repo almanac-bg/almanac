@@ -31,18 +31,29 @@ export function rewardSteps(rewards: MatchRewards | null | undefined): Step[] {
 /**
  * The rewards of a match, one beat at a time before its page: the new level, then each new avatar or frame, large, with
  * „Сложи го“. „Нататък“ goes on; Escape or a tap outside skips the rest. An ordinary match has none and goes straight
- * to its page. (All at once on one long page, a level-up landed as a line among a dozen.)
+ * to its page. (All at once on one long page, a level-up landed as a line among a dozen.) `quiet`: a match lost, or
+ * mostly missed — the level is said, without confetti.
  */
-export function RewardMoment({ steps, open, onDone }: { steps: Step[]; open: boolean; onDone: () => void }) {
+export function RewardMoment({
+  steps,
+  open,
+  quiet = false,
+  onDone,
+}: {
+  steps: Step[];
+  open: boolean;
+  quiet?: boolean;
+  onDone: () => void;
+}) {
   const [at, setAt] = useState(0);
   const step = steps[at];
   useEffect(() => {
     if (!open || !step) return;
     if (step.kind === 'level') {
       sfx.levelUp();
-      burst(0.9);
+      if (!quiet) burst(0.9);
     } else sfx.achievement();
-  }, [open, step]);
+  }, [open, step, quiet]);
   if (!step) return null;
   const last = at + 1 >= steps.length;
   return (

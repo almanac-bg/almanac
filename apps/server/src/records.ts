@@ -12,7 +12,6 @@ import {
   sofiaHour,
 } from '@quiz/shared';
 import { grantXp } from './account';
-import { CHALLENGE_DAYS } from './challenges';
 import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
@@ -57,19 +56,11 @@ export const RECORDS = {
 };
 
 /**
- * The runs that make a Дуел's opponent: ten mixed questions ending on a final, played as a Дуел is (a Дуел, the day's
- * questions, a challenge link). A Дуел first: it was played in rounds.
+ * The runs that make a Дуел's opponent: Дуели only. They were played in rounds, so the match against one keeps them
+ * (each round's category as picked then); and their questions are nobody's open set (the day's, a link's, a friend
+ * duel's), so nobody plays those knowing the answers.
  */
-const SOURCES = ['duel', 'daily', 'challenge'] as const;
-
-/**
- * Only questions nobody can still meet elsewhere: never today's daily (whoever played it as a recording would play
- * the day knowing the answers), nor a challenge link or friend duel that may still be open.
- */
-const closed = (r: { mode: string; played_at: number }, now: number) =>
-  r.mode === 'duel' ||
-  (r.mode === 'daily' && dayKey(r.played_at) !== dayKey(now)) ||
-  (r.mode === 'challenge' && r.played_at < now - CHALLENGE_DAYS * 24 * 60 * 60_000);
+const SOURCES = ['duel'] as const;
 
 export interface RecordPick {
   runId: number;
@@ -83,7 +74,6 @@ export interface RecordPick {
 interface Candidate {
   id: number;
   user_id: number;
-  mode: string;
   rating: number | null;
   answers: string;
   played_at: number;
@@ -104,7 +94,7 @@ interface Candidate {
 export function pickRecord(userId: number, rating: number | null, rng: Rng = Math.random): RecordPick | null {
   const centre = skillCentre(userId, rating);
   const rows = all<Candidate>(
-    `SELECT r.id, r.user_id, r.mode, r.rating, r.answers, r.played_at, u.username, u.avatar, u.frame, u.title, u.xp,
+    `SELECT r.id, r.user_id, r.rating, r.answers, r.played_at, u.username, u.avatar, u.frame, u.title, u.xp,
        s.rating AS skill, s.answers AS skill_answers
      FROM runs r JOIN users u ON u.id = r.user_id
      LEFT JOIN player_skill s ON s.user_id = r.user_id AND s.category = 'all'
@@ -116,9 +106,7 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
     userId,
     RECORDS.candidates,
   );
-  const now = Date.now();
   const near = rows.filter((r) => {
-    if (!closed(r, now)) return false;
     const skill = (r.skill_answers ?? 0) >= SKILL.reliableAfter ? r.skill! : (r.rating ?? START_RATING);
     return Math.abs(skill - centre) <= RECORDS.skillBand;
   });
@@ -127,8 +115,7 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
   const playable = new Map<string, PlayableQuestion>(
     [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [q.id, q]),
   );
-  const ordered = shuffle(near, rng).sort((a, b) => Number(b.mode === 'duel') - Number(a.mode === 'duel'));
-  for (const r of ordered) {
+  for (const r of shuffle(near, rng)) {
     const pick = fromRun(r, playable, seen, rng);
     if (pick) return pick;
   }
@@ -197,7 +184,7 @@ function fromRun(
     },
     script,
     questions,
-    rounds: r.mode === 'duel' ? roundsOf(questions) : [],
+    rounds: roundsOf(questions),
   };
 }
 

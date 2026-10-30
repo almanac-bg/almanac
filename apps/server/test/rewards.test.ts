@@ -467,6 +467,143 @@ test('a private room with nobody else in it is practice: winning there is no win
   assert.equal(getUser(host)!.wins, 0);
 });
 
+test('Соло with double time: an answer past the usual clock scores, but says nothing about what the player knows', () => {
+  const solo = account();
+  const ends: GameEndPayload[] = [];
+  const game = new Game(
+    {
+      mode: 'solo',
+      ranked: false,
+      roomCode: null,
+      hostUserId: null,
+      timeMs: TIME,
+      category: 'mixed',
+      elimination: false,
+      teams: false,
+      dailyDay: null,
+      challengeId: null,
+      questions: pickQuestions(10, 'mixed', new Map()).filter(isChoice),
+      rounds: [],
+      humans: [{ player: player(solo), powerups: [], emotes: [] }],
+      bots: [],
+      pace: 'relaxed',
+    },
+    {
+      toGame: () => {},
+      toUser: (_userId, event, ...args) => {
+        if (event === 'game:end') ends.push(args[0] as GameEndPayload);
+      },
+      toGameExcept: () => {},
+    } satisfies GameEmitter,
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      crowd: () => null,
+      shown: () => {},
+      onClosed: () => {},
+    },
+  );
+  game.start();
+  advance(COUNTDOWN);
+  // Every answer right: the first half within the usual 10 s, the rest after it (time enough to look it up).
+  const total = game.questions.length;
+  for (let i = 0; game.phase !== 'ended'; i++) {
+    advance(i < total / 2 ? 2_000 : TIME + 2_000);
+    game.answer(`u${solo}`, game.index, choiceAt(game).answer);
+    advance(NEXT_QUESTION);
+  }
+  const fast = Math.ceil(total / 2);
+  const [end] = ends;
+  assert.equal(end.standings[0].correct, total, 'all of them right, as the match shows');
+  assert.ok(!labels(end).some((l) => /перфект/i.test(l)), 'no perfect match');
+  const stats = one<{ faced: number; right: number }>(
+    'SELECT questions_answered AS faced, correct_answers AS right FROM users WHERE id = ?',
+    solo,
+  )!;
+  assert.deepEqual({ ...stats }, { faced: fast, right: fast }, 'accuracy counts the quick ones only');
+  assert.equal(
+    one<{ n: number }>("SELECT answers AS n FROM player_skill WHERE user_id = ? AND category = 'all'", solo)?.n,
+    fast,
+    'and so does skill',
+  );
+  assert.equal(
+    one<{ n: number }>('SELECT COUNT(*) AS n FROM answers WHERE user_id = ?', solo)!.n,
+    fast,
+    'and the answer log',
+  );
+});
+
+test('knocked out and answering on, the right answers pay XP and count for what the player knows', () => {
+  const [out, other] = [account(), account()];
+  const ends = new Map<number, GameEndPayload>();
+  const game = new Game(
+    {
+      mode: 'custom',
+      ranked: false,
+      roomCode: '24680',
+      hostUserId: out,
+      timeMs: TIME,
+      category: 'mixed',
+      elimination: true,
+      teams: false,
+      dailyDay: null,
+      challengeId: null,
+      questions: pickQuestions(10, 'mixed', new Map()).filter(isChoice),
+      rounds: [],
+      humans: [out, other].map((id) => ({ player: player(id), powerups: [], emotes: [] })),
+      bots: [
+        {
+          player: { ...player(0), id: 'b1', userId: null, isBot: true },
+          brain: { skill: 2000, pace: 0.3, strong: [], weak: [] },
+        },
+      ],
+    },
+    {
+      toGame: () => {},
+      toUser: (userId, event, ...args) => {
+        if (event === 'game:end') ends.set(userId, args[0] as GameEndPayload);
+      },
+      toGameExcept: () => {},
+    } satisfies GameEmitter,
+    {
+      finalize: finalizeMatch,
+      undelivered: () => {},
+      release: () => {},
+      progress: () => {},
+      draining: () => false,
+      crowd: () => null,
+      shown: () => {},
+      onClosed: () => {},
+    },
+  );
+  game.start();
+  advance(COUNTDOWN);
+  const p = game.participants.get(`u${out}`)!;
+  // Wrong until knocked out, then right to the end.
+  while (game.phase !== 'ended') {
+    if (game.phase === 'question') {
+      const q = choiceAt(game);
+      game.answer(`u${out}`, game.index, p.eliminatedAt === null ? (q.answer + 1) % 4 : q.answer);
+      game.answer(`u${other}`, game.index, q.answer);
+    }
+    advance(1_000);
+  }
+  assert.ok(p.eliminatedAt !== null);
+  const after = game.questions.length - p.eliminatedAt!;
+  assert.ok(after > 0);
+  const end = ends.get(out)!;
+  assert.ok(labels(end).includes(`Верни след отпадането (${after})`), labels(end).join(' | '));
+  assert.equal(end.standings.find((s) => s.id === `u${out}`)!.correct, 0, 'the match counts none of them');
+  assert.equal(
+    one<{ n: number }>('SELECT COUNT(*) AS n FROM answers WHERE user_id = ? AND correct = 1', out)!.n,
+    after,
+    'what the player knows does',
+  );
+});
+
 test('a question hidden before anyone has played the day leaves the day’s set; once someone has, the set stands', () => {
   const hide = (id: string) => {
     run('INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, NULL, ?)', id, Date.now());
@@ -578,6 +715,8 @@ test('every answer a person gives is logged, with totals per question; too-perfe
       points: 900,
       powerup: null,
       retried: false,
+      slow: false,
+      out: false,
     })),
   );
   const flagged = playCheck().suspicious.map((p) => p.user.id);

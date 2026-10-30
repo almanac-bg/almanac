@@ -82,6 +82,7 @@ gameClock.now = () => Date.now();
 const {
   imageBank,
   isChoice,
+  numberBank,
   orderBank,
   pickDuelSet,
   pickMatch,
@@ -173,6 +174,23 @@ test('pictures and orders seen in the last 30 days stay out; a short match has o
     short.filter((q) => q.kind === 'order' || isPicture(q)).every((q) => q.category === 'history'),
     'of the category',
   );
+});
+
+test('a number final seen in the last 30 days stays out, in Микс too: a question with options closes instead', () => {
+  const now = Date.now();
+  const recently = new Map<string, number>(numberBank().map((q) => [q.id, now - 5 * 24 * 60 * 60_000]));
+  for (const category of ['mixed', 'history'] as const) {
+    const questions = pickMatch(10, category, recently, { final: true, now });
+    assert.equal(questions.length, 10);
+    assert.ok(!questions.some((q) => q.kind === 'number'), category);
+  }
+  const plan = pickRounds(recently, seededRng('rounds-recent'), { now })!;
+  assert.ok(isChoice(plan.questions.at(-1)!), 'a Дуел closes on a hard question');
+  // One seen long enough ago comes back.
+  const again = new Map(recently);
+  const [old] = numberBank();
+  again.set(old.id, now - 40 * 24 * 60 * 60_000);
+  assert.equal(pickMatch(10, 'mixed', again, { final: true, now }).at(-1)!.id, old.id);
 });
 
 test('a room of pictures is all pictures as far as the bank has them, then questions with options', () => {

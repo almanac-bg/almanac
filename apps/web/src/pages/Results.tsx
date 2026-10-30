@@ -1,5 +1,5 @@
 import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
-import { categoryById, isQueueMode, MODES, REVIEW, TEAMS } from '@quiz/shared';
+import { categoryById, EVENING, isQueueMode, MODES, REVIEW, TEAMS } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { m } from 'motion/react';
@@ -70,8 +70,9 @@ export function Results({ game }: { game: LiveGame }) {
   const perfect = mine.correct === game.start.totalQuestions;
   // Beaten on a link's board (or by the friend, in a duel): played alone, but lost all the same.
   const lostLink = !!link && (duel ? duel.outcome === 'lost' : link.rank > 1);
-  // Lost to other people: no fanfare (a level gained along the way still says so, quietly).
+  // Lost to other people, or under half right alone: no fanfare (a level gained along the way still says so, quietly).
   const lost = (!single && !won && !end.noContest) || lostLink;
+  const quiet = lost || (single && mine.correct * 2 < game.start.totalQuestions);
   const best = rewards?.soloBest ?? null;
   const newBest = best !== null && best > 0 && mine.score > best;
   // A no contest says so in the headline; the other reasons a rating stayed put get a card.
@@ -231,7 +232,7 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
-      <RewardMoment steps={steps} open={moment} onDone={() => setMoment(false)} />
+      <RewardMoment steps={steps} open={moment} quiet={quiet} onDone={() => setMoment(false)} />
       <m.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
           {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
@@ -309,7 +310,10 @@ export function Results({ game }: { game: LiveGame }) {
             )}
             {end.mode === 'evening' && mine.placement === 1 && (
               <span className="rounded-full bg-indigo-400/15 px-3 py-1 text-indigo-100">
-                <Emoji e="🌙" /> Шампион на вечерта — титлата е твоя за денонощие
+                <Emoji e="🌙" /> {/* The title is won against people: bots make a quiet evening up to eight. */}
+                {game.start.players.filter((p) => !p.isBot && !p.record).length >= EVENING.titleFrom
+                  ? 'Шампион на вечерта — титлата е твоя за денонощие'
+                  : `Първо място. Титлата „Шампион на вечерта“ се печели срещу поне ${EVENING.titleFrom - 1} души`}
               </span>
             )}
             {/* A guest has it in the card that offers to keep it, right below. */}
@@ -362,7 +366,7 @@ export function Results({ game }: { game: LiveGame }) {
         {!rewardsCard ? null : rewards ? (
           <div className="space-y-4">
             <UnlockReveal rewards={rewards} celebrated={steps.length > 0} />
-            <RewardsCard rewards={rewards} quiet={lost} celebrated={steps.length > 0} />
+            <RewardsCard rewards={rewards} quiet={quiet} celebrated={steps.length > 0} />
           </div>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>

@@ -116,19 +116,15 @@ test('not a recording with questions the player has seen, nor one whose question
   assert.equal(pickRecord(1, 1000), null, 'too old');
 });
 
-test("never today's daily, nor a link that may still be open: their questions are still to be played", () => {
+test('only a Дуел makes a recording: it was played in rounds, and no day, link or friend duel is left open by it', () => {
   run('DELETE FROM runs');
   run('DELETE FROM seen_questions');
   const day = 24 * 60 * 60_000;
-  addRun(2, { mode: 'daily' });
-  addRun(2, { mode: 'challenge', at: Date.now() - 2 * day });
-  assert.equal(pickRecord(1, 1000), null, "today's daily and a week-young link (or a friend duel) stay unplayed");
-  // Yesterday's daily is over, and so is a link past its week.
-  const yesterday = addRun(2, { mode: 'daily', at: dayEndsAt(shiftDay(dayKey(), -1)) - 60_000 });
-  assert.equal(pickRecord(1, 1000)?.runId, yesterday);
-  run('DELETE FROM runs WHERE id = ?', yesterday);
-  const expired = addRun(2, { mode: 'challenge', at: Date.now() - 8 * day });
-  assert.equal(pickRecord(1, 1000)?.runId, expired);
+  addRun(2, { mode: 'daily', at: dayEndsAt(shiftDay(dayKey(), -1)) - 60_000 });
+  addRun(2, { mode: 'challenge', at: Date.now() - 8 * day });
+  assert.equal(pickRecord(1, 1000), null, "yesterday's daily and a link past its week are no Дуел either");
+  const duel = addRun(2);
+  assert.equal(pickRecord(1, 1000)?.runId, duel);
   run('DELETE FROM runs');
 });
 

@@ -915,6 +915,33 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE users ADD COLUMN duel_wins_paid INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  // v35, „Поправителен“ (almanac.ts → makeRoom): at most REVIEW.keep (30) coming back at a time. A queue that grew past
+  // that keeps the 30 due last: a player behind on it never got to the oldest.
+  {
+    compatible: `
+    DELETE FROM review_queue WHERE (user_id, question_id) IN (
+      SELECT user_id, question_id FROM (
+        SELECT user_id, question_id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY due_at DESC, question_id) AS n
+        FROM review_queue
+      ) WHERE n > 30
+    );
+    `,
+  },
+  // v36, the evening Роял (evening.ts): how many people (not bots) were in each one's match, for the title, the frame
+  // and the night's top (EVENING.titleFrom). Null on the rows from before: they count as they did.
+  {
+    compatible: `
+    ALTER TABLE evening_results ADD COLUMN people INTEGER;
+    `,
+  },
+  // v37, mastery (mastery.ts): a player is ranked in a category from MASTERY.minAnswers (60) answers in it, not 30. The
+  // index of those ranked follows (older code still finds them, without it).
+  {
+    compatible: `
+    DROP INDEX player_skill_ranked;
+    CREATE INDEX player_skill_ranked ON player_skill(category, rating) WHERE answers >= 60;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

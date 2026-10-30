@@ -37,6 +37,7 @@ export function ModeCard({
   searching,
   rating,
   starter,
+  need,
   onPlay,
   onRankInfo,
 }: {
@@ -44,6 +45,11 @@ export function ModeCard({
   className?: string;
   big?: boolean;
   searching?: number;
+  /**
+   * What the mode needs before it can be played (Отбори: a friend, online), said before the tap; `ready` false dims the
+   * button (it still opens the mode, which says what to do).
+   */
+  need?: { text: string; ready: boolean };
   /** Ranked modes: the player's rating, shown as a rank chip that explains itself. */
   rating?: number;
   starter?: boolean;
@@ -166,7 +172,13 @@ export function ModeCard({
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-5 sm:pt-6">
           <span className="text-xs text-fg-3">
-            {mode.questions} въпроса · {mode.timeMs / 1000} с
+            {need ? (
+              <span className={need.ready ? 'text-emerald-300' : 'text-fg-2'}>{need.text}</span>
+            ) : (
+              <>
+                {mode.questions} въпроса · {mode.timeMs / 1000} с
+              </>
+            )}
             {searching ? <span className="ml-2 text-emerald-300">● {searching} търсят</span> : null}
           </span>
           {/* Not positioned, so its ::after covers the card rather than the button. */}
@@ -178,8 +190,12 @@ export function ModeCard({
           >
             {/* A real button's size and shape, in the mode's colours: the main action of the page. */}
             <span
-              className={clsx(buttonClass({ variant: 'accent' }), 'group-hover:translate-x-0.5')}
-              style={{ ...accentFill(mode), boxShadow: `0 8px 24px -8px ${a}` }}
+              className={clsx(
+                buttonClass({ variant: 'accent' }),
+                'group-hover:translate-x-0.5',
+                need && !need.ready && 'opacity-60 saturate-50',
+              )}
+              style={{ ...accentFill(mode), boxShadow: need && !need.ready ? undefined : `0 8px 24px -8px ${a}` }}
             >
               Играй <span className="sr-only">{mode.name}</span>
               <ArrowRight aria-hidden className="size-4" />

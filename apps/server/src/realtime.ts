@@ -8,17 +8,20 @@ import {
   isSoloPace,
   type LobbyStats,
   MODES,
+  NUMBER,
   POWERUPS,
   type PowerupId,
   type Presence,
   REVIEW,
   ROUNDS,
+  sofiaTimeOn,
 } from '@quiz/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
 import { learn, reviewQuestions } from './almanac';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import {
+  challengeMadeAt,
   challengeQuestions,
   claimChallengeAttempt,
   createChallenge,
@@ -31,6 +34,7 @@ import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily'
 import { setEveningLobby } from './evening';
 import { areFriends, friendIds, incomingRequests } from './friends';
 import { EveningLobby } from './game/eveningLobby';
+import { FINAL_TIMES_FROM } from './game/Game';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry, startFailure } from './game/registry';
@@ -355,6 +359,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           category: 'mixed',
           elimination: false,
           dailyDay: claim.day,
+          finalTimes: claim.day < FINAL_TIMES_FROM ? 1 : NUMBER.finalTimes,
           questions: dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
@@ -407,6 +412,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           category: 'mixed',
           elimination: false,
           challengeId: id,
+          finalTimes: (challengeMadeAt(id) ?? 0) < sofiaTimeOn(FINAL_TIMES_FROM, 0) ? 1 : NUMBER.finalTimes,
           duelWith: duelOpponent(id, userId),
           questions: challengeQuestions(id, userId),
           humans: [buildHuman(userId, 'challenge')],

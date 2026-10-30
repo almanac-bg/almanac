@@ -135,7 +135,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 2, order: true },
     tagline: 'Ти и приятел срещу друга двойка.',
-    description: 'Покани приятел и играйте заедно срещу друга двойка (или два бота). Точките на двамата се събират.',
+    description: 'Покани приятел и играйте заедно срещу друга двойка (хора или ботове). Точките на двамата се събират.',
     accent: ['#38bdf8', '#fb7185'],
   },
   trio: {
@@ -245,18 +245,28 @@ export const QUEUE_MODES: QueueModeId[] = ['duel', 'teams', 'squad', 'royale'];
 
 /**
  * „Вечерен Роял“: every day at `hour` (Sofia time) one big match, its lobby open `lobbyMinutes` before. Up to
- * `maxPlayers` in a match (more make more matches); bots only make up to MODES.evening.minPlayers. After each
- * `checkpoints` question the bottom `share` go out (at least one), after `finalTwoAfter` all but two, who play the last
- * two questions. The winner wears „Шампион на вечерта“ for `titleHours`; `winsForFrame` wins earn a frame; the night's
- * `top` stay on the home page until the next one.
+ * `maxPlayers` in a match (more make more matches); bots only make up to MODES.evening.minPlayers. After each of the
+ * `cuts` the bottom `share` go out (at least one) — fewer the first time, and not before the 4th question: one slow
+ * start on a phone is no reason to end the evening — and after `finalTwoAfter` all but two, who play the last two
+ * questions. The winner of a match of `titleFrom` people or more wears „Шампион на вечерта“ for `titleHours`;
+ * `winsForFrame` such wins earn a frame; the night's `top` stay on the home page until the next one.
  */
 export const EVENING = {
   hour: 21,
   lobbyMinutes: 5,
   maxPlayers: 50,
-  checkpoints: [3, 6, 9, 12],
-  share: 0.3,
+  cuts: [
+    { after: 4, share: 0.2 },
+    { after: 7, share: 0.3 },
+    { after: 10, share: 0.3 },
+    { after: 12, share: 0.3 },
+  ],
   finalTwoAfter: 13,
+  /**
+   * People (not bots) in the match for its winner to be champion, count toward the frame, and its places to make the
+   * night's top: four beaten at least. Bots make a quiet evening up to eight, and winning that is no title.
+   */
+  titleFrom: 5,
   titleHours: 24,
   winsForFrame: 3,
   top: 10,
@@ -264,15 +274,16 @@ export const EVENING = {
 
 /**
  * How many are knocked out after question `n` (1-based) with `active` still in: one at each question of `schedule` —
- * or, in the evening Роял, the bottom EVENING.share at its checkpoints and all but the final two after
+ * or, in the evening Роял, the bottom share at each of EVENING.cuts and all but the final two after
  * EVENING.finalTwoAfter. Never below two.
  */
 export function knockoutsAfter(mode: ModeId, schedule: readonly number[], n: number, active: number): number {
   if (active <= 2) return 0;
   if (mode === 'evening') {
     if (n === EVENING.finalTwoAfter) return active - 2;
-    if (!(EVENING.checkpoints as readonly number[]).includes(n)) return 0;
-    return Math.min(active - 2, Math.max(1, Math.round(active * EVENING.share)));
+    const cut = EVENING.cuts.find((c) => c.after === n);
+    if (!cut) return 0;
+    return Math.min(active - 2, Math.max(1, Math.round(active * cut.share)));
   }
   return schedule.includes(n) ? 1 : 0;
 }
@@ -293,6 +304,22 @@ export const TEAMS = [
 ] as const;
 
 export type TeamId = 0 | 1;
+
+/**
+ * Each team's score from its members' (`[team, score]` for everyone on one, those who left too): their sum, and for
+ * the smaller side of unequal teams (a room may start 3 against 2) the sum as if it had as many as the larger one — its
+ * average per member times the larger side's size — so one more player is no head start.
+ */
+export function teamPoints(members: Iterable<readonly [TeamId, number]>): [number, number] {
+  const sums: [number, number] = [0, 0];
+  const sizes: [number, number] = [0, 0];
+  for (const [team, score] of members) {
+    sums[team] += score;
+    sizes[team]++;
+  }
+  const most = Math.max(...sizes);
+  return [0, 1].map((t) => (sizes[t] ? Math.round((sums[t] * most) / sizes[t]) : 0)) as [number, number];
+}
 
 export interface RoomSettings {
   maxPlayers: number;
@@ -320,7 +347,8 @@ export interface RoomSettings {
 export const ROOM_LIMITS = {
   maxPlayers: [2, 40],
   questions: [5, 10, 15, 20],
-  timeMs: [10_000, 15_000, 20_000, 30_000],
+  /** Up to a minute: a class with a pupil who reads slowly, or answers with a switch, has the time it needs. */
+  timeMs: [10_000, 15_000, 20_000, 30_000, 45_000, 60_000],
   /** Knockouts one at a time only work for a few: with them on, a room takes at most this many. */
   eliminationPlayers: 8,
 } as const;

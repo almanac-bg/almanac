@@ -20,15 +20,20 @@ import { QuestionPicture } from './QuestionPicture';
 export function QuestionView({ game, offline }: { game: LiveGame; offline: boolean }) {
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
+  // Соло without a clock: each answer waits for „Продължи“.
+  const untimedRun = game.start.mode === 'solo' && game.start.pace === 'untimed';
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
-  // Knocked out: the questions go on, to watch (not to tap).
-  const watching = game.eliminated.includes(youId);
-  const active = !watching && !reveal && !game.resyncing;
+  // Knocked out: the questions go on, and can still be answered — for XP and the almanac, outside the race.
+  const out = game.eliminated.includes(youId);
+  const active = !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
   const reduceMotion = useReducedMotion();
   const number = q.kind === 'number';
   const order = q.kind === 'order';
+  // Against a recording, a round's category is the one picked when it was played: said where the round begins.
+  const round = game.rounds.findIndex((r) => r.from === q.index);
+  const recordedRound = round > 0 && game.start.players.some((p) => p.record);
   // Each new question takes the focus (the view is new per question): a screen reader reads it, and Tab goes on to its
   // answers — unless a field of its own (a number to type) has taken it already.
   const heading = useRef<HTMLHeadingElement>(null);
@@ -42,16 +47,19 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   }, []);
 
   // Who picked what, shown under each option at reveal.
+  const eliminated = game.eliminated;
   const pickers = useMemo(() => {
     const map: Record<number, GamePlayer[]> = {};
     if (!reveal) return map;
     for (const [pid, r] of Object.entries(reveal.results)) {
-      if (r.choice === null || pid === youId) continue;
+      // Not those knocked out before this question, answering on: they're no part of the race.
+      const outBefore = eliminated.includes(pid) && !reveal.eliminated.includes(pid);
+      if (r.choice === null || pid === youId || outBefore) continue;
       map[r.choice] ??= [];
       map[r.choice].push(game.players[pid]);
     }
     return map;
-  }, [reveal, game.players, youId]);
+  }, [reveal, game.players, youId, eliminated]);
 
   return (
     // The clock is already running: the last question gets out of the way at once (the next one waits for it to
@@ -67,7 +75,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       <div className="flex flex-wrap items-center gap-2">
         {q.final && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-extrabold tracking-wide text-amber-200 uppercase">
-            <Emoji e="🎯" /> Финал
+            <Emoji e="🎯" /> Финал{q.times > 1 && ` · ×${q.times}`}
           </span>
         )}
         {game.start.questionSet ? (
@@ -87,6 +95,11 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             </span>
           </>
         )}
+        {recordedRound && (
+          <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
+            Рунд {round + 1} · избран в записания мач
+          </span>
+        )}
         {q.elimination && (
           // MotionConfig only stills movement; this loop is opacity, so it stops here.
           <m.span
@@ -97,9 +110,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             <Skull className="size-3.5" /> Елиминация след този въпрос
           </m.span>
         )}
-        {watching && (
+        {out && (
           <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
-            <Emoji e="👀" /> Гледаш
+            <Emoji e="💀" /> Отпадна · отговаряш за XP
           </span>
         )}
         {inDropZone(game).has(youId) && !reveal && (
@@ -211,7 +224,6 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                   locked={game.myChoice !== null}
                   removed={game.removed.includes(i)}
                   disabled={!active || offline}
-                  watching={watching}
                   offline={(offline || game.resyncing) && !reveal}
                   correct={reveal ? reveal.correct === i : null}
                   pickers={pickers[i] ?? []}
@@ -243,15 +255,20 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                 <ActivePowerups game={game} />
               </m.div>
             ) : (
-              active && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
+              active && !out && !number && !order && <PowerupBar key="pw" game={game} offline={offline} />
             )}
           </AnimatePresence>
           {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
         </div>
-        {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). */}
-        {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
+        {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). Without
+            a clock, every answer waits for „Продължи“ (the server holds it). */}
+        {reveal?.fact && game.start.players.length === 1 && (
+          <FactNote index={q.index} fact={reveal.fact} waiting={untimedRun} />
+        )}
         {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
-        {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
+        {reveal && !reveal.fact && game.start.mode === 'solo' && (
+          <PauseAfterAnswer index={q.index} waiting={untimedRun} />
+        )}
         {/* A class whose teacher stopped on this answer to talk it through. */}
         {reveal && game.paused === reveal.index && (
           <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
@@ -267,8 +284,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
  * "Знаеше ли?" under the result, in a run played alone. The run goes on at its usual pace; "Спри, за да прочета" holds
  * the next question until "Продължи" (nobody else is waiting), so reading is the player's choice, never a delay.
  */
-function FactNote({ index, fact }: { index: number; fact: string }) {
-  const [state, setState] = useState<'shown' | 'asking' | 'holding'>('shown');
+function FactNote({ index, fact, waiting }: { index: number; fact: string; waiting: boolean }) {
+  const [state, setState] = useState<'shown' | 'asking' | 'holding'>(waiting ? 'holding' : 'shown');
+  useContinueKey(state === 'holding');
   const ref = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -321,9 +339,13 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
   );
 }
 
-/** „Пауза“ after an answer in Соло: the next question waits until „Продължи“ (or a couple of minutes). */
-function PauseAfterAnswer({ index }: { index: number }) {
-  const [state, setState] = useState<'shown' | 'asking' | 'holding'>('shown');
+/**
+ * „Пауза“ after an answer in Соло: the next question waits until „Продължи“ (or a couple of minutes). Without a clock
+ * (`waiting`) every answer waits from the start.
+ */
+function PauseAfterAnswer({ index, waiting }: { index: number; waiting: boolean }) {
+  const [state, setState] = useState<'shown' | 'asking' | 'holding'>(waiting ? 'holding' : 'shown');
+  useContinueKey(state === 'holding');
   async function hold() {
     setState('asking');
     setState((await actions.holdOnFact(index)) ? 'holding' : 'shown');
@@ -341,6 +363,21 @@ function PauseAfterAnswer({ index }: { index: number }) {
       )}
     </div>
   );
+}
+
+/** Enter goes on from a held answer, as „Продължи“ does (not while typing, or on a focused button that has its own). */
+function useContinueKey(on: boolean) {
+  useEffect(() => {
+    if (!on) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.repeat) return;
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, select, button, a')) return;
+      e.preventDefault();
+      actions.resumeAfterFact();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [on]);
 }
 
 /** „62% знаят“: how everyone who played this question before did on it (once enough have). */
@@ -528,7 +565,6 @@ function AnswerButton({
   locked,
   removed,
   disabled,
-  watching,
   offline,
   correct,
   pickers,
@@ -540,8 +576,6 @@ function AnswerButton({
   locked: boolean;
   removed: boolean;
   disabled: boolean;
-  /** Knocked out and watching: the answers are there to read, not to pick. */
-  watching: boolean;
   /** No connection (or not yet re-synced): shown as out of reach, not just unresponsive. */
   offline: boolean;
   correct: boolean | null;
@@ -560,7 +594,7 @@ function AnswerButton({
         : 'dim'
     : selected
       ? 'selected'
-      : locked || offline || watching
+      : locked || offline
         ? 'dim'
         : 'idle';
 

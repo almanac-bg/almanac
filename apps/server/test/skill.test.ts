@@ -51,6 +51,8 @@ const entry = (q: Q, correct: boolean, powerup: PowerupId | null = null) => ({
   points: correct ? 900 : 0,
   powerup,
   retried: false,
+  slow: false,
+  out: false,
 });
 const byDifficulty = (d: Q['difficulty']) => questionBank().filter((q) => q.difficulty === d);
 
@@ -103,6 +105,8 @@ test('a number counts by how close it was: near the answer, about as much as a r
     points: Math.round(1000 * closeness),
     powerup: null,
     retried: false,
+    slow: false,
+    out: false,
   });
   run(
     `INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (5, 'e', 'e', 'x', 0), (6, 'f', 'f', 'x', 0)`,

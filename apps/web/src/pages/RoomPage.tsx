@@ -347,7 +347,7 @@ export function RoomPage() {
             onChange={(teams) => update({ teams })}
             icon={<Users className="size-4 text-sky-300" />}
             title="Отбори"
-            hint="2 отбора, точките се събират"
+            hint="2 отбора, точките се събират (при неравни — по средно на играч)"
           />
 
           <Toggle

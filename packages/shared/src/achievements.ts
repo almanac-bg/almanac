@@ -100,7 +100,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'evening_3',
     name: 'Три вечери',
-    description: 'Спечели „Вечерен Роял“ три пъти.',
+    description: 'Спечели „Вечерен Роял“ три пъти, срещу поне четирима души.',
     icon: '🌙',
     rarity: 'epic',
     xp: 600,

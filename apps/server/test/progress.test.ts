@@ -49,10 +49,21 @@ test('daily quests: three a day that stay put, paid once each, plus a bonus for 
     'the same quests all day',
   );
 
-  // A match that does a lot of everything, in three different modes, finishes any combination of quests.
-  const big = { multiplayer: true, won: true, correct: 40, hardCorrect: 10, bestStreak: 10, jokers: 5 };
+  // A match that does a lot of everything, in every mode a quest asks for, finishes any combination of quests.
+  const big = {
+    multiplayer: true,
+    won: true,
+    correct: 40,
+    hardCorrect: 10,
+    bestStreak: 10,
+    jokers: 5,
+    facts: 10,
+    ordersRight: 1,
+    finalCloseness: 1,
+    friendDuel: false,
+  };
   const correctByCategory = new Map(CATEGORY_IDS.map((c) => [c, 10]));
-  const lines = (['daily', 'royale', 'challenge'] as const).flatMap((mode) =>
+  const lines = (['daily', 'royale', 'challenge', 'squad', 'evening', 'review'] as const).flatMap((mode) =>
     advanceQuests(id, { ...big, mode, correctByCategory }, day),
   );
   const after = questsInfo(id, day);
@@ -73,6 +84,28 @@ test('daily quests: three a day that stay put, paid once each, plus a bonus for 
     after.quests.map((q) => q.progress),
     'a new day starts fresh',
   );
+});
+
+test('a quest is drawn only when it can be finished: „Поправителен“ once one is ready, a friend duel with a friend', () => {
+  const drawn = (id: number) =>
+    new Set(
+      Array.from({ length: 120 }, (_, i) => questsInfo(id, shiftDay('2027-01-01', i)).quests.map((q) => q.id)).flat(),
+    );
+  const alone = user();
+  assert.ok(!drawn(alone).has('review'), 'nothing to review');
+  assert.ok(!drawn(alone).has('friendDuel'), 'nobody to duel');
+  const busy = user();
+  const friend = user();
+  run(
+    "INSERT INTO friendships (user_a, user_b, requested_by, status, created_at) VALUES (?, ?, ?, 'accepted', 0)",
+    Math.min(busy, friend),
+    Math.max(busy, friend),
+    busy,
+  );
+  for (let i = 0; i < 3; i++)
+    run('INSERT INTO review_queue (user_id, question_id, step, due_at) VALUES (?, ?, 0, 0)', busy, `history-${i}`);
+  assert.ok(drawn(busy).has('review'));
+  assert.ok(drawn(busy).has('friendDuel'));
 });
 
 test('streak shields: earned every 7 days, spent on a missed day instead of the streak', () => {

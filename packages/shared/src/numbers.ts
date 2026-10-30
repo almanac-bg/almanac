@@ -26,6 +26,11 @@ export const NUMBER = {
   exactBonus: 250,
   /** This close keeps a streak going, and counts as a right answer. */
   rightFrom: 0.8,
+  /**
+   * A match's final (its last question) counts this many times over: a final that rarely changes the winner is no
+   * final. (Between two equal players a Дуел's final turned 5% of them at ×1, about 9% at ×2.)
+   */
+  finalTimes: 2,
 } as const;
 
 /** How close a guess is: 1 spot on, down to 0 a tolerance away (on a log scale, a tolerance-fold). */

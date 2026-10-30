@@ -77,7 +77,7 @@ export function ReviewCard({ queue, className }: { queue: ReviewQueue; className
           <h2 className="t-card">Поправителен</h2>
           <p className="mt-0.5 text-sm text-fg-2 text-pretty">
             {queue.ready
-              ? `${plural(queue.due, 'сгрешен въпрос се върна', 'сгрешени въпроса се върнаха')}. Помниш ли ги сега?`
+              ? `${plural(Math.min(queue.due, REVIEW.size), 'сгрешен въпрос е готов', 'сгрешени въпроса са готови')} за нов опит. Помниш ли ги сега?`
               : queue.due > 0
                 ? `${plural(queue.due, 'въпрос се върна', 'въпроса се върнаха')}: играе се, щом станат поне ${REVIEW.min}.`
                 : nothing

@@ -81,7 +81,10 @@ function Searching({
             ? `След ${seconds} започваме — вече сте ${queue.found}`
             : mode.minPlayers
               ? `След ${seconds} започваме — ботове на твоето ниво допълват до ${mode.minPlayers === 3 ? 'трима' : mode.minPlayers}`
-              : `След ${seconds} местата се попълват с ботове на твоето ниво`;
+              : queue.mode === 'duel'
+                ? // Alone in a Дуел, the other side is often a real player's recorded Дуел (records.ts).
+                  `След ${seconds} играеш срещу бот или запис на истински мач на твоето ниво`
+                : `След ${seconds} местата се попълват с ботове на твоето ниво`;
 
   return (
     <div className="flex w-full max-w-md flex-col items-center text-center">

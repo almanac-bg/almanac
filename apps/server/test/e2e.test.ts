@@ -396,12 +396,28 @@ test(
           }
         ).n;
       const holdsBefore = holds();
+      // What the 30 s run measured: its answers (all quick here) count for skill.
+      const skill = () =>
+        (
+          srv.db
+            .prepare('SELECT COALESCE(SUM(answers), 0) AS n FROM player_skill WHERE user_id = ?')
+            .get(P.user.id) as {
+            n: number;
+          }
+        ).n;
+      const skillBefore = skill();
+      assert.ok(skillBefore > 0, 'the 30 s run was measured');
+
+      // No clock: each answer waits for „Продължи“ (here: nothing comes until the player goes on).
       const untimed = newLog();
-      let paused = false;
+      let waited = false;
       s.on('game:reveal', async (rv) => {
-        if (paused || rv.fact) return;
-        paused = true;
-        assert.deepEqual(await emitAck(s, 'game:hold', { index: rv.index }), { ok: true }, 'a pause without a fact');
+        if (!waited) {
+          waited = true;
+          const soon = next(s, 'game:question', 600);
+          await assert.rejects(soon, 'the next question waits');
+          assert.equal((await emitAck(s, 'game:hold', { index: rv.index })).ok, false, 'held already');
+        }
         s.emit('game:resume');
       });
       const playUntimed = autoPlay(s, 'right', untimed);
@@ -416,8 +432,12 @@ test(
       });
       const mine = (rv: (typeof choice)[number]) => rv.results[u.start!.youId];
       assert.equal(mine(choice[0]).points, SCORING.base + (mine(choice[0]).streak - 1) * SCORING.streakStep);
-      assert.ok(paused);
-      assert.equal(holds(), holdsBefore, 'a pause is not a fact stopped on');
+      assert.ok(waited);
+      assert.equal(holds(), holdsBefore, 'a wait is not a fact stopped on');
+      // Practice: right answers pay half, and nothing is measured (skill, mastery, quests, feats).
+      const right = u.end.rewards!.breakdown.find((l) => l.label.startsWith('Верни отговори'));
+      assert.match(right!.label, /без часовник/);
+      assert.equal(skill(), skillBefore, 'nothing measured without a clock');
     } finally {
       s.close();
     }

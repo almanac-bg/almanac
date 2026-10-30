@@ -7,10 +7,13 @@ import {
   type ModeId,
   type QuestsInfo,
   type QueueModeId,
+  REVIEW,
   type XpLine,
 } from '@quiz/shared';
+import { reviewQueue } from './almanac';
 import { config } from './config';
 import { all, one, run } from './db';
+import { friendIds } from './friends';
 import { seededRng } from './questions';
 import { getUser } from './users';
 
@@ -24,6 +27,14 @@ export interface QuestEvent {
   bestStreak: number;
   jokers: number;
   correctByCategory: Map<CategoryId, number>;
+  /** Facts the match added to the player's almanac. */
+  facts: number;
+  /** „Подреди“ questions with everything in its place. */
+  ordersRight: number;
+  /** How close the number final came, 0–1 (null: none played). */
+  finalCloseness: number | null;
+  /** A friend duel (a challenge between two friends). */
+  friendDuel: boolean;
 }
 
 interface QuestDef {
@@ -57,11 +68,28 @@ const SEASONED = 3;
 /**
  * One quest from each slot: showing up, playing well, and trying something different. `level`/`below`: from that level
  * on, or only under it (the starter ones). `account`: only for players with an account (a guest can't make a challenge
- * link, so couldn't finish it alone).
+ * link, so couldn't finish it alone). `when`: only when the player can finish it today (a „Поправителен“ ready, a
+ * friend to play, an evening Роял on this server).
  */
-const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: true; def: QuestDef }[][] = [
+const SLOTS: {
+  level?: number;
+  below?: number;
+  queue?: QueueModeId;
+  account?: true;
+  when?: (userId: number) => boolean;
+  def: QuestDef;
+}[][] = [
   [
-    { def: { id: 'play3', icon: '🎮', text: 'Изиграй 3 мача', goal: 3, xp: 60, count: () => 1 } },
+    {
+      def: {
+        id: 'play3',
+        icon: '🎮',
+        text: 'Изиграй 3 мача',
+        goal: 3,
+        xp: 60,
+        count: (e) => (e.mode === 'review' ? 0 : 1),
+      },
+    },
     {
       def: {
         id: 'mp2',
@@ -170,7 +198,85 @@ const SLOTS: { level?: number; below?: number; queue?: QueueModeId; account?: tr
         text: 'Изиграй предизвикателство по линк',
         goal: 1,
         xp: 70,
-        count: (e) => (e.mode === 'challenge' ? 1 : 0),
+        count: (e) => (e.mode === 'challenge' && !e.friendDuel ? 1 : 0),
+      },
+    },
+    // The newer ways to play, one at a time: a quest is how most of them are first tried.
+    {
+      when: (userId) => reviewQueue(userId).due >= REVIEW.min,
+      def: {
+        id: 'review',
+        icon: '📒',
+        text: 'Изиграй „Поправителен“',
+        goal: 1,
+        xp: 60,
+        count: (e) => (e.mode === 'review' ? 1 : 0),
+      },
+    },
+    {
+      def: {
+        id: 'almanac5',
+        icon: '📖',
+        text: 'Добави 5 факта в алманаха си',
+        goal: 5,
+        xp: 70,
+        count: (e) => e.facts,
+      },
+    },
+    {
+      account: true,
+      when: (userId) => friendIds(userId).length > 0,
+      def: {
+        id: 'friendDuel',
+        icon: '🤝',
+        text: 'Изиграй дуел с приятел',
+        goal: 1,
+        xp: 80,
+        count: (e) => (e.friendDuel ? 1 : 0),
+      },
+    },
+    {
+      queue: 'squad',
+      def: {
+        id: 'arena',
+        icon: '🏟️',
+        text: 'Изиграй мач „Арена“',
+        goal: 1,
+        xp: 80,
+        count: (e) => (e.mode === 'squad' ? 1 : 0),
+      },
+    },
+    {
+      level: SEASONED,
+      def: {
+        id: 'final90',
+        icon: '🎯',
+        text: 'На финала с число бъди поне 90% близо',
+        goal: 1,
+        xp: 80,
+        count: (e) => ((e.finalCloseness ?? 0) >= 0.9 ? 1 : 0),
+      },
+    },
+    {
+      level: SEASONED,
+      def: {
+        id: 'order',
+        icon: '🔢',
+        text: 'Нареди един „Подреди“ без грешка',
+        goal: 1,
+        xp: 80,
+        count: (e) => e.ordersRight,
+      },
+    },
+    {
+      when: () => config.eveningAt !== null,
+      def: {
+        id: 'evening',
+        icon: '🌙',
+        text: 'Изиграй вечерния Роял',
+        goal: 1,
+        xp: 80,
+        count: (e) => (e.mode === 'evening' ? 1 : 0),
       },
     },
   ],
@@ -208,7 +314,8 @@ function todays(userId: number, day: string): Row[] {
         (s.level ?? 0) <= level &&
         level < (s.below ?? Number.POSITIVE_INFINITY) &&
         (!s.queue || config.openQueues.includes(s.queue)) &&
-        !(s.account && guest),
+        !(s.account && guest) &&
+        (!s.when || s.when(userId)),
     );
     return options[Math.floor(rng() * options.length)].def.id;
   });

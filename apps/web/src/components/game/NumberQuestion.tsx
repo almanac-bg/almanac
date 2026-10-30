@@ -51,6 +51,8 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
   const n = q.number!;
   const locked = game.myChoice !== null;
   const slider = slides(n);
+  // The final counts double.
+  const times = q.times;
   // Empty until it's moved, a slider too: a thumb resting in the middle mustn't be an answer by itself.
   const [text, setText] = useState('');
   const value = parse(text);
@@ -126,7 +128,7 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
             от {numberText(n.min, n)} до {numberText(n.max, n)}
           </p>
           <p className="text-fg-3">
-            до {fmt(NUMBER.points)} точки според близостта · +{NUMBER.exactBonus} за точно
+            до {fmt(NUMBER.points * times)} точки според близостта · +{NUMBER.exactBonus * times} за точно
           </p>
         </div>
       )}

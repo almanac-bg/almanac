@@ -43,21 +43,27 @@ test('the evening Роял: in from its lobby, on at the set time with bots maki
   const { start, end } = await autoPlay(socket, 'right');
   assert.equal(start!.mode, 'evening');
   assert.equal(start!.players.length, 8, 'one person and seven bots');
-  assert.deepEqual(start!.eliminationSchedule, [3, 6, 9, 12, 13]);
+  assert.deepEqual(start!.eliminationSchedule, [4, 7, 10, 12, 13]);
   assert.equal(start!.totalQuestions, 15);
   assert.equal(end.rewards!.rating, null, 'unrated');
 
-  // Over for tonight: the lobby is shut, and the night's top shows who played.
+  // Over for tonight: the lobby is shut. The place is kept, with how many people (not bots) the match had.
   const later = await emitAck(socket, 'evening:join');
   assert.equal(later.ok, false);
+  const kept = srv.db
+    .prepare('SELECT placement, players, people FROM evening_results WHERE user_id = ?')
+    .get(player.user.id) as { placement: number; players: number; people: number };
+  assert.deepEqual(
+    { ...kept },
+    { placement: end.standings.find((s) => s.id === `u${player.user.id}`)!.placement, players: 8, people: 1 },
+  );
   const night: EveningInfo = (await api.get('/api/evening', player.cookie)).body;
-  const mine = night.lastNight!.top.find((t) => t.user.username === 'vecherniak')!;
-  assert.equal(mine.placement, end.standings.find((s) => s.id === `u${player.user.id}`)!.placement);
   assert.ok(night.status!.startsAt > Date.now(), 'the next one is tomorrow');
 
-  // The winner wears the champion's title (bots win some nights: then nobody does).
+  // One person among bots: no night's top, and no champion, whoever came first.
+  assert.equal(night.lastNight, null);
   const me: MeUser = (await api.get('/api/me', player.cookie)).body.user;
-  assert.equal(me.eveningChampion, mine.placement === 1);
+  assert.equal(me.eveningChampion, false);
   const equip = await api.send('PATCH', '/api/me/loadout', player.cookie, { title: 'evening_champion' });
-  assert.equal(equip.status, mine.placement === 1 ? 200 : 400);
+  assert.equal(equip.status, 400);
 });

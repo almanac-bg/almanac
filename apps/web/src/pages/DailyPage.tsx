@@ -8,7 +8,7 @@ import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
 import { DayField } from '../components/results/DayField';
 import { Button, Card, Spinner } from '../components/ui';
-import { dailyLinkUrl, offBoardLine } from '../lib/daily';
+import { dailyLinkUrl, offBoardLine, placeShown } from '../lib/daily';
 import { useLoad } from '../lib/load';
 import { savedDailyShare, shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
@@ -135,7 +135,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                   <span className="text-lg text-fg-2">
                     · {info.played.correct}/{MODE.questions}
                   </span>
-                  {!info.offBoard && (
+                  {!info.offBoard && placeShown(info.total) && (
                     <span className="text-lg font-semibold text-amber-300">
                       {' '}
                       · #{info.played.rank} <span className="text-fg-3">от {info.total}</span>
