@@ -22,7 +22,10 @@ WORKDIR /app
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
 COPY --from=build /app/apps/web/dist-ssr apps/web/dist-ssr
-RUN mkdir -p /data && chown node:node /data
+# The server needs node alone: no package manager in the running image to fetch or run anything else.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm \
+      /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* \
+    && mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data
 EXPOSE 3001

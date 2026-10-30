@@ -1,4 +1,4 @@
-import { api, errorMessage, plural, setState } from '@quiz/client';
+import { api, errorMessage, plural, setState, toast } from '@quiz/client';
 import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, UsersRound } from 'lucide-react';
@@ -105,12 +105,18 @@ export function AuthPage() {
     setError(null);
     setBusy(true);
     try {
-      const { user } =
+      const { user, emailNotSent } =
         mode === 'login'
-          ? await api.login(username, password)
+          ? { ...(await api.login(username, password)), emailNotSent: undefined }
           : await api.register(username, password, email.trim() || undefined);
       markReturning();
       setState({ me: user });
+      if (emailNotSent)
+        toast({
+          kind: 'info',
+          title: 'Профилът е създаден, но писмото за потвърждение не тръгна',
+          body: `${emailNotSent} Добави имейла отново от Настройки.`,
+        });
     } catch (err) {
       setError(errorMessage(err));
     } finally {

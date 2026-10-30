@@ -64,6 +64,11 @@ export function AdminPage() {
             <ShieldCheck className="size-4" /> Модератор
           </p>
           <h1 className="mt-1 t-page">Модерация</h1>
+          {!me.email && (
+            <p className="mt-1 text-sm text-amber-300">
+              Нямаш потвърден имейл: няма да получаваш сутрешното резюме и сигналите за спешното (Настройки → Имейл).
+            </p>
+          )}
         </div>
         <Segmented
           value={section}

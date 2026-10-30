@@ -44,6 +44,26 @@ export class RateLimiter {
     return false;
   }
 
+  /**
+   * A per-network limit a flood from one network's many addresses can't turn on everyone: the wider network (IPv4
+   * /24, IPv6 /48) is counted first, at `wide` × the limit, and once that's over, no key of the network's own goes into
+   * the scope. Counted by /64 alone, one /48 is 65,536 networks: enough spent keys to fill the scope, which then turns
+   * every new network away (no password resets, sign-ups or sign-ins for anyone).
+   */
+  hitNetwork(
+    scope: string,
+    ip: string | undefined,
+    limit: number,
+    windowMs: number,
+    now = Date.now(),
+    wide = 4,
+  ): boolean {
+    return (
+      this.hit(`${scope}-wide:${wideNetwork(ip)}`, limit * wide, windowMs, now) ||
+      this.hit(`${scope}:${network(ip)}`, limit, windowMs, now)
+    );
+  }
+
   /** How many keys a scope holds right now. */
   keys(scope: string): number {
     return this.scopes.get(scope)?.size ?? 0;
@@ -66,13 +86,18 @@ export class RateLimiter {
   }
 }
 
-/** Per scope: far more than are ever in use at once, and a few MB when a scope is flooded. */
-const limiter = new RateLimiter(10_000);
+/** Per scope: far more than are ever in use at once, and some 10 MB at most when a scope is flooded. */
+const limiter = new RateLimiter(100_000);
 setInterval(() => limiter.sweep(), 10 * 60_000).unref();
 
 /** Counts one event for `key` (`scope:detail`, see RateLimiter); true once it went over `limit` within `windowMs`. */
 export function throttled(key: string, limit = 10, windowMs = 5 * 60_000): boolean {
   return limiter.hit(key, limit, windowMs);
+}
+
+/** `limit` per network within `windowMs`, the wider network counted first (see RateLimiter.hitNetwork). */
+export function throttledNetwork(scope: string, ip: string | undefined, limit: number, windowMs: number): boolean {
+  return limiter.hitNetwork(scope, ip, limit, windowMs);
 }
 
 /**

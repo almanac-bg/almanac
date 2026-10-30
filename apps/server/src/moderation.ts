@@ -968,6 +968,20 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
         );
       break;
     }
+    case 'approve':
+      // An approval taken back: the question leaves play.
+      hideQuestion(adminId, String(row.target));
+      break;
+    case 'dismiss_flags': {
+      // „Въпросът е наред“ taken back: the flags open again, and a question they had hidden is hidden again.
+      for (const id of (undo.flags as number[] | undefined) ?? [])
+        run(
+          "UPDATE question_reports SET status = 'open', resolved_at = NULL, resolved_by = NULL WHERE id = ? AND status = 'dismissed'",
+          id,
+        );
+      if (undo.hidden) hideQuestion(adminId, String(row.target));
+      break;
+    }
     case 'dismiss_reports': {
       // The reports open again, for a decision.
       const ids = (undo.reports as number[] | undefined) ?? [];

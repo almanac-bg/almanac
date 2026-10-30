@@ -178,10 +178,41 @@ const MEMORY_REPORT_BYTES = 800 * 2 ** 20;
 const BROWSER_PER_MINUTE = 10;
 const BROWSER_PER_DAY = 150;
 
+/** What a browser's error report holds: anything else (logs, traces, replays, attachments) isn't passed on. */
+const BROWSER_ITEMS = new Set(['event', 'client_report']);
+
+/** The item types in an envelope (after its header line), or null when it isn't one. */
+function itemTypes(body: Buffer, from: number): string[] | null {
+  const types: string[] = [];
+  let i = from;
+  while (i < body.length) {
+    const end = body.indexOf(10, i);
+    const line = body.subarray(i, end === -1 ? body.length : end).toString();
+    i = end === -1 ? body.length : end + 1;
+    if (!line.trim()) continue;
+    let header: { type?: unknown; length?: unknown };
+    try {
+      header = JSON.parse(line);
+    } catch {
+      return null;
+    }
+    if (typeof header?.type !== 'string') return null;
+    types.push(header.type);
+    // The payload: so many bytes when the header says, else a line.
+    if (typeof header.length === 'number') i += header.length + 1;
+    else {
+      const next = body.indexOf(10, i);
+      i = next === -1 ? body.length : next + 1;
+    }
+  }
+  return types;
+}
+
 /**
  * The browser SDK's tunnel: passes an envelope on to Sentry if it's addressed to this site's own project (so the
- * endpoint can't be used to send anything anywhere else). Returns false when it isn't. Over the cap it's accepted and
- * dropped, so the SDK doesn't retry.
+ * endpoint can't be used to send anything anywhere else). Returns false when it isn't. Only error reports go: a log
+ * line (which could pass for the server's own) or anything else is accepted and dropped, as is everything over the cap,
+ * so the SDK doesn't retry.
  */
 export function forwardEnvelope(body: string): boolean {
   if (!dsn) return false;
@@ -193,6 +224,9 @@ export function forwardEnvelope(body: string): boolean {
     return false;
   }
   if (header.dsn !== dsn.raw) return false;
+  const bytes = Buffer.from(body);
+  const types = newline === -1 ? [] : itemTypes(bytes, Buffer.byteLength(body.slice(0, newline)) + 1);
+  if (!types?.length || types.some((t) => !BROWSER_ITEMS.has(t))) return true;
   if (throttled('monitoring-browser', BROWSER_PER_MINUTE, 60_000)) return true;
   if (throttled('monitoring-browser-day', BROWSER_PER_DAY, 24 * 60 * 60_000)) return true;
   void send(dsn.url, body);

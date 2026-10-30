@@ -38,6 +38,9 @@ export interface UserRow {
   reminders_on_at: number | null;
   beaten_mails_on_at: number | null;
   terms_at: number | null;
+  /** Friend-duel wins that paid XP on `duel_win_day` (challenges.ts → payDuelWin). */
+  duel_win_day: string | null;
+  duel_wins_paid: number;
   daily_streak: number;
   best_daily_streak: number;
   last_daily_day: string | null;

@@ -19,6 +19,7 @@ const { purgeGuests, purgeRoomGuests, ROOM_GUEST_MS } = await import('../src/gue
 const { setRealtime } = await import('../src/notify');
 const { getUser } = await import('../src/users');
 const { count, countActive, launchStats } = await import('../src/stats');
+const { payDuelWin } = await import('../src/challenges');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -229,6 +230,21 @@ test('a wave of guests is cleared a batch at a time, up to a share per run', asy
   assert.equal(await purgeGuests(now, 100), 100, 'a run stops at its share');
   assert.equal(await purgeGuests(now), 30, 'the next takes the rest');
   assert.equal(one<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n, before);
+});
+
+test('a friend-duel win pays only between accounts that rate others, three a day: an alt that always loses feeds nobody', () => {
+  const now = Date.now();
+  const old = { created_at: now - 2 * DAY, games_played: 10 };
+  const main = user(old);
+  const rival = user(old);
+  const alt = user({ created_at: now - 60_000, games_played: 0 });
+  assert.equal(payDuelWin(main, alt, now), false, 'a new account');
+  assert.equal(payDuelWin(alt, main, now), false, 'either way round');
+  assert.deepEqual(
+    [1, 2, 3, 4].map(() => payDuelWin(main, rival, now)),
+    [true, true, true, false],
+  );
+  assert.equal(payDuelWin(main, rival, now + DAY), true, 'the next day, again');
 });
 
 test('launch statistics: daily counters, and returns counted against the day a player joined', () => {

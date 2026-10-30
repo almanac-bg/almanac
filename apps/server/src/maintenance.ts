@@ -56,6 +56,8 @@ export function purgeExpired(now = Date.now()) {
   purgeOldChallenges(now);
   pruneRecordPlays(now);
   run('DELETE FROM erased_bans WHERE erased_at < ?', now - ERASED_BAN_MS);
+  // An alert's „once a day“ marks (alerts.ts): a week on, nobody asks about that day.
+  run("DELETE FROM settings WHERE key LIKE 'alert:%' AND value < ?", shiftDay(dayKey(now), -7));
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

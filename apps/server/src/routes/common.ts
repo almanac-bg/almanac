@@ -100,11 +100,17 @@ export function requireRecentPassword(_req: Request, res: Response, next: NextFu
 }
 
 /**
+ * Every check of a signed-in player's password (confirming it, changing it, deleting the account) counts against one
+ * allowance: a stolen session gets ten guesses in 15 minutes, not ten for each place that asks.
+ */
+export const passwordChecks = (userId: number) => throttled(`password-check:${userId}`, 10, 15 * 60_000);
+
+/**
  * The player's password, given again: to change or remove the email (whoever controls it can reset the password), and
- * to confirm a session for what needs a recent one (/auth/confirm, requireRecentPassword). Ten tries in 15 minutes.
+ * to confirm a session for what needs a recent one (/auth/confirm, requireRecentPassword).
  */
 export async function confirmPassword(res: Response, password: string): Promise<boolean> {
-  if (throttled(`confirm-password:${res.locals.userId}`, 10, 15 * 60_000)) {
+  if (passwordChecks(res.locals.userId)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return false;
   }

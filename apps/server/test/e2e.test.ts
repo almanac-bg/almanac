@@ -152,10 +152,21 @@ test(
     const stored = srv.db.prepare('SELECT password_hash AS h FROM users WHERE id = ?').get(old.user.id) as {
       h: string;
     };
-    assert.match(stored.h, /^scrypt\$N=65536,r=8,p=1\$/, 'and is redone at the current cost');
+    assert.match(stored.h, /^scrypt\$N=65536,r=8,p=2\$/, 'and is redone at the current cost');
     assert.equal(
       (await api.send('POST', '/api/auth/login', '', { username: 'star_hash', password: 'secret123' })).status,
       200,
+    );
+    // So is one from the cost before this (p = 1).
+    const p1 = `scrypt$N=65536,r=8,p=1$${salt.toString('base64')}$${scryptSync('secret123', salt, 64, { N: 2 ** 16, r: 8, p: 1, maxmem: 256 * 2 ** 20 }).toString('base64')}`;
+    srv.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(p1, old.user.id);
+    assert.equal(
+      (await api.send('POST', '/api/auth/login', '', { username: 'star_hash', password: 'secret123' })).status,
+      200,
+    );
+    assert.match(
+      (srv.db.prepare('SELECT password_hash AS h FROM users WHERE id = ?').get(old.user.id) as { h: string }).h,
+      /^scrypt\$N=65536,r=8,p=2\$/,
     );
   },
 );
@@ -197,6 +208,13 @@ test('an address gets a few verification mails a day, whoever types it in', T, a
   for (let i = 0; i < 5; i++) await register(srv.url, `pismo_${i}`, 'someone@example.test');
   const sent = srv.mails().filter((m) => m.to === 'someone@example.test').length - before;
   assert.equal(sent, 3, 'three, then nothing until tomorrow (the sign-ups themselves still work)');
+  const sixth = await api.send('POST', '/api/auth/register', '', {
+    username: 'pismo_6',
+    password: 'secret123',
+    email: 'someone@example.test',
+  });
+  assert.equal(sixth.status, 201);
+  assert.match(sixth.body.emailNotSent, /Твърде много писма/, 'and the sign-up says the mail didn’t go');
 });
 
 test('the mail provider reports a bounce: no more reminders, and Settings says why', T, async () => {
@@ -1438,6 +1456,8 @@ test('friends, invites and challenges', T, async () => {
   assert.equal((await api.get('/api/duels', A.cookie)).body.duels[0].state, 'theirs');
   assert.equal((await api.get(`/api/challenges/${duel.id}`, B.cookie)).body.duel.theirs.score, aScore);
 
+  // Both rate others (a day old, ten matches): a duel win between them pays.
+  srv.db.prepare('UPDATE users SET games_played = MAX(games_played, 10) WHERE id IN (?, ?)').run(A.user.id, B.user.id);
   const xpBefore = (await api.get('/api/me', A.cookie)).body.user.xp;
   const log = newLog();
   const bPlays = autoPlay(sb, 'wrong', log);
@@ -1787,6 +1807,19 @@ test('community questions', T, async () => {
   const backNote = next(sb, 'notification');
   await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
   assert.match((await backNote).item.text, /отново е в играта/);
+
+  // An approval taken back from the log: the question leaves play.
+  const approval = (await api.get('/api/admin/log', A.cookie)).body.entries.find(
+    (e: { action: string; target: string }) => e.action === 'approve' && e.target === questionId,
+  );
+  assert.ok(approval.canUndo);
+  const undone = await api.send('POST', `/api/admin/log/${approval.id}/undo`, A.cookie, {
+    reason: 'Одобрен по погрешка.',
+  });
+  assert.equal(undone.status, 200, undone.body.error);
+  const stillHidden = (await api.get('/api/admin/question-reports', A.cookie)).body.hidden;
+  assert.ok(stillHidden.some((q: { id: string }) => q.id === questionId));
+  await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
 });
 
 test('season settlement', T, async () => {
@@ -2520,6 +2553,15 @@ test(
       action: 'dismiss',
     });
     assert.equal(dismissed.status, 200, dismissed.body.error);
+    // „Въпросът е наред“ taken back from the log: the flags are open again, and the question hidden again.
+    const [dismissal] = (await api.get('/api/admin/log', A.cookie)).body.entries;
+    assert.equal(dismissal.action, 'dismiss_flags');
+    const back = await api.send('POST', `/api/admin/log/${dismissal.id}/undo`, A.cookie, {
+      reason: 'Сигналите бяха прави.',
+    });
+    assert.equal(back.status, 200, back.body.error);
+    assert.deepEqual(await hidden(), [id]);
+    await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'dismiss' });
     for (const u of [A, B, F]) await flag(u.cookie);
     assert.deepEqual(await hidden(), [], 'their flags were dismissed once: they wait for a moderator now');
     await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'dismiss' });

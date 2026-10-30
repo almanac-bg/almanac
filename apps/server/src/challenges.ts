@@ -22,6 +22,7 @@ import { notify, unreadAbout } from './notifications';
 import { push } from './push';
 import { type PreparedQuestion, pickDuelSet, pickMatch, recentFor, reorderOptions, withoutAuthors } from './questions';
 import { count } from './stats';
+import { ratesPeople } from './trust';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';
 
 /** How long a challenge link can be played. */
@@ -31,7 +32,23 @@ const DAY = 24 * 60 * 60 * 1000;
  * A friend duel: a challenge for one friend, who has a day to play it. Not rated (they play it at different times);
  * a win pays as a 1-on-1 win does.
  */
-export const DUEL = { hours: 24, winXp: 65, openPerPair: 3 } as const;
+export const DUEL = { hours: 24, winXp: 65, openPerPair: 3, paidWinsPerDay: 3 } as const;
+
+/**
+ * Whether a friend-duel win pays its XP: only between accounts that rate others (a day old, ten matches: trust.ts), and
+ * for DUEL.paidWinsPerDay wins a day — or a second account that always loses would buy the first one's level. Counts
+ * the win as paid when it does.
+ */
+export function payDuelWin(winnerId: number, loserId: number, now = Date.now()): boolean {
+  const winner = getUser(winnerId);
+  const loser = getUser(loserId);
+  if (!winner || !loser || !ratesPeople(winner, now) || !ratesPeople(loser, now)) return false;
+  const today = dayKey(now);
+  const paid = winner.duel_win_day === today ? winner.duel_wins_paid : 0;
+  if (paid >= DUEL.paidWinsPerDay) return false;
+  run('UPDATE users SET duel_win_day = ?, duel_wins_paid = ? WHERE id = ?', today, paid + 1, winnerId);
+  return true;
+}
 
 interface ChallengeRow {
   id: string;
@@ -444,11 +461,12 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
     });
   } else {
     const theirs = standing.outcome === 'won' ? 'lost' : standing.outcome === 'lost' ? 'won' : 'draw';
-    if (theirs === 'won') grantXp(friendId, DUEL.winXp);
+    const paid = theirs === 'won' && payDuelWin(friendId, userId);
+    if (paid) grantXp(friendId, DUEL.winXp);
     notify(friendId, {
       icon: theirs === 'won' ? '🏆' : theirs === 'lost' ? '⚔️' : '🤝',
       text: `${me.username} изигра дуела ви: ${standing.theirs.score} на ${score} — ${NOTE_OUTCOME[theirs]}${
-        theirs === 'won' ? ` (+${DUEL.winXp} XP)` : ''
+        paid ? ` (+${DUEL.winXp} XP)` : ''
       }.`,
       link,
       replace: true,

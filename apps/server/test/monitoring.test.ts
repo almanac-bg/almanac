@@ -114,8 +114,13 @@ test('the browser tunnel passes on envelopes for our project only', async () => 
   assert.equal(forwardEnvelope(envelope(DSN)), true);
   assert.equal(forwardEnvelope(envelope('https://other@evil.example/1')), false, 'never an open relay');
   assert.equal(forwardEnvelope('not json'), false);
+  // A log line from a browser could pass for the server's own: accepted (no retries) and dropped, as is anything else.
+  const log = `${JSON.stringify({ dsn: DSN })}\n${JSON.stringify({ type: 'log', item_count: 1 })}\n{"items":[]}\n`;
+  assert.equal(forwardEnvelope(log), true);
+  const replay = `${JSON.stringify({ dsn: DSN })}\n${JSON.stringify({ type: 'event' })}\n{}\n${JSON.stringify({ type: 'replay_event', length: 2 })}\n{}\n`;
+  assert.equal(forwardEnvelope(replay), true);
   await sleep(200);
-  assert.equal(received.length, 1);
+  assert.equal(received.length, 1, 'only the error report went on');
   assert.equal(received[0].url, '/api/42/envelope/');
 });
 

@@ -907,6 +907,14 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX erased_bans_age ON erased_bans(erased_at);
     `,
   },
+  // v34, abuse (challenges.ts → payDuelWin): friend-duel wins that paid XP today, so a second account that always loses
+  // can't feed the first one's level.
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN duel_win_day TEXT;
+    ALTER TABLE users ADD COLUMN duel_wins_paid INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

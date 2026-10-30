@@ -6,6 +6,7 @@ import { isCommonPassword } from './commonPasswords';
 import { config } from './config';
 import { one, run, tx } from './db';
 import { emailChangedMail, type Mail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
+import { reportError } from './monitoring';
 import { disconnectOtherSessions, disconnectUser } from './notify';
 import { throttled } from './throttle';
 import { emailKey, getUser, getUserByEmail, getUserByLogin } from './users';
@@ -72,16 +73,23 @@ export function requestEmailChange(userId: number, email: string, net: string): 
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const user = getUser(userId)!;
   if (user.email_key === emailKey(parsed.data)) return { ok: false, error: 'Това вече е твоят имейл.' };
-  // Whoever types an address, it's the mailbox's owner who gets the mail: a few a day per address (sign-up, a saved
-  // guest and Settings all come through here), and a ceiling for all of them, so nobody can mail a stranger in the
-  // site's name again and again.
+  // Whoever types an address, it's the mailbox's owner who gets the mail: a few a day per address and sender (sign-up,
+  // a saved guest and Settings all come through here) — so a stranger can't spend the owner's own allowance — a few
+  // more per address from everyone, and a ceiling for all of them near what the site really sends, so nobody can mail
+  // strangers in the site's name again and again (their complaints would send password resets to spam).
+  const to = emailKey(parsed.data);
   if (
-    throttled(`email-to:${emailKey(parsed.data)}`, 3, 24 * 60 * 60_000) ||
     // One network's share of the ceiling below: no single sender can use all of it up for everyone else.
-    throttled(`verify-mail-net:${net}`, 20, 60 * 60_000) ||
-    throttled('verify-mail-all', 300, 60 * 60_000)
+    throttled(`verify-mail-net:${net}`, 10, 60 * 60_000) ||
+    throttled(`email-to-from:${to}:${net}`, 3, 24 * 60 * 60_000) ||
+    throttled(`email-to:${to}`, 8, 24 * 60 * 60_000)
   )
     return { ok: false, error: 'Твърде много писма до този адрес. Опитай отново утре.' };
+  if (throttled('verify-mail-all', 60, 60 * 60_000)) {
+    if (!throttled('verify-mail-all-reported', 1, 60 * 60_000))
+      void reportError(new Error('Over 60 verification mails in an hour'), 'verification mail flood');
+    return { ok: false, error: 'В момента пращаме твърде много писма. Опитай отново след час.' };
+  }
   run('UPDATE users SET pending_email = ? WHERE id = ?', parsed.data, userId);
   const token = issueToken(userId, 'verify', parsed.data);
   sendMail(verifyEmailMail(parsed.data, user.username, link('/verify-email', token)));

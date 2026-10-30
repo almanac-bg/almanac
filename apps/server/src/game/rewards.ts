@@ -18,7 +18,7 @@ import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
 import { factCount, factsSince, noteMatch } from '../almanac';
 import { recordAnswers } from '../answers';
-import { DUEL, recordChallengeResult } from '../challenges';
+import { DUEL, payDuelWin, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, run, tx } from '../db';
 import { recordEvening } from '../evening';
@@ -295,7 +295,7 @@ function rewardHuman(
     : null;
   // A friend duel decided by this run: a win pays as a 1-on-1 win (the friend who played first got theirs then).
   const duelWon = challengeResult?.duel?.outcome === 'won';
-  if (duelWon && counts)
+  if (duelWon && counts && payDuelWin(userId, challengeResult!.duel!.friend.id))
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
   // ── Daily quests ──

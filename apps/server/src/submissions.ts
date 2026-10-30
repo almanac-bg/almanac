@@ -15,7 +15,7 @@ import { grantXp } from './account';
 import { all, one, run, tx } from './db';
 import { logAction } from './modlog';
 import { notify } from './notifications';
-import { type Question, questionBank, reloadQuestionBank } from './questions';
+import { questionBank, reloadQuestionBank } from './questions';
 import { getUser, toPublicUser, type UserRow } from './users';
 
 const [qMin, qMax] = SUBMISSION_RULES.question;
@@ -241,12 +241,21 @@ export function similarQuestions(id: number): SimilarQuestion[] {
   const options = JSON.parse(row.options) as string[];
   const answer = normalize(options[row.answer]);
   const words = stems(`${row.q} ${options[row.answer]}`);
-  const scored: { q: Question; score: number }[] = [];
-  for (const q of questionBank()) {
-    if (q.id === row.question_id) continue;
-    const other = stems(`${q.q} ${q.options[q.answer]}`);
+  // The bank, and the other proposals still waiting: two players can send the same question in the same week.
+  const candidates: SimilarQuestion[] = [
+    ...questionBank()
+      .filter((q) => q.id !== row.question_id)
+      .map((q) => ({ id: q.id, q: q.q, answer: q.options[q.answer] })),
+    ...all<Row>(
+      "SELECT * FROM question_submissions WHERE status = 'pending' AND id <> ? ORDER BY id LIMIT 500",
+      id,
+    ).map((r) => ({ id: `предложение №${r.id}`, q: r.q, answer: (JSON.parse(r.options) as string[])[r.answer] })),
+  ];
+  const scored: { q: SimilarQuestion; score: number }[] = [];
+  for (const q of candidates) {
+    const other = stems(`${q.q} ${q.answer}`);
     const shared = [...words].filter((w) => other.has(w)).length;
-    const sameAnswer = normalize(q.options[q.answer]) === answer;
+    const sameAnswer = normalize(q.answer) === answer;
     const overlap = shared / Math.max(1, Math.min(words.size, other.size));
     if ((sameAnswer && shared >= 1) || (shared >= 2 && overlap >= 0.5))
       scored.push({ q, score: overlap + (sameAnswer ? 1 : 0) });
@@ -254,7 +263,7 @@ export function similarQuestions(id: number): SimilarQuestion[] {
   return scored
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map(({ q }) => ({ id: q.id, q: q.q, answer: q.options[q.answer] }));
+    .map(({ q }) => q);
 }
 
 export function mySubmissions(userId: number): Submission[] {
@@ -314,10 +323,13 @@ export function approveSubmission(
       final.fact ? (final.factSource ?? null) : null,
       Date.now(),
     );
-    logAction({ adminId, action: 'approve', userId: row.user_id, target: questionId });
+    // Undone, it leaves play (hidden): a question already played keeps its id and its numbers.
+    logAction({ adminId, action: 'approve', userId: row.user_id, target: questionId, undo: {} });
+    // All of it as approved (with the moderator's edits): „Одобрени“ and the author's own list show what's in play, and
+    // „Поправи“ from there starts from it — a source or a fact left behind would wipe the live one.
     run(
       `UPDATE question_submissions SET status = 'approved', reviewed_at = ?, reviewed_by = ?, question_id = ?,
-         category = ?, difficulty = ?, q = ?, options = ?, answer = ?
+         category = ?, difficulty = ?, q = ?, options = ?, answer = ?, answer_source = ?, fact = ?, fact_source = ?
        WHERE id = ?`,
       Date.now(),
       adminId,
@@ -327,6 +339,9 @@ export function approveSubmission(
       final.q,
       JSON.stringify(final.options),
       final.answer,
+      final.answerSource ?? null,
+      final.fact ?? null,
+      final.fact ? (final.factSource ?? null) : null,
       id,
     );
     grantXp(row.user_id, SUBMISSION_RULES.approvedXp);

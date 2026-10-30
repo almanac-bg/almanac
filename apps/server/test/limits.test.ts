@@ -65,6 +65,17 @@ test('keys under their limit make room oldest first; an ended window starts over
   assert.equal(limiter.keys('forgot'), 1, 'sweeping forgets the windows that ended');
 });
 
+test('one IPv6 /48 flooding a per-network limit with its /64s turns only itself away, not everyone', () => {
+  const limiter = new RateLimiter(1000);
+  // Six password-reset requests from each of 2,000 /64s of one /48: more spent keys than the scope holds.
+  for (let i = 0; i < 2000; i++)
+    for (let k = 0; k < 6; k++) limiter.hitNetwork('forgot-ip', `2001:db8:1:${i.toString(16)}::1`, 5, 900_000, 0);
+  assert.equal(limiter.hitNetwork('forgot-ip', '203.0.113.7', 5, 900_000, 0), false, 'a new network is let in');
+  assert.equal(limiter.hitNetwork('forgot-ip', '2001:db8:2::1', 5, 900_000, 0), false, 'and another /48');
+  assert.ok(limiter.keys('forgot-ip') <= 6, `a handful of keys, not thousands (${limiter.keys('forgot-ip')})`);
+  assert.equal(limiter.hitNetwork('forgot-ip', '2001:db8:1:ffff::1', 5, 900_000, 0), true, 'the /48 itself is over');
+});
+
 test('addresses are counted by their network, and by the wider network around it', () => {
   assert.equal(network('203.0.113.7'), '203.0.113.7');
   assert.equal(network('::ffff:203.0.113.7'), '203.0.113.7');
@@ -77,9 +88,9 @@ test('addresses are counted by their network, and by the wider network around it
 });
 
 test('password hashing leaves two pool threads and a CPU core free, and queues about three seconds', () => {
-  assert.deepEqual(hashingLimits(4, 8), { slots: 2, waiting: 32 }, "libuv's default pool");
-  assert.deepEqual(hashingLimits(8, 8), { slots: 4, waiting: 64 }, 'the Docker image (UV_THREADPOOL_SIZE=8)');
-  assert.deepEqual(hashingLimits(8, 2), { slots: 1, waiting: 16 }, 'a two-core server keeps a core for the game');
-  assert.deepEqual(hashingLimits(1, 1), { slots: 1, waiting: 16 }, 'always at least one');
-  assert.deepEqual(hashingLimits(64, 64), { slots: 4, waiting: 64 }, 'never more than four (64 MiB each)');
+  assert.deepEqual(hashingLimits(4, 8), { slots: 2, waiting: 16 }, "libuv's default pool");
+  assert.deepEqual(hashingLimits(8, 8), { slots: 4, waiting: 32 }, 'the Docker image (UV_THREADPOOL_SIZE=8)');
+  assert.deepEqual(hashingLimits(8, 2), { slots: 1, waiting: 8 }, 'a two-core server keeps a core for the game');
+  assert.deepEqual(hashingLimits(1, 1), { slots: 1, waiting: 8 }, 'always at least one');
+  assert.deepEqual(hashingLimits(64, 64), { slots: 4, waiting: 32 }, 'never more than four (64 MiB each)');
 });

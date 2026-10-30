@@ -97,7 +97,11 @@ services:
     profiles: ["backup"]
     restart: unless-stopped
     logging: *logging
+    # It holds the backup keys and the whole database: as locked down as the app (writes only to the data volume).
     security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
     mem_limit: 256m
     pids_limit: 128
     # The app's user (node in the Node image): a database Litestream restores, and everything it keeps next to it,

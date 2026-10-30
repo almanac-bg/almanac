@@ -20,6 +20,11 @@ const transport = config.smtpUrl ? nodemailer.createTransport(config.smtpUrl) : 
 if (!transport && config.production) {
   console.warn('✉️  SMTP_URL is not set: password-reset and verification emails are not being sent.');
 }
+// smtp:// upgrades to TLS only if the server offers it: someone in between who hides the offer reads the login and
+// every reset link. smtps:// (port 465) or ?requireTLS=true insists.
+if (config.smtpUrl?.startsWith('smtp://') && !/[?&]requireTLS=true\b/.test(config.smtpUrl)) {
+  console.warn('✉️  SMTP_URL is smtp:// without requireTLS=true: use smtps://…:465, or add ?requireTLS=true.');
+}
 
 /**
  * Sends in the background; failures are logged and reported (an expired SMTP key would otherwise stop every email

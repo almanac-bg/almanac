@@ -27,7 +27,7 @@ import { count } from '../stats';
 import { network, throttled } from '../throttle';
 import { emailKey, getUser, nameTaken, usernameKey } from '../users';
 import { Registration } from './auth';
-import { confirmPassword, parse, requireAccount } from './common';
+import { confirmPassword, parse, passwordChecks, requireAccount } from './common';
 
 /**
  * The signed-in player's own account: /me and what they wear, email and password, reminders and web push, their data
@@ -100,7 +100,7 @@ accountRouter.post('/account/password', requireAuth, requireAccount, async (req,
     res,
   );
   if (!body) return;
-  if (throttled(`password:${res.locals.userId}`, 10, 15 * 60_000)) {
+  if (passwordChecks(res.locals.userId)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
@@ -262,7 +262,7 @@ accountRouter.post('/account/delete', requireAuth, async (req, res) => {
   // Guests have no password (deleteAccount asks everyone else for theirs).
   const body = parse(z.object({ password: z.string().max(200).default('') }), req, res);
   if (!body) return;
-  if (throttled(`delete:${res.locals.userId}`, 5, 15 * 60_000)) {
+  if (passwordChecks(res.locals.userId)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }

@@ -15,6 +15,10 @@ import { getUserByEmail } from './users';
  */
 const UNDELIVERABLE = new Set(['email_dropped', 'email_mailbox_not_found', 'email_spam', 'email_blocklisted']);
 
+// A short secret is one someone can try their way to; said at start (the endpoint still works, so reports aren't lost).
+if (config.emailEventsSecret && config.emailEventsSecret.length < 32)
+  console.warn('📮 EMAIL_EVENTS_SECRET is shorter than 32 characters: make a longer one (openssl rand -hex 16).');
+
 /** Whether a request's secret is this installation's (in constant time). No secret configured: nothing matches. */
 export function emailEventsSecretMatches(secret: string): boolean {
   const expected = config.emailEventsSecret;

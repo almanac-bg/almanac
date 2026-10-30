@@ -36,7 +36,7 @@ import { nameShape } from '../names';
 import { disconnectSession } from '../notify';
 import { guestsPaused } from '../settings';
 import { count } from '../stats';
-import { network, throttled, wideNetwork } from '../throttle';
+import { network, throttled, throttledNetwork, wideNetwork } from '../throttle';
 import { newSecret, otpauthUri, verify as verifyCode } from '../totp';
 import { getUser, getUserByLogin, nameTaken, usernameKey } from '../users';
 import { confirmPassword, parse, requireAccount, requireRecentPassword, requireStaff } from './common';
@@ -74,7 +74,7 @@ export const Token = z.string().min(10, BROKEN_LINK).max(200, BROKEN_LINK);
 
 authRouter.post('/auth/register', async (req, res) => {
   // Generous per-network limit: a whole school class (or a mobile operator's shared address) may sign up from it.
-  if (throttled(`register:${network(req.ip)}`, 60, 60 * 60_000)) {
+  if (throttledNetwork('register', req.ip, 60, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много регистрации. Опитай по-късно.' });
     return;
   }
@@ -122,11 +122,12 @@ authRouter.post('/auth/register', async (req, res) => {
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
   }
-  if (creds.email) requestEmailChange(userId, creds.email, network(req.ip));
+  // The account is made either way; a verification mail that couldn't go is said, not passed over.
+  const mail = creds.email ? requestEmailChange(userId, creds.email, network(req.ip)) : null;
   count('signups');
   setSessionCookie(res, createSession(userId));
   setDeviceCookie(res, userId);
-  res.status(201).json({ user: getMe(userId) });
+  res.status(201).json({ user: getMe(userId), ...(mail && !mail.ok && { emailNotSent: mail.error }) });
 });
 
 authRouter.post('/auth/login', async (req, res) => {
@@ -135,7 +136,7 @@ authRouter.post('/auth/login', async (req, res) => {
   const tooMany = () => res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
   // Per IP across accounts (password spraying) first: names are the sender's to choose, so a network over its limit
   // adds no keys for new ones.
-  if (throttled(`login-ip:${network(req.ip)}`, 100, 15 * 60_000)) return tooMany();
+  if (throttledNetwork('login-ip', req.ip, 100, 15 * 60_000)) return tooMany();
   const user = getUserByLogin(creds.username);
   // Then per IP and account, and per account across IPs (distributed guessing) — counted by the account itself, so its
   // name and its email don't each get an allowance. A device this account signed in from before has an allowance of
@@ -175,7 +176,7 @@ authRouter.post('/auth/forgot', (req, res) => {
   const body = parse(z.object({ login: z.string().trim().min(1, 'Въведи име или имейл.').max(254) }), req, res);
   if (!body) return;
   if (
-    throttled(`forgot-ip:${network(req.ip)}`, 5, 15 * 60_000) ||
+    throttledNetwork('forgot-ip', req.ip, 5, 15 * 60_000) ||
     throttled(`forgot:${usernameKey(body.login)}`, 3, 60 * 60_000)
   ) {
     res.status(429).json({ error: 'Твърде много заявки. Опитай по-късно.' });
@@ -188,7 +189,7 @@ authRouter.post('/auth/forgot', (req, res) => {
 authRouter.post('/auth/reset', async (req, res) => {
   const body = parse(z.object({ token: Token, password: PasswordSchema }), req, res);
   if (!body) return;
-  if (throttled(`reset:${network(req.ip)}`, 10, 15 * 60_000)) {
+  if (throttledNetwork('reset', req.ip, 10, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
@@ -211,7 +212,7 @@ authRouter.post('/auth/reset', async (req, res) => {
 /** The token alone proves mailbox ownership, so this works signed out too. */
 authRouter.post('/auth/verify-email', (req, res) => {
   // Links can't be guessed (32 random bytes), but there's no reason to let anyone try thousands.
-  if (throttled(`verify:${network(req.ip)}`, 20, 15 * 60_000)) {
+  if (throttledNetwork('verify', req.ip, 20, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }

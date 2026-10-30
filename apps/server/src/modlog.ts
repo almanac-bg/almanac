@@ -95,9 +95,7 @@ export function laterDecision(r: LogRow): LogRow | undefined {
 
 /** Where a moderator sees what an entry was about. */
 function linkOf(r: LogRow): string | null {
-  if (r.action === 'hide_set' || r.action === 'unhide_set') return r.target && `/sets/shared/${r.target}`;
-  if (r.target_user_id && !r.target) return null;
-  return null;
+  return (r.action === 'hide_set' || r.action === 'unhide_set') && r.target ? `/sets/shared/${r.target}` : null;
 }
 
 function toEntry(r: LogRow, names: Map<number, UserRow | undefined>): ModerationLogEntry {

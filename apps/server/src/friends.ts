@@ -52,8 +52,20 @@ export function blockPlayer(userId: number, otherId: number): { ok: true } | { o
   if (!getUser(otherId)) return { ok: false, error: 'Няма такъв играч.' };
   const [a, b] = pair(userId, otherId);
   tx(() => {
-    run('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created_at) VALUES (?, ?, ?)', userId, otherId, Date.now());
+    const now = Date.now();
+    run('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created_at) VALUES (?, ?, ?)', userId, otherId, now);
     run('DELETE FROM friendships WHERE user_a = ? AND user_b = ?', a, b);
+    // Friend duels still open between them end now (one couldn't otherwise keep pinging the other with its turn).
+    run(
+      `UPDATE challenges SET expires_at = ? WHERE expires_at > ? AND rival_id IS NOT NULL
+       AND ((creator_id = ? AND rival_id = ?) OR (creator_id = ? AND rival_id = ?))`,
+      now,
+      now,
+      userId,
+      otherId,
+      otherId,
+      userId,
+    );
   });
   return { ok: true };
 }

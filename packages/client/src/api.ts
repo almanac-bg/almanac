@@ -134,8 +134,9 @@ export const api = {
   site: () => request<SiteInfo>('GET', '/legal'),
   login: (username: string, password: string) =>
     request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
+  /** `emailNotSent`: the account is made, but the verification mail couldn't go (why). */
   register: (username: string, password: string, email?: string) =>
-    request<{ user: MeUser }>('POST', '/auth/register', { username, password, email }),
+    request<{ user: MeUser; emailNotSent?: string }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
   /** The password again, for what needs a recent one (see onPasswordNeeded). */
   confirmPassword: (password: string) => request<{ ok: true }>('POST', '/auth/confirm', { password }),

@@ -20,11 +20,11 @@ interface ScryptParams {
   p: number;
 }
 /**
- * The cost of new password hashes: N = 2^16 (64 MiB, about 180 ms on the server), within what OWASP recommends. Each
- * hash says its own parameters, so older ones (N = 2^14, written as `scrypt$salt$hash`) still verify, and are redone
- * at the current cost on the next sign-in (needsRehash).
+ * The cost of new password hashes: N = 2^16, r = 8, p = 2 (64 MiB, about 360 ms on the server) — OWASP's floor for
+ * scrypt (N = 2^16 with p = 1 was below it). Each hash says its own parameters, so older ones (p = 1; N = 2^14, written
+ * as `scrypt$salt$hash`) still verify, and are redone at the current cost on the next sign-in (needsRehash).
  */
-const SCRYPT: ScryptParams = { N: 2 ** 16, r: 8, p: 1 };
+const SCRYPT: ScryptParams = { N: 2 ** 16, r: 8, p: 2 };
 const LEGACY: ScryptParams = { N: 2 ** 14, r: 8, p: 1 };
 const paramsText = ({ N, r, p }: ScryptParams) => `N=${N},r=${r},p=${p}`;
 // scrypt needs 128·N·r bytes; Node refuses anything over 32 MiB unless told.
@@ -62,7 +62,7 @@ export class ServerBusyError extends Error {}
  */
 export function hashingLimits(poolSize: number, cores: number): { slots: number; waiting: number } {
   const slots = Math.max(1, Math.min(4, poolSize - 2, cores - 1));
-  return { slots, waiting: slots * 16 };
+  return { slots, waiting: slots * 8 };
 }
 const { slots: MAX_HASHING, waiting: MAX_WAITING } = hashingLimits(
   Number(process.env.UV_THREADPOOL_SIZE) || 4, // libuv's default

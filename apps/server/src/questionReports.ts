@@ -205,10 +205,11 @@ export function hideQuestion(adminId: number | null, questionId: string) {
  */
 export function resolveQuestionReports(adminId: number, questionId: string, action: QuestionReportAction): Result {
   if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
-  const reporters = all<{ user_id: number }>(
-    "SELECT user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
+  const open = all<{ id: number; user_id: number }>(
+    "SELECT id, user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
     questionId,
-  ).map((r) => r.user_id);
+  );
+  const reporters = open.map((r) => r.user_id);
   let shown = false;
   tx(() => {
     // Dismissed: those players' flags on this question never count toward hiding it again (reportQuestion).
@@ -226,7 +227,14 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
       run('DELETE FROM question_stats WHERE question_id = ?', questionId);
       run('DELETE FROM question_skill WHERE question_id = ?', questionId);
       logAction({ adminId, action: 'fix_question', target: questionId });
-    } else if (action === 'dismiss') logAction({ adminId, action: 'dismiss_flags', target: questionId });
+    } else if (action === 'dismiss')
+      // Which flags, and whether it was hidden: an undo opens them again and hides it again.
+      logAction({
+        adminId,
+        action: 'dismiss_flags',
+        target: questionId,
+        undo: { flags: open.map((r) => r.id), hidden: shown },
+      });
   });
   if (action === 'hide') hideQuestion(adminId, questionId);
   else if (shown || action === 'fixed') reloadQuestionBank();
