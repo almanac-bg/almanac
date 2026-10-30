@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
-import { PlayerName } from '../components/FitName';
+import { FitName, PlayerName } from '../components/FitName';
 import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
@@ -144,7 +144,8 @@ export function LeaderboardPage() {
                       className="relative mt-2"
                     />
                     <div className="relative mt-2 flex max-w-full items-center gap-1.5 text-sm font-semibold sm:mt-3 sm:text-base">
-                      <PlayerName name={e.user.username} />
+                      {/* A size down before a second line: a phone's column is about 75 px wide. */}
+                      <FitName as="span" name={e.user.username} min={11} />
                       <LevelBadge level={e.user.level} className="shrink-0 max-sm:hidden" />
                     </div>
                     <div className="relative max-w-full truncate text-xs text-fg-3 max-sm:hidden">
@@ -223,14 +224,16 @@ function Row({ board, entry: e, me }: { board: LeaderboardBoard; entry: Leaderbo
     <Link
       to={`/profile/${encodeURIComponent(e.user.username)}`}
       className={clsx(
-        'flex items-center gap-4 px-5 py-3 transition-colors hover:bg-tint/[0.04]',
+        'flex items-center gap-3 px-4 py-3 transition-colors hover:bg-tint/[0.04] sm:gap-4 sm:px-5',
         me && 'bg-violet-500/10',
       )}
     >
-      <span className="w-8 text-right font-bold text-fg-3 tabular-nums">{e.rank}</span>
+      <span className="w-7 shrink-0 text-right font-bold text-fg-3 tabular-nums sm:w-8">{e.rank}</span>
       <Avatar avatar={e.user.avatar} frame={e.user.frame} size={40} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 font-semibold">
+        {/* On a phone the name has about 120 px: a size down, and the level under it when they don't fit side by side
+            (in 70 px „Миленка.Стоянова“ broke as „Миленк / а…“). */}
+        <div className="flex flex-wrap items-center gap-x-1.5 font-semibold max-sm:text-sm">
           <PlayerName name={e.user.username} />
           <LevelBadge level={e.user.level} />
         </div>

@@ -1,14 +1,25 @@
 import clsx from 'clsx';
-import { Fragment, useLayoutEffect, useRef } from 'react';
+import { Fragment, type RefObject, useLayoutEffect, useRef } from 'react';
 
 /**
- * A player's name as a heading (3–20 letters, no spaces). It keeps its usual size when it fits on one line; otherwise
- * the font steps down until it does, but never below `min` px. Only then does it take a second line, broken after a
- * "_", "." or "-" or where letters meet digits ("Мозъчко" / "2502"), and anywhere only as the last resort. Measured,
- * not guessed: Cyrillic in the display font runs much wider than Latin.
+ * A player's name as a heading, or on a podium (`as="span"`): an account's 3–20 letters, or a room's name with spaces.
+ * It keeps its usual size when it fits on one line; otherwise the font steps down until it does, but never below `min`
+ * px. Only then does it take a second line, broken at a space, after a "_", "." or "-" or where letters meet digits
+ * ("Мозъчко" / "2502"), and anywhere only as the last resort. Measured, not guessed: Cyrillic runs much wider than
+ * Latin. A span needs a box of its own (a flex item, or `block`) to be measured against.
  */
-export function FitName({ name, className, min = 16 }: { name: string; className?: string; min?: number }) {
-  const ref = useRef<HTMLHeadingElement>(null);
+export function FitName({
+  name,
+  className,
+  min = 16,
+  as: Tag = 'h1',
+}: {
+  name: string;
+  className?: string;
+  min?: number;
+  as?: 'h1' | 'span';
+}) {
+  const ref = useRef<HTMLElement>(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -56,9 +67,12 @@ export function FitName({ name, className, min = 16 }: { name: string; className
   }, [name, min]);
 
   return (
-    <h1 ref={ref} className={clsx('line-clamp-2 [overflow-wrap:anywhere]', className)}>
+    <Tag
+      ref={ref as RefObject<HTMLHeadingElement>}
+      className={clsx('line-clamp-2 [overflow-wrap:anywhere]', className)}
+    >
       <Breakable name={name} />
-    </h1>
+    </Tag>
   );
 }
 

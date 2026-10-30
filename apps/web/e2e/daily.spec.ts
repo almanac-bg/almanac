@@ -13,6 +13,21 @@ test("a newcomer's first tap plays the day's questions; a duel is the next thing
   await expect(page.getByRole('button', { name: 'Играй Дуел', exact: true })).toBeVisible();
 });
 
+test("a visitor answers the landing's one question: the right answer and its fact, then the day's ten a tap away", async ({
+  page,
+}) => {
+  await page.goto('/');
+  const sample = page.getByRole('region', { name: /Валя Балканска/ });
+  await sample.getByRole('button', { name: /^Б\) / }).click();
+  await expect(sample.getByRole('button', { name: /— твоят избор, грешен$/ })).toBeVisible();
+  await expect(sample.getByRole('button', { name: /^А\) .* — верен отговор$/ })).toBeVisible();
+  await expect(sample.getByText('Знаеше ли?', { exact: true })).toBeVisible();
+  // Answered once: the others can't be pressed any more.
+  await expect(sample.getByRole('button', { name: /^В\) / })).toBeDisabled();
+  await sample.getByRole('button', { name: 'Играй въпросите на деня', exact: true }).click();
+  await expect(page).toHaveURL(/\/game$/);
+});
+
 test("a friend opens someone's daily link, plays the same questions and sees how they did against them", async ({
   page,
   newPlayer,

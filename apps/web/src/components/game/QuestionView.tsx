@@ -121,6 +121,14 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           className="absolute -top-20 left-1/2 size-60 -translate-x-1/2 rounded-full opacity-30 glow"
           style={{ color: accentText(cat.color) }}
         />
+        {/* The category's face, large and faint in the corner: what kind of question it is, at a glance. */}
+        {!game.start.questionSet && !q.image && (
+          <Emoji
+            e={cat.icon}
+            size="clamp(5.5rem, 22vw, 8.5rem)"
+            className="pointer-events-none absolute -right-3 -bottom-4 -rotate-12 opacity-[0.18]"
+          />
+        )}
         {q.image && (
           <QuestionPicture image={q.image} credit={reveal?.credit} className="relative mb-4 short:mb-2 flat:mb-1.5" />
         )}
@@ -244,6 +252,12 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         {reveal?.fact && game.start.players.length === 1 && <FactNote index={q.index} fact={reveal.fact} />}
         {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
         {reveal && !reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} />}
+        {/* A class whose teacher stopped on this answer to talk it through. */}
+        {reveal && game.paused === reveal.index && (
+          <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
+            <Pause aria-hidden className="size-4 shrink-0" /> Пауза на големия екран — следващият въпрос идва след нея.
+          </p>
+        )}
       </div>
     </m.section>
   );
@@ -290,7 +304,7 @@ function FactNote({ index, fact }: { index: number; fact: string }) {
         <span className="font-bold text-amber-200">
           <Lightbulb aria-hidden className="mb-0.5 inline size-4" /> Знаеше ли?{' '}
         </span>
-        {fact}
+        {keepTogether(fact)}
       </p>
       <div className="mt-2 flex justify-end">
         {state === 'holding' ? (

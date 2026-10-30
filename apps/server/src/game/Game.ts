@@ -65,6 +65,8 @@ const GRACE_MS = 400;
 /** Pause between the last answer arriving and the reveal. */
 const EARLY_REVEAL_MS = 600;
 const REVEAL_MS = 4_000;
+/** The longest a room host's „Пауза“ holds the next question: a big screen left paused doesn't keep the room forever. */
+const HOST_PAUSE_MS = 10 * 60_000;
 const ELIMINATION_EXTRA_MS = 2_000;
 /** A round's category, picked: on screen this long before its first question. */
 const ROUND_CARD_MS = 2_000;
@@ -299,8 +301,13 @@ export class Game {
   /** A run played alone whose player stopped on the fact (each stop gets a number, so an old timer can't end a new one). */
   private reading = 0;
   private readingSeq = 0;
-  /** The reveal ended while they were reading: the next question comes when they go on. */
+  /** A room's host paused the big screen on a reveal (numbered as `reading` is): the next question waits for them. */
+  private paused = 0;
+  private pauseSeq = 0;
+  /** The reveal ended while they were reading (or the host had paused): the next question comes when they go on. */
   private waitingForReader = false;
+  /** The reveal's own wait for the next question, which the host's „Следващ“ cuts short. */
+  private revealTimer: NodeJS.Timeout | null = null;
 
   private questionStartedAt = 0;
   /** The open question's clock: the match's, or a number's (longer: it's typed in). */
@@ -511,6 +518,41 @@ export class Game {
     return true;
   }
 
+  /**
+   * A class's pace, from the host's big screen: „Пауза“ on a reveal holds the next question while the teacher talks the
+   * answer through (HOST_PAUSE_MS at most); „Следващ“ brings it on now, paused or not. Everyone sees the pause.
+   */
+  steer(userId: number, index: number, action: 'pause' | 'next'): boolean {
+    if (userId !== this.setup.presenter || this.phase !== 'reveal' || index !== this.index) return false;
+    if (action === 'pause') {
+      // Not while the server drains: a pause would hold the match until it's cut short.
+      if (this.paused || this.hooks.draining()) return false;
+      const seq = ++this.pauseSeq;
+      this.paused = seq;
+      this.later(HOST_PAUSE_MS, () => this.unpause(seq));
+      this.toGame('game:paused', { index, paused: true });
+      return true;
+    }
+    this.guard(() => {
+      this.paused = 0;
+      this.waitingForReader = false;
+      if (this.revealTimer) clearTimeout(this.revealTimer);
+      this.revealTimer = null;
+      this.advance();
+    });
+    return true;
+  }
+
+  /** The host's pause runs out (or the server drains): on as if „Следващ“ had come when the reveal ended. */
+  private unpause(seq = this.paused) {
+    if (!this.paused || seq !== this.paused) return;
+    this.paused = 0;
+    this.toGame('game:paused', { index: this.index, paused: false });
+    if (!this.waitingForReader || this.reading) return;
+    this.waitingForReader = false;
+    this.advance();
+  }
+
   /** On with the run after a fact (or after FACT_HOLD_MS: `seq` says which stop the timer was for). */
   resume(playerId: string, seq = this.reading) {
     this.guard(() => {
@@ -635,9 +677,13 @@ export class Game {
     this.guard(() => this.finishUnattended());
   }
 
-  /** The server starts draining: a run held for its absent player ends now, and one stopped on a fact goes on. */
+  /**
+   * The server starts draining: a run held for its absent player ends now, and one stopped on a fact (or a class paused
+   * by its host) goes on.
+   */
   drain() {
     if (this.held) return this.endForDrain();
+    if (this.paused) return this.guard(() => this.unpause());
     if (!this.reading) return;
     this.reading = 0;
     if (!this.waitingForReader) return;
@@ -667,7 +713,7 @@ export class Game {
    * is decided at once rather than keeping the knocked-out waiting minutes for their result.
    */
   private advance() {
-    if (this.reading) {
+    if (this.reading || this.paused) {
       this.waitingForReader = true;
       return;
     }
@@ -969,7 +1015,7 @@ export class Game {
       crowd: this.crowdOf(q),
     });
     this.botReactions(results);
-    this.later(nextInMs, () => this.advance());
+    this.revealTimer = this.later(nextInMs, () => this.advance());
   }
 
   /** The next question's picture, to fetch while this one's answer is shown (unknown while its round isn't picked). */

@@ -106,6 +106,8 @@ export interface LiveGame {
   /** The first pick was wrong and a second one is allowed. */
   retryPrompt: boolean;
   reveal: RevealPayload | null;
+  /** The reveal a room's host paused the big screen on: the next question waits for them. */
+  paused: number | null;
   /** Just reconnected: until the server re-sends the question on screen, it may already be closed. */
   resyncing: boolean;
   /** In a match in rounds: each round's category, as far as it's decided. */

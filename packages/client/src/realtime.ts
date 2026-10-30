@@ -227,6 +227,7 @@ function bind(s: GameSocket) {
         retryArmed: false,
         retryPrompt: false,
         reveal: null,
+        paused: null,
         resyncing: false,
         rounds: start.rounds,
         pick: null,
@@ -323,6 +324,8 @@ function bind(s: GameSocket) {
     effect('wrong');
     patchGame((g) => ({ myChoice: null, retryPrompt: true, removed: [...g.removed, wrong] }));
   });
+
+  s.on('game:paused', ({ index, paused }) => patchGame(() => ({ paused: paused ? index : null })));
 
   s.on('game:reveal', (reveal) => {
     const before = getState().game;
@@ -697,6 +700,9 @@ export const actions = {
    */
   holdOnFact: async (index: number) => (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok,
   resumeAfterFact: () => getSocket().emit('game:resume'),
+  /** The big screen's host sets a class's pace on a reveal: hold the next question, or bring it on now. */
+  steer: async (index: number, action: 'pause' | 'next') =>
+    (await ask(() => withTimeout().emitWithAck('game:steer', { index, action }))).ok,
   /** Emotes are for the moment: one that can't go out now is dropped. */
   react: (emote: string) => void sendMove('game:react', emote),
   /** Unlike a move, a leave made offline should still land after the reconnect, so this one may queue. */

@@ -546,6 +546,14 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       if (game) game.resume(game.playerIdFor(userId));
     });
 
+    // A class's big screen sets its pace: „Пауза“ on a reveal, „Следващ“ at any point of one.
+    on('game:steer', (p, ack) => {
+      const game = games.presentedBy(userId);
+      const { index, action } = obj(p);
+      const steered = (action === 'pause' || action === 'next') && !!game?.steer(userId, int(index), action);
+      reply(ack, steered ? { ok: true } : { ok: false, error: 'Въпросът вече продължи.' });
+    });
+
     on('game:react', (emote) => {
       const game = games.forUser(userId);
       if (game) game.react(game.playerIdFor(userId), str(emote, 16));

@@ -35,6 +35,7 @@ import { buttonClass, Card } from '../components/ui';
 import CHRISTMAS from '../content/christmas.json';
 import { useSite } from '../lib/site';
 import { usePublicPageTitle } from '../lib/title';
+import { keepTogether } from '../lib/typography';
 import { NotFoundPage } from './NotFoundPage';
 
 interface SampleQuestion {
@@ -336,7 +337,7 @@ export function QuizCategoryPage() {
                   {q.fact && (
                     <>
                       {' '}
-                      <span className="font-semibold text-amber-200">Знаеше ли?</span> {q.fact}
+                      <span className="font-semibold text-amber-200">Знаеше ли?</span> {keepTogether(q.fact)}
                       {q.factSource && (
                         <>
                           {' '}
@@ -401,7 +402,7 @@ export function FactsPage() {
             <ul className="space-y-3">
               {facts.map((q) => (
                 <li key={q.id}>
-                  <b>{q.options[q.answer]}.</b> {q.fact}{' '}
+                  <b>{q.options[q.answer]}.</b> {keepTogether(q.fact ?? '')}{' '}
                   {q.factSource && (
                     <a
                       href={q.factSource}
@@ -448,6 +449,8 @@ export function TeachersPage() {
           </li>
           <li>
             <b>„Само водя“:</b> учителят не играе, а показва на проектора въпроса, как е отговорил класът и класирането.
+            На всеки отговор „Пауза“ задържа следващия въпрос, докато го обсъдите, а „Следващ въпрос“ го пуска веднага —
+            и от презентационно дистанционно (стрелка надясно).
           </li>
           <li>Вие избирате категориите, броя въпроси ({ROOM_LIMITS.questions.join(', ')}) и времето за въпрос.</li>
         </ul>

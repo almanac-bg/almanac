@@ -1,15 +1,16 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Lightbulb, Users } from 'lucide-react';
+import { ArrowRight, Check, Lightbulb, Pause, Users } from 'lucide-react';
 import { m } from 'motion/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
+import { FitName } from '../FitName';
 import { burst } from '../results/confetti';
 import { Button } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
@@ -49,6 +50,28 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     if (revealed !== null) sfx.correct();
   }, [revealed]);
 
+  // The teacher sets the pace on an answer: „Пауза“ to talk it through, „Следващ“ to go on now — from the screen, or a
+  // presenter's clicker (→ or PageDown), Space pausing and going on.
+  const paused = revealed !== null && game.paused === revealed;
+  const steer = (action: 'pause' | 'next') => {
+    if (revealed !== null) void actions.steer(revealed, action);
+  };
+  const keys = useRef({ steer, paused });
+  keys.current = { steer, paused };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // A focused button takes its own Space.
+      if (e.target instanceof Element && e.target.closest('button, a, input, textarea, select')) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') keys.current.steer('next');
+      else if (e.key === ' ') keys.current.steer(keys.current.paused ? 'next' : 'pause');
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="flex min-h-dvh flex-col bg-ink px-6 py-5 lg:px-12 lg:py-8">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -62,6 +85,23 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
           <p className="ml-auto font-display text-xl font-bold text-fg-2 lg:text-2xl">
             Въпрос {q.index + 1} от {q.total}
           </p>
+        )}
+        {q && reveal && !end && (
+          <div className="flex items-center gap-3">
+            {paused ? (
+              <span className="inline-flex items-center gap-2 font-semibold text-fg-2">
+                <Pause aria-hidden className="size-5" /> На пауза
+              </span>
+            ) : (
+              <Button variant="secondary" onClick={() => steer('pause')}>
+                <Pause aria-hidden className="size-4" /> Пауза
+              </Button>
+            )}
+            <Button onClick={() => steer('next')}>
+              {q.index + 1 >= q.total ? 'Към класирането' : 'Следващ въпрос'}{' '}
+              <ArrowRight aria-hidden className="size-4" />
+            </Button>
+          </div>
         )}
         {end && (
           <Button className="ml-auto" onClick={back}>
@@ -221,7 +261,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 <span className="font-bold text-amber-200">
                   <Lightbulb aria-hidden className="mb-1 inline size-6" /> Знаеше ли?{' '}
                 </span>
-                {reveal.fact}
+                {keepTogether(reveal.fact)}
               </p>
             )}
           </section>
@@ -372,7 +412,7 @@ function FinalBoard({ game, standings }: { game: LiveGame; standings: FinalStand
             >
               <Emoji e={medals[place]} size="3rem" />
               <Avatar avatar={p.avatar} frame={p.frame} size={place === 0 ? 120 : 88} />
-              <span className="mt-2 text-2xl font-extrabold [overflow-wrap:anywhere]">{p.name}</span>
+              <FitName as="span" name={p.name} min={18} className="mt-2 max-w-full text-2xl font-extrabold" />
               <span className="text-xl text-fg-2 tabular-nums">{fmt(s.score)} т.</span>
               <div className={clsx('mt-4 grid w-full justify-center rounded-t-3xl pt-3', stands[place])}>
                 <span className="font-display text-5xl font-black text-on-fill">{place + 1}</span>

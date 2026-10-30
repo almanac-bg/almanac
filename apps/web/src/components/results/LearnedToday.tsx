@@ -48,7 +48,7 @@ export function LearnedToday({ items, added }: { items: ReviewItem[]; added: num
                       : keepTogether(item.options[item.correct])}
                 </span>
               </p>
-              <p className="mt-1 text-[15px] text-fg text-pretty">{item.fact}</p>
+              <p className="mt-1 text-[15px] text-fg text-pretty">{keepTogether(item.fact ?? '')}</p>
             </div>
           </li>
         ))}

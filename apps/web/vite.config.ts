@@ -93,6 +93,13 @@ const manifest = JSON.stringify({
   ],
 });
 
+// The preview picture's address changes with the picture: Facebook, Messenger and Viber keep one by its address, and a
+// redrawn og.jpg under the old one would go on showing the old picture.
+const ogVersion = createHash('sha256')
+  .update(fs.readFileSync(path.join(import.meta.dirname, 'public', 'og.jpg')))
+  .digest('base64url')
+  .slice(0, 8);
+
 export default defineConfig({
   plugins: [
     react(),
@@ -103,6 +110,7 @@ export default defineConfig({
         html
           .replaceAll('%BRAND_NAME%', BRAND.name)
           .replaceAll('%BRAND_DOMAIN%', BRAND.domain)
+          .replaceAll('%OG_VERSION%', ogVersion)
           .replaceAll('%HOME_TITLE%', PUBLIC_PAGES['/'].title)
           .replaceAll('%HOME_DESCRIPTION%', PUBLIC_PAGES['/'].description),
       // The web app manifest comes from the same brand settings: a file in the build, and served by the dev server.

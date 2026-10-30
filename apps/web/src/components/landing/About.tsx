@@ -6,6 +6,7 @@ import { Link } from 'react-router';
 import { useSite } from '../../lib/site';
 import { Emoji } from '../Emoji';
 import { LegalLinks } from '../LegalLinks';
+import { SampleQuestion } from './SampleQuestion';
 
 const ABOUT_MODES: ModeId[] = ['daily', 'challenge', 'duel', 'royale', 'solo', 'custom'];
 
@@ -80,6 +81,8 @@ export function AboutGame({ cta }: { cta: ReactNode }) {
         — още повече. Играеш в браузъра, на телефона или на компютъра. Без изтегляне, без реклами, безплатно.
       </p>
 
+      <SampleQuestion cta={cta} />
+
       <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {ABOUT_MODES.map((modeId) => {
           const m = MODES[modeId];
@@ -104,10 +107,16 @@ export function AboutGame({ cta }: { cta: ReactNode }) {
         <div>
           <h3 className="t-card">{CATEGORIES.length} категории въпроси</h3>
           <p className="mt-1.5 text-sm text-fg-3">Избираш категория в „Соло“ или играеш микс от всички.</p>
+          {/* Each to its guide (/quiz/…): what it asks about, with sample questions. */}
           <ul className="mt-4 flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
-              <li key={c.id} className="rounded-full border border-line bg-tint/5 px-3 py-1.5 text-sm text-fg-2">
-                <Emoji e={c.icon} /> {c.name}
+              <li key={c.id}>
+                <Link
+                  to={`/quiz/${c.id}`}
+                  className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-tint/5 px-3 text-sm text-fg-2 hover:bg-tint/10 hover:text-fg"
+                >
+                  <Emoji e={c.icon} /> {c.name}
+                </Link>
               </li>
             ))}
           </ul>

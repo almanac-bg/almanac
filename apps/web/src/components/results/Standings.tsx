@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { shareText } from '../../lib/share';
 import { Avatar, LevelBadge, machineTag, PlayerTag } from '../Avatar';
 import { Emoji } from '../Emoji';
-import { PlayerName } from '../FitName';
+import { FitName } from '../FitName';
 import { accentText } from '../game/answers';
 import { BIG_MATCH, topAndYou } from '../game/bigMatch';
 import { teamColor } from '../game/teams';
@@ -141,7 +141,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
                     {p.name}
                   </Link>
                 ) : (
-                  <PlayerName name={p.name} />
+                  <FitName as="span" name={p.name} min={11} />
                 )}
                 <LevelBadge level={p.level} />
               </div>

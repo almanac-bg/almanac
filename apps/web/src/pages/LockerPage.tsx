@@ -22,6 +22,7 @@ import { m } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
+import { FitName } from '../components/FitName';
 import { KeyHint, POWERUP_KEYS } from '../components/game/Powerups';
 import { Card, Modal, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
@@ -86,8 +87,9 @@ export function LockerPage() {
             <Avatar avatar={me.avatar} frame={me.frame} size={wide ? 140 : 72} className="relative" />
           </m.div>
           <div className="relative min-w-0">
-            <h1 className="flex items-center gap-2 t-section lg:mt-5 lg:justify-center">
-              <span className="truncate">{me.username}</span> <LevelBadge level={level} />
+            {/* The name whole (a size down first), the level under it when they don't fit side by side. */}
+            <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 t-section lg:mt-5 lg:justify-center">
+              <FitName as="span" name={me.username} min={18} className="font-sans" /> <LevelBadge level={level} />
             </h1>
             <p className="mt-1 font-semibold text-violet-300">{titleName(me.title)}</p>
             <p className="mt-4 text-sm text-fg-3 max-lg:hidden">

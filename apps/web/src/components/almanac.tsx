@@ -41,7 +41,7 @@ export function FactItem({ fact }: { fact: AlmanacFact }) {
                 : keepTogether(fact.answer ?? '')}
           </span>
         </p>
-        <p className="mt-1 text-[15px] text-fg text-pretty">{fact.fact}</p>
+        <p className="mt-1 text-[15px] text-fg text-pretty">{keepTogether(fact.fact)}</p>
       </div>
     </div>
   );

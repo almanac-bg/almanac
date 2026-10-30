@@ -514,6 +514,8 @@ export interface ServerToClientEvents {
   /** An answer you sent wasn't taken (the client showed it as locked in). */
   'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
+  /** A room's host paused the big screen on this reveal (the next question waits), or the pause ran out. */
+  'game:paused': (p: { index: number; paused: boolean }) => void;
   /** A round's category is being picked (also re-sent to a client that reconnects meanwhile). */
   'game:pick': (p: PickPayload) => void;
   'game:round': (p: RoundPayload) => void;
@@ -586,6 +588,8 @@ export interface ClientToServerEvents {
   /** A run played alone: stop on this question's fact, to read it. The next question waits for game:resume. */
   'game:hold': (p: { index: number }, ack: Ack) => void;
   'game:resume': () => void;
+  /** A room's host, on the big screen: hold the next question on this reveal, or bring it on now. */
+  'game:steer': (p: { index: number; action: 'pause' | 'next' }, ack: Ack) => void;
 }
 
 // ─── REST ────────────────────────────────────────────────────────────────────

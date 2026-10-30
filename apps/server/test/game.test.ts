@@ -78,6 +78,8 @@ function setup(opts: {
   ratings?: Record<number, number>;
   /** Recordings of real players' matches to play against. */
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
+  /** A room's host running it on a big screen, by user id. */
+  presenter?: number;
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -107,6 +109,7 @@ function setup(opts: {
       })),
       bots: opts.bots ?? [],
       records: opts.records ?? [],
+      presenter: opts.presenter ?? null,
     },
     {
       toGame: (event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
@@ -521,6 +524,52 @@ test('with other people in the match, nobody can stop it to read', () => {
   advance(700);
   assert.equal(g.game.phase, 'reveal');
   assert.equal(g.game.hold('u1', g.game.index), false);
+});
+
+test('a class’s big screen sets the pace: „Пауза“ holds the next question (ten minutes at most), „Следващ“ brings it on now', () => {
+  const g = setup({ humans: [1, 2], presenter: 9 });
+  const toReveal = () => {
+    g.right(1);
+    g.right(2);
+    advance(700);
+    assert.equal(g.game.phase, 'reveal');
+    return g.game.index;
+  };
+
+  const at = toReveal();
+  assert.equal(g.game.steer(1, at, 'pause'), false, 'only the host');
+  assert.equal(g.game.steer(9, at + 1, 'pause'), false, 'only on the answer on screen');
+  assert.equal(g.game.steer(9, at, 'pause'), true);
+  assert.deepEqual(g.of('game:paused').at(-1), { index: at, paused: true });
+  assert.equal(g.game.steer(9, at, 'pause'), false, 'paused already');
+  advance(60_000);
+  assert.equal(g.game.phase, 'reveal', 'a minute on, still on the answer');
+  assert.equal(g.game.steer(9, at, 'next'), true);
+  assert.equal(g.game.phase, 'question');
+  assert.equal(g.game.index, at + 1);
+  assert.equal(g.game.steer(9, at + 1, 'next'), false, 'not while the question is open');
+
+  // „Следващ“ without a pause: on at once, and the reveal's own wait doesn't bring on another question later.
+  const next = toReveal();
+  assert.equal(g.game.steer(9, next, 'next'), true);
+  assert.equal(g.game.index, next + 1);
+  advance(4_500);
+  assert.equal(g.game.index, next + 1);
+
+  // A pause left alone runs out, and the match goes on.
+  const left = toReveal();
+  assert.equal(g.game.steer(9, left, 'pause'), true);
+  advance(10 * 60_000 + 100);
+  assert.equal(g.game.index, left + 1);
+  assert.deepEqual(g.of('game:paused').at(-1), { index: left, paused: false });
+
+  // The server drains: a pause ends, and no new one can hold the match up.
+  const drained = toReveal();
+  assert.equal(g.game.steer(9, drained, 'pause'), true);
+  g.drain();
+  advance(4_500);
+  assert.equal(g.game.index, drained + 1);
+  assert.equal(g.game.steer(9, toReveal(), 'pause'), false);
 });
 
 test('bots made up their minds when the question opened: once every person has answered, they answer at once', () => {

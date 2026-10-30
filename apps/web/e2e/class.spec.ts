@@ -62,8 +62,17 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await expect(teacher.getByRole('heading', { name: 'Коя е столицата на България?' })).toBeVisible({
     timeout: gameMs(10_000),
   });
+  // The teacher stops on the answer to talk it through, then goes on from the keyboard (a presenter's clicker sends →).
+  await pupil.getByRole('button', { name: /^[АБВГ]\) София/ }).click();
+  await teacher.getByRole('button', { name: 'Пауза', exact: true }).click({ timeout: gameMs(3_000) });
+  await expect(teacher.getByText('На пауза', { exact: true })).toBeVisible();
+  await expect(pupil.getByText('Пауза на големия екран', { exact: false })).toBeVisible();
+  await teacher.waitForTimeout(gameMs(2_000));
+  await expect(teacher.getByText('Въпрос 1 от 2', { exact: true })).toBeVisible();
+  await teacher.keyboard.press('ArrowRight');
+  await expect(teacher.getByRole('heading', { name: 'Дунав се влива в Черно море.' })).toBeVisible();
   const run = await playMatch(pupil);
-  expect(run).toEqual({ answered: 2, total: 2 });
+  expect(run).toEqual({ answered: 1, total: 2 });
   await expect(teacher.getByRole('heading', { name: 'Край!' })).toBeVisible();
   await expect(teacher.getByText('Мария 7Б')).toBeVisible();
 });

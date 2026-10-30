@@ -9,6 +9,7 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { DuelButton, DuelRow, useDuels, usePlayDuel } from '../components/duels';
 import { Emoji } from '../components/Emoji';
+import { PlayerName } from '../components/FitName';
 import { accentText } from '../components/game/answers';
 import { GroupsSection } from '../components/groups';
 import { LoadError } from '../components/LoadError';
@@ -168,10 +169,10 @@ function Friends() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
-                  {/* Where the name would be left a few letters, the buttons go under it. */}
-                  <Card className="flex flex-wrap items-center justify-end gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
-                    <PersonLink entry={f} className="basis-32" />
-                    <div className="flex shrink-0 gap-2">
+                  {/* As in the list: on a phone the buttons go under the name, which stays whole. */}
+                  <Card className="flex flex-wrap items-center gap-3 border-fuchsia-400/40 bg-fuchsia-500/[0.07] p-4">
+                    <PersonLink entry={f} />
+                    <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto">
                       <Button size="sm" onClick={() => mutate(() => api.acceptFriend(f.user.id), 'Вече сте приятели!')}>
                         <Check className="size-4" /> Приеми
                       </Button>
@@ -221,11 +222,13 @@ function Friends() {
           <SectionTitle>Изпратени покани</SectionTitle>
           <Card className="divide-y divide-line">
             {data.outgoing.map((f) => (
-              <div key={f.user.id} className="flex items-center gap-3 px-4 py-3 opacity-80 sm:px-5">
+              <div key={f.user.id} className="flex flex-wrap items-center gap-3 px-4 py-3 opacity-80 sm:px-5">
                 <PersonLink entry={f} hint={`изпратена ${timeAgo(f.since)}`} />
-                <Button size="sm" variant="ghost" onClick={() => mutate(() => api.removeFriend(f.user.id))}>
-                  Откажи поканата
-                </Button>
+                <div className="flex w-full justify-end sm:w-auto">
+                  <Button size="sm" variant="ghost" onClick={() => mutate(() => api.removeFriend(f.user.id))}>
+                    Откажи поканата
+                  </Button>
+                </div>
               </div>
             ))}
           </Card>
@@ -329,18 +332,18 @@ function AddFriendForm({ onAdded }: { onAdded: (d: FriendsResponse) => void }) {
   );
 }
 
-function PersonLink({ entry, hint, className }: { entry: FriendEntry; hint?: string; className?: string }) {
+function PersonLink({ entry, hint }: { entry: FriendEntry; hint?: string }) {
   const { user } = entry;
   return (
     <Link
       to={`/profile/${encodeURIComponent(user.username)}`}
-      className={clsx('focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl', className)}
+      className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
     >
       <Avatar avatar={user.avatar} frame={user.frame} size={44} />
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-semibold">{user.username}</span>
-          <LevelBadge level={user.level} />
+          <PlayerName name={user.username} className="font-semibold" />
+          <LevelBadge level={user.level} className="shrink-0" />
         </div>
         <div className="truncate text-xs text-fg-3">{hint ?? titleName(user.title)}</div>
       </div>
@@ -387,8 +390,8 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-semibold">{user.username}</span>
-            <LevelBadge level={user.level} />
+            <PlayerName name={user.username} className="font-semibold" />
+            <LevelBadge level={user.level} className="shrink-0" />
           </div>
           <div className="flex items-center gap-1.5 truncate text-xs">
             <span className="font-semibold" style={{ color: accentText(p.color) }}>

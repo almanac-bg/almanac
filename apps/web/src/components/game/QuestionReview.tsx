@@ -180,7 +180,7 @@ function ReviewRow({
         )}
         {item.fact && (
           <p className="mt-2 text-sm text-fg-2 text-pretty">
-            <Lightbulb aria-hidden className="mb-0.5 inline size-4 text-amber-200" /> {item.fact}
+            <Lightbulb aria-hidden className="mb-0.5 inline size-4 text-amber-200" /> {keepTogether(item.fact)}
           </p>
         )}
       </div>
