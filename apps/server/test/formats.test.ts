@@ -596,7 +596,9 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   assert.deepEqual([shown.w, shown.h, shown.alt], [800, 600, 'Каменна крепост на хълм']);
   const [e, sig] = [...shown.src.matchAll(/[?&][es]=([^&]+)/g)].map((m) => m[1]);
   assert.ok(pictureAllowed(up.id, e, sig));
-  assert.equal(pictureAllowed(up.id, e, `${sig.slice(0, -1)}A`), false, 'signed');
+  // One character changed, always to a different one: a signature that already ended in "A" failed this once in 64.
+  const forged = `${sig.slice(0, -1)}${sig.endsWith('A') ? 'B' : 'A'}`;
+  assert.equal(pictureAllowed(up.id, e, forged), false, 'signed');
   assert.equal(pictureAllowed(up.id, String(Number(e) + 3600), sig), false, 'for this expiry');
   assert.equal(pictureAllowed(up.id, e, sig, Number(e) * 1000 + 1), false, 'until it');
   assert.equal(numbered.kind, 'order');
