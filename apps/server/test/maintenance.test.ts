@@ -153,7 +153,7 @@ test('moderators get one email a day about what waits, from 09:00, and an alert 
   assert.equal(moderatorDigest(later), true);
   assert.equal(moderatorDigest(later + 60 * 60_000), false, 'once a day');
   const [digest] = toModerator();
-  assert.match(digest.text, /Предложени въпроси: 1/);
+  assert.match(digest.text, /Предложени въпроси: 1 \(най-старото чака \d+ дни\)/, 'and how long the oldest has waited');
 
   alertModerators('question:x', 'Сигнали', ['…'], later);
   alertModerators('question:x', 'Сигнали', ['…'], later + 60_000);

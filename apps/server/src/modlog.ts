@@ -20,6 +20,7 @@ interface LogRow {
   created_at: number;
   undone_at: number | null;
   undone_by: number | null;
+  undo_reason: string | null;
 }
 
 export function logAction(entry: {
@@ -52,8 +53,14 @@ export const logRow = (id: number) => one<LogRow>('SELECT * FROM moderation_log 
 
 export const parseUndo = <T>(row: LogRow): T | null => (row.undo ? (JSON.parse(row.undo) as T) : null);
 
-export function markUndone(id: number, adminId: number) {
-  run('UPDATE moderation_log SET undone_at = ?, undone_by = ? WHERE id = ?', Date.now(), adminId, id);
+export function markUndone(id: number, adminId: number, reason: string) {
+  run(
+    'UPDATE moderation_log SET undone_at = ?, undone_by = ?, undo_reason = ? WHERE id = ?',
+    Date.now(),
+    adminId,
+    reason,
+    id,
+  );
 }
 
 /**
@@ -108,6 +115,7 @@ function toEntry(r: LogRow, names: Map<number, UserRow | undefined>): Moderation
     createdAt: r.created_at,
     undoneAt: r.undone_at,
     undoneBy: name(r.undone_by),
+    undoReason: r.undo_reason,
     canUndo: !!r.undo && r.undone_at === null && !laterDecision(r),
   };
 }

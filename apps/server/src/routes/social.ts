@@ -12,7 +12,7 @@ import {
   requestFriend,
   unblockPlayer,
 } from '../friends';
-import { fileReport } from '../moderation';
+import { fileReport, playerSubject } from '../moderation';
 import { sendFriendsUpdate } from '../notify';
 import { throttled } from '../throttle';
 import { usernameKey } from '../users';
@@ -32,7 +32,12 @@ socialRouter.post('/reports', requireAuth, requireAccount, (req, res) => {
     res,
   );
   if (!body) return;
-  const result = fileReport(res.locals.userId, body.username, body.reason, body.details);
+  const subject = playerSubject(body.username);
+  if (!subject) {
+    res.status(400).json({ error: 'Няма такъв играч.' });
+    return;
+  }
+  const result = fileReport(res.locals.userId, subject, body.reason, body.details);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;

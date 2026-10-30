@@ -784,17 +784,43 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   });
   const copy = await api.send('POST', `/api/sets/shared/${mine.code}/copy`, B.cookie);
   assert.equal((await api.get(`/api/sets/${copy.body.id}`, B.cookie)).body.questions.length, 3);
+  // A notice of illegal content about the set: a case of its own, first in the queue, with a receipt for its sender.
   assert.equal(
-    (await api.send('POST', `/api/sets/shared/${mine.code}/report`, B.cookie, { details: 'обидно' })).status,
+    (await api.send('POST', `/api/sets/shared/${mine.code}/report`, B.cookie, { reason: 'name', details: 'x' })).status,
+    400,
+    "a set's reasons are a set's",
+  );
+  assert.equal(
+    (await api.send('POST', `/api/sets/shared/${mine.code}/report`, B.cookie, { reason: 'illegal', details: 'обидно' }))
+      .status,
     200,
   );
-  const filed = srv.db.prepare('SELECT details FROM reports WHERE target_id = ?').get(A.user.id) as {
-    details: string;
-  };
-  assert.match(filed.details, /^Набор „Урок по история“ \(\/sets\/shared\/.+\): обидно$/);
-  srv.db.prepare('DELETE FROM reports WHERE target_id = ?').run(A.user.id); // the moderation test counts its own
-  assert.equal((await api.send('POST', `/api/sets/shared/${mine.code}/hide`, B.cookie, { hidden: true })).status, 403);
-  srv.db.prepare('UPDATE question_sets SET hidden = 1 WHERE code = ?').run(mine.code);
+  assert.match(
+    (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,
+    /Получихме сигнала ти за незаконно съдържание в „Урок по история“/,
+  );
+  const [setCase] = (await api.get('/api/admin/reports', A.cookie)).body.cases;
+  assert.deepEqual(
+    [setCase.kind, setCase.id, setCase.name, setCase.size, setCase.reports[0].reason],
+    ['set', mine.code, 'Урок по история', 3, 'illegal'],
+  );
+  // The moderator reads all of it, and decides on the reports seen (one decided meanwhile is a conflict).
+  assert.equal((await api.get(`/api/admin/sets/${mine.code}`, B.cookie)).status, 403);
+  assert.equal((await api.get(`/api/admin/sets/${mine.code}`, A.cookie)).body.set.questions.length, 3);
+  const decide = (reportIds: number[], decision: object) =>
+    api.send('POST', `/api/admin/cases/set/${mine.code}/resolve`, A.cookie, { reportIds, decision });
+  const hide = { action: 'hide_set', basis: 'content', reason: 'Съдържа обиди към ученици.' };
+  assert.equal((await decide([setCase.reports[0].id + 1000], hide)).status, 409);
+  assert.equal((await decide([setCase.reports[0].id], { action: 'hide_set', reason: 'без основание' })).status, 400);
+  assert.equal((await decide([setCase.reports[0].id], hide)).status, 200);
+  assert.match(
+    (await api.get('/api/notifications', A.cookie)).body.notifications[0].text,
+    /Модератор скри набора ти „Урок по история“.*Основание: Неподходящо или незаконно съдържание.*Съдържа обиди/,
+  );
+  assert.match(
+    (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,
+    /Разгледахме доклада ти за „Урок по история“: наборът е скрит/,
+  );
   assert.equal((await api.get(`/api/sets/shared/${mine.code}`, B.cookie)).status, 404, 'hidden');
   assert.equal(
     (await api.get(`/api/sets/shared/${mine.code}`, A.cookie)).body.mine,
@@ -1933,14 +1959,24 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
     'a repeat report updates the open one',
   );
   assert.equal((await api.get('/api/admin/reports', B.cookie)).status, 403, 'only admins see reports');
-  const queue = (await api.get('/api/admin/reports', A.cookie)).body.groups;
+  const queue = (await api.get('/api/admin/reports', A.cookie)).body.cases;
   assert.equal(queue.length, 1);
-  assert.equal(queue[0].target.username, 'troll_test');
+  assert.deepEqual([queue[0].kind, queue[0].id, queue[0].owner.username], ['player', String(D.user.id), 'troll_test']);
   assert.equal(queue[0].reports.length, 1);
   assert.equal(queue[0].reports[0].reason, 'name');
+  assert.equal(queue[0].reports[0].reporter.name, 'maria_test', 'with who sent it');
   assert.deepEqual((await api.get('/api/admin/summary', A.cookie)).body.openReports, 1);
 
-  const resolve = (body: object) => api.send('POST', `/api/admin/reports/${D.user.id}/resolve`, A.cookie, body);
+  // A decision answers the reports the moderator saw.
+  const open = async () =>
+    (await api.get('/api/admin/reports', A.cookie)).body.cases
+      .filter((c: { kind: string; id: string }) => c.kind === 'player' && c.id === String(D.user.id))
+      .flatMap((c: { reports: { id: number }[] }) => c.reports.map((r) => r.id));
+  const resolve = async (decision: object) =>
+    api.send('POST', `/api/admin/cases/player/${D.user.id}/resolve`, A.cookie, {
+      reportIds: await open(),
+      decision,
+    });
   assert.equal(
     (await resolve({ action: 'rename', username: 'kurva_1', basis: 'name', reason: 'Името обижда другите играчи.' }))
       .status,
@@ -1973,11 +2009,16 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   const renamed = (await api.get('/api/notifications', D.cookie)).body.notifications[0];
   assert.match(
     renamed.text,
-    /Мирен_играч.*Неподходящо име.*Името обижда/,
-    'the player is told why, and where to appeal',
+    /Мирен_играч.*Неподходящо име.*Името обижда.*след сигнал от играч.*човек, не автоматично.*до 6 месеца.*извънсъдебно/,
+    'the player is told what, on what basis and why, that a person decided, and where to appeal',
   );
   assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
-  assert.equal((await api.get('/api/admin/reports', A.cookie)).body.groups.length, 0, 'reports close when resolved');
+  assert.equal((await api.get('/api/admin/reports', A.cookie)).body.cases.length, 0, 'reports close when resolved');
+  assert.match(
+    (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,
+    /Разгледахме доклада ти за „troll_test“: името е сменено/,
+    'and whoever reported hears what came of it',
+  );
 
   await api.send('POST', '/api/reports', B.cookie, { username: 'Мирен_играч', reason: 'cheating' });
   assert.equal(
@@ -1987,9 +2028,19 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   assert.equal((await api.get('/api/me', D.cookie)).body.user, null, 'a ban logs the player out');
   const login = await api.send('POST', '/api/auth/login', '', { username: 'Мирен_играч', password: 'secret123' });
   assert.equal(login.status, 403);
-  assert.match(login.body.error, /спрян до .*Нечестна игра.*Отговаря с програма.*Ако смяташ, че е грешка/);
+  assert.match(
+    login.body.error,
+    /спрян до .*Нечестна игра.*Отговаря с програма.*човек.*Ако смяташ, че е грешка.*данните си или изтриване/,
+  );
+  // With nothing reported any more, from the player's card.
   assert.equal(
-    (await resolve({ action: 'ban', days: null, basis: 'cheating', reason: 'Пак отговаря с програма.' })).status,
+    (
+      await api.send('POST', `/api/admin/players/${D.user.id}/ban`, A.cookie, {
+        days: null,
+        basis: 'cheating',
+        reason: 'Пак отговаря с програма.',
+      })
+    ).status,
     200,
     'permanent bans',
   );
@@ -2033,7 +2084,8 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     api.send('POST', `/api/admin/players/${E.user.id}/${what}`, A.cookie, body);
   const card = async () => (await api.get(`/api/admin/players/${E.user.id}`, A.cookie)).body.card;
   const log = async () => (await api.get('/api/admin/log', A.cookie)).body.entries;
-  const undo = (id: number) => api.send('POST', `/api/admin/log/${id}/undo`, A.cookie);
+  const undo = (id: number, reason = 'Обжалване: беше грешка.') =>
+    api.send('POST', `/api/admin/log/${id}/undo`, A.cookie, { reason });
 
   assert.equal((await api.get('/api/admin/players?q=izmam', B.cookie)).status, 403, 'moderators only');
   const found = (await api.get('/api/admin/players?q=izmam', A.cookie)).body.players;
@@ -2103,6 +2155,7 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   // Undone newest first: each puts back what it changed. An older one waits while a later decision stands, or it
   // would override it (undoing a week's ban once lifted a later permanent one).
   const [unban, shorter] = await log();
+  assert.equal((await undo(unban.id, 'кратко')).status, 400, 'an undo says why');
   assert.equal((await undo(unban.id)).status, 200);
   assert.ok((await card()).ban, 'the unban undone: banned again');
   assert.equal((await undo(unban.id)).status, 400, 'once');
@@ -2117,7 +2170,12 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   assert.equal((await undo(annulled.id)).status, 200);
   assert.deepEqual(results(), before, 'the results back');
   const entries = await log();
-  assert.ok(entries.find((e: { id: number }) => e.id === ban.id).undoneBy === A.user.username);
+  const undone = entries.find((e: { id: number }) => e.id === ban.id);
+  assert.deepEqual([undone.undoneBy, undone.undoReason], [A.user.username, 'Обжалване: беше грешка.']);
+  const told = srv.db
+    .prepare('SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 1')
+    .get(E.user.id) as { text: string };
+  assert.match(told.text, /върна резултатите ти.*Причина: Обжалване: беше грешка\./, 'the player hears each undo');
 
   // A rename, undone while the old name is free.
   assert.equal(
@@ -2135,17 +2193,29 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   assert.equal(group.status, 200, group.body.error);
   const groupId = group.body.id;
   assert.equal(
-    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, {})).status,
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'name' })).status,
     404,
     'only its members report a group',
   );
   const code = (srv.db.prepare('SELECT code FROM player_groups WHERE id = ?').get(groupId) as { code: string }).code;
   await api.send('POST', `/api/groups/join/${code}`, B.cookie);
-  assert.equal((await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { details: 'обидно' })).status, 200);
-  const report = (await api.get('/api/admin/reports', A.cookie)).body.groups.find(
-    (g: { target: { username: string } }) => g.target.username === 'izmamnik_test',
+  assert.equal(
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'content', details: 'обидно' }))
+      .status,
+    400,
+    "a group's reasons are a group's",
   );
-  assert.match(report.reports[0].details, new RegExp(`Група „Измамници“ \\(№${groupId}\\): обидно`));
+  assert.equal(
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'name', details: 'обидно' })).status,
+    200,
+  );
+  const report = (await api.get('/api/admin/reports', A.cookie)).body.cases.find(
+    (c: { kind: string; id: string }) => c.kind === 'group' && c.id === String(groupId),
+  );
+  assert.deepEqual(
+    [report.name, report.owner.username, report.reports[0].details],
+    ['Измамници', 'izmamnik_test', 'обидно'],
+  );
   assert.equal(
     (
       await api.send('POST', `/api/admin/groups/${groupId}/rename`, A.cookie, {
@@ -2156,11 +2226,17 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     200,
   );
   assert.equal((await card()).groups[0].name, `Група ${groupId}`);
+  const back = await api.send('PATCH', `/api/groups/${groupId}`, signedIn.cookie!, { name: 'Измамници 2' });
+  assert.match(back.body.error, /Модератор смени името наскоро/, "the owner can't put a name straight back");
+  assert.equal(
+    (await api.get('/api/admin/reports', A.cookie)).body.cases.some((c: { kind: string }) => c.kind === 'group'),
+    false,
+    "renaming the group closes its case's reports",
+  );
   const [renameGroup] = await log();
   assert.equal(renameGroup.action, 'rename_group');
   assert.equal((await undo(renameGroup.id)).status, 200);
   assert.equal((await card()).groups[0].name, 'Измамници');
-  assert.equal((await act('dismiss')).status, 200);
   await api.send('POST', `/api/groups/${groupId}/leave`, B.cookie);
 });
 

@@ -9,6 +9,7 @@ import {
   type GroupSummary,
   ordinal,
   shiftDay,
+  TIME_ZONE,
   weekEndsAt,
   weekStart,
 } from '@quiz/shared';
@@ -30,6 +31,8 @@ interface GroupRow {
   code: string;
   owner_id: number | null;
   created_at: number;
+  /** A moderator renamed it: its owner can't rename it again until then (moderation.ts → GROUP_NAME_LOCK_MS). */
+  name_locked_until: number | null;
 }
 
 type Result<T extends object = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -168,6 +171,12 @@ export function manageGroup(
   if (!g || !isMember(groupId, userId)) return { ok: false, error: 'Няма такава група.' };
   if (!runsGroup(g, userId)) return { ok: false, error: 'Само създателят на групата може това.' };
   if ('rename' in action) {
+    if (g.name_locked_until !== null && g.name_locked_until > Date.now()) {
+      const date = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'long', timeZone: TIME_ZONE }).format(
+        g.name_locked_until,
+      );
+      return { ok: false, error: `Модератор смени името наскоро — можеш да дадеш друго от ${date}.` };
+    }
     const name = cleanGroupName(action.rename);
     if (!name) return { ok: false, error: NAME_ERROR };
     const problem = textProblem(name, 'Името на групата');

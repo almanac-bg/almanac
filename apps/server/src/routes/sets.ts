@@ -1,14 +1,14 @@
-import { SETS } from '@quiz/shared';
+import { MODERATION, MODERATION_BASES, type ModerationBasis, SETS } from '@quiz/shared';
 import express, { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth';
-import { fileReport } from '../moderation';
+import { one } from '../db';
+import { fileReport, hideSetByModerator } from '../moderation';
 import {
   copySet,
   createSet,
   deleteSet,
   getSet,
-  hideSet,
   mySets,
   pictureFile,
   saveSet,
@@ -142,18 +142,21 @@ setsRouter.post('/sets/shared/:code/copy', requireAuth, requireAccount, (req, re
   res.json({ id: copied.id });
 });
 
-/** Something wrong with a shared set (offensive, or not what it says): a report about its author, with the link. */
+/** Something wrong with a shared set (offensive, illegal, not what it says): a report about the set. */
 setsRouter.post('/sets/shared/:code/report', requireAuth, requireAccount, (req, res) => {
-  const body = parse(z.object({ details: z.string().max(400).default('') }), req, res);
+  const body = parse(z.object({ reason: z.string(), details: z.string().max(400).default('') }), req, res);
   if (!body) return;
   const code = shareCode(req);
-  const preview = sharedPreview(code, res.locals.userId);
-  if (!preview?.author) {
+  const set = one<{ owner_id: number; name: string; hidden: number }>(
+    'SELECT owner_id, name, hidden FROM question_sets WHERE code = ?',
+    code,
+  );
+  if (!set || set.hidden) {
     res.status(404).json({ error: 'Този набор вече не е достъпен.' });
     return;
   }
-  const details = `Набор „${preview.name}“ (/sets/shared/${code})${body.details.trim() ? `: ${body.details.trim()}` : ''}`;
-  const filed = fileReport(res.locals.userId, preview.author, 'other', details);
+  const subject = { kind: 'set', id: code, owner: set.owner_id, label: set.name } as const;
+  const filed = fileReport(res.locals.userId, subject, body.reason, body.details);
   if (!filed.ok) {
     res.status(400).json({ error: filed.error });
     return;
@@ -161,12 +164,27 @@ setsRouter.post('/sets/shared/:code/report', requireAuth, requireAccount, (req, 
   res.json({ ok: true });
 });
 
-/** A moderator hides a set a report held up about (or shows it again). */
+/**
+ * A moderator hides a set (on a basis, with a reason its owner reads; every open report about it closes), or shows it
+ * again (with why).
+ */
 setsRouter.post('/sets/shared/:code/hide', requireAuth, requireAdmin, requireRecentPassword, (req, res) => {
-  const body = parse(z.object({ hidden: z.boolean() }), req, res);
+  const body = parse(
+    z.object({
+      hidden: z.boolean(),
+      basis: z
+        .enum(MODERATION_BASES.map((b) => b.id) as [ModerationBasis, ...ModerationBasis[]])
+        .nullable()
+        .default(null),
+      reason: z.string().max(MODERATION.reasonMax).default(''),
+    }),
+    req,
+    res,
+  );
   if (!body) return;
-  if (!hideSet(shareCode(req), body.hidden, res.locals.userId)) {
-    res.status(404).json({ error: 'Няма такъв набор.' });
+  const done = hideSetByModerator(res.locals.userId, shareCode(req), body.hidden, body);
+  if (!done.ok) {
+    res.status(done.status ?? 400).json({ error: done.error });
     return;
   }
   res.json({ ok: true });

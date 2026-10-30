@@ -22,7 +22,6 @@ import {
   type ProfileStats,
   RANK_TIERS,
   RARITIES,
-  REPORT_REASONS,
   type ReportReason,
   seasonTitle,
   titleName,
@@ -38,6 +37,7 @@ import { FitName } from '../components/FitName';
 import { accentText } from '../components/game/answers';
 import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
+import { ReportReasons } from '../components/ReportReasons';
 import { Button, buttonClass, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
@@ -511,7 +511,7 @@ function ReportButton({ username }: { username: string }) {
     setBusy(true);
     try {
       await api.report(username, reason, details);
-      toast({ kind: 'success', title: 'Благодарим! Модераторите ще прегледат доклада.' });
+      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще го прегледа, а ти ще научиш какво решихме.' });
       setOpen(false);
       setReason(null);
       setDetails('');
@@ -534,26 +534,7 @@ function ReportButton({ username }: { username: string }) {
         <Flag className="size-4.5" />
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title={`Докладвай ${username}`}>
-        <div className="space-y-2">
-          {REPORT_REASONS.map((r) => (
-            <label
-              key={r.id}
-              className={clsx(
-                'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
-                reason === r.id ? 'border-rose-400/50 bg-rose-500/10' : 'border-line hover:bg-tint/5',
-              )}
-            >
-              <input
-                type="radio"
-                name="reason"
-                checked={reason === r.id}
-                onChange={() => setReason(r.id)}
-                className="accent-rose-400"
-              />
-              {r.label}
-            </label>
-          ))}
-        </div>
+        <ReportReasons kind="player" value={reason} onChange={setReason} />
         <textarea
           value={details}
           onChange={(e) => setDetails(e.target.value.slice(0, 500))}

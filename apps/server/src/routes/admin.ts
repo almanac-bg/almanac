@@ -7,13 +7,13 @@ import {
   annulResults,
   banPlayer,
   changeBan,
+  decideCase,
   dismissReports,
+  openCases,
   openReportCount,
-  openReports,
   playerCard,
   renameGroupByModerator,
   renamePlayer,
-  resolveReports,
   searchPlayers,
   undoAction,
 } from '../moderation';
@@ -26,6 +26,7 @@ import {
   unhideQuestion,
 } from '../questionReports';
 import { bankProblem, reloadQuestionBank } from '../questions';
+import { setForModerator } from '../sets';
 import { launchStats } from '../stats';
 import {
   approveSubmission,
@@ -47,10 +48,10 @@ export const adminRouter = Router();
 adminRouter.use('/admin', requireAuth, requireAdmin);
 const change = requireRecentPassword;
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result = { ok: true } | { ok: false; error: string; status?: number };
 const reply = (res: import('express').Response, result: Result, body: () => object = () => ({ ok: true })) => {
   if (!result.ok) {
-    res.status(400).json({ error: result.error });
+    res.status(result.status ?? 400).json({ error: result.error });
     return;
   }
   res.json(body());
@@ -149,7 +150,7 @@ adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {
 // ─── Reports about players, and the players ──────────────────────────────────
 
 adminRouter.get('/admin/reports', (_req, res) => {
-  res.json({ groups: openReports() });
+  res.json(openCases());
 });
 
 const Decision = z.discriminatedUnion('action', [
@@ -162,12 +163,38 @@ const Decision = z.discriminatedUnion('action', [
     reason: Reason,
     annul: z.boolean().optional(),
   }),
+  z.object({ action: z.literal('rename_group'), basis: Basis, reason: Reason }),
+  z.object({ action: z.literal('hide_set'), basis: Basis, reason: Reason }),
 ]);
 
-adminRouter.post('/admin/reports/:id/resolve', change, (req, res) => {
-  const decision = parse(Decision, req, res);
-  if (!decision) return;
-  reply(res, resolveReports(res.locals.userId, idParam(req), decision), () => ({ ok: true, groups: openReports() }));
+/** A case decided: the reports the moderator saw in it (`reportIds`), and what was decided. */
+adminRouter.post('/admin/cases/:kind/:id/resolve', change, (req, res) => {
+  const body = parse(
+    z.object({ reportIds: z.array(z.number().int().positive()).min(1).max(500), decision: Decision }),
+    req,
+    res,
+  );
+  if (!body) return;
+  const kind = z.enum(['player', 'group', 'set']).safeParse(req.params.kind);
+  if (!kind.success) {
+    res.status(404).json({ error: 'Няма такъв случай.' });
+    return;
+  }
+  const id = String(req.params.id).slice(0, 32);
+  reply(res, decideCase(res.locals.userId, kind.data, id, body.reportIds, body.decision), () => ({
+    ok: true,
+    ...openCases(),
+  }));
+});
+
+/** A reported set, all of it, for the moderator to read (hidden or not). */
+adminRouter.get('/admin/sets/:code', (req, res) => {
+  const set = setForModerator(String(req.params.code).slice(0, 32));
+  if (!set) {
+    res.status(404).json({ error: 'Няма такъв набор.' });
+    return;
+  }
+  res.json({ set });
 });
 
 adminRouter.get('/admin/players', (req, res) => {
@@ -214,13 +241,9 @@ adminRouter.post('/admin/players/:id/rename', change, (req, res) => {
 });
 
 adminRouter.post('/admin/players/:id/annul', change, (req, res) => {
-  const body = parse(z.object({ reason: Reason }), req, res);
+  const body = parse(z.object({ basis: Basis, reason: Reason }), req, res);
   if (!body) return;
-  if (body.reason.trim().length < MODERATION.reasonMin) {
-    res.status(400).json({ error: `Напиши защо (поне ${MODERATION.reasonMin} знака).` });
-    return;
-  }
-  reply(res, annulResults(res.locals.userId, idParam(req), body.reason), cardOf(req));
+  reply(res, annulResults(res.locals.userId, idParam(req), body), cardOf(req));
 });
 
 adminRouter.post('/admin/players/:id/dismiss', change, (req, res) => {
@@ -241,5 +264,10 @@ adminRouter.get('/admin/log', (req, res) => {
 });
 
 adminRouter.post('/admin/log/:id/undo', change, (req, res) => {
-  reply(res, undoAction(res.locals.userId, idParam(req)), () => ({ ok: true, entries: moderationLog(50) }));
+  const body = parse(z.object({ reason: Reason }), req, res);
+  if (!body) return;
+  reply(res, undoAction(res.locals.userId, idParam(req), body.reason), () => ({
+    ok: true,
+    entries: moderationLog(50),
+  }));
 });

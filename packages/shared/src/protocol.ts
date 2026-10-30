@@ -793,19 +793,59 @@ export const SUBMISSION_RULES = {
 } as const;
 
 export const REPORT_REASONS = [
-  { id: 'name', label: 'Обидно потребителско име' },
+  { id: 'name', label: 'Обидно или неподходящо име' },
   { id: 'behavior', label: 'Обидно поведение' },
   { id: 'cheating', label: 'Измама или нечестна игра' },
+  { id: 'content', label: 'Обидно или неподходящо съдържание' },
   { id: 'illegal', label: 'Незаконно съдържание' },
   { id: 'other', label: 'Друго' },
 ] as const;
 
 export type ReportReason = (typeof REPORT_REASONS)[number]['id'];
 
-/** Open reports about one player, for the moderation queue. */
-export interface ReportGroup {
-  target: PublicUser & { bannedUntil: number | null };
-  reports: { id: number; reason: ReportReason; details: string | null; createdAt: number; reporter: string | null }[];
+/** What a report is about: a player, a group (its name) or a shared set (its questions and pictures). */
+export type ReportSubjectKind = 'player' | 'group' | 'set';
+
+/** The reasons a report about each kind of thing can give. */
+export const REPORT_REASONS_FOR: Record<ReportSubjectKind, readonly ReportReason[]> = {
+  player: ['name', 'behavior', 'cheating', 'illegal', 'other'],
+  group: ['name', 'illegal', 'other'],
+  set: ['content', 'illegal', 'other'],
+};
+
+/** Who sent a report, as far as it helps to weigh it: how long they've played, and how their reports went before. */
+export interface Reporter {
+  name: string;
+  days: number;
+  matches: number;
+  /** Their earlier reports a moderator acted on, and ones that found nothing. */
+  upheld: number;
+  dismissed: number;
+}
+
+/**
+ * A case: every open report about one thing (a player, a group, a set), decided as one. `id`: the player's or the
+ * group's id, or the set's code.
+ */
+export interface ReportCase {
+  kind: ReportSubjectKind;
+  id: string;
+  /** The player, or whose the group or the set is. */
+  owner: PublicUser & { bannedUntil: number | null };
+  /** A group's or a set's name (null for a player). */
+  name: string | null;
+  /** A group's members, a set's questions. */
+  size: number | null;
+  /** A set a moderator already hid. */
+  hidden: boolean;
+  reports: { id: number; reason: ReportReason; details: string | null; createdAt: number; reporter: Reporter | null }[];
+}
+
+/** The queue: the cases most in need first (illegal content, then the most reported, then the oldest), a page of them. */
+export interface ReportCases {
+  cases: ReportCase[];
+  /** All open cases, of which `cases` are the first. */
+  total: number;
 }
 
 /** What a ban or a forced rename rests on: the rules in the Terms (§3), named to the player with the reason. */
@@ -842,6 +882,12 @@ export type ModerationAction =
   | { action: 'rename'; username: string; basis: ModerationBasis; reason: string }
   | { action: 'ban'; days: number | null; basis: ModerationBasis; reason: string; annul?: boolean };
 
+/** A case's decision: about a player (as ModerationAction), a group's name, or a set. */
+export type CaseDecision =
+  | ModerationAction
+  | { action: 'rename_group'; basis: ModerationBasis; reason: string }
+  | { action: 'hide_set'; basis: ModerationBasis; reason: string };
+
 /** What the moderation log keeps (each with what undoing it takes, when it can be undone). */
 export type ModerationLogAction =
   | 'ban'
@@ -877,6 +923,8 @@ export interface ModerationLogEntry {
   createdAt: number;
   undoneAt: number | null;
   undoneBy: string | null;
+  /** Why it was undone. */
+  undoReason: string | null;
   /** It can be undone (not yet undone, and the action keeps what that takes). */
   canUndo: boolean;
 }

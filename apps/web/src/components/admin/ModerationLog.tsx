@@ -2,12 +2,12 @@ import { api, errorMessage, longDate, timeAgo, toast } from '@quiz/client';
 import type { ModerationLogAction, ModerationLogEntry } from '@quiz/shared';
 import clsx from 'clsx';
 import { Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
-import { basisLabel } from './Decisions';
+import { basisLabel, type Grounds, GroundsFields, groundsReady } from './Decisions';
 
 const ACTION: Record<ModerationLogAction, string> = {
   ban: 'спря профила на',
@@ -30,25 +30,26 @@ const ACTION: Record<ModerationLogAction, string> = {
   reload_bank: 'презареди банката с въпроси',
 };
 
-/** One decision: who, what, about whom, on what basis and why; undone, or a button to undo it. */
+/**
+ * One decision: who, what, about whom, on what basis and why; undone (and why), or a button to undo it — with a reason
+ * the log keeps and the player reads.
+ */
 export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUndone: () => void }) {
-  const [sure, setSure] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [grounds, setGrounds] = useState<Grounds>({ basis: 'other', reason: '' });
 
-  async function undo() {
-    if (!sure) {
-      setSure(true);
-      return;
-    }
+  async function undo(e: FormEvent) {
+    e.preventDefault();
+    if (!groundsReady(grounds)) return;
     setBusy(true);
     try {
-      await api.undoModeration(entry.id);
+      await api.undoModeration(entry.id, grounds.reason.trim());
       toast({ kind: 'success', title: 'Отменено' });
       onUndone();
     } catch (e) {
       toast({ kind: 'error', title: errorMessage(e, 'Не се отмени.') });
       setBusy(false);
-      setSure(false);
     }
   }
 
@@ -83,9 +84,9 @@ export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUnd
             {entry.undoneAt && ` · отменено от ${entry.undoneBy ?? 'изтрит модератор'} ${timeAgo(entry.undoneAt)}`}
           </span>
         </p>
-        {entry.canUndo && (
-          <Button size="sm" variant="ghost" onClick={undo} loading={busy}>
-            <Undo2 className="size-4" /> {sure ? 'Сигурно? Отмени' : 'Отмени'}
+        {entry.canUndo && !asking && (
+          <Button size="sm" variant="ghost" onClick={() => setAsking(true)}>
+            <Undo2 className="size-4" /> Отмени
           </Button>
         )}
       </div>
@@ -94,6 +95,25 @@ export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUnd
           {basis && <span className="font-semibold">{basis}. </span>}
           {entry.reason}
         </p>
+      )}
+      {entry.undoReason && <p className="mt-1 text-fg-3">Отменено, защото: {entry.undoReason}</p>}
+      {asking && (
+        <form onSubmit={undo} className="mt-3 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4">
+          <GroundsFields
+            grounds={grounds}
+            onChange={setGrounds}
+            withBasis={false}
+            reasonLabel="Защо го отменяш — дневникът го пази, а играчът го прочита"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" type="submit" loading={busy} disabled={!groundsReady(grounds)}>
+              <Undo2 className="size-4" /> Отмени решението
+            </Button>
+            <Button size="sm" variant="ghost" type="button" onClick={() => setAsking(false)}>
+              Отказ
+            </Button>
+          </div>
+        </form>
       )}
     </li>
   );
@@ -138,7 +158,7 @@ export function ModerationLogPanel() {
     <div className="space-y-4">
       <p className="text-fg-2">
         Всяко решение — с основанието и причината. „Отмени“ връща нещата както бяха преди него (спиране, име, резултати,
-        скрит въпрос или набор, име на група).
+        скрит въпрос или набор, име на група, отхвърлени доклади) и иска причина, която играчът научава.
       </p>
       <Card className="p-0">
         <ul className="divide-y divide-line">

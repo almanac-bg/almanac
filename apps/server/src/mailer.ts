@@ -217,33 +217,38 @@ export function beatenMail(
   };
 }
 
-const longDateTime = (ts: number) =>
+export const longDateTime = (ts: number) =>
   new Intl.DateTimeFormat('bg-BG', { dateStyle: 'long', timeStyle: 'short', timeZone: TIME_ZONE }).format(ts);
 
 /**
- * To a player whose profile a moderator stopped: for how long, on what basis and why, and where to appeal (the Terms'
- * §3а promise: a decision explained, and a way to contest it).
+ * A moderator's decision, to the player it's about (statements.ts: what, on what basis and why, that a person decided,
+ * and where to contest it), or to whoever reported (what came of it). The button contests it by mail, unless `button`
+ * says otherwise.
  */
-export function banMail(
+export function decisionMail(
   to: string,
   username: string,
-  ban: { until: number | null; basis: string; reason: string },
+  subject: string,
+  lines: string[],
+  button?: { label: string; link: string },
 ): Mail {
-  const how = ban.until === null ? 'за постоянно' : `до ${longDateTime(ban.until)}`;
-  const lead = `Модератор спря профила ти „${username}“ ${how}.`;
-  const why = `Основание: ${ban.basis}. Причина: ${ban.reason}`;
-  const appeal = `Ако смяташ, че решението е грешно, отговори ни на ${config.operator.email} до 6 месеца и ще го прегледаме отново.`;
+  const appeal = {
+    label: 'Обжалвай решението',
+    link: `mailto:${config.operator.email}?subject=${encodeURIComponent(`Обжалване – ${username}`)}`,
+  };
+  const { label, link } = button ?? appeal;
   return {
-    kind: 'ban',
+    kind: 'decision',
     to,
-    subject: `Профилът ти в ${BRAND.name} е спрян`,
-    text: `Здравей, ${username}!\n\n${lead}\n${why}\n\n${appeal}\n\nУсловията за ползване: ${config.appUrl}/terms`,
+    subject,
+    text: `Здравей, ${username}!\n\n${lines.join('\n\n')}\n\nУсловията за ползване: ${config.appUrl}/terms`,
     html: layout(
       `Здравей, ${username}!`,
-      `${escapeHtml(lead)}<br><br>${escapeHtml(why)}`,
-      'Условията за ползване',
-      `${config.appUrl}/terms`,
-      escapeHtml(appeal),
+      lines.map(escapeHtml).join('<br><br>'),
+      label,
+      link,
+      `<a href="${config.appUrl}/terms" style="color:#c4b5fd">Условията за ползване</a>`,
+      lines[0],
     ),
   };
 }

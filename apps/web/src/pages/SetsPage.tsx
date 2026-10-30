@@ -1,14 +1,23 @@
 import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@quiz/client';
-import { SETS, type SetImage, type SetQuestion, setPictureUrl } from '@quiz/shared';
+import {
+  type ModerationBasis,
+  type ReportReason,
+  SETS,
+  type SetImage,
+  type SetQuestion,
+  setPictureUrl,
+} from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, Send, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { SetVisibilityForm } from '../components/admin/Decisions';
 import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
+import { ReportReasons } from '../components/ReportReasons';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { shrinkPicture } from '../lib/pictures';
@@ -729,7 +738,9 @@ function SharedSet({ code }: { code: string }) {
   const { data, error, retry, setData } = useLoad(() => api.sharedSet(code), code);
   const [busy, setBusy] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
+  const [moderating, setModerating] = useState(false);
 
   async function copy() {
     setBusy(true);
@@ -744,21 +755,27 @@ function SharedSet({ code }: { code: string }) {
   }
 
   async function report() {
+    if (!reason) return;
     try {
-      await api.reportSet(code, details);
+      await api.reportSet(code, reason, details);
       setReporting(false);
-      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще прегледа набора.' });
+      setReason(null);
+      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще го прегледа, а ти ще научиш какво решихме.' });
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
     }
   }
 
-  async function hide(hidden: boolean) {
+  async function hide(hidden: boolean, grounds: { basis?: ModerationBasis; reason: string }) {
+    setBusy(true);
     try {
-      await api.hideSet(code, hidden);
+      await api.hideSet(code, hidden, grounds);
       if (data) setData({ ...data, hidden });
+      setModerating(false);
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -808,27 +825,38 @@ function SharedSet({ code }: { code: string }) {
             <Flag className="size-4" /> Сигнализирай
           </Button>
         )}
-        {admin && (
-          <Button variant="ghost" size="sm" onClick={() => void hide(!data.hidden)}>
+        {admin && !moderating && (
+          <Button variant="ghost" size="sm" onClick={() => setModerating(true)}>
             {data.hidden ? 'Покажи отново' : 'Скрий (модератор)'}
           </Button>
         )}
       </div>
+      {admin && moderating && (
+        <SetVisibilityForm
+          hidden={data.hidden}
+          busy={busy}
+          onSubmit={(grounds) => void hide(!data.hidden, grounds)}
+          onCancel={() => setModerating(false)}
+        />
+      )}
       <Modal open={reporting} onClose={() => setReporting(false)} title="Сигнал за набор">
-        <p className="text-sm text-fg-2">Какво не е наред — обидно, неподходящо или незаконно съдържание?</p>
+        <ReportReasons kind="set" value={reason} onChange={setReason} />
         <textarea
           value={details}
           maxLength={400}
           rows={3}
           aria-label="Подробности"
+          placeholder="Подробности (по желание): кой въпрос, коя снимка"
           onChange={(e) => setDetails(e.target.value)}
-          className="field mt-3 w-full rounded-2xl p-3 text-sm"
+          className="field mt-4 w-full rounded-2xl p-3 text-sm"
         />
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setReporting(false)}>
             Отказ
           </Button>
-          <Button onClick={() => void report()}>Изпрати</Button>
+          <Button onClick={() => void report()} disabled={!reason}>
+            Изпрати
+          </Button>
         </div>
       </Modal>
     </div>

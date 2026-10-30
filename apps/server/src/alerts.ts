@@ -42,17 +42,32 @@ export function moderatorDigest(now = Date.now()): boolean {
   const waiting = {
     submissions: n("SELECT COUNT(*) AS n FROM question_submissions WHERE status = 'pending'"),
     flags: n("SELECT COUNT(DISTINCT question_id) AS n FROM question_reports WHERE status = 'open'"),
-    reports: n("SELECT COUNT(DISTINCT target_id) AS n FROM reports WHERE status = 'open'"),
+    // One case per reported thing (a player, a group, a set).
+    reports: n(
+      `SELECT COUNT(*) AS n FROM (SELECT DISTINCT subject_kind, CASE WHEN subject_kind = 'player' THEN target_id
+       ELSE subject_id END FROM reports WHERE status = 'open')`,
+    ),
+    illegal: n("SELECT COUNT(*) AS n FROM reports WHERE status = 'open' AND reason = 'illegal'"),
     autoHidden: n(
       "SELECT COUNT(*) AS n FROM moderation_log WHERE action = 'auto_hide_question' AND undone_at IS NULL AND created_at > ?",
       now - 24 * 60 * 60_000,
     ),
   };
   if (!waiting.submissions && !waiting.flags && !waiting.reports && !waiting.autoHidden) return false;
+  // How long the oldest in a queue has waited, when it's more than a day: what's slipping.
+  const oldest = (sql: string) => {
+    const since = one<{ at: number | null }>(sql)!.at;
+    const days = since === null ? 0 : Math.floor((now - since) / (24 * 60 * 60_000));
+    return days >= 1 ? ` (най-старото чака ${days === 1 ? '1 ден' : `${days} дни`})` : '';
+  };
   const lines = [
-    waiting.submissions && `Предложени въпроси: ${waiting.submissions}`,
-    waiting.flags && `Въпроси със сигнали: ${waiting.flags}`,
-    waiting.reports && `Играчи с доклади: ${waiting.reports}`,
+    waiting.illegal && `Сигнали за незаконно съдържание: ${waiting.illegal} — първо тях`,
+    waiting.submissions &&
+      `Предложени въпроси: ${waiting.submissions}${oldest("SELECT MIN(created_at) AS at FROM question_submissions WHERE status = 'pending'")}`,
+    waiting.flags &&
+      `Въпроси със сигнали: ${waiting.flags}${oldest("SELECT MIN(created_at) AS at FROM question_reports WHERE status = 'open'")}`,
+    waiting.reports &&
+      `Доклади (играчи, групи, набори): ${waiting.reports}${oldest("SELECT MIN(created_at) AS at FROM reports WHERE status = 'open'")}`,
     waiting.autoHidden && `Скрити от сигналите на играчите (за денонощие): ${waiting.autoHidden}`,
   ].filter((l): l is string => !!l);
   for (const { email } of admins()) sendMail(moderatorMail(email, 'Модерацията днес', lines, `${config.appUrl}/admin`));

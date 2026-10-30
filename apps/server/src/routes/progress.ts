@@ -124,26 +124,23 @@ progress.post('/groups/:id/leave', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-/**
- * A group's name breaks the rules: a member reports it, as a report about its owner with the group in it (the
- * moderator renames it from the owner's card).
- */
+/** A group's name breaks the rules: a member reports it (a report about the group; its owner hears if it's renamed). */
 progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
-  const body = parse(z.object({ details: z.string().max(400).default('') }), req, res);
+  const body = parse(z.object({ reason: z.string(), details: z.string().max(400).default('') }), req, res);
   if (!body) return;
   const id = idParam(req);
-  const group = one<{ name: string; owner: string | null }>(
-    `SELECT g.name, u.username AS owner FROM player_groups g LEFT JOIN users u ON u.id = g.owner_id
+  const group = one<{ name: string; owner_id: number | null }>(
+    `SELECT g.name, g.owner_id FROM player_groups g
      WHERE g.id = ? AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?)`,
     id,
     res.locals.userId,
   );
-  if (!group?.owner) {
+  if (!group?.owner_id) {
     res.status(404).json({ error: 'Няма такава група.' });
     return;
   }
-  const details = `Група „${group.name}“ (№${id})${body.details.trim() ? `: ${body.details.trim()}` : ''}`;
-  const filed = fileReport(res.locals.userId, group.owner, 'name', details);
+  const subject = { kind: 'group', id: String(id), owner: group.owner_id, label: group.name } as const;
+  const filed = fileReport(res.locals.userId, subject, body.reason, body.details);
   if (!filed.ok) {
     res.status(400).json({ error: filed.error });
     return;

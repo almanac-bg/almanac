@@ -12,7 +12,6 @@ import {
 } from '@quiz/shared';
 import { z } from 'zod';
 import { all, one, run, tx } from './db';
-import { logAction } from './modlog';
 import { textProblem } from './names';
 import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
@@ -371,7 +370,7 @@ export function sharedPreview(code: string, viewerId: number, admin = false): Sh
     code,
   );
   if (!row || (row.hidden && !admin && row.owner_id !== viewerId)) return null;
-  if (row.owner_id !== viewerId) count('link_opens:set');
+  if (row.owner_id !== viewerId && !admin) count('link_opens:set'); // a moderator's look isn't a visit
   const questions = questionsOf(row);
   return {
     name: row.name,
@@ -402,18 +401,24 @@ export function copySet(code: string, userId: number): Result<{ id: number }> {
  * A moderator hides a set a report held up about (or shows it again): it can't be played or copied meanwhile, and its
  * pictures aren't served (copies of it show those questions without them).
  */
-export function hideSet(code: string, hidden: boolean, adminId: number | null = null): boolean {
+export function hideSet(code: string, hidden: boolean): { ownerId: number; name: string } | null {
   const row = one<SetRow>('SELECT * FROM question_sets WHERE code = ?', code);
-  if (!row) return false;
+  if (!row) return null;
   tx(() => {
     run('UPDATE question_sets SET hidden = ? WHERE id = ?', hidden ? 1 : 0, row.id);
     for (const id of imageIds(questionsOf(row)))
       run('UPDATE set_images SET blocked = ? WHERE id = ?', hidden ? 1 : 0, id);
-    // A moderator's (an undo from the log is logged as one already).
-    if (adminId !== null)
-      logAction({ adminId, action: hidden ? 'hide_set' : 'unhide_set', userId: row.owner_id, target: code, undo: {} });
   });
-  return true;
+  return { ownerId: row.owner_id, name: row.name };
+}
+
+/** A shared set as a moderator reads it to decide on a report: all of it, hidden or not. */
+export function setForModerator(code: string): (QuestionSetInfo & { author: string | null }) | null {
+  const row = one<SetRow & { username: string | null }>(
+    'SELECT s.*, u.username FROM question_sets s LEFT JOIN users u ON u.id = s.owner_id WHERE s.code = ?',
+    code,
+  );
+  return row ? { ...info(row), author: row.username } : null;
 }
 
 /** A set its owner can play in a room: theirs, not hidden, with questions in it. */

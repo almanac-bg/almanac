@@ -837,6 +837,26 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX users_room_guests ON users(room_guest_seen_at) WHERE room_guest_seen_at IS NOT NULL;
     `,
   },
+  // v30, moderation by case (moderation.ts): a report says what it's about — a player (`target_id`), a group or a set
+  // (`subject_id`: its id or code; `target_id` is then its owner) — and the open ones about one thing are one case.
+  // Open reports from before, about a group or a set, are read from the text they carried. An undo keeps its reason; a
+  // group a moderator renamed keeps the name for a while (`name_locked_until`).
+  {
+    compatible: `
+    ALTER TABLE reports ADD COLUMN subject_kind TEXT NOT NULL DEFAULT 'player';
+    ALTER TABLE reports ADD COLUMN subject_id TEXT;
+    UPDATE reports SET subject_kind = 'set',
+      subject_id = substr(details, instr(details, '(/sets/shared/') + 14,
+        instr(substr(details, instr(details, '(/sets/shared/') + 14), ')') - 1)
+    WHERE status = 'open' AND details LIKE 'Набор „%' AND instr(details, '(/sets/shared/') > 0;
+    UPDATE reports SET subject_kind = 'group',
+      subject_id = substr(details, instr(details, '(№') + 2, instr(substr(details, instr(details, '(№') + 2), ')') - 1)
+    WHERE status = 'open' AND details LIKE 'Група „%' AND instr(details, '(№') > 0;
+    CREATE INDEX reports_subject ON reports(subject_kind, subject_id, status);
+    ALTER TABLE moderation_log ADD COLUMN undo_reason TEXT;
+    ALTER TABLE player_groups ADD COLUMN name_locked_until INTEGER;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

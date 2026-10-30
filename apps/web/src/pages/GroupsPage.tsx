@@ -1,5 +1,5 @@
 import { api, errorMessage, fmt, plural, toast, useStore } from '@quiz/client';
-import { BRAND, GROUPS, type GroupEntry, type GroupInfo, shiftDay } from '@quiz/shared';
+import { BRAND, GROUPS, type GroupEntry, type GroupInfo, type ReportReason, shiftDay } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, Flag, Link2, LogOut, Pencil, Share2, Trash2, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
@@ -9,6 +9,7 @@ import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { GroupRow } from '../components/groups';
 import { LoadError } from '../components/LoadError';
+import { ReportReasons } from '../components/ReportReasons';
 import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { shareText } from '../lib/share';
@@ -412,15 +413,18 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
 
 /** A member tells the moderators the group's name breaks the rules (they rename it; its owner hears why). */
 function ReportGroup({ groupId, open, onClose }: { groupId: number; open: boolean; onClose: () => void }) {
+  const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function send() {
+    if (!reason) return;
     setBusy(true);
     try {
-      await api.reportGroup(groupId, details);
-      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще прегледа името на групата.' });
+      await api.reportGroup(groupId, reason, details);
+      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще го прегледа, а ти ще научиш какво решихме.' });
       setDetails('');
+      setReason(null);
       onClose();
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
@@ -430,21 +434,22 @@ function ReportGroup({ groupId, open, onClose }: { groupId: number; open: boolea
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Сигнал за името на групата">
-      <p className="text-sm text-fg-2">Какво не е наред с името — обидно, неподходящо? (по желание)</p>
+    <Modal open={open} onClose={onClose} title="Сигнал за групата">
+      <ReportReasons kind="group" value={reason} onChange={setReason} />
       <textarea
         value={details}
         maxLength={400}
         rows={3}
         aria-label="Подробности"
+        placeholder="Подробности (по желание)"
         onChange={(e) => setDetails(e.target.value)}
-        className="field mt-3 w-full rounded-2xl p-3 text-sm"
+        className="field mt-4 w-full rounded-2xl p-3 text-sm"
       />
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
           Отказ
         </Button>
-        <Button onClick={() => void send()} loading={busy}>
+        <Button onClick={() => void send()} loading={busy} disabled={!reason}>
           Изпрати
         </Button>
       </div>

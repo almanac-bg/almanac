@@ -3,6 +3,7 @@ import type {
   AlmanacCategoryPage,
   AlmanacOverview,
   AppNotification,
+  CaseDecision,
   CategoryId,
   ChallengeInfo,
   ChallengePreview,
@@ -19,7 +20,6 @@ import type {
   LeaderboardResponse,
   Loadout,
   MeUser,
-  ModerationAction,
   ModerationBasis,
   ModerationLogEntry,
   MyChallenge,
@@ -36,7 +36,8 @@ import type {
   QuestionReportReason,
   QuestionSetInfo,
   QuestionSetSummary,
-  ReportGroup,
+  ReportCase,
+  ReportCases,
   ReportReason,
   SeasonInfo,
   SetQuestion,
@@ -169,9 +170,16 @@ export const api = {
     request<QuestionReports>('POST', `/admin/question-reports/${encodeURIComponent(questionId)}/resolve`, { action }),
   unhideQuestion: (questionId: string) =>
     request<QuestionReports>('POST', `/admin/hidden-questions/${encodeURIComponent(questionId)}/unhide`),
-  adminReports: () => request<{ groups: ReportGroup[] }>('GET', '/admin/reports'),
-  resolveReports: (userId: number, decision: ModerationAction) =>
-    request<{ ok: true; groups: ReportGroup[] }>('POST', `/admin/reports/${userId}/resolve`, decision),
+  adminReports: () => request<ReportCases>('GET', '/admin/reports'),
+  /** A case decided: the reports seen in it (`reportIds`; a 409 when another moderator decided some meanwhile). */
+  decideCase: (c: Pick<ReportCase, 'kind' | 'id'>, reportIds: number[], decision: CaseDecision) =>
+    request<ReportCases & { ok: true }>('POST', `/admin/cases/${c.kind}/${encodeURIComponent(c.id)}/resolve`, {
+      reportIds,
+      decision,
+    }),
+  /** A reported set, all of it, for the moderator to read. */
+  adminSet: (code: string) =>
+    request<{ set: QuestionSetInfo & { author: string | null } }>('GET', `/admin/sets/${encodeURIComponent(code)}`),
   adminPlayers: (query: string) =>
     request<{ players: PlayerSearchHit[] }>('GET', `/admin/players?q=${encodeURIComponent(query)}`),
   adminPlayer: (id: number) => request<{ card: PlayerCard }>('GET', `/admin/players/${id}`),
@@ -182,14 +190,16 @@ export const api = {
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason }),
   renamePlayer: (id: number, rename: { username: string; basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/rename`, rename),
-  annulResults: (id: number, reason: string) =>
-    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/annul`, { reason }),
+  annulResults: (id: number, grounds: { basis: ModerationBasis; reason: string }) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/annul`, grounds),
   dismissPlayerReports: (id: number) => request<{ card: PlayerCard }>('POST', `/admin/players/${id}/dismiss`),
   renameGroupByModerator: (groupId: number, basis: ModerationBasis, reason: string) =>
     request<{ ok: true }>('POST', `/admin/groups/${groupId}/rename`, { basis, reason }),
   moderationLog: (before?: number) =>
     request<{ entries: ModerationLogEntry[] }>('GET', `/admin/log${before ? `?before=${before}` : ''}`),
-  undoModeration: (id: number) => request<{ ok: true; entries: ModerationLogEntry[] }>('POST', `/admin/log/${id}/undo`),
+  /** Takes a decision back, with why (the player reads it). */
+  undoModeration: (id: number, reason: string) =>
+    request<{ ok: true; entries: ModerationLogEntry[] }>('POST', `/admin/log/${id}/undo`, { reason }),
   reloadBank: () => request<{ ok: true }>('POST', '/admin/bank/reload'),
 
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
@@ -242,8 +252,9 @@ export const api = {
 
   groups: () => request<{ groups: GroupSummary[] }>('GET', '/groups'),
   createGroup: (name: string) => request<{ id: number }>('POST', '/groups', { name }),
-  /** A member reports the group's name. */
-  reportGroup: (id: number, details: string) => request<{ ok: true }>('POST', `/groups/${id}/report`, { details }),
+  /** A member reports the group (its name). */
+  reportGroup: (id: number, reason: ReportReason, details: string) =>
+    request<{ ok: true }>('POST', `/groups/${id}/report`, { reason, details }),
   group: (id: number) => request<GroupInfo>('GET', `/groups/${id}`),
   renameGroup: (id: number, name: string) => request<GroupInfo>('PATCH', `/groups/${id}`, { name }),
   newGroupLink: (id: number) => request<GroupInfo>('POST', `/groups/${id}/code`),
@@ -261,9 +272,10 @@ export const api = {
   uploadSetPicture: (picture: Blob) => request<{ id: string; w: number; h: number }>('POST', '/sets/images', picture),
   sharedSet: (code: string) => request<SharedSetPreview>('GET', `/sets/shared/${encodeURIComponent(code)}`),
   copySet: (code: string) => request<{ id: number }>('POST', `/sets/shared/${encodeURIComponent(code)}/copy`),
-  reportSet: (code: string, details: string) =>
-    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/report`, { details }),
-  hideSet: (code: string, hidden: boolean) =>
-    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/hide`, { hidden }),
+  reportSet: (code: string, reason: ReportReason, details: string) =>
+    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/report`, { reason, details }),
+  /** A moderator hides a set (a basis and a reason its owner reads) or shows it again (a reason). */
+  hideSet: (code: string, hidden: boolean, grounds: { basis?: ModerationBasis; reason: string }) =>
+    request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/hide`, { hidden, ...grounds }),
   joinGroup: (code: string) => request<{ id: number }>('POST', `/groups/join/${encodeURIComponent(code)}`),
 };

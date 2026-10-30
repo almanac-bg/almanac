@@ -7,7 +7,15 @@ import { useLoad } from '../../lib/load';
 import { Avatar, LevelBadge } from '../Avatar';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
-import { BanForm, basisLabel, type Grounds, GroundsFields, groundsReady, RenameForm } from './Decisions';
+import {
+  BanForm,
+  basisLabel,
+  type Grounds,
+  GroundsFields,
+  groundsReady,
+  RenameForm,
+  SetVisibilityForm,
+} from './Decisions';
 import { LogEntry } from './ModerationLog';
 
 /** A player found by name, and everything a moderator does about them in one card. */
@@ -47,7 +55,7 @@ export function PlayersPanel() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Име на играч (поне 2 букви)"
+          placeholder="Име, #номер или точен имейл"
           aria-label="Търси играч"
           className="field h-11 min-w-0 flex-1 rounded-2xl px-4 text-sm"
         />
@@ -205,11 +213,10 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
         {mode === 'annul' && (
           <ReasonForm
             busy={busy}
-            label="Защо (за дневника)"
             action="Анулирай резултатите"
-            hint="Рейтингите от този сезон, дневните и вечерните класирания отпадат. Може да се отмени от „Дневник“."
+            hint="Рейтингите от този сезон, дневните и вечерните класирания отпадат. Играчът научава основанието и причината. Може да се отмени от „Дневник“."
             onCancel={() => setMode('idle')}
-            onSubmit={(reason) => void act(() => api.annulResults(id, reason), 'Резултатите са анулирани')}
+            onSubmit={(grounds) => void act(() => api.annulResults(id, grounds), 'Резултатите са анулирани')}
           />
         )}
         {mode === 'idle' && (
@@ -334,32 +341,31 @@ function ChangeBanForm({
   );
 }
 
+/** A decision with only its grounds to give (annulling results). */
 function ReasonForm({
   busy,
-  label,
   action,
   hint,
   onSubmit,
   onCancel,
 }: {
   busy: boolean;
-  label: string;
   action: string;
   hint: string;
-  onSubmit: (reason: string) => void;
+  onSubmit: (grounds: { basis: ModerationBasis; reason: string }) => void;
   onCancel: () => void;
 }) {
-  const [grounds, setGrounds] = useState<Grounds>({ basis: 'other', reason: '' });
+  const [grounds, setGrounds] = useState<Grounds>({ basis: 'cheating', reason: '' });
   return (
     <form
       className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (groundsReady(grounds)) onSubmit(grounds.reason.trim());
+        if (groundsReady(grounds)) onSubmit({ basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim() });
       }}
     >
       <p className="text-sm text-fg-2">{hint}</p>
-      <GroundsFields grounds={grounds} onChange={setGrounds} withBasis={false} reasonLabel={label} />
+      <GroundsFields grounds={grounds} onChange={setGrounds} />
       <div className="flex gap-2">
         <Button size="sm" variant="danger" type="submit" loading={busy} disabled={!groundsReady(grounds)}>
           {action}
@@ -411,7 +417,7 @@ function GroupRow({ group, onRenamed }: { group: PlayerCard['groups'][number]; o
       {open && (
         <form onSubmit={rename} className="mt-3 space-y-3">
           <p className="text-xs text-fg-3">
-            Името става „Група {group.id}“; собственикът научава защо и може да ѝ даде друго.
+            Името става „Група {group.id}“ поне за седмица; собственикът научава основанието и причината.
           </p>
           <GroundsFields grounds={grounds} onChange={setGrounds} />
           <div className="flex gap-2">
@@ -429,12 +435,14 @@ function GroupRow({ group, onRenamed }: { group: PlayerCard['groups'][number]; o
 }
 
 function SetRow({ set, onChanged }: { set: PlayerCard['sets'][number]; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  async function toggle() {
+  async function submit(grounds: { basis?: ModerationBasis; reason: string }) {
     setBusy(true);
     try {
-      await api.hideSet(set.code, !set.hidden);
+      await api.hideSet(set.code, !set.hidden, grounds);
       toast({ kind: 'success', title: set.hidden ? 'Наборът отново се споделя' : 'Наборът е скрит' });
+      setOpen(false);
       onChanged();
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
@@ -443,14 +451,26 @@ function SetRow({ set, onChanged }: { set: PlayerCard['sets'][number]; onChanged
     }
   }
   return (
-    <li className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm sm:px-5">
-      <Link to={`/sets/shared/${set.code}`} className="min-w-0 flex-1 font-semibold hover:underline">
-        {set.name}
-      </Link>
-      {set.hidden && <span className="text-xs font-bold text-amber-300">Скрит</span>}
-      <Button size="sm" variant="ghost" onClick={toggle} loading={busy}>
-        {set.hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />} {set.hidden ? 'Покажи' : 'Скрий'}
-      </Button>
+    <li className="px-4 py-3 text-sm sm:px-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={`/sets/shared/${set.code}`} className="min-w-0 flex-1 font-semibold hover:underline">
+          {set.name}
+        </Link>
+        {set.hidden && <span className="text-xs font-bold text-amber-300">Скрит</span>}
+        {!open && (
+          <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+            {set.hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />} {set.hidden ? 'Покажи' : 'Скрий'}
+          </Button>
+        )}
+      </div>
+      {open && (
+        <SetVisibilityForm
+          hidden={set.hidden}
+          busy={busy}
+          onSubmit={(g) => void submit(g)}
+          onCancel={() => setOpen(false)}
+        />
+      )}
     </li>
   );
 }

@@ -1,5 +1,5 @@
 import { MODERATION, MODERATION_BASES, type ModerationBasis } from '@quiz/shared';
-import { Ban, PenLine } from 'lucide-react';
+import { Ban, Eye, EyeOff, PenLine } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Button, Segmented } from '../ui';
 
@@ -191,6 +191,60 @@ export function RenameForm({
       <div className="flex gap-2">
         <Button size="sm" type="submit" loading={busy} disabled={!ready}>
           <PenLine className="size-4" /> Смени името
+        </Button>
+        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
+          Отказ
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Hiding a shared set (a basis and a reason its owner reads) or showing it again (why): from a case, the player's card
+ * or the set's page.
+ */
+export function SetVisibilityForm({
+  hidden,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  /** Whether it's hidden now: the form does the opposite. */
+  hidden: boolean;
+  busy: boolean;
+  onSubmit: (grounds: { basis?: ModerationBasis; reason: string }) => void;
+  onCancel: () => void;
+}) {
+  const [grounds, setGrounds] = useState<Grounds>({ basis: hidden ? 'other' : 'content', reason: '' });
+  const ready = hidden ? grounds.reason.trim().length >= MODERATION.reasonMin : groundsReady(grounds);
+  return (
+    <form
+      className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4 text-left"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready)
+          onSubmit(
+            hidden
+              ? { reason: grounds.reason.trim() }
+              : { basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim() },
+          );
+      }}
+    >
+      <p className="text-xs text-fg-3">
+        {hidden
+          ? 'Наборът отново ще може да се играе и копира; собственикът научава защо.'
+          : 'Наборът вече няма да може да се играе в стаи, нито да се копира, а снимките му спират да се показват. Собственикът научава основанието и причината, с адреса за обжалване.'}
+      </p>
+      <GroundsFields
+        grounds={grounds}
+        onChange={setGrounds}
+        withBasis={!hidden}
+        reasonLabel={hidden ? 'Защо го показваш отново — собственикът ще го прочете' : undefined}
+      />
+      <div className="flex gap-2">
+        <Button size="sm" variant={hidden ? 'primary' : 'danger'} type="submit" loading={busy} disabled={!ready}>
+          {hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />} {hidden ? 'Покажи' : 'Скрий набора'}
         </Button>
         <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
           Отказ

@@ -68,13 +68,64 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   const entry = page.getByRole('listitem').filter({ hasText: `спря профила на ${player}` });
   await expect(entry).toContainText('Отговаря с програма.');
   await entry.getByRole('button', { name: 'Отмени', exact: true }).click();
-  await entry.getByRole('button', { name: 'Сигурно? Отмени', exact: true }).click();
+  const undo = entry.getByRole('button', { name: 'Отмени решението', exact: true });
+  await expect(undo, 'not without a reason').toBeDisabled();
+  await entry.getByLabel(/^Защо го отменяш/).fill('Обжалване: беше грешка в играта.');
+  await undo.click();
   await expect(entry).toContainText(`отменено от ${moderator}`);
+  await expect(entry).toContainText('Отменено, защото: Обжалване: беше грешка в играта.');
 
   await signIn(other, player, 'parola-123');
   // The browser logs the refused sign-in itself: that's the point here, not a problem.
   const expected = (p: string) => p.includes('status of 403') && p.includes('/api/auth/login');
   pageProblems.splice(0, pageProblems.length, ...pageProblems.filter((p) => !expected(p)));
+});
+
+test('a report about a set is a case: the moderator reads the set and hides it, its owner hears why and the reporter what came of it', async ({
+  page,
+  newPlayer,
+}) => {
+  const moderator = uniqueName('Проверяващ');
+  await signUp(page, moderator, 'parola-123');
+  makeModerator(moderator);
+  const owner = await newPlayer();
+  await signUp(owner, uniqueName('Автор'), 'parola-123');
+  const made = await owner.request.post('/api/sets', {
+    data: {
+      name: 'Обиден набор',
+      questions: [{ kind: 'truefalse', q: 'Това е въпрос с обида към някого?', answer: true }],
+    },
+  });
+  expect(made.ok()).toBe(true);
+  const { id } = (await made.json()) as { id: number };
+  const { code } = (await (await owner.request.get(`/api/sets/${id}`)).json()) as { code: string };
+
+  const reporter = await newPlayer();
+  await signUp(reporter, uniqueName('Сигнал'), 'parola-123');
+  await reporter.goto(`/sets/shared/${code}`);
+  await reporter.getByRole('button', { name: 'Сигнализирай' }).click();
+  const send = reporter.getByRole('button', { name: 'Изпрати', exact: true });
+  await expect(send, 'not without a reason').toBeDisabled();
+  await reporter.getByLabel('Незаконно съдържание').check();
+  await send.click();
+  await expect(reporter.getByText('Модератор ще го прегледа, а ти ще научиш какво решихме.')).toBeVisible();
+
+  await page.goto('/admin?tab=reports');
+  const card = page.getByRole('article', { name: 'Набор „Обиден набор“' });
+  await expect(card.getByText('Незаконно', { exact: true }), 'first, and marked').toBeVisible();
+  await card.getByRole('button', { name: 'Прочети набора' }).click();
+  await expect(card.getByText('Това е въпрос с обида към някого?')).toBeVisible();
+  await card.getByRole('button', { name: 'Скрий набора' }).click();
+  await card.getByLabel('Основание (от условията)').selectOption('content');
+  await card.getByLabel('Причина — играчът ще я прочете').fill('Въпросът обижда човек.');
+  await card.getByRole('button', { name: 'Скрий набора' }).click();
+  await expect(page.getByText('Наборът е скрит')).toBeVisible();
+
+  const note = async (p: Page) =>
+    ((await (await p.request.get('/api/notifications')).json()) as { notifications: { text: string }[] })
+      .notifications[0].text;
+  expect(await note(owner)).toMatch(/Модератор скри набора ти „Обиден набор“.*Въпросът обижда човек\..*до 6 месеца/);
+  expect(await note(reporter)).toMatch(/Разгледахме доклада ти за „Обиден набор“: наборът е скрит/);
 });
 
 test('a proposed question names where its answer is checked; its author edits or withdraws it while it waits', async ({
