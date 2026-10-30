@@ -11,19 +11,22 @@ export const ACCOUNT_ONLY = 'Това е за играчи с профил — �
 
 /**
  * A guest account: plays like any other, without a password until it's claimed. Seven digits: room for millions of
- * guests at once, so a free name is found on the first try or two.
+ * guests at once, so a free name is found on the first try or two. `room`: made to join a room from its link (a pupil
+ * in a class), so it's kept only while it's here (purgeRoomGuests).
  */
-export function createGuest(): number {
+export function createGuest({ room = false } = {}): number {
   for (let attempt = 0; attempt < 20; attempt++) {
     const username = `Гост_${randomInt(1_000_000, 10_000_000)}`;
     if (getUserByName(username)) continue;
+    const now = Date.now();
     const { lastInsertRowid } = run(
-      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_guest)
-       VALUES (?, ?, ?, '', ?, 1)`,
+      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_guest, room_guest_seen_at)
+       VALUES (?, ?, ?, '', ?, 1, ?)`,
       username,
       usernameKey(username),
       nameShape(username),
-      Date.now(),
+      now,
+      room ? now : null,
     );
     return Number(lastInsertRowid);
   }
@@ -73,4 +76,38 @@ export async function purgeGuests(now = Date.now(), limit = PER_RUN): Promise<nu
     await yieldToMatches();
   }
   return erased;
+}
+
+/**
+ * A room's guest goes this long after it was last here: maintenance runs every 15 minutes and marks the ones still
+ * here each time, so one is erased between 30 and 60 minutes after it left (what /teachers and the policy promise: within
+ * an hour).
+ */
+export const ROOM_GUEST_MS = 45 * 60_000;
+
+/**
+ * A class keeps nothing: a guest made to join a room from its link is erased, with every answer, run and name it
+ * played under, once it hasn't been here for ROOM_GUEST_MS — or at once when its session is gone (signed out). The
+ * ones here now are marked as seen (so a restart, which drops every connection for a moment, never takes them). The
+ * room's match stays in its host's history, with „Изтрит играч“ for each of them. Returns how many were erased.
+ */
+export async function purgeRoomGuests(now = Date.now()): Promise<number> {
+  const guests = all<{ id: number; seen: number; signedIn: number }>(
+    `SELECT id, room_guest_seen_at AS seen, EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id) AS signedIn
+     FROM users WHERE room_guest_seen_at IS NOT NULL`,
+  );
+  const here = guests.filter((g) => presence(g.id) !== 'offline');
+  if (here.length) {
+    tx(() => {
+      for (const g of here) run('UPDATE users SET room_guest_seen_at = ? WHERE id = ?', now, g.id);
+    });
+  }
+  const gone = guests.filter((g) => presence(g.id) === 'offline' && (g.seen < now - ROOM_GUEST_MS || !g.signedIn));
+  for (let i = 0; i < gone.length; i += BATCH) {
+    tx(() => {
+      for (const g of gone.slice(i, i + BATCH)) eraseAccount(g.id);
+    });
+    await yieldToMatches();
+  }
+  return gone.length;
 }

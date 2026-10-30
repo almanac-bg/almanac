@@ -829,6 +829,14 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX moderation_log_target ON moderation_log(target, id) WHERE target IS NOT NULL;
     `,
   },
+  // v29, a class keeps nothing: `room_guest_seen_at` marks a guest made to join a room from its link (a pupil), and
+  // holds when it was last here; an hour after that it's erased with all it played (guests.ts → purgeRoomGuests).
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN room_guest_seen_at INTEGER;
+    CREATE INDEX users_room_guests ON users(room_guest_seen_at) WHERE room_guest_seen_at IS NOT NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

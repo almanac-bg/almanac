@@ -1,8 +1,8 @@
 import { fmt } from '@quiz/client';
-import { type ChallengePreview, type DailyPreview, MODES } from '@quiz/shared';
-import { ArrowRight, CalendarDays, LogIn, RotateCcw, Swords, TriangleAlert, Zap } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { type ChallengePreview, type DailyPreview, MODES, ROOM_CODE_DIGITS } from '@quiz/shared';
+import { ArrowRight, CalendarDays, DoorOpen, LogIn, RotateCcw, Swords, TriangleAlert, Zap } from 'lucide-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import type { LoadFailure } from '../../lib/load';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
@@ -88,6 +88,7 @@ export function NewcomerStart({
   onForm: (mode: 'login' | 'register') => void;
 }) {
   const mode = MODES.daily;
+  const [roomCode, setRoomCode] = useState(false);
   return (
     <div>
       <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
@@ -123,9 +124,52 @@ export function NewcomerStart({
         >
           Създай профил
         </button>
+        <button
+          type="button"
+          onClick={() => setRoomCode(true)}
+          aria-expanded={roomCode}
+          className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 font-semibold text-violet-300 hover:text-violet-200"
+        >
+          <DoorOpen aria-hidden className="size-4" /> Имам код за стая
+        </button>
       </div>
+      {roomCode && <RoomCode />}
       <Consent />
     </div>
+  );
+}
+
+/**
+ * „almanac.bg, код 123456“, as a teacher puts it on the board: the room's invite page from here, where a pupil comes in
+ * as a guest kept only for the room.
+ */
+function RoomCode() {
+  const [code, setCode] = useState('');
+  const navigate = useNavigate();
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => field.current?.focus(), []);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (code.length === ROOM_CODE_DIGITS) navigate(`/join/${code}`);
+      }}
+      className="mt-2 flex gap-2"
+    >
+      <input
+        ref={field}
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, ROOM_CODE_DIGITS))}
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="Код на стая"
+        aria-label="Код на стая"
+        className="field h-11 min-w-0 flex-1 rounded-2xl px-4 font-mono text-lg tracking-[0.3em] placeholder:font-sans placeholder:text-sm placeholder:tracking-normal"
+      />
+      <Button type="submit" variant="secondary" disabled={code.length !== ROOM_CODE_DIGITS}>
+        Влез<span className="sr-only"> в стаята</span>
+      </Button>
+    </form>
   );
 }
 

@@ -150,8 +150,8 @@ accountRouter.post('/account/claim', requireAuth, async (req, res) => {
   try {
     tx(() => {
       run(
-        `UPDATE users SET username = ?, username_key = ?, username_shape = ?, password_hash = ?, is_guest = 0
-         WHERE id = ? AND is_guest = 1`,
+        `UPDATE users SET username = ?, username_key = ?, username_shape = ?, password_hash = ?, is_guest = 0,
+         room_guest_seen_at = NULL WHERE id = ? AND is_guest = 1`,
         creds.username,
         usernameKey(creds.username),
         nameShape(creds.username),

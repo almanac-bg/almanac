@@ -82,6 +82,7 @@ export interface Me {
   id: number;
   username: string;
   isGuest: boolean;
+  roomGuest: boolean;
   xp: number;
 }
 

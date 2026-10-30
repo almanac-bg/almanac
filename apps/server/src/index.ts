@@ -436,17 +436,15 @@ function dailyPage(html: string, at: string, code: string | null): string {
   });
 }
 
-/** A room's invite link (/join/<code>): who's inviting, while the room is open. */
+/**
+ * A room's invite link (/join/<code>). The same page whether the room is open or not, and nobody's name in it: codes
+ * tried one after another would find live rooms (a class's) and their hosts.
+ */
 function joinPage(html: string, at: string, code: string): string {
   // Only a room's code goes into the title: /join/<any text> would preview that text under the site's name.
   const isCode = new RegExp(`^\\d{${ROOM_CODE_DIGITS}}$`).test(code);
-  const room = isCode ? realtime.roomPreview(code) : null;
   return withHead(html, {
-    title: room
-      ? `${room.host} те кани в стая ${code} — ${BRAND.name}`
-      : isCode
-        ? `Покана за стая ${code} — ${BRAND.name}`
-        : `Покана за стая — ${BRAND.name}`,
+    title: isCode ? `Покана за стая ${code} — ${BRAND.name}` : `Покана за стая — ${BRAND.name}`,
     description: `До ${ROOM_LIMITS.maxPlayers[1]} играчи, без регистрация: влизаш с един тап.`,
     url: `${config.appUrl}${at}`,
     index: false,

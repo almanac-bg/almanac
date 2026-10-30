@@ -10,21 +10,23 @@ import {
   type RoomState,
   type TeamId,
 } from '@quiz/shared';
-import { areFriends } from '../friends';
+import { areFriends, blockedBetween } from '../friends';
 import { guarded } from '../guard';
 import { textProblem } from '../names';
 import { friendsChanged, notifyUser, presence } from '../notify';
 import { getRating } from '../seasons';
 import { prepareSet, setForRoom } from '../sets';
-import { getUser, nameTaken, publicUser } from '../users';
+import { getUser, keepForTheRoom, nameTaken, publicUser } from '../users';
 import { type Bot, makeBots } from './bots';
 import type { Game } from './Game';
 import type { IO, IOSocket } from './io';
 import { averageOf, buildHuman, type GameRegistry, startFailure } from './registry';
 
-/** Lobby members who drop (e.g. a page refresh) keep their seat this long. */
+/** Lobby members who drop (e.g. a page refresh) keep their seat this long; someone at a locked room's door their place. */
 const RECONNECT_GRACE_MS = 20_000;
 const INVITE_TTL_MS = 60_000;
+/** At a locked room's door at once, at most: a whole class can come late, a stream of new guests can't pile up. */
+const MAX_KNOCKS = 40;
 
 interface Room {
   code: string;
@@ -35,10 +37,18 @@ interface Room {
   /** Team per player id, when the room plays in teams. */
   teams: Map<string, TeamId>;
   game: Game | null;
-  /** Players the host removed; they can't rejoin unless invited again. */
+  /** Players the host removed, or didn't let in: they can't come back unless invited again. */
   kicked: Set<number>;
   /** What guests go by here (they pick it when they join): an account plays under its own name. */
   nicknames: Map<number, string>;
+  /**
+   * „Заключи стаята“: nobody new comes in by the code or the link; they knock (`knocks`) and the host lets each in or
+   * not. Everyone who has been in the room (`admitted`) may come back, and a friend the host invites walks in.
+   */
+  locked: boolean;
+  /** At the door of the locked room, in the order they came: the name a guest gave (null: an account's own). */
+  knocks: Map<number, string | null>;
+  admitted: Set<number>;
 }
 
 interface PendingInvite {
@@ -51,14 +61,9 @@ const memberId = (userId: number) => `u${userId}`;
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
-
-  /** Who a room's link comes from (its host), for the link's preview in a chat app; null if there's no such room. */
-  preview(code: string): { host: string; players: number } | null {
-    const room = this.rooms.get(code);
-    const host = room && getUser(room.hostUserId);
-    return host ? { host: host.username, players: room.members.length + room.bots.length } : null;
-  }
   private byUser = new Map<number, Room>();
+  /** The room each knocking player waits at (one at a time). */
+  private knockingAt = new Map<number, string>();
   private graceTimers = new Map<number, NodeJS.Timeout>();
   /** Invites sent and not yet expired, so a "decline" can only answer a real one. */
   private invites = new Map<string, PendingInvite>();
@@ -96,14 +101,20 @@ export class RoomManager {
       game: null,
       kicked: new Set(),
       nicknames: new Map(),
+      locked: false,
+      knocks: new Map(),
+      admitted: new Set(),
     };
     this.rooms.set(code, room);
     this.add(room, userId);
     return { ok: true, code };
   }
 
-  /** `nickname`: what a guest goes by here — a guest has no name of their own to show, so they have to give one. */
-  join(userId: number, code: string, nickname: unknown = null): AckResult<{ code: string }> {
+  /**
+   * `nickname`: what a guest goes by here — a guest has no name of their own to show, so they have to give one. A
+   * locked room's door: `waiting` until the host lets them in (they get the room's state) or not (`room:refused`).
+   */
+  join(userId: number, code: string, nickname: unknown = null): AckResult<{ code: string; waiting?: boolean }> {
     const room = this.rooms.get(code.trim());
     if (!room) return { ok: false, error: 'Няма стая с този код.' };
     if (room.members.includes(userId)) {
@@ -111,6 +122,8 @@ export class RoomManager {
       return { ok: true, code: room.code };
     }
     if (room.kicked.has(userId)) return { ok: false, error: 'Домакинът те премахна от тази стая.' };
+    // Either way round, and without saying who blocked whom.
+    if (blockedBetween(room.hostUserId, userId)) return { ok: false, error: 'Не можеш да влезеш в тази стая.' };
     if (room.game) return { ok: false, error: 'Играта в тази стая вече е започнала.' };
     if (room.members.length + room.bots.length >= room.settings.maxPlayers)
       return { ok: false, error: 'Стаята е пълна.' };
@@ -125,6 +138,17 @@ export class RoomManager {
       if (nameTaken(name)) return { ok: false, error: 'Това е името на друг играч — избери друго.' };
       const taken = new Set(this.state(room).players.map((p) => p.name.toLocaleLowerCase('bg')));
       if (taken.has(name.toLocaleLowerCase('bg'))) return { ok: false, error: 'Някой в стаята вече е с това име.' };
+      // Their page says so from now on.
+      if (keepForTheRoom(userId)) this.io.to(`user:${userId}`).emit('account:update');
+    }
+    if (room.locked && !room.admitted.has(userId)) {
+      if (room.knocks.size >= MAX_KNOCKS && !room.knocks.has(userId))
+        return { ok: false, error: 'Стаята е заключена — помоли домакина да я отключи.' };
+      this.leave(userId);
+      room.knocks.set(userId, name);
+      this.knockingAt.set(userId, room.code);
+      this.broadcast(room);
+      return { ok: true, code: room.code, waiting: true };
     }
     this.leave(userId);
     if (name) room.nicknames.set(userId, name);
@@ -134,6 +158,7 @@ export class RoomManager {
 
   leave(userId: number) {
     this.clearGrace(userId);
+    this.stopKnocking(userId);
     const room = this.byUser.get(userId);
     if (!room) return;
     this.byUser.delete(userId);
@@ -145,9 +170,62 @@ export class RoomManager {
     this.io.to(`user:${userId}`).emit('room:state', null);
     if (room.members.length === 0) {
       this.rooms.delete(room.code);
+      for (const id of [...room.knocks.keys()]) this.turnAway(room, id, 'Стаята се затвори.');
       return;
     }
     if (room.hostUserId === userId) room.hostUserId = room.members[0];
+    this.broadcast(room);
+  }
+
+  /** „Заключи стаята“, or open it again: whoever is at the door then comes in, as far as there are seats. */
+  lock(userId: number, locked: boolean) {
+    const room = this.hostRoom(userId);
+    if (!room) return;
+    room.locked = locked;
+    if (!locked) {
+      for (const id of [...room.knocks.keys()]) {
+        if (this.admit(userId, memberId(id), true).ok) continue;
+        const full = room.members.length + room.bots.length >= room.settings.maxPlayers;
+        this.turnAway(room, id, full ? 'Стаята е пълна.' : 'Не успя да влезеш — опитай пак.');
+      }
+    }
+    this.broadcast(room);
+  }
+
+  /** The host lets someone at the locked room's door in, or doesn't (then they can't knock again). */
+  admit(userId: number, playerId: string, admit: boolean): AckResult {
+    const room = this.hostRoom(userId);
+    if (!room) return { ok: false, error: 'Само домакинът пуска в стаята, между игрите.' };
+    const target = Number(playerId.replace(/^u/, ''));
+    if (!room.knocks.has(target)) return { ok: false, error: 'Вече не чака на вратата.' };
+    if (!admit) {
+      room.kicked.add(target);
+      this.turnAway(room, target, 'Домакинът не те пусна в стаята.');
+      this.broadcast(room);
+      return { ok: true };
+    }
+    if (room.members.length + room.bots.length >= room.settings.maxPlayers)
+      return { ok: false, error: 'Стаята е пълна — добави места в настройките.' };
+    if (this.games.forUser(target)) return { ok: false, error: 'В момента играе друг мач.' };
+    const nickname = room.knocks.get(target);
+    room.knocks.delete(target);
+    this.knockingAt.delete(target);
+    // Someone took the same name while they waited: a number tells the two apart.
+    if (nickname) room.nicknames.set(target, this.freeName(room, nickname));
+    this.add(room, target);
+    return { ok: true };
+  }
+
+  /** The host gives a guest's seat a plain „Играч N“ instead of the name the guest typed (on a class's screen above all). */
+  rename(userId: number, playerId: string) {
+    const room = this.hostRoom(userId);
+    const target = Number(playerId.replace(/^u/, ''));
+    if (!room?.nicknames.has(target)) return;
+    const name = this.freeName(room, 'Играч', 1);
+    room.nicknames.set(target, name);
+    this.io
+      .to(`user:${target}`)
+      .emit('notice', { kind: 'info', message: `Домакинът смени името ти в стаята на „${name}“.` });
     this.broadcast(room);
   }
 
@@ -191,7 +269,9 @@ export class RoomManager {
     for (const [id, invite] of this.invites) if (invite.expiresAt < now) this.invites.delete(id);
     const id = randomUUID();
     this.invites.set(id, { from: fromId, to: toId, expiresAt: now + INVITE_TTL_MS });
-    room.kicked.delete(toId); // inviting someone back lifts a kick
+    // Inviting someone back lifts a kick, and opens a locked room to them.
+    room.kicked.delete(toId);
+    room.admitted.add(toId);
     notifyUser(toId, 'invite', { id, from, roomCode: room.code, kind: 'room', expiresAt: now + INVITE_TTL_MS });
     return { ok: true };
   }
@@ -238,6 +318,7 @@ export class RoomManager {
     const target = Number(playerId.replace(/^u/, ''));
     if (target === userId || !room.members.includes(target)) return;
     room.kicked.add(target);
+    room.admitted.delete(target);
     this.leave(target);
     this.io.to(`user:${target}`).emit('notice', { kind: 'info', message: 'Домакинът те премахна от стаята.' });
   }
@@ -305,12 +386,12 @@ export class RoomManager {
     const room = this.byUser.get(userId);
     if (!room) return;
     socket.join(`room:${room.code}`);
-    socket.emit('room:state', this.state(room));
+    socket.emit('room:state', this.state(room, room.hostUserId === userId));
   }
 
   disconnected(userId: number) {
     const room = this.byUser.get(userId);
-    if (!room || room.game) return;
+    if (room?.game || (!room && !this.knockingAt.has(userId))) return;
     this.clearGrace(userId);
     this.graceTimers.set(
       userId,
@@ -323,6 +404,7 @@ export class RoomManager {
 
   private add(room: Room, userId: number) {
     room.members.push(userId);
+    room.admitted.add(userId);
     if (room.settings.teams) room.teams.set(memberId(userId), this.smallerTeam(room));
     this.byUser.set(userId, room);
     friendsChanged(userId);
@@ -354,8 +436,38 @@ export class RoomManager {
     this.graceTimers.delete(userId);
   }
 
+  /** The host's copy names who's at the door; the others' doesn't (a name nobody let in stays off everyone's screen). */
   private broadcast(room: Room) {
-    this.io.to(`room:${room.code}`).emit('room:state', this.state(room));
+    const host = `user:${room.hostUserId}`;
+    this.io.to(`room:${room.code}`).except(host).emit('room:state', this.state(room));
+    this.io.to(host).emit('room:state', this.state(room, true));
+  }
+
+  /** Off the room's door, with why (the room shut, no place, the host said no). */
+  private turnAway(room: Room, userId: number, message: string) {
+    room.knocks.delete(userId);
+    if (this.knockingAt.get(userId) !== room.code) return;
+    this.knockingAt.delete(userId);
+    this.io.to(`user:${userId}`).emit('room:refused', { code: room.code, message });
+  }
+
+  /** Gone from the door they were at (they left, went elsewhere, or their connection didn't come back). */
+  private stopKnocking(userId: number) {
+    const code = this.knockingAt.get(userId);
+    if (code === undefined) return;
+    this.knockingAt.delete(userId);
+    const room = this.rooms.get(code);
+    if (room?.knocks.delete(userId)) this.broadcast(room);
+  }
+
+  /** `name`, or with the first number after it nobody in the room goes by („Мария 2“; „Играч 1“ from `from`). */
+  private freeName(room: Room, name: string, from?: number): string {
+    const taken = new Set(this.state(room).players.map((p) => p.name.toLocaleLowerCase('bg')));
+    if (from === undefined && !taken.has(name.toLocaleLowerCase('bg'))) return name;
+    for (let n = from ?? 2; ; n++) {
+      const numbered = `${name.slice(0, 20 - String(n).length - 1)} ${n}`;
+      if (!taken.has(numbered.toLocaleLowerCase('bg'))) return numbered;
+    }
   }
 
   /** A member as they play here: under the name a guest picked for the room. */
@@ -366,12 +478,20 @@ export class RoomManager {
     return h;
   }
 
-  private state(room: Room): RoomState {
+  private state(room: Room, forHost = false): RoomState {
     return {
       code: room.code,
       hostId: `u${room.hostUserId}`,
       settings: room.settings,
       inGame: room.game !== null,
+      locked: room.locked,
+      knocking: forHost
+        ? [...room.knocks].map(([id, nickname]) => ({
+            id: memberId(id),
+            name: nickname ?? getUser(id)?.username ?? '',
+            isGuest: nickname !== null,
+          }))
+        : [],
       players: [
         ...room.members.map((id) => ({ ...this.human(room, id).player, isHost: id === room.hostUserId })),
         ...room.bots.map((b) => ({ ...b.player, isHost: false })),

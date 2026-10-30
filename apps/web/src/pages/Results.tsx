@@ -37,6 +37,7 @@ export function Results({ game }: { game: LiveGame }) {
   const navigate = useNavigate();
   const room = useStore((s) => s.room);
   const guest = useStore((s) => !!s.me?.isGuest);
+  const roomGuest = useStore((s) => !!s.me?.roomGuest);
   const me = useStore((s) => s.me);
   const [busy, setBusy] = useState(false);
   const youId = game.start.youId;
@@ -385,12 +386,19 @@ export function Results({ game }: { game: LiveGame }) {
         )}
       </div>
 
-      {/* A guest's results: what keeps them, once they've seen what there is to keep (it stood before the podium). */}
-      <GuestNudge className="mx-auto mt-6 max-w-2xl">
-        {rewards
-          ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
-          : undefined}
-      </GuestNudge>
+      {/* A guest's results: what keeps them, once they've seen what there is to keep (it stood before the podium). A
+          pupil in a class is told what happens to it instead: no offer to make a profile in the middle of a lesson. */}
+      {roomGuest && end.roomCode ? (
+        <p className="mx-auto mt-6 max-w-2xl rounded-2xl border border-line bg-tint/[0.04] p-4 text-sm text-fg-2">
+          Влезе като гост за стаята: до час, след като излезеш, профилът и всичко изиграно се изтриват.
+        </p>
+      ) : (
+        <GuestNudge className="mx-auto mt-6 max-w-2xl">
+          {rewards
+            ? `Запази тези ${fmt(rewards.xpGained)} XP: с име и парола нивото, серията и всичко изиграно остават твои — на всяко устройство.`
+            : undefined}
+        </GuestNudge>
+      )}
 
       <LearnedToday items={game.history} added={rewards?.almanac?.added ?? 0} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}

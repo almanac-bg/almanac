@@ -141,6 +141,11 @@ interface State {
   /** Local timestamp the current queue search started (for the stopwatch). */
   queueSince: number;
   room: RoomState | null;
+  /**
+   * At a locked room's door (`room:join` said wait): until the host lets you in (then `room` comes) or not (`refused`
+   * says why).
+   */
+  knock: { code: string; refused: string | null } | null;
   game: LiveGame | null;
   toasts: Toast[];
   invites: Invite[];
@@ -162,6 +167,7 @@ export const useStore = create<State>(() => ({
   queueSince: 0,
   evening: null,
   room: null,
+  knock: null,
   game: null,
   toasts: [],
   invites: [],
@@ -178,7 +184,17 @@ export const getState = useStore.getState;
  * stays in memory — a match, a room, a queue, an invite or a rematch would otherwise show up for the next one.
  */
 export function signedOut() {
-  setState({ me: null, room: null, game: null, queue: null, queueSince: 0, invites: [], rematch: null, evening: null });
+  setState({
+    me: null,
+    room: null,
+    knock: null,
+    game: null,
+    queue: null,
+    queueSince: 0,
+    invites: [],
+    rematch: null,
+    evening: null,
+  });
 }
 
 let toastSeq = 0;

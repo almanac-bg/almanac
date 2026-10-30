@@ -109,6 +109,7 @@ export function getMe(userId: number): MeUser | null {
     },
     quests: questsInfo(userId, today),
     isGuest: row.is_guest === 1,
+    roomGuest: row.room_guest_seen_at !== null,
     streakReminders: row.streak_reminders === 1,
     beatenMails: row.beaten_mails === 1,
     push: pushPrefs(row),

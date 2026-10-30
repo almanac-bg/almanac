@@ -180,7 +180,10 @@ function bind(s: GameSocket) {
     setState((st) => ({ queue, queueSince: queue && !st.queue ? Date.now() - queue.waitedMs : st.queueSince })),
   );
 
-  s.on('room:state', (room) => setState({ room }));
+  s.on('room:state', (room) => setState((st) => ({ room, knock: room ? null : st.knock })));
+  s.on('room:refused', ({ code, message }) =>
+    setState((st) => (st.knock?.code === code ? { knock: { code, refused: message } } : {})),
+  );
 
   s.on('evening:status', (evening) => setState({ evening }));
 
@@ -631,19 +634,32 @@ export const actions = {
   },
   createRoom: (settings: RoomSettingsPatch = {}) =>
     ask<{ code: string }>(() => withTimeout().emitWithAck('room:create', settings)),
-  /** `nickname`: what a guest goes by in the room (a guest has to give one). */
-  joinRoom: (code: string, nickname?: string) =>
-    ask<{ code: string }>(() =>
+  /**
+   * `nickname`: what a guest goes by in the room (a guest has to give one). `waiting`: the room is locked, and you're
+   * at its door (`knock`) until the host decides.
+   */
+  joinRoom: async (code: string, nickname?: string) => {
+    const res = await ask<{ code: string; waiting?: boolean }>(() =>
       withTimeout().emitWithAck('room:join', nickname === undefined ? code : { code, nickname }),
-    ),
+    );
+    if (res.ok && res.waiting) setState({ knock: { code: res.code, refused: null } });
+    return res;
+  },
+  /** Out of the room, or away from the door of a locked one. */
   leaveRoom: () => {
     getSocket().emit('room:leave');
-    setState({ room: null });
+    setState({ room: null, knock: null });
   },
   /** What the host changes: settings as they are, but a set by its id (null: the bank's questions). */
   roomSettings: (settings: RoomSettingsPatch) => getSocket().emit('room:settings', settings),
   roomBot: (action: 'add' | 'remove') => getSocket().emit('room:bot', action),
   roomKick: (playerId: string) => getSocket().emit('room:kick', playerId),
+  roomLock: (locked: boolean) => getSocket().emit('room:lock', locked),
+  /** The host lets someone at the locked room's door in, or doesn't. */
+  roomAdmit: (playerId: string, admit: boolean) =>
+    ask(() => withTimeout().emitWithAck('room:admit', { playerId, admit })),
+  /** The host gives a guest's seat a plain „Играч N“. */
+  roomRename: (playerId: string) => getSocket().emit('room:rename', playerId),
   roomTeam: (playerId: string) => getSocket().emit('room:team', playerId),
   startRoom: () => ask(() => withTimeout().emitWithAck('room:start')),
   invite: (userId: number) => ask(() => withTimeout().emitWithAck('invite:send', { userId })),

@@ -11,7 +11,7 @@ import { liveDailyStreak } from './daily';
 import { all, db, optimize, run } from './db';
 import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
-import { purgeGuests } from './guests';
+import { purgeGuests, purgeRoomGuests } from './guests';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
@@ -184,6 +184,8 @@ export function startMaintenance() {
       await pruneAnswers();
       await pruneRuns();
       await purgeGuests();
+      const pupils = await purgeRoomGuests();
+      if (pupils) console.log(`🏫 Guests who came for a room, gone for an hour: ${pupils} deleted`);
       const inactive = retireInactiveAccounts();
       if (inactive.warned || inactive.erased)
         console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);

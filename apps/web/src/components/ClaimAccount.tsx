@@ -119,11 +119,18 @@ export function ClaimAccountModal({
   );
 }
 
-/** For guests only: a quiet reminder that progress lives on this device until the account is saved. */
+/**
+ * For guests only: a quiet reminder that progress lives on this device until the account is saved — or, for a guest who
+ * came for a room, that it all goes within an hour of leaving.
+ */
 export function GuestNudge({ className = '', children }: { className?: string; children?: ReactNode }) {
   const guest = useStore((s) => !!s.me?.isGuest);
+  const roomGuest = useStore((s) => !!s.me?.roomGuest);
   const [open, setOpen] = useState(false);
   if (!guest) return null;
+  if (roomGuest && !children)
+    children =
+      'Влезе като гост за стая: до час, след като излезеш от сайта, профилът и играта ти се изтриват. Запази ги с име и парола, ако искаш да останат.';
   return (
     <div
       className={`flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-4 ${className}`}

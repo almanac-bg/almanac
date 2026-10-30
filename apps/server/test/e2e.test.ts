@@ -600,6 +600,111 @@ test('a class: guests join under a name of their own, the host runs it on a big 
   }
 });
 
+test(
+  'a locked room: newcomers knock and the host lets each in or not; a kicked guest needs the host to come back',
+  T,
+  async () => {
+    // Pupils come from the room's link: guests kept only for the room.
+    const pupil = async () => {
+      const made = await api.send('POST', '/api/auth/guest', '', { room: true });
+      assert.equal(made.body.user.roomGuest, true);
+      return { cookie: made.cookie!, socket: connect(srv.url, made.cookie!) };
+    };
+    const [p1, p2, p3, p4, p5, p6] = await Promise.all(Array.from({ length: 6 }, pupil));
+    const pupils = [p1, p2, p3, p4, p5, p6].map((p) => p.socket);
+    await connected(...pupils);
+    assert.equal((await guest(srv.url)).user.roomGuest, false, 'a guest from anywhere else is an ordinary one');
+    const C = await register(srv.url, 'blokirasht_test');
+    const sc = connect(srv.url, C.cookie);
+    await connected(sc);
+    let hostState: RoomState | null = null;
+    let pupilState: RoomState | null = null;
+    const onHost = (st: RoomState | null) => {
+      hostState = st;
+    };
+    const onPupil = (st: RoomState | null) => {
+      pupilState = st;
+    };
+    const host = () => hostState as unknown as RoomState;
+    const names = () => host().players.map((p) => p.name);
+    try {
+      sa.on('room:state', onHost);
+      p1.socket.on('room:state', onPupil);
+      const { code } = (await emitAck(sa, 'room:create', { hostPlays: false })) as { code: string };
+      assert.ok((await emitAck(p1.socket, 'room:join', { code, nickname: 'Ана' })).ok);
+      sa.emit('room:lock', true);
+      await eventually(() => assert.equal(host().locked, true));
+
+      // At the door: the host sees who, the others don't.
+      const knock = await emitAck(p2.socket, 'room:join', { code, nickname: 'Боби' });
+      assert.deepEqual(knock, { ok: true, code, waiting: true });
+      await eventually(() =>
+        assert.deepEqual(
+          host().knocking.map(({ name, isGuest }) => ({ name, isGuest })),
+          [{ name: 'Боби', isGuest: true }],
+        ),
+      );
+      await eventually(() => assert.equal((pupilState as RoomState | null)?.knocking.length, 0));
+      assert.equal(names().includes('Боби'), false);
+      const inside = next(p2.socket, 'room:state');
+      assert.ok((await emitAck(sa, 'room:admit', { playerId: host().knocking[0].id, admit: true })).ok);
+      assert.ok(
+        (await inside)?.players.some((p) => p.name === 'Боби'),
+        'let in, they get the room',
+      );
+
+      // Not let in: told so, and they can't knock again.
+      assert.ok((await emitAck(p3.socket, 'room:join', { code, nickname: 'Цвети' })).ok);
+      await eventually(() => assert.equal(host().knocking.length, 1));
+      const refused = next(p3.socket, 'room:refused');
+      assert.ok((await emitAck(sa, 'room:admit', { playerId: host().knocking[0].id, admit: false })).ok);
+      assert.equal((await refused).message, 'Домакинът не те пусна в стаята.');
+      assert.match(
+        ((await emitAck(p3.socket, 'room:join', { code, nickname: 'Цвети' })) as { error: string }).error,
+        /премахна/,
+      );
+
+      // Two at the door under one name: the second one in gets a number.
+      await emitAck(p4.socket, 'room:join', { code, nickname: 'Деси' });
+      await emitAck(p5.socket, 'room:join', { code, nickname: 'деси' });
+      await eventually(() => assert.equal(host().knocking.length, 2));
+      const [first, second] = host().knocking;
+      assert.ok((await emitAck(sa, 'room:admit', { playerId: first.id, admit: true })).ok);
+      assert.ok((await emitAck(sa, 'room:admit', { playerId: second.id, admit: true })).ok);
+      await eventually(() => assert.deepEqual(names().slice(1), ['Ана', 'Боби', 'Деси', 'деси 2']));
+
+      // The host swaps a typed name for a plain one.
+      const told = next(p2.socket, 'notice');
+      const bobi = host().players.find((p) => p.name === 'Боби')!;
+      sa.emit('room:rename', bobi.id);
+      assert.match((await told).message, /„Играч 1“/);
+      await eventually(() => assert.ok(names().includes('Играч 1')));
+
+      // A kicked guest can't walk back in; a new guest knocks, and opening the room lets whoever knocked in.
+      const ana = host().players.find((p) => p.name === 'Ана')!;
+      sa.emit('room:kick', ana.id);
+      await eventually(() => assert.equal(names().includes('Ана'), false));
+      assert.equal((await emitAck(p1.socket, 'room:join', { code, nickname: 'Ана' })).ok, false);
+      assert.deepEqual(await emitAck(p6.socket, 'room:join', { code, nickname: 'Ана' }), {
+        ok: true,
+        code,
+        waiting: true,
+      });
+      sa.emit('room:lock', false);
+      await eventually(() => assert.ok(names().includes('Ана')));
+      assert.deepEqual([host().locked, host().knocking], [false, []]);
+
+      // Someone who blocked the host (or was blocked) doesn't get in.
+      assert.equal((await api.send('POST', `/api/blocks/${A.user.id}`, C.cookie)).status, 200);
+      assert.match(((await emitAck(sc, 'room:join', code)) as { error: string }).error, /Не можеш да влезеш/);
+    } finally {
+      sa.off('room:state', onHost);
+      sa.emit('room:leave');
+      for (const s of [...pupils, sc]) s.close();
+    }
+  },
+);
+
 test('„Моите въпроси“: a host plays their own set in a room; shared by link, copied, reported, hidden', T, async () => {
   const set = {
     name: '  Урок   по история ',

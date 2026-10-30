@@ -123,7 +123,8 @@ export function AuthPage() {
     setGuestError(null);
     setGuestBusy(true);
     try {
-      const { user } = await api.guest();
+      // From a room's link: a guest only for the room (a pupil in a class), erased within an hour of leaving.
+      const { user } = await api.guest(!!roomCode);
       // Same render as signing in, so the signed-in app opens straight on the right page.
       if (landing) navigate(landing.to, { replace: true, state: landing.state });
       setState({ me: user });
@@ -267,7 +268,8 @@ export function AuthPage() {
                       <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
                       <span>
                         Имаш покана за стая <b className="font-mono tracking-widest text-fg">{roomCode}</b> — влез като
-                        гост или с профила си, за да се присъединиш.
+                        гост или с профила си, за да се присъединиш. Гостът е само за стаята: без имейл и парола, а до
+                        час, след като излезеш, се изтрива с всичко изиграно.
                       </span>
                     </p>
                   )}

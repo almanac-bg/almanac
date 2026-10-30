@@ -45,6 +45,8 @@ export interface MeUser extends PublicUser {
   quests: QuestsInfo;
   /** Playing as a guest: no name or password yet ("Запази прогреса си" turns it into a full account). */
   isGuest: boolean;
+  /** A guest made to join a room from its link (a pupil in a class): erased within an hour of leaving the site. */
+  roomGuest: boolean;
   /** Opted in to the evening "your streak is about to break" email. */
   streakReminders: boolean;
   /** The opt-in „X те изпревари на линка ти“ email (at most one a day). */
@@ -463,6 +465,10 @@ export interface RoomState {
   settings: RoomSettings;
   players: RoomPlayer[];
   inGame: boolean;
+  /** „Заключи стаята“: nobody new comes in by the code; they knock, and the host lets each in or not. */
+  locked: boolean;
+  /** Who's at the locked room's door, in the order they came: for the host only (empty for everyone else). */
+  knocking: { id: string; name: string; isGuest: boolean }[];
 }
 
 export interface LobbyStats {
@@ -507,6 +513,8 @@ export interface ServerToClientEvents {
   'lobby:stats': (s: LobbyStats) => void;
   'queue:status': (s: QueueStatus | null) => void;
   'room:state': (s: RoomState | null) => void;
+  /** You knocked on a locked room's door, and aren't coming in: the host said no, it filled up or it closed. */
+  'room:refused': (p: { code: string; message: string }) => void;
   'game:start': (p: GameStartPayload) => void;
   'game:question': (p: QuestionPayload) => void;
   'game:answered': (p: { playerId: string }) => void;
@@ -562,12 +570,21 @@ export interface ClientToServerEvents {
   'rematch:request': (p: { gameId: string }) => void;
   'rematch:decline': (p: { gameId: string }) => void;
   'room:create': (settings: RoomSettingsPatch, ack: Ack<{ code: string }>) => void;
-  /** `nickname`: what a guest goes by in the room (a guest has to give one). */
-  'room:join': (p: string | { code: string; nickname?: string }, ack: Ack<{ code: string }>) => void;
+  /**
+   * `nickname`: what a guest goes by in the room (a guest has to give one). `waiting`: the room is locked, and you're at
+   * its door until the host lets you in (the room's state comes) or not (`room:refused`).
+   */
+  'room:join': (p: string | { code: string; nickname?: string }, ack: Ack<{ code: string; waiting?: boolean }>) => void;
   'room:leave': () => void;
   'room:settings': (settings: RoomSettingsPatch) => void;
   'room:bot': (action: 'add' | 'remove') => void;
   'room:kick': (playerId: string) => void;
+  /** The host locks the room (nobody new comes in by the code: they knock) or opens it (whoever knocked comes in). */
+  'room:lock': (locked: boolean) => void;
+  /** The host lets someone at the locked room's door in, or doesn't. */
+  'room:admit': (p: { playerId: string; admit: boolean }, ack: Ack) => void;
+  /** The host gives a guest's seat a plain „Играч N“ instead of the name the guest typed. */
+  'room:rename': (playerId: string) => void;
   'room:team': (playerId: string) => void;
   'room:start': (ack: Ack) => void;
   'invite:send': (p: { userId: number }, ack: Ack) => void;

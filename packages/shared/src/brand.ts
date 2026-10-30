@@ -6,9 +6,10 @@ export const BRAND = {
   tagline: 'Онлайн викторина с въпросите на деня',
 } as const;
 
-/** The privacy policy's and terms' version. Who runs a site (name, address…) is its own configuration (see .env). */
+/** The privacy policy's and terms' versions. Who runs a site (name, address…) is its own configuration (see .env). */
 export const LEGAL = {
-  updated: '29 октомври 2026 г.',
-  /** The same day, for the sitemap. */
-  updatedIso: '2026-10-29',
+  privacyUpdated: '30 октомври 2026 г.',
+  termsUpdated: '29 октомври 2026 г.',
+  /** The later of the two, for the sitemap. */
+  updatedIso: '2026-10-30',
 } as const;

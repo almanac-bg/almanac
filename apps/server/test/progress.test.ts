@@ -15,7 +15,7 @@ const { one, run } = await import('../src/db');
 const { advanceQuests, QUEST_BONUS_XP, questsInfo } = await import('../src/quests');
 const { liveDailyStreak, recordDailyResult } = await import('../src/daily');
 const { sendStreakReminders } = await import('../src/maintenance');
-const { purgeGuests } = await import('../src/guests');
+const { purgeGuests, purgeRoomGuests, ROOM_GUEST_MS } = await import('../src/guests');
 const { setRealtime } = await import('../src/notify');
 const { getUser } = await import('../src/users');
 const { count, countActive, launchStats } = await import('../src/stats');
@@ -173,6 +173,53 @@ test('guests nobody will play as again are cleared after a day; a guest who is o
   const exists = (id: number) => !!one('SELECT 1 AS x FROM users WHERE id = ?', id);
   assert.deepEqual([stale, active, visitor, online, fresh, member].map(exists), [false, true, false, true, true, true]);
   assert.equal(await purgeGuests(now), 1, 'once offline, a later run takes it');
+});
+
+test('a guest who came for a room goes within an hour of leaving, with what it played; one still here stays', async () => {
+  const now = Date.now();
+  const session = (id: number) =>
+    run('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, 0, ?)', `r${id}`, id, now + DAY);
+  const pupil = (seenAgo: number) => {
+    const id = user({ is_guest: 1, created_at: now - 2 * 60 * 60_000, room_guest_seen_at: now - seenAgo });
+    session(id);
+    return id;
+  };
+  const left = pupil(ROOM_GUEST_MS + 60_000);
+  const justLeft = pupil(5 * 60_000);
+  // Still in the class an hour and more after joining: marked as seen, never taken.
+  const here = pupil(2 * ROOM_GUEST_MS);
+  const signedOut = user({ is_guest: 1, created_at: now, room_guest_seen_at: now });
+  const ordinary = user({ is_guest: 1, created_at: now - 2 * 60 * 60_000 });
+  session(ordinary);
+  run(
+    `INSERT INTO answers (user_id, match_id, question_id, difficulty, correct, time_ms, answered_at)
+     VALUES (?, 'class', 'q1', 'easy', 1, 1000, ?)`,
+    left,
+    now - ROOM_GUEST_MS,
+  );
+  setRealtime(
+    null as never,
+    (id) => (id === here ? 'room' : 'offline'),
+    () => [],
+    () => 0,
+    () => {},
+  );
+  try {
+    assert.equal(await purgeRoomGuests(now), 2);
+  } finally {
+    setRealtime(
+      null as never,
+      () => 'offline',
+      () => [],
+      () => 0,
+      () => {},
+    );
+  }
+  const exists = (id: number) => !!one('SELECT 1 AS x FROM users WHERE id = ?', id);
+  assert.deepEqual([left, justLeft, here, signedOut, ordinary].map(exists), [false, true, true, false, true]);
+  assert.equal(one<{ n: number }>("SELECT COUNT(*) AS n FROM answers WHERE match_id = 'class'")!.n, 0);
+  assert.equal(getUser(here)!.room_guest_seen_at, now, 'the one still here is marked as seen');
+  assert.equal(await purgeRoomGuests(now + ROOM_GUEST_MS + 1), 2, 'once gone long enough, the rest');
 });
 
 test('a wave of guests is cleared a batch at a time, up to a share per run', async () => {

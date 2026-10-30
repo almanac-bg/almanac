@@ -13,7 +13,7 @@ import { NavBar } from './components/NavBar';
 import { PasswordConfirm } from './components/PasswordConfirm';
 import { QueueOverlay } from './components/QueueOverlay';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
-import { RoomNickname } from './components/RoomNickname';
+import { RoomDoor, RoomNickname } from './components/RoomNickname';
 import { SeasonRecap } from './components/SeasonRecap';
 import { Toasts } from './components/Toasts';
 import { Card, PageSpinner, Spinner } from './components/ui';
@@ -261,25 +261,43 @@ function PageLoading() {
   return <PageSpinner />;
 }
 
-/** Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. */
+/**
+ * Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. A locked
+ * room keeps you at its door until the host lets you in or not; leaving this page leaves the door.
+ */
 function JoinRoute() {
   const { code = '' } = useParams();
   const navigate = useNavigate();
   const connected = useStore((s) => s.connected);
   const guest = useStore((s) => !!s.me?.isGuest);
+  const inside = useStore((s) => s.room?.code === code);
+  const knock = useStore((s) => (s.knock?.code === code ? s.knock : null));
   const tried = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // In: straight away, or once the host opens the door (the room's state comes before any answer to joining).
+  useEffect(() => {
+    if (inside) navigate('/room', { replace: true });
+  }, [inside, navigate]);
+
+  useEffect(
+    () => () => {
+      const { knock } = getState();
+      if (knock?.code !== code) return;
+      if (knock.refused) setState({ knock: null });
+      else actions.leaveRoom();
+    },
+    [code],
+  );
 
   useEffect(() => {
     if (guest || !connected || tried.current) return;
     tried.current = true;
     actions.joinRoom(code).then((res) => {
-      if (res.ok) navigate('/room', { replace: true });
-      else {
-        toast({ kind: 'error', title: res.error });
-        navigate('/', { replace: true });
-      }
+      if (res.ok) return;
+      toast({ kind: 'error', title: res.error });
+      navigate('/', { replace: true });
     });
   }, [guest, connected, code, navigate]);
 
@@ -287,10 +305,17 @@ function JoinRoute() {
     setBusy(true);
     const res = await actions.joinRoom(code, nickname);
     setBusy(false);
-    if (res.ok) navigate('/room', { replace: true });
-    else setError(res.error);
+    if (!res.ok) setError(res.error);
   }
 
+  if (knock)
+    return (
+      <div className="mx-auto max-w-md">
+        <Card className="p-6 sm:p-8">
+          <RoomDoor code={code} refused={knock.refused} onLeave={() => navigate('/', { replace: true })} />
+        </Card>
+      </div>
+    );
   if (!guest) return <PageSpinner />;
   return (
     <div className="mx-auto max-w-md">

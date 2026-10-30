@@ -219,7 +219,10 @@ authRouter.post('/auth/verify-email', (req, res) => {
   res.json({ ok: true });
 });
 
-/** "Играй като гост": a real account without a name or password yet, so a first game is one tap away. */
+/**
+ * "Играй като гост": a real account without a name or password yet, so a first game is one tap away. `room: true` from a
+ * room's invite link: a guest kept only while it's here (a pupil in a class; guests.ts → purgeRoomGuests).
+ */
 authRouter.post('/auth/guest', (req, res) => {
   const current = userIdFromRequest(req, res);
   if (current) {
@@ -242,7 +245,7 @@ authRouter.post('/auth/guest', (req, res) => {
   }
   if (throttled('guest-all', 5_000, 60 * 60_000) && !throttled('guest-all-reported', 1, 60 * 60_000))
     void reportError(new Error('Over 5,000 new guests in an hour'), 'guest flood');
-  const userId = createGuest();
+  const userId = createGuest({ room: (req.body as { room?: unknown } | undefined)?.room === true });
   count('guests');
   setSessionCookie(res, createSession(userId, false));
   res.status(201).json({ user: getMe(userId) });

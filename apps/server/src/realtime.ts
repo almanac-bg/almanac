@@ -73,8 +73,6 @@ const DRAINING = 'Обновяваме играта — нови мачове м
 export interface Realtime {
   io: IO;
   activeGames: () => number;
-  /** A room's host and size, for the preview of its link (/join/<code>); null if there's no such room. */
-  roomPreview: (code: string) => { host: string; players: number } | null;
   /**
    * Stops new matches and empties the queues, then resolves once running matches have finished. Any still running after
    * `maxMs` end there, with the scores so far, so nobody's match vanishes without a result.
@@ -483,6 +481,14 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       if (action === 'add' || action === 'remove') rooms.bot(userId, action);
     });
     on('room:kick', (playerId) => rooms.kick(userId, str(playerId, 32)));
+    on('room:lock', (locked) => {
+      if (typeof locked === 'boolean') rooms.lock(userId, locked);
+    });
+    on('room:admit', (p, ack) => {
+      const { playerId, admit } = obj(p);
+      reply(ack, rooms.admit(userId, str(playerId, 32), admit === true));
+    });
+    on('room:rename', (playerId) => rooms.rename(userId, str(playerId, 32)));
     on('room:team', (playerId) => rooms.switchTeam(userId, str(playerId, 32)));
     on('room:start', (ack) => reply(ack, draining ? { ok: false, error: DRAINING } : rooms.start(userId)));
 
@@ -589,7 +595,6 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   return {
     io,
     activeGames: () => games.activeGames,
-    roomPreview: (code: string) => rooms.preview(code),
     async drain(maxMs) {
       draining = true;
       games.startDraining();

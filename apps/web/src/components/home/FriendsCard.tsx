@@ -13,7 +13,7 @@ export function FriendsCard({ className }: { className?: string }) {
   const navigate = useNavigate();
   const guest = useStore((s) => !!s.me?.isGuest);
   const [code, setCode] = useState('');
-  const [busy, setBusy] = useState<'create' | 'join' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [claiming, setClaiming] = useState(false);
   // Friend duels still open: yours to play first, then the ones waiting for the friend.
   const duels = useDuels(!guest);
@@ -24,23 +24,17 @@ export function FriendsCard({ className }: { className?: string }) {
     .slice(0, 3);
 
   async function create() {
-    setBusy('create');
+    setBusy(true);
     const res = await actions.createRoom();
-    setBusy(null);
+    setBusy(false);
     if (res.ok) navigate('/room');
     else toast({ kind: 'error', title: res.error });
   }
 
-  async function join(e: FormEvent) {
+  // The invite link's page: a guest first says what to call them there, and a locked room keeps you at its door.
+  function join(e: FormEvent) {
     e.preventDefault();
-    if (code.length !== ROOM_CODE_DIGITS) return;
-    // A guest first says what to call them in the room (the invite link's page asks).
-    if (guest) return navigate(`/join/${code}`);
-    setBusy('join');
-    const res = await actions.joinRoom(code);
-    setBusy(null);
-    if (res.ok) navigate('/room');
-    else toast({ kind: 'error', title: res.error });
+    if (code.length === ROOM_CODE_DIGITS) navigate(`/join/${code}`);
   }
 
   return (
@@ -70,7 +64,7 @@ export function FriendsCard({ className }: { className?: string }) {
         {/* Beside a taller card (wide screens) the extra height goes here, so the actions sit at the bottom. */}
         <div className="flex-1" />
         {!guest && (
-          <Button variant="secondary" className="mt-5 w-full" onClick={create} loading={busy === 'create'}>
+          <Button variant="secondary" className="mt-5 w-full" onClick={create} loading={busy}>
             <Plus className="size-4" /> Създай стая
           </Button>
         )}
@@ -83,12 +77,7 @@ export function FriendsCard({ className }: { className?: string }) {
             aria-label="Код на стая"
             className="field h-11 min-w-0 flex-1 rounded-2xl px-4 font-mono text-lg tracking-[0.3em] placeholder:font-sans placeholder:text-sm placeholder:tracking-normal"
           />
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={code.length !== ROOM_CODE_DIGITS}
-            loading={busy === 'join'}
-          >
+          <Button type="submit" variant="secondary" disabled={code.length !== ROOM_CODE_DIGITS}>
             Влез<span className="sr-only"> в стаята</span>
           </Button>
         </form>

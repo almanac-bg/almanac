@@ -1,5 +1,5 @@
 import { levelFromXp, type PublicUser } from '@quiz/shared';
-import { all, one } from './db';
+import { all, one, run } from './db';
 import { nameShape } from './names';
 
 export interface UserRow {
@@ -41,6 +41,11 @@ export interface UserRow {
   ban_basis: string | null;
   /** Created by "Играй като гост": no password until claimed with a name and password. */
   is_guest: number;
+  /**
+   * A guest made to join a room from its link (a pupil in a class): when it was last here. Erased an hour after that
+   * (guests.ts → purgeRoomGuests); null for every other account, and once claimed.
+   */
+  room_guest_seen_at: number | null;
   /** Earned every 7 days of daily streak (at most 2); a missed day uses one up instead of breaking the streak. */
   streak_shields: number;
   /** Opted in to an evening email when the daily streak is about to break. */
@@ -64,6 +69,20 @@ export interface UserRow {
   room_xp: number;
   /** The season and achievement list the account was last settled for (account.ts → settleIfDue). */
   settled: string | null;
+}
+
+/**
+ * A guest who came straight to a room (the landing's „Имам код за стая“, or the lobby's code field before playing
+ * anything) is there for the room, like one from its link: kept only while it's here (guests.ts → purgeRoomGuests).
+ */
+export function keepForTheRoom(userId: number): boolean {
+  const { changes } = run(
+    `UPDATE users SET room_guest_seen_at = ? WHERE id = ? AND is_guest = 1 AND room_guest_seen_at IS NULL
+     AND games_played = 0 AND questions_answered = 0`,
+    Date.now(),
+    userId,
+  );
+  return Number(changes) > 0;
 }
 
 /** Names guests get ("Гост_4821137"); nobody can register one. */

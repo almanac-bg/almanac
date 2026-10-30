@@ -18,6 +18,7 @@ import {
   Copy,
   Crown,
   Image as ImageIcon,
+  Lock,
   LogOut,
   Minus,
   Play,
@@ -28,6 +29,7 @@ import {
   Skull,
   Target,
   UserMinus,
+  UserPen,
   Users,
 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
@@ -116,6 +118,8 @@ export function RoomPage() {
     if (p.isBot) actions.roomKick(p.id);
     else setKicking(p.id);
   }
+  // A kicked guest can come back as a new one with another name, unless the room is locked: the host can lock it too.
+  const comesBack = !!kickTarget?.isGuest && !room.locked;
 
   const update = (patch: RoomSettingsPatch) => actions.roomSettings(patch);
 
@@ -209,6 +213,16 @@ export function RoomPage() {
               <TeamColumns room={room} meId={me.id} isHost={isHost} onKick={kick} />
             ) : (
               <Seats room={room} meId={me.id} isHost={isHost} onKick={kick} />
+            )}
+            {isHost ? (
+              <Door room={room} />
+            ) : (
+              room.locked && (
+                <p className="mt-4 flex items-center gap-2 text-sm text-fg-3">
+                  <Lock aria-hidden className="size-4 shrink-0" /> Стаята е заключена: нови играчи влизат само с
+                  разрешение на домакина.
+                </p>
+              )
             )}
           </Card>
 
@@ -380,15 +394,19 @@ export function RoomPage() {
 
       <Modal open={!!kickTarget} onClose={() => setKicking(null)} title="Премахване от стаята">
         <p className="text-fg-2">
-          Да премахна ли <b className="text-fg [overflow-wrap:anywhere]">{kickTarget?.name}</b> от стаята? Ще може да се
-          върне само с нова покана от теб.
+          Да премахна ли <b className="text-fg [overflow-wrap:anywhere]">{kickTarget?.name}</b> от стаята?{' '}
+          {!kickTarget?.isGuest
+            ? 'Ще може да се върне само с нова покана от теб.'
+            : room.locked
+              ? 'Стаята е заключена: ако почука пак, решаваш ти.'
+              : 'Гост може да влезе пак с ново име — заключи стаята и ще влиза само който пуснеш ти.'}
         </p>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button variant="ghost" onClick={() => setKicking(null)}>
             Отказ
           </Button>
           <Button
-            variant="danger"
+            variant={comesBack ? 'secondary' : 'danger'}
             onClick={() => {
               if (kickTarget) actions.roomKick(kickTarget.id);
               setKicking(null);
@@ -396,6 +414,18 @@ export function RoomPage() {
           >
             <UserMinus className="size-4" /> Премахни
           </Button>
+          {comesBack && (
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (kickTarget) actions.roomKick(kickTarget.id);
+                actions.roomLock(true);
+                setKicking(null);
+              }}
+            >
+              <Lock className="size-4" /> Премахни и заключи
+            </Button>
+          )}
         </div>
       </Modal>
     </div>
@@ -528,6 +558,71 @@ function Setting({ label, children }: { label: string; children: React.ReactNode
 }
 
 /** A room setting the host switches on or off: the whole row is the switch, named by its title. */
+/** The host's door: „Заключи стаята“, and who's knocking on it — each let in or not. */
+function Door({ room }: { room: RoomState }) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function answer(playerId: string, admit: boolean) {
+    setBusy(playerId);
+    const res = await actions.roomAdmit(playerId, admit);
+    setBusy(null);
+    if (!res.ok) toast({ kind: 'error', title: res.error });
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Toggle
+        checked={room.locked}
+        disabled={false}
+        onChange={(locked) => actions.roomLock(locked)}
+        icon={<Lock className="size-4 text-amber-300" />}
+        title="Заключи стаята"
+        hint={
+          room.locked
+            ? 'Който влезе с кода, чука на вратата — ти решаваш дали да влезе'
+            : 'Щом всички са вътре: който дойде после, чака разрешение от теб'
+        }
+      />
+      <div aria-live="polite">
+        {room.knocking.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold">
+              На вратата <span className="text-fg-3">{room.knocking.length}</span>
+            </h3>
+            <ul className="mt-2 space-y-2">
+              {room.knocking.map((k) => (
+                <li key={k.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line p-2.5">
+                  <span className="min-w-0 flex-1 basis-32 text-sm font-semibold [overflow-wrap:anywhere]">
+                    {k.name}
+                    {k.isGuest && <span className="ml-2 text-xs font-bold tracking-wide text-fg-3">ГОСТ</span>}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => answer(k.id, true)}
+                    loading={busy === k.id}
+                    aria-label={`Пусни ${k.name}`}
+                  >
+                    <Check className="size-4" /> Пусни
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => answer(k.id, false)}
+                    disabled={busy === k.id}
+                    aria-label={`Не пускай ${k.name}`}
+                  >
+                    Не
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Toggle({
   checked,
   disabled,
@@ -593,6 +688,8 @@ function PlayerCard({
   presenting?: boolean;
 }) {
   const kickable = isHost && !p.isHost;
+  // A guest's name is what they typed: the host can swap it for a plain „Играч N“ (on a class's screen above all).
+  const renamable = isHost && p.isGuest && !p.isHost && !/^Играч \d+$/.test(p.name);
   return (
     <m.div
       layout
@@ -604,11 +701,12 @@ function PlayerCard({
         p.id === `u${meId}` && 'border-violet-400/40 bg-violet-500/10',
       )}
     >
-      {/* Bots are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would squeeze it out. */}
+      {/* Bots and guests are marked on the avatar: rows here also hold the host's buttons, and a chip by the name would
+          squeeze it out. A guest's name is only what they typed: it could pass for anyone's. */}
       <Avatar avatar={p.avatar} frame={p.frame} size={44}>
-        {p.isBot && (
+        {(p.isBot || p.isGuest) && (
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-ink-2 px-1 text-xs leading-3.5 font-bold tracking-wide text-fg-2 ring-1 ring-line">
-            БОТ
+            {p.isBot ? 'БОТ' : 'ГОСТ'}
           </span>
         )}
       </Avatar>
@@ -621,12 +719,23 @@ function PlayerCard({
         ) : (
           <PlayerTag name={p.name} title={p.title} level={p.level} />
         )}
-        {p.isBot && <span className="sr-only">бот</span>}
+        {(p.isBot || p.isGuest) && <span className="sr-only">{p.isBot ? 'бот' : 'гост'}</span>}
       </div>
       {p.isHost && <Crown className="size-4 shrink-0 text-amber-300" aria-label="Домакин" />}
       {(teamButton || kickable) && (
         <div className="flex shrink-0 items-center gap-2.5">
           {teamButton}
+          {renamable && (
+            <button
+              type="button"
+              onClick={() => actions.roomRename(p.id)}
+              aria-label={`Смени името ${p.name} на „Играч“ с номер`}
+              title="Смени името на „Играч“ с номер"
+              className={clsx(SEAT_BUTTON, 'hover:bg-tint/10 hover:text-fg')}
+            >
+              <UserPen className="size-4" />
+            </button>
+          )}
           {/* Keep "move" and the destructive "remove" apart. */}
           {teamButton && kickable && <span aria-hidden className="h-6 w-px bg-line" />}
           {kickable && (

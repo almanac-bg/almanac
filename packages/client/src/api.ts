@@ -122,7 +122,8 @@ export const api = {
   /** The password again, for what needs a recent one (see onPasswordNeeded). */
   confirmPassword: (password: string) => request<{ ok: true }>('POST', '/auth/confirm', { password }),
   /** Play first, sign up later: a guest account on this device. */
-  guest: () => request<{ user: MeUser }>('POST', '/auth/guest'),
+  /** `room`: to join a room from its link (a pupil in a class): the guest is erased within an hour of leaving. */
+  guest: (room = false) => request<{ user: MeUser }>('POST', '/auth/guest', room ? { room } : undefined),
   /** A guest picks a name and password; everything played so far stays. */
   claim: (username: string, password: string, email?: string) =>
     request<{ user: MeUser }>('POST', '/account/claim', { username, password, email: email || undefined }),
