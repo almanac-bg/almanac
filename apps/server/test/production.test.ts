@@ -39,7 +39,13 @@ test('nobody becomes an admin by signing up; the admin command line makes one', 
   assert.equal(added.status, 0, added.output);
   const api = http(srv.url);
   assert.equal((await api.get('/api/me', owner.cookie)).body.user.isAdmin, true, 'names match case-insensitively');
-  assert.match(cli(srv.dbPath, 'admin', 'list').output, /Собственик/);
+  assert.match(cli(srv.dbPath, 'admin', 'list').output, /Собственик\tmoderator\t2FA not set up/);
+  assert.equal((await api.get('/api/me', owner.cookie)).body.user.staffRole, 'moderator');
+  assert.equal(cli(srv.dbPath, 'admin', 'owner', 'Собственик').status, 0);
+  assert.equal((await api.get('/api/me', owner.cookie)).body.user.staffRole, 'owner');
+  // /admin wants an authenticator app first: what waits is counted, nothing else opens.
+  assert.equal((await api.get('/api/admin/summary', owner.cookie)).body.secondFactor, 'setup');
+  assert.equal((await api.get('/api/admin/reports', owner.cookie)).body.setup2fa, true);
 
   assert.equal(cli(srv.dbPath, 'admin', 'remove', 'Собственик').status, 0);
   assert.equal((await api.get('/api/me', owner.cookie)).body.user.isAdmin, false);

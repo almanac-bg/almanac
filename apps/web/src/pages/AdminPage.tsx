@@ -1,5 +1,11 @@
 import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@quiz/client';
-import { MODERATION, type QuestionDraft, type Submission, type SubmissionStatus } from '@quiz/shared';
+import {
+  type AdminSummary,
+  MODERATION,
+  type QuestionDraft,
+  type Submission,
+  type SubmissionStatus,
+} from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -23,7 +29,8 @@ import {
   validateDraft,
 } from '../components/questions/draft';
 import { QuestionPreview } from '../components/questions/QuestionPreview';
-import { Button, Card, EmptyState, Segmented, Spinner } from '../components/ui';
+import { SecondFactorGate } from '../components/SecondFactor';
+import { Button, Card, EmptyState, PageSpinner, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 
@@ -36,21 +43,17 @@ export function AdminPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab');
   const section: Section = SECTIONS.find((x) => x === tab) ?? 'questions';
-  const [counts, setCounts] = useState<{
-    pendingQuestions: number;
-    openReports: number;
-    questionReports: number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (me.isAdmin)
-      api
-        .adminSummary()
-        .then(setCounts)
-        .catch(() => {});
-  }, [me.isAdmin]);
+  // What waits, and whether this session has given its second factor: nothing else opens without it.
+  const summary = useLoad(() => (me.isAdmin ? api.adminSummary() : Promise.resolve(null)), String(me.isAdmin));
+  const counts = summary.data;
+  const setCounts = (patch: (c: AdminSummary) => AdminSummary) => counts && summary.setData(patch(counts));
 
   if (!me.isAdmin) return <Navigate to="/" replace />;
+  if (summary.error && !counts)
+    return <LoadError title="Модерацията не се зареди" error={summary.error} onRetry={summary.retry} />;
+  if (!counts) return <PageSpinner />;
+  if (counts.secondFactor !== 'ok') return <SecondFactorGate state={counts.secondFactor} onDone={summary.retry} />;
+  const owner = me.staffRole === 'owner';
 
   const badge = (n: number | undefined) => (n ? <span className="ml-1.5 text-amber-300">{n}</span> : null);
   return (
@@ -72,21 +75,20 @@ export function AdminPage() {
             { value: 'players', label: 'Играчи' },
             { value: 'log', label: 'Дневник' },
             { value: 'play', label: 'Игра' },
-            { value: 'stats', label: 'Статистика' },
+            // The numbers are the owner's.
+            ...(owner ? [{ value: 'stats' as const, label: 'Статистика' }] : []),
           ]}
         />
       </div>
       {section === 'questions' && (
-        <QuestionsQueue onPending={(n) => setCounts((c) => c && { ...c, pendingQuestions: n })} />
+        <QuestionsQueue onPending={(n) => setCounts((c) => ({ ...c, pendingQuestions: n }))} />
       )}
-      {section === 'flags' && (
-        <QuestionReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, questionReports: n })} />
-      )}
-      {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => c && { ...c, openReports: n })} />}
+      {section === 'flags' && <QuestionReportsQueue onOpen={(n) => setCounts((c) => ({ ...c, questionReports: n }))} />}
+      {section === 'reports' && <ReportsQueue onOpen={(n) => setCounts((c) => ({ ...c, openReports: n }))} />}
       {section === 'players' && <PlayersPanel />}
       {section === 'log' && <ModerationLogPanel />}
       {section === 'play' && <PlayCheckPanel />}
-      {section === 'stats' && <LaunchStatsPanel />}
+      {section === 'stats' && owner && <LaunchStatsPanel />}
     </div>
   );
 }

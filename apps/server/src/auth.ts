@@ -154,16 +154,17 @@ export function sessionTokenFromCookieHeader(header: string | undefined): string
  */
 export function resolveSession(
   token: string | null,
-): { userId: number; renewed: boolean; confirmedAt: number | null } | null {
+): { userId: number; renewed: boolean; confirmedAt: number | null; secondFactorAt: number | null } | null {
   if (!token) return null;
   const hash = hashToken(token);
   const session = one<{
     user_id: number;
     expires_at: number;
     confirmed_at: number | null;
+    second_factor_at: number | null;
     banned_until: number | null;
   }>(
-    `SELECT s.user_id, s.expires_at, s.confirmed_at, u.banned_until FROM sessions s JOIN users u ON u.id = s.user_id
+    `SELECT s.user_id, s.expires_at, s.confirmed_at, s.second_factor_at, u.banned_until FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token = ?`,
     hash,
   );
@@ -179,7 +180,17 @@ export function resolveSession(
     run('UPDATE sessions SET expires_at = ? WHERE token = ?', now + SESSION_MS, hash);
     seen(session.user_id, now);
   }
-  return { userId: session.user_id, renewed, confirmedAt: session.confirmed_at };
+  return {
+    userId: session.user_id,
+    renewed,
+    confirmedAt: session.confirmed_at,
+    secondFactorAt: session.second_factor_at,
+  };
+}
+
+/** A staff member's one-time code, given for this session: /admin opens for it (requireAdmin). */
+export function secondFactorGiven(token: string) {
+  run('UPDATE sessions SET second_factor_at = ? WHERE token = ?', Date.now(), hashToken(token));
 }
 
 /** The password, given again: the session counts as just signed in for what needs a recent one (requireRecentPassword). */
@@ -193,6 +204,7 @@ export function userIdFromRequest(req: Request, res: Response): number | null {
   const session = resolveSession(token);
   if (session?.renewed) setSessionCookie(res, token);
   res.locals.confirmedAt = session?.confirmedAt ?? null;
+  res.locals.secondFactorAt = session?.secondFactorAt ?? null;
   return session?.userId ?? null;
 }
 

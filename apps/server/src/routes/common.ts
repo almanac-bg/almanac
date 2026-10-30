@@ -1,9 +1,10 @@
+import type { SecondFactorState } from '@quiz/shared';
 import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
 import { verifyPassword } from '../auth';
 import { ACCOUNT_ONLY } from '../guests';
 import { throttled } from '../throttle';
-import { getUser, isAdmin } from '../users';
+import { getUser, isAdmin, isOwner } from '../users';
 
 /**
  * The body, or a 400 with the first problem in it. Schemas give their messages in Bulgarian; anything they don't word
@@ -29,10 +30,54 @@ export function requireAccount(_req: Request, res: Response, next: NextFunction)
 
 export const idParam = (req: Request) => Number(req.params.id);
 
-export function requireAdmin(_req: Request, res: Response, next: NextFunction) {
+/** Staff (the owner or a moderator), for what needs no second factor: the count of what waits, setting one up. */
+export function requireStaff(_req: Request, res: Response, next: NextFunction) {
   const user = getUser(res.locals.userId);
   if (!user || !isAdmin(user)) {
     res.status(403).json({ error: 'Само за модератори.' });
+    return;
+  }
+  next();
+}
+
+/** How long a one-time code given for a session opens /admin. */
+const SECOND_FACTOR_MS = 12 * 60 * 60_000;
+
+/**
+ * Where a staff member's second factor stands for this session: an authenticator app still to set up, a code to give
+ * (none yet, or it's been SECOND_FACTOR_MS), or given.
+ */
+export function secondFactor(res: Response): SecondFactorState {
+  const user = getUser(res.locals.userId);
+  if (!user?.totp_on_at) return 'setup';
+  const at = res.locals.secondFactorAt as number | null;
+  return at && Date.now() - at <= SECOND_FACTOR_MS ? 'ok' : 'needed';
+}
+
+/**
+ * Staff, with a second factor: a stolen password alone moderates nothing. Without an authenticator app set up the
+ * page leads to setting one up (`setup2fa`); without a recent code the app asks for one and tries again (`code`).
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  requireStaff(req, res, () => {
+    const state = secondFactor(res);
+    if (state === 'setup') {
+      res.status(403).json({ error: 'Първо включи двуфакторното влизане.', setup2fa: true });
+      return;
+    }
+    if (state === 'needed') {
+      res.status(403).json({ error: 'Въведи кода от приложението си за удостоверяване.', code: true });
+      return;
+    }
+    next();
+  });
+}
+
+/** What only the owner does: decide about moderators, reload the bank, read the numbers. */
+export function requireOwner(_req: Request, res: Response, next: NextFunction) {
+  const user = getUser(res.locals.userId);
+  if (!user || !isOwner(user)) {
+    res.status(403).json({ error: 'Само за собственика.' });
     return;
   }
   next();

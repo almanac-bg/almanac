@@ -1,5 +1,6 @@
 import type {
   AchievementProgress,
+  AdminSummary,
   AlmanacCategoryPage,
   AlmanacOverview,
   AppNotification,
@@ -87,6 +88,16 @@ export function onPasswordNeeded(ask: () => Promise<boolean>) {
   askForPassword = ask;
 }
 
+let askForCode: (() => Promise<boolean>) | null = null;
+let askingCode: Promise<boolean> | null = null;
+/**
+ * The app asks a staff member for a code from their authenticator app when /admin wants one (every 12 hours), then the
+ * request is tried again.
+ */
+export function onSecondFactorNeeded(ask: () => Promise<boolean>) {
+  askForCode = ask;
+}
+
 /** `body`: JSON, or a file (a Blob goes as it is, with its own type). */
 async function request<T>(method: string, path: string, body?: unknown, again = true): Promise<T> {
   let res: Response;
@@ -107,6 +118,12 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
       asking = null;
     });
     if (await asking) return request<T>(method, path, body, false);
+  }
+  if (res.status === 403 && data.code && again && askForCode) {
+    askingCode ??= askForCode().finally(() => {
+      askingCode = null;
+    });
+    if (await askingCode) return request<T>(method, path, body, false);
   }
   if (!res.ok) throw new ApiError(data.error ?? 'Нещо се обърка. Опитай пак.', res.status);
   return data as T;
@@ -159,8 +176,12 @@ export const api = {
 
   report: (username: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', '/reports', { username, reason, details }),
-  adminSummary: () =>
-    request<{ pendingQuestions: number; openReports: number; questionReports: number }>('GET', '/admin/summary'),
+  adminSummary: () => request<AdminSummary>('GET', '/admin/summary'),
+  /** A new authenticator-app secret for a staff member (shown once), until a code confirms it. */
+  setUpSecondFactor: () => request<{ secret: string; uri: string }>('POST', '/auth/2fa/setup'),
+  enableSecondFactor: (code: string) => request<{ ok: true }>('POST', '/auth/2fa/enable', { code }),
+  /** This session's code (/admin asks every 12 hours). */
+  giveSecondFactor: (code: string) => request<{ ok: true }>('POST', '/auth/2fa', { code }),
   reportQuestion: (questionId: string, reason: QuestionReportReason, details: string) =>
     request<{ ok: true }>('POST', `/questions/${encodeURIComponent(questionId)}/report`, { reason, details }),
   adminQuestionReports: () => request<QuestionReports>('GET', '/admin/question-reports'),

@@ -26,7 +26,17 @@ import { hideQuestion, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { hideSet } from './sets';
 import { basisLabel, confirmNotice, HUMAN, type Outcome, tellPlayer, tellReporters, tellReversal } from './statements';
-import { GUEST_NAME, getUser, getUserByName, nameTaken, toPublicUser, type UserRow, usernameKey } from './users';
+import {
+  GUEST_NAME,
+  getUser,
+  getUserByName,
+  isAdmin,
+  isOwner,
+  nameTaken,
+  toPublicUser,
+  type UserRow,
+  usernameKey,
+} from './users';
 
 /** Why a username can't be had (words nobody should see, or one that passes for the game's own), or null. */
 export function nameProblem(name: string): string | null {
@@ -127,11 +137,15 @@ export function fileReport(reporterId: number, subject: Subject, reason: unknown
   )!.n;
   const what = `${KIND_WORDS[subject.kind]} „${subject.label}“`;
   const last = `Последният: ${reasonLabel(reason)}${text ? ` — „${text}“` : ''}`;
+  // About staff: the owner's to hear, as to decide.
+  const ownerOnly = !!getUser(subject.owner)?.is_admin;
   if (reason === 'illegal') {
-    alertModerators(`case:${subject.kind}:${subject.id}:illegal`, `Незаконно съдържание: ${what}`, [last]);
+    alertModerators(`case:${subject.kind}:${subject.id}:illegal`, `Незаконно съдържание: ${what}`, [last], {
+      ownerOnly,
+    });
     confirmNotice(reporterId, subject.label);
   } else if (waiting >= MODERATION.alertAt)
-    alertModerators(`case:${subject.kind}:${subject.id}`, `${waiting} доклада за ${what}`, [last]);
+    alertModerators(`case:${subject.kind}:${subject.id}`, `${waiting} доклада за ${what}`, [last], { ownerOnly });
   return { ok: true };
 }
 
@@ -212,14 +226,23 @@ function describe(kind: ReportSubjectKind, id: string, ownerId: number): Omit<Re
   return { kind, id, owner: ownerRow(ownerId), name: null, size: null, hidden: false };
 }
 
+/** Reports about staff (or what they made) are the owner's to see and decide: SQL on `reports r` for a viewer. */
+const forViewer = (viewerId: number) => {
+  const viewer = getUser(viewerId);
+  return viewer && isOwner(viewer)
+    ? '1'
+    : 'NOT EXISTS (SELECT 1 FROM users s WHERE s.id = r.target_id AND s.is_admin = 1)';
+};
+
 /**
  * The queue: one case per reported thing, with every open report about it and who sent each. Those in most need first
- * — any illegal content, then the most reported, then the longest waiting — `limit` of them.
+ * — any illegal content, then the most reported, then the longest waiting — `limit` of them. A moderator's queue leaves
+ * out reports about staff: those are the owner's.
  */
-export function openCases(limit = 25): ReportCases {
+export function openCases(viewerId: number, limit = 25): ReportCases {
   const rows = all<ReportRow>(
     `SELECT id, reporter_id, target_id, subject_kind, subject_id, reason, details, created_at
-     FROM reports WHERE status = 'open' ORDER BY created_at`,
+     FROM reports r WHERE status = 'open' AND ${forViewer(viewerId)} ORDER BY created_at`,
   );
   const byCase = new Map<string, ReportRow[]>();
   for (const r of rows) {
@@ -252,11 +275,23 @@ export function openCases(limit = 25): ReportCases {
   return { cases, total: ordered.length };
 }
 
-export const openReportCount = () =>
+export const openReportCount = (viewerId: number) =>
   one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM (SELECT DISTINCT subject_kind, CASE WHEN subject_kind = 'player' THEN target_id
-     ELSE subject_id END FROM reports WHERE status = 'open')`,
+     ELSE subject_id END FROM reports r WHERE status = 'open' AND ${forViewer(viewerId)})`,
   )!.n;
+
+/**
+ * Nobody decides about themselves, and decisions about staff (or what they made) are the owner's: one bad or stolen
+ * moderator account can't lock the others out, or clear its own name. The reason why not, or null.
+ */
+function notTheirs(actorId: number, aboutId: number | null): string | null {
+  if (aboutId === null) return null;
+  if (aboutId === actorId) return 'Не можеш да решаваш за себе си — остави го на друг модератор.';
+  const about = getUser(aboutId);
+  const actor = getUser(actorId);
+  return about && isAdmin(about) && !(actor && isOwner(actor)) ? 'Решение за модератор взема собственикът.' : null;
+}
 
 // ─── Decisions ───────────────────────────────────────────────────────────────
 // Every one is logged (modlog.ts) with its basis and reason, and told (statements.ts): to the player, with where to
@@ -308,7 +343,8 @@ export function banPlayer(
 ): Result {
   const target = getUser(targetId);
   if (!target) return { ok: false, error: 'Няма такъв играч.' };
-  if (targetId === adminId) return { ok: false, error: 'Не можеш да наказваш себе си.' };
+  const mine = notTheirs(adminId, targetId);
+  if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(ban.basis, ban.reason);
   if (problem) return { ok: false, error: problem };
   const reason = ban.reason.trim().slice(0, MODERATION.reasonMax);
@@ -363,6 +399,8 @@ const BANNED_DATA = () =>
 export function changeBan(adminId: number, targetId: number, days: number | null, reason: string): Result {
   const target = getUser(targetId);
   if (!target) return { ok: false, error: 'Няма такъв играч.' };
+  const mine = notTheirs(adminId, targetId);
+  if (mine) return { ok: false, error: mine };
   if (!target.banned_until || target.banned_until < Date.now()) return { ok: false, error: 'Профилът не е спрян.' };
   if (reason.trim().length < MODERATION.reasonMin)
     return { ok: false, error: `Напиши защо (поне ${MODERATION.reasonMin} знака).` };
@@ -410,6 +448,8 @@ export function renamePlayer(
 ): Result {
   const target = getUser(targetId);
   if (!target) return { ok: false, error: 'Няма такъв играч.' };
+  const mine = notTheirs(adminId, targetId);
+  if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(rename.basis, rename.reason);
   if (problem) return { ok: false, error: problem };
   const name = rename.username.trim();
@@ -479,6 +519,8 @@ export function annulResults(
   { told = true } = {},
 ): Result {
   if (!getUser(targetId)) return { ok: false, error: 'Няма такъв играч.' };
+  const mine = notTheirs(adminId, targetId);
+  if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(grounds.basis, grounds.reason);
   if (problem) return { ok: false, error: problem };
   const reason = grounds.reason.trim().slice(0, MODERATION.reasonMax);
@@ -522,6 +564,8 @@ function dismiss(adminId: number, kind: ReportSubjectKind, id: string, closes: C
     ...aboutThing(kind, id)[1],
   );
   if (!owner) return { ok: false, error: 'Няма отворени доклади.' };
+  const mine = notTheirs(adminId, owner.target_id);
+  if (mine) return { ok: false, error: mine };
   const thing = describe(kind, id, owner.target_id);
   tx(() => {
     const closed = closeReports(adminId, closes, 'dismiss', thing.name ?? thing.owner.username);
@@ -594,6 +638,8 @@ export function renameGroupByModerator(
     groupId,
   );
   if (!group) return { ok: false, error: 'Няма такава група.' };
+  const mine = notTheirs(adminId, group.owner_id);
+  if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(basis, reason);
   if (problem) return { ok: false, error: problem };
   const name = `Група ${groupId}`;
@@ -652,6 +698,8 @@ export function hideSetByModerator(
     code,
   );
   if (!set) return { ok: false, error: 'Няма такъв набор.', status: 404 };
+  const mine = notTheirs(adminId, set.owner_id);
+  if (mine) return { ok: false, error: mine };
   if (set.hidden === Number(hidden))
     return { ok: false, error: hidden ? 'Наборът вече е скрит.' : 'Наборът не е скрит.' };
   const reason = grounds.reason.trim().slice(0, MODERATION.reasonMax);
@@ -732,6 +780,7 @@ export function playerCard(id: number): PlayerCard | null {
       lastSeenAt: u.last_seen_at,
       hasEmail: !!u.email,
     },
+    staff: isAdmin(u) ? (u.staff_role ?? 'moderator') : null,
     ban: banned
       ? { until: u.banned_until!, basis: (u.ban_basis as ModerationBasis | null) ?? null, reason: u.ban_reason }
       : null,
@@ -776,6 +825,8 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
   if (reason.length < MODERATION.reasonMin)
     return { ok: false, error: `Напиши защо го отменяш (поне ${MODERATION.reasonMin} знака).` };
   const userId = row.target_user_id;
+  const mine = notTheirs(adminId, userId);
+  if (mine) return { ok: false, error: mine };
   switch (row.action) {
     case 'ban':
     case 'unban':

@@ -18,6 +18,7 @@ import {
   SEASON_REWARD_XP,
   seasonKey,
 } from '@quiz/shared';
+import { codeAt, stepAt } from '../src/totp';
 import {
   type Account,
   answer,
@@ -41,6 +42,7 @@ import {
   startServer,
   type TestServer,
   tokenFrom,
+  withSecondFactor,
 } from './helpers';
 
 const T = { timeout: 90_000 };
@@ -59,6 +61,8 @@ before(async () => {
   api = http(srv.url);
   A = await register(srv.url, 'Иван_тест');
   B = await register(srv.url, 'maria_test');
+  // A is the first account, so the owner: /admin wants their second factor.
+  await withSecondFactor(srv.url, A.cookie);
   // Accounts from yesterday: they play the shared daily (a brand-new account gets its own: the guest's daily below).
   srv.db
     .prepare('UPDATE users SET created_at = ? WHERE id IN (?, ?)')
@@ -805,14 +809,19 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     ['set', mine.code, 'Урок по история', 3, 'illegal'],
   );
   // The moderator reads all of it, and decides on the reports seen (one decided meanwhile is a conflict).
+  const hideSet = { action: 'hide_set', basis: 'content', reason: 'Съдържа обиди към ученици.' };
   assert.equal((await api.get(`/api/admin/sets/${mine.code}`, B.cookie)).status, 403);
   assert.equal((await api.get(`/api/admin/sets/${mine.code}`, A.cookie)).body.set.questions.length, 3);
-  const decide = (reportIds: number[], decision: object) =>
-    api.send('POST', `/api/admin/cases/set/${mine.code}/resolve`, A.cookie, { reportIds, decision });
-  const hide = { action: 'hide_set', basis: 'content', reason: 'Съдържа обиди към ученици.' };
-  assert.equal((await decide([setCase.reports[0].id + 1000], hide)).status, 409);
+  // Nobody decides about what's their own, and what staff made is an owner's to decide: here, a second owner.
+  const N = await register(srv.url, 'nadzor_test');
+  assert.equal(cli(srv.dbPath, 'admin', 'owner', 'nadzor_test').status, 0);
+  await withSecondFactor(srv.url, N.cookie);
+  const decide = (reportIds: number[], decision: object, cookie = N.cookie) =>
+    api.send('POST', `/api/admin/cases/set/${mine.code}/resolve`, cookie, { reportIds, decision });
+  assert.match((await decide([setCase.reports[0].id], hideSet, A.cookie)).body.error, /себе си/);
+  assert.equal((await decide([setCase.reports[0].id + 1000], hideSet)).status, 409);
   assert.equal((await decide([setCase.reports[0].id], { action: 'hide_set', reason: 'без основание' })).status, 400);
-  assert.equal((await decide([setCase.reports[0].id], hide)).status, 200);
+  assert.equal((await decide([setCase.reports[0].id], hideSet)).status, 200);
   assert.match(
     (await api.get('/api/notifications', A.cookie)).body.notifications[0].text,
     /Модератор скри набора ти „Урок по история“.*Основание: Неподходящо или незаконно съдържание.*Съдържа обиди/,
@@ -2050,33 +2059,99 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   );
 });
 
-test('a moderator gives the password again for changes, at most an hour after giving it', T, async () => {
-  // A saved guest made a moderator. Saving set the password, so it counts as given then; an hour and more ago here.
-  const guestM = await guest(srv.url);
-  const claimed = await api.send('POST', '/api/account/claim', guestM.cookie, {
-    username: 'pazitel_test',
-    password: 'secret123',
-  });
-  assert.equal(claimed.status, 200);
-  const M = { cookie: claimed.cookie! };
-  const sessionHash = createHash('sha256')
-    .update(decodeURIComponent(M.cookie.split('=')[1]))
-    .digest('base64url');
-  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
-  assert.equal(cli(srv.dbPath, 'admin', 'add', 'pazitel_test').status, 0);
-  const reject = () => api.send('POST', '/api/admin/submissions/999999/reject', M.cookie, { reason: '' });
+test(
+  'staff: an authenticator app before /admin opens, a code each session, the password again for changes; decisions about staff are the owner’s',
+  T,
+  async () => {
+    // A saved guest made a moderator. Saving set the password, so it counts as given then.
+    const guestM = await guest(srv.url);
+    const claimed = await api.send('POST', '/api/account/claim', guestM.cookie, {
+      username: 'pazitel_test',
+      password: 'secret123',
+    });
+    assert.equal(claimed.status, 200);
+    const M = { cookie: claimed.cookie!, id: claimed.body.user.id as number };
+    const sessionHash = createHash('sha256')
+      .update(decodeURIComponent(M.cookie.split('=')[1]))
+      .digest('base64url');
+    assert.equal(cli(srv.dbPath, 'admin', 'add', 'pazitel_test').status, 0);
+    assert.equal((await api.get('/api/me', M.cookie)).body.user.staffRole, 'moderator');
 
-  assert.equal((await api.get('/api/admin/summary', M.cookie)).status, 200, 'looking needs no password');
-  const asked = await reject();
-  assert.equal(asked.status, 403);
-  assert.equal(asked.body.confirm, true, 'a change asks for it');
-  assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'wrong-password' })).status, 400);
-  assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'secret123' })).status, 200);
-  assert.equal((await reject()).status, 400, 'then the change goes through (to "no such question")');
+    // Before anything opens, an authenticator app; what waits is counted meanwhile (the home card shows it).
+    assert.equal((await api.get('/api/admin/summary', M.cookie)).body.secondFactor, 'setup');
+    assert.equal((await api.get('/api/admin/reports', M.cookie)).body.setup2fa, true);
+    const setup = await api.send('POST', '/api/auth/2fa/setup', M.cookie);
+    assert.equal(setup.status, 200);
+    assert.match(setup.body.uri, /^otpauth:\/\/totp\/.*pazitel_test\?secret=/);
+    const secret: string = setup.body.secret;
+    const now = () => stepAt(Date.now());
+    const wrong = String((Number(codeAt(secret, now())) + 1) % 1_000_000).padStart(6, '0');
+    assert.equal((await api.send('POST', '/api/auth/2fa/enable', M.cookie, { code: wrong })).status, 400);
+    const first = codeAt(secret, now());
+    assert.equal((await api.send('POST', '/api/auth/2fa/enable', M.cookie, { code: first })).status, 200);
+    assert.equal((await api.get('/api/admin/summary', M.cookie)).body.secondFactor, 'ok');
+    assert.equal((await api.get('/api/admin/reports', M.cookie)).status, 200);
+    // Twelve hours on, a code again; each one works once.
+    srv.db
+      .prepare('UPDATE sessions SET second_factor_at = ? WHERE token = ?')
+      .run(Date.now() - 13 * 60 * 60_000, sessionHash);
+    assert.equal((await api.get('/api/admin/reports', M.cookie)).body.code, true);
+    assert.equal((await api.send('POST', '/api/auth/2fa', M.cookie, { code: first })).status, 400, 'once');
+    assert.equal((await api.send('POST', '/api/auth/2fa', M.cookie, { code: codeAt(secret, now() + 1) })).status, 200);
 
-  srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
-  assert.equal((await reject()).status, 403, 'an hour later it asks again');
-});
+    // Changes want the password given within the hour.
+    srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
+    const reject = () => api.send('POST', '/api/admin/submissions/999999/reject', M.cookie, { reason: '' });
+    const asked = await reject();
+    assert.equal(asked.status, 403);
+    assert.equal(asked.body.confirm, true, 'a change asks for it');
+    assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'wrong-password' })).status, 400);
+    assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'secret123' })).status, 200);
+    assert.equal((await reject()).status, 400, 'then the change goes through (to "no such question")');
+    srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
+    assert.equal((await reject()).status, 403, 'an hour later it asks again');
+    assert.equal((await api.send('POST', '/api/auth/confirm', M.cookie, { password: 'secret123' })).status, 200);
+
+    // A moderator decides about players: not about themselves, not about staff; the numbers and the bank are the owner's.
+    const grounds = { basis: 'abuse', reason: 'Проверка на правилата.' };
+    const banOwner = await api.send('POST', `/api/admin/players/${A.user.id}/ban`, M.cookie, { days: 1, ...grounds });
+    assert.match(banOwner.body.error, /собственикът/);
+    const self = await api.send('POST', `/api/admin/players/${M.id}/rename`, M.cookie, {
+      username: 'pazitel_2',
+      ...grounds,
+    });
+    assert.match(self.body.error, /себе си/);
+    assert.equal((await api.get('/api/admin/stats', M.cookie)).status, 403);
+    assert.equal((await api.send('POST', '/api/admin/bank/reload', M.cookie)).status, 403);
+    // A report about a moderator is the owner's to see and decide.
+    await api.send('POST', '/api/reports', B.cookie, {
+      username: 'pazitel_test',
+      reason: 'behavior',
+      details: 'проба',
+    });
+    const about = (cookie: string) =>
+      api
+        .get('/api/admin/reports', cookie)
+        .then((r) => r.body.cases.find((c: { owner: { username: string } }) => c.owner.username === 'pazitel_test'));
+    assert.equal(await about(M.cookie), undefined);
+    const theirs = await about(A.cookie);
+    assert.equal(
+      (
+        await api.send('POST', `/api/admin/cases/player/${M.id}/resolve`, A.cookie, {
+          reportIds: theirs.reports.map((r: { id: number }) => r.id),
+          decision: { action: 'dismiss' },
+        })
+      ).status,
+      200,
+    );
+    // Who joined the staff, in the log: the command line did it.
+    const joined = (await api.get('/api/admin/log', A.cookie)).body.entries.find(
+      (e: { action: string; user: { username: string } | null }) =>
+        e.action === 'staff_add' && e.user?.username === 'pazitel_test',
+    );
+    assert.deepEqual([joined.admin, joined.reason], [null, 'Модератор']);
+  },
+);
 
 test('every moderation decision is logged with its grounds, and can be undone', T, async () => {
   const E = await register(srv.url, 'izmamnik_test');

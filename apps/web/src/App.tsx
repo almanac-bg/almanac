@@ -15,6 +15,7 @@ import { QueueOverlay } from './components/QueueOverlay';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { RoomDoor, RoomNickname } from './components/RoomNickname';
 import { SeasonRecap } from './components/SeasonRecap';
+import { SecondFactorPrompt } from './components/SecondFactor';
 import { Toasts } from './components/Toasts';
 import { Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
@@ -252,6 +253,7 @@ function SignedIn() {
       <Invites />
       <SeasonRecap />
       <PasswordConfirm />
+      <SecondFactorPrompt />
     </>
   );
 }

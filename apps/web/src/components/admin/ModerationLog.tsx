@@ -28,6 +28,9 @@ const ACTION: Record<ModerationLogAction, string> = {
   unhide_set: 'показа отново набор',
   rename_group: 'преименува група на',
   reload_bank: 'презареди банката с въпроси',
+  staff_add: 'направи от екипа',
+  staff_remove: 'махна от екипа',
+  staff_2fa_reset: 'нулира двуфакторното влизане на',
 };
 
 /**
@@ -58,7 +61,9 @@ export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUnd
     <li className={clsx('px-4 py-3 text-sm sm:px-5', entry.undoneAt && 'opacity-60')}>
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <p className="min-w-0 flex-1">
-          <b>{entry.admin ?? 'Играта'}</b> {ACTION[entry.action]}{' '}
+          {/* No moderator behind it: the game's own (flags hid a question), or the command line on the server. */}
+          <b>{entry.admin ?? (entry.action.startsWith('staff_') ? 'Командният ред' : 'Играта')}</b>{' '}
+          {ACTION[entry.action]}{' '}
           {entry.user && (
             <Link
               to={`/admin?tab=players&player=${entry.user.id}`}

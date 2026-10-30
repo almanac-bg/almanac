@@ -1,3 +1,4 @@
+import { BRAND } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getMe } from '../account';
@@ -11,6 +12,7 @@ import {
   knownDevice,
   needsRehash,
   requireAuth,
+  secondFactorGiven,
   sessionTokenFromCookieHeader,
   setDeviceCookie,
   setSessionCookie,
@@ -35,8 +37,9 @@ import { disconnectSession } from '../notify';
 import { guestsPaused } from '../settings';
 import { count } from '../stats';
 import { network, throttled, wideNetwork } from '../throttle';
+import { newSecret, otpauthUri, verify as verifyCode } from '../totp';
 import { getUser, getUserByLogin, nameTaken, usernameKey } from '../users';
-import { confirmPassword, parse, requireAccount } from './common';
+import { confirmPassword, parse, requireAccount, requireRecentPassword, requireStaff } from './common';
 
 /** Signing up, in and out, playing as a guest, and the links emails carry (verify an address, reset a password). */
 export const authRouter = Router();
@@ -100,14 +103,15 @@ authRouter.post('/auth/register', async (req, res) => {
   let userId: number;
   try {
     const { lastInsertRowid } = run(
-      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_admin)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_admin, staff_role)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       creds.username,
       usernameKey(creds.username),
       nameShape(creds.username),
       hash,
       Date.now(),
       firstUser ? 1 : 0,
+      firstUser ? 'owner' : null,
     );
     userId = Number(lastInsertRowid);
   } catch (err) {
@@ -258,6 +262,75 @@ authRouter.post('/auth/logout', (req, res) => {
     disconnectSession(hashToken(token)); // the socket of every tab on this session too
   }
   setSessionCookie(res, null);
+  res.json({ ok: true });
+});
+
+// ─── A second factor for staff ───────────────────────────────────────────────
+
+/**
+ * Setting up an authenticator app: a new secret (with the password given within the hour), shown once as text and as
+ * an otpauth:// link; it takes effect when a code from the app confirms it (/auth/2fa/enable).
+ */
+authRouter.post('/auth/2fa/setup', requireAuth, requireStaff, requireRecentPassword, (_req, res) => {
+  const user = getUser(res.locals.userId)!;
+  if (throttled(`2fa-setup:${user.id}`, 5, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  if (user.totp_on_at) {
+    res.status(400).json({ error: 'Двуфакторното влизане вече е включено.' });
+    return;
+  }
+  const secret = newSecret();
+  run('UPDATE users SET totp_secret = ?, totp_step = NULL WHERE id = ?', secret, user.id);
+  res.json({ secret, uri: otpauthUri(BRAND.name, user.username, secret) });
+});
+
+const Code = z.object({ code: z.string().max(12) });
+
+/** A code from the app confirms the secret: two-factor sign-in is on, and this session has given its code. */
+authRouter.post('/auth/2fa/enable', requireAuth, requireStaff, (req, res) => {
+  const body = parse(Code, req, res);
+  if (!body) return;
+  const user = getUser(res.locals.userId)!;
+  if (user.totp_on_at || !user.totp_secret) {
+    res.status(400).json({ error: user.totp_on_at ? 'Вече е включено.' : 'Започни отначало.' });
+    return;
+  }
+  if (throttled(`2fa:${user.id}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const step = verifyCode(user.totp_secret, body.code);
+  if (step === null) {
+    res.status(400).json({ error: 'Кодът не е верен — провери часовника на телефона и опитай пак.' });
+    return;
+  }
+  run('UPDATE users SET totp_on_at = ?, totp_step = ? WHERE id = ?', Date.now(), step, user.id);
+  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  res.json({ ok: true });
+});
+
+/** The code for this session (/admin asks for one every 12 hours). Each code works once; ten tries in 15 minutes. */
+authRouter.post('/auth/2fa', requireAuth, requireStaff, (req, res) => {
+  const body = parse(Code, req, res);
+  if (!body) return;
+  const user = getUser(res.locals.userId)!;
+  if (!user.totp_on_at || !user.totp_secret) {
+    res.status(400).json({ error: 'Първо включи двуфакторното влизане.' });
+    return;
+  }
+  if (throttled(`2fa:${user.id}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const step = verifyCode(user.totp_secret, body.code, Date.now(), user.totp_step ?? -1);
+  if (step === null) {
+    res.status(400).json({ error: 'Кодът не е верен или вече е използван.' });
+    return;
+  }
+  run('UPDATE users SET totp_step = ? WHERE id = ?', step, user.id);
+  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
   res.json({ ok: true });
 });
 

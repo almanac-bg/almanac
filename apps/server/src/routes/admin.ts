@@ -1,4 +1,10 @@
-import { MODERATION, MODERATION_BASES, type ModerationBasis, type SubmissionStatus } from '@quiz/shared';
+import {
+  type AdminSummary,
+  MODERATION,
+  MODERATION_BASES,
+  type ModerationBasis,
+  type SubmissionStatus,
+} from '@quiz/shared';
 import { type Request, Router } from 'express';
 import { z } from 'zod';
 import { playCheck } from '../answers';
@@ -37,7 +43,15 @@ import {
   rejectSubmission,
   similarQuestions,
 } from '../submissions';
-import { idParam, parse, requireAdmin, requireRecentPassword } from './common';
+import {
+  idParam,
+  parse,
+  requireAdmin,
+  requireOwner,
+  requireRecentPassword,
+  requireStaff,
+  secondFactor,
+} from './common';
 
 /**
  * The moderators' API (/admin): the queues (proposed questions, flags on questions, reports about players), the
@@ -45,6 +59,21 @@ import { idParam, parse, requireAdmin, requireRecentPassword } from './common';
  * given within the hour (requireRecentPassword).
  */
 export const adminRouter = Router();
+
+/**
+ * What waits (the home card and the tabs count it), with where the second factor stands: staff only, but no code
+ * needed — it's how the page knows to ask for one, or to set an app up.
+ */
+adminRouter.get('/admin/summary', requireAuth, requireStaff, (_req, res) => {
+  const summary: AdminSummary = {
+    pendingQuestions: pendingCount(),
+    openReports: openReportCount(res.locals.userId),
+    questionReports: openQuestionReportCount(),
+    secondFactor: secondFactor(res),
+  };
+  res.json(summary);
+});
+
 adminRouter.use('/admin', requireAuth, requireAdmin);
 const change = requireRecentPassword;
 
@@ -62,15 +91,7 @@ const Basis = z.enum(MODERATION_BASES.map((b) => b.id) as [ModerationBasis, ...M
 });
 const Reason = z.string().max(MODERATION.reasonMax).default('');
 
-adminRouter.get('/admin/summary', (_req, res) => {
-  res.json({
-    pendingQuestions: pendingCount(),
-    openReports: openReportCount(),
-    questionReports: openQuestionReportCount(),
-  });
-});
-
-adminRouter.get('/admin/stats', (_req, res) => {
+adminRouter.get('/admin/stats', requireOwner, (_req, res) => {
   res.json(launchStats());
 });
 
@@ -118,7 +139,7 @@ adminRouter.put('/admin/questions/:id', change, (req, res) => {
 });
 
 /** The bank read again from disk (after a pull of the private bank, without a restart). */
-adminRouter.post('/admin/bank/reload', change, (_req, res) => {
+adminRouter.post('/admin/bank/reload', requireOwner, change, (_req, res) => {
   reloadQuestionBank();
   const problem = bankProblem();
   if (problem) {
@@ -150,7 +171,7 @@ adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {
 // ─── Reports about players, and the players ──────────────────────────────────
 
 adminRouter.get('/admin/reports', (_req, res) => {
-  res.json(openCases());
+  res.json(openCases(res.locals.userId));
 });
 
 const Decision = z.discriminatedUnion('action', [
@@ -183,7 +204,7 @@ adminRouter.post('/admin/cases/:kind/:id/resolve', change, (req, res) => {
   const id = String(req.params.id).slice(0, 32);
   reply(res, decideCase(res.locals.userId, kind.data, id, body.reportIds, body.decision), () => ({
     ok: true,
-    ...openCases(),
+    ...openCases(res.locals.userId),
   }));
 });
 

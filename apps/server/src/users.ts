@@ -27,6 +27,13 @@ export interface UserRow {
   best_solo_score: number;
   hosted_games: number;
   is_admin: number;
+  /** Staff: 'owner' (decides about moderators, keeps the bank) or 'moderator'; null for players. */
+  staff_role: 'owner' | 'moderator' | null;
+  /** The authenticator app's secret (base32), once set up; `totp_on_at` once a code confirmed it. */
+  totp_secret: string | null;
+  totp_on_at: number | null;
+  /** The last code's step: a code works once. */
+  totp_step: number | null;
   daily_streak: number;
   best_daily_streak: number;
   last_daily_day: string | null;
@@ -145,4 +152,9 @@ export function achievementSet(userId: number): Set<string> {
 /** Moderators: the account flag, set with the admin command line (src/cli.ts) or for the first account in development. */
 export function isAdmin(row: Pick<UserRow, 'is_admin'>): boolean {
   return row.is_admin === 1;
+}
+
+/** Who runs the place: decides about moderators (and reports about them), reloads the bank, reads the numbers. */
+export function isOwner(row: Pick<UserRow, 'is_admin' | 'staff_role'>): boolean {
+  return row.is_admin === 1 && row.staff_role === 'owner';
 }

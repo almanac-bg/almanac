@@ -1,6 +1,9 @@
 // Server administration from the command line (run next to the live server; SQLite handles both).
 //   node apps/server/dist/cli.mjs admin add <username>     — make a player a moderator
-//   node apps/server/dist/cli.mjs admin remove <username>  — take it away
+//   node apps/server/dist/cli.mjs admin owner <username>   — make them the owner (decides about moderators, keeps the
+//                                                            bank and the numbers)
+//   node apps/server/dist/cli.mjs admin remove <username>  — take either away
+//   node apps/server/dist/cli.mjs admin 2fa-reset <username> — a lost phone: their authenticator app set up anew
 //   node apps/server/dist/cli.mjs admin list
 //   node apps/server/dist/cli.mjs guests off | on | status — turn new guests away (a flood of them), or let them in again
 //   node apps/server/dist/cli.mjs vapid-keys               — a key pair for web push, as .env lines (append them:
@@ -12,6 +15,7 @@
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
 import webpush from 'web-push';
 import { all, run } from './db';
+import { logAction } from './modlog';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
 import { guestsPaused, pauseGuests } from './settings';
 import { getUserByName } from './users';
@@ -24,7 +28,7 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin remove <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank';
+  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank';
 
 if (area === 'check-bank') {
   try {
@@ -63,17 +67,48 @@ if (area === 'guests') {
   process.exit(0);
 }
 
-if (area !== 'admin' || !['add', 'remove', 'list'].includes(command ?? '')) fail(USAGE);
+if (area !== 'admin' || !['add', 'owner', 'remove', '2fa-reset', 'list'].includes(command ?? '')) fail(USAGE);
 
 if (command === 'list') {
-  const admins = all<{ username: string }>('SELECT username FROM users WHERE is_admin = 1 ORDER BY username');
-  console.log(admins.length ? admins.map((a) => a.username).join('\n') : '(no admins)');
+  const staff = all<{ username: string; staff_role: string | null; totp_on_at: number | null }>(
+    'SELECT username, staff_role, totp_on_at FROM users WHERE is_admin = 1 ORDER BY username',
+  );
+  console.log(
+    staff.length
+      ? staff
+          .map((s) => `${s.username}\t${s.staff_role ?? 'moderator'}\t${s.totp_on_at ? '2FA on' : '2FA not set up'}`)
+          .join('\n')
+      : '(no admins)',
+  );
 } else {
   if (!username) fail(`Usage: cli admin ${command} <username>`);
   const user = getUserByName(username);
   if (!user) fail(`No player named "${username}". Register the account first, then run this again.`);
-  run('UPDATE users SET is_admin = ? WHERE id = ?', command === 'add' ? 1 : 0, user.id);
-  console.log(
-    command === 'add' ? `✅ ${user.username} is now an admin.` : `✅ ${user.username} is no longer an admin.`,
-  );
+  // In the moderation log, as the command line's (no moderator account did it).
+  if (command === 'add' || command === 'owner') {
+    const role = command === 'owner' ? 'owner' : 'moderator';
+    run('UPDATE users SET is_admin = 1, staff_role = ? WHERE id = ?', role, user.id);
+    logAction({
+      adminId: null,
+      action: 'staff_add',
+      userId: user.id,
+      reason: role === 'owner' ? 'Собственик' : 'Модератор',
+    });
+    console.log(
+      `✅ ${user.username} is now ${role === 'owner' ? 'the owner' : 'a moderator'}. They set up two-factor sign-in on /admin.`,
+    );
+  } else if (command === 'remove') {
+    run(
+      'UPDATE users SET is_admin = 0, staff_role = NULL, totp_secret = NULL, totp_on_at = NULL, totp_step = NULL WHERE id = ?',
+      user.id,
+    );
+    run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
+    logAction({ adminId: null, action: 'staff_remove', userId: user.id });
+    console.log(`✅ ${user.username} is no longer staff.`);
+  } else {
+    run('UPDATE users SET totp_secret = NULL, totp_on_at = NULL, totp_step = NULL WHERE id = ?', user.id);
+    run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
+    logAction({ adminId: null, action: 'staff_2fa_reset', userId: user.id });
+    console.log(`✅ ${user.username} sets up two-factor sign-in anew on their next visit to /admin.`);
+  }
 }

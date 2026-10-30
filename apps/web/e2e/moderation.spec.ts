@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { codeAt, stepAt } from '../../server/src/totp';
 import { expect, type Page, signIn, signUp, test, uniqueName } from './support';
 
 // The server the tests run against (playwright.config.ts): its database, and the admin command line next to it.
@@ -13,6 +14,17 @@ function makeModerator(username: string) {
     encoding: 'utf8',
   });
   expect(cli.status, cli.stderr).toBe(0);
+}
+
+/** A moderator's authenticator app, set up from this page's session (as the admin page does it). */
+async function secondFactor(page: Page) {
+  const setup = await page.request.post('/api/auth/2fa/setup');
+  expect(setup.ok()).toBe(true);
+  const { secret } = (await setup.json()) as { secret: string };
+  const enabled = await page.request.post('/api/auth/2fa/enable', {
+    data: { code: codeAt(secret, stepAt(Date.now())) },
+  });
+  expect(enabled.ok()).toBe(true);
 }
 
 /** Far past the level that unlocks proposing questions (as if they'd played a lot). */
@@ -42,6 +54,14 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   makeModerator(moderator);
   const other = await newPlayer();
   await signUp(other, player, 'parola-123');
+
+  // /admin opens with an authenticator app: its key on the page, then the code it shows.
+  await page.goto('/admin');
+  await page.getByRole('button', { name: 'Включи' }).click();
+  const key = (await page.locator('code').first().textContent())!.replace(/\s/g, '');
+  await page.getByLabel('Код от приложението').fill(codeAt(key, stepAt(Date.now())));
+  await page.getByRole('button', { name: 'Потвърди' }).click();
+  await expect(page.getByRole('heading', { name: 'Модерация' })).toBeVisible();
 
   await openPlayer(page, player);
   await page.getByRole('button', { name: 'Спри профила', exact: true }).click();
@@ -88,6 +108,7 @@ test('a report about a set is a case: the moderator reads the set and hides it, 
   const moderator = uniqueName('Проверяващ');
   await signUp(page, moderator, 'parola-123');
   makeModerator(moderator);
+  await secondFactor(page);
   const owner = await newPlayer();
   await signUp(owner, uniqueName('Автор'), 'parola-123');
   const made = await owner.request.post('/api/sets', {

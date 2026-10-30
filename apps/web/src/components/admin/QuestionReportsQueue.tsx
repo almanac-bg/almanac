@@ -1,4 +1,4 @@
-import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast } from '@quiz/client';
+import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast, useStore } from '@quiz/client';
 import {
   categoryById,
   QUESTION_REPORT_REASONS,
@@ -95,6 +95,7 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
 /** After a fix pulled into the bank on the server: the game reads it again without a restart. */
 function ReloadBank() {
   const [busy, setBusy] = useState(false);
+  const owner = useStore((s) => s.me?.staffRole === 'owner');
   async function reload() {
     setBusy(true);
     try {
@@ -106,6 +107,8 @@ function ReloadBank() {
       setBusy(false);
     }
   }
+  // The bank is the owner's (the server's copy of it).
+  if (!owner) return null;
   return (
     <div className="flex justify-end">
       <Button size="sm" variant="ghost" onClick={reload} loading={busy}>

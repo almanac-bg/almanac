@@ -94,6 +94,7 @@ export function getMe(userId: number): MeUser | null {
     ratings: getRatings(userId),
     dailyBonusAvailable: row.last_daily_bonus !== today,
     isAdmin: isAdmin(row),
+    staffRole: isAdmin(row) ? (row.staff_role ?? 'moderator') : null,
     bestSeasonTier: bestSeasonTier(userId),
     stats: {
       games: row.games_played,

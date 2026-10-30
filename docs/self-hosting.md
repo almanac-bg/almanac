@@ -119,13 +119,18 @@ S3-съвместимо object storage. Нищо не го обвързва с �
 6. **Провери, че всичко работи:** `docker compose ps` показва три контейнера `Up` (приложението — `healthy`),
    `docker compose logs litestream` показва, че базата се реплицира, а `curl -fsS https://almanac.bg/api/health`
    отговаря с `{"ok":true}`.
-7. Отвори https://almanac.bg, регистрирай профила си и го направи администратор:
+7. Отвори https://almanac.bg, регистрирай профила си и се направи собственик (решава и за модераторите, презарежда
+   банката, вижда статистиката):
 
    ```bash
-   docker compose exec app node apps/server/dist/cli.mjs admin add <your-username>
+   docker compose exec app node apps/server/dist/cli.mjs admin owner <your-username>
    ```
 
-   (`admin list` и `admin remove <username>` работят по същия начин.) Съществени промени в условията или
+   После отвори `/admin`: първо иска приложение за удостоверяване (Google Authenticator, Aegis…) и код от него, а
+   после — код веднъж на 12 часа. Модератор се добавя с `admin add <username>`, маха се с `admin remove`, а
+   `admin list` показва екипа и дали всеки е включил двуфакторното влизане. Загубен телефон:
+   `admin 2fa-reset <username>`, и влизането се настройва наново. Всяка от тези команди се записва в дневника на
+   модерацията. Съществени промени в условията или
    политиката се обявяват 14 дни предварително (така обещават): `cli.mjs notice "<текст>" /terms` оставя известие на
    всички играчи. Известия на устройството (web push): `docker compose exec -T app node apps/server/dist/cli.mjs
    vapid-keys >> .env` (ключовете отиват направо в `.env`, без да се показват), после командата за деплой.

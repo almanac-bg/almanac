@@ -8,13 +8,22 @@ import { moderatorMail, sendMail } from './mailer';
  * something reaches MODERATION.alertAt reports or flags, and every morning a summary of the queues.
  */
 
-const admins = () =>
+const admins = (ownerOnly = false) =>
   all<{ email: string }>(
-    'SELECT email FROM users WHERE is_admin = 1 AND email IS NOT NULL AND email_bounced_at IS NULL',
+    `SELECT email FROM users WHERE is_admin = 1 AND email IS NOT NULL AND email_bounced_at IS NULL
+     ${ownerOnly ? "AND staff_role = 'owner'" : ''}`,
   );
 
-/** Once a day per `key` at most (the same question flagged again is the same alert). */
-export function alertModerators(key: string, subject: string, lines: string[], now = Date.now()) {
+/**
+ * Once a day per `key` at most (the same question flagged again is the same alert). `ownerOnly`: about staff, which
+ * only the owner decides.
+ */
+export function alertModerators(
+  key: string,
+  subject: string,
+  lines: string[],
+  { now = Date.now(), ownerOnly = false } = {},
+) {
   const setting = `alert:${key}`;
   const day = dayKey(now);
   if (one('SELECT 1 AS x FROM settings WHERE key = ? AND value = ?', setting, day)) return;
@@ -23,7 +32,7 @@ export function alertModerators(key: string, subject: string, lines: string[], n
     setting,
     day,
   );
-  for (const { email } of admins()) sendMail(moderatorMail(email, subject, lines, `${config.appUrl}/admin`));
+  for (const { email } of admins(ownerOnly)) sendMail(moderatorMail(email, subject, lines, `${config.appUrl}/admin`));
 }
 
 /**

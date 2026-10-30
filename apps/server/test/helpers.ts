@@ -17,6 +17,7 @@ import {
   type ServerToClientEvents,
 } from '@quiz/shared';
 import { io, type Socket } from 'socket.io-client';
+import { codeAt, stepAt } from '../src/totp';
 
 export type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -204,6 +205,21 @@ export async function guest(url: string): Promise<Account> {
   const body = (await r.json()) as { user: MeUser };
   if (!r.ok) throw new Error(`guest: ${JSON.stringify(body)}`);
   return { cookie: r.headers.get('set-cookie')!.split(';')[0], user: body.user };
+}
+
+/**
+ * A staff account's authenticator app set up, and this session's code given — what /admin asks before anything else.
+ * Needs the password given within the hour (a fresh sign-in counts). Returns the app's secret, for later codes.
+ */
+export async function withSecondFactor(url: string, cookie: string): Promise<string> {
+  const api = http(url);
+  const setup = await api.send('POST', '/api/auth/2fa/setup', cookie);
+  if (setup.status !== 200) throw new Error(`2FA setup: ${JSON.stringify(setup.body)}`);
+  const enabled = await api.send('POST', '/api/auth/2fa/enable', cookie, {
+    code: codeAt(setup.body.secret, stepAt(Date.now())),
+  });
+  if (enabled.status !== 200) throw new Error(`2FA enable: ${JSON.stringify(enabled.body)}`);
+  return setup.body.secret;
 }
 
 /** Runs the admin command line (src/cli.ts, or the bundle with TEST_TARGET=dist) against a test server's database. */

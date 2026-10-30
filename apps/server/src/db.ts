@@ -857,6 +857,20 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE player_groups ADD COLUMN name_locked_until INTEGER;
     `,
   },
+  // v31, staff (moderation.ts, totp.ts): `staff_role` — the owner (who runs the place: decides about moderators, reloads
+  // the bank) or a moderator; `is_admin` stays the mark of either. Admins until now were made by the owner and become
+  // the owner. A one-time code from an authenticator app (`totp_*`) for /admin, kept per session
+  // (`second_factor_at`).
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN staff_role TEXT;
+    UPDATE users SET staff_role = 'owner' WHERE is_admin = 1;
+    ALTER TABLE users ADD COLUMN totp_secret TEXT;
+    ALTER TABLE users ADD COLUMN totp_on_at INTEGER;
+    ALTER TABLE users ADD COLUMN totp_step INTEGER;
+    ALTER TABLE sessions ADD COLUMN second_factor_at INTEGER;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

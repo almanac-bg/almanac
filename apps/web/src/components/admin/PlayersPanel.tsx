@@ -156,6 +156,11 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
               {user.lastSeenAt && ` · последно ${timeAgo(user.lastSeenAt)}`} · {card.gamesPlayed} мача ·{' '}
               {user.hasEmail ? 'с имейл' : 'без имейл'}
             </p>
+            {card.staff && (
+              <p className="mt-1 text-xs font-semibold text-emerald-300">
+                {card.staff === 'owner' ? 'Собственик' : 'Модератор'} — решенията за този профил са на собственика
+              </p>
+            )}
           </div>
         </div>
 

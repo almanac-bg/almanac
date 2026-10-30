@@ -36,6 +36,8 @@ export interface MeUser extends PublicUser {
   ratings: Partial<Record<QueueModeId, number>>;
   dailyBonusAvailable: boolean;
   isAdmin: boolean;
+  /** Staff: the owner (decides about moderators, keeps the bank and the numbers) or a moderator. */
+  staffRole: 'owner' | 'moderator' | null;
   /** Best tier index ever finished a season at (-1 = none); unlocks season cosmetics. */
   bestSeasonTier: number;
   /** All-time totals, for the home card (the profile page has the full statistics). */
@@ -907,7 +909,10 @@ export type ModerationLogAction =
   | 'hide_set'
   | 'unhide_set'
   | 'rename_group'
-  | 'reload_bank';
+  | 'reload_bank'
+  | 'staff_add'
+  | 'staff_remove'
+  | 'staff_2fa_reset';
 
 export interface ModerationLogEntry {
   id: number;
@@ -929,9 +934,22 @@ export interface ModerationLogEntry {
   canUndo: boolean;
 }
 
+/** A staff member's second factor this session: an authenticator app to set up, a code to give, or given. */
+export type SecondFactorState = 'setup' | 'needed' | 'ok';
+
+/** What waits for the moderators (the home card, the tabs' counts), and their second factor this session. */
+export interface AdminSummary {
+  pendingQuestions: number;
+  openReports: number;
+  questionReports: number;
+  secondFactor: SecondFactorState;
+}
+
 /** A player as a moderator sees them (the „Играчи“ tab). */
 export interface PlayerCard {
   user: PublicUser & { isGuest: boolean; createdAt: number; lastSeenAt: number | null; hasEmail: boolean };
+  /** Staff: decisions about them are the owner's. */
+  staff: 'owner' | 'moderator' | null;
   ban: { until: number; basis: ModerationBasis | null; reason: string | null } | null;
   gamesPlayed: number;
   reports: { open: number; resolved: number; filed: number };
