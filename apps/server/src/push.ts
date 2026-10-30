@@ -15,7 +15,7 @@ import {
 import webpush from 'web-push';
 import { z } from 'zod';
 import { config } from './config';
-import { all, one, run } from './db';
+import { afterCommit, all, one, run } from './db';
 import { reportError } from './monitoring';
 import type { UserRow } from './users';
 
@@ -146,27 +146,31 @@ export function push(
     );
   }
   const payload = JSON.stringify({ ...message, tag: message.tag ?? kind });
-  if (config.pushOutbox) {
-    fs.mkdirSync(config.pushOutbox, { recursive: true });
-    const name = `${Date.now()}-${randomBytes(3).toString('hex')}.json`;
-    fs.writeFileSync(
-      path.join(config.pushOutbox, name),
-      JSON.stringify({ userId, kind, devices: subs.length, ...JSON.parse(payload) }),
-    );
-    return true;
-  }
-  for (const s of subs)
-    webpush
-      .sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
-        TTL: 6 * 60 * 60,
-        urgency: 'normal',
-      })
-      .catch((err: { statusCode?: number }) => {
-        // Gone (the browser dropped it, the app was removed): forget this device.
-        if (err.statusCode === 404 || err.statusCode === 410)
-          run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
-        else void reportError(err, 'push', { extra: { status: err.statusCode ?? null } });
-      });
+  // Called within a match's result (or another write) it goes out once that's in: a result rolled back buzzes nobody,
+  // and the day's count (push_sent) is rolled back with it.
+  afterCommit(() => {
+    if (config.pushOutbox) {
+      fs.mkdirSync(config.pushOutbox, { recursive: true });
+      const name = `${Date.now()}-${randomBytes(3).toString('hex')}.json`;
+      fs.writeFileSync(
+        path.join(config.pushOutbox, name),
+        JSON.stringify({ userId, kind, devices: subs.length, ...JSON.parse(payload) }),
+      );
+      return;
+    }
+    for (const s of subs)
+      webpush
+        .sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
+          TTL: 6 * 60 * 60,
+          urgency: 'normal',
+        })
+        .catch((err: { statusCode?: number }) => {
+          // Gone (the browser dropped it, the app was removed): forget this device.
+          if (err.statusCode === 404 || err.statusCode === 410)
+            run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
+          else void reportError(err, 'push', { extra: { status: err.statusCode ?? null } });
+        });
+  });
   return true;
 }
 

@@ -24,7 +24,7 @@ import { getRating } from '../seasons';
 import { skillCentre } from '../skill';
 import { getUser } from '../users';
 import type { Bot } from './bots';
-import { Game, type GameEmitter, type GameSetup, type RecordScript } from './Game';
+import { Game, type GameEmitter, type GameSetup, type RecordScript, STILL_MS } from './Game';
 import type { IO } from './io';
 import { finalizeMatch } from './rewards';
 
@@ -124,9 +124,6 @@ function releaseAttempts(game: Game) {
   }
 }
 
-/** Longer than any match can run (see sweepStuck). */
-const STUCK_MS = 90 * 60_000;
-
 /** Why a match can't start, in words for the player (any other error is ours: they're told only that it failed). */
 export class StartError extends Error {}
 
@@ -166,14 +163,19 @@ export class GameRegistry {
   }
 
   /**
-   * Even the longest match (a solo run stopped on every fact, its player away the longest a run waits) is over well
-   * within this. One still registered after it is stuck on a bug: its players would be "in a game" until a restart.
+   * A match can run long (an untimed Соло, a player who keeps coming back), but it never stands still longer than
+   * STILL_MS. One that does is stuck on a bug: its players would be "in a game" until a restart.
    */
   private sweepStuck(now = Date.now()) {
     for (const game of [...this.games.values()]) {
-      if (now - game.startedAt < STUCK_MS) continue;
-      void reportError(new Error('A match was still running after 90 minutes'), 'stuck match', {
-        extra: { match: game.id, mode: game.setup.mode, phase: game.phase },
+      if (now - game.movedAt < STILL_MS) continue;
+      void reportError(new Error('A match stood still too long'), 'stuck match', {
+        extra: {
+          match: game.id,
+          mode: game.setup.mode,
+          phase: game.phase,
+          minutes: Math.round((now - game.startedAt) / 60_000),
+        },
       });
       game.stop();
       if (this.games.has(game.id)) this.close(game);
@@ -200,6 +202,13 @@ export class GameRegistry {
 
   get activeGames() {
     return this.games.size;
+  }
+
+  /** Matches under way, by mode (the live report). */
+  byMode(): Partial<Record<ModeId, number>> {
+    const n: Partial<Record<ModeId, number>> = {};
+    for (const g of this.games.values()) n[g.setup.mode] = (n[g.setup.mode] ?? 0) + 1;
+    return n;
   }
 
   /**

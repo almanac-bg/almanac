@@ -24,12 +24,15 @@ result=$(docker compose run --rm --no-deps --entrypoint node app -e "
   const live = new DatabaseSync('/data/quiz.db', { readOnly: true });
   const stamp = (db) => Number(db.prepare(\"SELECT value FROM settings WHERE key = 'alive_at'\").get()?.value ?? 0);
   const behind = Math.round((stamp(live) - stamp(copy)) / 60000);
-  console.log(copy.prepare('PRAGMA quick_check').get().quick_check, copy.prepare('SELECT COUNT(*) AS n FROM users').get().n, behind);") ||
+  const idle = Math.round((Date.now() - stamp(live)) / 60000);
+  console.log(copy.prepare('PRAGMA quick_check').get().quick_check, copy.prepare('SELECT COUNT(*) AS n FROM users').get().n, behind, idle);") ||
   result="error"
 clean
 set -- $result
 [ "${1:-}" = ok ] || fail "the restored copy is broken: $result"
 [ "${3:-999}" -le 60 ] || fail "the backup is ${3} minutes behind the live database: replication has stopped"
+# Both stamps equally old pass the line above: the upkeep that writes them every 15 minutes has stopped.
+[ "${4:-999}" -le 30 ] || fail "the live database's upkeep last ran ${4} minutes ago: it has stopped"
 
 [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null
 echo "$(date -u +%FT%TZ) backup ok: intact, $2 accounts, $3 minutes behind"

@@ -66,6 +66,12 @@ case "$1" in
   run) [ -f "$S/bank-refused" ] && exit 1 ;;
   compose)
     shift
+    # The app's live report (deploy.sh asks it for a quiet moment): busy for as many asks as state/busy says.
+    if [ "$1 $2 $3" = "exec -T app" ]; then
+      n=$(cat "$S/busy" 2>/dev/null || echo 0)
+      [ "$n" -gt 0 ] && echo "1 room match(es) under way" && echo $((n - 1)) >"$S/busy"
+      exit 0
+    fi
     echo "APP_RELEASE=\${APP_RELEASE:-} $*" >>"$S/compose.log"
     # Caddy refusing a config: state/caddy-refuses.
     [ "$1 $3 $5" = "exec caddy reload" ] && [ -f "$S/caddy-refuses" ] && exit 1 ;;
@@ -269,5 +275,39 @@ test('a changed Caddyfile is reloaded into Caddy; one it refuses fails the deplo
     assert.match(refused.output, /Caddy refused the new deploy\/Caddyfile and kept the old one/);
   } finally {
     fs.rmSync(path.join(state, 'caddy-refuses'));
+  }
+});
+
+test('a deploy waits for a quiet moment (a class mid-match), up to 20 minutes; --now doesn’t wait', () => {
+  const current = git(checkout, 'rev-parse', 'HEAD');
+  const next = publishCommit(work, 'app.txt', 'v-quiet');
+  published(next, 'sha256:quiet');
+  try {
+    // Busy for good: nothing changes.
+    fs.writeFileSync(path.join(state, 'busy'), '1000');
+    const refused = run('deploy.sh');
+    assert.equal(refused.status, 1);
+    assert.match(refused.output, /waiting for a quiet moment[\s\S]*1 room match\(es\) under way/);
+    assert.match(refused.output, /still not quiet after 20 minutes: nothing deployed/);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), current, 'the checkout stays');
+    assert.deepEqual(compose(), []);
+
+    // Quiet after a few minutes: then it goes ahead.
+    fs.writeFileSync(path.join(state, 'busy'), '3');
+    const waited = run('deploy.sh');
+    assert.equal(waited.status, 0, waited.output);
+    assert.match(waited.output, /quiet now[\s\S]*deployed/);
+
+    // --now: no asking at all.
+    const again = publishCommit(work, 'app.txt', 'v-now');
+    published(again, 'sha256:now');
+    fs.writeFileSync(path.join(state, 'busy'), '1000');
+    const now = run('deploy.sh', '--now');
+    assert.equal(now.status, 0, now.output);
+    assert.doesNotMatch(now.output, /waiting/);
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), again);
+    assert.equal(run('deploy.sh', '--later').status, 2, 'an unknown option');
+  } finally {
+    fs.rmSync(path.join(state, 'busy'), { force: true });
   }
 });

@@ -13,7 +13,7 @@ process.env.DB_PATH = path.join(tmp, 'push.db');
 process.env.VAPID_PUBLIC_KEY = keys.publicKey;
 process.env.VAPID_PRIVATE_KEY = keys.privateKey;
 process.env.PUSH_OUTBOX = path.join(tmp, 'pushes');
-const { run } = await import('../src/db');
+const { one, run, tx } = await import('../src/db');
 const { dailyReminderPushes, push, subscribe, timedPushes } = await import('../src/push');
 const { defaultPushPrefs } = await import('@quiz/shared');
 
@@ -112,4 +112,20 @@ test('the evening Роял: in the quarter hour before it starts, to whoever ask
     sent().map((p) => [p.userId, p.kind]),
     [[fan, 'evening']],
   );
+});
+
+test('a push within a write goes out once it commits, and not at all if it rolls back', () => {
+  clear();
+  const id = player();
+  assert.throws(() =>
+    tx(() => {
+      assert.equal(push(id, 'duels', message, at(10)), true);
+      assert.equal(sent().length, 0, 'not before the commit');
+      throw new Error('the result failed');
+    }),
+  );
+  assert.equal(sent().length, 0, 'a result rolled back buzzes nobody');
+  assert.equal(one('SELECT 1 AS x FROM push_sent WHERE user_id = ?', id), undefined, 'nor counts for the day');
+  tx(() => push(id, 'duels', message, at(10)));
+  assert.equal(sent().length, 1);
 });

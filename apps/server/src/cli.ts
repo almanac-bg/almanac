@@ -12,8 +12,12 @@
 //                                                            or the privacy policy change, as both promise)
 //   node apps/server/dist/cli.mjs check-bank               — whether this code loads the question bank (QUESTIONS_PATH):
 //                                                            deploy/deploy.sh asks before it switches to either
+//   node apps/server/dist/cli.mjs live                     — what's going on in the server running next to it: people
+//                                                            online, matches, rooms, the evening, and what a restart
+//                                                            now would cut short (deploy/deploy.sh waits for that)
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
 import webpush from 'web-push';
+import { config } from './config';
 import { all, run } from './db';
 import { logAction } from './modlog';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
@@ -28,7 +32,7 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank';
+  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live';
 
 if (area === 'check-bank') {
   try {
@@ -38,6 +42,13 @@ if (area === 'check-bank') {
   } catch (err) {
     fail(`❌ The question bank doesn't load: ${err instanceof Error ? err.message : String(err)}`);
   }
+}
+
+if (area === 'live') {
+  const res = await fetch(`http://127.0.0.1:${config.port}/api/live`).catch(() => null);
+  if (!res?.ok) fail(`The server isn't answering on port ${config.port} here.`);
+  console.log(JSON.stringify(await res.json(), null, 2));
+  process.exit(0);
 }
 
 if (area === 'vapid-keys') {

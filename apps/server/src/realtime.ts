@@ -8,13 +8,16 @@ import {
   isSoloPace,
   type LobbyStats,
   MODES,
+  type ModeId,
   NUMBER,
   POWERUPS,
   type PowerupId,
   type Presence,
+  type QueueModeId,
   REVIEW,
   ROUNDS,
   sofiaTimeOn,
+  TIME_ZONE,
 } from '@quiz/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
@@ -33,17 +36,18 @@ import { config } from './config';
 import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
 import { setEveningLobby } from './evening';
 import { areFriends, friendIds, incomingRequests } from './friends';
-import { EveningLobby } from './game/eveningLobby';
+import { EveningLobby, type KeptEvening } from './game/eveningLobby';
 import { FINAL_TIMES_FROM } from './game/Game';
 import type { IO } from './game/io';
 import { Matchmaker } from './game/matchmaking';
 import { buildHuman, GameRegistry, startFailure } from './game/registry';
 import { Rematches } from './game/rematch';
-import { RoomManager } from './game/rooms';
+import { type KeptRoom, RoomManager } from './game/rooms';
 import { guarded } from './guard';
 import { ACCOUNT_ONLY } from './guests';
 import { reportError } from './monitoring';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
+import { handOver, takeHandover } from './settings';
 import { count } from './stats';
 import { eventBucket, network, throttled } from './throttle';
 import { getUser, publicUser } from './users';
@@ -74,12 +78,37 @@ const MAX_SOCKETS_PER_NETWORK = 300;
 /** Shown while the server restarts for an update. */
 const DRAINING = 'Обновяваме играта — нови мачове може да започнат след минута-две.';
 
+/** What's going on right now (GET /api/live, `cli live`): what deploy/deploy.sh looks at before it restarts the server. */
+export interface LiveReport {
+  at: number;
+  /** People with the game open. */
+  online: number;
+  matches: Partial<Record<ModeId, number>>;
+  queues: Record<QueueModeId, number>;
+  rooms: { open: number; playing: number; people: number };
+  evening: { opensAt: number; startsAt: number; waiting: number; live: boolean } | null;
+  /** Why a restart now would cut something short; empty when it wouldn't. */
+  busy: string[];
+}
+
+/** The lobbies one process hands the next on a restart, if it comes up within KEPT_MS. */
+interface Kept {
+  rooms: KeptRoom[];
+  evening: KeptEvening | null;
+}
+const KEPT_MS = 10 * 60_000;
+
+const clock = (ts: number) =>
+  new Date(ts).toLocaleTimeString('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+
 export interface Realtime {
   io: IO;
   activeGames: () => number;
+  live: () => LiveReport;
   /**
    * Stops new matches and empties the queues, then resolves once running matches have finished. Any still running after
-   * `maxMs` end there, with the scores so far, so nobody's match vanishes without a result.
+   * `maxMs` end there, with the scores so far, so nobody's match vanishes without a result. The lobbies (rooms, the
+   * evening's) are then kept for the next process.
    */
   drain: (maxMs: number) => Promise<void>;
 }
@@ -112,10 +141,23 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   };
   const matchmaker: Matchmaker = new Matchmaker(io, games, idleOnline);
   const rooms = new RoomManager(io, games, (userId) => openSockets.has(userId));
-  const evening = new EveningLobby(io, games, (userId) => openSockets.has(userId) && !draining);
+  const evening = new EveningLobby(
+    io,
+    games,
+    (userId) => openSockets.has(userId),
+    () => draining,
+  );
   setEveningLobby(evening);
   /** Set when the server is shutting down for an update. */
   let draining = false;
+  const kept = takeHandover<Kept>(KEPT_MS);
+  if (kept) {
+    rooms.restore(kept.rooms);
+    evening.restore(kept.evening);
+    console.log(
+      `🔁 Taken over from before the restart: ${kept.rooms.length} room(s), the evening lobby's ${kept.evening?.waiting.length ?? 0}`,
+    );
+  }
   const rematches = new Rematches(
     io,
     games,
@@ -601,14 +643,41 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   return {
     io,
     activeGames: () => games.activeGames,
+    live() {
+      const now = Date.now();
+      const r = rooms.counts();
+      const e = evening.status();
+      const busy: string[] = [];
+      // A class's match can run 11 minutes, longer than the drain waits.
+      if (r.playing) busy.push(`${r.playing} room match(es) under way: a class's can run past the drain`);
+      // From a drain's length before its lobby opens until its matches are over.
+      if (e && now >= e.opensAt - config.drainMs - 60_000)
+        busy.push(
+          e.live
+            ? `the evening Роял is on (it began at ${clock(e.startsAt)})`
+            : `the evening Роял: its lobby opens at ${clock(e.opensAt)}, it begins at ${clock(e.startsAt)}`,
+        );
+      return {
+        at: now,
+        online: openSockets.size,
+        matches: games.byMode(),
+        queues: matchmaker.counts(),
+        rooms: r,
+        evening: e && { opensAt: e.opensAt, startsAt: e.startsAt, waiting: e.waiting, live: e.live },
+        busy,
+      };
+    },
     async drain(maxMs) {
       draining = true;
       games.startDraining();
       for (const userId of matchmaker.clear()) notifyUser(userId, 'notice', { kind: 'info', message: DRAINING });
       io.emit('server:draining', { message: DRAINING });
+      evening.drain();
       await games.idle(maxMs);
       // A moment for the results to reach the players before the connections close.
       if (games.stopAll() > 0) await new Promise((resolve) => setTimeout(resolve, 500));
+      // Rooms and the evening's lobby carry on in the next process: a class waiting on its code doesn't start over.
+      handOver({ rooms: rooms.kept(), evening: evening.kept() } satisfies Kept);
     },
   };
 }

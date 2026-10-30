@@ -45,6 +45,11 @@ interface DuoInvite {
  */
 export class Matchmaker {
   private queues = Object.fromEntries(QUEUE_MODES.map((m) => [m, [] as Party[]])) as Record<QueueModeId, Party[]>;
+  /**
+   * Who's in which queue, rebuilt after the queues change (changed()): modeOf is asked for every online player each
+   * second (idleOnline, presence), and a scan of every party per player held the event loop for tens of ms at scale.
+   */
+  private where: Map<number, QueueModeId> | null = null;
   private duoInvites = new Map<string, DuoInvite>();
 
   constructor(
@@ -62,6 +67,7 @@ export class Matchmaker {
   join(userIds: number[], mode: QueueModeId) {
     for (const userId of userIds) this.leave(userId, false);
     this.queues[mode].push({ userIds, joinedAt: Date.now() });
+    this.changed();
     friendsChanged(...userIds);
     this.tick();
   }
@@ -73,6 +79,7 @@ export class Matchmaker {
       const i = q.findIndex((p) => p.userIds.includes(userId));
       if (i === -1) continue;
       const [party] = q.splice(i, 1);
+      this.changed();
       this.broadcast(mode);
       friendsChanged(...party.userIds);
       for (const mate of party.userIds.filter((id) => id !== userId)) {
@@ -89,13 +96,24 @@ export class Matchmaker {
   /** Empties every queue (the server is about to restart). Returns who was waiting. */
   clear(): number[] {
     const waiting = QUEUE_MODES.flatMap((mode) => this.queues[mode].splice(0).flatMap((p) => p.userIds));
+    this.changed();
     for (const userId of waiting) this.io.to(`user:${userId}`).emit('queue:status', null);
     friendsChanged(...waiting);
     return waiting;
   }
 
   modeOf(userId: number): QueueModeId | null {
-    return QUEUE_MODES.find((m) => this.queues[m].some((p) => p.userIds.includes(userId))) ?? null;
+    if (!this.where) {
+      this.where = new Map();
+      for (const mode of QUEUE_MODES)
+        for (const party of this.queues[mode]) for (const id of party.userIds) this.where.set(id, mode);
+    }
+    return this.where.get(userId) ?? null;
+  }
+
+  /** The queues changed: who's where is worked out again when next asked. */
+  private changed() {
+    this.where = null;
   }
 
   /** Players waiting in each queue. */
@@ -142,9 +160,12 @@ export class Matchmaker {
     if (config.botFillMs === null) return null;
     const queued = QUEUE_MODES.reduce((n, m) => n + waiting(this.queues[m]), 0);
     // Nobody else is queued, and nobody online could join: waiting would only keep them waiting.
-    if (queued <= DUO && this.idleOnline() === 0) return Math.min(config.botFillMs, ALONE_FILL_MS);
+    // idleOnline walks everyone online: only asked when its answer matters, and at most once.
+    let idle: number | undefined;
+    const idleNow = () => (idle ??= this.idleOnline());
+    if (queued <= DUO && idleNow() === 0) return Math.min(config.botFillMs, ALONE_FILL_MS);
     if (config.botFillBusyMs === config.botFillMs || queued === 0) return config.botFillMs;
-    return this.idleOnline() > 0 ? config.botFillBusyMs : config.botFillMs;
+    return idleNow() > 0 ? config.botFillBusyMs : config.botFillMs;
   }
 
   private tick() {
@@ -155,9 +176,15 @@ export class Matchmaker {
       const seats = MODES[mode].players;
       // Two pairs (Отбори), or a full match of players.
       const full = () => (MODES[mode].teams ? q.length >= 2 : waiting(q) >= seats);
-      while (full()) this.launch(mode, MODES[mode].teams ? q.splice(0, 2) : q.splice(0, seats));
+      while (full()) {
+        const parties = MODES[mode].teams ? q.splice(0, 2) : q.splice(0, seats);
+        this.changed();
+        this.launch(mode, parties);
+      }
       if (q.length > 0 && fill !== null && now - q[0].joinedAt >= fill) {
-        this.launch(mode, MODES[mode].teams ? q.splice(0, 1) : q.splice(0, seats));
+        const parties = MODES[mode].teams ? q.splice(0, 1) : q.splice(0, seats);
+        this.changed();
+        this.launch(mode, parties);
       }
       this.broadcast(mode, fill);
     }

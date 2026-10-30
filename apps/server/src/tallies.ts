@@ -11,7 +11,8 @@ import { all, one, run, tx } from './db';
  * They're added to as matches are settled (tallyMatchPlayer, recordAnswers) and taken from as old answers go
  * (pruneAnswers). Whatever ran without keeping them — a crash between a write and its tally can't happen (one
  * transaction), but a release from before them can, after a rollback — is caught at the next start: only a stop of
- * this code marks them as kept (keepTallies), and a start without that mark counts them again from the rows.
+ * this code marks them as kept (keepTallies), with where the rows stood then, and a start that finds no mark, or rows
+ * that moved since (an older release played and pruned in between, leaving the mark as it was), counts them again.
  */
 
 /** Each match a player played (mp, with its match m), as it adds to their tally in that mode. */
@@ -92,9 +93,24 @@ export function accurateAnswerers(minAnswers: number, minAccuracy: number, limit
   );
 }
 
+/**
+ * Where the rows the tallies count stand: the last match settled, the last answer logged and the oldest kept (each an
+ * index's end, so cheap at any size). Anything that plays or prunes moves one of them.
+ */
+function rowsMark(): string {
+  const r = one<{ ended: number | null; logged: number | null; oldest: number | null }>(
+    `SELECT (SELECT MAX(ended_at) FROM matches) AS ended, (SELECT MAX(rowid) FROM answers) AS logged,
+       (SELECT MIN(answered_at) FROM answers) AS oldest`,
+  )!;
+  return `${r.ended ?? 0}:${r.logged ?? 0}:${r.oldest ?? 0}`;
+}
+
 /** Marks the tallies as kept up to now: at a clean stop, the only time nothing is half-way. */
 export function keepTallies() {
-  run("INSERT INTO settings (key, value) VALUES ('tallies_kept', '1') ON CONFLICT (key) DO NOTHING");
+  run(
+    "INSERT INTO settings (key, value) VALUES ('tallies_kept', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    rowsMark(),
+  );
 }
 
 /**
@@ -103,7 +119,8 @@ export function keepTallies() {
  * so a crash from here on is caught the same way.
  */
 export function catchUpTallies(): boolean {
-  const kept = !!one("SELECT 1 AS x FROM settings WHERE key = 'tallies_kept'");
+  const mark = one<{ value: string }>("SELECT value FROM settings WHERE key = 'tallies_kept'")?.value;
+  const kept = mark === rowsMark();
   tx(() => {
     run("DELETE FROM settings WHERE key = 'tallies_kept'");
     if (kept) return;

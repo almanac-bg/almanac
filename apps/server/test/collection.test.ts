@@ -431,6 +431,47 @@ test("a group's week: the best five dailies summed; its winner hears so, and wea
   );
 });
 
+test("a group's week waits for Sunday's last dailies: a run started before midnight still counts", async () => {
+  const now = Date.now();
+  const lastMonday = shiftDay(weekStart(dayKey(now)), -7);
+  const sunday = shiftDay(lastMonday, 6);
+  const [ana, boris, vera] = [account('Ана'), account('Борис'), account('Вера')];
+  const made = groups.createGroup(ana, 'Късно');
+  assert.ok(made.ok);
+  run('UPDATE player_groups SET created_at = 0 WHERE id = ?', made.id);
+  const code = one<{ code: string }>('SELECT code FROM player_groups WHERE id = ?', made.id)!.code;
+  groups.joinGroup(boris, code);
+  groups.joinGroup(vera, code);
+  run(
+    `INSERT INTO daily_results (user_id, day, started_at, finished_at, score, correct, time_ms)
+     VALUES (?, ?, 0, 1, 900, 5, 30000)`,
+    ana,
+    sunday,
+  );
+  // Борис started a run at 23:59 and is still playing it; Вера's was left by a server that has since stopped.
+  run('INSERT INTO daily_results (user_id, day, started_at) VALUES (?, ?, ?)', boris, sunday, now);
+  run('INSERT INTO daily_results (user_id, day, started_at) VALUES (?, ?, 0)', vera, sunday);
+  run("DELETE FROM settings WHERE key = 'groups_settled'");
+  const settled = () => one('SELECT 1 AS x FROM group_weeks WHERE group_id = ? AND week = ?', made.id, lastMonday);
+  await groups.settleGroupWeeks(now);
+  assert.equal(groups.settleWeek(made.id, lastMonday, now), false, 'the group page waits too');
+  assert.equal(settled(), undefined, 'the upkeep waits');
+
+  run(
+    'UPDATE daily_results SET finished_at = ?, score = 1500, correct = 8, time_ms = 40000 WHERE user_id = ? AND day = ?',
+    now,
+    boris,
+    sunday,
+  );
+  assert.ok((await groups.settleGroupWeeks(now)) >= 1);
+  assert.equal(
+    one<{ winner_id: number }>('SELECT winner_id FROM group_weeks WHERE group_id = ? AND week = ?', made.id, lastMonday)
+      ?.winner_id,
+    boris,
+    'the late run won it',
+  );
+});
+
 test('a group made this week has no last week to settle', () => {
   const owner = account();
   const made = groups.createGroup(owner, 'Нова група');

@@ -18,7 +18,7 @@ import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
-import { db, isBusy } from './db';
+import { db, isBusy, one } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
 import { flushLogs, forwardEnvelope, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
@@ -65,6 +65,8 @@ const setJson = express.json({ limit: '128kb' });
 app.use((req, res, next) => (/^\/api\/sets(\/\d+)?$/.test(req.path) ? setJson : json)(req, res, next));
 /** Below this much free space on the database's disk, writes are about to start failing (and backups with them). */
 const MIN_FREE_DISK = 256 * 1024 * 1024;
+/** The upkeep runs every 15 minutes (maintenance.ts): silent this long, it has stopped. */
+const UPKEEP_SILENT_MS = 60 * 60_000;
 
 function freeDisk(): number | null {
   try {
@@ -94,7 +96,20 @@ app.get('/api/health', (_req, res) => {
     res.status(503).json({ ok: false, problem: 'disk' });
     return;
   }
+  // The upkeep (backups, purges, reminders) writes this every run: an hour without it, it has stopped.
+  const alive = Number(one<{ value: string }>("SELECT value FROM settings WHERE key = 'alive_at'")?.value ?? 0);
+  if (alive && Date.now() - alive > UPKEEP_SILENT_MS) {
+    res.status(503).json({ ok: false, problem: 'upkeep' });
+    return;
+  }
   res.json({ ok: true });
+});
+// What's going on right now (realtime.ts → LiveReport), for deploy/deploy.sh and `cli live`: on the machine itself only.
+// Caddy's requests come over the Docker bridge, with X-Forwarded-For; anyone else gets the usual 404.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+app.get('/api/live', (req, res, next) => {
+  if (!LOOPBACK.has(req.socket.remoteAddress ?? '') || req.headers['x-forwarded-for']) return next();
+  res.json(realtime.live());
 });
 // The browser SDK's error reports, passed on to Sentry (see monitoring.ts). Envelopes are plain text, not JSON.
 app.post('/api/monitoring', express.text({ type: () => true, limit: '256kb' }), (req, res) => {

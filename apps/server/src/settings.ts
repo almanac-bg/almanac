@@ -11,6 +11,25 @@ export function pauseGuests(paused: boolean) {
 }
 
 /**
+ * What one server process hands the next on a restart (the lobbies, realtime.ts): written as it stops, taken once as the
+ * next one starts, and only if that's within `maxAgeMs` (after a longer stop, nobody is waiting any more).
+ */
+export function handOver(value: unknown) {
+  run(
+    "INSERT INTO settings (key, value) VALUES ('handover', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    JSON.stringify({ at: Date.now(), value }),
+  );
+}
+
+export function takeHandover<T>(maxAgeMs: number): T | null {
+  const row = one<{ value: string }>("SELECT value FROM settings WHERE key = 'handover'");
+  if (!row) return null;
+  run("DELETE FROM settings WHERE key = 'handover'");
+  const { at, value } = JSON.parse(row.value) as { at: number; value: T };
+  return Date.now() - at <= maxAgeMs ? value : null;
+}
+
+/**
  * A random secret this installation makes the first time it's asked for and keeps from then on. The code is public;
  * what it seeds (e.g. which questions a day's challenge gets) mustn't be guessable from it.
  */

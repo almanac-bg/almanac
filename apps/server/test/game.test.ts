@@ -317,6 +317,16 @@ test('a run alone ends with what was played after ten minutes away, or when the 
   assert.equal(early.finalized(), false);
   assert.equal(early.released(), 1, 'the attempt is theirs again');
   assert.ok(early.events.some((e) => e.to === 'u1' && e.event === 'game:aborted'));
+
+  // The tab closed during the countdown, and ten minutes pass: no attempt either, not a run of ten unanswered.
+  mock.timers.reset();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 4_000_000 });
+  const closed = setup({ humans: [1], daily: true, countdown: true });
+  closed.game.setConnected('u1', false);
+  advance(10 * 60_000 + 1_000);
+  assert.equal(closed.game.phase, 'ended');
+  assert.equal(closed.finalized(), false);
+  assert.equal(closed.released(), 1, 'the attempt is theirs again');
 });
 
 test("once every person is knocked out, the bots' final is decided at once (and quietly)", () => {

@@ -87,6 +87,11 @@ const RESUME_MS = 2_500;
 const FACT_HOLD_MS = HOLD.pauseMs;
 /** Соло without a clock still ends a question someone walked away from: after this long it's revealed. */
 const UNTIMED_MS = HOLD.untimedMs;
+/**
+ * The longest a match can go without moving on (a question, a pick or a reveal): an untimed question left open, then
+ * its player away for as long as a run waits. A match that's still for longer than this is stuck on a bug.
+ */
+export const STILL_MS = UNTIMED_MS + ALONE_ABANDON_MS + 10 * 60_000;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;
@@ -299,6 +304,8 @@ const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double'];
 export class Game {
   readonly id = randomUUID();
   readonly startedAt = Date.now();
+  /** When the match last moved on (see STILL_MS). */
+  movedAt = this.startedAt;
   readonly participants = new Map<string, Participant>();
   readonly schedule: number[];
   /** The match's questions (a round's are in place once it's picked). */
@@ -768,6 +775,7 @@ export class Game {
     this.index++;
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
+    this.movedAt = Date.now();
     this.questionStartedAt = gameClock.now();
     const q = this.questions[this.index];
     const image = questionImage(q);
@@ -815,6 +823,7 @@ export class Game {
    */
   private startPick(round: number) {
     this.phase = 'pick';
+    this.movedAt = Date.now();
     const picker = this.trailing();
     const options = this.setup.rounds[round].offers.map((o) => o.category);
     this.picking = { round, pickerId: picker.player.id, options, startedAt: gameClock.now() };
@@ -903,6 +912,7 @@ export class Game {
   private reveal() {
     if (this.phase !== 'question') return;
     this.phase = 'reveal';
+    this.movedAt = Date.now();
     this.played++;
     this.clearTimers();
 
@@ -1596,8 +1606,10 @@ export class Game {
     const anyoneHere = this.humans.some((h) => !h.left && h.connected);
     if (anyoneHere || this.abandonTimer) return;
     const wait = this.alone ? ALONE_ABANDON_MS : ABANDON_MS;
+    // A run alone left before its first question was no attempt (as when the server stops then: endForDrain), not a 0.
+    const give = () => (this.alone && this.index < 0 ? this.stop() : this.finishUnattended());
     // Not one of `timers` (every reveal clears those), but on the same game clock.
-    this.abandonTimer = setTimeout(() => this.guard(() => this.finishUnattended()), wait * config.gameTimeScale);
+    this.abandonTimer = setTimeout(() => this.guard(give), wait * config.gameTimeScale);
   }
 
   /** Everything the match's room hears goes through here (and nothing while it's being played out unwatched). */

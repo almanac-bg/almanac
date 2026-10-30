@@ -980,6 +980,27 @@ function setSchemaFloor(floor: number) {
   ).run(String(floor));
 }
 
+const PRE_MIGRATION_NAME = /^quiz-v\d+-before-v\d+\.db$/;
+/**
+ * The copies taken before migrations stop being an option after a month (the privacy policy promises backups forget
+ * within 30 days), and only the newest few are kept: each is a whole database, and one week brought eleven in two days
+ * (docs/operations.md → „Диск“).
+ */
+const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+const PRE_MIGRATION_KEEP = 2;
+
+/** Deletes the copies taken before migrations that are past keeping: as a new one is made, and every day. */
+export function prunePreMigrationCopies(now = Date.now(), dir = config.backupDir) {
+  if (!dir || !fs.existsSync(dir)) return;
+  const copies = fs
+    .readdirSync(dir)
+    .filter((f) => PRE_MIGRATION_NAME.test(f))
+    .map((f) => ({ f, at: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.at - a.at);
+  for (const [i, { f, at }] of copies.entries())
+    if (i >= PRE_MIGRATION_KEEP || now - at > PRE_MIGRATION_KEEP_MS) fs.rmSync(path.join(dir, f));
+}
+
 /**
  * A copy of the database as it was before this code's migrations (into the backups folder): migrations only go
  * forward, so this is the way back to the previous version should a deploy go wrong. Taken once per schema version —
@@ -990,8 +1011,14 @@ function copyBeforeMigrating(from: number) {
   const file = path.join(config.backupDir, `quiz-v${from}-before-v${MIGRATIONS.length}.db`);
   if (fs.existsSync(file)) return;
   fs.mkdirSync(config.backupDir, { recursive: true });
-  db.exec(`VACUUM INTO '${file.replaceAll("'", "''")}'`);
+  // Under a temporary name, then renamed: a copy cut short (a rollback's kill, out of memory) never passes for the way
+  // back, nor keeps a whole one from being made on the next start.
+  const partial = `${file}.partial`;
+  fs.rmSync(partial, { force: true });
+  db.exec(`VACUUM INTO '${partial.replaceAll("'", "''")}'`);
+  fs.renameSync(partial, file);
   console.log(`💾 Saved the database before migrating (v${from} → v${MIGRATIONS.length}): ${file}`);
+  prunePreMigrationCopies();
 }
 
 function migrate() {

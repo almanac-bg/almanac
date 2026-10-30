@@ -8,7 +8,7 @@ import { pruneAnswers } from './answers';
 import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
-import { all, db, optimize, run } from './db';
+import { all, db, optimize, prunePreMigrationCopies, run } from './db';
 import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests, purgeRoomGuests } from './guests';
@@ -30,10 +30,6 @@ const REMINDER_HOURS = [19, 22] as const;
 /** Per maintenance run, so a big list doesn't flood the mail provider (and its daily quota) in one go. */
 const REMINDERS_PER_RUN = 200;
 const SNAPSHOT_NAME = /^quiz-\d{4}-\d{2}-\d{2}\.db$/;
-/** The copy taken before a deploy's migrations (see db.ts): the way back if that deploy goes wrong. */
-const PRE_MIGRATION_NAME = /^quiz-v\d+-before-v\d+\.db$/;
-/** …which stops being an option after a month (the privacy policy promises backups forget within 30 days). */
-const PRE_MIGRATION_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, addresses
@@ -161,62 +157,135 @@ export async function snapshot(now = Date.now(), dir = config.backupDir): Promis
     .filter((f) => SNAPSHOT_NAME.test(f))
     .sort();
   for (const old of snapshots.slice(0, -config.backupKeepDays)) fs.rmSync(path.join(dir, old));
-  for (const f of fs.readdirSync(dir).filter((f) => PRE_MIGRATION_NAME.test(f))) {
-    if (now - fs.statSync(path.join(dir, f)).mtimeMs > PRE_MIGRATION_KEEP_MS) fs.rmSync(path.join(dir, f));
-  }
+  // The copies taken before a deploy's migrations (db.ts) too.
+  prunePreMigrationCopies(now, dir);
   return file;
 }
+
+/** How often the upkeep runs, and when a run that hasn't finished counts as stuck (reported, and no longer waited on). */
+export const UPKEEP = { everyMs: 15 * 60_000, stuckMs: 30 * 60_000 } as const;
+
+/**
+ * The upkeep's steps, each on its own: one that throws is reported and the rest still run (the backup copy last of
+ * all, so a broken step before it never stops the backups).
+ */
+const STEPS: [string, () => unknown][] = [
+  ['expired', () => purgeExpired()],
+  ['answers', () => pruneAnswers()],
+  ['runs', () => pruneRuns()],
+  ['guests', () => purgeGuests()],
+  [
+    'room guests',
+    async () => {
+      const pupils = await purgeRoomGuests();
+      if (pupils) console.log(`🏫 Guests who came for a room, gone for an hour: ${pupils} deleted`);
+    },
+  ],
+  [
+    'inactive accounts',
+    () => {
+      const inactive = retireInactiveAccounts();
+      if (inactive.warned || inactive.erased)
+        console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);
+    },
+  ],
+  [
+    'streak reminders',
+    () => {
+      const reminded = sendStreakReminders();
+      if (reminded) console.log(`🔥 Streak reminders sent: ${reminded}`);
+    },
+  ],
+  [
+    'recordings',
+    () => {
+      const told = tellRecordOwners();
+      if (told) console.log(`📼 Owners of recordings told how they did: ${told}`);
+    },
+  ],
+  ['duels', () => tellExpiredDuels()],
+  // The evening champion's title is worn for a day.
+  ['champion titles', () => retireChampionTitles()],
+  [
+    'group weeks',
+    async () => {
+      const weeks = await settleGroupWeeks();
+      if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
+    },
+  ],
+  [
+    'pictures',
+    () => {
+      const pictures = sweepPictures();
+      if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
+    },
+  ],
+  [
+    'digest',
+    () => {
+      if (moderatorDigest()) console.log('🛡️  Morning summary sent to the moderators');
+    },
+  ],
+  ['optimize', () => optimize()],
+  [
+    'pushes',
+    () => {
+      const pushed = dailyReminderPushes() + timedPushes((u) => liveDailyStreak(u), eveningStartsAt(dayKey()));
+      if (pushed) console.log(`📲 Pushes sent: ${pushed}`);
+    },
+  ],
+  [
+    'backup',
+    async () => {
+      if (sofiaHour() < SNAPSHOT_HOUR) return;
+      const file = await snapshot();
+      if (file) console.log(`💾 Backup saved: ${file}`);
+    },
+  ],
+];
 
 /** Runs the upkeep every 15 minutes. Returns a stop that resolves once a run in progress (a backup copy) is done. */
 export function startMaintenance() {
   let running: Promise<void> | null = null;
+  let since = 0;
   const tick = () => {
-    running ??= work().finally(() => {
+    // A run that never ended (an await that hangs) would stop every run after it: said once, and left behind.
+    if (running && Date.now() - since > UPKEEP.stuckMs) {
+      void reportError(
+        new Error(`The upkeep has been running for ${Math.round((Date.now() - since) / 60_000)} minutes`),
+        'maintenance',
+      );
       running = null;
+    }
+    if (running) return;
+    since = Date.now();
+    const job = work();
+    running = job;
+    void job.finally(() => {
+      if (running === job) running = null;
     });
   };
   const work = async () => {
+    // A write every run even when nobody plays: the daily backup check compares this stamp in the restored copy with
+    // the live one (a replica that stopped), and its age with now (an upkeep that stopped); /api/health reads it too.
     try {
-      // A write every 15 minutes even when nobody plays: the daily backup check compares this stamp in the restored
-      // copy with the live one, so a replica that stopped is caught (deploy/backup-check.sh).
       run(
         "INSERT INTO settings (key, value) VALUES ('alive_at', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
         String(Date.now()),
       );
-      purgeExpired();
-      await pruneAnswers();
-      await pruneRuns();
-      await purgeGuests();
-      const pupils = await purgeRoomGuests();
-      if (pupils) console.log(`🏫 Guests who came for a room, gone for an hour: ${pupils} deleted`);
-      const inactive = retireInactiveAccounts();
-      if (inactive.warned || inactive.erased)
-        console.log(`🗓️  Unused accounts: ${inactive.warned} warned, ${inactive.erased} deleted`);
-      const reminded = sendStreakReminders();
-      if (reminded) console.log(`🔥 Streak reminders sent: ${reminded}`);
-      const told = tellRecordOwners();
-      if (told) console.log(`📼 Owners of recordings told how they did: ${told}`);
-      tellExpiredDuels();
-      // The evening champion's title is worn for a day.
-      retireChampionTitles();
-      const weeks = await settleGroupWeeks();
-      if (weeks) console.log(`👑 Groups' weeks settled: ${weeks}`);
-      const pictures = sweepPictures();
-      if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
-      if (moderatorDigest()) console.log('🛡️  Morning summary sent to the moderators');
-      optimize();
-      const pushed = dailyReminderPushes() + timedPushes((u) => liveDailyStreak(u), eveningStartsAt(dayKey()));
-      if (pushed) console.log(`📲 Pushes sent: ${pushed}`);
-      if (sofiaHour() >= SNAPSHOT_HOUR) {
-        const file = await snapshot();
-        if (file) console.log(`💾 Backup saved: ${file}`);
-      }
     } catch (err) {
-      void reportError(err, 'maintenance');
+      void reportError(err, 'maintenance: alive_at');
+    }
+    for (const [name, step] of STEPS) {
+      try {
+        await step();
+      } catch (err) {
+        void reportError(err, `maintenance: ${name}`);
+      }
     }
   };
   const first = setTimeout(tick, 10_000).unref();
-  const every = setInterval(tick, 15 * 60_000).unref();
+  const every = setInterval(tick, UPKEEP.everyMs).unref();
   return async () => {
     clearTimeout(first);
     clearInterval(every);

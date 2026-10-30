@@ -12,7 +12,7 @@ process.env.DB_PATH = path.join(tmp, 'maintenance.db');
 process.env.BACKUP_KEEP_DAYS = '3';
 process.env.MAIL_OUTBOX = path.join(tmp, 'outbox');
 const { DatabaseSync } = await import('node:sqlite');
-const { all, one, run } = await import('../src/db');
+const { all, one, prunePreMigrationCopies, run } = await import('../src/db');
 const { createSession } = await import('../src/auth');
 const { INACTIVE_MS, INACTIVE_WARNING_MS, purgeExpired, retireInactiveAccounts, snapshot } = await import(
   '../src/maintenance'
@@ -85,6 +85,30 @@ test('daily snapshots: one per day, a working copy, only the newest kept', async
 
   for (const d of [2, 3, 4, 5]) await snapshot(day(d), dir);
   assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-03.db', 'quiz-2026-10-04.db', 'quiz-2026-10-05.db']);
+});
+
+test('copies from before migrations: the newest two are kept, none past a month', () => {
+  const dir = path.join(tmp, 'before-migrations');
+  fs.mkdirSync(dir);
+  const now = Date.UTC(2026, 9, 30, 12);
+  const made = (name: string, daysAgo: number) => {
+    fs.writeFileSync(path.join(dir, name), '');
+    fs.utimesSync(path.join(dir, name), new Date(now - daysAgo * DAY), new Date(now - daysAgo * DAY));
+  };
+  made('quiz-v40-before-v41.db', 3);
+  made('quiz-v41-before-v42.db', 2);
+  made('quiz-v42-before-v43.db', 1);
+  made('quiz-2026-10-29.db', 1);
+  prunePreMigrationCopies(now, dir);
+  assert.deepEqual(fs.readdirSync(dir).sort(), [
+    'quiz-2026-10-29.db',
+    'quiz-v41-before-v42.db',
+    'quiz-v42-before-v43.db',
+  ]);
+  prunePreMigrationCopies(now + 28.5 * DAY, dir);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-29.db', 'quiz-v42-before-v43.db'], 'a month on');
+  prunePreMigrationCopies(now + 29.5 * DAY, dir);
+  assert.deepEqual(fs.readdirSync(dir), ['quiz-2026-10-29.db'], 'the daily copies are not theirs to prune');
 });
 
 test('an account unused for three years gets an email a month before it is deleted; signing in keeps it', () => {

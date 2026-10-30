@@ -55,6 +55,19 @@ if v4=$(curl -fsS -m 10 https://www.cloudflare.com/ips-v4) && v6=$(curl -fsS -m 
   [ "$published" = "$trusted" ] || fail "Cloudflare's IP ranges changed: deploy/Caddyfile trusts $trusted; published: $published"
 fi
 
+# The daily copy (the fast way back, docs/operations.md): the newest under 26 hours old, or the upkeep stopped making
+# them. Asked in the app's container, where the app looks (BACKUP_DIR, else beside the database); not when it's off.
+age=$(docker compose exec -T app sh -c '
+  dir=${BACKUP_DIR:-$(dirname "${DB_PATH:-/data/quiz.db}")/backups}
+  [ "$dir" = off ] && echo off && exit
+  newest=$(ls -t "$dir"/quiz-????-??-??.db 2>/dev/null | head -1)
+  [ -n "$newest" ] && echo $(( ($(date +%s) - $(stat -c %Y "$newest")) / 3600 ))') || true
+case "$age" in
+  off) ;;
+  '') fail "no daily copy of the database in the app's backups" ;;
+  *) [ "$age" -le 26 ] || fail "the newest daily copy of the database is $age hours old" ;;
+esac
+
 [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null
 # How the database grows, day by day, in this log.
 data=$(docker compose exec -T app du -sh /data 2>/dev/null | cut -f1)

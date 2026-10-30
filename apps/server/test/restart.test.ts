@@ -4,9 +4,23 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { autoPlay, connect, connected, emitAck, next, register, sleep, startServer, type TestServer } from './helpers';
+import {
+  autoPlay,
+  connect,
+  connected,
+  emitAck,
+  http,
+  next,
+  register,
+  sleep,
+  startServer,
+  type TestServer,
+} from './helpers';
 
 const T = { timeout: 60_000 };
+/** Sofia wall-clock time `seconds` from now, as EVENING_AT takes it. */
+const sofiaIn = (seconds: number) =>
+  new Date(Date.now() + seconds * 1000).toLocaleTimeString('en-GB', { timeZone: 'Europe/Sofia', hour12: false });
 
 test('a restart lets the running match finish, refuses new ones, then exits', T, async () => {
   const srv = await startServer({ DRAIN_SECONDS: '60' });
@@ -82,6 +96,81 @@ test(
     }
   },
 );
+
+test(
+  'a restart keeps the lobbies: a room with its players, and the evening’s, which starts late if it has to',
+  T,
+  async () => {
+    // The evening begins while the server restarts.
+    const at = sofiaIn(20);
+    const first = await startServer({ EVENING_AT: at });
+    let second: TestServer | undefined;
+    try {
+      const host = await register(first.url, 'domakin_na_staia');
+      const pupil = await register(first.url, 'uchenik_v_staia');
+      const fan = await register(first.url, 'chaka_vecherta');
+      const [sh, sp, sf] = [host, pupil, fan].map((a) => connect(first.url, a.cookie));
+      await connected(sh, sp, sf);
+      const made = await emitAck(sh, 'room:create', { questions: 5 });
+      assert.ok(made.ok);
+      assert.ok((await emitAck(sp, 'room:join', made.code)).ok);
+      assert.deepEqual(await emitAck(sf, 'evening:join'), { ok: true });
+
+      // What a deploy asks first: the evening is near, so it isn't a quiet moment.
+      const live = (await http(first.url).get('/api/live')).body;
+      assert.deepEqual(live.rooms, { open: 1, playing: 0, people: 2 });
+      assert.equal(live.evening.waiting, 1);
+      assert.match(live.busy.join('\n'), /the evening Роял: its lobby opens at/);
+      const proxied = await fetch(`${first.url}/api/live`, { headers: { 'x-forwarded-for': '203.0.113.9' } });
+      assert.equal(proxied.status, 404, 'only on the machine itself, never through the proxy');
+
+      const told = next(sf, 'notice');
+      assert.equal(await first.kill('SIGTERM'), 0);
+      assert.match((await told).message, /Мястото ти във Вечерния Роял се пази/);
+      for (const s of [sh, sp, sf]) s.close();
+
+      await sleep(Math.max(0, live.evening.startsAt - Date.now() + 500));
+      second = await startServer({ DB_PATH: first.dbPath, EVENING_AT: at });
+      const [h2, p2, f2] = [host, pupil, fan].map((a) => connect(second!.url, a.cookie));
+      const rooms = Promise.all([next(h2, 'room:state'), next(p2, 'room:state')]);
+      const evening = autoPlay(f2, 'right');
+      await connected(h2, p2, f2);
+      for (const room of await rooms) {
+        assert.ok(room, 'back in the room');
+        assert.equal(room.code, made.code, 'the same room, by the same code');
+        assert.deepEqual(
+          room.players.map((p) => p.name),
+          ['domakin_na_staia', 'uchenik_v_staia'],
+        );
+        assert.equal(room.hostId, `u${host.user.id}`);
+        assert.equal(room.settings.questions, 5);
+      }
+      const { start } = await evening;
+      assert.equal(start!.mode, 'evening', 'the evening began a moment late, with whoever was in its lobby');
+      for (const s of [h2, p2, f2]) s.close();
+    } finally {
+      await second?.stop();
+      await first.stop();
+    }
+  },
+);
+
+test('an upkeep that hasn’t run for an hour turns the health check red', T, async () => {
+  const srv = await startServer();
+  try {
+    assert.equal((await fetch(`${srv.url}/api/health`)).status, 200);
+    srv.db
+      .prepare(
+        "INSERT INTO settings (key, value) VALUES ('alive_at', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      )
+      .run(String(Date.now() - 61 * 60_000));
+    const res = await fetch(`${srv.url}/api/health`);
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { ok: false, problem: 'upkeep' });
+  } finally {
+    await srv.stop();
+  }
+});
 
 test('an idle server stops right away', T, async () => {
   const srv = await startServer({ DRAIN_SECONDS: '60' });

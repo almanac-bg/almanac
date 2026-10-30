@@ -13,6 +13,7 @@ import {
   weekEndsAt,
   weekStart,
 } from '@quiz/shared';
+import { config } from './config';
 import { all, one, run, tx } from './db';
 import { textProblem } from './names';
 import { notify } from './notifications';
@@ -254,14 +255,31 @@ function ranks(played: Standing[]) {
 }
 
 /**
+ * Whether Sunday's dailies (of the group's members, or anyone's) are all in. A run started just before midnight ends
+ * after it, later still if its player drops and comes back, and still counts for Sunday. One a stopped server left
+ * unfinished isn't running any more.
+ */
+function lastRunsIn(monday: string, groupId?: number): boolean {
+  const member = groupId ? 'AND d.user_id IN (SELECT user_id FROM group_members WHERE group_id = ?)' : '';
+  return !one(
+    `SELECT 1 AS x FROM daily_results d WHERE d.day = ? AND d.finished_at IS NULL AND d.started_at >= ? ${member}`,
+    shiftDay(monday, 6),
+    config.bootedAt,
+    ...(groupId ? [groupId] : []),
+  );
+}
+
+/**
  * Settles a finished week: its winner (none if nobody played) is kept, and whoever played hears how it ended. Once per
- * group and week (whoever gets there first: the upkeep, or the group's page after the week turned). Returns whether
- * this call did it.
+ * group and week (whoever gets there first: the upkeep, or the group's page after the week turned), once Sunday's
+ * last runs are in. Returns whether this call did it.
  */
 export function settleWeek(groupId: number, monday: string, now = Date.now()): boolean {
   const g = getGroup(groupId);
   // Not before the week is over, and not a week from before the group.
   if (!g || now < weekEndsAt(monday) || g.created_at >= weekEndsAt(monday)) return false;
+  if (one('SELECT 1 AS x FROM group_weeks WHERE group_id = ? AND week = ?', groupId, monday)) return false;
+  if (!lastRunsIn(monday, groupId)) return false;
   const { played } = weekBoard(groupId, monday, dayKey(now));
   const winner = played[0] ?? null;
   const { changes } = run(
@@ -302,12 +320,14 @@ const SETTLE_BATCH = 500;
 const SETTLE_TURN = 20;
 
 /**
- * The upkeep's part: settles the week just finished in every group that hasn't had it settled. Returns how many. Once
- * every group's is, the week is noted as done: the groups aren't looked through again until the next one ends.
+ * The upkeep's part: settles the week just finished in every group that hasn't had it settled, once Sunday's last
+ * dailies are in. Returns how many. Once every group's is, the week is noted as done: the groups aren't looked through
+ * again until the next one ends.
  */
 export async function settleGroupWeeks(now = Date.now()): Promise<number> {
   const lastWeek = shiftDay(weekStart(dayKey(now)), -7);
   if (one("SELECT 1 AS x FROM settings WHERE key = 'groups_settled' AND value = ?", lastWeek)) return 0;
+  if (!lastRunsIn(lastWeek)) return 0;
   const due = all<{ id: number }>(
     `SELECT id FROM player_groups g WHERE created_at < ?
      AND NOT EXISTS (SELECT 1 FROM group_weeks w WHERE w.group_id = g.id AND w.week = ?) LIMIT ?`,

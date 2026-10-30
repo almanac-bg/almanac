@@ -3,14 +3,21 @@
 # Litestream on up-to-date images too). Nothing is built here, and nothing changes until that image is here: a commit
 # CI hasn't passed has no image, and the deploy stops with the old code and the old question bank still in place. The
 # image that ran until now is kept as `almanac:previous` for deploy/rollback.sh; a deploy that isn't healthy within
-# 90 seconds goes back to it by itself. Run as root in the checkout, in a quiet hour: queues close while running
-# matches play out (see docs/operations.md → Обновяване).
+# 90 seconds goes back to it by itself. Run as root in the checkout. It waits for a quiet moment first (no class in the
+# middle of a match, not the evening Роял's hour), up to 20 minutes; `deploy/deploy.sh --now` doesn't. Queues close
+# while running matches play out (see docs/operations.md → Обновяване).
 set -eu
 
 # All of it is read before anything runs: the merge below may rewrite this very file, and sh reads a script as it goes.
 main() {
+  case "${1:-}" in
+    '' | --now) ;;
+    *)
+      echo "Usage: deploy/deploy.sh [--now]"
+      exit 2
+      ;;
+  esac
   cd "$(dirname "$0")/.."
-  echo "$(date -u +%FT%TZ) deploying (note the time: Litestream can bring the database back to it)"
   git fetch --quiet origin
   git -C private fetch --quiet origin
   commit=$(git rev-parse origin/main)
@@ -20,6 +27,8 @@ main() {
     echo "No image for $release: CI publishes one once every check on the commit has passed (still running, or failed?)."
     exit 1
   }
+  [ "${1:-}" = --now ] || quiet_moment || exit 1
+  echo "$(date -u +%FT%TZ) deploying (note the time: Litestream can bring the database back to it)"
 
   bank_before=$(git -C private rev-parse HEAD)
   git -C private merge --quiet --ff-only origin/main
@@ -80,6 +89,37 @@ main() {
   docker image prune -f >/dev/null
   docker builder prune -f >/dev/null
   echo "$(date -u +%FT%TZ) deployed $release"
+}
+
+# Why a restart now would cut something short, from the app that's running (/api/live, which answers only on its own
+# machine): a line per reason, nothing when it's quiet, or when there's no app to ask (an app from before /api/live
+# answers 404: nothing).
+busy() {
+  docker compose exec -T app node -e '
+    fetch(`http://127.0.0.1:${process.env.PORT ?? 3001}/api/live`)
+      .then((r) => (r.ok ? r.json() : { busy: [] }))
+      .then((live) => live.busy.forEach((reason) => console.log(reason)), () => {})' 2>/dev/null || true
+}
+
+# Waits, up to 20 minutes, until nothing busy() names is going on. A restart cuts a match short after DRAIN_SECONDS
+# (a class's can run 11 minutes) and empties the lobbies, so this is what keeps a deploy from landing on a lesson.
+quiet_moment() {
+  reasons=$(busy)
+  [ -z "$reasons" ] && return 0
+  echo "$(date -u +%FT%TZ) waiting for a quiet moment, up to 20 minutes (deploy/deploy.sh --now doesn't wait):"
+  echo "$reasons" | sed 's/^/  /'
+  waited=0
+  while [ -n "$reasons" ]; do
+    if [ "$waited" -ge 1200 ]; then
+      echo "$(date -u +%FT%TZ) still not quiet after 20 minutes: nothing deployed. Again later, or with --now:"
+      echo "$reasons" | sed 's/^/  /'
+      return 1
+    fi
+    sleep 30
+    waited=$((waited + 30))
+    reasons=$(busy)
+  done
+  echo "$(date -u +%FT%TZ) quiet now"
 }
 
 # The site answers its health check over HTTPS, through Caddy, the way visitors reach it.

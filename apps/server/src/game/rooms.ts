@@ -24,6 +24,8 @@ import { averageOf, buildHuman, type GameRegistry, startFailure } from './regist
 
 /** Lobby members who drop (e.g. a page refresh) keep their seat this long; someone at a locked room's door their place. */
 const RECONNECT_GRACE_MS = 20_000;
+/** …and after a restart (the server down for a few seconds, every page reconnecting), this long. */
+const RESTART_GRACE_MS = 60_000;
 const INVITE_TTL_MS = 60_000;
 /** At a locked room's door at once, at most: a whole class can come late, a stream of new guests can't pile up. */
 const MAX_KNOCKS = 40;
@@ -58,6 +60,21 @@ interface PendingInvite {
 }
 
 const memberId = (userId: number) => `u${userId}`;
+
+/** A room's lobby as one server process hands it to the next on a restart (kept(), restore()): plain data. */
+export interface KeptRoom {
+  code: string;
+  hostUserId: number;
+  settings: RoomSettings;
+  members: number[];
+  bots: Bot[];
+  teams: [string, TeamId][];
+  kicked: number[];
+  nicknames: [number, string][];
+  locked: boolean;
+  knocks: [number, string | null][];
+  admitted: number[];
+}
 
 export class RoomManager {
   private rooms = new Map<string, Room>();
@@ -389,7 +406,7 @@ export class RoomManager {
     socket.emit('room:state', this.state(room, room.hostUserId === userId));
   }
 
-  disconnected(userId: number) {
+  disconnected(userId: number, graceMs = RECONNECT_GRACE_MS) {
     const room = this.byUser.get(userId);
     if (room?.game || (!room && !this.knockingAt.has(userId))) return;
     this.clearGrace(userId);
@@ -397,9 +414,60 @@ export class RoomManager {
       userId,
       setTimeout(
         guarded('room grace', () => this.leave(userId)),
-        RECONNECT_GRACE_MS,
+        graceMs,
       ),
     );
+  }
+
+  /**
+   * The lobbies, for the next process to carry on (a deploy restarts the server: a class waiting for its code to fill
+   * shouldn't have to start over). A match a room was playing has ended by now (the drain waits for it).
+   */
+  kept(): KeptRoom[] {
+    return [...this.rooms.values()].map((r) => ({
+      code: r.code,
+      hostUserId: r.hostUserId,
+      settings: r.settings,
+      members: r.members,
+      bots: r.bots,
+      teams: [...r.teams],
+      kicked: [...r.kicked],
+      nicknames: [...r.nicknames],
+      locked: r.locked,
+      knocks: [...r.knocks],
+      admitted: [...r.admitted],
+    }));
+  }
+
+  /** The lobbies the last process kept: everyone in them gets RESTART_GRACE_MS to come back (their page reconnects). */
+  restore(kept: KeptRoom[]) {
+    for (const k of kept) {
+      if (this.rooms.has(k.code) || !k.members.length) continue;
+      const room: Room = {
+        ...k,
+        game: null,
+        teams: new Map(k.teams),
+        kicked: new Set(k.kicked),
+        nicknames: new Map(k.nicknames),
+        knocks: new Map(k.knocks),
+        admitted: new Set(k.admitted),
+      };
+      this.rooms.set(room.code, room);
+      for (const id of room.members) this.byUser.set(id, room);
+      for (const id of room.knocks.keys()) this.knockingAt.set(id, room.code);
+      for (const id of [...room.members, ...room.knocks.keys()]) this.disconnected(id, RESTART_GRACE_MS);
+    }
+  }
+
+  /** For the live report: open rooms, how many play a match now, and the people in them. */
+  counts() {
+    let playing = 0;
+    let people = 0;
+    for (const r of this.rooms.values()) {
+      if (r.game) playing++;
+      people += r.members.length;
+    }
+    return { open: this.rooms.size, playing, people };
   }
 
   private add(room: Room, userId: number) {

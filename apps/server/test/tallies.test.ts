@@ -140,6 +140,22 @@ test('a clean stop marks them kept; the next start uses them, and the one after 
   // No stop marked since that start (a crash, or an older release ran): counted from the rows.
   assert.equal(catchUpTallies(), true);
   assert.equal(one<{ games: number }>("SELECT games FROM mode_stats WHERE user_id = 4 AND mode = 'squad'")!.games, 1);
+
+  // A clean stop, then a rollback to a release from before the tallies: it plays a match (and leaves the mark as it
+  // was, since it knows nothing of it), then this code starts again. The rows moved: counted again.
+  keepTallies();
+  run(
+    "INSERT INTO matches (id, mode, ranked, room_code, player_count, question_count, started_at, ended_at) VALUES ('older', 'squad', 1, NULL, 1, 10, ?, ?)",
+    Date.now(),
+    Date.now() + 60_000,
+  );
+  run(
+    `INSERT INTO match_players (match_id, player_id, user_id, name, avatar, is_bot, placement, score, correct, faced,
+       best_streak, left_match, team, won)
+     VALUES ('older', 'u4', 4, 'd', '🙂', 0, 1, 0, 0, 10, 0, 0, NULL, 0)`,
+  );
+  assert.equal(catchUpTallies(), true, 'played in between: counted again');
+  assert.equal(one<{ games: number }>("SELECT games FROM mode_stats WHERE user_id = 4 AND mode = 'squad'")!.games, 2);
 });
 
 function answer(questionId: string, difficulty: Difficulty, correct: boolean): AnswerLogEntry {
