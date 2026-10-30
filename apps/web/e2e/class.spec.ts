@@ -1,4 +1,4 @@
-import { expect, gameMs, me, playMatch, signUp, test, uniqueName } from './support';
+import { expect, gameMs, me, playMatch, png, signUp, test, uniqueName } from './support';
 
 test('a class: the teacher writes a set, runs it on a big screen, and a pupil joins by link under a name of their own', async ({
   page: teacher,
@@ -121,4 +121,32 @@ test('a locked room: a pupil with the code from the landing knocks, the teacher 
   await expect(boby.getByRole('heading', { name: 'Не влезе в стаята' })).toBeVisible();
   await expect(boby.getByText('Домакинът не те пусна в стаята.')).toBeVisible();
   await expect(teacher.getByRole('heading', { name: /^На вратата/ })).toHaveCount(0);
+});
+
+test('a picture for a set’s question: picked on the device, made small, uploaded (Safari’s too) and shown only by its signed address', async ({
+  page,
+}) => {
+  await signUp(page, uniqueName('Учител'), 'parola-123');
+  await page.goto('/sets');
+  await page.getByRole('button', { name: 'Нов набор' }).click();
+  await expect(page).toHaveURL(/\/sets\/\d+$/);
+  await page.getByLabel('Име на набора').fill('Крепости');
+  await page.getByRole('button', { name: /^Въпрос 1/ }).click();
+  await page.getByRole('button', { name: 'Вярно/невярно' }).last().click();
+  await page.getByLabel('Текст на въпрос 1').fill('Това е Царевец.');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Снимка към въпроса' }).click(),
+  ]);
+  await chooser.setFiles({ name: 'krepost.png', mimeType: 'image/png', buffer: png(240, 180) });
+  const picture = page.getByRole('img', { name: 'Снимката към въпрос 1' });
+  await expect(picture).toBeVisible();
+  // Loaded, from an address the server signed (the bare one serves nothing).
+  await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  const src = (await picture.getAttribute('src'))!;
+  expect(src).toMatch(/^\/api\/sets\/images\/[0-9a-f]{16}\?e=\d+&s=/);
+  expect((await page.request.get(src.split('?')[0])).status()).toBe(404);
+  await page.getByLabel('Какво има на снимката — за незрящите, без да издава отговора').fill('Крепост на хълм');
+  await page.getByRole('button', { name: 'Запази' }).click();
+  await expect(page.getByText('1 от 50 въпроса · запазено')).toBeVisible();
 });

@@ -185,7 +185,7 @@ const Decision = z.discriminatedUnion('action', [
     annul: z.boolean().optional(),
   }),
   z.object({ action: z.literal('rename_group'), basis: Basis, reason: Reason }),
-  z.object({ action: z.literal('hide_set'), basis: Basis, reason: Reason }),
+  z.object({ action: z.literal('hide_set'), basis: Basis, reason: Reason, copies: z.boolean().optional() }),
 ]);
 
 /** A case decided: the reports the moderator saw in it (`reportIds`), and what was decided. */

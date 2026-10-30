@@ -442,7 +442,7 @@ function GroupRow({ group, onRenamed }: { group: PlayerCard['groups'][number]; o
 function SetRow({ set, onChanged }: { set: PlayerCard['sets'][number]; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  async function submit(grounds: { basis?: ModerationBasis; reason: string }) {
+  async function submit(grounds: { basis?: ModerationBasis; reason: string; copies?: boolean }) {
     setBusy(true);
     try {
       await api.hideSet(set.code, !set.hidden, grounds);

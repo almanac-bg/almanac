@@ -10,6 +10,7 @@ import {
   deleteSet,
   getSet,
   mySets,
+  pictureAllowed,
   pictureFile,
   saveSet,
   sharedPreview,
@@ -95,26 +96,29 @@ setsRouter.post(
       res.status(400).json({ error: up.error });
       return;
     }
-    res.json({ id: up.id, w: up.w, h: up.h });
+    res.json({ id: up.id, w: up.w, h: up.h, url: up.url });
   },
 );
 
 /**
- * A set's picture, for the rooms that play it and its editor. Its address is a hash nobody guesses; cached for a day
- * only, so one a moderator blocks soon stops showing, and never by a shared cache.
+ * A set's picture, for the rooms that play it, its editor and a moderator reading it: only by the signed address the
+ * server gave them (pictureUrl), until it expires — a picture is no file anyone can link to from elsewhere. Cached for
+ * an hour at most, so one a moderator blocks soon stops showing, never by a shared cache, and never by another site.
  */
 setsRouter.get('/sets/images/:id', (req, res) => {
   const id = String(req.params.id);
-  const file = /^[0-9a-f]{16}$/.test(id) ? pictureFile(id) : undefined;
+  const allowed = /^[0-9a-f]{16}$/.test(id) && pictureAllowed(id, req.query.e, req.query.s);
+  const file = allowed ? pictureFile(id) : undefined;
   if (!file) {
     res.status(404).json({ error: 'Няма такава снимка.' });
     return;
   }
   res.set({
     'Content-Type': file.type,
-    'Cache-Control': 'private, max-age=86400',
+    'Cache-Control': 'private, max-age=3600',
     'X-Robots-Tag': 'noindex',
     'Content-Security-Policy': "default-src 'none'",
+    'Cross-Origin-Resource-Policy': 'same-origin',
   });
   res.send(Buffer.from(file.bytes));
 });
@@ -177,6 +181,7 @@ setsRouter.post('/sets/shared/:code/hide', requireAuth, requireAdmin, requireRec
         .nullable()
         .default(null),
       reason: z.string().max(MODERATION.reasonMax).default(''),
+      copies: z.boolean().optional(),
     }),
     req,
     res,

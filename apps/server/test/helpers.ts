@@ -393,3 +393,30 @@ export function autoPlay(
     s.on('game:start', onStart).on('game:question', onQuestion).on('game:reveal', onReveal).on('game:end', onEnd);
   });
 }
+
+/** A JPEG's shape as a canvas writes it: JFIF, tables, the frame, Huffman tables, a scan; `extra` segments after JFIF. */
+export function jpeg(w: number, h: number, extra: number[][] = []): Buffer {
+  const segment = (marker: number, body: number[]) => [
+    0xff,
+    marker,
+    (body.length + 2) >> 8,
+    (body.length + 2) & 0xff,
+    ...body,
+  ];
+  return Buffer.from([
+    0xff,
+    0xd8,
+    ...segment(0xe0, [0x4a, 0x46, 0x49, 0x46, 0]),
+    ...extra.flat(),
+    ...segment(0xdb, Array(65).fill(1)),
+    ...segment(0xc0, [8, h >> 8, h & 0xff, w >> 8, w & 0xff, 1, 1, 0x11, 0]),
+    ...segment(0xc4, Array(20).fill(0)),
+    ...segment(0xda, [1, 1, 0, 0, 0x3f, 0]),
+    0x12,
+    0x34,
+    0xff,
+    0xd9,
+  ]);
+}
+/** An APPn (or comment) segment carrying `text`. */
+export const app = (marker: number, text: string) => [0xff, marker, 0, text.length + 2, ...Buffer.from(text, 'latin1')];

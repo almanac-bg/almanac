@@ -8,7 +8,6 @@ import {
   type MeUser,
   newlyUnlocked,
   seasonKey,
-  setPictureUrl,
   type UnlockContext,
 } from '@quiz/shared';
 import { settleAchievements } from './achievements';
@@ -27,6 +26,7 @@ import { pushPrefs } from './push';
 import { reloadQuestionBank } from './questions';
 import { questsInfo } from './quests';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
+import { pictureUrl } from './sets';
 import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser, type UserRow } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
@@ -191,7 +191,8 @@ export function exportAccount(userId: number) {
     // The pictures themselves are at their address (too big to put in here).
     setPictures: rows('SELECT id, type, w, h, blocked, created_at FROM set_images WHERE owner_id = ?').map((r) => ({
       ...r,
-      url: `${config.appUrl}${setPictureUrl(String(r.id))}`,
+      // For a week: long enough to fetch them, not a public address for good.
+      url: `${config.appUrl}${pictureUrl(String(r.id), 7 * 24 * 60 * 60_000)}`,
     })),
     groupWeeksWon: rows(
       `SELECT g.name, w.week, w.score FROM group_weeks w JOIN player_groups g ON g.id = w.group_id

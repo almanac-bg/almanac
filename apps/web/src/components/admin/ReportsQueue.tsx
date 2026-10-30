@@ -219,7 +219,7 @@ function CaseCard({
             onCancel={() => setMode('idle')}
             onSubmit={(g) =>
               void decide(
-                { action: 'hide_set', basis: g.basis as ModerationBasis, reason: g.reason },
+                { action: 'hide_set', basis: g.basis as ModerationBasis, reason: g.reason, copies: g.copies },
                 'Наборът е скрит',
               )
             }
@@ -322,7 +322,7 @@ function SetReader({ code }: { code: string }) {
           </p>
           {'image' in q && q.image && (
             <img
-              src={setPictureUrl(q.image.id)}
+              src={q.image.url ?? setPictureUrl(q.image.id)}
               alt={q.image.alt}
               width={q.image.w}
               height={q.image.h}

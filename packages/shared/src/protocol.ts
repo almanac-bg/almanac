@@ -888,7 +888,7 @@ export type ModerationAction =
 export type CaseDecision =
   | ModerationAction
   | { action: 'rename_group'; basis: ModerationBasis; reason: string }
-  | { action: 'hide_set'; basis: ModerationBasis; reason: string };
+  | { action: 'hide_set'; basis: ModerationBasis; reason: string; copies?: boolean };
 
 /** What the moderation log keeps (each with what undoing it takes, when it can be undone). */
 export type ModerationLogAction =
@@ -1289,6 +1289,8 @@ export interface SetImage {
   h: number;
   /** What's in it, for players who can't see it (without the answer). */
   alt: string;
+  /** Where to see it for now (a signed address the server gives with the set; never kept with it). */
+  url?: string;
 }
 
 /** Where a set's picture is served (an id is 16 hex digits; encoded all the same, as anything put in an address). */

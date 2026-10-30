@@ -213,10 +213,11 @@ export function SetVisibilityForm({
   /** Whether it's hidden now: the form does the opposite. */
   hidden: boolean;
   busy: boolean;
-  onSubmit: (grounds: { basis?: ModerationBasis; reason: string }) => void;
+  onSubmit: (grounds: { basis?: ModerationBasis; reason: string; copies?: boolean }) => void;
   onCancel: () => void;
 }) {
   const [grounds, setGrounds] = useState<Grounds>({ basis: hidden ? 'other' : 'content', reason: '' });
+  const [copies, setCopies] = useState(true);
   const ready = hidden ? grounds.reason.trim().length >= MODERATION.reasonMin : groundsReady(grounds);
   return (
     <form
@@ -227,7 +228,7 @@ export function SetVisibilityForm({
           onSubmit(
             hidden
               ? { reason: grounds.reason.trim() }
-              : { basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim() },
+              : { basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim(), copies },
           );
       }}
     >
@@ -242,6 +243,20 @@ export function SetVisibilityForm({
         withBasis={!hidden}
         reasonLabel={hidden ? 'Защо го показваш отново — собственикът ще го прочете' : undefined}
       />
+      {!hidden && (
+        <label className="flex items-start gap-2 text-sm text-fg-2">
+          <input
+            type="checkbox"
+            checked={copies}
+            onChange={(e) => setCopies(e.target.checked)}
+            className="mt-0.5 size-4 accent-rose-400"
+          />
+          <span>
+            Скрий и копията, които други домакини са взели от него
+            <span className="block text-xs text-fg-3">Всеки собственик на копие научава защо.</span>
+          </span>
+        </label>
+      )}
       <div className="flex gap-2">
         <Button size="sm" variant={hidden ? 'primary' : 'danger'} type="submit" loading={busy} disabled={!ready}>
           {hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />} {hidden ? 'Покажи' : 'Скрий набора'}

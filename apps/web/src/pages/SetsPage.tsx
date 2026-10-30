@@ -538,6 +538,10 @@ function QuestionCard({
   );
 }
 
+/** Where a set's picture shows from: the address the server signed for it, only ever one of ours. */
+const pictureSrc = (image: SetImage) =>
+  image.url?.startsWith('/api/sets/images/') ? image.url : setPictureUrl(image.id);
+
 /**
  * A picture over the question: picked from the device, made small enough here (lib/pictures), uploaded, then kept with
  * the set when it's saved. With a line for players who can't see it.
@@ -565,7 +569,7 @@ function PictureField({
         return;
       }
       const up = await api.uploadSetPicture(small);
-      onChange({ id: up.id, w: up.w, h: up.h, alt: image?.alt ?? '' });
+      onChange({ id: up.id, w: up.w, h: up.h, alt: image?.alt ?? '', url: up.url });
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
     } finally {
@@ -578,7 +582,7 @@ function PictureField({
     return (
       <div className="mt-3 flex flex-wrap gap-3">
         <img
-          src={setPictureUrl(image.id)}
+          src={pictureSrc(image)}
           alt={`Снимката към въпрос ${index + 1}`}
           width={image.w}
           height={image.h}
@@ -766,7 +770,7 @@ function SharedSet({ code }: { code: string }) {
     }
   }
 
-  async function hide(hidden: boolean, grounds: { basis?: ModerationBasis; reason: string }) {
+  async function hide(hidden: boolean, grounds: { basis?: ModerationBasis; reason: string; copies?: boolean }) {
     setBusy(true);
     try {
       await api.hideSet(code, hidden, grounds);

@@ -24,7 +24,7 @@ import { hasBlockedWords, nameShape, passesForTheGame } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { hideQuestion, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
-import { hideSet } from './sets';
+import { copiesOf, hideSet } from './sets';
 import { basisLabel, confirmNotice, HUMAN, type Outcome, tellPlayer, tellReporters, tellReversal } from './statements';
 import {
   GUEST_NAME,
@@ -677,14 +677,15 @@ export function renameGroupByModerator(
 }
 
 /**
- * A moderator hides a shared set (it can't be played or copied, and its pictures stop serving), on a basis and with a
- * reason its owner reads; or shows it again, with why.
+ * A moderator hides a shared set (it can't be played, copied or edited, and its pictures are blocked for good), on a
+ * basis and with a reason its owner reads — with `copies`, every copy taken of it too (each a decision of its own,
+ * told to its owner); or shows it again, with why.
  */
 export function hideSetByModerator(
   adminId: number,
   code: string,
   hidden: boolean,
-  grounds: { basis?: ModerationBasis | null; reason: string },
+  grounds: { basis?: ModerationBasis | null; reason: string; copies?: boolean },
   closes: Closes = { kind: 'set', id: code },
 ): Result {
   const problem = hidden
@@ -728,7 +729,36 @@ export function hideSetByModerator(
       link: '/sets',
     });
   else tellReversal(set.owner_id, `Наборът ти „${set.name}“ отново може да се играе и копира.`, reason, '👁️', '/sets');
+  if (hidden && grounds.copies)
+    for (const copy of copiesOf(code)) hideCopy(adminId, copy, set.name, grounds.basis ?? null, reason);
   return { ok: true };
+}
+
+/** A copy of a hidden set goes with it (unless it's staff's: that's the owner's to decide). */
+function hideCopy(adminId: number, code: string, of: string, basis: ModerationBasis | null, reason: string) {
+  const copy = one<{ owner_id: number; name: string }>('SELECT owner_id, name FROM question_sets WHERE code = ?', code);
+  if (!copy || notTheirs(adminId, copy.owner_id)) return;
+  tx(() => {
+    hideSet(code, true);
+    logAction({
+      adminId,
+      action: 'hide_set',
+      userId: copy.owner_id,
+      target: code,
+      basis,
+      reason: `Копие на „${of}“. ${reason}`,
+      undo: {},
+    });
+  });
+  tellPlayer(copy.owner_id, {
+    what: `Модератор скри набора ти „${copy.name}“ — копие на набор, скрит заради съдържанието му: вече не може да се играе в стаи, нито да се копира.`,
+    basis,
+    reason,
+    onReport: false,
+    subject: 'Наборът ти е скрит',
+    icon: '🙈',
+    link: '/sets',
+  });
 }
 
 // ─── Players, for moderators ─────────────────────────────────────────────────

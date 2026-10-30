@@ -290,13 +290,14 @@ export const api = {
   saveSet: (id: number, set: SetBody) => request<QuestionSetInfo>('PUT', `/sets/${id}`, set),
   deleteSet: (id: number) => request<{ ok: true }>('DELETE', `/sets/${id}`),
   /** A picture for a question of a set (a WebP or a JPEG, made small enough first): its id and size. */
-  uploadSetPicture: (picture: Blob) => request<{ id: string; w: number; h: number }>('POST', '/sets/images', picture),
+  uploadSetPicture: (picture: Blob) =>
+    request<{ id: string; w: number; h: number; url: string }>('POST', '/sets/images', picture),
   sharedSet: (code: string) => request<SharedSetPreview>('GET', `/sets/shared/${encodeURIComponent(code)}`),
   copySet: (code: string) => request<{ id: number }>('POST', `/sets/shared/${encodeURIComponent(code)}/copy`),
   reportSet: (code: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/report`, { reason, details }),
   /** A moderator hides a set (a basis and a reason its owner reads) or shows it again (a reason). */
-  hideSet: (code: string, hidden: boolean, grounds: { basis?: ModerationBasis; reason: string }) =>
+  hideSet: (code: string, hidden: boolean, grounds: { basis?: ModerationBasis; reason: string; copies?: boolean }) =>
     request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/hide`, { hidden, ...grounds }),
   joinGroup: (code: string) => request<{ id: number }>('POST', `/groups/join/${encodeURIComponent(code)}`),
 };

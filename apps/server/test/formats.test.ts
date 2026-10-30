@@ -20,7 +20,7 @@ import {
 } from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
 import type { OrderQuestion, PreparedQuestion } from '../src/questions';
-import { writeFixtureQuestions } from './helpers';
+import { app, jpeg, writeFixtureQuestions } from './helpers';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-formats-'));
 process.env.DB_PATH = path.join(tmp, 'formats.db');
@@ -91,9 +91,17 @@ const {
   reorderOptions,
   seededRng,
 } = await import('../src/questions');
-const { hideSet, createSet, prepareSet, readPicture, saveSet, sweepPictures, uploadPicture } = await import(
-  '../src/sets'
-);
+const {
+  hideSet,
+  createSet,
+  pictureAllowed,
+  pictureFile,
+  prepareSet,
+  readPicture,
+  saveSet,
+  sweepPictures,
+  uploadPicture,
+} = await import('../src/sets');
 
 const isPicture = (q: PreparedQuestion) => isChoice(q) && !!q.image;
 
@@ -401,16 +409,18 @@ function webp(w: number, h: number, extra = 0): Buffer {
   return b;
 }
 
-function jpeg(w: number, h: number, exif = false): Buffer {
-  const app = exif ? [0xff, 0xe1, 0x00, 0x04, 0x45, 0x78] : [0xff, 0xe0, 0x00, 0x04, 0x4a, 0x46];
-  const sof = [0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 0xff, w >> 8, w & 0xff, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  return Buffer.from([0xff, 0xd8, ...app, ...sof, 0xff, 0xd9]);
-}
-
-test('a set’s picture is a still WebP or JPEG of a sensible size, without a photo’s metadata', () => {
-  assert.deepEqual(readPicture(webp(800, 600)), { type: 'image/webp', w: 800, h: 600 });
-  assert.deepEqual(readPicture(jpeg(640, 480)), { type: 'image/jpeg', w: 640, h: 480 });
-  assert.equal(readPicture(jpeg(640, 480, true)), null, 'EXIF (where a photo was taken) is refused');
+test('a set’s picture is a still WebP or JPEG of a sensible size; a photo’s metadata is taken out, a wrapper refused', () => {
+  const plain = jpeg(640, 480);
+  assert.deepEqual(readPicture(webp(800, 600)), { type: 'image/webp', w: 800, h: 600, bytes: webp(800, 600) });
+  assert.deepEqual(readPicture(plain), { type: 'image/jpeg', w: 640, h: 480, bytes: plain });
+  // Safari's canvas writes EXIF (APP1) and APP13; a photo's EXIF can say where it was taken: kept is the picture alone.
+  const safari = jpeg(640, 480, [app(0xe1, 'Exif GPS'), app(0xed, 'Photoshop'), app(0xfe, 'comment')]);
+  assert.deepEqual(readPicture(safari)?.bytes, plain, 'metadata and comments taken out');
+  // Anything wrapped as a JPEG (a comment of bytes in a frame, no picture in it) is refused.
+  const sof = [0xff, 0xc0, 0x00, 0x0b, 8, 0x01, 0xe0, 0x02, 0x80, 1, 1, 0x11, 0];
+  const wrapper = Buffer.from([0xff, 0xd8, ...app(0xfe, 'anything at all'), ...sof, 0xff, 0xd9]);
+  assert.equal(readPicture(wrapper), null);
+  assert.equal(readPicture(Buffer.concat([plain.subarray(0, -10), Buffer.from([0xff, 0xd9])])), null, 'no scan');
   assert.equal(readPicture(webp(SETS.imageSide + 1, 600)), null, 'too big');
   assert.equal(readPicture(webp(8, 8)), null, 'too small');
   assert.equal(readPicture(webp(800, 600).subarray(0, 28)), null, 'cut short');
@@ -511,13 +521,15 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   const played = prepareSet(made.id, 11)!;
   const [picture, numbered, plain] = played;
   assert.ok(isChoice(picture) && picture.image && 'url' in picture.image);
-  assert.deepEqual(questionImage(picture), {
-    src: `/api/sets/images/${up.id}`,
-    srcSet: `/api/sets/images/${up.id} 800w`,
-    w: 800,
-    h: 600,
-    alt: 'Каменна крепост на хълм',
-  });
+  // Shown by an address signed for a while: the bare one serves nothing.
+  const shown = questionImage(picture)!;
+  assert.match(shown.src, new RegExp(`^/api/sets/images/${up.id}\\?e=\\d+&s=[\\w-]{22}$`));
+  assert.deepEqual([shown.w, shown.h, shown.alt], [800, 600, 'Каменна крепост на хълм']);
+  const [e, sig] = [...shown.src.matchAll(/[?&][es]=([^&]+)/g)].map((m) => m[1]);
+  assert.ok(pictureAllowed(up.id, e, sig));
+  assert.equal(pictureAllowed(up.id, e, `${sig.slice(0, -1)}A`), false, 'signed');
+  assert.equal(pictureAllowed(up.id, String(Number(e) + 3600), sig), false, 'for this expiry');
+  assert.equal(pictureAllowed(up.id, e, sig, Number(e) * 1000 + 1), false, 'until it');
   assert.equal(numbered.kind, 'order');
   assert.equal(plain.kind, 'order');
   if (numbered.kind !== 'order' || plain.kind !== 'order') return;
@@ -539,12 +551,16 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   );
   assert.ok(plain.hideValues, 'and no numbers to show');
 
-  // Another host's copy uses the same picture; a moderator hides the set: the picture isn't served anywhere.
+  // Another host's copy uses the same picture; a moderator hides the set: the picture isn't served anywhere, isn't
+  // taken again from anyone, and the set can't be changed.
   const code = one<{ code: string }>('SELECT code FROM question_sets WHERE id = ?', made.id)!.code;
   assert.ok(hideSet(code, true));
-  assert.equal(one<{ blocked: number }>('SELECT blocked FROM set_images WHERE id = ?', up.id)!.blocked, 1);
+  assert.equal(pictureFile(up.id), undefined);
   assert.equal(prepareSet(made.id, 11), null, 'a hidden set isn’t played');
+  assert.deepEqual(uploadPicture(12, webp(800, 600)), { ok: false, error: 'Тази снимка е спряна от модератор.' });
+  assert.match(String((saveSet(made.id, 11, { name: 'Урок 6', questions: [] }) as { error: string }).error), /скрит/);
   assert.ok(hideSet(code, false));
+  assert.ok(pictureFile(up.id), 'shown again: served again');
 
   // A day on, the picture no set uses goes; the one in the set stays.
   assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 1);

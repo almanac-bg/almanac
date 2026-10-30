@@ -22,6 +22,7 @@ import { codeAt, stepAt } from '../src/totp';
 import {
   type Account,
   answer,
+  app,
   autoPlay,
   type Client,
   cli,
@@ -32,6 +33,7 @@ import {
   eventually,
   guest,
   http,
+  jpeg,
   newLog,
   next,
   nextWhere,
@@ -733,6 +735,25 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   });
   assert.equal(bad.status, 400);
   assert.match(bad.body.error, /^Въпрос 1: .*еднакви/);
+  // A picture as Safari's canvas writes it (EXIF and APP13 in the JPEG): kept without them, and served only by the
+  // signed address the server gives, never to another site.
+  const uploaded = await fetch(`${srv.url}/api/sets/images`, {
+    method: 'POST',
+    headers: { cookie: A.cookie, 'content-type': 'image/jpeg' },
+    body: jpeg(320, 240, [app(0xe1, 'Exif GPS'), app(0xed, 'Photoshop')]),
+  });
+  assert.equal(uploaded.status, 200);
+  const picture = (await uploaded.json()) as { id: string; url: string };
+  const shown = await fetch(`${srv.url}${picture.url}`);
+  assert.equal(shown.status, 200);
+  assert.equal(shown.headers.get('cross-origin-resource-policy'), 'same-origin');
+  assert.deepEqual(Buffer.from(await shown.arrayBuffer()), jpeg(320, 240));
+  assert.equal(
+    (await fetch(`${srv.url}/api/sets/images/${picture.id}`)).status,
+    404,
+    'the bare address serves nothing',
+  );
+
   const made = await api.send('POST', '/api/sets', A.cookie, set);
   assert.equal(made.status, 200);
   const mine = (await api.get(`/api/sets/${made.body.id}`, A.cookie)).body;
@@ -809,7 +830,7 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     ['set', mine.code, 'Урок по история', 3, 'illegal'],
   );
   // The moderator reads all of it, and decides on the reports seen (one decided meanwhile is a conflict).
-  const hideSet = { action: 'hide_set', basis: 'content', reason: 'Съдържа обиди към ученици.' };
+  const hideSet = { action: 'hide_set', basis: 'content', reason: 'Съдържа обиди към ученици.', copies: true };
   assert.equal((await api.get(`/api/admin/sets/${mine.code}`, B.cookie)).status, 403);
   assert.equal((await api.get(`/api/admin/sets/${mine.code}`, A.cookie)).body.set.questions.length, 3);
   // Nobody decides about what's their own, and what staff made is an owner's to decide: here, a second owner.
@@ -826,10 +847,11 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     (await api.get('/api/notifications', A.cookie)).body.notifications[0].text,
     /Модератор скри набора ти „Урок по история“.*Основание: Неподходящо или незаконно съдържание.*Съдържа обиди/,
   );
-  assert.match(
-    (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,
-    /Разгледахме доклада ти за „Урок по история“: наборът е скрит/,
-  );
+  // B's copy goes with it, and B hears why.
+  assert.equal((await api.get(`/api/sets/${copy.body.id}`, B.cookie)).body.hidden, true);
+  const toB = (await api.get('/api/notifications', B.cookie)).body.notifications.map((n: { text: string }) => n.text);
+  assert.ok(toB.some((t: string) => /копие на набор, скрит заради съдържанието му.*Съдържа обиди/.test(t)));
+  assert.ok(toB.some((t: string) => /Разгледахме доклада ти за „Урок по история“: наборът е скрит/.test(t)));
   assert.equal((await api.get(`/api/sets/shared/${mine.code}`, B.cookie)).status, 404, 'hidden');
   assert.equal(
     (await api.get(`/api/sets/shared/${mine.code}`, A.cookie)).body.mine,

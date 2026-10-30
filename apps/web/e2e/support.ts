@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
 
 export type { Page };
@@ -304,4 +305,30 @@ export async function expectNoSideScroll(page: Page, where: string) {
       return { scrollWidth, culprits: culprits.slice(0, 5).map(describe) };
     }, width);
   await expect.poll(overflow, { message: `${where}: wider than the ${width}px screen`, timeout: 3_000 }).toBeNull();
+}
+
+/** A PNG of the given size (a gradient: a picture a canvas has something to encode), for a file input. */
+export function png(w: number, h: number): Buffer {
+  const rows = Array.from({ length: h }, (_, y) =>
+    Buffer.from([0, ...Array.from({ length: w }, (_, x) => [(x * 255) / w, (y * 255) / h, 128]).flat()]),
+  );
+  const chunk = (type: string, data: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(w, 0);
+  header.writeUInt32BE(h, 4);
+  header[8] = 8; // bits per channel
+  header[9] = 2; // RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.concat(rows))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }

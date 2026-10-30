@@ -871,6 +871,19 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE sessions ADD COLUMN second_factor_at INTEGER;
     `,
   },
+  // v32, set pictures (sets.ts): a picture a moderator blocked, by its content's hash — whoever uploads it again, and
+  // whichever copy of a set has it, it's neither taken nor served (a blocked picture used to come back on re-upload).
+  // Pictures blocked until now are blocked for good the same way. Hidden sets, found by index.
+  {
+    compatible: `
+    CREATE TABLE blocked_pictures (
+      id TEXT PRIMARY KEY,
+      blocked_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    INSERT OR IGNORE INTO blocked_pictures (id, blocked_at) SELECT id, created_at FROM set_images WHERE blocked = 1;
+    CREATE INDEX question_sets_hidden ON question_sets(id) WHERE hidden = 1;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
