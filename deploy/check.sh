@@ -68,6 +68,20 @@ case "$age" in
   *) [ "$age" -le 26 ] || fail "the newest daily copy of the database is $age hours old" ;;
 esac
 
+# Docker itself comes from Docker's repository, which the nightly security updates leave alone (updating it restarts
+# every container, at a moment nobody chose): one waiting a week is time for the update by hand, at a quiet moment
+# (docs/operations.md → Обновяване). Counted from the first check that saw it.
+docker_packages='docker-ce|docker-ce-cli|containerd\.io|docker-compose-plugin|docker-buildx-plugin'
+docker_updates=$(apt list --upgradable 2>/dev/null | grep -o -E "^($docker_packages)/" | tr -d / | tr '\n' ' ')
+seen=/var/tmp/almanac-docker-update
+if [ -z "$docker_updates" ]; then
+  rm -f "$seen"
+else
+  [ -f "$seen" ] || date +%s >"$seen"
+  waiting=$((($(date +%s) - $(cat "$seen")) / 86400))
+  [ "$waiting" -lt 7 ] || fail "a Docker update has been waiting $waiting days: $docker_updates"
+fi
+
 [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 "$heartbeat" >/dev/null
 # How the database grows, day by day, in this log.
 data=$(docker compose exec -T app du -sh /data 2>/dev/null | cut -f1)
