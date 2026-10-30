@@ -76,6 +76,16 @@ export interface MeUser extends PublicUser {
   groups: number;
   /** Won the evening Роял in the last day: its title is theirs to wear. */
   eveningChampion: boolean;
+  /** Rewards picked at the level milestones (choiceKey), and the milestones reached and not yet decided. */
+  chosen: string[];
+  choices: PendingChoice[];
+}
+
+/** A level milestone reached and not yet decided: its own two (`options`), or one left at an earlier milestone. */
+export interface PendingChoice {
+  level: number;
+  options: UnlockRef[];
+  earlier: UnlockRef[];
 }
 
 export interface QuestInfo {

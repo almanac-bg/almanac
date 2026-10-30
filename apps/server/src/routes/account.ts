@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { levelFromXp } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
@@ -14,6 +15,7 @@ import {
   userIdFromRequest,
 } from '../auth';
 import { myDuels } from '../challenges';
+import { chooseReward } from '../choices';
 import { config } from '../config';
 import { joinBoardAfterSave } from '../daily';
 import { isUniqueViolation, run, tx } from '../db';
@@ -59,6 +61,27 @@ accountRouter.patch('/me/loadout', requireAuth, (req, res) => {
     return;
   }
   res.json({ user: getMe(res.locals.userId) });
+});
+
+/** A level milestone's reward (choices.ts): one of its two, or one left at a milestone decided before it. */
+accountRouter.post('/me/choice', requireAuth, (req, res) => {
+  const body = parse(
+    z.object({
+      level: z.number().int().min(1).max(1000),
+      kind: z.enum(['avatar', 'frame', 'title', 'emote']),
+      id: z.string().max(40),
+    }),
+    req,
+    res,
+  );
+  if (!body) return;
+  const userId = res.locals.userId;
+  const result = chooseReward(userId, levelFromXp(getUser(userId)!.xp), body.level, { kind: body.kind, id: body.id });
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ user: getMe(userId) });
 });
 
 accountRouter.post('/account/email', requireAuth, requireAccount, async (req, res) => {

@@ -1,25 +1,34 @@
 import { api, errorMessage, setState as setStore, toast, unlockPreview, useStore } from '@quiz/client';
-import type { MatchRewards, UnlockRef } from '@quiz/shared';
+import { LEVEL_CHOICES, type MatchRewards, type UnlockRef } from '@quiz/shared';
 import { Check } from 'lucide-react';
 import { AnimatePresence, m, useIsPresent } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
+import { LevelChoice } from '../LevelChoice';
 import { Button, Modal } from '../ui';
 import { burst } from './confetti';
 
-type Step = { kind: 'level'; level: number } | { kind: 'unlock'; unlock: UnlockRef; more: number };
+type Step =
+  | { kind: 'level'; level: number }
+  | { kind: 'choice'; level: number }
+  | { kind: 'unlock'; unlock: UnlockRef; more: number };
 
 /** Unlocks shown one by one at most; the rest are counted on the last one (a first match can bring half a dozen). */
 const SHOWN_UNLOCKS = 3;
 
-/** What a match brought that deserves a moment of its own: a new level, then the avatars and frames it unlocked. */
+/**
+ * What a match brought that deserves a moment of its own: a new level, a milestone's reward to pick (LEVEL_CHOICES),
+ * then the avatars and frames it unlocked.
+ */
 export function rewardSteps(rewards: MatchRewards | null | undefined): Step[] {
   if (!rewards) return [];
   const unlocks = rewards.unlocks.filter((u) => u.kind === 'avatar' || u.kind === 'frame');
   const shown = unlocks.slice(0, SHOWN_UNLOCKS);
+  const milestones = LEVEL_CHOICES.filter((c) => c.level > rewards.levelBefore && c.level <= rewards.levelAfter);
   return [
     ...(rewards.levelAfter > rewards.levelBefore ? [{ kind: 'level' as const, level: rewards.levelAfter }] : []),
+    ...milestones.map((c) => ({ kind: 'choice' as const, level: c.level })),
     ...shown.map((unlock, i) => ({
       kind: 'unlock' as const,
       unlock,
@@ -52,7 +61,7 @@ export function RewardMoment({
     if (step.kind === 'level') {
       sfx.levelUp();
       if (!quiet) burst(0.9);
-    } else sfx.achievement();
+    } else if (step.kind === 'unlock') sfx.achievement();
   }, [open, step, quiet]);
   if (!step) return null;
   const last = at + 1 >= steps.length;
@@ -72,6 +81,9 @@ export function RewardMoment({
 function Beat({ step, last, first, onNext }: { step: Step; last: boolean; first: boolean; onNext: () => void }) {
   const present = useIsPresent();
   const button = useRef<HTMLButtonElement>(null);
+  // A milestone's reward: until it's picked, going on leaves it for later („Колекция“ keeps it waiting).
+  const [chose, setChose] = useState(false);
+  const deferring = step.kind === 'choice' && !chose;
   useEffect(() => {
     if (!first) button.current?.focus({ preventScroll: true });
   }, [first]);
@@ -89,19 +101,40 @@ function Beat({ step, last, first, onNext }: { step: Step; last: boolean; first:
           <p className="t-eyebrow text-amber-300">Ново ниво</p>
           <p className="mt-3 font-display text-8xl leading-none font-black text-gradient">{step.level}</p>
         </>
+      ) : step.kind === 'choice' ? (
+        <ChoiceStep level={step.level} onPicked={() => setChose(true)} />
       ) : (
         <Unlocked unlock={step.unlock} more={step.more} />
       )}
       <Button
         ref={button}
-        className="mt-8 w-full"
+        className={deferring ? 'mt-3 w-full' : 'mt-8 w-full'}
         size="lg"
-        variant={step.kind === 'unlock' ? 'ghost' : 'primary'}
+        variant={step.kind === 'unlock' || deferring ? 'ghost' : 'primary'}
         onClick={onNext}
       >
-        {last ? 'Към резултата' : 'Нататък'}
+        {deferring ? 'Избери по-късно' : last ? 'Към резултата' : 'Нататък'}
       </Button>
     </m.div>
+  );
+}
+
+/**
+ * Every fifth level: a reward to pick, one of two. What it offers comes with the player's profile; until that's back
+ * from the match, the milestone's own two.
+ */
+function ChoiceStep({ level, onPicked }: { level: number; onPicked: () => void }) {
+  const pending = useStore((s) => s.me?.choices.find((c) => c.level === level));
+  const choice = pending ?? {
+    level,
+    options: LEVEL_CHOICES.find((c) => c.level === level)?.options ?? [],
+    earlier: [],
+  };
+  return (
+    <div className="w-full">
+      <p className="t-eyebrow text-center text-amber-300">Ниво {level}: избери награда</p>
+      <LevelChoice choice={choice} onPicked={onPicked} className="mt-4" />
+    </div>
   );
 }
 

@@ -41,6 +41,7 @@ export function requirementLabel(req: Requirement, compact = false): string {
     return compact ? `${tier.icon} ${tier.name}` : `Стани ${tier.name} в „${category}“`;
   }
   if ('evening' in req) return compact ? '🌙 Шампион' : 'Спечели „Вечерен Роял“ (за един ден)';
+  if ('choice' in req) return compact ? `🎁 Ниво ${req.choice}` : `Избери го на ниво ${req.choice} (едно от две)`;
   const name = achievementById(req.achievement)?.name ?? req.achievement;
   return compact ? `🏆 ${name}` : `Постижение „${name}“`;
 }
@@ -52,5 +53,6 @@ export function unlockContextOf(me: MeUser): UnlockContext {
     seasonTier: me.bestSeasonTier,
     mastery: Object.fromEntries(me.mastery.map((m) => [m.category, m.tier])),
     eveningChampion: me.eveningChampion,
+    chosen: new Set(me.chosen),
   };
 }

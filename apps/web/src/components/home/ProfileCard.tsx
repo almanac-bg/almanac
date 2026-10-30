@@ -17,6 +17,7 @@ import { Link } from 'react-router';
 import { useMediaQuery } from '../../lib/media';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { GuestNudge } from '../ClaimAccount';
+import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';
 import { Card, ProgressBar } from '../ui';
 
@@ -71,13 +72,22 @@ export function ProfileCard({ className }: { className?: string }) {
       <div
         className={clsx(
           'relative mt-4 flex flex-wrap items-center gap-2 sm:mt-5',
-          !me.dailyBonusAvailable && 'max-sm:hidden',
+          !me.dailyBonusAvailable && !me.choices.length && 'max-sm:hidden',
         )}
       >
         {me.dailyBonusAvailable && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300">
             <Gift aria-hidden className="size-3.5" /> Първият мач за деня носи +100 XP
           </span>
+        )}
+        {/* A milestone's reward waiting to be picked: the collection has it. */}
+        {me.choices.length > 0 && (
+          <Link
+            to="/locker"
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-300 hover:bg-amber-400/25"
+          >
+            <Emoji e="🎁" /> Избери награда за ниво {me.choices[0].level}
+          </Link>
         )}
         {next && <UpNext unlock={next} className="max-sm:hidden" />}
         <SeasonChip ratings={me.ratings} className="max-sm:hidden" />

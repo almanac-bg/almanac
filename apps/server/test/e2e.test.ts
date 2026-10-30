@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 import {
   dayKey,
   type GameStartPayload,
+  type MeUser,
   type PowerupEvent,
   PUBLIC_PAGES,
   type QuestionPayload,
@@ -1218,6 +1219,36 @@ test('profiles, achievements, leaderboards, loadout', T, async () => {
     400,
     'level-50 avatar is locked',
   );
+});
+
+test('every fifth level a reward to pick: one of two, the other still to pick at a later milestone', T, async () => {
+  const P = await register(srv.url, 'izbor_test');
+  const me = async () => (await api.get('/api/me', P.cookie)).body.user as MeUser;
+  const choose = (level: number, kind: string, id: string) =>
+    api.send('POST', '/api/me/choice', P.cookie, { level, kind, id });
+  assert.deepEqual((await me()).choices, [], 'none before level 5');
+  // Level 12: two milestones reached.
+  srv.db.prepare('UPDATE users SET xp = ? WHERE id = ?').run(50 * 12 * 11, P.user.id);
+  assert.deepEqual(
+    (await me()).choices.map((c) => [c.level, c.options.map((o) => o.id), c.earlier.length]),
+    [
+      [5, ['hedgehog', 'otter'], 0],
+      [10, ['lavender', 'coral'], 0],
+    ],
+  );
+  assert.equal((await choose(15, 'title', 'seeker')).status, 400, 'not reached yet');
+  assert.equal((await choose(5, 'frame', 'lavender')).status, 400, 'not on offer at 5');
+  assert.equal((await api.send('PATCH', '/api/me/loadout', P.cookie, { avatar: 'otter' })).status, 400, 'not yet');
+  const picked = await choose(5, 'avatar', 'otter');
+  assert.equal(picked.status, 200);
+  assert.deepEqual(picked.body.user.chosen, ['avatar:otter']);
+  assert.equal((await choose(5, 'avatar', 'hedgehog')).status, 400, 'one a milestone');
+  // At 10, the hedgehog left at 5 can be picked instead of a frame.
+  assert.deepEqual((await me()).choices[0].earlier, [{ kind: 'avatar', id: 'hedgehog' }]);
+  assert.equal((await choose(10, 'avatar', 'hedgehog')).status, 200);
+  assert.deepEqual((await me()).choices, []);
+  assert.equal((await api.send('PATCH', '/api/me/loadout', P.cookie, { avatar: 'otter' })).status, 200, 'it is theirs');
+  assert.equal((await api.send('PATCH', '/api/me/loadout', P.cookie, { frame: 'coral' })).status, 400, 'not picked');
 });
 
 test('daily challenge', T, async () => {

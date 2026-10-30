@@ -3,11 +3,13 @@ import { type CategoryMastery, MASTERY_TITLES } from './mastery';
 import { RANK_TIERS, type RankTierId } from './progression';
 
 /**
- * Unlocked by reaching a level, earning an achievement, finishing a season at a rank tier (or higher), or earning a
- * category's mastery tier (or higher).
+ * Unlocked by reaching a level, earning an achievement, finishing a season at a rank tier (or higher), earning a
+ * category's mastery tier (or higher), or picking it at a level milestone (LEVEL_CHOICES).
  */
 export type Requirement =
   | { level: number }
+  /** One of two offered at this milestone level (every CHOICE_EVERY): the player picks; the other stays to pick later. */
+  | { choice: number }
   | { achievement: string }
   | { season: RankTierId }
   | { mastery: CategoryMastery }
@@ -25,6 +27,8 @@ export interface UnlockContext {
   mastery: Partial<Record<CategoryId, number>>;
   /** Won the evening Роял in the last EVENING.titleHours. */
   eveningChampion: boolean;
+  /** What the player picked at the level milestones, as choiceKey gives it. */
+  chosen: ReadonlySet<string>;
 }
 
 export interface AvatarDef {
@@ -98,6 +102,21 @@ export const AVATARS: AvatarDef[] = [
   { id: 'zmey', name: 'Змей', emoji: '🐉', req: { level: 55 } },
   { id: 'amphora', name: 'Амфора', emoji: '🏺', req: { level: 70 } },
   { id: 'milkyway', name: 'Млечен път', emoji: '🌌', req: { level: 90 } },
+  // Picked at the milestones (LEVEL_CHOICES): one of each pair.
+  { id: 'hedgehog', name: 'Таралеж', emoji: '🦔', req: { choice: 5 } },
+  { id: 'otter', name: 'Видра', emoji: '🦦', req: { choice: 5 } },
+  { id: 'turtle', name: 'Костенурка', emoji: '🐢', req: { choice: 20 } },
+  { id: 'dolphin', name: 'Делфин', emoji: '🐬', req: { choice: 20 } },
+  { id: 'flamingo', name: 'Фламинго', emoji: '🦩', req: { choice: 35 } },
+  { id: 'parrot', name: 'Папагал', emoji: '🦜', req: { choice: 35 } },
+  { id: 'elephant', name: 'Слон', emoji: '🐘', req: { choice: 50 } },
+  { id: 'giraffe', name: 'Жираф', emoji: '🦒', req: { choice: 50 } },
+  { id: 'butterfly', name: 'Пеперуда', emoji: '🦋', req: { choice: 65 } },
+  { id: 'bee', name: 'Пчела', emoji: '🐝', req: { choice: 65 } },
+  { id: 'fairy', name: 'Фея', emoji: '🧚', req: { choice: 80 } },
+  { id: 'vampire', name: 'Вампир', emoji: '🧛', req: { choice: 80 } },
+  { id: 'superhero', name: 'Супергерой', emoji: '🦸', req: { choice: 95 } },
+  { id: 'ninja', name: 'Нинджа', emoji: '🥷', req: { choice: 95 } },
   { id: 'bolt', name: 'Мълния', emoji: '⚡', req: { achievement: 'speed_demon' } },
   { id: 'flame', name: 'Пламък', emoji: '🔥', req: { achievement: 'streak_10' } },
   { id: 'target', name: 'В десетката', emoji: '🎯', req: { achievement: 'perfect' } },
@@ -232,6 +251,87 @@ export const FRAMES: FrameDef[] = [
     animated: true,
     req: { achievement: 'evening_3' },
   },
+  // Picked at the milestones (LEVEL_CHOICES): one of each pair.
+  {
+    id: 'lavender',
+    name: 'Лавандула',
+    background: 'linear-gradient(135deg,#ddd6fe,#a78bfa,#6d28d9)',
+    req: { choice: 10 },
+  },
+  { id: 'coral', name: 'Корал', background: 'linear-gradient(135deg,#fecdd3,#fb7185,#ea580c)', req: { choice: 10 } },
+  { id: 'forest', name: 'Гора', background: 'linear-gradient(135deg,#bbf7d0,#22c55e,#14532d)', req: { choice: 25 } },
+  {
+    id: 'night',
+    name: 'Нощно небе',
+    background: 'linear-gradient(135deg,#c7d2fe,#4f46e5,#1e1b4b)',
+    req: { choice: 25 },
+  },
+  {
+    id: 'silver',
+    name: 'Сребро',
+    background: 'linear-gradient(135deg,#f8fafc,#94a3b8,#e2e8f0,#475569)',
+    req: { choice: 40 },
+  },
+  {
+    id: 'copper',
+    name: 'Мед',
+    background: 'linear-gradient(135deg,#fed7aa,#ea580c,#fdba74,#7c2d12)',
+    req: { choice: 40 },
+  },
+  {
+    id: 'volcano',
+    name: 'Вулкан',
+    background: 'conic-gradient(#7f1d1d,#ef4444,#f97316,#facc15,#f97316,#7f1d1d)',
+    animated: true,
+    req: { choice: 55 },
+  },
+  {
+    id: 'glacier',
+    name: 'Ледник',
+    background: 'conic-gradient(#e0f2fe,#7dd3fc,#0ea5e9,#e0f2fe,#bae6fd,#e0f2fe)',
+    animated: true,
+    req: { choice: 55 },
+  },
+  {
+    id: 'rose',
+    name: 'Розов кварц',
+    background: 'linear-gradient(135deg,#fce7f3,#f9a8d4,#fbcfe8,#be185d)',
+    req: { choice: 70 },
+  },
+  {
+    id: 'lagoon',
+    name: 'Лагуна',
+    background: 'linear-gradient(135deg,#ccfbf1,#2dd4bf,#0e7490,#99f6e4)',
+    req: { choice: 70 },
+  },
+  {
+    id: 'starry',
+    name: 'Звездна нощ',
+    background: 'conic-gradient(#1e1b4b,#6366f1,#fde68a,#1e1b4b,#a5b4fc,#1e1b4b)',
+    animated: true,
+    req: { choice: 85 },
+  },
+  {
+    id: 'blaze',
+    name: 'Пламък',
+    background: 'conic-gradient(#fef08a,#f97316,#dc2626,#f97316,#fef08a)',
+    animated: true,
+    req: { choice: 85 },
+  },
+  {
+    id: 'sun',
+    name: 'Слънце',
+    background: 'conic-gradient(#fffbeb,#fcd34d,#f59e0b,#fffbeb,#fde68a,#d97706,#fffbeb)',
+    animated: true,
+    req: { choice: 100 },
+  },
+  {
+    id: 'moon',
+    name: 'Луна',
+    background: 'conic-gradient(#f8fafc,#cbd5e1,#64748b,#f8fafc,#e2e8f0,#334155,#f8fafc)',
+    animated: true,
+    req: { choice: 100 },
+  },
   {
     id: 'season_master',
     name: 'Сезон: Майстор',
@@ -259,6 +359,19 @@ export const TITLES: TitleDef[] = [
   { id: 'deathless', name: 'Безсмъртен ум', req: { level: 75 } },
   { id: 'chronicler', name: 'Летописец', req: { level: 85 } },
   { id: 'almanac', name: 'Жив алманах', req: { level: 100 } },
+  // Picked at the milestones (LEVEL_CHOICES): one of each pair.
+  { id: 'seeker', name: 'Търсещ ум', req: { choice: 15 } },
+  { id: 'nightowl', name: 'Нощна сова', req: { choice: 15 } },
+  { id: 'razor', name: 'Ум като бръснач', req: { choice: 30 } },
+  { id: 'storm', name: 'Буря от отговори', req: { choice: 30 } },
+  { id: 'sharp', name: 'Остър поглед', req: { choice: 45 } },
+  { id: 'quiet', name: 'Тиха сила', req: { choice: 45 } },
+  { id: 'quick', name: 'Бърза мисъл', req: { choice: 60 } },
+  { id: 'spring', name: 'Дълбок извор', req: { choice: 60 } },
+  { id: 'quizstar', name: 'Звезда на викторината', req: { choice: 75 } },
+  { id: 'heart', name: 'Сърцето на играта', req: { choice: 75 } },
+  { id: 'light', name: 'Светлина на знанието', req: { choice: 90 } },
+  { id: 'unquenched', name: 'Неугасим пламък', req: { choice: 90 } },
   { id: 'speedster', name: 'Демон на скоростта', req: { achievement: 'speed_demon' } },
   { id: 'unstoppable', name: 'Неудържима серия', req: { achievement: 'streak_10' } },
   { id: 'perfectionist', name: 'Безупречност', req: { achievement: 'perfect' } },
@@ -344,8 +457,13 @@ const CATALOG: Record<UnlockKind, { id: string; req: Requirement }[]> = {
 
 export const tierIndex = (tier: RankTierId) => RANK_TIERS.findIndex((t) => t.id === tier);
 
-export function meetsRequirement(req: Requirement, ctx: UnlockContext): boolean {
+/** How a picked reward is kept (UnlockContext.chosen, the server's level_choices). */
+export const choiceKey = (u: UnlockRef) => `${u.kind}:${u.id}`;
+
+/** `key` (choiceKey): which item it is — a reward picked at a milestone is that item's alone. */
+export function meetsRequirement(req: Requirement, ctx: UnlockContext, key?: string): boolean {
   if ('level' in req) return ctx.level >= req.level;
+  if ('choice' in req) return key !== undefined && ctx.chosen.has(key);
   if ('achievement' in req) return ctx.achievements.has(req.achievement);
   if ('mastery' in req) return (ctx.mastery[req.mastery.category] ?? -1) >= req.mastery.tier;
   if ('evening' in req) return ctx.eveningChampion;
@@ -354,11 +472,11 @@ export function meetsRequirement(req: Requirement, ctx: UnlockContext): boolean 
 
 export function isUnlocked(kind: UnlockKind, id: string, ctx: UnlockContext): boolean {
   const item = CATALOG[kind].find((i) => i.id === id);
-  return !!item && meetsRequirement(item.req, ctx);
+  return !!item && meetsRequirement(item.req, ctx, choiceKey({ kind, id }));
 }
 
 export function unlockedIds(kind: UnlockKind, ctx: UnlockContext): string[] {
-  return CATALOG[kind].filter((i) => meetsRequirement(i.req, ctx)).map((i) => i.id);
+  return CATALOG[kind].filter((i) => meetsRequirement(i.req, ctx, choiceKey({ kind, id: i.id }))).map((i) => i.id);
 }
 
 /** Everything that became available between two progression states. */
@@ -366,7 +484,9 @@ export function newlyUnlocked(before: UnlockContext, after: UnlockContext): Unlo
   const out: UnlockRef[] = [];
   for (const kind of Object.keys(CATALOG) as UnlockKind[]) {
     for (const item of CATALOG[kind]) {
-      if (!meetsRequirement(item.req, before) && meetsRequirement(item.req, after)) out.push({ kind, id: item.id });
+      const key = choiceKey({ kind, id: item.id });
+      if (!meetsRequirement(item.req, before, key) && meetsRequirement(item.req, after, key))
+        out.push({ kind, id: item.id });
     }
   }
   return out;
@@ -381,6 +501,35 @@ export function upcomingUnlocks(level: number, limit = 3): (UnlockRef & { level:
     }
   }
   return out.sort((a, b) => a.level - b.level).slice(0, limit);
+}
+
+/** A level milestone's reward: every CHOICE_EVERY levels, one of two (LEVEL_CHOICES). */
+export const CHOICE_EVERY = 5;
+
+/**
+ * The milestones, from the catalogue's `choice` items: at each, two of one kind. Picking one at a milestone leaves the
+ * other to pick at a later one, so nothing is lost for good — a pick is a matter of when, and two players at the same
+ * level look different.
+ */
+export const LEVEL_CHOICES: { level: number; options: UnlockRef[] }[] = (() => {
+  const by = new Map<number, UnlockRef[]>();
+  for (const kind of Object.keys(CATALOG) as UnlockKind[])
+    for (const item of CATALOG[kind])
+      if ('choice' in item.req) by.set(item.req.choice, [...(by.get(item.req.choice) ?? []), { kind, id: item.id }]);
+  return [...by].sort(([a], [b]) => a - b).map(([level, options]) => ({ level, options }));
+})();
+
+/** One milestone's picks: its own two, and those left unpicked at the milestones already decided before it. */
+export function choiceOffers(
+  level: number,
+  picks: ReadonlyMap<number, string>,
+): { options: UnlockRef[]; earlier: UnlockRef[] } {
+  const taken = new Set(picks.values());
+  const options = LEVEL_CHOICES.find((c) => c.level === level)?.options ?? [];
+  const earlier = LEVEL_CHOICES.filter((c) => c.level < level && picks.has(c.level)).flatMap((c) =>
+    c.options.filter((o) => !taken.has(choiceKey(o))),
+  );
+  return { options: options.filter((o) => !taken.has(choiceKey(o))), earlier };
 }
 
 export const avatarEmoji = (id: string) => AVATARS.find((a) => a.id === id)?.emoji ?? '🦊';

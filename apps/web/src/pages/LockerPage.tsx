@@ -3,6 +3,8 @@ import {
   ACHIEVEMENTS,
   AVATARS,
   CATEGORIES,
+  CHOICE_EVERY,
+  choiceKey,
   EMOTES,
   FRAMES,
   type Loadout,
@@ -15,6 +17,7 @@ import {
   TITLES,
   type TitleDef,
   titleName,
+  type UnlockKind,
   xpToReach,
 } from '@quiz/shared';
 import clsx from 'clsx';
@@ -25,6 +28,7 @@ import { Avatar, LevelBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
 import { KeyHint, POWERUP_KEYS } from '../components/game/Powerups';
+import { itemName, LevelChoice } from '../components/LevelChoice';
 import { Card, Modal, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
@@ -39,7 +43,8 @@ export function LockerPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const ctx = unlockContextOf(me);
   const level = ctx.level;
-  const unlocked = (req: Requirement) => meetsRequirement(req, ctx);
+  const unlocked = (kind: UnlockKind, item: { id: string; req: Requirement }) =>
+    meetsRequirement(item.req, ctx, choiceKey({ kind, id: item.id }));
   const wide = useMediaQuery('(min-width: 1024px)');
 
   async function equip(patch: Partial<Loadout>) {
@@ -59,10 +64,10 @@ export function LockerPage() {
 
   // Козове aren't collected: everyone has them all, so their tab has no count.
   const counts: Record<Exclude<Tab, 'powerup'>, [number, number]> = {
-    avatar: [AVATARS.filter((a) => unlocked(a.req)).length, AVATARS.length],
-    frame: [FRAMES.filter((a) => unlocked(a.req)).length, FRAMES.length],
-    title: [TITLES.filter((a) => unlocked(a.req)).length, TITLES.length],
-    emote: [EMOTES.filter((a) => unlocked(a.req)).length, EMOTES.length],
+    avatar: [AVATARS.filter((a) => unlocked('avatar', a)).length, AVATARS.length],
+    frame: [FRAMES.filter((a) => unlocked('frame', a)).length, FRAMES.length],
+    title: [TITLES.filter((a) => unlocked('title', a)).length, TITLES.length],
+    emote: [EMOTES.filter((a) => unlocked('emote', a)).length, EMOTES.length],
   };
   const label = (t: Exclude<Tab, 'powerup'>, name: string) => (
     <>
@@ -100,6 +105,7 @@ export function LockerPage() {
         </Card>
 
         <div className="min-w-0 space-y-5">
+          {me.choices.length > 0 && <ChoicesWaiting key={me.choices[0].level} />}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="t-section">Колекция</h2>
             <Segmented
@@ -123,7 +129,7 @@ export function LockerPage() {
                   key={a.id}
                   name={a.name}
                   req={a.req}
-                  unlocked={unlocked(a.req)}
+                  unlocked={unlocked('avatar', a)}
                   equipped={me.avatar === a.id}
                   saving={saving === a.id}
                   onEquip={() => equip({ avatar: a.id })}
@@ -140,7 +146,7 @@ export function LockerPage() {
                   key={f.id}
                   name={f.name}
                   req={f.req}
-                  unlocked={unlocked(f.req)}
+                  unlocked={unlocked('frame', f)}
                   equipped={me.frame === f.id}
                   saving={saving === f.id}
                   onEquip={() => equip({ frame: f.id })}
@@ -157,7 +163,7 @@ export function LockerPage() {
                   <TitleButton
                     key={t.id}
                     title={t}
-                    open={unlocked(t.req)}
+                    open={unlocked('title', t)}
                     equipped={me.title === t.id}
                     onEquip={() => equip({ title: t.id })}
                   />
@@ -169,8 +175,8 @@ export function LockerPage() {
                   Майсторство
                 </h2>
                 <p className="mt-1 max-w-2xl text-sm text-fg-3">
-                  Степен във всяка категория според това колко добре я знаеш спрямо останалите играчи (след поне 30
-                  отговора в нея). Веднъж стигната, остава твоя.
+                  Степен във всяка категория според това колко добре я знаеш спрямо останалите играчи (след поне{' '}
+                  {MASTERY.minAnswers} отговора в нея). Веднъж стигната, остава твоя.
                 </p>
                 <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
                   {CATEGORIES.map((c) => (
@@ -187,7 +193,7 @@ export function LockerPage() {
                               title={t}
                               label={tier.name}
                               icon={tier.icon}
-                              open={unlocked(t.req)}
+                              open={unlocked('title', t)}
                               equipped={me.title === t.id}
                               onEquip={() => equip({ title: t.id })}
                               compact
@@ -208,7 +214,7 @@ export function LockerPage() {
               </p>
               <Grid>
                 {EMOTES.map((e) => (
-                  <Item key={e.id} name="" req={e.req} unlocked={unlocked(e.req)}>
+                  <Item key={e.id} name="" req={e.req} unlocked={unlocked('emote', e)}>
                     <Emoji e={e.emoji} size="3rem" />
                   </Item>
                 ))}
@@ -454,5 +460,33 @@ function TitleButton({
       </button>
       {locked}
     </>
+  );
+}
+
+/**
+ * The level milestones reached and not yet decided (every fifth level: one of two), the lowest first: picked, the next
+ * one comes up.
+ */
+function ChoicesWaiting() {
+  const choices = useStore((s) => s.me!.choices);
+  const [first] = choices;
+  return (
+    <Card className="relative overflow-hidden p-5 sm:p-6">
+      <div className="absolute -top-16 -right-12 size-48 rounded-full glow text-amber-400/20" />
+      <h2 className="relative t-card">
+        <Emoji e="🎁" /> Ниво {first.level}: избери награда
+      </h2>
+      <p className="relative mt-1 text-sm text-fg-2">
+        На всеки {CHOICE_EVERY} нива — едно от две.
+        {choices.length === 2 && ` Чака още едно: на ниво ${choices[1].level}.`}
+        {choices.length > 2 && ` Чакат още ${choices.length - 1}: следващото е на ниво ${choices[1].level}.`}
+      </p>
+      {/* Picked, the next one takes its place at once: the toast says what was taken. */}
+      <LevelChoice
+        choice={first}
+        onPicked={(item) => toast({ kind: 'success', title: `Взе „${itemName(item)}“` })}
+        className="relative mt-4 max-w-md"
+      />
+    </Card>
   );
 }

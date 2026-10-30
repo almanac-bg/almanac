@@ -14,6 +14,7 @@ import {
 import { settleAchievements } from './achievements';
 import { factCount, reviewQueue } from './almanac';
 import { verifyPassword } from './auth';
+import { pendingChoices, picksOf } from './choices';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
 import { all, one, run, tx } from './db';
@@ -38,6 +39,7 @@ export function unlockContext(userId: number): UnlockContext {
     seasonTier: bestSeasonTier(userId),
     mastery: Object.fromEntries(earnedMastery(userId).map((m) => [m.category, m.tier])),
     eveningChampion: isChampion(userId),
+    chosen: new Set(picksOf(userId).values()),
   };
 }
 
@@ -89,6 +91,7 @@ export function getMe(userId: number): MeUser | null {
   settleIfDue(before);
   const row = getUser(userId)!;
   const today = dayKey();
+  const picks = picksOf(userId);
   return {
     ...toPublicUser(row),
     createdAt: row.created_at,
@@ -127,6 +130,8 @@ export function getMe(userId: number): MeUser | null {
     almanac: { facts: factCount(userId), due: reviewQueue(userId).due },
     groups: groupIdsOf(userId).length,
     eveningChampion: isChampion(userId),
+    chosen: [...picks.values()],
+    choices: pendingChoices(userId, levelFromXp(row.xp), picks),
   };
 }
 
@@ -182,7 +187,10 @@ export function exportAccount(userId: number) {
     learned: rows('SELECT question_id, learned_at FROM learned WHERE user_id = ? ORDER BY learned_at'),
     reviewQueue: rows('SELECT question_id, step, due_at FROM review_queue WHERE user_id = ? ORDER BY due_at'),
     mastery: rows('SELECT category, tier, earned_at FROM mastery WHERE user_id = ?'),
-    eveningResults: rows('SELECT day, placement, score, players FROM evening_results WHERE user_id = ? ORDER BY day'),
+    eveningResults: rows(
+      'SELECT day, placement, score, players, people FROM evening_results WHERE user_id = ? ORDER BY day',
+    ),
+    levelChoices: rows('SELECT level, kind, item_id, chosen_at FROM level_choices WHERE user_id = ? ORDER BY level'),
     groups: rows(
       `SELECT g.name, g.owner_id = m.user_id AS owner, m.joined_at FROM group_members m
        JOIN player_groups g ON g.id = m.group_id WHERE m.user_id = ?`,

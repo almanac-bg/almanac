@@ -5,11 +5,14 @@ import path from 'node:path';
 import { test } from 'node:test';
 import {
   answerPoints,
+  CHOICE_EVERY,
+  choiceOffers,
   closeness,
   dayEndsAt,
   dayKey,
   eliminationSchedule,
   knockoutsAfter,
+  LEVEL_CHOICES,
   levelFromXp,
   levelProgress,
   meetsRequirement,
@@ -125,6 +128,26 @@ test('days and seasons follow Sofia time, across DST changes', () => {
   assert.equal(seasonTitle('2026-10'), 'Октомври 2026');
 });
 
+test('every fifth level a pick of two; what was left can be picked at a later milestone, never the same twice', () => {
+  assert.deepEqual(
+    LEVEL_CHOICES.map((c) => c.level),
+    Array.from({ length: 20 }, (_, i) => (i + 1) * CHOICE_EVERY),
+  );
+  for (const c of LEVEL_CHOICES) {
+    assert.equal(c.options.length, 2, `level ${c.level}`);
+    assert.equal(c.options[0].kind, c.options[1].kind, `level ${c.level}: two of a kind`);
+  }
+  const none = new Map<number, string>();
+  assert.deepEqual(choiceOffers(5, none), { options: LEVEL_CHOICES[0].options, earlier: [] });
+  // Undecided at 5: its two wait for it, not for 10.
+  assert.deepEqual(choiceOffers(10, none).earlier, []);
+  const picks = new Map([[5, 'avatar:otter']]);
+  assert.deepEqual(choiceOffers(10, picks).earlier, [{ kind: 'avatar', id: 'hedgehog' }]);
+  // Taken at 10 instead of a frame: the hedgehog is gone from 15 on, and both of 10's frames wait there.
+  picks.set(10, 'avatar:hedgehog');
+  assert.deepEqual(choiceOffers(15, picks).earlier, LEVEL_CHOICES[1].options);
+});
+
 test('unlock requirements', () => {
   const ctx = {
     level: 10,
@@ -132,8 +155,13 @@ test('unlock requirements', () => {
     seasonTier: 2,
     mastery: { history: 1 },
     eveningChampion: false,
+    chosen: new Set(['avatar:otter']),
   };
   assert.ok(meetsRequirement({ level: 10 }, ctx));
+  // A milestone's reward is the one picked, whatever the level.
+  assert.ok(meetsRequirement({ choice: 5 }, ctx, 'avatar:otter'));
+  assert.ok(!meetsRequirement({ choice: 5 }, ctx, 'avatar:hedgehog'));
+  assert.ok(!meetsRequirement({ choice: 5 }, ctx), 'not without saying which');
   assert.ok(!meetsRequirement({ level: 11 }, ctx));
   assert.ok(meetsRequirement({ achievement: 'royale_win' }, ctx));
   assert.ok(meetsRequirement({ season: 'gold' }, ctx));
@@ -144,8 +172,15 @@ test('unlock requirements', () => {
   assert.ok(!meetsRequirement({ mastery: { category: 'history', tier: 2 } }, ctx));
   assert.ok(!meetsRequirement({ mastery: { category: 'music', tier: 0 } }, ctx));
   const gained = newlyUnlocked(
-    { level: 2, achievements: new Set(), seasonTier: -1, mastery: {}, eveningChampion: false },
-    { level: 3, achievements: new Set(), seasonTier: 1, mastery: { sports: 0 }, eveningChampion: true },
+    { level: 2, achievements: new Set(), seasonTier: -1, mastery: {}, eveningChampion: false, chosen: new Set() },
+    {
+      level: 3,
+      achievements: new Set(),
+      seasonTier: 1,
+      mastery: { sports: 0 },
+      eveningChampion: true,
+      chosen: new Set(),
+    },
   );
   assert.ok(
     gained.some((u) => u.kind === 'avatar' && u.id === 'tiger'),

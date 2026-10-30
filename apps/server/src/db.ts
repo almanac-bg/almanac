@@ -942,6 +942,21 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX player_skill_ranked ON player_skill(category, rating) WHERE answers >= 60;
     `,
   },
+  // v38, the level milestones (choices.ts): the reward each player picked at each (one of two, every 5th level), and
+  // each item once. Older code leaves it alone (and doesn't know those items).
+  {
+    compatible: `
+    CREATE TABLE level_choices (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      level INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      chosen_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, level),
+      UNIQUE (user_id, kind, item_id)
+    ) WITHOUT ROWID;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

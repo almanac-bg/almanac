@@ -47,6 +47,7 @@ import type {
   SiteInfo,
   Submission,
   SubmissionStatus,
+  UnlockRef,
 } from '@quiz/shared';
 import { clientConfig } from './config';
 
@@ -225,6 +226,8 @@ export const api = {
   reloadBank: () => request<{ ok: true }>('POST', '/admin/bank/reload'),
 
   loadout: (patch: Partial<Loadout>) => request<{ user: MeUser }>('PATCH', '/me/loadout', patch),
+  chooseReward: (level: number, item: UnlockRef) =>
+    request<{ user: MeUser }>('POST', '/me/choice', { level, kind: item.kind, id: item.id }),
   achievements: () => request<{ achievements: AchievementProgress[] }>('GET', '/achievements'),
   notifications: () => request<{ notifications: AppNotification[] }>('GET', '/notifications'),
   /** The list was opened: everything in it is seen. */
