@@ -156,6 +156,9 @@ export function exportAccount(userId: number) {
     username_shape: _shape,
     email_key: _alsoDerived,
     reminder_key: _link,
+    // The authenticator app's secret: with it, a stolen session would make its own codes.
+    totp_secret: _second,
+    totp_step: _used,
     ...account
   } = getUser(userId)!;
   const rows = (sql: string) => all<Record<string, unknown>>(sql, userId);

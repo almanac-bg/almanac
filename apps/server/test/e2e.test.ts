@@ -2144,6 +2144,15 @@ test(
       ).status,
       200,
     );
+    // The data export leaves the app's secret out: a stolen session can't make its own codes from it.
+    const exported = (await (
+      await fetch(`${srv.url}/api/account/export`, { headers: { cookie: M.cookie } })
+    ).json()) as {
+      account: { totp_on_at: number | null };
+    };
+    assert.equal(JSON.stringify(exported).includes(secret), false);
+    assert.ok(exported.account.totp_on_at, 'that it is on, though, is theirs to know');
+
     // Who joined the staff, in the log: the command line did it.
     const joined = (await api.get('/api/admin/log', A.cookie)).body.entries.find(
       (e: { action: string; user: { username: string } | null }) =>
