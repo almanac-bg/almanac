@@ -4,8 +4,9 @@
 # states, never secrets: the names in .env without their values, key fingerprints, URLs in cron jobs masked, IP
 # addresses cut to their first two parts. Changes nothing; run as root, on the server or from your machine:
 #   ssh root@<server> 'cd /root/almanac && deploy/audit.sh'
+# Not -e: a check that fails says so in its line, and the rest still run.
 set -u
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 s() { printf '\n== %s\n' "$1"; }
 mask() { sed -E 's/([0-9]{1,3}\.[0-9]{1,3})\.[0-9]{1,3}\.[0-9]{1,3}/\1.x.x/g; s#https?://[^ "]+#<url>#g'; }
 app=$(docker compose ps -q app 2>/dev/null)
