@@ -7,13 +7,16 @@ import { expect, gameMs, playMatch, startAsGuest, startSolo, test } from './supp
  * contrast, landmarks. (e2e/contrast.spec.ts measures every accent itself; this catches what nobody thought to list.)
  */
 async function check(page: Page, screen: string) {
-  // Settled first: text still fading in (the drawn landing's entrance) would read as too faint.
-  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-  const found = violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
-  expect(found, `${screen}: ${found.join('\n')}`).toEqual([]);
+  const scan = async () => {
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+    const { violations } = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    return violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
+  };
+  // Measured again until it holds: text still fading in (the drawn landing's entrance, a question's answers coming in,
+  // slower in a loaded engine) reads as too faint for a moment, while a real problem stays.
+  await expect.poll(scan, { message: screen, timeout: 10_000, intervals: [500, 1_000] }).toEqual([]);
 }
 
 for (const colorScheme of ['dark', 'light'] as const) {

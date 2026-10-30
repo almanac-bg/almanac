@@ -10,7 +10,10 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.goto('/sets');
   await teacher.getByRole('button', { name: 'Нов набор' }).click();
   await expect(teacher).toHaveURL(/\/sets\/\d+$/);
-  await teacher.getByLabel('Име на набора').fill('Урок 5');
+  const setName = teacher.getByLabel('Име на набора');
+  await setName.fill('Урок 5');
+  // Where a lost name would show (WebKit in CI once saved „Нов набор“): kept as typed, and still there at the save.
+  await expect(setName).toHaveValue('Урок 5');
   await teacher.getByRole('button', { name: /^Въпрос 1/ }).click();
   await teacher.getByLabel('Текст на въпрос 1').fill('Коя е столицата на България?');
   for (const [letter, text] of [
@@ -23,6 +26,7 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.getByRole('button', { name: /^Въпрос 2/ }).click();
   await teacher.getByRole('button', { name: 'Вярно/невярно' }).last().click();
   await teacher.getByLabel('Текст на въпрос 2').fill('Дунав се влива в Черно море.');
+  await expect(setName).toHaveValue('Урок 5');
   await teacher.getByRole('button', { name: 'Запази' }).click();
   await expect(teacher.getByText('2 от 50 въпроса · запазено')).toBeVisible();
 
