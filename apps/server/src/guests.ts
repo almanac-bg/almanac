@@ -20,13 +20,16 @@ export function createGuest({ room = false } = {}): number {
     if (getUserByName(username)) continue;
     const now = Date.now();
     const { lastInsertRowid } = run(
-      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_guest, room_guest_seen_at)
-       VALUES (?, ?, ?, '', ?, 1, ?)`,
+      // Playing as a guest accepts the terms (each way in says so): terms_at keeps when.
+      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_guest, room_guest_seen_at,
+         terms_at)
+       VALUES (?, ?, ?, '', ?, 1, ?, ?)`,
       username,
       usernameKey(username),
       nameShape(username),
       now,
       room ? now : null,
+      now,
     );
     return Number(lastInsertRowid);
   }

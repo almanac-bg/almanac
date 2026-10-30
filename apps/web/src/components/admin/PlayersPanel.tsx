@@ -156,6 +156,16 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
               {user.lastSeenAt && ` · последно ${timeAgo(user.lastSeenAt)}`} · {card.gamesPlayed} мача ·{' '}
               {user.hasEmail ? 'с имейл' : 'без имейл'}
             </p>
+            {card.bannedBefore && (
+              <p className="mt-1 text-xs font-semibold text-rose-300">
+                Изтрит профил с този имейл беше спрян
+                {card.bannedBefore.until
+                  ? ` (${card.bannedBefore.until >= 8e15 ? 'завинаги' : `до ${longDate(card.bannedBefore.until)}`})`
+                  : ''}
+                {card.bannedBefore.basis ? ` · ${basisLabel(card.bannedBefore.basis)}` : ''} — изтрит{' '}
+                {timeAgo(card.bannedBefore.erasedAt)}
+              </p>
+            )}
             {card.staff && (
               <p className="mt-1 text-xs font-semibold text-emerald-300">
                 {card.staff === 'owner' ? 'Собственик' : 'Модератор'} — решенията за този профил са на собственика

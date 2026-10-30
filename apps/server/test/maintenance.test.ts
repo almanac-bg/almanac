@@ -12,7 +12,7 @@ process.env.DB_PATH = path.join(tmp, 'maintenance.db');
 process.env.BACKUP_KEEP_DAYS = '3';
 process.env.MAIL_OUTBOX = path.join(tmp, 'outbox');
 const { DatabaseSync } = await import('node:sqlite');
-const { one, run } = await import('../src/db');
+const { all, one, run } = await import('../src/db');
 const { createSession } = await import('../src/auth');
 const { INACTIVE_MS, INACTIVE_WARNING_MS, purgeExpired, retireInactiveAccounts, snapshot } = await import(
   '../src/maintenance'
@@ -126,6 +126,47 @@ test('an account unused for three years gets an email a month before it is delet
   assert.equal(getUser(10), undefined, 'deleted a month after the warning');
   assert.ok(getUser(12), 'kept: in use again');
   assert.ok(getUser(14));
+});
+
+test('a deleted account leaves no name: not in others’ matches, not where its recording played; a banned one leaves a hash of its e-mail for a year', async () => {
+  const { bannedBefore, eraseAccount } = await import('../src/account');
+  const { DELETED_NAME } = await import('../src/users');
+  const now = Date.now();
+  run(
+    `INSERT INTO users (id, username, username_key, password_hash, created_at, email, email_key, banned_until, ban_basis)
+     VALUES (30, 'zapisan', 'zapisan', 'x', 0, 'Zap@Example.test', 'zap@example.test', ?, 'cheating'),
+            (31, 'drug', 'drug', 'x', 0, NULL, NULL, NULL, NULL)`,
+    now + DAY,
+  );
+  run(
+    "INSERT INTO matches (id, mode, ranked, player_count, started_at, ended_at, question_count) VALUES ('rec', 'duel', 1, 2, 0, 0, 10)",
+  );
+  run(
+    `INSERT INTO match_players (match_id, player_id, user_id, record_owner_id, name, avatar, is_bot, placement, score,
+       correct, faced, best_streak, left_match, won)
+     VALUES ('rec', 'r9', NULL, 30, 'zapisan', 'fox', 1, 2, 10, 1, 10, 1, 0, 0),
+            ('rec', 'u31', 31, NULL, 'drug', 'fox', 0, 1, 20, 2, 10, 2, 0, 1)`,
+  );
+  eraseAccount(30);
+  assert.deepEqual(
+    all<object>(
+      "SELECT player_id, name, record_owner_id FROM match_players WHERE match_id = 'rec' ORDER BY player_id",
+    ).map((r) => ({ ...r })),
+    [
+      { player_id: 'r9', name: DELETED_NAME, record_owner_id: null },
+      { player_id: 'u31', name: 'drug', record_owner_id: null },
+    ],
+  );
+  const kept = bannedBefore('zap@EXAMPLE.test ');
+  assert.equal(kept?.basis, 'cheating', 'the same address, however written');
+  assert.equal(bannedBefore('other@example.test'), null);
+  assert.equal(
+    JSON.stringify(all('SELECT * FROM erased_bans')).includes('example'),
+    false,
+    'a keyed hash, not the address',
+  );
+  purgeExpired(now + 366 * DAY);
+  assert.equal(bannedBefore('zap@example.test'), null, 'gone after a year');
 });
 
 test('moderators get one email a day about what waits, from 09:00, and an alert at most once a day per thing', async () => {

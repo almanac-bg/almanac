@@ -120,12 +120,14 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
     for (const s of standings) {
       const p = game.participants.get(s.id)!;
       run(
-        `INSERT INTO match_players (match_id, player_id, user_id, name, avatar, is_bot, placement, score, correct,
-           faced, best_streak, eliminated_at, left_match, rating_delta, team, won)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        `INSERT INTO match_players (match_id, player_id, user_id, record_owner_id, name, avatar, is_bot, placement, score,
+           correct, faced, best_streak, eliminated_at, left_match, rating_delta, team, won)
+         VALUES (?, ?, ?, (SELECT user_id FROM runs WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         game.id,
         s.id,
         p.player.userId,
+        // A recording's owner (its row has no account of its own): their name goes from here with their account.
+        p.player.record ? Number(s.id.slice(1)) : null,
         p.player.name,
         p.player.avatar,
         // A recording is no person in the match either (its owner played it before).

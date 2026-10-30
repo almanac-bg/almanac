@@ -34,6 +34,10 @@ export interface UserRow {
   totp_on_at: number | null;
   /** The last code's step: a code works once. */
   totp_step: number | null;
+  /** When the opt-in mails were turned on (consent that can be shown), and when the terms were accepted. */
+  reminders_on_at: number | null;
+  beaten_mails_on_at: number | null;
+  terms_at: number | null;
   daily_streak: number;
   best_daily_streak: number;
   last_daily_day: string | null;

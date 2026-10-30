@@ -1,10 +1,12 @@
 import { ApiError, configureClient, type Effect, setState } from '@quiz/client';
+import { dayKey } from '@quiz/shared';
 import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PICTURE_SIZES } from './components/game/QuestionPicture';
+import { dropOldShares } from './lib/device';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
@@ -93,6 +95,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 if (paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1')
   setState({ authChecked: true, me: null });
 upgradeReturning();
+dropOldShares(dayKey());
 
 const container = document.getElementById('root')!;
 const app = (

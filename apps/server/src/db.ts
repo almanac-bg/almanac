@@ -884,6 +884,29 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX question_sets_hidden ON question_sets(id) WHERE hidden = 1;
     `,
   },
+  // v33, privacy: a recording's row in someone's match keeps its owner (`record_owner_id`), so deleting the account
+  // takes the name out of other players' histories too (it stayed there, under no account); filled in for every
+  // recording whose run is still there. When a player turned the opt-in mails on, and when they accepted the terms
+  // (`*_on_at`, `terms_at`): consent that can be shown. A banned account deleted leaves only a keyed hash of its e-mail
+  // and the ban, for 12 months (`erased_bans`, account.ts): starting over with the same address shows on the new card.
+  {
+    compatible: `
+    ALTER TABLE match_players ADD COLUMN record_owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    UPDATE match_players SET record_owner_id = (SELECT r.user_id FROM runs r WHERE 'r' || r.id = match_players.player_id)
+    WHERE user_id IS NULL AND player_id LIKE 'r%';
+    CREATE INDEX match_players_record_owner ON match_players(record_owner_id) WHERE record_owner_id IS NOT NULL;
+    ALTER TABLE users ADD COLUMN reminders_on_at INTEGER;
+    ALTER TABLE users ADD COLUMN beaten_mails_on_at INTEGER;
+    ALTER TABLE users ADD COLUMN terms_at INTEGER;
+    CREATE TABLE erased_bans (
+      email_hash TEXT PRIMARY KEY,
+      basis TEXT,
+      banned_until INTEGER,
+      erased_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE INDEX erased_bans_age ON erased_bans(erased_at);
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

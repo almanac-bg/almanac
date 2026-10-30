@@ -23,14 +23,15 @@ import {
   VolumeX,
   XCircle,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { BlockedSettings } from '../components/BlockedSettings';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
 import { PasswordField } from '../components/PasswordField';
 import { PushSettings } from '../components/PushSettings';
-import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, Spinner, SwitchTrack } from '../components/ui';
+import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, SwitchTrack } from '../components/ui';
+import { forgetThisDevice } from '../lib/device';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 import { setTheme, useThemeChoice } from '../lib/theme';
@@ -105,18 +106,21 @@ export function ResetPasswordPage() {
 
 // ─── /verify-email?token=… ───────────────────────────────────────────────────
 
+/**
+ * The link from the verification mail. It waits for a press, as the unsubscribe page does: mail scanners open links
+ * (some run the page's scripts too), and one that confirmed on opening would let anyone confirm a stranger's address.
+ */
 export function VerifyEmailPage() {
   usePageTitle('Потвърждение на имейла');
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const signedIn = useStore((s) => !!s.me);
-  const [state, setLocal] = useState<'working' | 'done' | { error: string }>('working');
-  const started = useRef(false);
+  const [state, setLocal] = useState<'ready' | 'working' | 'done' | { error: string }>(() =>
+    token ? 'ready' : { error: 'Линкът е непълен. Отвори го отново от писмото.' },
+  );
 
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    if (!token) return setLocal({ error: 'Линкът е непълен. Отвори го отново от писмото.' });
+  function confirm() {
+    setLocal('working');
     api
       .verifyEmail(token)
       .then(() => {
@@ -124,14 +128,20 @@ export function VerifyEmailPage() {
         void refreshMe();
       })
       .catch((err) => setLocal({ error: errorMessage(err) }));
-  }, [token]);
+  }
 
   return (
     <EmailLinkPage>
-      {state === 'working' ? (
-        <div className="grid place-items-center gap-3 py-6 text-fg-2">
-          <Spinner className="size-8 text-violet-400" />
-          Потвърждаваме имейла…
+      {state === 'ready' || state === 'working' ? (
+        <div className="text-center">
+          <MailCheck className="mx-auto size-12 text-violet-300" />
+          <h1 className="mt-3 t-section">Потвърди имейла си</h1>
+          <p className="mt-2 text-sm text-fg-2">
+            С потвърден имейл можеш да възстановиш паролата си и да получаваш писмата, които включиш.
+          </p>
+          <Button size="lg" className="mt-6 w-full" loading={state === 'working'} onClick={confirm}>
+            Потвърди имейла
+          </Button>
         </div>
       ) : state === 'done' ? (
         <div className="text-center">
@@ -222,6 +232,7 @@ function LogoutButton() {
 
   async function logout() {
     setBusy(true);
+    await forgetThisDevice({ server: true });
     await api.logout().catch(() => {});
     // Next time the sign-in page opens on "Вход" — unless this was a guest, who has nothing to sign in with.
     if (!me.isGuest) markReturning();
@@ -643,6 +654,7 @@ function DataSettings() {
     try {
       // A guest has no password: being signed in on this device is the proof.
       await api.deleteAccount(guest ? '' : password);
+      await forgetThisDevice({ server: false });
       clearSession();
       navigate('/', { replace: true });
       toast({ kind: 'info', title: 'Профилът е изтрит. Довиждане!' });

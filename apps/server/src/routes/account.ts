@@ -190,9 +190,13 @@ accountRouter.post('/account/reminders', requireAuth, requireAccount, (req, res)
     return;
   }
   run(
-    'UPDATE users SET streak_reminders = ?, reminder_key = COALESCE(reminder_key, ?) WHERE id = ?',
+    // When it was turned on: consent that can be shown (GDPR Art. 7(1)).
+    `UPDATE users SET streak_reminders = ?, reminder_key = COALESCE(reminder_key, ?),
+     reminders_on_at = CASE WHEN ? THEN ? ELSE NULL END WHERE id = ?`,
     body.on ? 1 : 0,
     randomBytes(16).toString('base64url'),
+    body.on ? 1 : 0,
+    Date.now(),
     res.locals.userId,
   );
   res.json({ user: getMe(res.locals.userId) });
@@ -207,9 +211,12 @@ accountRouter.post('/account/beaten-mails', requireAuth, requireAccount, (req, r
     return;
   }
   run(
-    'UPDATE users SET beaten_mails = ?, reminder_key = COALESCE(reminder_key, ?) WHERE id = ?',
+    `UPDATE users SET beaten_mails = ?, reminder_key = COALESCE(reminder_key, ?),
+     beaten_mails_on_at = CASE WHEN ? THEN ? ELSE NULL END WHERE id = ?`,
     body.on ? 1 : 0,
     randomBytes(16).toString('base64url'),
+    body.on ? 1 : 0,
+    Date.now(),
     res.locals.userId,
   );
   res.json({ user: getMe(res.locals.userId) });

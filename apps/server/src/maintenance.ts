@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
-import { eraseAccount } from './account';
+import { ERASED_BAN_MS, eraseAccount } from './account';
 import { moderatorDigest } from './alerts';
 import { pruneAnswers } from './answers';
 import { purgeOldChallenges, tellExpiredDuels } from './challenges';
@@ -55,6 +55,7 @@ export function purgeExpired(now = Date.now()) {
   run('DELETE FROM notifications WHERE created_at < ?', now - NOTIFICATION_MAX_AGE_MS);
   purgeOldChallenges(now);
   pruneRecordPlays(now);
+  run('DELETE FROM erased_bans WHERE erased_at < ?', now - ERASED_BAN_MS);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -950,6 +950,8 @@ export interface PlayerCard {
   user: PublicUser & { isGuest: boolean; createdAt: number; lastSeenAt: number | null; hasEmail: boolean };
   /** Staff: decisions about them are the owner's. */
   staff: 'owner' | 'moderator' | null;
+  /** A deleted account with this verified e-mail was banned (in the last 12 months): the same person starting over. */
+  bannedBefore: { basis: ModerationBasis | null; until: number | null; erasedAt: number } | null;
   ban: { until: number; basis: ModerationBasis | null; reason: string | null } | null;
   gamesPlayed: number;
   reports: { open: number; resolved: number; filed: number };
@@ -1161,6 +1163,9 @@ export interface SiteInfo {
   questions: number;
   /** The year in the footer's ©: the server's, as it drew its pages (a browser's own could be a year on, and differ). */
   year: number;
+  /** Error reports go to a provider (Sentry), and web push is on: the privacy policy names them only then. */
+  monitoring: boolean;
+  push: boolean;
 }
 
 // ─── „Моят алманах“ ──────────────────────────────────────────────────────────

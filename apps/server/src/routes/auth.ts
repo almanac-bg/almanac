@@ -103,8 +103,9 @@ authRouter.post('/auth/register', async (req, res) => {
   let userId: number;
   try {
     const { lastInsertRowid } = run(
-      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_admin, staff_role)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      // terms_at: signing up accepts the terms (the form says so), and when is kept.
+      `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_admin, staff_role, terms_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       creds.username,
       usernameKey(creds.username),
       nameShape(creds.username),
@@ -112,6 +113,7 @@ authRouter.post('/auth/register', async (req, res) => {
       Date.now(),
       firstUser ? 1 : 0,
       firstUser ? 'owner' : null,
+      Date.now(),
     );
     userId = Number(lastInsertRowid);
   } catch (err) {

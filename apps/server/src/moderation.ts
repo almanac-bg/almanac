@@ -15,6 +15,7 @@ import {
   type ReportSubjectKind,
   seasonKey,
 } from '@quiz/shared';
+import { bannedBefore } from './account';
 import { alertModerators } from './alerts';
 import { config } from './config';
 import { all, one, run, tx } from './db';
@@ -811,6 +812,7 @@ export function playerCard(id: number): PlayerCard | null {
       hasEmail: !!u.email,
     },
     staff: isAdmin(u) ? (u.staff_role ?? 'moderator') : null,
+    bannedBefore: bannedBefore(u.email),
     ban: banned
       ? { until: u.banned_until!, basis: (u.ban_basis as ModerationBasis | null) ?? null, reason: u.ban_reason }
       : null,

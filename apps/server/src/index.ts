@@ -133,10 +133,15 @@ app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction)
   res.status(500).json({ error: 'Нещо се обърка. Опитай пак.' });
 });
 
+/**
+ * When security.txt stops being vouched for: a date someone renews on purpose, after checking the contacts still
+ * reach a person (an expiry always a year away said nothing). A test fails a month before it.
+ */
+const SECURITY_TXT_EXPIRES = '2027-07-01T00:00:00.000Z';
+
 // RFC 9116: where to report a security problem (the repository's SECURITY.md says how it's handled).
 app.get('/.well-known/security.txt', (_req, res) => {
-  // Valid for a year from now: the standard wants an expiry, and this file is never stale.
-  const expires = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
+  const expires = SECURITY_TXT_EXPIRES;
   const lines = [
     // The contact address (it reaches the operator), and GitHub's private vulnerability reports.
     `Contact: mailto:${config.operator.email}`,

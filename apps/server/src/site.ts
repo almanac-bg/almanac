@@ -15,4 +15,6 @@ export const siteInfo: SiteInfo = {
   questions:
     Math.floor((questionBank().length + imageBank().length + numberBank().length + orderBank().length) / 100) * 100,
   year: new Date().getFullYear(),
+  monitoring: !!config.sentryDsn,
+  push: !!config.vapid,
 };

@@ -15,7 +15,7 @@ import { usePageTitle } from '../lib/title';
  * that mustn't switch anyone's reminders off. The button does it (mail apps' one-click unsubscribe calls the API directly).
  */
 export function UnsubscribePage() {
-  usePageTitle('Напомняния за серията');
+  usePageTitle('Писма по желание');
   const [params] = useSearchParams();
   const u = params.get('u') ?? '';
   const k = params.get('k') ?? '';

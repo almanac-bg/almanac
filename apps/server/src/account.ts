@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import {
   ACHIEVEMENTS,
   dayKey,
@@ -6,6 +6,7 @@ import {
   type Loadout,
   levelFromXp,
   type MeUser,
+  type ModerationBasis,
   newlyUnlocked,
   seasonKey,
   type UnlockContext,
@@ -27,7 +28,8 @@ import { reloadQuestionBank } from './questions';
 import { questsInfo } from './quests';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
 import { pictureUrl } from './sets';
-import { achievementSet, DELETED_NAME, getUser, isAdmin, toPublicUser, type UserRow } from './users';
+import { installationSecret } from './settings';
+import { achievementSet, DELETED_NAME, emailKey, getUser, isAdmin, toPublicUser, type UserRow } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
   return {
@@ -265,11 +267,54 @@ export async function deleteAccount(
 }
 
 /** Removes an account for good (see deleteAccount); also used for guest accounts nobody can sign in to any more. */
+/** A keyed hash of an e-mail address: matches the same address again, and says nothing about it otherwise. */
+const emailHash = (email: string) =>
+  createHmac('sha256', installationSecret('erased-bans')).update(emailKey(email)).digest('base64url');
+
+/** How long a deleted account's ban is remembered (the privacy policy says so). */
+export const ERASED_BAN_MS = 365 * 24 * 60 * 60_000;
+
+/**
+ * A deleted account that was banned (now, or any time in the log) with an e-mail: a new account with that address is
+ * the same person starting over, and repeat offences weigh more (Terms §3). Shown on the new account's card only.
+ */
+export function bannedBefore(
+  email: string | null,
+): { basis: ModerationBasis | null; until: number | null; erasedAt: number } | null {
+  if (!email) return null;
+  const r = one<{ basis: string | null; banned_until: number | null; erased_at: number }>(
+    'SELECT basis, banned_until, erased_at FROM erased_bans WHERE email_hash = ? AND erased_at > ?',
+    emailHash(email),
+    Date.now() - ERASED_BAN_MS,
+  );
+  return r ? { basis: r.basis as ModerationBasis | null, until: r.banned_until, erasedAt: r.erased_at } : null;
+}
+
 export function eraseAccount(userId: number) {
   removeFromPlay(userId);
   tx(() => {
+    const user = getUser(userId);
+    const banned =
+      user?.email &&
+      ((user.banned_until ?? 0) > Date.now() ||
+        one(
+          "SELECT 1 AS x FROM moderation_log WHERE target_user_id = ? AND action = 'ban' AND undone_at IS NULL",
+          userId,
+        ));
+    if (user?.email && banned)
+      run(
+        `INSERT INTO erased_bans (email_hash, basis, banned_until, erased_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (email_hash) DO UPDATE SET basis = excluded.basis, banned_until = excluded.banned_until,
+         erased_at = excluded.erased_at`,
+        emailHash(user.email),
+        user.ban_basis,
+        user.banned_until,
+        Date.now(),
+      );
     const groups = groupIdsOf(userId);
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
+    // Where their recording played someone: the name goes from that history too.
+    run('UPDATE match_players SET record_owner_id = NULL, name = ? WHERE record_owner_id = ?', DELETED_NAME, userId);
     // Reports they filed stay for the record, but their words go with them.
     run('UPDATE reports SET details = NULL WHERE reporter_id = ?', userId);
     // Decisions about them name them (an old name, a reason): they go too. A moderator's own stay, unsigned.

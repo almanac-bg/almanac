@@ -223,6 +223,20 @@ test('the mail provider reports a bounce: no more reminders, and Settings says w
   assert.deepEqual([me.emailBounced, me.streakReminders], [true, false]);
 });
 
+test(
+  'security.txt says where to report a problem, until a date someone renews on purpose (this fails a month before)',
+  T,
+  async () => {
+    const text = await (await fetch(`${srv.url}/.well-known/security.txt`)).text();
+    assert.match(text, /^Contact: mailto:/m);
+    const expires = Date.parse(/^Expires: (.+)$/m.exec(text)![1]);
+    assert.ok(
+      expires > Date.now() + 30 * 24 * 60 * 60_000,
+      'renew SECURITY_TXT_EXPIRES (index.ts), after checking the contacts still reach someone',
+    );
+  },
+);
+
 test('an unknown /api address answers JSON, like the rest of the API', T, async () => {
   const res = await fetch(`${srv.url}/api/no-such-route`);
   assert.equal(res.status, 404);
@@ -1648,6 +1662,17 @@ test("alone in a Дуел, the opponent is a recording of a real player's match 
   assert.ok(
     srv.db.prepare('SELECT 1 FROM record_plays WHERE owner_id = ? AND player_id = ?').get(A.user.id, C.user.id),
     'A hears about it tomorrow',
+  );
+  // The row in C's history knows whose recording it was: A's name goes from it with A's account.
+  assert.deepEqual(
+    {
+      ...(srv.db
+        .prepare(
+          'SELECT record_owner_id AS owner, name FROM match_players WHERE match_id = ? AND user_id IS NULL AND is_bot = 1',
+        )
+        .get(end.gameId) as object),
+    },
+    { owner: A.user.id, name: A.user.username },
   );
   sc.close();
 });

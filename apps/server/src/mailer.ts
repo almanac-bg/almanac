@@ -105,7 +105,8 @@ export function verifyEmailMail(to: string, username: string, link: string): Mai
 /** To the previous address when a profile's email is changed or removed: the owner hears about it. */
 export function emailChangedMail(to: string, username: string, removed: boolean): Mail {
   const what = removed ? 'Имейлът беше премахнат от профила ти' : 'Профилът ти вече използва друг имейл';
-  const advice = `Ако промяната не е от теб, смени паролата си веднага и ни пиши на ${config.operator.email}.`;
+  // If someone else changed both the address and the password, there's no password left to change: we help.
+  const advice = `Ако промяната не е от теб, отговори на това писмо веднага — ще ти помогнем да си върнеш профила.`;
   return {
     kind: 'email-changed',
     to,
@@ -145,7 +146,8 @@ export function inactiveAccountMail(to: string, username: string, deleteOn: numb
     year: 'numeric',
     timeZone: TIME_ZONE,
   }).format(deleteOn);
-  const lead = `Профилът ти в ${BRAND.name} не е използван от три години. За да не пазим данни, които никой не ползва, на ${date} ще го изтрием заедно с нивото, статистиката и всичко изиграно.`;
+  // It goes out a month before the three years are up.
+  const lead = `Профилът ти в ${BRAND.name} не е използван от почти три години. За да не пазим данни, които никой не ползва, на ${date} ще го изтрием заедно с нивото, статистиката и всичко изиграно.`;
   const keep = 'Искаш да го запазиш? Просто влез в профила си дотогава — нищо друго не е нужно.';
   return {
     kind: 'inactive',
@@ -169,7 +171,8 @@ export function streakReminderMail(
 ): Mail {
   const lead = `Серията ти от ${streak} дни на „Въпросите на деня“ прекъсва в полунощ.`;
   const shield = shields > 0 ? ' Имаш и щит за серията, но защо да го хабиш?' : '';
-  const stop = 'Не искаш тези писма?';
+  // Why this arrives: trust, and fewer spam marks.
+  const stop = `Получаваш това писмо, защото напомнянията са включени в профила ти „${username}“. Не ги искаш?`;
   return {
     kind: 'streak',
     to,
@@ -199,7 +202,7 @@ export function beatenMail(
 ): Mail {
   const lead = `${beaten.rival} изигра предизвикателството ти и събра ${beaten.score} точки — вече си на ${ordinal(beaten.place)} място.`;
   const next = 'Виж класирането — или направи нов линк и си върни първото място.';
-  const stop = 'Писмото е по желание, най-много едно на ден. Не го искаш?';
+  const stop = `Получаваш това писмо, защото го включи в профила си „${username}“ — най-много едно на ден. Не го искаш?`;
   return {
     kind: 'beaten',
     to,
