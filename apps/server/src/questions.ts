@@ -185,6 +185,61 @@ let images: Question[] | null = null;
 let numbers: NumberQuestion[] | null = null;
 let orders: OrderQuestion[] | null = null;
 let playable: Map<string, PlayableQuestion> | null = null;
+/** Each question's giveaways both ways (findConflicts): a match never deals two that clash. */
+let conflicts = new Map<string, Set<string>>();
+
+/** An answer named in more questions than this is common knowledge (a country, a big city), not a giveaway. */
+const COMMON_ANSWER = 20;
+const plainWords = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/**
+ * Pairs of questions where one names the other's answer — in its question, its "Знаеше ли?" fact (shown before the next
+ * question), an order item or a picture's description — as whole words. The bank's tools catch the obvious ones when a
+ * question is written; this catches the rest at play time, whatever the tools missed.
+ */
+export function findConflicts(questions: readonly PlayableQuestion[]): Map<string, Set<string>> {
+  const texts = new Map<string, string>();
+  const withWord = new Map<string, string[]>();
+  for (const q of questions) {
+    const parts = [q.q, q.fact ?? ''];
+    if (q.kind === 'order') parts.push(...q.items.map((i) => i.text));
+    else if (q.kind !== 'number' && q.image) parts.push(q.image.alt);
+    const text = ` ${plainWords(parts.join(' '))} `;
+    texts.set(q.id, text);
+    for (const word of new Set(text.split(' '))) if (word) withWord.set(word, [...(withWord.get(word) ?? []), q.id]);
+  }
+  const found = new Map<string, Set<string>>();
+  const link = (a: string, b: string) => {
+    found.set(a, (found.get(a) ?? new Set()).add(b));
+    found.set(b, (found.get(b) ?? new Set()).add(a));
+  };
+  for (const q of questions) {
+    if (q.kind === 'number' || q.kind === 'order') continue;
+    const answer = plainWords(q.options[q.answer]);
+    if (answer.length < 4) continue;
+    // The answer's rarest word narrows the search; the whole answer must then appear as words.
+    const [rarest] = answer
+      .split(' ')
+      .map((w) => withWord.get(w) ?? [])
+      .sort((a, b) => a.length - b.length);
+    const naming = rarest.filter((id) => id !== q.id && texts.get(id)!.includes(` ${answer} `));
+    if (naming.length > COMMON_ANSWER) continue;
+    for (const id of naming) link(q.id, id);
+  }
+  return found;
+}
+
+/** Whether `id` names the answer of any of `chosen` (or the other way round). */
+const clashes = (id: string, chosen: Iterable<string>) => {
+  const others = conflicts.get(id);
+  if (!others) return false;
+  for (const other of chosen) if (others.has(other)) return true;
+  return false;
+};
 
 /** Every question by id, hidden ones included (for moderation and reports). */
 export function questionById(id: string): PlayableQuestion | undefined {
@@ -276,7 +331,7 @@ export const withoutAuthors = (questions: PreparedQuestion[]): PreparedQuestion[
  * hidden ones and those with a picture (imageBank: a match places those itself).
  */
 export function questionBank(): Question[] {
-  if (!bank) ({ everything, bank, images, numbers, orders, playable } = loadBank());
+  if (!bank) ({ everything, bank, images, numbers, orders, playable, conflicts } = loadBank());
   return bank;
 }
 
@@ -309,7 +364,7 @@ export const bankProblem = () => reloadFailure;
  */
 export function reloadQuestionBank() {
   try {
-    ({ everything, bank, images, numbers, orders, playable } = loadBank());
+    ({ everything, bank, images, numbers, orders, playable, conflicts } = loadBank());
     reloadFailure = null;
   } catch (err) {
     reloadFailure = err instanceof Error ? err.message : String(err);
@@ -360,6 +415,7 @@ function loadBank(): {
   numbers: NumberQuestion[];
   orders: OrderQuestion[];
   playable: Map<string, PlayableQuestion>;
+  conflicts: Map<string, Set<string>>;
 } {
   const file = readBankFile();
   const dir = imageDir();
@@ -418,14 +474,8 @@ function loadBank(): {
       '📚 Playing the public sample bank: put the real one in private/questions.json (or set QUESTIONS_PATH).',
     );
   }
-  return {
-    everything,
-    bank,
-    images,
-    numbers,
-    orders,
-    playable: new Map<string, PlayableQuestion>([...bank, ...images, ...numbers, ...orders].map((q) => [q.id, q])),
-  };
+  const playable = new Map<string, PlayableQuestion>([...bank, ...images, ...numbers, ...orders].map((q) => [q.id, q]));
+  return { everything, bank, images, numbers, orders, playable, conflicts: findConflicts([...playable.values()]) };
 }
 
 export type Rng = () => number;
@@ -492,7 +542,8 @@ const RAMP_BLUR = 1.25;
 /**
  * Picks `count` questions: ones none of the players has seen first, then the ones seen longest ago, with a 40/40/20
  * easy/medium/hard mix ordered so the match ramps up. `seen` maps question ids to when any of the players last saw them.
- * `pool`: what to draw from (the bank's questions without a picture; a room of pictures draws from those).
+ * `pool`: what to draw from (the bank's questions without a picture; a room of pictures draws from those). Nothing that
+ * clashes with another pick or with `avoid` (the match's final…): see findConflicts.
  */
 export function pickQuestions(
   count: number,
@@ -500,6 +551,7 @@ export function pickQuestions(
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
   pool: readonly Question[] = questionBank(),
+  avoid: ReadonlySet<string> = new Set(),
 ): Question[] {
   const ofCategory = pool.filter((q) => category === 'mixed' || q.category === category);
   // Shuffled first, so unseen questions (and ones seen in the same match) come in random order; the sort is stable.
@@ -516,6 +568,14 @@ export function pickQuestions(
     for (const q of ordered) {
       if (picked.length >= count) return;
       if (picked.includes(q)) continue;
+      if (
+        clashes(q.id, avoid) ||
+        clashes(
+          q.id,
+          picked.map((p) => p.id),
+        )
+      )
+        continue;
       if (respectQuota && quota[q.difficulty] <= 0) continue;
       if (respectCap && (perCategory.get(q.category) ?? 0) >= perCategoryCap) continue;
       picked.push(q);
@@ -551,7 +611,14 @@ function placeOne(
   if (!free.length) return null;
   for (const gap of [0, 1]) {
     for (const c of candidates) {
-      if (questions.some((q) => q.id === c.id)) continue;
+      if (
+        questions.some((q) => q.id === c.id) ||
+        clashes(
+          c.id,
+          questions.map((q) => q.id),
+        )
+      )
+        continue;
       const fits = free.filter(
         (i) => Math.abs(DIFFICULTY_ORDER[questions[i].difficulty] - DIFFICULTY_ORDER[c.difficulty]) === gap,
       );
@@ -602,10 +669,12 @@ export function pickFinal(
   category: CategoryChoice,
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
-  opts: { not?: readonly CategoryId[]; now?: number } = {},
+  opts: { not?: readonly CategoryId[]; now?: number; avoid?: Iterable<string> } = {},
 ): NumberQuestion | null {
+  const avoid = [...(opts.avoid ?? [])];
   const pool = numberBank().filter(
-    (q) => (category === 'mixed' || q.category === category) && !opts.not?.includes(q.category),
+    (q) =>
+      (category === 'mixed' || q.category === category) && !opts.not?.includes(q.category) && !clashes(q.id, avoid),
   );
   const [first] = leastSeenFirst(pool, seen, rng);
   if (!first) return null;
@@ -629,12 +698,14 @@ export function pickMatch(
   const final = opts.final ? pickFinal(category, seen, rng, { now: opts.now }) : null;
   const body = count - (final ? 1 : 0);
   let questions: PreparedQuestion[];
+  const avoid = new Set(final ? [final.id] : []);
   if (opts.pictures) {
-    const drawn = pickQuestions(body, category, seen, rng, imageBank());
-    const rest = pickQuestions(body - drawn.length, category, seen, rng);
+    const drawn = pickQuestions(body, category, seen, rng, imageBank(), avoid);
+    for (const q of drawn) avoid.add(q.id);
+    const rest = pickQuestions(body - drawn.length, category, seen, rng, questionBank(), avoid);
     questions = [...drawn, ...rest].sort((a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]);
   } else {
-    questions = pickQuestions(body, category, seen, rng);
+    questions = pickQuestions(body, category, seen, rng, questionBank(), avoid);
     placeFormats(questions, category, seen, opts.formats ?? TEXT_ONLY, rng, opts.now ?? Date.now());
   }
   return final ? [...questions, final] : questions;
@@ -663,13 +734,19 @@ function drawFrom(
   round?: { index: number; from: number; formats: Formats; now: number },
 ): PreparedQuestion[] | null {
   const pool = leastSeenFirst(
-    questionBank().filter((q) => q.category === category && !used.has(q.id)),
+    questionBank().filter((q) => q.category === category && !used.has(q.id) && !clashes(q.id, used)),
     seen,
     rng,
   );
   const picked: Question[] = [];
+  const fits = (x: Question) =>
+    !picked.includes(x) &&
+    !clashes(
+      x.id,
+      picked.map((p) => p.id),
+    );
   for (const d of difficulties) {
-    const q = pool.find((x) => x.difficulty === d && !picked.includes(x)) ?? pool.find((x) => !picked.includes(x));
+    const q = pool.find((x) => x.difficulty === d && fits(x)) ?? pool.find(fits);
     if (!q) return null;
     picked.push(q);
   }
@@ -678,7 +755,7 @@ function drawFrom(
     const { index, from, formats, now } = round;
     const fresh = <T extends PlayableQuestion>(bank: T[]) =>
       notRecent(
-        bank.filter((q) => q.category === category && !used.has(q.id)),
+        bank.filter((q) => q.category === category && !used.has(q.id) && !clashes(q.id, used)),
         seen,
         rng,
         now,
@@ -709,6 +786,7 @@ export function pickRounds(
 ): { questions: PreparedQuestion[]; rounds: RoundPlan[] } | null {
   const used = new Set<string>();
   const final = numberFinal ? pickFinal('mixed', seen, rng, { now }) : null;
+  if (final) used.add(final.id);
   const categories = shuffle(
     CATEGORY_IDS.filter((c) => c !== final?.category),
     rng,
@@ -781,7 +859,7 @@ export function pickDuelSet(
     }
     questions.push(...round);
   }
-  let closing: PreparedQuestion | null = pickFinal('mixed', seen, rng, { not: played, now });
+  let closing: PreparedQuestion | null = pickFinal('mixed', seen, rng, { not: played, now, avoid: used });
   while (!closing && drawn.length) closing = drawFrom(drawn.shift()!, ['hard'], seen, used, rng)?.[0] ?? null;
   return closing ? [...questions, closing] : null;
 }

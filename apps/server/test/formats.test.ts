@@ -73,8 +73,38 @@ const extra = CATEGORY_IDS.flatMap((category) =>
     ];
   }),
 );
+// A question, another whose fact names its answer, and a final whose fact does too: a match deals one of them at most.
+const fact = { fact: 'Тестовият герой е роден в Каламата.', factSource: 'https://example.test/fact' };
+const giveaways = [
+  {
+    id: 'history-g0',
+    category: 'history',
+    difficulty: 'easy',
+    q: 'В кой град е роден тестовият герой?',
+    options: ['Каламата', 'Патра', 'Волос', 'Лариса'],
+    answer: 0,
+  },
+  {
+    id: 'history-g1',
+    category: 'history',
+    difficulty: 'easy',
+    q: 'Кой е тестовият герой от юга?',
+    options: ['Верен ✓ g', 'Грешен 1 g', 'Грешен 2 g', 'Грешен 3 g'],
+    answer: 0,
+    ...fact,
+  },
+  {
+    id: 'history-g2',
+    kind: 'number',
+    category: 'history',
+    difficulty: 'easy',
+    q: 'В коя година е роден тестовият герой?',
+    number: { answer: 1820, unit: '', min: 1500, max: 2000, step: 1, scale: 'linear', tolerance: 10 },
+    ...fact,
+  },
+];
 const fixture = JSON.parse(fs.readFileSync(process.env.QUESTIONS_PATH, 'utf8'));
-fs.writeFileSync(process.env.QUESTIONS_PATH, JSON.stringify([...fixture, ...extra]));
+fs.writeFileSync(process.env.QUESTIONS_PATH, JSON.stringify([...fixture, ...extra, ...giveaways]));
 
 const { one, run } = await import('../src/db');
 const { Game, gameClock } = await import('../src/game/Game');
@@ -88,6 +118,7 @@ const {
   pickMatch,
   pickQuestions,
   pickRounds,
+  questionBank,
   questionImage,
   reorderOptions,
   seededRng,
@@ -191,6 +222,26 @@ test('a number final seen in the last 30 days stays out, in Микс too: a ques
   const [old] = numberBank();
   again.set(old.id, now - 40 * 24 * 60 * 60_000);
   assert.equal(pickMatch(10, 'mixed', again, { final: true, now }).at(-1)!.id, old.id);
+});
+
+test('a match never deals a question and another that names its answer (in its fact, here), final included', () => {
+  // Every other history question seen long ago: the three unseen ones come first, so only the rule keeps them apart.
+  const seen = new Map<string, number>(
+    [...questionBank(), ...numberBank()].filter((q) => !q.id.startsWith('history-g')).map((q) => [q.id, 1]),
+  );
+  const together = (questions: PreparedQuestion[]) => questions.filter((q) => q.id.startsWith('history-g')).length;
+  for (let seed = 0; seed < 20; seed++) {
+    const rng = seededRng(`giveaway-${seed}`);
+    const plain = pickMatch(10, 'history', seen, { final: false, rng });
+    assert.equal(together(plain), 1, 'the answer, or the fact that names it: not both');
+    const withFinal = pickMatch(10, 'history', seen, { final: true, rng });
+    assert.equal(withFinal.at(-1)!.id, 'history-g2', 'the unseen final');
+    assert.ok(!withFinal.some((q) => q.id === 'history-g0'), 'the final names its answer: it stays out');
+    assert.ok(
+      withFinal.some((q) => q.id === 'history-g1'),
+      'naming the same thing is no clash',
+    );
+  }
 });
 
 test('a room of pictures is all pictures as far as the bank has them, then questions with options', () => {

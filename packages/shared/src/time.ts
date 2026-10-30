@@ -130,3 +130,22 @@ export function seasonTitle(season: string): string {
   const name = seasonName(season);
   return name[0].toUpperCase() + name.slice(1);
 }
+
+/**
+ * Days whose questions are about something (month-day, Sofia time): that day's draw takes the bank's questions tagged
+ * with the theme first, as far as the day's mix of difficulties and categories allows, and the daily page names it.
+ */
+export const CALENDAR_DAYS: Readonly<Record<string, { tag: string; name: string }>> = {
+  '02-19': { tag: 'levski', name: 'Васил Левски' },
+  '03-03': { tag: 'liberation', name: 'Освобождението' },
+  '05-24': { tag: 'alphabet', name: 'Кирил и Методий и българската азбука' },
+  '06-02': { tag: 'botev', name: 'Христо Ботев' },
+  '09-06': { tag: 'unification', name: 'Съединението' },
+  '09-22': { tag: 'independence', name: 'Независимостта' },
+  '11-01': { tag: 'enlighteners', name: 'Народните будители' },
+  '12-24': { tag: 'christmas', name: 'Коледа' },
+  '12-25': { tag: 'christmas', name: 'Коледа' },
+};
+
+/** The theme of a day's questions (a day key, "2027-03-03"), if it has one. */
+export const dayTheme = (day: string) => CALENDAR_DAYS[day.slice(5)] ?? null;

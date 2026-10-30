@@ -19,10 +19,14 @@ from it. Every batch is verified independently before it goes in.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
   spread, fact length/source/giveaways). docs/questions.md documents the format.
-- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `fill`, `facts`, `similar`,
-  `giveaways`, `collect`, `image` (usage at its top). Use it to write the banks: it keeps the one-question-per-line layout, so a diff is one
-  line per changed question, gives new questions the next free ids and puts the non-breaking spaces into facts. For a
-  one-off fix, editing that question's line directly is fine.
+- The tool: `node .claude/skills/question-bank/bank.mjs` — `stats`, `show`, `add`, `fill`, `facts`, `edit`,
+  `similar`, `giveaways`, `collect`, `image` (usage at its top). Use it to write the banks: it keeps the
+  one-question-per-line layout, so a diff is one line per changed question, gives new questions the next free ids and
+  puts the non-breaking spaces into facts. Fixes go through `edit` with a patch file (`[{id, field: value}]`, `null`
+  removes a field), so they can be read before they're applied. `stats` also lists questions whose `reviewBy` is due.
+- Giveaways: `bank.mjs giveaways` lists questions whose text, fact, order items or picture description name another
+  question's answer, for the writer to judge. The server also keeps any such pair out of one match
+  (`findConflicts` in `apps/server/src/questions.ts`), so a pair it lists is a matter of teaching, not of fairness.
 - Agents doing this work never send personal data anywhere: no names or email addresses in User-Agent headers,
   search queries or URLs (in stage 1 one writer put the owner's email in a Wikipedia API User-Agent).
 
@@ -69,7 +73,9 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
       `private/plans/`. Save the briefs to a work folder as `batches.json`, with each one's `siblings`.
    2. `workflows/batches.js` (args `{dir, today, slugs, checkOnly}`): per brief a writer (`draft.json`), then a
       separate checker (`verified.json`). Keep the Mac awake: a sleeping machine kills the agents. A batch whose
-      check died can go in `checkOnly` next time.
+      check died can go in `checkOnly` next time. Number finals, „Подреди“ and pictures: `workflows/formats.js` (args
+      add `format`: `number`, `order` or `picture`), with the rules in `briefs/formats-write.md` and
+      `formats-check.md`; pictures then go through `bank.mjs image` before `add`.
    3. `bank.mjs collect <dir> <out>`, then `similar` and `giveaways` on `<out>.tids.json`: judge every pair between
       new questions, and each one where a new question names an old one's answer (or the reverse); reword or drop.
       Then `add <out>.json`, the bank test, a commit per merge. A checker may move a question's difficulty, so look at

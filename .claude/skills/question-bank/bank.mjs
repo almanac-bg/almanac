@@ -8,6 +8,8 @@
 //   node .claude/skills/question-bank/bank.mjs add <file.json> [bank]   appends new questions (an array; a question
 //                                                                       without an id gets the next free one)
 //   node .claude/skills/question-bank/bank.mjs facts <file.json> [bank] sets fact + factSource ([{id, fact, factSource}])
+//   node .claude/skills/question-bank/bank.mjs edit <file.json> [bank]  patches questions: [{id, field: value…}], null deletes
+//                                                                       a field (a fix, a difficulty, reviewBy); facts tidied
 //   node .claude/skills/question-bank/bank.mjs similar <file.json> [bank]  near-duplicates of the file's questions, in
 //                                                                       the bank and within the file (to judge, not proof)
 //   node .claude/skills/question-bank/bank.mjs giveaways [file.json] [bank]  questions whose text names another one's
@@ -126,8 +128,8 @@ const number = (id) => Number(id.split('-')[1]);
 /** A non-breaking space between a number and its unit or "г." (2925 м, 1885 г.): a narrow screen never splits them. */
 const tidyFact = (fact) =>
   fact.replace(
-    /(\d) (?=(?:м|км|см|мм|кг|г\.|т|тона|милиона|милиарда|хиляди|души|години|дни|часа|минути|%|°)(?![\p{L}]))/gu,
-    '$1 ',
+    /(\d) (?=(?:м|км|см|мм|м²|км²|кг|г\.|т|тона|милион|милиона|милиард|милиарда|млн\.|млрд\.|хиляди|души|години|дни|часа|минути|пъти|държави|вида|метра|километра|%|°C|°F|°|MW|kW|Hz|kHz)(?![\p{L}]))/gu,
+    '$1\u00a0',
   );
 
 /** Question words: every other question has them, so they say nothing about two being the same. */
@@ -348,6 +350,13 @@ switch (command) {
         `${title}: ${counts.map((c) => `${c.category} ${c.total}${format === 'number' ? '' : ` ${c.split}`}${c.total < most ? ` (+${most - c.total})` : ''}`).join(' · ')}`,
       );
     }
+    // A record, an office, a count: `reviewBy` says until when the answer is sure to hold. Due ones need a look.
+    const today = new Date().toISOString().slice(0, 10);
+    const dated = questions.filter((q) => q.reviewBy);
+    const due = dated.filter((q) => q.reviewBy <= today);
+    console.log(
+      `review dates: ${dated.length}${due.length ? `, due now: ${due.map((q) => `${q.id} (${q.reviewBy})`).join(', ')}` : ', none due'}`,
+    );
     break;
   }
   case 'show': {
@@ -396,6 +405,28 @@ switch (command) {
       `${bank.where}: added ${picked.length}; now ${bank.questions.length}. ${spares.length} spares → ${spareFile}`,
     );
     console.log(still.length ? `still lacking: ${still.join(', ')}` : 'balanced');
+    break;
+  }
+  case 'edit': {
+    // One-off fixes as a reviewed patch file instead of hand-edited lines: the bank keeps its layout, facts their
+    // non-breaking spaces. A field set to null is removed.
+    const [file, bankName] = args;
+    const patches = readJson(file);
+    const target = load(bankName);
+    const byId = new Map(target.questions.map((q) => [q.id, q]));
+    for (const { id, ...fields } of patches) {
+      const q = byId.get(id);
+      if (!q) fail(`${id} isn't in ${target.where}`);
+      for (const [key, value] of Object.entries(fields)) {
+        if (!KEYS.includes(key) || key === 'id') fail(`${id}: unknown field ${key}`);
+        if (value === null) delete q[key];
+        else q[key] = value;
+      }
+      if (q.fact) q.fact = tidyFact(q.fact);
+      console.log(`${id}: ${Object.keys(fields).join(', ')}`);
+    }
+    target.save();
+    console.log(`${patches.length} edited in ${target.where}; now run the bank test`);
     break;
   }
   case 'facts': {
@@ -451,8 +482,10 @@ switch (command) {
   }
   case 'giveaways': {
     // In one match (Микс takes every category), a question whose text names another's answer, on the same subject,
-    // gives it away. The same answer alone isn't enough ("България" is in hundreds), hence the shared key words. A
-    // number (a year) is given away by a fact too, shown after an earlier question, and one shared word is enough.
+    // gives it away. The same answer alone isn't enough ("България" is in hundreds), hence the shared key words. Facts
+    // (shown before the next question), order items and picture descriptions count too: there one shared word is
+    // enough, for a distinctive answer (5 letters or more). A number (a year) is given away by a fact too. The server
+    // also keeps such pairs out of one match (findConflicts in apps/server/src/questions.ts); this is for the writer.
     const extra = args[0]?.endsWith('.json') ? readJson(args[0]) : [];
     const { questions } = load(args[0]?.endsWith('.json') ? args[1] : args[0]);
     const all = [...questions, ...extra.map((q, i) => ({ ...q, id: q.id ?? q.tid ?? `#${i + 1}` }))];
@@ -462,27 +495,34 @@ switch (command) {
         .toLowerCase()
         .replace(/[^\p{L}\p{N}]+/gu, ' ')
         .trim()} `;
+    const around = (q) => [q.fact ?? '', ...(q.items ?? []).map((i) => i.text), q.image?.alt ?? q.alt ?? ''].join(' ');
     const texts = all.map((q) => ({
       q,
       text: norm(q.q),
-      withFact: norm(`${q.q} ${q.fact ?? ''}`),
+      around: norm(around(q)),
       words: stems(q.q),
-      factWords: stems(`${q.q} ${q.fact ?? ''}`),
+      allWords: stems(`${q.q} ${around(q)}`),
     }));
+    // As the server sees it: an answer more than COMMON_ANSWER questions name is common knowledge, not a giveaway.
+    const COMMON_ANSWER = 20;
     let found = 0;
     for (const a of all) {
       const isNumber = kindOf(a) === 'number';
       const answer = norm(answerOf(a));
       if (answer.trim().length < (isNumber ? 2 : 4)) continue;
+      const naming = texts.filter((b) => b.q !== a && (b.text.includes(answer) || b.around.includes(answer)));
+      if (!isNumber && naming.length > COMMON_ANSWER) continue;
       const words = stems(a.q);
-      for (const b of texts) {
-        if (b.q === a || !(mine.has(a) || mine.has(b.q))) continue;
-        if (!(isNumber ? b.withFact : b.text).includes(answer)) continue;
-        const shared = [...words].filter((w) => (isNumber ? b.factWords : b.words).has(w));
-        if (shared.length < (isNumber ? 1 : 2)) continue;
+      for (const b of naming) {
+        if (!(mine.has(a) || mine.has(b.q))) continue;
+        const inText = b.text.includes(answer);
+        if (!inText && !isNumber && answer.trim().length < 5) continue;
+        const shared = [...words].filter((w) => (inText && !isNumber ? b.words : b.allWords).has(w));
+        if (shared.length < (inText && !isNumber ? 2 : 1)) continue;
         found++;
-        console.log(`${b.q.id} names the answer of ${a.id} («${answerOf(a)}»)`);
-        console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}${isNumber && b.q.fact ? ` [${b.q.fact}]` : ''}`);
+        const where = inText ? 'question' : 'fact, items or picture';
+        console.log(`${b.q.id} names the answer of ${a.id} («${answerOf(a)}») in its ${where}`);
+        console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}${inText ? '' : ` [${around(b.q).trim()}]`}`);
       }
     }
     console.log(found ? `${found} pairs to judge` : 'no giveaways');
@@ -503,12 +543,37 @@ switch (command) {
         tally[item.verdict] = (tally[item.verdict] ?? 0) + 1;
         if (item.verdict !== 'OK' && item.verdict !== 'FIX') continue;
         const q = Object.fromEntries(KEYS.filter((k) => k !== 'id' && item[k] != null).map((k) => [k, item[k]]));
+        const n = q.number;
+        // What each format can't go in without; the bank test checks the rest after `add`.
+        const format =
+          q.kind === 'number'
+            ? [
+                !(
+                  n &&
+                  Number.isFinite(n.answer) &&
+                  n.min <= n.answer &&
+                  n.answer <= n.max &&
+                  n.step > 0 &&
+                  n.tolerance > 0 &&
+                  ['linear', 'log'].includes(n.scale) &&
+                  typeof n.unit === 'string'
+                ) && 'number',
+              ]
+            : q.kind === 'order'
+              ? [
+                  !(q.items?.length === 4 && q.items.every((i) => i.text?.trim() && Number.isFinite(i.value))) &&
+                    'items',
+                  !['asc', 'desc'].includes(q.direction) && 'direction',
+                ]
+              : [
+                  !(q.options?.length === 4 && q.options.every((o) => o.trim() && o.length <= 45)) && 'options',
+                  !(Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3) && 'answer',
+                ];
         const bad = [
           !PREFIX[q.category] && 'category',
           !DIFFICULTIES.includes(q.difficulty) && 'difficulty',
-          !(q.q?.trim().length >= 10 && q.q.length <= 150 && /[?“]$/.test(q.q)) && 'question',
-          !(q.options?.length === 4 && q.options.every((o) => o.trim() && o.length <= 45)) && 'options',
-          !(Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3) && 'answer',
+          !(q.q?.trim().length >= 10 && q.q.length <= 150 && /[?“:.]$/.test(q.q)) && 'question',
+          ...format,
           q.fact && !(q.fact.trim().length >= 20 && q.fact.length <= 200 && /[.!?…“"]$/.test(q.fact)) && 'fact',
           q.fact && !q.factSource?.startsWith('https://') && 'factSource',
         ].filter(Boolean);
@@ -518,11 +583,13 @@ switch (command) {
       console.log(`${slug.padEnd(34)} OK ${tally.OK}  FIX ${tally.FIX}  DROP ${tally.DROP}`);
     }
     // Options are shuffled in every match anyway; spreading the stored positions keeps the bank's position test honest.
-    kept.forEach((q, i) => {
-      const shift = (q.answer - (i % 4) + 4) % 4;
-      q.options = [...q.options.slice(shift), ...q.options.slice(0, shift)];
-      q.answer = i % 4;
-    });
+    kept
+      .filter((q) => q.options)
+      .forEach((q, i) => {
+        const shift = (q.answer - (i % 4) + 4) % 4;
+        q.options = [...q.options.slice(shift), ...q.options.slice(0, shift)];
+        q.answer = i % 4;
+      });
     fs.writeFileSync(`${out}.tids.json`, JSON.stringify(kept, null, 1));
     fs.writeFileSync(
       `${out}.json`,

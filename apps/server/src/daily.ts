@@ -9,6 +9,7 @@ import {
   dayKey,
   dayNumber,
   daysBetween,
+  dayTheme,
   MODES,
   STREAK_SHIELDS,
   weekStart,
@@ -63,11 +64,13 @@ function dailySet(day: string): PreparedQuestion[] {
       r.answered,
     ]),
   );
-  // The picks take the lowest first.
+  // The picks take the lowest first. A day with a theme (CALENDAR_DAYS: 3 март, 24 май…) takes its tagged questions
+  // before any other, as far as the day's mix of difficulties and categories allows.
+  const theme = dayTheme(day);
   const order = new Map(
     [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [
       q.id,
-      (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0),
+      (theme && q.tags?.includes(theme.tag) ? -2_000_000 : 0) + (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0),
     ]),
   );
   // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.

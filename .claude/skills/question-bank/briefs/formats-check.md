@@ -30,7 +30,16 @@ against reliable sources you actually fetch, never from memory alone.
 5. **The fact** (if any) is true in every claim (names, dates, numbers, qualifiers like „единственият“, „първият“,
    „най-“) per its `factSource`, which you fetch; 20–200 characters, ends with a period; numbers in Bulgarian style (a
    non-breaking space U+00A0 between a number and its unit or „г.“).
-6. **Image questions only:**
+6. **Number questions only:** the `answer` is the exact number on a source you fetched (and on a second one when the
+   first is a news report), counted the way the question says and as of the date it gives; sources don't disagree on
+   it. The question has one reading (what is counted, when, in which unit). `min`/`max` don't hint at the answer (wide,
+   the answer not in the middle) and the `tolerance` is fair for the difficulty (a well-read guess scores, a wild one
+   doesn't). A number that may change carries `reviewBy`. Grep the bank for the number: no other question or fact names
+   it on the same subject.
+7. **Ordering questions only:** can any item text or the question be read so that a value changes (a first attempt
+   against a first success, a country's date against the world's, a book against its film)? Add the qualifier („за
+   първи път“, „като книга“, „официално“) or replace the item.
+8. **Image questions only:**
    - Fetch the Commons file through the API
      (`https://commons.wikimedia.org/w/api.php?action=query&titles=<title>&prop=imageinfo&iiprop=url|size|extmetadata&iiurlwidth=800&format=json`):
      the licence is public domain, CC0, CC BY or CC BY-SA (any version) and nothing else; the file is what the question

@@ -222,6 +222,10 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
           .split(/[^\p{L}\p{N}]+/u)
           .filter((w) => w.length >= 5),
       );
+    // Normalized once: the loop below compares every fact with every answer (thousands × thousands).
+    const answers = withOptions
+      .map((other) => ({ other, answer: normalize(other.options[other.answer]) }))
+      .filter(({ answer }) => answer.length >= 4);
     // A number question is a match's final, last: what its fact says comes after every other question (its own rules
     // are further down).
     for (const q of everything) {
@@ -231,11 +235,10 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
       assert.match(q.fact, /[.!?…“"]$/, `${where} — a finished sentence`);
       assert.ok(q.factSource && new URL(q.factSource).protocol === 'https:', `${where} — needs an https source`);
       // Shown after its own question, but a later one in the same match may be about the same thing.
+      const fact = normalize(q.fact);
       const factWords = words(q.fact);
-      for (const other of withOptions) {
-        if (other === q) continue;
-        const answer = normalize(other.options[other.answer]);
-        if (answer.length < 4 || !normalize(q.fact).includes(answer)) continue;
+      for (const { other, answer } of answers) {
+        if (other === q || !fact.includes(answer)) continue;
         const shared = [...words(other.q)].filter((w) => factWords.has(w));
         assert.ok(shared.length < 2, `${where} — gives away ${other.id} (${other.q} → ${answer}; shares ${shared})`);
       }

@@ -24,6 +24,16 @@ process.env.DB_PATH = path.join(tmp, 'rewards.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 process.env.BACKUP_DIR = 'off';
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
+// Four questions about 3 March (CALENDAR_DAYS: tag "liberation"), one of each difficulty and two categories.
+const themed = ['history-0', 'history-13', 'history-25', 'general-1'];
+fs.writeFileSync(
+  process.env.QUESTIONS_PATH,
+  JSON.stringify(
+    JSON.parse(fs.readFileSync(process.env.QUESTIONS_PATH, 'utf8')).map((q: { id: string }) =>
+      themed.includes(q.id) ? { ...q, tags: ['liberation'] } : q,
+    ),
+  ),
+);
 const { Game, gameClock } = await import('../src/game/Game');
 // The match's clock follows the mocked Date (mock.timers can't mock performance.now).
 gameClock.now = () => Date.now();
@@ -602,6 +612,11 @@ test('knocked out and answering on, the right answers pay XP and count for what 
     after,
     'what the player knows does',
   );
+});
+
+test('a day with a theme takes the questions tagged for it first, as far as its mix allows', () => {
+  const march3 = dailyQuestions('2027-03-03', 1).map((q) => q.id);
+  for (const id of themed) assert.ok(march3.includes(id), `${id} on 3 March`);
 });
 
 test('a question hidden before anyone has played the day leaves the day’s set; once someone has, the set stands', () => {

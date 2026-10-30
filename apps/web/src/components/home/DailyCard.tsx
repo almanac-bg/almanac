@@ -4,6 +4,7 @@ import {
   type DailyInfo,
   dayKey,
   dayNumber,
+  dayTheme,
   type LeaderboardEntry,
   MODES,
   STREAK_SHIELDS,
@@ -62,6 +63,7 @@ export function DailyCard({ className }: { className?: string }) {
     if (!res.ok) toast({ kind: 'error', title: res.error });
   }
 
+  const theme = dayTheme(info?.day ?? me.daily.day);
   const dayLabel = new Date(`${info?.day ?? me.daily.day}T12:00:00Z`).toLocaleDateString('bg-BG', {
     day: 'numeric',
     month: 'long',
@@ -102,6 +104,7 @@ export function DailyCard({ className }: { className?: string }) {
           </div>
           <h2 className="mt-3 t-card lg:text-2xl">{MODES.daily.name}</h2>
           <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
+          {theme && <p className="mt-1 text-sm font-semibold text-amber-300">Темата днес: {theme.name}</p>}
 
           <div className="mt-auto pt-5">
             {failed ? (

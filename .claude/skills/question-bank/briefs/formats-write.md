@@ -1,7 +1,7 @@
-# АЛМАНАХ — writing image and ordering („Подреди“) questions
+# АЛМАНАХ — writing picture, number and ordering („Подреди“) questions
 
 АЛМАНАХ (almanac.bg) is a Bulgarian quiz game. Players learn from it, so a wrong answer or a wrong fact is the worst bug
-it can ship. You are drafting questions for two new formats. Your draft is checked by a separate agent afterwards, but
+it can ship. You are drafting questions in one of its special formats. Your draft is checked by a separate agent afterwards, but
 write it as if nobody would check.
 
 ## Ground rules
@@ -12,7 +12,7 @@ write it as if nobody would check.
   User-Agent `AlmanacBank/1.0 (https://almanac.bg)` for every request to Wikimedia.
 - Node isn't on PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`. Run commands from
   `/Users/hristo/Developer/quiz`.
-- The bank already has 3050 questions (`private/questions.json`, one per line). Grep it for your topic and answer
+- The bank already has over 3000 questions (`private/questions.json`, one per line). Grep it for your topic and answer
   before writing: no near-duplicates, and nothing that gives another question's answer away (a match mixes all
   categories). `node .claude/skills/question-bank/bank.mjs similar <your-draft.json>` lists look-alikes (it reads `q`
   and `options`; ordering drafts: run it on a copy where `options` = the four item texts).
@@ -28,7 +28,7 @@ write it as if nobody would check.
   answer.
 - Every question carries `answerSource`: an https page that confirms the answer (Wikipedia bg/en is fine; better an
   official or museum page).
-- Give each question `"added": "2026-10-29"` and, when it is about Bulgaria, `"tags": ["bg"]`.
+- Give each question `"added"` with the date your task gives (`YYYY-MM-DD`) and, when it is about Bulgaria, `"tags": ["bg"]`.
 
 Write the draft as a JSON array to the file you're told, then report back briefly: how many, any you dropped and why,
 and anything you were unsure of.
@@ -93,6 +93,50 @@ Category ideas (ids in brackets):
 - [nature] animals and plants, Bulgarian ones too (родопски силивряк, еделвайс, рис, лалугер…).
 - [general] („Обща култура“) traditions and customs (кукери, мартеници, сурвачки, нестинари), traditional dress, food,
   everyday objects, world symbols.
+
+## Number questions (a match's final)
+
+The last question of a match: the player types or slides a number; the closer, the more points, with a bonus for the
+exact one. One per match, so each is seen rarely and remembered: it should be a number worth learning.
+
+Draft format:
+
+```json
+{
+  "kind": "number",
+  "category": "geography",
+  "difficulty": "medium",
+  "q": "Колко метра е високо Мусала?",
+  "number": { "answer": 2925, "unit": "м", "min": 500, "max": 9000, "step": 1, "scale": "linear", "tolerance": 300 },
+  "fact": "…", "factSource": "https://…",
+  "answerSource": "https://…",
+  "tags": ["bg"],
+  "added": "2026-10-31"
+}
+```
+
+- `q` 10–150 characters, ending in „?“, asking for one number with one reading: say what is counted and as of when
+  („според преброяването от 2021 г.“, „през 2024 г.“), and the unit when it isn't obvious („в метри“). Never „около“ in a
+  question whose answer is exact; when the source rounds, ask for the rounded number („закръглено до милион“). The
+  number itself never appears in the question.
+- `answer`: the exact number from the source you fetched; a whole number of `step`s (step 1 for years and counts, 0.1
+  for one decimal). Nothing where reliable sources disagree on the number (choose another question).
+- `unit` (at most 12 characters): what the number counts, shown with the answer („м“, „км“, „години“, „души“, „%“);
+  empty for a year.
+- `min`/`max`: the range the keypad and slider allow. It must give nothing away: wide (at least 3 × `tolerance`), and
+  the answer not in its middle (put it anywhere in the range). Years: a range of a few centuries around the answer.
+- `tolerance`: how far off still scores. A well-read guess should land inside it, a wild one shouldn't: about a tenth
+  to a quarter of a sensible range of guesses (Мусала 2925 м: 300; a year in the 20th century: 10–15; a count of 12:
+  4). At least 2 × `step`.
+- `scale`: `linear` almost always; `log` only for numbers whose guesses span orders of magnitude (populations of the
+  world's cities, distances in space): then `min` > 0 and `tolerance` is a factor (1.5 = within ×1.5).
+- What makes a good final: a number a Bulgarian adult can reason towards (a year they can place, a height they can
+  compare, a count they can estimate), with a reveal that teaches something. Not a trivia ID number, not a phone code,
+  not a number only an enthusiast could guess within the tolerance (even on hard).
+- Counts, records and populations change: pin them to a year in the question, and give them `"reviewBy"` (a date,
+  `YYYY-MM-DD`, about a year ahead) when the number may change.
+- Grep `private/questions.json` for the number and the subject: no other question or fact may name this number on the
+  same subject (it would give the final away), and this one's fact must not name another question's answer.
 
 ## Ordering questions („Подреди“)
 

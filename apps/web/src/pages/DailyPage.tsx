@@ -1,5 +1,5 @@
 import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client';
-import { BRAND, type DailyInfo, type DailyPreview, dayKey, MODES, TIME_ZONE } from '@quiz/shared';
+import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@quiz/shared';
 import { ArrowRight, CalendarDays, ChartColumn, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
@@ -58,6 +58,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
   const [starting, setStarting] = useState(false);
   // Your own link opened: nothing to compare with yourself.
   const sharer = link?.sharer && link.sharer.user.username !== me.username ? link.sharer : null;
+  const theme = dayTheme(info.day);
 
   async function play() {
     setStarting(true);
@@ -113,6 +114,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
           </span>
           <h1 className="mt-3 t-page">{MODE.name}</h1>
           <p className="mt-2 text-fg-2">{MODE.tagline}</p>
+          {theme && <p className="mt-1 font-semibold text-amber-300">Темата днес: {theme.name}</p>}
 
           {sharer && (
             <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-sunk/25 p-3.5">
