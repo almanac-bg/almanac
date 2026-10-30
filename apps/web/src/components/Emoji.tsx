@@ -9,9 +9,15 @@ const ART = import.meta.glob('../emoji/*.webp', { eager: true, query: '?url', im
   string,
   string
 >;
-const BY_CODE = new Map(
-  Object.entries(ART).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -'.webp'.length), url]),
-);
+/** The same at 64 px, for where it's drawn small (most of the time: beside text). A third of the bytes. */
+const SMALL = import.meta.glob('../emoji/64/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<
+  string,
+  string
+>;
+const byCode = (files: Record<string, string>) =>
+  new Map(Object.entries(files).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -'.webp'.length), url]));
+const BY_CODE = byCode(ART);
+const SMALL_BY_CODE = byCode(SMALL);
 
 const codeOf = (emoji: string) =>
   [...emoji]
@@ -49,9 +55,21 @@ export function Emoji({
       </span>
     );
   const side = size ?? '1.15em';
+  const small = SMALL_BY_CODE.get(codeOf(e));
   return (
     <img
-      src={src}
+      src={small ?? src}
+      // The browser takes the 64 px one where it's enough (the size it's drawn at, times the screen's density), the
+      // 192 px one for the big art. `auto`: the size it's laid out at (a lazy image's right); a browser that doesn't
+      // know it takes the next — a size in px or rem as given, but for one in em (of text whose size this can't
+      // know: `sizes` counts em from 16 px) the full picture, never a blurred one.
+      srcSet={small ? `${small} 64w, ${src} 192w` : undefined}
+      sizes={
+        small
+          ? `auto, ${typeof side === 'number' ? `${side}px` : /(?:px|rem)$/.test(side) ? side : '100vw'}`
+          : undefined
+      }
+      loading="lazy"
       alt={label ?? ''}
       aria-hidden={label ? undefined : true}
       draggable={false}

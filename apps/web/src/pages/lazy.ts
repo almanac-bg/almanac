@@ -7,6 +7,9 @@ import { type ComponentType, createElement, lazy, useState } from 'react';
  */
 const loaders = {
   account: () => import('./AccountPages'),
+  // The landing's sign-in and the lobby: each in a file of its own, so a visitor downloads only the one they see.
+  auth: () => import('./AuthPage'),
+  home: () => import('./HomePage'),
   achievements: () => import('./AchievementsPage'),
   almanac: () => import('./AlmanacPage'),
   admin: () => import('./AdminPage'),
@@ -96,6 +99,8 @@ function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeo
 }
 
 export const AchievementsPage = page('achievements', 'AchievementsPage');
+export const AuthPage = page('auth', 'AuthPage');
+export const HomePage = page('home', 'HomePage');
 export const AdminPage = page('admin', 'AdminPage');
 export const AlmanacPage = page('almanac', 'AlmanacPage');
 export const ChallengePage = page('challenge', 'ChallengePage');
@@ -133,9 +138,17 @@ export function prefetchPages({ admin }: { admin: boolean }) {
 
 /**
  * The code of the page at this address, when the server drew it and it loads on demand: fetched before the app first
- * draws it, so the drawn page never blinks to "loading" (main.tsx). The legal pages and the guides (PUBLIC_PAGES).
+ * draws it, so the drawn page never blinks to "loading" (main.tsx). The legal pages, the guides (PUBLIC_PAGES) and the
+ * sign-in a page drawn for a visitor without a session shows (`signedOut`).
  */
-export function preloadPage(pathname: string): Promise<unknown> {
+export function preloadPage(pathname: string, signedOut: boolean): Promise<unknown> {
   if (pathname === '/privacy' || pathname === '/terms') return load('legal');
-  return pathname !== '/' && routeKind(pathname) === 'public' ? load('guide') : Promise.resolve();
+  if (pathname !== '/' && routeKind(pathname) === 'public') return load('guide');
+  return signedOut ? load('auth') : Promise.resolve();
 }
+
+/**
+ * The lobby's code, asked for as the page starts (not waited for): a "/" the server didn't draw was opened with a
+ * session, so the lobby is what comes once the app knows who's signed in — fetched meanwhile, not after.
+ */
+export const prefetchLobby = () => void load('home').catch(() => {});

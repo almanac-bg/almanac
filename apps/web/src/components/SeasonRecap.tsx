@@ -1,6 +1,5 @@
 import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
 import { RANK_TIERS, seasonTitle } from '@quiz/shared';
-import confetti from 'canvas-confetti';
 import { m } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
 import { sfx } from '../lib/sound';
@@ -21,13 +20,16 @@ export function SeasonRecap() {
   useEffect(() => {
     if (!open || !tier) return;
     sfx.levelUp();
-    void confetti({
-      particleCount: 120,
-      spread: 80,
-      origin: { y: 0.4 },
-      colors: [tier.color, '#ffffff', '#a78bfa'],
-      disableForReducedMotion: true,
-    });
+    // Its library loads for the moment it's needed (once a season), not with every visitor's first download.
+    void import('canvas-confetti').then(({ default: confetti }) =>
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.4 },
+        colors: [tier.color, '#ffffff', '#a78bfa'],
+        disableForReducedMotion: true,
+      }),
+    );
   }, [open, tier]);
 
   async function close() {

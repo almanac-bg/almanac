@@ -68,7 +68,12 @@ export function pushPrefs(row: Pick<UserRow, 'push_prefs'>): PushPrefs | null {
 }
 
 /** This device gets pushes from now on (its first one sets up the player's choices with the defaults). */
-export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema>) {
+/**
+ * Keeps this device's subscription for the player. True when it's new to them: the app posts a device's subscription
+ * again now and then (keepPushUp) to have it back should it have gone, and only a new one is greeted.
+ */
+export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema>): boolean {
+  const had = one('SELECT 1 AS x FROM push_subscriptions WHERE endpoint = ? AND user_id = ?', sub.endpoint, userId);
   run(
     `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`,
@@ -79,6 +84,7 @@ export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema
     Date.now(),
   );
   run('UPDATE users SET push_prefs = COALESCE(push_prefs, ?) WHERE id = ?', JSON.stringify(defaultPushPrefs()), userId);
+  return !had;
 }
 
 export const unsubscribe = (userId: number, endpoint: string) =>

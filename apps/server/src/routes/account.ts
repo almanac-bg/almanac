@@ -328,12 +328,12 @@ accountRouter.post('/push/subscribe', requireAuth, requireAccount, (req, res) =>
     res.status(429).json({ error: 'Твърде много опити. Опитай утре.' });
     return;
   }
-  subscribe(res.locals.userId, sub);
-  push(res.locals.userId, 'hello', {
-    title: 'Известията работят ✓',
-    body: 'Ще идват само избраните в Настройки — най-много две на ден, нищо нощем.',
-    url: '/settings',
-  });
+  if (subscribe(res.locals.userId, sub))
+    push(res.locals.userId, 'hello', {
+      title: 'Известията работят ✓',
+      body: 'Ще идват само избраните в Настройки — най-много две на ден, нищо нощем.',
+      url: '/settings',
+    });
   res.json({ user: getMe(res.locals.userId) });
 });
 

@@ -31,20 +31,21 @@ import { Toasts } from './components/Toasts';
 import { Button, Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
+import { keepPushUp } from './lib/pushUpkeep';
 import { markReturning } from './lib/returning';
 import { useRouteFocus } from './lib/routeFocus';
-import { AuthPage } from './pages/AuthPage';
-import { HomePage } from './pages/HomePage';
 import {
   AchievementsPage,
   AdminPage,
   AlmanacPage,
+  AuthPage,
   ChallengePage,
   DailyPage,
   FactsPage,
   FriendsPage,
   GamePage,
   GroupsPage,
+  HomePage,
   HowToPlayPage,
   LeaderboardPage,
   LockerPage,
@@ -202,6 +203,26 @@ export function App() {
     };
   }, [userId]);
 
+  // An account's push subscription on this device, kept up (a day at a time).
+  const pushable = !!me && !me.isGuest;
+  useEffect(() => {
+    if (pushable) void keepPushUp().catch(() => {});
+  }, [pushable]);
+
+  // A notification tapped while the app is open: the worker brings this window up and says where (public/sw.js).
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const go = (e: MessageEvent) => {
+      const to = (e.data as { navigate?: unknown } | null)?.navigate;
+      if (typeof to === 'string' && to.startsWith('/')) navigate(to);
+    };
+    navigator.serviceWorker.addEventListener('message', go);
+    // Messages wait until this says they're heard (addEventListener alone doesn't).
+    navigator.serviceWorker.startMessages();
+    return () => navigator.serviceWorker.removeEventListener('message', go);
+  }, [navigate]);
+
   // Signed in: fetch the other pages in the background once the lobby is up, so a match can open instantly.
   useEffect(() => {
     if (!userId) return;
@@ -263,7 +284,9 @@ export function App() {
               // Signed out on a mistyped link: say so, rather than show the sign-up form as if the link were the site.
               <NotFoundPage standalone />
             ) : (
-              <AuthPage />
+              <Suspense fallback={<PageLoading />}>
+                <AuthPage />
+              </Suspense>
             )}
           </main>
         )}

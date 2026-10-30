@@ -12,7 +12,7 @@ import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
 import { buzz, sfx, unlockAudioOnFirstTap } from './lib/sound';
 import { watchSystemTheme } from './lib/theme';
-import { preloadPage } from './pages/lazy';
+import { prefetchLobby, preloadPage } from './pages/lazy';
 import './styles.css';
 
 // Every page opens at the top (App scrolls there on each move). Left to the browser, a step back through history also
@@ -92,8 +92,8 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 // before showing it. (The app still asks, in the background.)
 // A challenge link opened without a session (the server says so on the root, and put the preview in the page): the
 // same, so the challenge shows at once.
-if (paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1')
-  setState({ authChecked: true, me: null });
+const signedOut = paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1';
+if (signedOut) setState({ authChecked: true, me: null });
 upgradeReturning();
 dropOldShares(dayKey());
 
@@ -110,6 +110,7 @@ const app = (
 // A page the server drew is hydrated, not drawn again: it stays on screen as it is and becomes interactive (a tap
 // that comes before that is replayed). Its code first, for the legal pages, which load on demand.
 const drawn = isPainted();
-preloadPage(window.location.pathname)
+if (!drawn && !signedOut && window.location.pathname === '/') prefetchLobby();
+preloadPage(window.location.pathname, drawn && signedOut)
   .catch(() => {})
   .then(() => (drawn ? hydrateRoot(container, app) : createRoot(container).render(app)));

@@ -46,14 +46,53 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// A window already open is brought up and told where to go (the app moves there itself, as a link in it would): no
+// reload of a tab that may be mid-match, and navigate() fails anyway for a window this worker doesn't control.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  const url = new URL(event.notification.data?.url || '/', self.location.origin);
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
       const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
-      if (open) return open.navigate(url).then((w) => (w ?? open).focus());
-      return self.clients.openWindow(url);
+      if (!open) return self.clients.openWindow(url.href);
+      open.postMessage({ navigate: url.pathname + url.search });
+      return open.focus();
     }),
+  );
+});
+
+/** The server's key as the browser wants it (it gives it base64url). */
+function keyBytes(base64url) {
+  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4)), (c) => c.charCodeAt(0));
+}
+
+const post = (path, body) =>
+  fetch(path, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+// The push service replaced this device's subscription, or let it lapse: subscribe again with the site's key and tell
+// the server (as the player, with their cookie), or the reminders would stop on this device without a word.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      const old = event.oldSubscription;
+      let sub = event.newSubscription;
+      if (!sub) {
+        const known = old?.options?.applicationServerKey;
+        const key = known ?? (await (await fetch('/api/push/key', { credentials: 'include' })).json()).key;
+        if (!key) return;
+        sub = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: typeof key === 'string' ? keyBytes(key) : key,
+        });
+      }
+      await post('/api/push/subscribe', sub.toJSON());
+      if (old && old.endpoint !== sub.endpoint) await post('/api/push/unsubscribe', { endpoint: old.endpoint });
+    })().catch(() => {}),
   );
 });

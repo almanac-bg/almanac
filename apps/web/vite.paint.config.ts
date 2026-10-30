@@ -11,6 +11,9 @@ export default defineConfig({
   define: { 'process.env.NODE_ENV': '"production"' },
   build: {
     ssr: 'src/paint.tsx',
+    // The art as the client build has it (vite.config.ts): files of their own, at the same addresses. Inlined here, a
+    // drawn page carried ~28 KB of base64 that no cache keeps (and the client's own render pointed at the files).
+    assetsInlineLimit: (file) => (file.includes('/emoji/') ? false : undefined),
     outDir: 'dist-ssr',
     sourcemap: true,
     rolldownOptions: {

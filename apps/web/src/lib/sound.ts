@@ -59,6 +59,16 @@ export function buzz(pattern: number | number[] | undefined) {
   }
 }
 
+/**
+ * How long the audio engine runs after the last sound before it's put to sleep: a running context keeps the device's
+ * audio output open (battery; on some Androids, the audio focus) for the rest of the visit. The next sound wakes it.
+ */
+const IDLE_MS = 10_000;
+let idle: ReturnType<typeof setTimeout> | undefined;
+const sleep = () => {
+  if (ctx?.state === 'running') void ctx.suspend();
+};
+
 /** The audio graph, made the first time a sound plays: the context, and its master bus. */
 function audio(): AudioContext | null {
   if (muted) return null;
@@ -78,8 +88,10 @@ function audio(): AudioContext | null {
       makeup.gain.value = 2.5;
       master.connect(compressor).connect(makeup).connect(ctx.destination);
     }
-    // Suspended until a tap; „interrupted“ after a call on iOS: either way it has to be asked to run again.
+    // Suspended until a tap, or asleep (IDLE_MS); „interrupted“ after a call on iOS: it has to be asked to run again.
     if (ctx.state !== 'running') void ctx.resume();
+    clearTimeout(idle);
+    idle = setTimeout(sleep, IDLE_MS);
     return ctx;
   } catch {
     return null;
@@ -104,9 +116,10 @@ export function unlockAudioOnFirstTap() {
   };
   for (const type of ['pointerdown', 'keydown', 'touchend'] as const)
     window.addEventListener(type, unlock, { passive: true });
-  // Back from the background (a call, another app): ask it to run again before the next sound.
+  // In the background it sleeps; back (from a call, another app), it's asked to run again before the next sound.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') void ctx.resume();
+    if (document.visibilityState === 'hidden') sleep();
+    else if (ctx && ctx.state !== 'running') void ctx.resume();
   });
 }
 

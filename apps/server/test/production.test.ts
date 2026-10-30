@@ -289,7 +289,10 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   for (const page of [landing, back, terms, await get('/privacy')]) {
     assert.doesNotMatch(page.html, /<!--\$\?-->|<template id="B:/);
     assert.match(page.html, /<main>/);
+    // The art as files the browser keeps, at the client's own addresses: never base64 in the page.
+    assert.doesNotMatch(page.html, /data:image\/webp/);
   }
+  assert.match(landing.html, /src="\/assets\/[0-9a-f-]+-[\w-]+\.webp"/, 'the landing draws its art from files');
 
   // Every page carries who runs the site, for the footer and the legal pages; the game's own screens aren't drawn.
   const settings = await get('/settings');
