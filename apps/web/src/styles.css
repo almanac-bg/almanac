@@ -113,6 +113,9 @@
   --color-sunk: #9d97bd;
   --color-avatar-hi: #ffffff;
   --color-avatar-lo: #e4e1f2;
+  /* On paper the lilac would fade and the gold turn to brown (--color-gold): a deep violet and a clear amber. */
+  --logo-petal: #6d28d9;
+  --logo-gold: #f59e0b;
   --gradient-a: #c026d3;
   --gradient-b: #7c3aed;
   --gradient-c: #0891b2;
@@ -217,7 +220,10 @@
 
 :root {
   color-scheme: dark;
-  /* The gradient of the name, and a field's well: brighter on ink, deeper on paper. */
+  /* The rosette (public/favicon.svg): lilac petals and the gold one, as on the app icon's dark tile. */
+  --logo-petal: #c4b5fd;
+  --logo-gold: #fbbf24;
+  /* The gradient of big numbers and titles, and a field's well: brighter on ink, deeper on paper. */
   --gradient-a: #f0abfc;
   --gradient-b: #a78bfa;
   --gradient-c: #22d3ee;

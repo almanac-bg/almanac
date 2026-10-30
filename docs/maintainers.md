@@ -11,6 +11,14 @@ vulnerability reporting, secret scanning, етикети, защитен `main` 
 настройки съществуват само за публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично.
 Изображението за social preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.
 
+## Знакът и картините
+
+Знакът е розетката в `apps/web/public/favicon.svg`: четири листа, единият златен — четирите отговора, единият верен.
+След промяна в него `npm run icons -w @quiz/web` рисува иконите на приложението (`icon-192/512`, `apple-touch-icon`,
+`icon-maskable-512`, `favicon.ico`) и значката на известията, а `npm run share-images -w @quiz/web` — картините при
+споделяне: `og.jpg` на сайта и `.github/social-preview.png` (качи я отново в GitHub). В интерфейса знакът е `Rosette` в
+`NavBar.tsx`, с цветовете `--logo-petal` и `--logo-gold` за двете теми.
+
 ## CodeQL
 
 CodeQL (разширеният набор заявки) проверява кода при всеки push и pull request; pull request с открит проблем от

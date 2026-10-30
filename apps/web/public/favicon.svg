@@ -1,16 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0.1" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#f0abfc"/>
-      <stop offset="0.45" stop-color="#a78bfa"/>
-      <stop offset="1" stop-color="#22d3ee"/>
-    </linearGradient>
-    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fef08a"/>
-      <stop offset="1" stop-color="#fbbf24"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="#0b0915"/>
-  <path d="M15 53 32 11l17 42" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M12 44 30 30.5l-1.2 7L52 32 34 45.5l1.2-7z" fill="url(#b)" stroke="#0b0915" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke"/>
+  <!-- The rosette: four answers, one of them right (gold). The tile is the icon's ground; scripts/icons.mjs draws the
+       app icons, the full-bleed ones and the notification badge from the group below. -->
+  <rect width="64" height="64" rx="15" fill="#140f26"/>
+  <g id="rosette">
+    <path d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)" fill="#fbbf24"/>
+    <path d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)" fill="#c4b5fd"/>
+    <path d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)" fill="#c4b5fd"/>
+    <path d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)" fill="#c4b5fd"/>
+  </g>
 </svg>

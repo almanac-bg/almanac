@@ -9,7 +9,8 @@
     "build": "vite build && vite build -c vite.paint.config.ts && node ../../scripts/licenses.mjs dist/licenses.txt",
     "preview": "vite preview",
     "test:browser": "playwright test",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "share-images": "node scripts/share-images.mjs"
   },
   "dependencies": {
     "@quiz/client": "*",

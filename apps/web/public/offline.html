@@ -16,14 +16,10 @@
       }
       /* As the device is set (the page can't read the game's own choice offline). No system-ui: Apple's sets Bulgarian
          with its own letter forms. */
-      @media (prefers-color-scheme: light) {
-        html { background: #f4f3f9; }
-        body { color: #16131f; }
-        .logo { color: #6d28d9; text-shadow: none; }
-        p { color: #4a4462; }
-        a { background: #7c3aed; }
-      }
-      .logo { font-weight: 900; font-size: 28px; letter-spacing: -0.02em; color: #e9d5ff; text-shadow: 0 0 28px rgb(168 85 247 / 0.55); }
+      .logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 900; font-size: 28px; letter-spacing: -0.02em; }
+      /* The rosette (favicon.svg), its colours as in the game (--logo-* in styles.css). */
+      .logo .petal { fill: #c4b5fd; }
+      .logo .gold { fill: #fbbf24; }
       h1 { margin: 24px 0 8px; font-size: 22px; }
       p { margin: 0 auto; max-width: 22rem; color: #b3aed0; }
       a {
@@ -31,11 +27,20 @@
         color: #fff; font-weight: 700; text-decoration: none;
       }
       a:focus-visible { outline: 2px solid #22d3ee; outline-offset: 3px; }
+      /* After the rules above, so that it wins over them. */
+      @media (prefers-color-scheme: light) {
+        html { background: #f4f3f9; }
+        body { color: #16131f; }
+        .logo .petal { fill: #6d28d9; }
+        .logo .gold { fill: #f59e0b; }
+        p { color: #4a4462; }
+        a { background: #7c3aed; }
+      }
     </style>
   </head>
   <body>
     <main>
-      <div class="logo">АЛМАНАХ<svg aria-hidden="true" viewBox="13 5 38 54" width="17" height="24" style="margin-left:3px;vertical-align:-3px"><path d="M36 6 14 36h14l-4 22 26-32H36l4-20z" fill="#fbbf24"/></svg></div>
+      <div class="logo"><svg aria-hidden="true" viewBox="8.5 8.5 47 47" width="27" height="27"><path class="gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</div>
       <h1>Няма връзка</h1>
       <p>Играта иска интернет. Щом връзката се върне, страницата ще се отвори сама.</p>
       <a href="">Опитай отново</a>
