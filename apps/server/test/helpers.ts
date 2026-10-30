@@ -6,6 +6,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { after } from 'node:test';
 import {
   CATEGORY_IDS,
   type ClientToServerEvents,
@@ -94,8 +95,20 @@ export interface TestServer {
   mails(): SentMail[];
   /** Sends a signal to the server process and resolves with its exit code once it exits. */
   kill(signal: NodeJS.Signals): Promise<number | null>;
+  /** Errors the server reported (reportError) so far: a test that causes one on purpose names it here. */
+  allowErrors(...patterns: RegExp[]): void;
   stop(): Promise<void>;
 }
+
+/**
+ * Errors test servers reported that no test said to expect: they fail the file (in after(), so a test's own failure
+ * isn't hidden by the server's). The server prints them as 💥 lines too.
+ */
+const unexpectedErrors: string[] = [];
+after(() => {
+  if (unexpectedErrors.length)
+    throw new Error(`The server reported errors no test expected:\n${unexpectedErrors.join('\n')}`);
+});
 
 /**
  * Boots a real server on a free port with a throwaway database, fixture questions, fast timers
@@ -107,6 +120,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
   // A given database: the same one again, as after a restart.
   const dbPath = env.DB_PATH ?? path.join(dir, 'test.db');
   const outbox = path.join(dir, 'outbox');
+  const errorsFile = path.join(dir, 'errors.jsonl');
+  const allowed: RegExp[] = [];
   writeFixtureQuestions(questions);
   // A given port: the same server again, as after a restart (test/load.ts).
   const port = env.PORT ? Number(env.PORT) : await freePort();
@@ -116,7 +131,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       : [require.resolve('tsx/cli'), path.join(serverDir, 'src/index.ts')];
   const child: ChildProcess = spawn(process.execPath, args, {
     env: {
-      ...process.env,
+      // Nothing else from the developer's shell (a Sentry DSN, VAPID keys, NODE_ENV): what a test server is, is here.
+      ...shellBasics(),
       PORT: String(port),
       DB_PATH: dbPath,
       QUESTIONS_PATH: questions,
@@ -125,10 +141,14 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       PUBLIC_QUEUES: 'all',
       GAME_TIME_SCALE: '0.05',
       MAIL_OUTBOX: outbox,
+      ERROR_OUTBOX: errorsFile,
       APP_URL: 'https://almanac.test',
       // The tests talk to it over plain HTTP, as if from behind the proxy.
       COOKIE_SECURE: 'false',
-      SMTP_URL: '',
+      // No evening Роял at whatever hour the tests run (CI often runs at 21:00 Sofia): evening.test sets its own.
+      EVENING_AT: 'off',
+      // Where `npm test` collects every statement for the plan check (test/plans.ts).
+      ...(process.env.SQL_LOG && { SQL_LOG: process.env.SQL_LOG }),
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -172,12 +192,20 @@ export async function startServer(env: Record<string, string> = {}): Promise<Tes
       const [code] = await exited;
       return code as number | null;
     },
+    allowErrors(...patterns) {
+      allowed.push(...patterns);
+    },
     async stop() {
       db.close();
       if (child.exitCode === null && child.signalCode === null) {
         child.kill('SIGTERM');
         await onceEvent(child, 'exit');
       }
+      if (fs.existsSync(errorsFile))
+        for (const line of fs.readFileSync(errorsFile, 'utf8').split('\n').filter(Boolean)) {
+          const { where, message } = JSON.parse(line) as { where: string; message: string };
+          if (!allowed.some((p) => p.test(`${where}: ${message}`))) unexpectedErrors.push(`💥 ${where}: ${message}`);
+        }
       fs.rmSync(dir, { recursive: true, force: true });
     },
   };
@@ -222,6 +250,12 @@ export async function withSecondFactor(url: string, cookie: string): Promise<str
   return setup.body.secret;
 }
 
+/** What a child process needs from the shell to run at all: where programs, the home folder and temporary files are. */
+export function shellBasics(): Record<string, string> {
+  const keep = ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'SystemRoot'];
+  return Object.fromEntries(keep.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]!]));
+}
+
 /** Runs the admin command line (src/cli.ts, or the bundle with TEST_TARGET=dist) against a test server's database. */
 export function cli(dbPath: string, ...args: string[]): { status: number | null; output: string } {
   const entry =
@@ -229,7 +263,7 @@ export function cli(dbPath: string, ...args: string[]): { status: number | null;
       ? [path.join(serverDir, 'dist/cli.mjs')]
       : [require.resolve('tsx/cli'), path.join(serverDir, 'src/cli.ts')];
   const r = spawnSync(process.execPath, [...entry, ...args], {
-    env: { ...process.env, DB_PATH: dbPath },
+    env: { ...shellBasics(), DB_PATH: dbPath },
     encoding: 'utf8',
   });
   return { status: r.status, output: `${r.stdout}${r.stderr}` };

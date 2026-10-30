@@ -13,6 +13,8 @@ test(
   T,
   async () => {
     const srv = await startServer();
+    // The refused sign-up below is reported as an error, as it should be in production.
+    srv.allowErrors(/the database stayed locked/);
     const other = new DatabaseSync(srv.dbPath);
     try {
       other.exec('BEGIN IMMEDIATE');

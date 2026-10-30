@@ -22,6 +22,8 @@ const root = path.resolve(import.meta.dirname, '../..');
 const serverEntry = path.join(root, 'apps/server/dist/index.mjs');
 const webIndex = path.join(root, 'apps/web/dist/index.html');
 const outputDir = path.join(import.meta.dirname, 'test-results');
+/** What the server reports as errors during the run (ERROR_OUTBOX): e2e/teardown.ts fails the run on any. */
+export const serverErrors = path.join(outputDir, 'server', 'errors.jsonl');
 
 // A missing build would surface as a server that can't start or pages that 404. Checked once, in the runner.
 if (!process.env.TEST_WORKER_INDEX) {
@@ -49,6 +51,7 @@ const chromium = browserPath ? { launchOptions: { executablePath: browserPath } 
 export default defineConfig({
   testDir: './e2e',
   outputDir,
+  globalTeardown: './e2e/teardown.ts',
   fullyParallel: true,
   forbidOnly: CI,
   retries: CI ? 1 : 0,
@@ -134,6 +137,7 @@ export default defineConfig({
       PORT: String(PORT),
       // Inside the output folder, which Playwright empties before each run (and before starting the server).
       DB_PATH: path.join(outputDir, 'server', 'quiz.db'),
+      ERROR_OUTBOX: serverErrors,
       APP_URL: baseURL,
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
       // engines more (CI runs WebKit and Firefox at 0.5, as their clicks take longer than Chrome's).
@@ -151,6 +155,10 @@ export default defineConfig({
       PUBLIC_QUEUES: '',
       SMTP_URL: '',
       SENTRY_DSN: '',
+      VAPID_PUBLIC_KEY: '',
+      VAPID_PRIVATE_KEY: '',
+      // No evening Роял at whatever hour the tests run (CI often runs at 21:00 Sofia).
+      EVENING_AT: 'off',
       // Every statement it runs, beside the server tests' (`npm run plans -w @quiz/server` checks them all).
       SQL_LOG: path.join(root, 'apps/server/.sql-log'),
     },

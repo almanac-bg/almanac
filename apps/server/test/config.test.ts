@@ -56,6 +56,7 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
     'DB_PATH',
     // Tied to stop_grace_period in docker-compose.yml: a longer drain would be cut short by Docker anyway.
     'DRAIN_SECONDS',
+    'ERROR_OUTBOX',
     'GAME_TIME_SCALE',
     'MAIL_OUTBOX',
     'PUSH_OUTBOX',

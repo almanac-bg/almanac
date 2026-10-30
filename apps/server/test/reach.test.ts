@@ -23,9 +23,9 @@ let srv: TestServer;
 let api: ReturnType<typeof http>;
 const pushDir = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-push-'));
 const T = { timeout: 90_000 };
+const keys = webpush.generateVAPIDKeys();
 
 before(async () => {
-  const keys = webpush.generateVAPIDKeys();
   srv = await startServer({
     VAPID_PUBLIC_KEY: keys.publicKey,
     VAPID_PRIVATE_KEY: keys.privateKey,
@@ -143,17 +143,14 @@ test(
     const key = (n: number) => randomBytes(n).toString('base64url');
     const device = (endpoint: string) => ({ endpoint, keys: { p256dh: key(65), auth: key(16) } });
 
+    assert.equal((await api.get('/api/push/key')).body.key, keys.publicKey, 'the key a device subscribes with');
     assert.equal(
       (await api.send('POST', '/api/push/subscribe', F.cookie, device('https://evil.example/x'))).status,
       400,
     );
     assert.equal((await api.send('POST', '/api/push/subscribe', F.cookie, device('https://10.0.0.1/x'))).status, 400);
-    const on = await api.send(
-      'POST',
-      '/api/push/subscribe',
-      F.cookie,
-      device(`https://fcm.googleapis.com/fcm/send/${key(20)}`),
-    );
+    const phone = device(`https://fcm.googleapis.com/fcm/send/${key(20)}`);
+    const on = await api.send('POST', '/api/push/subscribe', F.cookie, phone);
     assert.equal(on.status, 200, on.body.error);
     assert.equal(on.body.user.push.kinds.duels, true, 'the usual choices to start with');
     await eventually(() => assert.ok(pushes().some((p) => p.userId === F.user.id && p.kind === 'hello')));
@@ -180,5 +177,14 @@ test(
       assert.match(turns[0].title, /Твой ред: predizvikva те предизвика/);
       assert.match(turns[0].url, /^\/c\//);
     });
+
+    // The device is let go (switched off in Settings, or signed out of): nothing more goes to it.
+    const devices = () =>
+      (srv.db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?').get(F.user.id) as { n: number })
+        .n;
+    assert.equal((await api.send('POST', '/api/push/unsubscribe', G.cookie, { endpoint: phone.endpoint })).status, 200);
+    assert.equal(devices(), 1, "someone else's device isn't theirs to let go");
+    assert.equal((await api.send('POST', '/api/push/unsubscribe', F.cookie, { endpoint: phone.endpoint })).status, 200);
+    assert.equal(devices(), 0);
   },
 );

@@ -10,7 +10,7 @@
     "start": "NODE_ENV=production node dist/index.mjs",
     "test": "rm -rf .sql-log && SQL_LOG=\"$PWD/.sql-log\" node --import tsx --test --test-timeout=120000 test/*.test.ts && npm run plans",
     "plans": "node --import tsx test/plans.ts",
-    "test:dist": "TEST_TARGET=dist node --import tsx --test --test-timeout=120000 test/*.test.ts",
+    "test:dist": "TEST_TARGET=dist node --import tsx --test --test-timeout=120000 test/e2e-*.test.ts test/evening.test.ts test/production.test.ts test/reach.test.ts test/restart.test.ts test/writers.test.ts",
     "load": "node --import tsx test/load.ts"
   },
   "dependencies": {

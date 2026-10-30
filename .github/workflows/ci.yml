@@ -45,22 +45,24 @@ jobs:
       - run: shellcheck --severity=warning deploy/*.sh scripts/*.sh
       - run: npm run typecheck
       - run: npm run build
-      # Sources, then the production bundle that ships in the Docker image.
+      # Sources, then the production bundle that ships in the Docker image (the tests that start a server on it).
       - run: npm test
       - run: npm run test:dist -w @quiz/server
       # The built app in a real browser (the runner's Google Chrome): guest play, challenge links, saving an account,
-      # layouts. See apps/web/playwright.config.ts.
-      - run: npm run test:browser -w @quiz/web
+      # layouts. See apps/web/playwright.config.ts. On production's Node; the browser doesn't care which the server ran.
+      - if: matrix.node == 26
+        run: npm run test:browser -w @quiz/web
       # How SQLite runs every statement the server ran in the tests above, browser tests included: a read of a whole
       # table that grows with players fails (apps/server/test/plans.ts; `npm test` checks the server tests' alone).
-      - run: npm run plans -w @quiz/server
+      - if: matrix.node == 26
+        run: npm run plans -w @quiz/server
       # A test that passed only on its retry, written down (and its trace uploaded below): green, but worth a look.
       - id: flaky
-        if: always()
+        if: always() && matrix.node == 26
         run: node .github/flaky.mjs
       # What went wrong, to look at: the HTML report, with screenshots and the retry's trace.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure() || steps.flaky.outputs.flaky > 0
+        if: matrix.node == 26 && (failure() || steps.flaky.outputs.flaky > 0)
         with:
           name: playwright-report-node${{ matrix.node }}
           path: |
@@ -72,6 +74,7 @@ jobs:
   # The same browser tests in Safari's engine and in Firefox's (the test job runs them in Chrome): Playwright's own builds
   # of WebKit and Firefox, on the production build, the game at 0.5 speed (a question lasts 7.5 s: on the runner their
   # clicks take far longer than Chrome's).
+  # Each engine in two halves on two runners: WebKit alone took nine minutes, the longest job in the run.
   browsers:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -79,7 +82,8 @@ jobs:
       fail-fast: false
       matrix:
         engine: [webkit, firefox]
-    name: browser tests (${{ matrix.engine }})
+        shard: [1, 2]
+    name: browser tests (${{ matrix.engine }} ${{ matrix.shard }}/2)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,7 +98,9 @@ jobs:
       - run: npx playwright install --with-deps ${{ matrix.engine }}
         working-directory: apps/web
       - run: npm run build
-      - run: npx playwright test --project=${{ matrix.engine }}-phone --project=${{ matrix.engine }}-desktop
+      - run: >-
+          npx playwright test --project=${{ matrix.engine }}-phone --project=${{ matrix.engine }}-desktop
+          --shard=${{ matrix.shard }}/2
         working-directory: apps/web
         env:
           E2E_ENGINES: ${{ matrix.engine }}
@@ -105,17 +111,17 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure() || steps.flaky.outputs.flaky > 0
         with:
-          name: playwright-report-${{ matrix.engine }}
+          name: playwright-report-${{ matrix.engine }}-${{ matrix.shard }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 14
 
+  # Its own build, so it starts at once beside the others (`image` and `publish` wait for every job).
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

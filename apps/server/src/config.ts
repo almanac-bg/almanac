@@ -129,6 +129,8 @@ export const config = {
   emailEventsSecret: process.env.EMAIL_EVENTS_SECRET || null,
   /** Tests: write every outgoing email as a JSON file into this directory. */
   mailOutbox: process.env.MAIL_OUTBOX || null,
+  /** Tests: every error reported (reportError) is also appended to this file, one JSON line each. */
+  errorOutbox: process.env.ERROR_OUTBOX || null,
   /** Tests: pushes are written here (one JSON file each) instead of sent to the push services. */
   pushOutbox: process.env.PUSH_OUTBOX || null,
   /** Tests (at any hour): PUSH_QUIET=off lifts the night's silence. */

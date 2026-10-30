@@ -77,7 +77,8 @@ ruleset=$(cat <<'JSON'
       "do_not_enforce_on_create": false,
       "required_status_checks": [
         {"context": "test (Node 24)"}, {"context": "test (Node 26)"}, {"context": "docker"},
-        {"context": "browser tests (webkit)"}, {"context": "browser tests (firefox)"}
+        {"context": "browser tests (webkit 1/2)"}, {"context": "browser tests (webkit 2/2)"},
+        {"context": "browser tests (firefox 1/2)"}, {"context": "browser tests (firefox 2/2)"}
       ]
     }},
     {"type": "code_scanning", "parameters": {"code_scanning_tools": [

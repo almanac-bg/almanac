@@ -957,6 +957,13 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ) WITHOUT ROWID;
     `,
   },
+  // v39, a moderator correcting a community question in the game (submissions.ts → editCommunityQuestion) finds its
+  // submission by the question's id, not by reading every submission. Older code doesn't mind it.
+  {
+    compatible: `
+    CREATE INDEX submissions_question ON question_submissions(question_id) WHERE question_id IS NOT NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
