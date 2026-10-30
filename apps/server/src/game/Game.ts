@@ -13,6 +13,7 @@ import {
   type GameEndPayload,
   type GamePlayer,
   type GameStartPayload,
+  HOLD,
   IMAGE,
   isOrder,
   knockoutsAfter,
@@ -83,9 +84,9 @@ const ALONE_ABANDON_MS = 10 * 60_000;
 /** A run that waited for its player goes on this long after they're back, so the next question doesn't ambush them. */
 const RESUME_MS = 2_500;
 /** A run alone can stop on a fact to read it; it goes on by itself after this long. */
-const FACT_HOLD_MS = 2 * 60_000;
+const FACT_HOLD_MS = HOLD.pauseMs;
 /** Соло without a clock still ends a question someone walked away from: after this long it's revealed. */
-const UNTIMED_MS = 10 * 60_000;
+const UNTIMED_MS = HOLD.untimedMs;
 /** A dropped connection (a page refresh, a tunnel) is waited for this long before the question can close without them. */
 const DISCONNECT_GRACE_MS = 5_000;
 const REACTION_COOLDOWN_MS = 700;

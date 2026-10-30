@@ -288,7 +288,7 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   // to, and without scripts the spinner would be the page).
   for (const page of [landing, back, terms, await get('/privacy')]) {
     assert.doesNotMatch(page.html, /<!--\$\?-->|<template id="B:/);
-    assert.match(page.html, /<main>/);
+    assert.match(page.html, /<main[ >]/);
     // The art as files the browser keeps, at the client's own addresses: never base64 in the page.
     assert.doesNotMatch(page.html, /data:image\/webp/);
   }

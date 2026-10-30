@@ -7,6 +7,7 @@ import {
   Disc3,
   Download,
   Flame,
+  Keyboard,
   KeyRound,
   LogOut,
   Mail,
@@ -32,6 +33,7 @@ import { PasswordField } from '../components/PasswordField';
 import { PushSettings } from '../components/PushSettings';
 import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, SwitchTrack } from '../components/ui';
 import { forgetThisDevice } from '../lib/device';
+import { setMatchKeys, useMatchKeysOn } from '../lib/matchKeys';
 import { markReturning } from '../lib/returning';
 import { sfx, useMuted } from '../lib/sound';
 import { setTheme, useThemeChoice } from '../lib/theme';
@@ -196,6 +198,7 @@ export function SettingsPage() {
       )}
       <ThemeSettings />
       <SoundSettings />
+      <MatchKeySettings />
       {!me.isGuest && <PasswordSettings />}
       <DataSettings />
       {/* Last: leaving is the rarest thing done here, and the least to be hit by mistake. */}
@@ -444,6 +447,23 @@ function SoundSettings() {
 }
 
 /**
+ * Достъпност: the match's one-key shortcuts on this device (lib/matchKeys). On for most; off for someone who dictates,
+ * whose words reach the page as keys (a stray „e“ was a bet of 500 points).
+ */
+function MatchKeySettings() {
+  const on = useMatchKeysOn();
+  return (
+    <SwitchCard
+      icon={<Keyboard className={clsx('size-5', on ? 'text-violet-300' : 'text-fg-3')} />}
+      title="Клавиши в мача"
+      hint="Достъпност: 1–4 за отговорите, Q, W и E за козовете, P за пауза в Соло, цифри за число. Изключи ги, ако диктуваш или управляваш с глас — тогава нищо не се натиска случайно. На това устройство."
+      on={on}
+      onToggle={() => setMatchKeys(!on)}
+    />
+  );
+}
+
+/**
  * Others playing against recordings of your matches (when nobody's there for their Дуел): on unless switched off here.
  * They see your name, avatar and level, as on the boards.
  */
@@ -481,7 +501,6 @@ function RecordSettings() {
   );
 }
 
-/** The opt-in evening email when the daily streak is about to break (needs a verified address to go to). */
 /** An optional email (the streak reminder; someone beating you on your link): consent asked, a confirmed email needed. */
 function MailOptIn({
   field,

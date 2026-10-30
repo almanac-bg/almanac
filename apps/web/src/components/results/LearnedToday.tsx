@@ -27,7 +27,7 @@ export function LearnedToday({ items, added }: { items: ReviewItem[]; added: num
         {added > 0 && (
           <Link
             to="/almanac"
-            className="focus-ring inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/25"
+            className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/25"
           >
             <BookOpen aria-hidden className="size-4" />+{added} в алманаха ти
           </Link>

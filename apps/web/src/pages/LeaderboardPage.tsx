@@ -136,6 +136,8 @@ export function LeaderboardPage() {
                     )}
                   >
                     {i === 0 && <div className="absolute -top-16 size-48 rounded-full glow text-amber-400/25" />}
+                    {/* The medal says the place to the eye; the link's name says it in words. */}
+                    <span className="sr-only">{i + 1} място:</span>
                     <Emoji e={['🥇', '🥈', '🥉'][i]} className="relative size-7 sm:size-9" size="" />
                     <Avatar
                       avatar={e.user.avatar}
@@ -162,16 +164,25 @@ export function LeaderboardPage() {
 
           {/* Not with three players or fewer: it would be an empty strip under the podium. */}
           {(entries.length > 3 || (!meInList && meEntry)) && (
-            <Card className="divide-y divide-line">
-              {entries.slice(3).map((e) => (
-                <Row key={e.user.id} board={board} entry={e} me={e.user.id === me.id} />
-              ))}
-              {!meInList && meEntry && (
-                <>
-                  <div className="px-5 py-1 text-center text-xs text-fg-3">⋯</div>
-                  <Row board={board} entry={meEntry} me />
-                </>
-              )}
+            <Card>
+              {/* The places after the podium, as a list (they were links side by side). */}
+              <ol className="divide-y divide-line">
+                {entries.slice(3).map((e) => (
+                  <li key={e.user.id}>
+                    <Row board={board} entry={e} me={e.user.id === me.id} />
+                  </li>
+                ))}
+                {!meInList && meEntry && (
+                  <>
+                    <li aria-hidden className="px-5 py-1 text-center text-xs text-fg-3">
+                      ⋯
+                    </li>
+                    <li>
+                      <Row board={board} entry={meEntry} me />
+                    </li>
+                  </>
+                )}
+              </ol>
             </Card>
           )}
           {!meEntry && !amongFriends && board !== 'level' && (
@@ -228,7 +239,10 @@ function Row({ board, entry: e, me }: { board: LeaderboardBoard; entry: Leaderbo
         me && 'bg-violet-500/10',
       )}
     >
-      <span className="w-7 shrink-0 text-right font-bold text-fg-3 tabular-nums sm:w-8">{e.rank}</span>
+      <span className="w-7 shrink-0 text-right font-bold text-fg-3 tabular-nums sm:w-8">
+        {e.rank}
+        <span className="sr-only"> място:</span>
+      </span>
       <Avatar avatar={e.user.avatar} frame={e.user.frame} size={40} />
       <div className="min-w-0 flex-1">
         {/* On a phone the name has about 120 px: a size down, and the level under it when they don't fit side by side

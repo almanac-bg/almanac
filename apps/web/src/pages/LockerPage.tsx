@@ -94,9 +94,9 @@ export function LockerPage() {
           </m.div>
           <div className="relative min-w-0">
             {/* The name whole (a size down first), the level under it when they don't fit side by side. */}
-            <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 t-section lg:mt-5 lg:justify-center">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 t-section lg:mt-5 lg:justify-center">
               <FitName as="span" name={me.username} min={18} className="font-sans" /> <LevelBadge level={level} />
-            </h1>
+            </p>
             <p className="mt-1 font-semibold text-violet-300">{titleName(me.title)}</p>
             <p className="mt-4 text-sm text-fg-3 max-lg:hidden">
               Така те виждат другите играчи в лобито и по време на игра.
@@ -107,7 +107,7 @@ export function LockerPage() {
         <div className="min-w-0 space-y-5">
           {me.choices.length > 0 && <ChoicesWaiting key={me.choices[0].level} />}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="t-section">Колекция</h2>
+            <h1 className="t-section">Колекция</h1>
             <Segmented
               scroll
               value={tab}
@@ -214,7 +214,7 @@ export function LockerPage() {
               </p>
               <Grid>
                 {EMOTES.map((e) => (
-                  <Item key={e.id} name="" req={e.req} unlocked={unlocked('emote', e)}>
+                  <Item key={e.id} name={e.name} req={e.req} unlocked={unlocked('emote', e)}>
                     <Emoji e={e.emoji} size="3rem" />
                   </Item>
                 ))}
@@ -285,9 +285,10 @@ function Item({
       <m.button
         type="button"
         whileTap={clickable ? { scale: 0.96 } : undefined}
-        // Locked: still a button, which says what it takes (a disabled one can't be reached or tapped).
-        disabled={unlocked && !clickable}
-        onClick={unlocked ? onEquip : () => setInfo(true)}
+        // Locked: still a button, which says what it takes (a disabled one can't be reached or tapped). Worn: pressed,
+        // and a press does nothing — not disabled, which dropped the focus and read as "unavailable".
+        aria-pressed={unlocked && onEquip ? !!equipped : undefined}
+        onClick={!unlocked ? () => setInfo(true) : clickable ? onEquip : undefined}
         aria-label={unlocked ? undefined : `${name || 'Емоция'}: заключено — ${requirementLabel(req)}`}
         title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
         className={clsx(
@@ -422,8 +423,8 @@ function TitleButton({
       <>
         <button
           type="button"
-          disabled={open && equipped}
-          onClick={open ? onEquip : () => setInfo(true)}
+          aria-pressed={open ? equipped : undefined}
+          onClick={!open ? () => setInfo(true) : equipped ? undefined : onEquip}
           aria-label={`${t.name}: ${open ? state.toLowerCase() : requirementLabel(t.req)}`}
           className={clsx(
             'focus-ring flex min-w-0 flex-col items-center rounded-2xl border border-line bg-tint/[0.03] px-1.5 py-2 text-center transition-colors',
@@ -444,8 +445,8 @@ function TitleButton({
     <>
       <button
         type="button"
-        disabled={open && equipped}
-        onClick={open ? onEquip : () => setInfo(true)}
+        aria-pressed={open ? equipped : undefined}
+        onClick={!open ? () => setInfo(true) : equipped ? undefined : onEquip}
         className={clsx(
           'focus-ring glass flex items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors',
           open && !equipped && 'hover:bg-tint/10',

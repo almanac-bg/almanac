@@ -19,6 +19,7 @@ import { embeddedChallenge } from '../lib/embedded';
 import { useLoad } from '../lib/load';
 import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
+import { focusPageHeading } from '../lib/routeFocus';
 import { usePageTitle } from '../lib/title';
 
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
@@ -113,6 +114,7 @@ export function AuthPage() {
           : await api.register(username, password, email.trim() || undefined);
       markReturning();
       setState({ me: user });
+      focusPageHeading(); // the lobby opens on this same address: its heading takes the focus the form had
       if (emailNotSent)
         toast({
           kind: 'info',
@@ -137,6 +139,7 @@ export function AuthPage() {
       // Same render as signing in, so the signed-in app opens straight on the right page.
       if (landing) navigate(landing.to, { replace: true, state: landing.state });
       setState({ me: user });
+      focusPageHeading();
     } catch (err) {
       setGuestError(errorMessage(err));
       setGuestBusy(false);
@@ -152,11 +155,20 @@ export function AuthPage() {
     : daily
       ? { to: pathname, state: { play: true } }
       : null;
+  // Opened by the player („Създай профил“, „Вход“): its first field takes the focus, which was on the button now gone.
+  const focusForm = useRef(false);
   const openForm = (m: 'login' | 'register') => {
+    focusForm.current = true;
     setFormOpen(true);
     setMode(m);
     setError(null);
   };
+  useEffect(() => {
+    if (formOpen && focusForm.current) {
+      focusForm.current = false;
+      usernameRef.current?.focus();
+    }
+  }, [formOpen]);
 
   const guest = (
     <GuestPlay
@@ -246,11 +258,7 @@ export function AuthPage() {
                   busy={guestBusy}
                   guestError={guestError}
                   onPlay={() => playAsGuest(guestLanding)}
-                  onSignIn={() => {
-                    setFormOpen(true);
-                    setMode('login');
-                    setError(null);
-                  }}
+                  onSignIn={() => openForm('login')}
                 />
               ) : mode === 'forgot' ? (
                 <ForgotPassword

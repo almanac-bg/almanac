@@ -15,7 +15,7 @@ test('a private room: a friend joins by its code, the host starts, both play and
   await expect(host).toHaveURL(/\/room$/);
   await expect(host.getByRole('heading', { name: 'Частна стая', exact: true })).toBeVisible();
   const code = (await host
-    .getByRole('button', { name: /^\d{6}/ })
+    .getByRole('button', { name: /^Код [\d ]+ — копирай/ })
     .first()
     .textContent())!.match(/\d{6}/)![0];
 

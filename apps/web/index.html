@@ -48,12 +48,23 @@
       [data-theme='light'] .boot { color: #6d28d9; text-shadow: none; }
       @keyframes boot-pulse { from { opacity: 0.55; } to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .boot { animation: none; } }
+      .noscript {
+        margin: 1rem auto 2rem; max-width: 28rem; padding: 1rem 1.25rem;
+        border-radius: 1rem; background: #1b1830; color: #f4f3f9; text-align: center;
+        font: 500 1rem / 1.5 'Segoe UI', Roboto, Arial, sans-serif;
+      }
+      /* Over the splash of a page that needs the app (a page the server drew reads without it: there, below it). */
+      body:has(#root > .boot) .noscript { position: fixed; inset: auto 0 2rem; }
     </style>
   </head>
   <body>
     <!-- Painted instantly while the app's code downloads; React replaces it. Between the markers the server may put
          the page itself, already drawn (see src/lib/painted.ts). -->
     <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span><svg aria-hidden="true" viewBox="13 5 38 54" style="height:0.9em;width:auto;align-self:center"><path d="M36 6 14 36h14l-4 22 26-32H36l4-20z" fill="#fbbf24"/></svg></div><!--/app--></div>
+    <!-- Without scripts (switched off, or blocked) the game can't run: said, rather than a splash that never ends. The
+         pages drawn on the server (the guides, the legal ones) read without it. -->
+    <noscript><p class="noscript">%BRAND_NAME% е игра в реално време и има нужда от JavaScript. Включи го в браузъра и
+      презареди страницата.</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

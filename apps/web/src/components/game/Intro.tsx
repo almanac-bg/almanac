@@ -54,14 +54,23 @@ export function Intro({ game }: { game: LiveGame }) {
   const mode = MODES[game.start.mode];
   const category = categoryById(game.start.category);
   const me = players.find((p) => p.id === game.start.youId)!;
+  // The match takes the focus that was on what started it (a queue's dialog, a button now gone), not the page.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!document.activeElement || document.activeElement === document.body)
+      root.current?.focus({ preventScroll: true });
+  }, []);
 
   return (
     <m.div
+      ref={root}
+      tabIndex={-1}
+      aria-label="Мачът започва"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       // The countdown is the only thing on screen: in the middle of it.
-      className="flex min-h-[55dvh] flex-col items-center justify-center py-8 text-center"
+      className="flex min-h-[55dvh] flex-col items-center justify-center py-8 text-center outline-none"
     >
       <p className="t-eyebrow text-fg-3">{game.start.duelWith ? 'Дуел с приятел' : mode.name}</p>
       {players.length === 1 ? (

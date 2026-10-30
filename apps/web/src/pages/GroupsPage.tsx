@@ -2,7 +2,7 @@ import { api, errorMessage, fmt, plural, toast, useStore } from '@quiz/client';
 import { BRAND, GROUPS, type GroupEntry, type GroupInfo, type ReportReason, shiftDay } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, Flag, Link2, LogOut, Pencil, Share2, Trash2, UserMinus } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useId, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { GuestNudge } from '../components/ClaimAccount';
@@ -47,9 +47,12 @@ function GroupList() {
   const { data, error, retry } = useLoad(() => api.groups());
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tooShort, setTooShort] = useState(false);
+  const hintId = useId();
 
   async function create(e: FormEvent) {
     e.preventDefault();
+    if (name.trim().length < GROUPS.name[0]) return setTooShort(true);
     setBusy(true);
     try {
       const { id } = await api.createGroup(name);
@@ -104,18 +107,23 @@ function GroupList() {
           <form onSubmit={create} className="mt-4 flex flex-wrap gap-3">
             <input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setTooShort(false);
+              }}
               maxLength={GROUPS.name[1]}
-              required
-              minLength={GROUPS.name[0]}
               aria-label="Име на групата"
+              aria-invalid={tooShort}
+              aria-describedby={`${hintId}-length`}
               placeholder="Например „10 Б клас“ или „Офис 3“"
               className={clsx(INPUT, 'min-w-0 flex-1 basis-56')}
             />
-            <Button type="submit" size="lg" loading={busy} disabled={name.trim().length < GROUPS.name[0]}>
+            {/* Not disabled while the name is short: Enter on it went nowhere without a word. */}
+            <Button type="submit" size="lg" loading={busy}>
               Създай
             </Button>
           </form>
+          <NameLength id={`${hintId}-length`} tooShort={tooShort} />
         </Card>
       )}
     </div>
@@ -500,11 +508,14 @@ function RenameGroup({
 }) {
   const [value, setValue] = useState(name);
   const [busy, setBusy] = useState(false);
+  const [tooShort, setTooShort] = useState(false);
+  const id = useId();
   useEffect(() => {
     if (open) setValue(name);
   }, [open, name]);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (value.trim().length < GROUPS.name[0]) return setTooShort(true);
     setBusy(true);
     await onSave(value);
     setBusy(false);
@@ -514,21 +525,42 @@ function RenameGroup({
       <form onSubmit={submit}>
         <input
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setTooShort(false);
+          }}
           maxLength={GROUPS.name[1]}
           aria-label="Име на групата"
+          aria-invalid={tooShort}
+          aria-describedby={id}
           className={INPUT}
         />
+        <NameLength id={id} tooShort={tooShort} />
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Отказ
           </Button>
-          <Button type="submit" loading={busy} disabled={value.trim().length < GROUPS.name[0]}>
+          <Button type="submit" loading={busy}>
             Запази
           </Button>
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** How long a group's name may be — said again, and read out, when a short one is sent. */
+function NameLength({ id, tooShort }: { id: string; tooShort: boolean }) {
+  return (
+    <p
+      id={id}
+      aria-live="polite"
+      className={clsx('mt-2 text-xs', tooShort ? 'font-semibold text-rose-300' : 'text-fg-3')}
+    >
+      {tooShort
+        ? `Името е твърде кратко: поне ${GROUPS.name[0]} знака.`
+        : `От ${GROUPS.name[0]} до ${GROUPS.name[1]} знака.`}
+    </p>
   );
 }
 

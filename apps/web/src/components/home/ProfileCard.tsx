@@ -34,9 +34,11 @@ export function ProfileCard({ className }: { className?: string }) {
         <div className="min-w-0 flex-1">
           <p className="text-sm text-fg-3 max-sm:hidden">Здравей,</p>
           {/* Names run to 20 characters: a size down before a second line (see FitName). Half the width on tablets. */}
+          {/* Not the lobby's heading (that's „Играй“, HomePage): the name, as text. */}
           <FitName
+            as="span"
             name={me.username}
-            className="text-xl leading-tight font-extrabold sm:text-3xl md:text-2xl lg:text-3xl"
+            className="block text-xl leading-tight font-extrabold sm:text-3xl md:text-2xl lg:text-3xl"
           />
           <p className="truncate text-sm text-fg-2">{TITLES.find((t) => t.id === me.title)?.name}</p>
         </div>

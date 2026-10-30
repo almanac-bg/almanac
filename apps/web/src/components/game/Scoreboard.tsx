@@ -22,9 +22,10 @@ export function Scoreboard({ game }: { game: LiveGame }) {
   const { shown, gap } = big ? topAndYou(game.standings, game.start.youId, 5) : { shown: game.standings, gap: null };
   return (
     <div className="glass sticky top-20 rounded-3xl p-3">
-      <p className="px-2 pt-1 pb-2 t-eyebrow text-fg-3">
+      {/* A heading, so the board is a named place to land on (its <aside> takes the name from it: GamePage). */}
+      <h2 id="scoreboard-title" className="px-2 pt-1 pb-2 t-eyebrow text-fg-3">
         Класиране{big && <span className="normal-case"> · {game.standings.length} играчи</span>}
-      </p>
+      </h2>
       <ul className="space-y-1">
         {shown.map((s, i) => (
           <Fragment key={s.id}>
@@ -52,6 +53,9 @@ function TeamScoreboard({ game }: { game: LiveGame }) {
   const leader: TeamId | null = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
   return (
     <div className="sticky top-20 space-y-3">
+      <h2 id="scoreboard-title" className="sr-only">
+        Класиране по отбори
+      </h2>
       {([0, 1] as TeamId[]).map((team) => {
         const color = teamColor(team);
         const all = game.standings.filter((s) => game.players[s.id]?.team === team);
@@ -105,7 +109,11 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
         me && 'bg-violet-500/12 ring-1 ring-violet-400/30',
       )}
     >
-      <span className="w-5 text-center text-sm font-bold text-fg-3 tabular-nums">{out ? '' : s.rank}</span>
+      {/* Read as „1 място“, not a bare „1“ before the name. */}
+      <span className="w-5 text-center text-sm font-bold text-fg-3 tabular-nums">
+        {out ? '' : s.rank}
+        {!out && <span className="sr-only"> място:</span>}
+      </span>
       <Avatar avatar={p.avatar} frame={p.frame} size={38} dim={out || !s.connected}>
         {answered && (
           <m.span
@@ -127,9 +135,15 @@ function ScoreRow({ game, standing: s }: { game: LiveGame; standing: Standing })
           {s.left ? (
             'напусна'
           ) : s.eliminatedAt !== null ? (
-            <Skull aria-hidden className="size-4 text-rose-300" />
+            <>
+              <Skull aria-hidden className="size-4 text-rose-300" />
+              <span className="sr-only">отпадна</span>
+            </>
           ) : (
-            fmt(score)
+            <>
+              {fmt(score)}
+              <span className="sr-only"> точки</span>
+            </>
           )}
         </div>
         {/* Room for the question's points even before they're in: every row keeps its height through the reveal, so

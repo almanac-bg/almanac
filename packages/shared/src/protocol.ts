@@ -299,6 +299,13 @@ export const defaultPushPrefs = (): PushPrefs => ({
  * bought with time; an answer past 15 s doesn't count for skill and mastery); or none (base points, each answer waits
  * for „Продължи“) — to read and think at leisure, as practice.
  */
+/**
+ * How long a run alone waits on a hold (Game.ts): one the player asked for („Спри, за да прочета“, „Пауза“) goes on by
+ * itself after `pauseMs`; in Соло without a clock every answer waits up to `untimedMs`. `warnMs` before the end, the
+ * page says the run is about to go on.
+ */
+export const HOLD = { pauseMs: 2 * 60_000, untimedMs: 10 * 60_000, warnMs: 20_000 } as const;
+
 export const SOLO_PACES = [
   { id: 'normal', label: '15 с', hint: 'С бонус за бързина' },
   {

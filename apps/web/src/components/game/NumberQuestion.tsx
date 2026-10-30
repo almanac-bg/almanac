@@ -13,6 +13,7 @@ import clsx from 'clsx';
 import { Delete, Flame, Lock, Minus, Plus } from 'lucide-react';
 import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { matchKeysOn } from '../../lib/matchKeys';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';
@@ -42,7 +43,12 @@ function Figure({ value, n }: { value: number; n: Parameters<typeof numberText>[
   return (
     <>
       {numberText(value, { ...n, unit: '' })}
-      {n.unit && <span className="font-sans font-extrabold">{n.unit}</span>}
+      {n.unit && (
+        <span className="font-sans font-extrabold">
+          <span className="sr-only"> </span>
+          {n.unit}
+        </span>
+      )}
     </>
   );
 }
@@ -85,9 +91,11 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
       const target = e.target instanceof Element ? e.target : null;
       if (target?.closest('textarea, select, [contenteditable], input:not([type="range"])')) return;
       const { type, erase, submit } = keys.current;
-      if (/^\d$/.test(e.key) && !slider) type(e.key);
-      else if ((e.key === ',' || e.key === '.') && !slider) type(',');
-      else if (e.key === '-' && n.min < 0 && !slider) type('−');
+      // Characters only while the match keys are on (lib/matchKeys); ⌫ and Enter always.
+      const typing = !slider && matchKeysOn();
+      if (/^\d$/.test(e.key) && typing) type(e.key);
+      else if ((e.key === ',' || e.key === '.') && typing) type(',');
+      else if (e.key === '-' && n.min < 0 && typing) type('−');
       else if (e.key === 'Backspace' && !slider) erase();
       else if (e.key === 'Enter' && !target?.closest('button')) submit();
       else return;
@@ -99,27 +107,50 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
 
   const shown = locked && game.myGuess !== null ? game.myGuess : value;
   const middle = snapNumber((n.min + n.max) / 2, n);
+  // Locked: the keypad or slider that had the focus is gone; the number (the output below) takes it.
+  const readout = useRef<HTMLOutputElement>(null);
+  useEffect(() => {
+    if (locked && document.activeElement === document.body) readout.current?.focus({ preventScroll: true });
+  }, [locked]);
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3 short:gap-2">
+      {/* Read by its content (a label on a live region isn't announced as it changes): the number, and whether it's
+          out of the range — before, only the colour of „от … до …“ said so, and Enter did nothing. */}
       <output
+        ref={readout}
+        tabIndex={-1}
         aria-live="polite"
-        aria-label={shown === null ? 'Още няма число' : `Твоят отговор: ${numberText(shown, n)}`}
         className={clsx(
-          'flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl border px-4 font-display text-4xl font-bold tabular-nums short:min-h-12 short:text-3xl',
+          'flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl border px-4 font-display text-4xl font-bold tabular-nums outline-none short:min-h-12 short:text-3xl',
           locked ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100' : 'border-line bg-tint/[0.045]',
           !locked && text && !valid && 'border-rose-400/50',
         )}
       >
         {locked && <Lock aria-hidden className="size-5 text-emerald-300" />}
+        <span className="sr-only">{shown === null ? 'Още няма число' : 'Твоят отговор:'} </span>
         {shown === null ? (
-          <span className="text-fg-3">{text || '?'}</span>
+          <span aria-hidden className="text-fg-3">
+            {text || '?'}
+          </span>
         ) : locked ? (
           <Figure value={shown} n={n} />
         ) : (
           <>
             <span>{slider ? numberText(shown, { ...n, unit: '' }) : text}</span>
-            {n.unit && <span className="font-sans text-xl font-semibold text-fg-2">{n.unit}</span>}
+            {/* A space between number and unit for the ear („52 дни“, not „52дни“); the eye has the gap. */}
+            {n.unit && (
+              <span className="font-sans text-xl font-semibold text-fg-2">
+                <span className="sr-only"> </span>
+                {n.unit}
+              </span>
+            )}
           </>
+        )}
+        {!locked && text && !valid && (
+          <span className="sr-only">
+            {' '}
+            — извън границите: от {numberText(n.min, n)} до {numberText(n.max, n)}
+          </span>
         )}
       </output>
       {!locked && (
@@ -151,6 +182,8 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
               disabled={inert}
               onChange={(e) => setText(e.target.value)}
               aria-label="Твоят отговор"
+              // Resting in the middle until it's moved: no answer yet, and said so (it read „50“).
+              aria-valuetext={value === null ? 'не е избрано' : numberText(value, n)}
               className="h-11 flex-1 accent-violet-400"
             />
             <StepButton

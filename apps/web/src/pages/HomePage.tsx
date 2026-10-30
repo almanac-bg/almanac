@@ -35,7 +35,7 @@ import { usePageTitle } from '../lib/title';
 const LIVE_COUNT_MIN = 5;
 
 export function HomePage() {
-  usePageTitle(null);
+  usePageTitle('Играй');
   const me = useStore((s) => s.me)!;
   const lobby = useStore((s) => s.lobby);
   const room = useStore((s) => s.room);
@@ -78,6 +78,8 @@ export function HomePage() {
 
   return (
     <div className="space-y-6">
+      {/* The page's heading, for a screen reader and the focus after signing in (the first card is the player's). */}
+      <h1 className="sr-only">Играй</h1>
       {room && (
         // A link (it goes somewhere), like the bar of a match in progress.
         <m.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>

@@ -293,6 +293,8 @@ function SetEditor({ id }: { id: number }) {
       >
         <ArrowLeft aria-hidden className="size-4" /> Моите въпроси
       </Link>
+      {/* The page's heading (the name field below says it too, as an edit): where the focus lands on arrival. */}
+      <h1 className="sr-only">Набор „{data.name}“</h1>
       {data.hidden && (
         <p className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-rose-100">
           Модератор скри този набор след сигнал: не може да се играе и споделя.

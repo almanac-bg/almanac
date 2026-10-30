@@ -27,6 +27,7 @@ import { ReloadForUpdate } from './components/ReloadForUpdate';
 import { RoomDoor, RoomNickname } from './components/RoomNickname';
 import { SeasonRecap } from './components/SeasonRecap';
 import { SecondFactorPrompt } from './components/SecondFactor';
+import { SkipLink } from './components/SkipLink';
 import { Toasts } from './components/Toasts';
 import { Button, Card, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
@@ -256,13 +257,14 @@ export function App() {
     // component would bring them all back into the first download, so it's an error).
     <LazyMotion features={loadMotion} strict>
       <MotionConfig reducedMotion="user">
+        <SkipLink />
         <Background />
         <Toasts />
         {me && !isPublicPath(pathname) ? (
           <SignedIn />
         ) : (
           // The page itself (SignedIn has its header and tab bar around its own <main>).
-          <main>
+          <main id="content" tabIndex={-1} className="outline-none">
             {isPublicPath(pathname) ? (
               <PageBoundary>
                 <Suspense fallback={<PageLoading />}>
@@ -314,9 +316,18 @@ function SignedIn() {
   return (
     <>
       {!inGame && <NavBar />}
+      {/* Right after the header, not after the page: an invite lasts a minute, and a keyboard reached it after the
+          whole lobby (22 Tabs and more). */}
+      <Invites />
       {!inGame && <MaintenanceBanner />}
       {!inGame && <ActiveMatchBar />}
-      <main className={inGame ? '' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 cramped:pb-8 sm:px-6 md:pb-16'}>
+      <main
+        id="content"
+        tabIndex={-1}
+        className={
+          inGame ? 'outline-none' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
+        }
+      >
         <PageBoundary>
           <Suspense fallback={<PageLoading />}>
             <Routes>
@@ -353,7 +364,6 @@ function SignedIn() {
       </main>
       {!inGame && <QueueOverlay />}
       <ConnectionBanner explained={!inGame && maintenance} />
-      <Invites />
       <SeasonRecap />
       <PasswordConfirm />
       <SecondFactorPrompt />

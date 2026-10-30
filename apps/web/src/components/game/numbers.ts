@@ -1,10 +1,29 @@
 import { decimalsOf, isExact, type NumberInput } from '@quiz/shared';
 
+/** A unit written in the plural, as its one: „1 ден“, not „1 дни“ (a host's own question can count in words). */
+const ONE: Record<string, string> = {
+  дни: 'ден',
+  години: 'година',
+  месеца: 'месец',
+  седмици: 'седмица',
+  часа: 'час',
+  минути: 'минута',
+  секунди: 'секунда',
+  пъти: 'път',
+  души: 'човек',
+  броя: 'брой',
+  страни: 'страна',
+  града: 'град',
+  метра: 'метър',
+  километра: 'километър',
+};
+
 /** A number as Bulgarian writes it: a decimal comma, a space every three digits from 10 000 on, then its unit. */
 export function numberText(value: number, n: Pick<NumberInput, 'unit' | 'step'>): string {
   const digits = decimalsOf(n.step);
   const text = value.toLocaleString('bg-BG', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  return n.unit ? `${text} ${n.unit}` : text;
+  const unit = value === 1 ? (ONE[n.unit] ?? n.unit) : n.unit;
+  return unit ? `${text} ${unit}` : text;
 }
 
 /**

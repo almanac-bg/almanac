@@ -79,7 +79,11 @@ function GuideLayout({ title, lead, children }: { title: string; lead: ReactNode
         <Link to="/" className="text-2xl">
           <Logo />
         </Link>
-        <nav aria-label="Ръководства" className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold text-fg-2">
+        {/* Each link a full 44 px tall (the project's target size), not the 20 px of its line. */}
+        <nav
+          aria-label="Ръководства"
+          className="flex flex-wrap gap-x-4 text-sm font-semibold text-fg-2 [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center"
+        >
           <Link to="/how-to-play" className="hover:text-fg">
             Как се играе
           </Link>
@@ -311,8 +315,9 @@ export function QuizCategoryPage() {
                     <li key={o}>
                       <button
                         type="button"
-                        disabled={done}
-                        onClick={() => setPicked((p) => ({ ...p, [q.id]: k }))}
+                        // Answered: no second pick, but still focusable (disabled, the focus fell to the page).
+                        aria-disabled={done || undefined}
+                        onClick={() => !done && setPicked((p) => ({ ...p, [q.id]: k }))}
                         className={clsx(
                           'focus-ring flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
                           !done && 'border-line hover:bg-tint/[0.07]',
@@ -360,12 +365,18 @@ export function QuizCategoryPage() {
           );
         })}
       </ol>
-      {answered.length > 0 && (
-        <p role="status" className="rounded-2xl bg-violet-500/10 px-4 py-3 font-semibold text-fg">
-          Позна {right} от {answered.length}.{' '}
-          {answered.length === questions.length && 'В играта — с часовник, козове и класация.'}
-        </p>
-      )}
+      {/* Always there, empty until a first answer: a live region that comes in already holding its text isn't read. */}
+      <p
+        role="status"
+        className={answered.length ? 'rounded-2xl bg-violet-500/10 px-4 py-3 font-semibold text-fg' : 'sr-only'}
+      >
+        {answered.length > 0 && (
+          <>
+            Позна {right} от {answered.length}.{' '}
+            {answered.length === questions.length && 'В играта — с часовник, козове и класация.'}
+          </>
+        )}
+      </p>
       <nav aria-label="Други категории" className="flex flex-wrap gap-2">
         {CATEGORIES.filter((x) => x.id !== c?.id).map((x) => (
           <Link

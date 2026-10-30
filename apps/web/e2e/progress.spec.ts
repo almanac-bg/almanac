@@ -12,7 +12,9 @@ test('„Моят алманах“ keeps the facts a run taught, and the missed
   if (right > 0) await expect(page.getByRole('link', { name: `+${right} в алманаха ти` })).toBeVisible();
 
   await page.goto('/almanac');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(new RegExp(`^${right} от \\d+ факта$`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    new RegExp(`^Моят алманах: ${right} от \\d+ факта$`),
+  );
   // Every miss waits, except a final's number guessed half-way close or nearer (nearly known).
   const missed = 10 - right;
   const waiting = page.getByText(

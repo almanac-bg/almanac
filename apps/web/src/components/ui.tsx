@@ -42,14 +42,20 @@ export function buttonClass({ variant = 'primary', size = 'md' }: { variant?: Va
   );
 }
 
-/** A plain button unless it says `type="submit"` (the HTML default would submit any form it sits in). */
+/**
+ * A plain button unless it says `type="submit"` (the HTML default would submit any form it sits in). `loading`: busy —
+ * it keeps its place and the keyboard focus (a disabled button drops it to the page, and a second Enter went nowhere),
+ * says so to a screen reader, and takes no second press; a submit button's form isn't sent again meanwhile either.
+ */
 export function Button({
   variant = 'primary',
   size = 'md',
   type = 'button',
   className,
   children,
-  loading,
+  loading = false,
+  onClick,
+  ref,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
@@ -57,14 +63,42 @@ export function Button({
   loading?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }) {
+  const own = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const form = type === 'submit' && loading ? own.current?.form : null;
+    if (!form) return;
+    // Before React hears of it (its handlers listen at the root): an Enter in a field mustn't send the form twice.
+    const hold = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    form.addEventListener('submit', hold);
+    return () => form.removeEventListener('submit', hold);
+  }, [type, loading]);
   return (
     <button
       {...rest}
+      ref={(el) => {
+        own.current = el;
+        if (typeof ref === 'function') ref(el);
+        else if (ref) (ref as { current: HTMLButtonElement | null }).current = el;
+      }}
       type={type}
-      disabled={rest.disabled || loading}
-      className={clsx(buttonClass({ variant, size }), className)}
+      aria-disabled={loading || undefined}
+      aria-busy={loading || undefined}
+      onClick={(e) => {
+        if (loading) return e.preventDefault();
+        onClick?.(e);
+      }}
+      className={clsx(buttonClass({ variant, size }), 'relative', className)}
     >
-      {loading ? <Spinner className="size-4" /> : children}
+      {loading && (
+        <span className="absolute inset-0 grid place-items-center">
+          <Spinner className="size-4" />
+        </span>
+      )}
+      {/* Kept while busy, unseen: the button keeps its width, and its name. */}
+      <span className={clsx('contents', loading && 'invisible')}>{children}</span>
     </button>
   );
 }
@@ -124,7 +158,8 @@ export function SwitchTrack({ on }: { on: boolean }) {
       aria-hidden
       className={clsx(
         'relative h-7 w-12 shrink-0 rounded-full border transition-colors',
-        on ? 'border-violet-400/60 bg-violet-500/70' : 'border-line bg-tint/10',
+        // Off: an edge that shows on a white card too (it barely did).
+        on ? 'border-violet-400/60 bg-violet-500/70' : 'border-(--field-edge) bg-tint/10',
       )}
     >
       <span
@@ -351,7 +386,8 @@ export function Segmented<T extends string | number>({
           {o.value === value && (
             <m.span
               layoutId={`seg-${options.map((x) => x.value).join('-')}`}
-              className="absolute inset-0 rounded-xl bg-tint/12 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
+              // An edge as well as a fill: the fill alone was 1.3:1 to the track, the choice told mostly by the text.
+              className="absolute inset-0 rounded-xl border border-(--field-edge) bg-tint/12 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]"
               transition={{ type: 'spring', stiffness: 500, damping: 38 }}
             />
           )}

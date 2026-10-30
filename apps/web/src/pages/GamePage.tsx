@@ -18,6 +18,7 @@ import { RoundPick } from '../components/game/RoundPick';
 import { MobileStrip, Scoreboard } from '../components/game/Scoreboard';
 import { TopBar } from '../components/game/TopBar';
 import { Button, Modal, Restoring } from '../components/ui';
+import { matchKeysOn } from '../lib/matchKeys';
 import { useMediaQuery } from '../lib/media';
 import { usePageTitle } from '../lib/title';
 import { Results } from './Results';
@@ -42,9 +43,10 @@ const POWERUP_BY_CODE = new Map<string, PowerupId>(
 );
 
 /**
- * 1–4 answer (and 1–3 pick a round's category), Q–E play a коз — but not behind a dialog, and not while typing
- * somewhere. A key presses its button, so it does exactly what a click would, and nothing when the button can't be
- * pressed. A number question takes its digits itself (NumberAnswer).
+ * 1–4 answer (and 1–3 pick a round's category), Q–E play a коз, P pauses after an answer in Соло — but not behind a
+ * dialog, not while typing somewhere, and not when they're switched off (lib/matchKeys). A key presses its button, so
+ * it does exactly what a click would, and nothing when the button can't be pressed. A number question takes its digits
+ * itself (NumberAnswer).
  */
 function useMatchKeys(paused: boolean) {
   const pausedNow = useRef(paused);
@@ -56,11 +58,14 @@ function useMatchKeys(paused: boolean) {
       const byKey = ANSWER_KEYS.indexOf(e.key);
       const choice = byKey >= 0 ? byKey : ANSWER_CODES.indexOf(e.code);
       const powerup = POWERUP_BY_CODE.get(e.code);
-      if ((choice < 0 && !powerup) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const hold = e.code === 'KeyP';
+      if ((choice < 0 && !powerup && !hold) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!matchKeysOn()) return;
       if (pausedNow.current || document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
       // Like a tap, on what's on screen: not on a question still on its way in behind the last one's reveal.
-      if (choice >= 0)
+      if (hold) document.querySelector<HTMLButtonElement>('[data-hold]')?.click();
+      else if (choice >= 0)
         document.querySelector<HTMLButtonElement>(`[data-answer="${choice}"]:not([aria-disabled])`)?.click();
       else document.querySelector<HTMLButtonElement>(`[data-powerup="${powerup}"]:not(:disabled)`)?.click();
     };
@@ -127,7 +132,7 @@ function Arena({ game }: { game: LiveGame }) {
         </div>
         {/* Wide screens only: on a phone the strip above says it, and a hidden board would still redraw every tick. */}
         {!single && wide && (
-          <aside>
+          <aside aria-labelledby="scoreboard-title">
             <Scoreboard game={game} />
           </aside>
         )}

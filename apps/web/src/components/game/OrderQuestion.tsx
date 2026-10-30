@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Check, Flame, Lock } from 'lucide-react';
 import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { useMatchKeysOn } from '../../lib/matchKeys';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
@@ -24,6 +25,7 @@ export function orderValueText(value: number, unit: string): string {
  * back the last, Enter locks it in. Once it's in, the order stays on show.
  */
 export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: QuestionPayload; disabled: boolean }) {
+  const shortcuts = useMatchKeysOn();
   const items = q.order!.items;
   const locked = game.myChoice !== null;
   const [picked, setPicked] = useState<number[]>([]);
@@ -76,7 +78,7 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
                 aria-disabled={inert || undefined}
                 aria-pressed={placed}
                 data-answer={item}
-                aria-keyshortcuts={String(item + 1)}
+                aria-keyshortcuts={shortcuts ? String(item + 1) : undefined}
                 onClick={() => !inert && toggle(item)}
                 className={clsx(
                   'focus-ring flex min-h-14 w-full items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-[background,border-color,opacity] duration-200 short:min-h-11 short:py-1.5 sm:min-h-16',

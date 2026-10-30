@@ -6,9 +6,10 @@ import { numberText } from './numbers';
 import { orderValueText } from './OrderQuestion';
 
 /**
- * What a screen reader hears during a match: what it is as it starts, each question as it opens (with its options, so
- * 1–4 can answer it right away), then how it went, where you stand and who dropped out. Polite, so it never cuts the
- * reader off mid-sentence.
+ * What a screen reader hears during a match: what it is as it starts, a round's pick (yours: what to choose from), each
+ * question as it opens (the question itself is read where the focus lands, its heading, which carries the options:
+ * QuestionView), what a коз did, then how it went — with its "Знаеше ли?" in a run alone —, where you stand and who
+ * dropped out. Polite, so it never cuts the reader off mid-sentence.
  */
 export function MatchAnnouncer({ game }: { game: LiveGame }) {
   const [message, setMessage] = useState('');
@@ -34,23 +35,44 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
     if (intro) setMessage(intro);
   }, [intro]);
 
-  // Keyed by the text itself: a resync that re-sends the same question stays quiet.
+  // A round's category being picked: by you (what from, and how long), or by whom; then what it is.
+  const pick = game.phase === 'pick' ? game.pick : null;
+  const picking = pick
+    ? pick.pickerId === youId
+      ? `Рунд ${pick.round + 1} от ${game.rounds.length}. Ти избираш категорията: ${pick.options
+          .map((c, i) => `${i + 1}) ${categoryById(c)?.name}`)
+          .join(', ')}. ${plural(Math.round(pick.durationMs / 1000), 'секунда', 'секунди')}.`
+      : `Рунд ${pick.round + 1} от ${game.rounds.length}. ${game.players[pick.pickerId]?.name ?? 'Съперникът'} избира категорията…`
+    : null;
+  useEffect(() => {
+    if (picking) setMessage(picking);
+  }, [picking]);
+  const chosen = pick?.chosen ? `Рунд ${pick.round + 1}: ${categoryById(pick.chosen)?.name}.` : null;
+  useEffect(() => {
+    if (chosen) setMessage(chosen);
+  }, [chosen]);
+
+  // Keyed by the text itself: a resync that re-sends the same question stays quiet. The question and its options are
+  // read where the focus goes (its heading): said here too, they were cut off by that move, or heard twice.
   const opening = q
     ? `${q.final ? 'Финал. ' : ''}Въпрос ${q.index + 1} от ${q.total}${
         q.elimination ? ' — след него най-слабият отпада' : ''
-      }: ${q.image ? `Картина: ${q.image.alt}. ` : ''}${q.q} ${
-        q.number
-          ? `Напиши число между ${numberText(q.number.min, q.number)} и ${numberText(q.number.max, q.number)}.`
-          : q.order
-            ? `Подреди, като ги избереш едно след друго (1 до 4), после Enter: ${q.order.items
-                .map((o, i) => `${LETTERS[i]}) ${o}.`)
-                .join(' ')}`
-            : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ')
-      }`
+      }.`
     : null;
   useEffect(() => {
     if (opening) setMessage(opening);
   }, [opening]);
+
+  // What a коз did: two options gone, or the bet on.
+  const removed = q && !reveal && game.removed.length ? game.removed : null;
+  const fifty = removed ? `Махнати са ${removed.map((i) => `${LETTERS[i]})`).join(' и ')}.` : null;
+  useEffect(() => {
+    if (fifty) setMessage(fifty);
+  }, [fifty]);
+  const bet = q && !reveal && game.doubled ? 'Двойно или нищо: верен отговор носи двойно, грешка — минус 500.' : null;
+  useEffect(() => {
+    if (bet) setMessage(bet);
+  }, [bet]);
 
   let outcome: string | null = null;
   if (q && reveal) {
@@ -87,8 +109,10 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
         id === youId ? 'Ти отпадна от мача.' : `${game.players[id]?.name ?? 'Играч'} отпада.`,
       ),
       standing(game),
+      // Alone, the fact is shown with the answer (with others, it waits for the results).
+      reveal.fact && game.start.players.length === 1 ? `Знаеше ли? ${reveal.fact}` : null,
     ];
-    outcome = parts.join(' ');
+    outcome = parts.filter(Boolean).join(' ');
   }
   useEffect(() => {
     if (outcome) setMessage(outcome);

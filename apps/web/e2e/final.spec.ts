@@ -33,7 +33,7 @@ test('a solo match ends on a number, typed on the keyboard, shown on a line agai
   await expect(lock).toBeEnabled();
   await page.keyboard.press('Enter');
   await expect(lock).toBeHidden();
-  await expect(readout).toHaveAttribute('aria-label', new RegExp(`Твоят отговор: ${low}`));
+  await expect(readout).toContainText(new RegExp(`Твоят отговор:\\s*${low}`));
 
   // The reveal: a line with the answer on it, and how far off the number was.
   await expect(page.getByText(/^(точно|[+−].+|[×÷].+)$/).first()).toBeVisible({ timeout: gameMs(10_000) });

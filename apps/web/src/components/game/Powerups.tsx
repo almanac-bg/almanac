@@ -3,6 +3,7 @@ import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { useMatchKeysOn } from '../../lib/matchKeys';
 import { Emoji } from '../Emoji';
 
 /**
@@ -11,8 +12,12 @@ import { Emoji } from '../Emoji';
  */
 export const POWERUP_KEYS: Record<PowerupId, string> = { fifty: 'Q', retry: 'W', double: 'E' };
 
-/** A key's letter on screen: only for a mouse and a keyboard (a touch screen has no keys to press). */
+/**
+ * A key's letter on screen: only for a mouse and a keyboard (a touch screen has no keys to press), and only while the
+ * match keys are on (lib/matchKeys).
+ */
 export function KeyHint({ children, className }: { children: string; className?: string }) {
+  if (!useMatchKeysOn()) return null;
   return (
     <kbd
       aria-hidden
@@ -188,6 +193,7 @@ const BLOCKED_HINT_MS = 2200;
  * (a touch screen has no hover title to tell).
  */
 export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean }) {
+  const keys = useMatchKeysOn();
   const [hint, setHint] = useState<{ id: PowerupId; text: string } | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(hintTimer.current), []);
@@ -208,11 +214,15 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
     >
       <div className="flex flex-wrap items-center gap-2">
         <ActivePowerups game={game} />
+        {/* Said by a region that's there before it has anything to say (one that comes in holding its text isn't read). */}
+        <span role="status" className="sr-only">
+          {hint?.text ?? ''}
+        </span>
         <AnimatePresence>
           {hint && (
             <m.span
               key={hint.id}
-              role="status"
+              aria-hidden
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
@@ -245,7 +255,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               onClick={() => (blocked ? explain(p, blocked) : actions.powerup(p.id))}
               title={blocked ? `${p.name} — ${blocked}` : `${p.name} (${POWERUP_KEYS[p.id]}): ${p.description}`}
               aria-label={`${p.name}: ${p.description}${blocked ? ` (${blocked})` : ''}`}
-              aria-keyshortcuts={POWERUP_KEYS[p.id]}
+              aria-keyshortcuts={keys ? POWERUP_KEYS[p.id] : undefined}
               className={clsx(
                 'focus-ring relative inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:h-12 max-sm:min-w-10 max-sm:max-w-16 max-sm:flex-1 max-sm:flex-col max-sm:justify-center max-sm:gap-0.5 max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
                 used

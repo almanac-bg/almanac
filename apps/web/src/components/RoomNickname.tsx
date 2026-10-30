@@ -1,5 +1,5 @@
 import { DoorClosed } from 'lucide-react';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Button, INPUT, Spinner } from './ui';
 
 const KEY = 'quiz:room-nickname';
@@ -43,6 +43,9 @@ export function RoomNickname({
   const [name, setName] = useState(remembered);
   const [problem, setProblem] = useState<string | null>(null);
   const id = useId();
+  // Its one field takes the focus: it comes in place of the button that led here (Enter then went nowhere).
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => field.current?.focus(), []);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -69,6 +72,7 @@ export function RoomNickname({
           Име в стаята
         </label>
         <input
+          ref={field}
           id={id}
           value={name}
           onChange={(e) => setName(e.target.value)}

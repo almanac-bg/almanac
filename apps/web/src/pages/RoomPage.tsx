@@ -141,6 +141,8 @@ export function RoomPage() {
             onClick={copy}
             className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl"
             title="Копирай линк за покана"
+            // Named for what it does, not only the digits it shows.
+            aria-label={`Код ${room.code.split('').join(' ')} — копирай линк за покана`}
           >
             <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
             <span className="grid size-9 place-items-center rounded-xl bg-tint/5 text-fg-2 group-hover:bg-tint/10">

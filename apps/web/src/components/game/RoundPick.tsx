@@ -2,6 +2,8 @@ import { actions, type LiveGame, useNow } from '@quiz/client';
 import { type CategoryId, categoryById, ROUNDS } from '@quiz/shared';
 import clsx from 'clsx';
 import { m } from 'motion/react';
+import { useEffect, useRef } from 'react';
+import { useMatchKeysOn } from '../../lib/matchKeys';
 import { Emoji } from '../Emoji';
 import { Spinner } from '../ui';
 import { KeyHint } from './Powerups';
@@ -20,6 +22,12 @@ export function RoundPick({ game }: { game: LiveGame }) {
   const left = Math.max(0, pick.endsAt - now);
   const drawn = decided && game.rounds[pick.round]?.pickedBy === null;
   const chosen = decided ? categoryById(pick.chosen!) : null;
+  // Yours to pick: the focus on the first category (it was left on the page), the choice said by MatchAnnouncer.
+  const tiles = useRef<HTMLDivElement>(null);
+  const yours = mine && !decided;
+  useEffect(() => {
+    if (yours) tiles.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  }, [yours]);
 
   const title = chosen ? (
     <>
@@ -50,9 +58,7 @@ export function RoundPick({ game }: { game: LiveGame }) {
       <p className="t-eyebrow text-fg-3">
         Рунд {pick.round + 1} от {game.rounds.length}
       </p>
-      <h1 className="mt-2 font-display text-3xl font-bold text-balance sm:text-4xl" aria-live="polite">
-        {title}
-      </h1>
+      <h1 className="mt-2 font-display text-3xl font-bold text-balance sm:text-4xl">{title}</h1>
       <p className="mt-2 max-w-md text-sm text-balance text-fg-2 sm:text-base">{note}</p>
 
       {!decided && (
@@ -68,7 +74,7 @@ export function RoundPick({ game }: { game: LiveGame }) {
         </div>
       )}
 
-      <div className="mt-6 grid w-full gap-3 sm:grid-cols-3">
+      <div ref={tiles} className="mt-6 grid w-full gap-3 sm:grid-cols-3">
         {pick.options.map((id, i) => (
           <Tile
             key={id}
@@ -100,6 +106,7 @@ function Tile({
   chosen: boolean;
   faded: boolean;
 }) {
+  const keys = useMatchKeysOn();
   const cat = categoryById(id)!;
   const body = (
     <>
@@ -132,7 +139,7 @@ function Tile({
         <button
           type="button"
           data-answer={index}
-          aria-keyshortcuts={String(index + 1)}
+          aria-keyshortcuts={keys ? String(index + 1) : undefined}
           onClick={() => actions.pickCategory(id)}
           className={clsx(className, 'focus-ring hover:-translate-y-[3px] motion-reduce:hover:translate-y-0')}
           style={style}

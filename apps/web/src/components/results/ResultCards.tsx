@@ -291,7 +291,7 @@ export function RewardsCard({
         <button
           type="button"
           onClick={() => setAllLines(true)}
-          className="focus-ring relative mt-2 rounded-lg text-sm font-semibold text-violet-300 hover:underline"
+          className="focus-ring relative mt-1 inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-violet-300 hover:underline"
         >
           + още {breakdown.length - SHOWN_LINES} {breakdown.length - SHOWN_LINES === 1 ? 'ред' : 'реда'}
         </button>

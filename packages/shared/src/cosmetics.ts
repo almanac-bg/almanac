@@ -56,6 +56,8 @@ export interface TitleDef {
 export interface EmoteDef {
   id: string;
   emoji: string;
+  /** Its name in words: what a screen reader says for it (the emoji alone read oddly, or not at all). */
+  name: string;
   req: Requirement;
 }
 
@@ -396,24 +398,24 @@ export const TITLES: TitleDef[] = [
 ];
 
 export const EMOTES: EmoteDef[] = [
-  { id: 'thumbs', emoji: '👍', req: { level: 1 } },
-  { id: 'lol', emoji: '😂', req: { level: 1 } },
-  { id: 'wow', emoji: '😮', req: { level: 1 } },
-  { id: 'fire', emoji: '🔥', req: { level: 1 } },
-  { id: 'cool', emoji: '😎', req: { level: 4 } },
-  { id: 'mindblown', emoji: '🤯', req: { level: 6 } },
-  { id: 'clap', emoji: '👏', req: { level: 8 } },
-  { id: 'dead', emoji: '💀', req: { level: 10 } },
-  { id: 'salute', emoji: '🫡', req: { level: 14 } },
-  { id: 'clown', emoji: '🤡', req: { level: 18 } },
-  { id: 'goat', emoji: '🐐', req: { level: 24 } },
-  { id: 'monocle', emoji: '🧐', req: { level: 32 } },
-  { id: 'party', emoji: '🥳', req: { level: 36 } },
-  { id: 'praise', emoji: '🙌', req: { level: 44 } },
-  { id: 'trophy', emoji: '🏆', req: { achievement: 'first_win' } },
-  { id: 'huff', emoji: '😤', req: { achievement: 'photo_finish' } },
-  { id: 'ice', emoji: '🥶', req: { achievement: 'flawless_duel' } },
-  { id: 'handshake', emoji: '🤝', req: { achievement: 'team_win' } },
+  { id: 'thumbs', emoji: '👍', name: 'Палец нагоре', req: { level: 1 } },
+  { id: 'lol', emoji: '😂', name: 'Смях', req: { level: 1 } },
+  { id: 'wow', emoji: '😮', name: 'Учудване', req: { level: 1 } },
+  { id: 'fire', emoji: '🔥', name: 'Огън', req: { level: 1 } },
+  { id: 'cool', emoji: '😎', name: 'Готино', req: { level: 4 } },
+  { id: 'mindblown', emoji: '🤯', name: 'Шок', req: { level: 6 } },
+  { id: 'clap', emoji: '👏', name: 'Аплодисменти', req: { level: 8 } },
+  { id: 'dead', emoji: '💀', name: 'Умрях от смях', req: { level: 10 } },
+  { id: 'salute', emoji: '🫡', name: 'Поздрав', req: { level: 14 } },
+  { id: 'clown', emoji: '🤡', name: 'Клоун', req: { level: 18 } },
+  { id: 'goat', emoji: '🐐', name: 'Най-великият', req: { level: 24 } },
+  { id: 'monocle', emoji: '🧐', name: 'Хм', req: { level: 32 } },
+  { id: 'party', emoji: '🥳', name: 'Купон', req: { level: 36 } },
+  { id: 'praise', emoji: '🙌', name: 'Браво', req: { level: 44 } },
+  { id: 'trophy', emoji: '🏆', name: 'Купа', req: { achievement: 'first_win' } },
+  { id: 'huff', emoji: '😤', name: 'Яд', req: { achievement: 'photo_finish' } },
+  { id: 'ice', emoji: '🥶', name: 'Хладнокръвно', req: { achievement: 'flawless_duel' } },
+  { id: 'handshake', emoji: '🤝', name: 'Ръкостискане', req: { achievement: 'team_win' } },
 ];
 
 /**

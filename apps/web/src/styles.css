@@ -118,6 +118,9 @@
   --gradient-c: #0891b2;
   --field: #fff;
   --field-focus: #fff;
+  /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
+  --field-edge: #8a84a3;
+  --field-focus-edge: #7c3aed;
   --accent-l-min: 0;
   --accent-l-max: 0.5;
   --color-amber-50: oklch(27.9% 0.077 45.635);
@@ -220,6 +223,9 @@
   --gradient-c: #22d3ee;
   --field: rgb(0 0 0 / 0.3);
   --field-focus: rgb(0 0 0 / 0.4);
+  /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
+  --field-edge: #6e6890;
+  --field-focus-edge: #a78bfa;
   /* An accent as text (accentText): its lightness kept where it reads on this theme's backgrounds, 4.5:1 or more. */
   --accent-l-min: 0.72;
   --accent-l-max: 1;
@@ -286,7 +292,7 @@ body {
   @apply text-lg font-extrabold wrap-anywhere hyphens-auto;
 }
 @utility t-eyebrow {
-  @apply text-[11px] font-bold tracking-[0.16em] uppercase;
+  @apply text-xs font-bold tracking-[0.16em] uppercase;
 }
 
 /*
@@ -382,7 +388,7 @@ body {
    */
   .field,
   .field-box {
-    border: 1px solid var(--color-line);
+    border: 1px solid var(--field-edge);
     background-color: var(--field);
     outline: none;
     transition:
@@ -407,7 +413,7 @@ body {
   }
   .field:focus-visible,
   .field-box:focus-within {
-    border-color: #a78bfa;
+    border-color: var(--field-focus-edge);
     background-color: var(--field-focus);
     box-shadow: 0 0 0 3px rgb(139 92 246 / 0.35);
     /* The shadow's stand-in where high contrast drops it. */

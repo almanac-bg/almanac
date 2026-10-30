@@ -32,6 +32,7 @@ function Overview() {
       <header>
         <p className="t-eyebrow text-fg-3">Моят алманах</p>
         <h1 className="mt-2 font-display text-4xl font-black sm:text-5xl">
+          <span className="sr-only">Моят алманах: </span>
           {fmt(data.facts)} <span className="text-2xl font-bold text-fg-3 sm:text-3xl">от {fmt(data.total)} факта</span>
         </h1>
         <ProgressBar value={data.total ? data.facts / data.total : 0} className="mt-4 max-w-md" />

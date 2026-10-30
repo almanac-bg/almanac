@@ -26,7 +26,7 @@ test('a solo player stops on a "Знаеше ли?" fact to read it, and finds t
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
     } else await answer.first().click({ timeout: gameMs(2_500) });
-    await expect(page.getByText('Знаеше ли?')).toBeVisible({ timeout: gameMs(2_000) });
+    await expect(page.getByText('Знаеше ли?', { exact: true })).toBeVisible({ timeout: gameMs(2_000) });
     await stop.click({ timeout: gameMs(1_500) }).catch((error) => {
       if (!(error instanceof errors.TimeoutError)) throw error;
     });

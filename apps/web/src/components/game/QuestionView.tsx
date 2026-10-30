@@ -1,9 +1,10 @@
 import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@quiz/client';
-import { answerPoints, type Crowd, categoryById, type GamePlayer, type QuestionPayload } from '@quiz/shared';
+import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type QuestionPayload } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, m, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMatchKeysOn } from '../../lib/matchKeys';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
@@ -12,6 +13,7 @@ import { Button, Spinner } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
+import { numberText } from './numbers';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderQuestion';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
 import { QuestionPicture } from './QuestionPicture';
@@ -160,13 +162,29 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             {!reveal && !number && !order && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
+            {/* Where the focus lands as the question opens: read there whole — which one, a picture's description, the
+                question, then (its description) the options or what to do — rather than in a live message the focus
+                move would cut off (MatchAnnouncer says only which question it is). */}
             <h1
               ref={heading}
               tabIndex={-1}
+              aria-describedby={`q${q.index}-how`}
               className="text-[clamp(1.35rem,3.2vw,2rem)] leading-snug font-bold text-pretty hyphens-auto short:max-sm:text-[1.15rem] sm:text-balance large:text-[2.375rem] flat:text-[1.05rem]"
             >
+              <span className="sr-only">
+                Въпрос {q.index + 1} от {q.total}: {q.image ? `Картина: ${q.image.alt}. ` : ''}
+              </span>
               {keepTogether(q.q)}
             </h1>
+            <p id={`q${q.index}-how`} className="sr-only">
+              {q.number
+                ? `Напиши число между ${numberText(q.number.min, q.number)} и ${numberText(q.number.max, q.number)}.`
+                : q.order
+                  ? `Подреди, като ги избереш едно след друго, после Enter: ${q.order.items
+                      .map((o, i) => `${LETTERS[i]}) ${o}.`)
+                      .join(' ')}`
+                  : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ')}
+            </p>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
           </div>
         </div>
@@ -287,6 +305,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
 function FactNote({ index, fact, waiting }: { index: number; fact: string; waiting: boolean }) {
   const [state, setState] = useState<'shown' | 'asking' | 'holding'>(waiting ? 'holding' : 'shown');
   useContinueKey(state === 'holding');
+  const goOn = useFocusOnHold(state === 'holding');
   const ref = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -326,15 +345,16 @@ function FactNote({ index, fact, waiting }: { index: number; fact: string; waiti
       </p>
       <div className="mt-2 flex justify-end">
         {state === 'holding' ? (
-          <Button size="sm" onClick={actions.resumeAfterFact}>
+          <Button ref={goOn} size="sm" onClick={actions.resumeAfterFact}>
             Продължи <ArrowRight aria-hidden className="size-4" />
           </Button>
         ) : (
-          <Button size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
+          <Button data-hold size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
             Спри, за да прочета
           </Button>
         )}
       </div>
+      {state === 'holding' && <HoldEnding holdMs={waiting ? HOLD.untimedMs : HOLD.pauseMs} />}
     </m.div>
   );
 }
@@ -346,6 +366,7 @@ function FactNote({ index, fact, waiting }: { index: number; fact: string; waiti
 function PauseAfterAnswer({ index, waiting }: { index: number; waiting: boolean }) {
   const [state, setState] = useState<'shown' | 'asking' | 'holding'>(waiting ? 'holding' : 'shown');
   useContinueKey(state === 'holding');
+  const goOn = useFocusOnHold(state === 'holding');
   async function hold() {
     setState('asking');
     setState((await actions.holdOnFact(index)) ? 'holding' : 'shown');
@@ -353,16 +374,52 @@ function PauseAfterAnswer({ index, waiting }: { index: number; waiting: boolean 
   return (
     <div className="mt-3 flex justify-end short:max-sm:mt-2">
       {state === 'holding' ? (
-        <Button size="sm" onClick={actions.resumeAfterFact}>
+        <Button ref={goOn} size="sm" onClick={actions.resumeAfterFact}>
           Продължи <ArrowRight aria-hidden className="size-4" />
         </Button>
       ) : (
-        <Button size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
+        <Button data-hold size="sm" variant="ghost" onClick={hold} loading={state === 'asking'}>
           <Pause aria-hidden className="size-4" /> Пауза
         </Button>
       )}
+      {state === 'holding' && <HoldEnding holdMs={waiting ? HOLD.untimedMs : HOLD.pauseMs} />}
     </div>
   );
+}
+
+/**
+ * A hold goes on by itself after a while (HOLD): its last seconds are said, once, rather than the next question
+ * arriving out of nowhere (WCAG 2.2.1).
+ */
+function HoldEnding({ holdMs }: { holdMs: number }) {
+  const [since] = useState(() => Date.now());
+  const now = useNow(1000);
+  const left = Math.ceil((since + holdMs - now) / 1000);
+  const ending = left * 1000 <= HOLD.warnMs;
+  return (
+    <p className="mt-2 w-full text-right text-xs text-fg-3">
+      {/* Said once, as the last seconds begin (a line changing every second would talk over everything). */}
+      <span role="status" className="sr-only">
+        {ending ? `Мачът продължава сам след ${HOLD.warnMs / 1000} секунди. „Продължи“ го пуска веднага.` : ''}
+      </span>
+      {ending && <span aria-hidden>Мачът продължава сам след {Math.max(0, left)} с</span>}
+    </p>
+  );
+}
+
+/**
+ * „Продължи“, taking the focus from the button that asked for the hold (it's gone once the hold is on, and focus would
+ * fall to the page): only when the player asked, not when a run without a clock holds every answer by itself.
+ */
+function useFocusOnHold(holding: boolean) {
+  const button = useRef<HTMLButtonElement>(null);
+  const wasHolding = useRef(holding);
+  useEffect(() => {
+    if (holding && !wasHolding.current && button.current?.ownerDocument.activeElement === document.body)
+      button.current.focus();
+    wasHolding.current = holding;
+  }, [holding]);
+  return button;
 }
 
 /** Enter goes on from a held answer, as „Продължи“ does (not while typing, or on a focused button that has its own). */
@@ -608,6 +665,7 @@ function AnswerButton({
 
   const inert = disabled || locked || removed;
   const liftable = !inert;
+  const keys = useMatchKeysOn();
   return (
     // The hover lift is on the button, the hover itself on this wrapper that stays put: lifting the button can't move
     // it out from under a resting pointer (which made it flicker between raised and lowered).
@@ -615,7 +673,7 @@ function AnswerButton({
       <m.button
         type="button"
         data-answer={index}
-        aria-keyshortcuts={String(index + 1)}
+        aria-keyshortcuts={keys ? String(index + 1) : undefined}
         // Not `disabled`: that would drop keyboard focus from the answer you just picked (to the top of the page).
         aria-disabled={inert || undefined}
         onClick={() => !inert && actions.answer(index)}

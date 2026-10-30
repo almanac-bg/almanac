@@ -36,7 +36,8 @@ for (const via of ['header', 'settings'] as const) {
     // Another device: the name and password lead into that same account.
     const elsewhere = await newPlayer();
     await signIn(elsewhere, username, password);
-    await expect(elsewhere.getByRole('heading', { level: 1, name: username, exact: true })).toBeVisible();
+    // Signed in there, as the same player: the lobby's card says who.
+    await expect(elsewhere.getByRole('main').getByText(username, { exact: true })).toBeVisible();
     expect(await me(elsewhere)).toMatchObject({ id: guest.id, username, isGuest: false });
   });
 }
