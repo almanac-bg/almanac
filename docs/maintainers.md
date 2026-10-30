@@ -11,9 +11,18 @@ vulnerability reporting, secret scanning, етикети, защитен `main` 
 настройки съществуват само за публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично.
 Изображението за social preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.
 
+## CodeQL
+
+CodeQL (разширеният набор заявки) проверява кода при всеки push и pull request; pull request с открит проблем от
+висока или критична степен не се слива. Всеки сигнал (Security → Code scanning) се проверява в кода: истински проблем
+се поправя в същия pull request, а фалшив се отхвърля с причина (False positive / Won't fix и едно изречение защо,
+напр. „throttled() inside: the limit is in the handler“), за да личи защо при следващия поглед. Целта е нула отворени.
+
 ## От commit до продукцията
 
 Промяна влиза в `main` през pull request със зелен CI. CI на `main` пуска всички проверки отново и, щом минат, публикува
-образа `ghcr.io/almanac-bg/almanac:<commit>`; `deploy/deploy.sh` на сървъра пуска точно него (виж
-[Поддръжка → Обновяване](operations.md#обновяване)). Всяко внедряване получава запис в [CHANGELOG.md](../CHANGELOG.md):
-датата и часът (софийско време), commit-ът и какво влезе.
+образа `ghcr.io/almanac-bg/almanac:<commit>` с подписано удостоверение за произход (build provenance): че точно този
+образ е направен от CI на това хранилище за този commit. `deploy/deploy.sh` на сървъра взема цифровия отпечатък (digest)
+на образа, проверява удостоверението и пуска точно него (виж [Поддръжка → Обновяване](operations.md#обновяване)); ръчна
+проверка: `gh attestation verify oci://ghcr.io/almanac-bg/almanac:<commit> --repo almanac-bg/almanac`. Всяко внедряване
+получава запис в [CHANGELOG.md](../CHANGELOG.md): датата и часът (софийско време), commit-ът и какво влезе.

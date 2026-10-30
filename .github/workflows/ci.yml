@@ -10,18 +10,20 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same branch makes the run before it pointless.
+# A newer push to a pull request's branch makes the run before it pointless. Not on main: every commit there gets its
+# run to the end, and so its image (deploy/rollback.sh <commit> can go back to any of them).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Actions are pinned to a commit (a tag can be moved to other code); Dependabot updates the commit and the comment.
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Node 24 (development, long-term support until 2028) and Node 26 (long-term support from October 2026):
-    # the whole suite has to pass on both before the Docker image moves to a newer Node.
+    # A hung test would otherwise hold the runner for six hours.
+    timeout-minutes: 25
+    # Node 24 (development, and the floor in `engines`) and Node 26 (what the Docker image, so production, runs).
     strategy:
       fail-fast: false
       matrix:
@@ -29,6 +31,9 @@ jobs:
     name: test (Node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes: the token isn't left in .git for the steps that follow.
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
@@ -69,6 +74,7 @@ jobs:
   # clicks take far longer than Chrome's).
   browsers:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -76,9 +82,13 @@ jobs:
     name: browser tests (${{ matrix.engine }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes: the token isn't left in .git for the steps that follow.
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          # Production's.
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.engine }}
@@ -104,9 +114,13 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes: the token isn't left in .git for the steps that follow.
+          persist-credentials: false
       # The production compose file must parse (anchors, profiles, env interpolation)…
       - run: DOMAIN=example.test docker compose config --quiet
       # …and Caddy must accept its config: a mistake there takes HTTPS down.
@@ -154,10 +168,10 @@ jobs:
           }
 
           docker network create backup
-          docker run -d --name s3 --network backup motoserver/moto:5.2.4
+          docker run -d --name s3 --network backup motoserver/moto:5.2.4@sha256:120b1589c6df7e35d2092935f6ff724486bb2c4189d0e36ce795baba1400ffd2
           docker run -d --name app --network backup -v data:/data $app_env almanac
           healthy app
-          docker run --rm --network backup curlimages/curl:8.11.1 -sf -X PUT http://s3:5000/backups
+          docker run --rm --network backup curlimages/curl:8.11.1@sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69 -sf -X PUT http://s3:5000/backups
 
           register app before_backup
           docker run -d --name litestream --network backup $as_app -v data:/data $config $env_args "$LITESTREAM" replicate
@@ -217,6 +231,7 @@ jobs:
             runner: ubuntu-24.04-arm
     name: image (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -224,6 +239,9 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes: the token isn't left in .git for the steps that follow.
+          persist-credentials: false
       - run: >-
           docker build -t "$IMAGE"
           --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}"
@@ -240,18 +258,30 @@ jobs:
       - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - run: docker push "$IMAGE"
 
-  # ghcr.io/…:<commit>, what deploy/deploy.sh pulls: a list of the two, so each server gets its own.
+  # ghcr.io/…:<commit>, what deploy/deploy.sh pulls: a list of the two, so each server gets its own. With a signed
+  # statement (build provenance) that this workflow, on this commit, made exactly that list: a tag can be pushed again
+  # by anyone with write access to the package, the statement can't, and deploy/deploy.sh pulls only what it covers.
   publish:
     needs: image
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       packages: write
+      id-token: write
+      attestations: write
     env:
       IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
     steps:
       - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - run: docker buildx imagetools create -t "$IMAGE" "$IMAGE-amd64" "$IMAGE-arm64"
       - name: Both kinds are in it
+        id: list
         run: |
           docker buildx imagetools inspect "$IMAGE" | tee /dev/stderr | grep -q 'linux/amd64'
           docker buildx imagetools inspect "$IMAGE" | grep -q 'linux/arm64'
+          echo "digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' | jq -r .digest)" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.list.outputs.digest }}
+          create-storage-record: false

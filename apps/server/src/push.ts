@@ -93,9 +93,6 @@ export const unsubscribe = (userId: number, endpoint: string) =>
 export const setPushPrefs = (userId: number, prefs: PushPrefs) =>
   run('UPDATE users SET push_prefs = ? WHERE id = ?', JSON.stringify(prefs), userId);
 
-export const deviceCount = (userId: number) =>
-  one<{ n: number }>('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?', userId)!.n;
-
 export interface PushMessage {
   title: string;
   body: string;

@@ -93,9 +93,9 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    само за него. В `.env`: `BACKUP_ENDPOINT=https://<Account ID>.eu.r2.cloudflarestorage.com`,
    `BACKUP_REGION=auto` и ключовете от токена. (Hetzner Object Storage също работи, но е при същата фирма като
    сървъра.)
-4. **Дай на сървъра достъп до частната банка с въпроси:** създай ключ без парола (за да работи `git pull` без теб) и
-   добави публичния му ключ в almanac-questions → Settings → Deploy keys, само за четене (ако организацията не ги
-   позволява: Organization → Settings → Repository → Deploy keys):
+4. **Дай на сървъра достъп до частната банка с въпроси** (без достъп до нея — виж края на стъпка 5): създай ключ без
+   парола (за да работи `git pull` без теб) и добави публичния му ключ в almanac-questions → Settings → Deploy keys,
+   само за четене (ако организацията не ги позволява: Organization → Settings → Repository → Deploy keys):
 
    ```bash
    ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C almanac-server
@@ -116,6 +116,13 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    `ghcr.io/almanac-bg/almanac` е публичен (в GitHub: организацията → Packages → almanac → Package settings → Change
    visibility), така че сървърът го тегли без парола. **Запази `.env` в password manager** веднага: в него
    са ключовете за бекъпите, имейлите и Sentry, а без тях бекъпите не могат да се възстановят на нов сървър.
+
+   **Без достъп до almanac-questions** (частната банка е само за almanac.bg): прескочи стъпка 4 и вместо
+   `git clone … private` сложи своя банка в `private/questions.json` (форматът е в [Добавяне на въпроси](questions.md))
+   или, за да опиташ, примерната: `mkdir private && cp apps/server/src/data/questions.sample.json private/questions.json`.
+   Деплоят я оставя каквато е; промяна в нея влиза в играта с `/admin` → „Презареди банката“. От свой fork: CI
+   публикува образа в `ghcr.io/<организация>/<хранилище>` — задай го като `IMAGE` в `.env` (пакетът трябва да е
+   публичен или сървърът да е влязъл в ghcr.io).
 6. **Провери, че всичко работи:** `docker compose ps` показва три контейнера `Up` (приложението — `healthy`),
    `docker compose logs litestream` показва, че базата се реплицира, а `curl -fsS https://almanac.bg/api/health`
    отговаря с `{"ok":true}`.

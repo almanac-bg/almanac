@@ -15,8 +15,8 @@ git clone git@github.com:almanac-bg/almanac-questions.git private
 
 Когато я има, сървърът използва `private/questions.json`, а `npm run build` я слага до сървърния bundle. Образът,
 който CI публикува, е само с публичния код: в продукция `docker-compose.yml` монтира `private/` само за четене
-(`QUESTIONS_PATH`), така че нови въпроси на сървъра са `git -C private pull && docker compose restart app`, без
-деплой. Без банката сървърът играе с публичната извадка,
+(`QUESTIONS_PATH`), така че нови въпроси стигат до сървъра с `deploy/deploy.sh`: той дърпа и банката и я проверява,
+преди да рестартира приложението на нея (същият образ — без нов билд). Без банката сървърът играе с публичната извадка,
 `apps/server/src/data/questions.sample.json`. Двата файла са в един и същ формат и `npm test` проверява наличните. За
 да добавиш вградени въпроси, добави ги в края на банката (после commit и push в `private/`):
 

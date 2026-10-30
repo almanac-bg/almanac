@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && vite build -c vite.paint.config.ts",
+    "build": "vite build && vite build -c vite.paint.config.ts && node ../../scripts/licenses.mjs dist/licenses.txt",
     "preview": "vite preview",
     "test:browser": "playwright test",
     "icons": "node scripts/icons.mjs"

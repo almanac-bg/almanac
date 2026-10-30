@@ -1,5 +1,5 @@
 import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
-import { BRAND, type FriendEntry, type FriendsResponse, titleName } from '@quiz/shared';
+import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@quiz/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
@@ -322,7 +322,7 @@ function AddFriendForm({ onAdded }: { onAdded: (d: FriendsResponse) => void }) {
         onChange={(e) => setUsername(e.target.value)}
         placeholder="Потребителско име"
         aria-label="Потребителско име на приятел"
-        maxLength={20}
+        maxLength={USERNAME.max}
         className="field h-11 min-w-0 flex-1 rounded-2xl px-4 text-[15px] sm:w-64"
       />
       <Button type="submit" loading={busy} disabled={!username.trim()}>

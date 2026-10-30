@@ -1,7 +1,9 @@
 #!/bin/sh
-# Deploys what's on GitHub: both repositories, and the image CI built, tested and published for this commit (Caddy and
-# Litestream on up-to-date images too). Nothing is built here, and nothing changes until that image is here: a commit
-# CI hasn't passed has no image, and the deploy stops with the old code and the old question bank still in place. The
+# Deploys what's on GitHub: both repositories (the question bank in private/ when it's a clone of one), and the image
+# CI built, tested and published for this commit (IMAGE in .env: a fork's own; Caddy and Litestream on up-to-date
+# images too), pulled by digest and only with CI's build provenance (deploy/pull-image.sh). Nothing is built here, and
+# nothing changes until that image is here: a commit CI hasn't passed has no image, and the deploy stops with the old
+# code and the old question bank still in place. The
 # image that ran until now is kept as `almanac:previous` for deploy/rollback.sh; a deploy that isn't healthy within
 # 90 seconds goes back to it by itself. Run as root in the checkout. It waits for a quiet moment first (no class in the
 # middle of a match, not the evening Роял's hour), up to 20 minutes; `deploy/deploy.sh --now` doesn't. Queues close
@@ -19,20 +21,26 @@ main() {
   esac
   cd "$(dirname "$0")/.."
   git fetch --quiet origin
-  git -C private fetch --quiet origin
+  # The bank as a clone of its own repository (almanac-questions), or a file put there by hand (docs/self-hosting.md).
+  bank=$([ -d private/.git ] && echo git || echo file)
+  [ "$bank" = file ] || git -C private fetch --quiet origin
   commit=$(git rev-parse origin/main)
   release=$(git rev-parse --short "$commit")
-  image="ghcr.io/almanac-bg/almanac:$commit"
-  docker pull --quiet "$image" >/dev/null || {
+  pulled=0
+  image=$(deploy/pull-image.sh "$commit") || pulled=$?
+  if [ "$pulled" = 3 ]; then
+    echo "The image for $release has no build provenance from its repository's CI: not deployed. Was the tag pushed by hand?"
+    exit 1
+  elif [ "$pulled" != 0 ]; then
     echo "No image for $release: CI publishes one once every check on the commit has passed (still running, or failed?)."
     exit 1
-  }
+  fi
   [ "${1:-}" = --now ] || quiet_moment || exit 1
   echo "$(date -u +%FT%TZ) deploying (note the time: Litestream can bring the database back to it)"
 
-  bank_before=$(git -C private rev-parse HEAD)
-  git -C private merge --quiet --ff-only origin/main
-  bank_after=$(git -C private rev-parse HEAD)
+  bank_before=$([ "$bank" = file ] || git -C private rev-parse HEAD)
+  [ "$bank" = file ] || git -C private merge --quiet --ff-only origin/main
+  bank_after=$([ "$bank" = file ] || git -C private rev-parse HEAD)
   # The new code on the new questions, in a container of its own, before anything switches: a bank it can't load (a
   # slip in the file, a format the code doesn't know yet) leaves the game as it is, on the questions it has.
   if [ "$bank_after" != "$bank_before" ] && ! docker run --rm -e DB_PATH=/tmp/check.db \

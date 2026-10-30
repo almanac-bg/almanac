@@ -33,6 +33,10 @@ export function LegalLinks({ className = '' }: { className?: string }) {
           Изходен код
         </a>
       )}
+      {/* The fonts', emoji's and packages' licences, as they ask to travel with the code (scripts/licenses.mjs). */}
+      <a href="/licenses.txt" className="inline-flex min-h-11 items-center hover:text-fg-2">
+        Лицензи
+      </a>
       <span className="inline-flex min-h-11 items-center">
         © {op?.year ?? new Date().getFullYear()} {BRAND.name}
       </span>

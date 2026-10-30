@@ -1,11 +1,15 @@
 # Weekly update pull requests (and immediate ones for security advisories). CI runs on each, so a green one is
-# safe to merge; patch and minor npm updates come grouped as one pull request.
+# safe to merge; patch and minor npm updates come grouped as one pull request. A release is proposed once it's five
+# days old: a hijacked package is usually found and pulled within that (security updates don't wait). Images are
+# pinned by digest as well as by tag, and Dependabot moves both.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 5
     groups:
       npm-minor:
         update-types: [minor, patch]

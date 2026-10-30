@@ -223,6 +223,10 @@ test('search engines get the public pages in a sitemap, the site and its mark on
   );
   const robots = await text('/robots.txt');
   assert.match(robots, /^Disallow: \/api\/$/m);
+  // The third-party notices the footer links to: fonts, emoji and packages, in the build.
+  const notices = await text('/licenses.txt');
+  for (const part of ['SIL Open Font License', 'Fluent Emoji', '--- react@', '--- web-push@', '--- express@'])
+    assert.ok(notices.includes(part), part);
   assert.match(robots, /^Allow: \/api\/legal$/m);
   assert.match(robots, new RegExp(`^Sitemap: https://${BRAND.domain}/sitemap.xml$`, 'm'));
 

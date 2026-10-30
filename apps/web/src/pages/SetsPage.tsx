@@ -9,7 +9,7 @@ import {
 } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, Send, Trash2 } from 'lucide-react';
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { SetVisibilityForm } from '../components/admin/Decisions';
 import { GuestNudge } from '../components/ClaimAccount';
@@ -218,7 +218,9 @@ function SetEditor({ id }: { id: number }) {
   const [deleting, setDeleting] = useState(false);
   usePageTitle(data?.name ?? 'Набор');
 
-  useEffect(() => {
+  // Before the form is first painted (a layout effect): a field shown empty for a frame could be typed into, and that
+  // would then be overwritten (a teacher's name for the set, lost to „Нов набор“).
+  useLayoutEffect(() => {
     if (!data) return;
     const base = content(data.name, data.questions.map(toDraft));
     // Changes this tab had made and not saved (a reload, a deploy, a match in between): back, if the set is as it was.

@@ -1,3 +1,4 @@
+import { nicknameProblem, ROOM_NICKNAME, tidyNickname } from '@quiz/shared';
 import { DoorClosed } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Button, INPUT, Spinner } from './ui';
@@ -15,14 +16,6 @@ function remembered(): string {
   } catch {
     return '';
   }
-}
-
-/** As the server checks it: 2–20 letters, digits, spaces and . - _ */
-export function nicknameProblem(name: string): string | null {
-  const n = name.replace(/\s+/gu, ' ').trim();
-  if ([...n].length < 2 || [...n].length > 20) return 'Името е от 2 до 20 знака.';
-  if (!/^[\p{L}\p{N} ._-]+$/u.test(n)) return 'Само букви, цифри и интервали.';
-  return null;
 }
 
 /**
@@ -52,7 +45,7 @@ export function RoomNickname({
     const issue = nicknameProblem(name);
     setProblem(issue);
     if (issue) return;
-    const clean = name.replace(/\s+/gu, ' ').trim();
+    const clean = tidyNickname(name);
     try {
       sessionStorage.setItem(KEY, clean);
     } catch {
@@ -76,7 +69,7 @@ export function RoomNickname({
           id={id}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          maxLength={20}
+          maxLength={ROOM_NICKNAME.max}
           autoComplete="nickname"
           placeholder="Например Мария или Иван 7Б"
           aria-invalid={!!message}

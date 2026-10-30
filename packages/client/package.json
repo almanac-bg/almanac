@@ -10,7 +10,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts"
+    "test": "node --import tsx --experimental-test-module-mocks --test --test-timeout=120000 test/*.test.ts"
   },
   "dependencies": {
     "@quiz/shared": "*"

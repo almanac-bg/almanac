@@ -22,10 +22,11 @@
 
 ## Бърз старт
 
-Нужен е Node 24+. Играта ползва вградения `node:sqlite`, така че няма база данни за инсталиране.
+Нужни са Node 24+ и macOS или Linux (на Windows — WSL: скриптовете са за POSIX shell). Играта ползва вградения
+`node:sqlite`, така че няма база данни за инсталиране.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -41,15 +42,15 @@ npm run dev
 играе и без други хора. За да тестваш истински мултиплейър локално, отвори втори браузър (или частен прозорец) с друг
 профил.
 
-| Скрипт              | Какво прави                                                                |
-| ------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`       | API + realtime сървър на :3001 и Vite на :5173 (през proxy)                |
-| `npm run build`     | Билдва уеб приложението и пакетира сървъра в `apps/server/dist`            |
-| `npm start`         | Продукционен сървър на :3001 (чист Node), който сервира и уеб приложението |
-| `npm run typecheck` | Проверява типовете във всички пакети                                       |
-| `npm test`          | Всички тестове (около минута и половина), виж [Тестове](docs/testing.md)   |
-| `npm run lint`      | Форматиране, правила и подредба на импортите (Biome), както в CI           |
-| `npm run format`    | Поправя автоматично каквото може от горното                                |
+| Скрипт              | Какво прави                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`       | API + realtime сървър на :3001 и Vite на :5173 (през proxy)                                                           |
+| `npm run build`     | Билдва уеб приложението и пакетира сървъра в `apps/server/dist`                                                       |
+| `npm start`         | Продукционен сървър на :3001 (чист Node), който сервира и уеб приложението; иска `OPERATOR_NAME` (виж `.env.example`) |
+| `npm run typecheck` | Проверява типовете във всички пакети                                                                                  |
+| `npm test`          | Всички тестове (около минута и половина), виж [Тестове](docs/testing.md)                                              |
+| `npm run lint`      | Форматиране, правила и подредба на импортите (Biome), както в CI                                                      |
+| `npm run format`    | Поправя автоматично каквото може от горното                                                                           |
 
 ## Тестове
 
@@ -73,16 +74,28 @@ apps/server       Express + Socket.IO + SQLite
   src/daily.ts            Въпросите на деня: един набор на ден (от seed), един опит, линкове към деня
   src/skill.ts            Колко труден е всеки въпрос и колко силен всеки играч, мерено по отговорите (като Elo)
   src/runs.ts             Всеки изигран мач въпрос по въпрос (пази се година): за съперници-записи и анализ
+  src/game/eveningLobby.ts Вечерният Роял: лобито от 20:55 и мачовете в 21:00
+  src/records.ts          Записи на истински Дуели, срещу които се играе, когато няма друг човек
+  src/challenges.ts       Линкове с предизвикателство и дуели с приятел
+  src/groups.ts           Групи със седмична класация и корона
+  src/sets.ts             Наборите с въпроси на учителите и техните картини
+  src/almanac.ts, src/mastery.ts  „Моят алманах“, „Поправителен“ и майсторството по категории
+  src/push.ts             Известия на устройството (web push)
+  src/moderation.ts, src/modlog.ts, src/statements.ts  Модерация, дневникът ѝ и решенията, които играчите получават
   src/friends.ts          Покани за приятелство и кой е онлайн
   src/submissions.ts      Въпроси от общността и модерация
+  src/maintenance.ts      Поддръжката на 15 минути: почистване, напомняния, дневните копия на базата
+  src/realtime.ts         Сокетите: опашки, стаи, мачове, плавният рестарт и /api/live
   src/data/questions.sample.json  Публична извадка от банката с въпроси (истинската е частна, в private/)
   test/                   Тестовете на сървъра (docs/testing.md)
 packages/client   Ядрото на клиента: API заявки, състояние на играта в реално време (zustand), форматиране.
                   Сайтът добавя звуците си; отделено е, за да могат и други клиенти да го ползват
 apps/web          React 19 + Vite + Tailwind 4 + Motion
   e2e/                    Браузърните тестове (Playwright)
-deploy/           Caddyfile (HTTPS и страницата при обновяване) и litestream.yml (бекъпите)
-scripts/          github-setup.sh: настройките на хранилището в GitHub
+deploy/           Caddyfile (HTTPS и страницата при обновяване), litestream.yml (бекъпите) и скриптовете на сървъра:
+                  deploy.sh, rollback.sh, pull-image.sh, check.sh и backup-check.sh (docs/operations.md)
+scripts/          github-setup.sh (настройките на хранилището в GitHub), subset-fonts.mjs (шрифтовете),
+                  licenses.mjs (/licenses.txt)
 ```
 
 ## Документация
@@ -130,7 +143,7 @@ Vite + Tailwind web app (`apps/web`), and the rules and protocol shared by both 
 the server. Production is a single Docker host behind Caddy, with continuous Litestream backups; CI tests every commit
 (server, client, and browser tests in Chrome, WebKit and Firefox) and publishes the image that gets deployed.
 
-Run it with Node 24+: `npm install && npm run dev`, then open http://localhost:5173. The real question bank is private
+Run it with Node 24+: `npm ci && npm run dev`, then open http://localhost:5173. The real question bank is private
 (answers shouldn't be searchable mid-match); a public sample of 120 questions ships with the code. The code is free
 software under the [AGPL-3.0](LICENSE); the name, logo and domain are not part of the licence. The documentation is in
 Bulgarian; issues and pull requests in English are welcome.

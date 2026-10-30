@@ -119,7 +119,7 @@ export const config = {
   sessionDays: 30,
   /** Public origin used in email links. */
   appUrl: (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, ''),
-  /** e.g. smtp://user:pass@smtp-relay.brevo.com:587 — without it, emails are printed to the console. */
+  /** e.g. smtp://PROJECT_ID:SECRET_KEY@smtp.tem.scaleway.com:587 — without it, emails are printed to the console. */
   smtpUrl: process.env.SMTP_URL || null,
   mailFrom: process.env.MAIL_FROM || `${BRAND.name} <no-reply@${BRAND.domain}>`,
   /**

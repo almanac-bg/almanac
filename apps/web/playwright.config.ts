@@ -124,7 +124,7 @@ export default defineConfig({
     command: `node ${JSON.stringify(serverEntry)}`,
     url: `${baseURL}/api/health`,
     // Always a fresh server: a new database, and no rate limits left over from an earlier run. (Within a run they
-    // apply: 20 new guests an hour from one address, so --repeat-each above 2 runs into them.)
+    // apply: 300 new guests an hour from one address, so a high --repeat-each can run into them.)
     reuseExistingServer: false,
     timeout: 30_000,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },

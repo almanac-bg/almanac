@@ -3,12 +3,15 @@ import {
   type AckResult,
   DEFAULT_ROOM_SETTINGS,
   isCategoryChoice,
+  nicknameProblem,
   ROOM_CODE_DIGITS,
   ROOM_LIMITS,
+  ROOM_NICKNAME,
   ROUNDS_QUESTIONS,
   type RoomSettings,
   type RoomState,
   type TeamId,
+  tidyNickname,
 } from '@quiz/shared';
 import { areFriends, blockedBetween } from '../friends';
 import { guarded } from '../guard';
@@ -147,7 +150,9 @@ export class RoomManager {
     let name: string | null = null;
     if (getUser(userId)?.is_guest) {
       name = cleanNickname(nickname);
-      if (!name) return { ok: false, error: NICKNAME_ERROR };
+      // The form's own words (it checks the same rule first); a client that sent no name at all, the general ones.
+      if (!name)
+        return { ok: false, error: (typeof nickname === 'string' && nicknameProblem(nickname)) || NICKNAME_ERROR };
       // On the room's screen (a class's projector too): no words nobody should read, nothing that passes for the
       // game, and no player's own name — a guest could appear as anyone.
       const problem = textProblem(name, 'Името');
@@ -613,12 +618,10 @@ function forAClass(settings: RoomSettings, patch: Record<string, unknown>, wasPl
   return opens ? { ...settings, maxPlayers: ROOM_LIMITS.maxPlayers[1] } : settings;
 }
 
-/** A guest's name for a room: letters, digits, spaces and . - _ (2–20); null if it isn't one. */
+/** A guest's name for a room (ROOM_NICKNAME), tidied; null if it isn't one. */
 export function cleanNickname(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const name = raw.normalize('NFC').replace(/\s+/gu, ' ').trim();
-  const length = [...name].length;
-  return length >= 2 && length <= 20 && /^[\p{L}\p{N} ._-]+$/u.test(name) ? name : null;
+  if (typeof raw !== 'string' || nicknameProblem(raw)) return null;
+  return tidyNickname(raw);
 }
 
-const NICKNAME_ERROR = 'Избери име за стаята: от 2 до 20 букви, цифри или интервали.';
+const NICKNAME_ERROR = `Избери име за стаята: от ${ROOM_NICKNAME.min} до ${ROOM_NICKNAME.max} букви, цифри или интервали.`;

@@ -18,6 +18,7 @@ import {
   SCORING,
   SEASON_REWARD_XP,
   seasonKey,
+  shiftDay,
 } from '@quiz/shared';
 import { codeAt, stepAt } from '../src/totp';
 import {
@@ -2330,9 +2331,12 @@ test('every moderation decision is logged with its grounds, and can be undone', 
       'INSERT INTO daily_results (user_id, day, started_at, finished_at, score, correct, time_ms, own_set) VALUES (?, ?, ?, ?, 9000, 10, 30000, 0)',
     )
     .run(E.user.id, day, Date.now(), Date.now());
-  srv.db
-    .prepare('INSERT INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, 1, 9000, 30)')
-    .run(day, E.user.id);
+  const evening = srv.db.prepare(
+    'INSERT INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, 1, 9000, 30)',
+  );
+  evening.run(day, E.user.id);
+  // …and one from a season before: what the player is told is this season's results, so that one stands.
+  evening.run(shiftDay(`${season}-01`, -10), E.user.id);
   const value = (sql: string) => Object.values(srv.db.prepare(sql).get(E.user.id) as object)[0];
   const results = () => ({
     rating: value('SELECT COUNT(*) AS n FROM season_ratings WHERE user_id = ?'),
@@ -2346,7 +2350,7 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   const banned = await act('ban', { days: 30, basis: 'cheating', reason: 'Отговаря с програма.', annul: true });
   assert.equal(banned.status, 200, banned.body.error);
   assert.equal(banned.body.card.ban.basis, 'cheating');
-  assert.deepEqual(results(), { rating: 0, daily: 1, evening: 0 }, 'results annulled');
+  assert.deepEqual(results(), { rating: 0, daily: 1, evening: 1 }, "this season's results annulled");
   const [annulled, ban] = await log();
   assert.equal(annulled.action, 'annul');
   assert.equal(ban.action, 'ban');

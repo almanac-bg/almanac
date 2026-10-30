@@ -59,7 +59,13 @@ async function download(p) {
 fs.mkdirSync(out, { recursive: true });
 for (const font of FONTS) {
   const full = await download(font.source);
-  const woff2 = await subsetFont(full, text, { targetFormat: 'woff2', variationAxes: { wght: font.wght } });
+  // Name IDs 13 and 14 too (the licence and its URL), beside the copyright and names kept by default: the OFL asks for
+  // the licence with every copy, and the served woff2 is one.
+  const woff2 = await subsetFont(full, text, {
+    targetFormat: 'woff2',
+    variationAxes: { wght: font.wght },
+    preserveNameIds: [13, 14],
+  });
   fs.writeFileSync(path.join(out, font.file), woff2);
   const family = font.file.replace('.woff2', '');
   fs.writeFileSync(path.join(out, `OFL-${family}.txt`), await download(font.license));

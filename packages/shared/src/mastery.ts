@@ -11,8 +11,6 @@ export const MASTERY_TIERS = [
   { id: 'master', name: 'Майстор', icon: '🥇', top: 0.05, fixed: 1400 },
 ] as const;
 
-export type MasteryTierId = (typeof MASTERY_TIERS)[number]['id'];
-
 export const MASTERY = {
   /**
    * Answers in a category before a player is ranked in it (and counted among those ranked). A tier is kept for good, so

@@ -1,5 +1,5 @@
 import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
-import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { PASSWORD_MIN_LENGTH, USERNAME } from '@quiz/shared';
 import { Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';
@@ -78,8 +78,8 @@ export function ClaimAccountModal({
             aria-describedby={error && invalid.includes('username') ? `${id}-error` : undefined}
             ref={usernameRef}
             required
-            minLength={3}
-            maxLength={20}
+            minLength={USERNAME.min}
+            maxLength={USERNAME.max}
             placeholder="напр. Мозъчко"
             className={INPUT}
           />

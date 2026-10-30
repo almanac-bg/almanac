@@ -1,4 +1,4 @@
-import { BRAND } from '@quiz/shared';
+import { BRAND, USERNAME } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getMe } from '../account';
@@ -49,9 +49,9 @@ const Credentials = z
     username: z
       .string()
       .trim()
-      .min(3, 'Името трябва да е поне 3 знака.')
-      .max(20, 'Името може да е най-много 20 знака.')
-      .regex(/^[\p{L}\p{N}_.-]+$/u, 'Само букви, цифри, точка, тире и долна черта.'),
+      .min(USERNAME.min, `Името трябва да е поне ${USERNAME.min} знака.`)
+      .max(USERNAME.max, `Името може да е най-много ${USERNAME.max} знака.`)
+      .regex(USERNAME.chars, 'Само букви, цифри, точка, тире и долна черта.'),
     password: PasswordSchema,
   })
   // The first thing anyone tries.

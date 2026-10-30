@@ -14,6 +14,7 @@ import {
   type ReportReason,
   type ReportSubjectKind,
   seasonKey,
+  USERNAME,
 } from '@quiz/shared';
 import { bannedBefore } from './account';
 import { alertModerators } from './alerts';
@@ -463,8 +464,11 @@ export function renamePlayer(
   const problem = checkGrounds(rename.basis, rename.reason);
   if (problem) return { ok: false, error: problem };
   const name = rename.username.trim();
-  if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(name))
-    return { ok: false, error: 'Името трябва да е 3–20 букви, цифри, точка, тире или долна черта.' };
+  if (name.length < USERNAME.min || name.length > USERNAME.max || !USERNAME.chars.test(name))
+    return {
+      ok: false,
+      error: `Името трябва да е ${USERNAME.min}–${USERNAME.max} букви, цифри, точка, тире или долна черта.`,
+    };
   const bad = nameProblem(name);
   if (bad) return { ok: false, error: bad };
   const taken = nameTaken(name, targetId);
@@ -519,7 +523,7 @@ interface AnnulUndo {
 
 /**
  * Takes a cheater's results off the boards: this season's ratings start over, this season's dailies leave the day's
- * board, and their evening places go. The rows are kept in the log, for an undo. `told: false`: part of a ban, whose
+ * board, and this season's evening places go (what the player is told: earlier seasons stand). The rows are kept in the log, for an undo. `told: false`: part of a ban, whose
  * statement says it.
  */
 export function annulResults(
@@ -548,11 +552,15 @@ export function annulResults(
         targetId,
         `${season}-01`,
       ),
-      evening: all('SELECT day, placement, score, players FROM evening_results WHERE user_id = ?', targetId),
+      evening: all(
+        'SELECT day, placement, score, players FROM evening_results WHERE user_id = ? AND day >= ?',
+        targetId,
+        `${season}-01`,
+      ),
     };
     run('DELETE FROM season_ratings WHERE user_id = ? AND season = ?', targetId, season);
     run('UPDATE daily_results SET own_set = 1 WHERE user_id = ? AND day >= ?', targetId, `${season}-01`);
-    run('DELETE FROM evening_results WHERE user_id = ?', targetId);
+    run('DELETE FROM evening_results WHERE user_id = ? AND day >= ?', targetId, `${season}-01`);
     logAction({ adminId, action: 'annul', userId: targetId, basis: grounds.basis, reason, undo });
   });
   if (told)

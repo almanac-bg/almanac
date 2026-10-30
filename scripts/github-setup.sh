@@ -42,8 +42,10 @@ try "secret scanning with push protection" gh api -X PATCH "repos/$repo" --input
 {"security_and_analysis": {"secret_scanning": {"status": "enabled"}, "secret_scanning_push_protection": {"status": "enabled"}}}
 JSON
 
-# CodeQL: GitHub's own security analysis of the code, on every push and pull request (free for public repositories).
-try "code scanning (CodeQL)" gh api -X PATCH "repos/$repo/code-scanning/default-setup" -f state=configured -f query_suite=default
+# CodeQL: GitHub's own security analysis of the code, on every push and pull request (free for public repositories),
+# with the extended set of queries (more findings, some of them to dismiss; docs/maintainers.md says how).
+try "code scanning (CodeQL, extended queries)" gh api -X PATCH "repos/$repo/code-scanning/default-setup" \
+  -f state=configured -f query_suite=extended
 
 echo "Labels"
 label() { try "label: $1" gh label create "$1" --repo "$repo" --color "$2" --description "$3" --force; }
@@ -57,8 +59,9 @@ label dependencies 0366d6 "Обновяване на зависимости (Dep
 label "good first issue" 7057ff "Малка, ясна задача за начало"
 
 echo "Branch protection"
-# main can't be deleted or force-pushed (history is never rewritten), and a pull request merges only once CI passed
-# (Dependabot's auto-merge included). Admins bypass the checks, so a maintainer can still push straight to main.
+# main can't be deleted or force-pushed (history is never rewritten), and a pull request merges only once CI passed,
+# in all three browsers too, and CodeQL found nothing high or critical (Dependabot's auto-merge included). Admins
+# bypass the checks, so a maintainer can still push straight to main.
 ruleset=$(cat <<'JSON'
 {
   "name": "Protect main",
@@ -72,8 +75,14 @@ ruleset=$(cat <<'JSON'
     {"type": "required_status_checks", "parameters": {
       "strict_required_status_checks_policy": false,
       "do_not_enforce_on_create": false,
-      "required_status_checks": [{"context": "test (Node 24)"}, {"context": "test (Node 26)"}, {"context": "docker"}]
-    }}
+      "required_status_checks": [
+        {"context": "test (Node 24)"}, {"context": "test (Node 26)"}, {"context": "docker"},
+        {"context": "browser tests (webkit)"}, {"context": "browser tests (firefox)"}
+      ]
+    }},
+    {"type": "code_scanning", "parameters": {"code_scanning_tools": [
+      {"tool": "CodeQL", "security_alerts_threshold": "high_or_higher", "alerts_threshold": "errors"}
+    ]}}
   ]
 }
 JSON

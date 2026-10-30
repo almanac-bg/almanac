@@ -53,10 +53,9 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
   // Set by the image or the container (NODE_ENV, PORT, DB_PATH…), or for tests and development only.
   const notPassed = new Set([
     'BACKUP_DIR',
-    'BACKUP_KEEP_DAYS',
     'DB_PATH',
+    // Tied to stop_grace_period in docker-compose.yml: a longer drain would be cut short by Docker anyway.
     'DRAIN_SECONDS',
-    'EVENING_AT',
     'GAME_TIME_SCALE',
     'MAIL_OUTBOX',
     'PUSH_OUTBOX',
@@ -67,4 +66,25 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
     'UV_THREADPOOL_SIZE',
   ]);
   assert.deepEqual([...read].filter((name) => !passed.has(name) && !notPassed.has(name)).sort(), []);
+});
+
+// docs/configuration.md is where an operator looks: every setting the server, the deploy (.env.example) and the
+// development tools read is there.
+test('every setting the code and .env.example name is described in docs/configuration.md', () => {
+  const root = path.resolve(import.meta.dirname, '../../..');
+  const names = new Set<string>();
+  const collect = (code: string) => {
+    for (const m of code.matchAll(/\b(?:process\.env|env)\.([A-Z][A-Z0-9_]+)/g)) names.add(m[1]);
+  };
+  const src = path.join(root, 'apps/server/src');
+  for (const file of fs.readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((f) => f.endsWith('.ts')))
+    collect(fs.readFileSync(path.join(src, file), 'utf8'));
+  for (const file of ['apps/web/vite.config.ts', 'apps/web/playwright.config.ts', 'apps/server/test/helpers.ts'])
+    collect(fs.readFileSync(path.join(root, file), 'utf8'));
+  for (const m of fs.readFileSync(path.join(root, '.env.example'), 'utf8').matchAll(/^([A-Z][A-Z0-9_]+)=/gm))
+    names.add(m[1]);
+  // Set by CI and the test runner themselves.
+  for (const name of ['CI', 'TEST_WORKER_INDEX']) names.delete(name);
+  const doc = fs.readFileSync(path.join(root, 'docs/configuration.md'), 'utf8');
+  assert.deepEqual([...names].filter((name) => !doc.includes(`\`${name}\``)).sort(), []);
 });

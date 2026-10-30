@@ -1,7 +1,8 @@
 // deploy/deploy.sh and deploy/rollback.sh, run for real against a checkout of their own: git does what it does, while
 // docker, curl and sleep are stand-ins that keep their state in files (which images exist under which name, what
-// compose was asked to run, whether the site answers). What production relies on: no image, no change; the image that
-// ran becomes the way back; an unhealthy deploy goes back by itself; a rollback runs what ran before.
+// compose was asked to run, whether the site answers, what the registry and GitHub's attestations hold). What
+// production relies on: no image (or one without CI's provenance), no change; the image that ran becomes the way back;
+// an unhealthy deploy goes back by itself; a rollback runs what ran before.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -39,7 +40,8 @@ fs.mkdirSync(stubs);
 fs.mkdirSync(path.join(state, 'images'), { recursive: true });
 const stub = (name: string, body: string) =>
   fs.writeFileSync(path.join(stubs, name), `#!/bin/sh\n${body}`, { mode: 0o755 });
-// Images live in state/images, one file per name holding the image's id; state/registry lists what CI published.
+// Images live in state/images, one file per name holding the image's id; state/registry lists what CI published
+// (`<repository>:<tag> <id>`, the id standing in for the digest too), and state/attested the digests CI attested.
 stub(
   'docker',
   `S="$STUB_STATE"
@@ -48,7 +50,10 @@ name() { printf '%s' "$1" | tr '/:' '__'; }
 case "$1" in
   pull)
     [ "$2" = --quiet ] && img=$3 || img=$2
-    id=$(sed -n "s|^$img ||p" "$S/registry")
+    case $img in
+      *@*) id=$(grep "^\${img%@*}:[^ ]* \${img#*@}$" "$S/registry" | head -1 | cut -d' ' -f2) ;;
+      *) id=$(sed -n "s|^$img ||p" "$S/registry" | head -1) ;;
+    esac
     [ -n "$id" ] || exit 1
     echo "$id" >"$S/images/$(name "$img")" ;;
   image)
@@ -79,8 +84,27 @@ esac
 exit 0
 `,
 );
-// The site answers through Caddy unless state/down says otherwise.
-stub('curl', '[ -f "$STUB_STATE/down" ] && exit 7\nexit 0\n');
+// The registry (a tag's digest), GitHub's attestations, and the site, which answers through Caddy unless state/down
+// says otherwise.
+stub(
+  'curl',
+  `S="$STUB_STATE"
+for a in "$@"; do url=$a; done
+case $url in
+  *ghcr.io/token*) echo '{"token":"t"}' ;;
+  *ghcr.io/v2/*/manifests/*)
+    path=\${url#https://ghcr.io/v2/}
+    id=$(sed -n "s|^ghcr.io/\${path%/manifests/*}:\${path##*/manifests/} ||p" "$S/registry" | head -1)
+    [ -n "$id" ] || exit 22
+    printf 'HTTP/2 200\\r\\ndocker-content-digest: %s\\r\\n\\r\\n' "$id" ;;
+  *api.github.com/*/attestations/*)
+    if grep -qx "\${url##*/}" "$S/attested" 2>/dev/null; then echo '{"attestations":[{"bundle":{}}]}'
+    else echo '{"attestations":[]}'; fi ;;
+  *) [ -f "$S/down" ] && exit 7 ;;
+esac
+exit 0
+`,
+);
 stub('sleep', 'exit 0\n');
 
 // The origin (GitHub), a developer's clone to push from, and the server's checkout with the private bank inside.
@@ -93,7 +117,7 @@ for (const bare of [origin, bankOrigin]) git(tmp, 'init', '-q', '--bare', '-b', 
 git(tmp, 'clone', '-q', origin, work);
 git(tmp, 'clone', '-q', bankOrigin, bankWork);
 fs.mkdirSync(path.join(work, 'deploy'));
-for (const script of ['deploy.sh', 'rollback.sh'])
+for (const script of ['deploy.sh', 'rollback.sh', 'pull-image.sh'])
   fs.copyFileSync(path.join(repo, 'deploy', script), path.join(work, 'deploy', script));
 fs.writeFileSync(path.join(work, '.gitignore'), '/private/\n/.release\n/.release-previous\n/.env\n');
 const first = publishCommit(work, 'app.txt', 'v1');
@@ -110,9 +134,11 @@ const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf
 /** The id the image under this name has (null: no such name). */
 const tagged = (name: string) => read(path.join(state, 'images', name.replaceAll('/', '_').replaceAll(':', '_')));
 const compose = () => read(path.join(state, 'compose.log'))?.split('\n') ?? [];
-/** CI published this commit's image, with this id. */
-const published = (commit: string, id: string) =>
+/** CI published this commit's image, with this id (and attested it, unless told otherwise). */
+const published = (commit: string, id: string, { attested = true } = {}) => {
   fs.appendFileSync(path.join(state, 'registry'), `${image(commit)} ${id}\n`);
+  if (attested) fs.appendFileSync(path.join(state, 'attested'), `${id}\n`);
+};
 
 function run(script: string, ...args: string[]) {
   fs.rmSync(path.join(state, 'compose.log'), { force: true });
@@ -310,4 +336,45 @@ test('a deploy waits for a quiet moment (a class mid-match), up to 20 minutes; -
   } finally {
     fs.rmSync(path.join(state, 'busy'), { force: true });
   }
+});
+
+test('a self-hosted copy: its own image (IMAGE in .env), and a question bank that is a file, not a clone', () => {
+  const env = path.join(checkout, '.env');
+  const bankGit = path.join(checkout, 'private', '.git');
+  const away = path.join(tmp, 'bank-git-away');
+  fs.writeFileSync(env, 'DOMAIN=example.test\nIMAGE=ghcr.io/someone/almanac\n');
+  fs.renameSync(bankGit, away);
+  try {
+    const fork = publishCommit(work, 'app.txt', 'v-fork');
+    fs.appendFileSync(path.join(state, 'registry'), `ghcr.io/someone/almanac:${fork} sha256:fork\n`);
+    fs.appendFileSync(path.join(state, 'attested'), 'sha256:fork\n');
+    const deployed = run('deploy.sh');
+    assert.equal(deployed.status, 0, deployed.output);
+    assert.equal(tagged('almanac:latest'), 'sha256:fork', 'the fork’s image runs');
+    assert.equal(git(checkout, 'rev-parse', 'HEAD'), fork);
+    assert.equal(fs.existsSync(bankGit), false, 'the bank was left as it is');
+  } finally {
+    fs.renameSync(away, bankGit);
+    fs.writeFileSync(env, 'DOMAIN=example.test\n');
+  }
+});
+
+test('an image without CI’s build provenance isn’t deployed; a rollback to one takes --unverified', () => {
+  const current = git(checkout, 'rev-parse', 'HEAD');
+  const running = tagged('almanac:latest');
+  const pushed = publishCommit(work, 'app.txt', 'v-pushed-by-hand');
+  published(pushed, 'sha256:unattested', { attested: false });
+  const refused = run('deploy.sh', '--now');
+  assert.equal(refused.status, 1);
+  assert.match(refused.output, /no build provenance/);
+  assert.equal(git(checkout, 'rev-parse', 'HEAD'), current, 'the checkout stays');
+  assert.equal(tagged('almanac:latest'), running);
+
+  const back = run('rollback.sh', pushed);
+  assert.equal(back.status, 1);
+  assert.match(back.output, /add --unverified/);
+  assert.equal(tagged('almanac:latest'), running);
+  const taken = run('rollback.sh', pushed, '--unverified');
+  assert.equal(taken.status, 0, taken.output);
+  assert.equal(tagged('almanac:latest'), 'sha256:unattested');
 });
