@@ -78,7 +78,7 @@ function layout(title: string, intro: string, button: string, link: string, outr
 ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#0b0915">${escapeHtml(preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>` : ''}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b0915" style="background:#0b0915"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" bgcolor="#15122a" style="width:100%;max-width:480px;background:#15122a;border-radius:20px">
-<tr><td style="padding:32px 32px 0;${font};font-size:26px;font-weight:900;letter-spacing:1px;color:#c4b5fd">${BRAND.name}⚡</td></tr>
+<tr><td style="padding:32px 32px 0;${font};font-size:26px;font-weight:900;letter-spacing:1px;color:#f5f3ff">${BRAND.name}</td></tr>
 <tr><td style="padding:20px 32px 0;${font};font-size:20px;font-weight:bold;color:#f5f3ff">${escapeHtml(title)}</td></tr>
 <tr><td style="padding:12px 32px 0;${font};font-size:15px;line-height:1.6;color:#d4d0ea">${intro}</td></tr>
 <tr><td style="padding:28px 32px">

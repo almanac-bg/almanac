@@ -88,7 +88,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
     const played = info.played;
     shareText(
       played
-        ? `⚡ ${BRAND.name} №${info.number} · ${played.correct}/${MODE.questions}\n${fmt(played.score)} т.\n${url}`
+        ? `${BRAND.mark} ${BRAND.name} №${info.number} · ${played.correct}/${MODE.questions}\n${fmt(played.score)} т.\n${url}`
         : url,
       'Линкът е копиран',
     );

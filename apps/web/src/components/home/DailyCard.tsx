@@ -42,7 +42,7 @@ export function DailyCard({ className }: { className?: string }) {
     const link = await dailyLinkUrl();
     const of = MODES.daily.questions;
     shareText(
-      `⚡ ${BRAND.name} №${info.number} · ${info.played.correct}/${of}\n${fmt(info.played.score)} т.\n${link}`,
+      `${BRAND.mark} ${BRAND.name} №${info.number} · ${info.played.correct}/${of}\n${fmt(info.played.score)} т.\n${link}`,
       'Линкът и резултатът са копирани',
     );
   }

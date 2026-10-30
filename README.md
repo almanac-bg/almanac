@@ -1,4 +1,4 @@
-# АЛМАНАХ ⚡ — almanac.bg
+# АЛМАНАХ — almanac.bg
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Лиценз: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)

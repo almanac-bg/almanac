@@ -40,7 +40,7 @@ test('signing out on a shared device leaves nothing of the player in the browser
 }) => {
   await signUp(page, uniqueName('Споделен'), 'parola-123');
   await page.evaluate(() => {
-    localStorage.setItem('quiz:daily-share:2026-10-30', '⚡ АЛМАНАХ №1 · 8/10');
+    localStorage.setItem('quiz:daily-share:2026-10-30', '🏵️ АЛМАНАХ №1 · 8/10');
     localStorage.setItem('quiz:room-nickname', 'Мария 7Б');
     sessionStorage.setItem('quiz:room-nickname', 'Мария 7Б');
   });

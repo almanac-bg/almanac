@@ -8,7 +8,7 @@ const storageKey = (day: string) => `quiz:daily-share:${day}`;
  * The day's result, Wordle-style: spoiler-free squares (⬛ a question left unanswered, ⬜ one never reached, 🟨 an order
  * partly in place), the day's
  * number, the score, the place once the board has a crowd to place in, and the link that plays the same questions:
- *   ⚡ АЛМАНАХ №4 · 8/10
+ *   🏵️ АЛМАНАХ №4 · 8/10
  *   🟩🟩🟥🟩⬛🟩🟩🟩🟩🟩
  *   🎯 Финал: ±3
  *   1 240 т. · 7-мо място от 23
@@ -39,7 +39,7 @@ export function dailyShareText(d: {
   const score = [`${fmt(d.score)} т.`];
   // "1-во място от 3" says more about the day's numbers than about the player.
   if (d.place && d.place.of >= SHOW_PLACE_FROM) score.push(`${ordinal(d.place.rank)} място от ${fmt(d.place.of)}`);
-  const lines = [`⚡ ${BRAND.name} №${dayNumber(d.day)} · ${correct}/${d.total}`, squares];
+  const lines = [`${BRAND.mark} ${BRAND.name} №${dayNumber(d.day)} · ${correct}/${d.total}`, squares];
   const final = d.history.find((h) => h.number && h.number.guess !== null)?.number;
   if (final) lines.push(`🎯 Финал: ${finalOff(final.guess!, final.answer, final)}`);
   lines.push(score.join(' · '));
@@ -105,7 +105,7 @@ export function matchShareText(m: {
           : m.players === 2
             ? `⚔️ ${m.modeName} · ${score}`
             : `${ordinal(m.place)} място от ${m.players} в ${m.modeName} · ${score}`;
-  const lines = [`⚡ ${BRAND.name}`, headline];
+  const lines = [`${BRAND.mark} ${BRAND.name}`, headline];
   if (m.history.length) lines.push(squares(m.history));
   if (m.levelUp) lines.push(`⬆️ Ниво ${m.levelUp}`);
   lines.push(`Можеш ли повече? ${BRAND.domain}`);

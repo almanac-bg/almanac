@@ -20,7 +20,7 @@ try() { # try <label> <command…>: runs it, reporting success or GitHub's reaso
 
 echo "About"
 try "description, website and topics" gh repo edit "$repo" \
-  --description "АЛМАНАХ ⚡ Куиз битки в реално време: дуели, Роял за 8 играчи, дневно предизвикателство и предизвикателства с линк. React, Node.js, Socket.IO, SQLite." \
+  --description "АЛМАНАХ — куиз битки в реално време: дуели, Роял за 8 играчи, дневно предизвикателство и предизвикателства с линк. React, Node.js, Socket.IO, SQLite." \
   --homepage "https://almanac.bg" \
   --add-topic quiz,trivia,quiz-game,multiplayer-game,realtime,browser-game,bulgaria,bulgarian,react,typescript,nodejs,socket-io,sqlite,vite,tailwindcss,pwa,self-hosted,agpl
 
