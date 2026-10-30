@@ -1604,7 +1604,13 @@ test('team room', T, async () => {
   assert.ok(start!.teams && start!.players.every((p) => p.team === 0 || p.team === 1));
   assert.equal(end.teamScores!.length, 2);
   assert.ok(end.teamScores![0].score >= end.teamScores![1].score);
-  assert.equal(end.standings.find((s) => s.id === `u${A.user.id}`)!.placement, 1);
+  // Whoever won (bots that don't know an answer guess, and over five questions they can come out ahead): the winning
+  // team shares first place.
+  const aTeam = start!.players.find((p) => p.id === `u${A.user.id}`)!.team;
+  assert.equal(
+    end.standings.find((s) => s.id === `u${A.user.id}`)!.placement,
+    end.teamScores![0].team === aTeam ? 1 : 2,
+  );
   assert.ok(!end.rewards!.achievements.includes('team_win'), 'two friends against bots in a room is practice');
   sa.off('room:state', onState);
   sa.emit('room:leave');
