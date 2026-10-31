@@ -81,8 +81,8 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
       Then `add <out>.json`, the bank test, a commit per merge. A checker may move a question's difficulty, so look at
       `stats` again after merging and let the next batch close what's left.
    To land exactly on balance (as the 2026-10 balance run did), give each brief's `mix` one spare per difficulty it
-   needs, and use `fill <out>.tids.json` instead of `add`: it adds exactly what each category and difficulty lacks and
-   leaves the rest in `<out>.spares.json` — keep those, checked, in `private/plans/` for the next run.
+   needs, and use `fill <out>.tids.json` instead of `add`: it adds exactly what each category and difficulty lacks (with
+   `--size N`, to grow every category to N) and leaves the rest in `<out>.spares.json` — keep those, checked, in `private/plans/` for the next run.
 5. **Commit and push in `private/`** (`git -C private …`, the usual commit trailer). Production gets the change on
    the next deploy; deploying is outward-facing, so ask the owner unless they already said to ship it.
 6. **Tell the owner** what went in: a short list (question → answer, and the fact if any), so they can read it.

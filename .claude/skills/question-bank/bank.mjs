@@ -14,8 +14,9 @@
 //                                                                       the bank and within the file (to judge, not proof)
 //   node .claude/skills/question-bank/bank.mjs giveaways [file.json] [bank]  questions whose text names another one's
 //                                                                       answer (with a file: pairs involving its questions)
-//   node .claude/skills/question-bank/bank.mjs fill <file.json> [bank]   adds exactly what balance lacks from checked
-//                                                                       candidates; the rest → <file>.spares.json
+//   node .claude/skills/question-bank/bank.mjs fill <file.json> [bank] [--size N]  adds exactly what balance lacks
+//                                                                       from checked candidates (with --size: what it takes
+//                                                                       for N per category); the rest → <file>.spares.json
 //   node .claude/skills/question-bank/bank.mjs collect <dir> <out> [slug...]  a workflow's checked batches
 //                                                                       (<dir>/<slug>/verified.json) → <out>.json for `add`
 //   node .claude/skills/question-bank/bank.mjs image <draft.json> <out.json> [bank]  picture questions: each draft's
@@ -162,7 +163,7 @@ const stems = (text) =>
 /** Each category's counts, and what it lacks to be balanced: every category the same size, split as a match draws
  * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over.
  * Questions with options only: number questions are balanced on their own (numberBalance). */
-function balance(all) {
+function balance(all, atLeast = 0) {
   const questions = all.filter((q) => formatOf(q) === 'choice');
   const rows = Object.entries(PREFIX).map(([category, prefix]) => {
     const qs = questions.filter((q) => q.category === category);
@@ -172,10 +173,12 @@ function balance(all) {
     ).padStart(3, '0');
     return { category, total: qs.length, count, facts: qs.filter((q) => q.fact).length, next: `${prefix}-${next}` };
   });
-  const size =
+  const size = Math.max(
+    atLeast,
     Math.ceil(
       Math.max(...rows.flatMap((r) => [r.total, ...DIFFICULTIES.map((d) => r.count[d] / SHARE[d])])) / 5 - 1e-9,
-    ) * 5;
+    ) * 5,
+  );
   const target = { easy: size * SHARE.easy, medium: size * SHARE.medium, hard: size * SHARE.hard };
   for (const r of rows)
     r.short = Object.fromEntries(DIFFICULTIES.map((d) => [d, Math.max(0, Math.round(target[d] - r.count[d]))]));
@@ -380,10 +383,14 @@ switch (command) {
   case 'fill': {
     // Checked candidates (e.g. collect's .tids.json, written with a spare or two per difficulty) → exactly what each
     // category and difficulty lacks for balance, in the file's order; the rest wait in <file>.spares.json.
+    // --size N: grow every category to N (a multiple of 5) rather than to the smallest balanced size.
+    const sizeAt = args.indexOf('--size');
+    const atLeast = sizeAt >= 0 ? Number(args.splice(sizeAt, 2)[1]) : 0;
+    if (!Number.isInteger(atLeast) || atLeast % 5) fail('--size takes a multiple of 5');
     const candidates = readJson(args[0]);
     if (candidates.some((q) => formatOf(q) !== 'choice')) fail('fill takes questions with options only');
     const bank = load(args[1]);
-    const { rows } = balance(bank.questions);
+    const { rows } = balance(bank.questions, atLeast);
     const lacking = Object.fromEntries(rows.map((r) => [r.category, { ...r.short }]));
     const picked = [];
     const spares = [];

@@ -62,10 +62,12 @@ Never send personal data in any request: no names or email addresses in User-Age
   ${NODE} && ${TOOL} similar ${args.dir}/${slug}/draft.json
 and replace anything it shows that asks the same thing (the same answer from a different angle is fine, unless one gives the other away).
 
+Tag ["bg"] what is about Bulgaria, and add a calendar theme's tag where your brief asks for one ("tags": ["bg", "liberation"]).
+
 Vary the position of the right answer (about five each at 0, 1, 2, 3). For questions with four numbers, make the right one the smallest or the largest about half the time.
 
 Write them as a JSON array to ${args.dir}/${slug}/draft.json (create the folder), each object:
-{"tid":"${slug}-01","category":"${categoryOf(slug)}","difficulty":"easy","q":"…?","options":["…","…","…","…"],"answer":0,"fact":"….","factSource":"https://…","answerSource":"https://…"}
+{"tid":"${slug}-01","category":"${categoryOf(slug)}","difficulty":"easy","q":"…?","options":["…","…","…","…"],"answer":0,"fact":"….","factSource":"https://…","answerSource":"https://…","tags":["bg"]}
 Edit no other file (never private/questions.json). Return the summary.`,
     { label: `write:${slug}`, phase: 'Write', schema: WRITTEN, agentType: 'general-purpose' },
   )
@@ -86,8 +88,8 @@ Input: ${args.dir}/${slug}/draft.json — the draft's questions in category ${ca
 Verdict per question: OK; FIX (you correct whatever is wrong — question, options, answer, difficulty, fact, factSource — and the corrected version must itself be confirmed); DROP (contested, unconfirmable, or not fixable).
 
 Write ${args.dir}/${slug}/verified.json: a JSON array with one object per draft question, in order:
-{"tid":"…","verdict":"OK|FIX|DROP","category":"…","difficulty":"…","q":"…","options":[…],"answer":0,"fact":"…","factSource":"https://…","note":"what you checked or changed, with the evidence in a few words"}
-(final values; for DROP keep the draft's values and say why). Edit no other file. Return the summary.`,
+{"tid":"…","verdict":"OK|FIX|DROP","category":"…","difficulty":"…","q":"…","options":[…],"answer":0,"fact":"…","factSource":"https://…","answerSource":"https://…","tags":[…],"note":"what you checked or changed, with the evidence in a few words"}
+(final values; keep the draft's answerSource and tags, if it has them; for DROP keep the draft's values and say why). Edit no other file. Return the summary.`,
     { label: `check:${slug}`, phase: 'Check', schema: CHECKED, agentType: 'general-purpose' },
   ).then((c) => ({ slug, written, checked: c }))
 
