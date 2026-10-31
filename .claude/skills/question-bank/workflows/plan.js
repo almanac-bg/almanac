@@ -60,7 +60,7 @@ const plan = (n) => ({
 
 phase('Plan')
 const plans = await parallel(PLANNED.map((c) => () => agent(
-  `You plan new questions for one category of АЛМАНАХ, a real-time quiz game for Bulgarian players (repo: /Users/hristo/Developer/quiz).
+  `You plan new questions for one category of АЛМАНАХ, a real-time quiz game for Bulgarian players (repo: /Users/hristo/Developer/almanac).
 
 First read .claude/skills/question-bank/SKILL.md: the bank's rules and conventions.
 

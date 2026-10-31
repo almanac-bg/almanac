@@ -49,7 +49,7 @@ const kindLine = KIND[args.format] ? `"kind": "${KIND[args.format]}", ` : ''
 
 const write = (slug) =>
   agent(
-    `You write new questions for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/quiz). Players learn from it: a wrong number or fact is the worst bug it can ship.
+    `You write new questions for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/almanac). Players learn from it: a wrong number or fact is the worst bug it can ship.
 
 Read first, all of it: .claude/skills/question-bank/SKILL.md ("Adding questions" and "Writing „Знаеше ли?“ facts") and .claude/skills/question-bank/briefs/formats-write.md ("Ground rules" and the section "${section}"). They are the rules for this task, and they are strict.
 
@@ -69,7 +69,7 @@ Write them as a JSON array to ${args.dir}/${slug}/draft.json (create the folder)
 
 const check = (written, slug) =>
   agent(
-    `You are an independent fact-checker for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/quiz). Someone else drafted these questions; don't trust their notes. Drafts often hold a confident detail no source states: be skeptical. Today is ${args.today}.
+    `You are an independent fact-checker for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/almanac). Someone else drafted these questions; don't trust their notes. Drafts often hold a confident detail no source states: be skeptical. Today is ${args.today}.
 
 Read first, all of it: .claude/skills/question-bank/briefs/formats-check.md (which tells you to read formats-write.md too; its section "${section}" is this batch's format) and .claude/skills/question-bank/SKILL.md.
 

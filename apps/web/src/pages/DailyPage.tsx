@@ -2,7 +2,7 @@ import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client
 import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@quiz/shared';
 import { ArrowRight, CalendarDays, ChartColumn, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar } from '../components/Avatar';
 import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
@@ -114,7 +114,17 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
           </span>
           <h1 className="mt-3 t-page">{MODE.name}</h1>
           <p className="mt-2 text-fg-2">{MODE.tagline}</p>
-          {theme && <p className="mt-1 font-semibold text-amber-300">Темата днес: {theme.name}</p>}
+          {theme && (
+            <p className="mt-1 font-semibold text-amber-300">
+              Темата днес:{' '}
+              <Link
+                to={theme.page}
+                className="underline decoration-amber-300/50 underline-offset-2 hover:decoration-amber-300"
+              >
+                {theme.name}
+              </Link>
+            </p>
+          )}
 
           {sharer && (
             <div className="mt-5 flex items-center gap-3 rounded-2xl border border-line bg-sunk/25 p-3.5">

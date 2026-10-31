@@ -24,6 +24,7 @@ import {
   imageBank,
   numberBank,
   orderBank,
+  type PlayableQuestion,
   type PreparedQuestion,
   pickMatch,
   questionBank,
@@ -50,6 +51,33 @@ holdBackDaily(() => {
   if (held.day !== day) held = { day, ids: dailySet(day).map((q) => q.id) };
   return held.ids;
 });
+
+const stems = (text: string) =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => w.length >= 5)
+      .map((w) => w.slice(0, 5)),
+  );
+
+/**
+ * A question the day's own label answers: „Темата днес: Народните будители“ above „Какво честваме на 1 ноември?“ —
+ * its answer shares a word with the theme, or it asks about the very date (the review's COPY-2).
+ */
+function givesTheDayAway(q: PlayableQuestion, day: string, theme: string): boolean {
+  const date = dateWords(day);
+  if (q.q.toLowerCase().includes(date)) return true;
+  if (q.kind === 'number' || q.kind === 'order') return false;
+  const named = stems(theme);
+  return [...stems(q.options[q.answer])].some((s) => named.has(s));
+}
+
+/** A day as the questions write it: „1 ноември“, „24 май“. */
+const dateWords = (day: string) => {
+  const [, m, d] = day.split('-').map(Number);
+  return `${d} ${['януари', 'февруари', 'март', 'април', 'май', 'юни', 'юли', 'август', 'септември', 'октомври', 'ноември', 'декември'][m - 1]}`;
+};
 
 /** How far back a daily's questions stay out of the next ones. */
 export const DAILY_REPEAT_DAYS = 30;
@@ -87,7 +115,7 @@ function dailySet(day: string): PreparedQuestion[] {
   const order = new Map(
     [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [
       q.id,
-      (recent.has(q.id) ? 4_000_000 : 0) +
+      (recent.has(q.id) || (theme && givesTheDayAway(q, day, theme.name)) ? 4_000_000 : 0) +
         (theme && q.tags?.includes(theme.tag) ? -2_000_000 : 0) +
         (q.fact ? 0 : 1_000_000) +
         (played.get(q.id) ?? 0),

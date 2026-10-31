@@ -432,6 +432,22 @@ export function reloadQuestionBank() {
   }
 }
 
+/**
+ * A question a moderator (or its players' flags) just hid: out of the loaded bank at once, without reading the file
+ * and finding every giveaway again (84–96 ms each time, the 31 October review, SERVER-9). Its giveaway links may stay:
+ * a question out of play is never picked, so it never clashes. Bringing one back reloads (`reloadQuestionBank`): it
+ * has to pass the bank's checks again (a public copy, its picture there).
+ */
+export function dropFromPlay(id: string) {
+  if (!everything) return reloadQuestionBank();
+  const without = <T extends { id: string }>(list: T[] | null) => list?.filter((q) => q.id !== id) ?? null;
+  bank = without(bank);
+  images = without(images);
+  numbers = without(numbers);
+  orders = without(orders);
+  playable?.delete(id);
+}
+
 /** The bank file's questions by format, each checked against its own schema (the first problems, with their ids). */
 function readBankFile(): { choice: Question[]; number: NumberQuestion[]; order: OrderQuestion[] } {
   const items = z.array(z.record(z.string(), z.unknown())).parse(JSON.parse(fs.readFileSync(QUESTIONS_PATH, 'utf8')));
