@@ -43,8 +43,8 @@ writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
 const { ordinal } = await import('@quiz/shared');
 const { nameProblem } = await import('../src/moderation');
-const { textProblem } = await import('../src/names');
-const { nameShape } = await import('../src/names');
+const { BLOCKED_EDGES, BLOCKED_STARTS, BLOCKED_STEMS, BRAND, STAFF, mixesScripts, nameShape, textProblem } =
+  await import('../src/names');
 
 test('elimination schedule leaves a two-player final', () => {
   assert.deepEqual(
@@ -394,6 +394,76 @@ test('more words nobody should see (from the October 2026 review); group, set an
     textProblem('Модератори', 'Името на групата'),
     'Името на групата изглежда като на самата игра или на екипа ѝ — избери друго.',
   );
+});
+
+test('disguised words are caught: doubled letters, look-alike letters from another alphabet, number codes (the 31 October review)', () => {
+  for (const bad of [
+    // Listed words with a double letter (dead while repeats were collapsed).
+    'Nigger',
+    'Nigga_88',
+    'N1gger',
+    'Niiigger',
+    'Pussy',
+    'Support',
+    'OfficialBG',
+    // A letter swapped for its Cyrillic, Greek or Ukrainian twin.
+    'Нitler',
+    'Ηitler',
+    'Hіtler',
+    'Νazi',
+    'fυck',
+    'fuсk',
+    'f.u.с.k',
+    'Κурва',
+    'pіchka',
+    'Αdmin',
+    'Μoderator',
+    'Αlmanac',
+    // Words the lists missed.
+    'Ебамайкати',
+    'ебанат',
+    'Ебах те',
+    'Чифут',
+    'Slut',
+    'Retard',
+    // Number codes, in a username.
+    '1488',
+    'HH88',
+    'НН88',
+  ])
+    assert.ok(nameProblem(bad), `should block "${bad}"`);
+  for (const ok of [
+    'Niger',
+    'Nigel',
+    'Knight',
+    'Нигерия',
+    'Гризебах',
+    'Маричков',
+    'Горичка',
+    'Supper',
+    'Ivan88',
+    'Ани1990',
+    'Ivan_Иванов',
+  ])
+    assert.equal(nameProblem(ok), null, `should allow "${ok}"`);
+  // A group's name under the brand in an invite preview, a set's, a class nickname: the same check.
+  assert.ok(textProblem('Nigger club', 'Името'));
+  assert.ok(textProblem('„Нitler беше прав“', 'Името'));
+  // 1488 is a year too: refused in usernames only.
+  assert.equal(textProblem('Битката от 1488', 'Името'), null);
+});
+
+test('a word written in two alphabets is refused; a name whose words each keep to one is fine', () => {
+  for (const mixed of ['Нristo', 'МарияM', 'Pеtar_7']) assert.match(nameProblem(mixed) ?? '', /смесва/, mixed);
+  assert.match(textProblem('Нristo фен клуб', 'Името на групата') ?? '', /^Името на групата смесва латиница/);
+  for (const ok of ['Badminton клуб', 'Ivan_Иванов', 'Клас 7Б', 'C++ и Java', 'Число π']) {
+    assert.equal(mixesScripts(ok), false, ok);
+  }
+});
+
+test('every listed word is plain lowercase Latin, so it reads as a pattern (no regex characters slip in)', () => {
+  for (const word of [...BLOCKED_STEMS, ...BLOCKED_EDGES, ...BLOCKED_STARTS, ...BRAND, ...STAFF])
+    assert.match(word, /^[a-z]+$/, word);
 });
 
 test('names that look the same on screen have one shape; names that only share letters do not', () => {

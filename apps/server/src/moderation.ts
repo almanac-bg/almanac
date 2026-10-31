@@ -22,7 +22,7 @@ import { config } from './config';
 import { all, one, run, tx } from './db';
 import { longDateTime } from './mailer';
 import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
-import { hasBlockedWords, nameShape, passesForTheGame } from './names';
+import { hasBlockedWords, mixesScripts, nameShape, passesForTheGame } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { hideQuestion, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
@@ -51,8 +51,9 @@ import {
 
 /** Why a username can't be had (words nobody should see, or one that passes for the game's own), or null. */
 export function nameProblem(name: string): string | null {
-  if (hasBlockedWords(name)) return 'Името съдържа неподходящи думи.';
+  if (hasBlockedWords(name, { username: true })) return 'Името съдържа неподходящи думи.';
   if (passesForTheGame(name) || GUEST_NAME.test(name.trim())) return 'Това име е запазено.';
+  if (mixesScripts(name)) return 'Името смесва латиница и кирилица (или гръцки) в една дума — напиши я с едната.';
   return null;
 }
 

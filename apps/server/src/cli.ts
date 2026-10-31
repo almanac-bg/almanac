@@ -15,11 +15,15 @@
 //   node apps/server/dist/cli.mjs live                     — what's going on in the server running next to it: people
 //                                                            online, matches, rooms, the evening, and what a restart
 //                                                            now would cut short (deploy/deploy.sh waits for that)
+//   node apps/server/dist/cli.mjs names                    — names already taken that today's name check would refuse
+//                                                            (players, groups, sets), to rename through /admin
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
 import webpush from 'web-push';
 import { config } from './config';
 import { all, run } from './db';
+import { nameProblem } from './moderation';
 import { logAction } from './modlog';
+import { textProblem } from './names';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
 import { guestsPaused, pauseGuests } from './settings';
 import { getUserByName } from './users';
@@ -32,7 +36,7 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live';
+  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live | names';
 
 if (area === 'check-bank') {
   try {
@@ -48,6 +52,33 @@ if (area === 'live') {
   const res = await fetch(`http://127.0.0.1:${config.port}/api/live`).catch(() => null);
   if (!res?.ok) fail(`The server isn't answering on port ${config.port} here.`);
   console.log(JSON.stringify(await res.json(), null, 2));
+  process.exit(0);
+}
+
+if (area === 'names') {
+  // Read-only: what the check says of each name now. Guests' generated names and hidden sets are left out.
+  const rows = [
+    ...all<{ id: number; name: string }>('SELECT id, username AS name FROM users WHERE is_guest = 0').map((r) => ({
+      ...r,
+      kind: 'player',
+      problem: nameProblem(r.name),
+    })),
+    ...all<{ id: number; name: string }>('SELECT id, name FROM player_groups').map((r) => ({
+      ...r,
+      kind: 'group',
+      problem: textProblem(r.name, 'Името'),
+    })),
+    ...all<{ id: number; name: string }>('SELECT id, name FROM question_sets WHERE hidden = 0').map((r) => ({
+      ...r,
+      kind: 'set',
+      problem: textProblem(r.name, 'Името'),
+    })),
+  ].filter((r) => r.problem);
+  console.log(
+    rows.length
+      ? rows.map((r) => `${r.kind} #${r.id}\t${r.name}\t${r.problem}`).join('\n')
+      : '✅ Every name in use passes the check.',
+  );
   process.exit(0);
 }
 

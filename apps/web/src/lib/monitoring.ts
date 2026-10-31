@@ -13,8 +13,19 @@ let userId: number | null = null;
 /** Reports keep only the path of a link, without names or codes (scrubPaths). */
 const scrub = (url: unknown) => (typeof url === 'string' ? scrubPaths(url) : url);
 
-/** Noise nothing can be done about: other origins' scripts, browser quirks, a connection that dropped. */
-const IGNORED = ['Script error.', /ResizeObserver loop/, /^NetworkError/, /Failed to fetch/, /Load failed/];
+/**
+ * Noise nothing can be done about: other origins' scripts, browser quirks, a connection that dropped — including a
+ * page's code that didn't arrive, in each browser's words (Chrome's is „Failed to fetch dynamically imported module“).
+ */
+const IGNORED = [
+  'Script error.',
+  /ResizeObserver loop/,
+  /^NetworkError/,
+  /Failed to fetch/,
+  /Load failed/,
+  /Importing a module script failed/,
+  /error loading dynamically imported module/,
+];
 
 const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content || undefined;
 

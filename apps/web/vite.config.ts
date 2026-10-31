@@ -205,6 +205,12 @@ export default defineConfig({
     },
   ],
   build: {
+    // No <link rel="modulepreload"> for the code, in the page or added before a lazy page's import: in WebKit a script
+    // link whose fetch fails once stays failed for the tab, through every retry and reload (the server is never asked
+    // again), so one lost second on an iPhone left the game without its match or its connection. A plain import that
+    // fails is fetched anew the next time (the 31 October review, WEB-2; e2e/updates.spec.ts). The cost: a lazy page's
+    // own imports are found when its file arrives, not with it; the lobby's background prefetch hides that.
+    modulePreload: false,
     // The art (src/emoji) stays in files of its own, however small: inlined, 34 of them made 160 KB of base64 in the
     // first script (base64 hardly compresses), where each file is fetched only when shown and then cached for good.
     assetsInlineLimit: (file) => (file.includes('/emoji/') ? false : undefined),
