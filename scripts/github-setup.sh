@@ -42,6 +42,14 @@ try "secret scanning with push protection" gh api -X PATCH "repos/$repo" --input
 {"security_and_analysis": {"secret_scanning": {"status": "enabled"}, "secret_scanning_push_protection": {"status": "enabled"}}}
 JSON
 
+# A private vulnerability report notifies only those who watch the repository (all activity, or Custom → Security
+# alerts), and so does every outside issue and pull request: until 31 October nobody watched, so SECURITY.md's first
+# channel reached no one (the review's GH-2). This watches it for whoever runs the script. GitHub's API needs the
+# notifications scope for it: `gh auth refresh -h github.com -s notifications`, or the Watch button (Custom → Security
+# alerts) on the repository's page. Where the mail goes: github.com/settings/notifications → Custom routing.
+try "watched by you (vulnerability reports, issues and pull requests reach you)" gh api -X PUT \
+  "repos/$repo/subscription" -F subscribed=true -F ignored=false
+
 # CodeQL: GitHub's own security analysis of the code, on every push and pull request (free for public repositories),
 # with the extended set of queries (more findings, some of them to dismiss; docs/maintainers.md says how).
 try "code scanning (CodeQL, extended queries)" gh api -X PATCH "repos/$repo/code-scanning/default-setup" \

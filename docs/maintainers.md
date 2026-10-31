@@ -11,6 +11,12 @@ vulnerability reporting, secret scanning, етикети, защитен `main` 
 настройки съществуват само за публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично.
 Изображението за social preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.
 
+**Следи хранилищата.** Доклад за уязвимост (първият начин в `SECURITY.md`), issue и pull request от някой отвън
+известяват само онези, които следят хранилището. Скриптът го прави за този, който го пуска (трябва му правото
+`notifications` на `gh`: `gh auth refresh -h github.com -s notifications`), а иначе — бутонът Watch → Custom →
+Security alerts на всяко хранилище на организацията. Къде отиват писмата: github.com/settings/notifications → Custom
+routing.
+
 ## Знакът и картините
 
 Знакът е розетката в `apps/web/public/favicon.svg`: четири листа, единият златен — четирите отговора, единият верен.

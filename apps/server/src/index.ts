@@ -59,6 +59,13 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(securityHeaders);
 app.use('/api', sameSiteWrites);
+// No /api answer is kept anywhere on the way: what it says depends on who asks (a profile's friendship, block and Дуел
+// record), and Cloudflare keeps any address that ends like a file (`/api/profile/ivan.exe`) for everyone after, unless
+// it's told not to (the 31 October review, CF-2). A route whose answer may be kept says so itself (a set's picture).
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 // A host's question set („Моите въпроси“, up to 50 questions) is the one bigger body there is.
 const json = express.json({ limit: '20kb' });
 const setJson = express.json({ limit: '128kb' });
@@ -181,6 +188,13 @@ app.use(
     setHeaders: (res) => res.setHeader('X-Robots-Tag', 'noindex'),
   }),
 );
+// A picture that isn't there: never kept on the way either, or a file added later stays missing at the edge.
+app.use(IMAGE_PATH, (err: { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  res
+    .status(err.status ?? 404)
+    .setHeader('Cache-Control', 'no-store')
+    .end();
+});
 
 // In production the server also hosts the built web app.
 if (fs.existsSync(config.webDist)) {

@@ -90,9 +90,15 @@ test('guests play right away, stay off the boards, and keep everything when they
   );
 
   const xp = (await api.get('/api/me', G.cookie)).body.user.xp;
+  // „КОМА“ in Cyrillic capitals looks exactly like the Latin „KOMA“ (a word that mixed the two would be refused anyway).
+  await register(srv.url, 'KOMA_gost');
   assert.equal(
-    (await api.send('POST', '/api/account/claim', G.cookie, { username: 'm\u0430ria_test', password: 'secret123' }))
-      .status,
+    (
+      await api.send('POST', '/api/account/claim', G.cookie, {
+        username: '\u041a\u041e\u041c\u0410_gost',
+        password: 'secret123',
+      })
+    ).status,
     409,
     'nor one that looks the same as a taken name',
   );
