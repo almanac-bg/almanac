@@ -10,11 +10,14 @@ from it. Every batch is verified independently before it goes in.
 
 ## Where things are
 
-- `private/questions.json` — the real bank (~2 000 questions). A clone of the private repo
+- `private/questions.json` — the real bank (about 3 900: 325 four-option, 40 number finals, 15 pictures and 15
+  „Подреди“ per category). A clone of the private repo
   `almanac-bg/almanac-questions`, ignored by this repo. Production pulls it on every deploy (`deploy/deploy.sh`).
   It's private so answers can't be searched or copied: never paste many of its questions anywhere public.
 - `apps/server/src/data/questions.sample.json` — the public sample (12 per category), an older snapshot of 120
-  questions. CI and the browser tests play it. Every Geography question in it has a fact (`apps/web/e2e/facts.spec.ts`
+  questions. CI and the browser tests play it. It's public with its answers (the /quiz pages, /facts, the landing), and
+  so are the holiday quizzes in `apps/web/src/content/`: the server never deals the real bank's copies of either (same
+  id or same text, `apps/server/src/publicQuestions.ts`), so a question moved into the sample leaves play. Every Geography question in it has a fact (`apps/web/e2e/facts.spec.ts`
   relies on that): a new sample Geography question needs one too.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions

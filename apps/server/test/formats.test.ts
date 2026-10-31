@@ -639,3 +639,67 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   assert.ok(!one('SELECT 1 AS x FROM set_images WHERE id = ?', spare.ok ? spare.id : ''));
   assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 0, 'once a day: the next run that day reads no sets');
 });
+
+test('a giveaway in another form: a final’s number in an order item or an answer, a word with its ending, an abbreviation', async () => {
+  const { findConflicts } = await import('../src/questions');
+  const base = { category: 'technology' as const, difficulty: 'easy' as const };
+  const choice = (id: string, q: string, answer: string, fact?: string) => ({
+    ...base,
+    id,
+    q,
+    options: [answer, 'Друго 1', 'Друго 2', 'Друго 3'],
+    answer: 0,
+    ...(fact && { fact }),
+  });
+  const final = (id: string, q: string, answer: number) => ({
+    ...base,
+    id,
+    kind: 'number' as const,
+    q,
+    number: { answer, unit: '', min: 0, max: 200_000, step: 1, scale: 'linear' as const, tolerance: 1 },
+  });
+  const links = findConflicts([
+    final('f-chatgpt', 'В коя година е пуснат ChatGPT?', 2022),
+    {
+      ...base,
+      id: 'o-launches',
+      kind: 'order' as const,
+      q: 'Подреди по година на пускане.',
+      items: [
+        { text: 'ChatGPT', value: 2022 },
+        { text: 'Таблетът iPad', value: 2010 },
+        { text: 'Windows XP', value: 2001 },
+        { text: 'Първият смартфон', value: 1994 },
+      ],
+      direction: 'asc' as const,
+    },
+    final('f-area', 'Около колко хиляди квадратни километра е площта на България?', 111),
+    choice('c-area', 'Каква е приблизително площта на България?', '111 000 км²'),
+    final('f-unrelated', 'Колко метра е висок Айфеловата кула с антената?', 2022),
+    choice('c-mars', 'Коя планета е наречена на бога на войната?', 'Марс'),
+    choice(
+      'c-mars-fact',
+      'Коя е най-високата планина в Слънчевата система?',
+      'Олимп',
+      'Тя е на Марс; Марсът е червен.',
+    ),
+    choice('c-usa', 'В коя държава е Гранд Каньон?', 'САЩ'),
+    choice('c-usa-fact', 'Кой е най-дългият мост в света?', 'Данян–Кушан', 'Повече от САЩ и Европа взети заедно.'),
+  ] as never);
+  const linked = (a: string, b: string) => !!links.get(a)?.has(b);
+  assert.ok(linked('f-chatgpt', 'o-launches'), 'an order item’s value');
+  assert.ok(linked('f-area', 'c-area'), 'a marked answer, in thousands');
+  assert.ok(!linked('f-unrelated', 'o-launches'), 'the same number about something else is no clash');
+  assert.ok(linked('c-mars', 'c-mars-fact'), 'a word with its ending (Марсът)');
+  assert.ok(linked('c-usa', 'c-usa-fact'), 'an abbreviation');
+});
+
+test('a big match takes the final the fewest of its players saw lately, rather than none (GAMEPLAY-3)', () => {
+  const now = Date.now();
+  // Every final seen a moment ago by someone: strictly, no final at all.
+  const seen = new Map(numberBank().map((q) => [q.id, now - 1000]));
+  assert.ok(!pickMatch(10, 'mixed', seen, { final: true }).some((q) => q.kind === 'number'), 'strictly: none');
+  const fewest = numberBank()[0].id;
+  const crowd = new Map(numberBank().map((q) => [q.id, q.id === fewest ? 1 : 3]));
+  assert.equal(pickMatch(10, 'mixed', seen, { final: true, crowd }).at(-1)!.id, fewest, 'the one fewest saw');
+});

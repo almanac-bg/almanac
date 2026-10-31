@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';
 import { reportError } from './monitoring';
+import { publicQuestions, questionKey } from './publicQuestions';
 import { installationSecret } from './settings';
 
 /** The longest "Знаеше ли?" fact: one or two sentences, readable at a glance. */
@@ -210,7 +211,12 @@ export function findConflicts(questions: readonly PlayableQuestion[]): Map<strin
     else if (q.kind !== 'number' && q.image) parts.push(q.image.alt);
     const text = ` ${plainWords(parts.join(' '))} `;
     texts.set(q.id, text);
-    for (const word of new Set(text.split(' '))) if (word) withWord.set(word, [...(withWord.get(word) ?? []), q.id]);
+    for (const word of new Set(text.split(' ')))
+      if (word) {
+        const ids = withWord.get(word);
+        if (ids) ids.push(q.id);
+        else withWord.set(word, [q.id]);
+      }
   }
   const found = new Map<string, Set<string>>();
   const link = (a: string, b: string) => {
@@ -219,18 +225,72 @@ export function findConflicts(questions: readonly PlayableQuestion[]): Map<strin
   };
   for (const q of questions) {
     if (q.kind === 'number' || q.kind === 'order') continue;
-    const answer = plainWords(q.options[q.answer]);
-    if (answer.length < 4) continue;
+    const said = q.options[q.answer];
+    const answer = plainWords(said);
+    // Short answers are too often part of other words — but an abbreviation („САЩ“, „ДНК“) is its own (SERVER-8).
+    if (answer.length < 4 && !/^\p{Lu}{2,3}$/u.test(said.trim())) continue;
     // The answer's rarest word narrows the search; the whole answer must then appear as words.
     const [rarest] = answer
       .split(' ')
       .map((w) => withWord.get(w) ?? [])
       .sort((a, b) => a.length - b.length);
     const naming = rarest.filter((id) => id !== q.id && texts.get(id)!.includes(` ${answer} `));
+    // A one-word answer in another form too: „Марс“ in „Марсът“, „планина“ in „планините“.
+    if (!answer.includes(' ') && answer.length >= 4)
+      for (const ending of BG_ENDINGS)
+        for (const id of withWord.get(`${answer}${ending}`) ?? [])
+          if (id !== q.id && !naming.includes(id)) naming.push(id);
     if (naming.length > COMMON_ANSWER) continue;
     for (const id of naming) link(q.id, id);
   }
+  linkFinalNumbers(questions, link);
   return found;
+}
+
+/** Endings a Bulgarian word takes (the article, the plural) that leave it recognisable. */
+const BG_ENDINGS = ['а', 'я', 'ът', 'ят', 'та', 'то', 'те', 'и', 'ите', 'ове', 'овете'];
+
+/** Words most questions share, which say nothing about what a question is about. */
+const COMMON_WORDS = new Set(
+  'година години годината колко около какво който която което които първи първия първият първата първото повече според държава държави игра през както между'.split(
+    ' ',
+  ),
+);
+
+/** Numbers as one token: „8 848“ and „111 000“ (thousands set apart) are 8848 and 111000. */
+const numberWords = (s: string) => plainWords(s.replace(/(\d)[\s\u00a0.](?=\d{3}(?!\d))/g, '$1'));
+
+/**
+ * A final's exact number, shown before it: in an order item's value („ChatGPT — 2022“ before „В коя година е пуснат
+ * ChatGPT?“), a marked answer, a question or a fact — when it also shares a word that says what the final is about
+ * (the 31 October review, BANK-1).
+ */
+function linkFinalNumbers(questions: readonly PlayableQuestion[], link: (a: string, b: string) => void) {
+  const withNumber = new Map<string, { id: string; words: Set<string> }[]>();
+  for (const q of questions) {
+    if (q.kind === 'number') continue;
+    const parts = [q.q, q.fact ?? ''];
+    if (q.kind === 'order') parts.push(...q.items.map((i) => `${i.text} ${i.value}`));
+    else parts.push(q.options[q.answer], q.image?.alt ?? '');
+    const words = numberWords(parts.join(' ')).split(' ');
+    const entry = { id: q.id, words: new Set(words.filter((w) => w.length >= 5 && !/^\d+$/.test(w))) };
+    // A number in thousands counts as itself too: „111 000 км²“ gives away „Около колко хиляди км² е…? — 111“.
+    const numbers = words.filter((w) => /^\d+$/.test(w));
+    for (const n of [...numbers]) if (/^[1-9]\d*000$/.test(n)) numbers.push(n.slice(0, -3));
+    for (const n of new Set(numbers)) {
+      const list = withNumber.get(n);
+      if (list) list.push(entry);
+      else withNumber.set(n, [entry]);
+    }
+  }
+  for (const q of questions) {
+    if (q.kind !== 'number' || !Number.isInteger(q.number.answer)) continue;
+    const about = numberWords(q.q)
+      .split(' ')
+      .filter((w) => w.length >= 5 && !COMMON_WORDS.has(w) && !/^\d+$/.test(w));
+    for (const other of withNumber.get(String(q.number.answer)) ?? [])
+      if (other.id !== q.id && about.some((w) => other.words.has(w))) link(q.id, other.id);
+  }
 }
 
 /** Whether `id` names the answer of any of `chosen` (or the other way round). */
@@ -425,7 +485,25 @@ function loadBank(): {
     fs.existsSync(path.join(dir, q.image.file)) &&
     fs.existsSync(path.join(dir, smallImage(q.image.file)));
   missingImages = file.choice.filter((q) => q.image && !present(q)).map((q) => q.id);
-  const builtIn = file.choice;
+  // The real bank's copies of what the public pages show with its answer (publicQuestions.ts): never dealt. Not when
+  // the sample is the bank itself (development, the tests): then there's nothing else to play.
+  const isPublic = (() => {
+    if (QUESTIONS_PATH === SAMPLE_BANK) return () => false;
+    const open = publicQuestions(SAMPLE_BANK);
+    return (q: PlayableQuestion) =>
+      open.ids.has(q.id) ||
+      open.keys.has(
+        questionKey({
+          q: q.q,
+          image: q.kind !== 'number' && q.kind !== 'order' && q.image && 'file' in q.image ? q.image : undefined,
+          items: q.kind === 'order' ? q.items : undefined,
+        }),
+      );
+  })();
+  const builtIn = file.choice.filter((q) => !isPublic(q));
+  const publicHeld = file.choice.length - builtIn.length + [...file.number, ...file.order].filter(isPublic).length;
+  file.number = file.number.filter((q) => !isPublic(q));
+  file.order = file.order.filter((q) => !isPublic(q));
   const community = all<{
     id: string;
     category: CategoryId;
@@ -462,7 +540,9 @@ function loadBank(): {
   console.log(
     `📚 ${builtIn.length - images.length} built-in + ${community.length} community questions, ${images.length} with a picture, ${
       file.number.length
-    } number, ${file.order.length} order${hidden.size ? `, ${hidden.size} hidden` : ''}`,
+    } number, ${file.order.length} order${hidden.size ? `, ${hidden.size} hidden` : ''}${
+      publicHeld ? `, ${publicHeld} held back (on the public pages)` : ''
+    }`,
   );
   if (missingImages.length) {
     const message = `Held back, their picture isn't in ${dir}: ${missingImages.slice(0, 10).join(', ')}`;
@@ -528,8 +608,26 @@ const REPEAT_MS = 30 * 24 * 60 * 60_000;
  * Unseen (or seen REPEAT_MS ago or more), least seen first. A ranking that isn't a time (the daily's, by how often each
  * was played) is far below any time: everything in it counts as unseen.
  */
-const notRecent = <T extends { id: string }>(pool: T[], seen: ReadonlyMap<string, number>, rng: Rng, now: number) =>
-  leastSeenFirst(pool, seen, rng).filter((q) => !seen.has(q.id) || seen.get(q.id)! <= now - REPEAT_MS);
+/**
+ * How many of a big match's players saw each question in the last REPEAT_MS (seenBy). With three or more people the
+ * strict rule — nobody saw it — left a regular group's evening without its final and pictures; there the one seen by
+ * the fewest goes instead (D5, the 31 October review, GAMEPLAY-3).
+ */
+export type Crowd = ReadonlyMap<string, number>;
+
+const notRecent = <T extends { id: string }>(
+  pool: T[],
+  seen: ReadonlyMap<string, number>,
+  rng: Rng,
+  now: number,
+  crowd?: Crowd,
+) =>
+  crowd
+    ? leastSeenFirst(pool, seen, rng)
+        .map((q, i) => ({ q, i }))
+        .sort((a, b) => (crowd.get(a.q.id) ?? 0) - (crowd.get(b.q.id) ?? 0) || a.i - b.i)
+        .map(({ q }) => q)
+    : leastSeenFirst(pool, seen, rng).filter((q) => !seen.has(q.id) || seen.get(q.id)! <= now - REPEAT_MS);
 
 const DIFFICULTY_ORDER: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
 /**
@@ -552,6 +650,8 @@ export function pickQuestions(
   rng: Rng = Math.random,
   pool: readonly Question[] = questionBank(),
   avoid: ReadonlySet<string> = new Set(),
+  /** A day's theme: its tagged questions aren't held to the per-category share (a theme's are often all history). */
+  themed: (q: PlayableQuestion) => boolean = () => false,
 ): Question[] {
   const ofCategory = pool.filter((q) => category === 'mixed' || q.category === category);
   // Shuffled first, so unseen questions (and ones seen in the same match) come in random order; the sort is stable.
@@ -577,7 +677,7 @@ export function pickQuestions(
       )
         continue;
       if (respectQuota && quota[q.difficulty] <= 0) continue;
-      if (respectCap && (perCategory.get(q.category) ?? 0) >= perCategoryCap) continue;
+      if (respectCap && !themed(q) && (perCategory.get(q.category) ?? 0) >= perCategoryCap) continue;
       picked.push(q);
       quota[q.difficulty]--;
       perCategory.set(q.category, (perCategory.get(q.category) ?? 0) + 1);
@@ -605,19 +705,14 @@ function placeOne(
   to: number,
   taken: Set<number>,
   rng: Rng,
+  alongside: readonly string[] = [],
 ): number | null {
   const free: number[] = [];
   for (let i = Math.max(0, from); i <= Math.min(to, questions.length - 1); i++) if (!taken.has(i)) free.push(i);
   if (!free.length) return null;
   for (const gap of [0, 1]) {
     for (const c of candidates) {
-      if (
-        questions.some((q) => q.id === c.id) ||
-        clashes(
-          c.id,
-          questions.map((q) => q.id),
-        )
-      )
+      if (questions.some((q) => q.id === c.id) || clashes(c.id, [...questions.map((q) => q.id), ...alongside]))
         continue;
       const fits = free.filter(
         (i) => Math.abs(DIFFICULTY_ORDER[questions[i].difficulty] - DIFFICULTY_ORDER[c.difficulty]) === gap,
@@ -644,18 +739,28 @@ function placeFormats(
   formats: Formats,
   rng: Rng,
   now: number,
+  themed: (q: PlayableQuestion) => boolean = () => false,
+  /** What else the match deals (its final): nothing placed may clash with it either. */
+  alongside: readonly string[] = [],
+  crowd?: Crowd,
 ) {
   const inCategory = (q: PlayableQuestion) => category === 'mixed' || q.category === category;
-  const taken = new Set<number>();
+  // A day's themed questions keep their places, and a themed picture or order question goes first (GAMEPLAY-6).
+  const taken = new Set<number>(questions.flatMap((q, i) => (themed(q) ? [i] : [])));
+  const themedFirst = <T extends PlayableQuestion>(list: T[]) =>
+    list
+      .map((q, i) => ({ q, i }))
+      .sort((a, b) => Number(themed(b.q)) - Number(themed(a.q)) || a.i - b.i)
+      .map(({ q }) => q);
   if (formats.order && questions.length >= 5) {
-    const candidates = notRecent(orderBank().filter(inCategory), seen, rng, now);
-    placeOne(questions, candidates, Math.floor(questions.length / 2), questions.length - 1, taken, rng);
+    const candidates = themedFirst(notRecent(orderBank().filter(inCategory), seen, rng, now, crowd));
+    placeOne(questions, candidates, Math.floor(questions.length / 2), questions.length - 1, taken, rng, alongside);
   }
   const pictures = Math.min(formats.images, questions.length >= IMAGE.fullMatch ? IMAGE.perMatch : 1);
   if (pictures > 0 && questions.length >= 2) {
-    const candidates = notRecent(imageBank().filter(inCategory), seen, rng, now);
+    const candidates = themedFirst(notRecent(imageBank().filter(inCategory), seen, rng, now, crowd));
     for (let n = 0; n < pictures; n++) {
-      if (placeOne(questions, candidates, IMAGE.first, IMAGE.last, taken, rng) === null) break;
+      if (placeOne(questions, candidates, IMAGE.first, IMAGE.last, taken, rng, alongside) === null) break;
     }
   }
 }
@@ -669,13 +774,15 @@ export function pickFinal(
   category: CategoryChoice,
   seen: ReadonlyMap<string, number>,
   rng: Rng = Math.random,
-  opts: { not?: readonly CategoryId[]; now?: number; avoid?: Iterable<string> } = {},
+  opts: { not?: readonly CategoryId[]; now?: number; avoid?: Iterable<string>; crowd?: Crowd } = {},
 ): NumberQuestion | null {
   const avoid = [...(opts.avoid ?? [])];
   const pool = numberBank().filter(
     (q) =>
       (category === 'mixed' || q.category === category) && !opts.not?.includes(q.category) && !clashes(q.id, avoid),
   );
+  // A big match: the final seen by the fewest of its players, never none (it then counts once: registry.ts).
+  if (opts.crowd) return notRecent(pool, seen, rng, opts.now ?? Date.now(), opts.crowd)[0] ?? null;
   const [first] = leastSeenFirst(pool, seen, rng);
   if (!first) return null;
   const at = seen.get(first.id);
@@ -692,21 +799,41 @@ export function pickMatch(
   count: number,
   category: CategoryChoice,
   seen: ReadonlyMap<string, number>,
-  opts: { final: boolean; formats?: Formats; pictures?: boolean; rng?: Rng; now?: number },
+  opts: {
+    final: boolean;
+    formats?: Formats;
+    pictures?: boolean;
+    rng?: Rng;
+    now?: number;
+    theme?: string;
+    crowd?: Crowd;
+  },
 ): PreparedQuestion[] {
   const rng = opts.rng ?? Math.random;
-  const final = opts.final ? pickFinal(category, seen, rng, { now: opts.now }) : null;
+  const theme = opts.theme;
+  const themed = theme ? (q: PlayableQuestion) => !!q.tags?.includes(theme) : () => false;
+  const final = opts.final ? pickFinal(category, seen, rng, { now: opts.now, crowd: opts.crowd }) : null;
   const body = count - (final ? 1 : 0);
   let questions: PreparedQuestion[];
   const avoid = new Set(final ? [final.id] : []);
   if (opts.pictures) {
-    const drawn = pickQuestions(body, category, seen, rng, imageBank(), avoid);
+    const drawn = pickQuestions(body, category, seen, rng, imageBank(), avoid, themed);
     for (const q of drawn) avoid.add(q.id);
-    const rest = pickQuestions(body - drawn.length, category, seen, rng, questionBank(), avoid);
+    const rest = pickQuestions(body - drawn.length, category, seen, rng, questionBank(), avoid, themed);
     questions = [...drawn, ...rest].sort((a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]);
   } else {
-    questions = pickQuestions(body, category, seen, rng, questionBank(), avoid);
-    placeFormats(questions, category, seen, opts.formats ?? TEXT_ONLY, rng, opts.now ?? Date.now());
+    questions = pickQuestions(body, category, seen, rng, questionBank(), avoid, themed);
+    placeFormats(
+      questions,
+      category,
+      seen,
+      opts.formats ?? TEXT_ONLY,
+      rng,
+      opts.now ?? Date.now(),
+      themed,
+      [...avoid],
+      opts.crowd,
+    );
   }
   return final ? [...questions, final] : questions;
 }
@@ -731,7 +858,7 @@ function drawFrom(
   seen: ReadonlyMap<string, number>,
   used: Set<string>,
   rng: Rng,
-  round?: { index: number; from: number; formats: Formats; now: number },
+  round?: { index: number; from: number; formats: Formats; now: number; crowd?: Crowd },
 ): PreparedQuestion[] | null {
   const pool = leastSeenFirst(
     questionBank().filter((q) => q.category === category && !used.has(q.id) && !clashes(q.id, used)),
@@ -752,13 +879,14 @@ function drawFrom(
   }
   const questions: PreparedQuestion[] = picked.map((q) => shuffled(q, rng));
   if (round) {
-    const { index, from, formats, now } = round;
+    const { index, from, formats, now, crowd } = round;
     const fresh = <T extends PlayableQuestion>(bank: T[]) =>
       notRecent(
         bank.filter((q) => q.category === category && !used.has(q.id) && !clashes(q.id, used)),
         seen,
         rng,
         now,
+        crowd,
       );
     const taken = new Set<number>();
     if (index === ROUNDS.count - 1 && formats.order) placeOne(questions, fresh(orderBank()), 0, 2, taken, rng);
@@ -782,10 +910,11 @@ export function pickRounds(
     final: numberFinal = true,
     formats = TEXT_ONLY,
     now = Date.now(),
-  }: { final?: boolean; formats?: Formats; now?: number } = {},
+    crowd,
+  }: { final?: boolean; formats?: Formats; now?: number; crowd?: Crowd } = {},
 ): { questions: PreparedQuestion[]; rounds: RoundPlan[] } | null {
   const used = new Set<string>();
-  const final = numberFinal ? pickFinal('mixed', seen, rng, { now }) : null;
+  const final = numberFinal ? pickFinal('mixed', seen, rng, { now, crowd }) : null;
   if (final) used.add(final.id);
   const categories = shuffle(
     CATEGORY_IDS.filter((c) => c !== final?.category),
@@ -801,6 +930,7 @@ export function pickRounds(
         from: round * ROUNDS.size,
         formats,
         now,
+        crowd,
       });
       if (questions) offers.push({ category, questions });
     }
@@ -924,8 +1054,23 @@ export function recentFor(userIds: number[]): Map<string, number> {
   return seen;
 }
 
+/** How many of these players saw each question in the last REPEAT_MS: a big match's way to choose (Crowd). */
+export function seenBy(userIds: number[], now = Date.now()): Map<string, number> {
+  if (!userIds.length) return new Map();
+  return new Map(
+    all<{ question_id: string; n: number }>(
+      `SELECT question_id, COUNT(DISTINCT user_id) AS n FROM seen_questions
+       WHERE user_id IN (${userIds.map(() => '?').join(',')}) AND seen_at > ? GROUP BY question_id`,
+      ...userIds,
+      now - REPEAT_MS,
+    ).map((r) => [r.question_id, r.n]),
+  );
+}
+
 /** Today's daily questions (daily.ts draws them, and says how: holdBackDaily); none until it does. */
 let todaysDaily: () => readonly string[] = () => [];
 export function holdBackDaily(today: () => readonly string[]) {
   todaysDaily = today;
 }
+/** Today's ten, which stay out of every other match until midnight — a recording's included (records.ts). */
+export const dailyHeldBack = (): ReadonlySet<string> => new Set(todaysDaily());

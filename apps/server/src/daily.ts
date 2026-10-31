@@ -12,6 +12,7 @@ import {
   dayTheme,
   MODES,
   STREAK_SHIELDS,
+  shiftDay,
   weekStart,
 } from '@quiz/shared';
 import { config } from './config';
@@ -50,6 +51,19 @@ holdBackDaily(() => {
   return held.ids;
 });
 
+/** How far back a daily's questions stay out of the next ones. */
+export const DAILY_REPEAT_DAYS = 30;
+
+/** The questions the dailies of the DAILY_REPEAT_DAYS before `day` asked. */
+function recentDailyIds(day: string): Set<string> {
+  const rows = all<{ questions: string }>(
+    'SELECT questions FROM daily_sets WHERE day < ? AND day >= ?',
+    day,
+    shiftDay(day, -DAILY_REPEAT_DAYS),
+  );
+  return new Set(rows.flatMap((r) => (JSON.parse(r.questions) as { id: string }[]).map((q) => q.id)));
+}
+
 /**
  * Today's question set: drawn once a day, then frozen in the database. Questions with a "Знаеше ли?" fact come first,
  * and of those the ones played least so far: the day everyone plays shouldn't be what the regulars have seen most. The
@@ -65,17 +79,24 @@ function dailySet(day: string): PreparedQuestion[] {
     ]),
   );
   // The picks take the lowest first. A day with a theme (CALENDAR_DAYS: 3 март, 24 май…) takes its tagged questions
-  // before any other, as far as the day's mix of difficulties and categories allows.
+  // before any other, as far as the day's mix of difficulties and categories allows. What a daily of the last 30 days
+  // asked comes after everything else, themed or not: 25 December repeated 24 December's final and half its questions,
+  // every year (the 31 October review, GAMEPLAY-1). Not a year back: that would take next Christmas its theme.
   const theme = dayTheme(day);
+  const recent = recentDailyIds(day);
   const order = new Map(
     [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [
       q.id,
-      (theme && q.tags?.includes(theme.tag) ? -2_000_000 : 0) + (q.fact ? 0 : 1_000_000) + (played.get(q.id) ?? 0),
+      (recent.has(q.id) ? 4_000_000 : 0) +
+        (theme && q.tags?.includes(theme.tag) ? -2_000_000 : 0) +
+        (q.fact ? 0 : 1_000_000) +
+        (played.get(q.id) ?? 0),
     ]),
   );
   // The seed includes this installation's secret: with the code public, a date alone mustn't reveal the questions.
   const questions = pickMatch(MODES.daily.questions, 'mixed', order, {
     final: MODES.daily.final,
+    theme: theme?.tag,
     // A picture every day; „Подреди“ on Mondays.
     formats: { ...MODES.daily.formats, order: weekStart(day) === day },
     rng: seededRng(`daily:${installationSecret('daily-seed')}:${day}`),
@@ -99,6 +120,8 @@ export function redrawDailyWithout(questionId: string, day = dayKey()): boolean 
   const started = one('SELECT 1 AS x FROM daily_results WHERE day = ? LIMIT 1', day);
   if (started) return false;
   run('DELETE FROM daily_sets WHERE day = ?', day);
+  // What other matches hold back is the new set, not the one drawn before (the review's GAMEPLAY-10).
+  if (held.day === day) held = { day: '', ids: [] };
   return true;
 }
 
