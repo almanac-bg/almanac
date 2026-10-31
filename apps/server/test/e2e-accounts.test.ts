@@ -64,8 +64,20 @@ test('auth', T, async () => {
     password: 'secret123',
   });
   assert.equal(dup.status, 409, 'duplicate username (case-insensitive, Cyrillic) is rejected');
-  // One Cyrillic "а" for the Latin "a": a different name to the database, the same one on screen.
-  const twin = await api.send('POST', '/api/auth/register', '', { username: 'm\u0430ria_test', password: 'secret123' });
+  // One Cyrillic "а" for the Latin "a": a word in two alphabets is refused by itself (names.ts → mixesScripts)…
+  const mixed = await api.send('POST', '/api/auth/register', '', {
+    username: 'm\u0430ria_test',
+    password: 'secret123',
+  });
+  assert.equal(mixed.status, 400);
+  assert.match(mixed.body.error, /смесва латиница и кирилица/);
+  // …and a word wholly in Cyrillic capitals that look like Latin ones („КОМА“ for „KOMA“) is a different name to the
+  // database, the same one on screen.
+  await register(srv.url, 'KOMA_test');
+  const twin = await api.send('POST', '/api/auth/register', '', {
+    username: '\u041a\u041e\u041c\u0410_test',
+    password: 'secret123',
+  });
   assert.equal(twin.status, 409, 'a name that looks the same as a taken one is rejected');
   assert.match(twin.body.error, /изглежда точно като/);
   const bad = await api.send('POST', '/api/auth/login', '', { username: A.user.username, password: 'wrongpass' });
@@ -989,6 +1001,15 @@ test('website files are served with the right caching', {
     /max-age=31536000.*immutable/,
     'hashed files are cached for good',
   );
+
+  // An API answer is never kept on the way, even at an address that ends like a file: a player may be named „ivan.exe“,
+  // and their profile says something else to each viewer (the 31 October review, CF-2).
+  const dotted = await register(srv.url, 'ivan.exe');
+  const profile = await fetch(`${srv.url}/api/profile/ivan.exe`, { headers: { cookie: dotted.cookie } });
+  assert.equal(profile.status, 200);
+  assert.equal(profile.headers.get('cache-control'), 'no-store', 'per-viewer answers are never stored by a CDN');
+  assert.equal((await fetch(`${srv.url}/api/no-such-thing.css`)).headers.get('cache-control'), 'no-store');
+  assert.equal((await fetch(`${srv.url}/qimg/no-such-picture.webp`)).headers.get('cache-control'), 'no-store');
 
   const gone = await fetch(`${srv.url}/assets/index-from-an-old-deploy.js`);
   assert.equal(gone.status, 404, 'a missing build file is a 404, not the page');

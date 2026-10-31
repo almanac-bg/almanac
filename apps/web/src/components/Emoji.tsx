@@ -29,6 +29,20 @@ const codeOf = (emoji: string) =>
 export const emojiArt = (emoji: string): string | null => BY_CODE.get(codeOf(emoji)) ?? null;
 
 /**
+ * How wide the art is drawn, for `sizes`: a size in px or rem as given; one in em is of text whose size this can't know
+ * (`sizes` counts em from 16 px), so it's reckoned at the biggest body text, 24 px (the usual 1.15em → 28 px); anything
+ * else, the full picture, never a blurred one. Not `auto`: in Chromium a lazy image with `sizes="auto, …"` stays
+ * registered for viewport changes after it's gone, and keeps its whole removed screen alive with it — every match's
+ * answer cards, results and lobby, about 5 MB a match (the 31 October review, WEB-1; e2e/memory.spec.ts).
+ */
+function drawnAt(side: number | string): string {
+  if (typeof side === 'number') return `${side}px`;
+  if (/(?:px|rem)$/.test(side)) return side;
+  const em = /^(\d*\.?\d+)em$/.exec(side);
+  return em ? `${Math.ceil(Number(em[1]) * 24)}px` : '100vw';
+}
+
+/**
  * An emoji as the game draws it: its picture from the art set, else the system's glyph. As big as the text around it
  * unless `size` says otherwise. Decorative unless it has a `label` (then it's an image with that name).
  */
@@ -60,15 +74,9 @@ export function Emoji({
     <img
       src={small ?? src}
       // The browser takes the 64 px one where it's enough (the size it's drawn at, times the screen's density), the
-      // 192 px one for the big art. `auto`: the size it's laid out at (a lazy image's right); a browser that doesn't
-      // know it takes the next — a size in px or rem as given, but for one in em (of text whose size this can't
-      // know: `sizes` counts em from 16 px) the full picture, never a blurred one.
+      // 192 px one for the big art.
       srcSet={small ? `${small} 64w, ${src} 192w` : undefined}
-      sizes={
-        small
-          ? `auto, ${typeof side === 'number' ? `${side}px` : /(?:px|rem)$/.test(side) ? side : '100vw'}`
-          : undefined
-      }
+      sizes={small ? drawnAt(side) : undefined}
       loading="lazy"
       alt={label ?? ''}
       aria-hidden={label ? undefined : true}

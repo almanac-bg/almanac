@@ -1,17 +1,9 @@
 import type { WebSocketRoute } from '@playwright/test';
-import { expect, startAsGuest, test } from './support';
+import { expect, startAsGuest, startSolo, test } from './support';
 
 // The app's service worker answers file requests from its cache in some engines, out of page.route()'s sight: here
 // every download goes over the network, where the tests decide how it ends.
 test.use({ serviceWorkers: 'block' });
-
-/**
- * WebKit (Playwright's build 2370) keeps a module that failed to load for the rest of the tab's life, reloads
- * included: only a new tab fetches it again. A real deploy renames every file whose code changed, so a reload then asks
- * for new names; what stays stuck is a file that failed under the same name (one asked for in the seconds the app
- * restarts). To check on a real iPhone.
- */
-const WEBKIT_KEEPS_FAILED_MODULES = 'WebKit keeps a failed module for the tab, even across reloads';
 
 /** The legal pages' code: loaded only when asked for (pages/lazy.ts → ON_REQUEST), so a test controls its download. */
 const LEGAL_CODE = /\/assets\/LegalPages-[^/]+\.js$/;
@@ -23,7 +15,7 @@ const LEGAL_CODE = /\/assets\/LegalPages-[^/]+\.js$/;
  */
 function forgive(problems: string[]) {
   const expected = (p: string) =>
-    /LegalPages|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520|#422/.test(
+    /LegalPages|GamePage|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520|#422/.test(
       p,
     ) || /^console: (Error|JSHandle@object) \(.*\/assets\/react-[^/]+\.js\)$/.test(p);
   problems.splice(0, problems.length, ...problems.filter((p) => !expected(p)));
@@ -32,9 +24,7 @@ function forgive(problems: string[]) {
 test('a deploy mid-session: the server says so, the tab comes back to the new one, and old code is fetched anew', async ({
   page,
   pageProblems,
-  browserName,
 }) => {
-  test.fixme(browserName === 'webkit', WEBKIT_KEEPS_FAILED_MODULES);
   // Every realtime connection goes through here, so the test can play the server's side of a restart.
   const links: { page: WebSocketRoute; server: WebSocketRoute }[] = [];
   await page.routeWebSocket(/\/socket\.io\//, (ws) => {
@@ -76,7 +66,6 @@ test('a deploy mid-session: the server says so, the tab comes back to the new on
 test('a page whose code won’t download: one reload to fetch it again, then a way out, never a loop', async ({
   page,
   pageProblems,
-  browserName,
 }) => {
   await page.goto('/');
   // What a file request gets while the app restarts for a deploy: Caddy's "updating" page (deploy/Caddyfile), not code.
@@ -98,15 +87,28 @@ test('a page whose code won’t download: one reload to fetch it again, then a w
   await page.waitForTimeout(1_500);
   expect(loads, 'reloaded once to try again').toBe(1);
 
-  // The deploy is through: „Опитай пак“ asks for the page anew. WebKit keeps a module that failed to load for the
-  // page's life, so there the way out is the reload, home, and from there the page opens in a new tab only.
+  // The deploy is through: „Опитай пак“ asks for the page anew, in every engine. (WebKit once kept the failed file for
+  // the tab, reloads included, because the app asked for it through <link rel="modulepreload">: vite.config.ts.)
   await page.unroute(LEGAL_CODE);
-  if (browserName !== 'webkit') {
-    await page.getByRole('button', { name: 'Опитай пак', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
-  } else {
-    await page.getByRole('button', { name: 'Презареди', exact: true }).click();
-    await expect(page).toHaveURL(/\/$/);
-  }
+  await page.getByRole('button', { name: 'Опитай пак', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
+  forgive(pageProblems);
+});
+
+test('a page whose code was lost while the lobby fetched it in the background still opens when it’s needed', async ({
+  page,
+  pageProblems,
+}) => {
+  // A second without a line just after the lobby appears (a lift, a switch from Wi-Fi to 4G): the match's code, which
+  // the lobby fetches in the background (pages/lazy.ts → prefetchPages), doesn't arrive. In WebKit that once left the
+  // tab without any match until it was closed (the 31 October review, WEB-2).
+  let lost = 0;
+  await page.route(/\/assets\/GamePage-[^/]+\.js$/, (route) =>
+    lost++ === 0 ? route.abort('internetdisconnected') : route.continue(),
+  );
+  await startAsGuest(page);
+  await expect.poll(() => lost, { message: 'the background fetch asked for the match’s code' }).toBeGreaterThan(0);
+  await startSolo(page, 'Микс');
+  await expect(page.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: 15_000 });
   forgive(pageProblems);
 });
