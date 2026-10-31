@@ -72,16 +72,19 @@ export function pushPrefs(row: Pick<UserRow, 'push_prefs'>): PushPrefs | null {
  * Keeps this device's subscription for the player. True when it's new to them: the app posts a device's subscription
  * again now and then (keepPushUp) to have it back should it have gone, and only a new one is greeted.
  */
-export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema>): boolean {
+export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema>, session: string | null): boolean {
   const had = one('SELECT 1 AS x FROM push_subscriptions WHERE endpoint = ? AND user_id = ?', sub.endpoint, userId);
+  // `session`: the hash of the session it came with — when that session is gone, so is this (db.ts, v40's trigger).
   run(
-    `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`,
+    `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at, session_token) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth,
+       session_token = excluded.session_token`,
     sub.endpoint,
     userId,
     sub.keys.p256dh,
     sub.keys.auth,
     Date.now(),
+    session,
   );
   run('UPDATE users SET push_prefs = COALESCE(push_prefs, ?) WHERE id = ?', JSON.stringify(defaultPushPrefs()), userId);
   return !had;

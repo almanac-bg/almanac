@@ -477,3 +477,21 @@ test('names that look the same on screen have one shape; names that only share l
   assert.ok(!same('Иван', 'Ivan'), 'transliteration is a different name, not a disguise');
   assert.ok(!same('maria', 'maria_'), 'every visible character counts');
 });
+
+test('a mail-events subscription link is followed only on Scaleway’s Topics and Events servers (SEC-10)', async () => {
+  const { handleEmailEvent } = await import('../src/emailEvents');
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    for (const url of [
+      'https://console.scaleway.com/confirm',
+      'https://sns.mnq.fr-par.scaleway.com.attacker.example/confirm',
+      'http://sns.mnq.fr-par.scaleway.com/confirm',
+      'https://sns.mnq.fr-par.scaleway.com:8443/confirm',
+      'https://example.scw.cloud/confirm',
+    ])
+      assert.equal(await handleEmailEvent({ Type: 'SubscriptionConfirmation', SubscribeURL: url }), 'ignored', url);
+  } finally {
+    console.warn = warn;
+  }
+});

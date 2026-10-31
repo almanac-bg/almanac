@@ -31,6 +31,10 @@ const ACTION: Record<ModerationLogAction, string> = {
   staff_add: 'направи от екипа',
   staff_remove: 'махна от екипа',
   staff_2fa_reset: 'нулира двуфакторното влизане на',
+  staff_sign_in: 'влезе в модерацията',
+  second_factor_failed: 'отбеляза грешен код за двуфакторното влизане на',
+  second_factor_locked: 'спря двуфакторното влизане след твърде много грешни кодове на',
+  stop_reports: 'спря сигналите за 30 дни на',
 };
 
 /**

@@ -268,7 +268,8 @@ const pictureSignature = (id: string, expires: number) =>
 /** A picture's address as signed, and not yet expired. */
 export function pictureAllowed(id: string, expires: unknown, signature: unknown, now = Date.now()): boolean {
   if (typeof expires !== 'string' || !/^\d{1,12}$/.test(expires) || Number(expires) * 1000 < now) return false;
-  if (typeof signature !== 'string' || signature.length !== 22) return false;
+  // 22 base64url characters: a longer character (ä, ж) passes `length` but not timingSafeEqual's equal byte lengths.
+  if (typeof signature !== 'string' || !/^[\w-]{22}$/.test(signature)) return false;
   return timingSafeEqual(Buffer.from(pictureSignature(id, Number(expires))), Buffer.from(signature));
 }
 

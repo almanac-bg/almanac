@@ -21,10 +21,12 @@ const fake = http.createServer((req, res) => {
 await new Promise<void>((resolve) => fake.listen(0, '127.0.0.1', resolve));
 const { port } = fake.address() as { port: number };
 const DSN = `http://public123@127.0.0.1:${port}/42`;
+const BROWSER_DSN = `http://browser456@127.0.0.1:${port}/43`;
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-monitoring-'));
 process.env.DB_PATH = path.join(tmp, 'monitoring.db');
 process.env.SENTRY_DSN = DSN;
+process.env.SENTRY_BROWSER_DSN = BROWSER_DSN;
 process.env.APP_RELEASE = 'test-release';
 const { forwardEnvelope, reportError, scrubLog, shipLogs, watchEventLoop } = await import('../src/monitoring');
 
@@ -108,20 +110,33 @@ test('the same error repeating is reported once, and a flood is capped', async (
   assert.ok(received.length <= 20, `at most 20 a minute, got ${received.length}`);
 });
 
-test('the browser tunnel passes on envelopes for our project only', async () => {
+test('the browser tunnel passes on envelopes for the browser’s project only, as a browser’s', async () => {
   received.length = 0;
-  const envelope = (dsn: string) => `${JSON.stringify({ dsn })}\n${JSON.stringify({ type: 'event' })}\n{}\n`;
-  assert.equal(forwardEnvelope(envelope(DSN)), true);
+  const envelope = (dsn: string, event = {}) =>
+    `${JSON.stringify({ dsn })}\n${JSON.stringify({ type: 'event' })}\n${JSON.stringify(event)}\n`;
+  assert.equal(forwardEnvelope(envelope(BROWSER_DSN)), true);
+  assert.equal(forwardEnvelope(envelope(DSN)), false, 'the server’s project takes nothing from a browser (SEC-5)');
   assert.equal(forwardEnvelope(envelope('https://other@evil.example/1')), false, 'never an open relay');
   assert.equal(forwardEnvelope('not json'), false);
   // A log line from a browser could pass for the server's own: accepted (no retries) and dropped, as is anything else.
-  const log = `${JSON.stringify({ dsn: DSN })}\n${JSON.stringify({ type: 'log', item_count: 1 })}\n{"items":[]}\n`;
+  const log = `${JSON.stringify({ dsn: BROWSER_DSN })}\n${JSON.stringify({ type: 'log', item_count: 1 })}\n{"items":[]}\n`;
   assert.equal(forwardEnvelope(log), true);
-  const replay = `${JSON.stringify({ dsn: DSN })}\n${JSON.stringify({ type: 'event' })}\n{}\n${JSON.stringify({ type: 'replay_event', length: 2 })}\n{}\n`;
+  const replay = `${JSON.stringify({ dsn: BROWSER_DSN })}\n${JSON.stringify({ type: 'event' })}\n{}\n${JSON.stringify({ type: 'replay_event', length: 2 })}\n{}\n`;
   assert.equal(forwardEnvelope(replay), true);
+  // An event that claims to be the server's goes on as a browser's.
+  const forged = { message: 'database gone', platform: 'node', server_name: 'almanac', tags: { area: 'x' } };
+  assert.equal(forwardEnvelope(envelope(BROWSER_DSN, forged), { account: true }), true);
   await sleep(200);
-  assert.equal(received.length, 1, 'only the error report went on');
-  assert.equal(received[0].url, '/api/42/envelope/');
+  assert.equal(received.length, 2, 'only the error reports went on');
+  assert.ok(
+    received.every((r) => r.url === '/api/43/envelope/'),
+    'to the browser’s project',
+  );
+  const [, item, event] = lines(received[1].body);
+  assert.equal(item.length, Buffer.byteLength(JSON.stringify(event)));
+  assert.equal(event.platform, 'javascript');
+  assert.equal(event.server_name, undefined);
+  assert.deepEqual(event.tags, { area: 'x', origin: 'browser' });
 });
 
 /** The console's four methods replaced by a recorder (what stdout would have shown), for the length of `fn`. */

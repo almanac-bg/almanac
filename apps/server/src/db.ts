@@ -964,6 +964,24 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX submissions_question ON question_submissions(question_id) WHERE question_id IS NOT NULL;
     `,
   },
+  // v40, the staff second factor (secondFactor.ts): wrong codes in a row and when the last one came, kept across
+  // restarts, so guessing slows down for good and stops at 100. And each device's push subscription remembers the
+  // session that made it (push.ts → subscribe): when that session ends, however it ends — signing out, a reset or
+  // changed password, a ban, its expiry — the device gets no more pushes (the 31 October review, SEC-7). And a reporter
+  // a moderator stopped for bad faith (moderation.ts → stopReports, MOD-3). Older code doesn't read the columns, and the
+  // trigger works for it too.
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN totp_failures INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN totp_failed_at INTEGER;
+    ALTER TABLE users ADD COLUMN reports_stopped_until INTEGER;
+    ALTER TABLE push_subscriptions ADD COLUMN session_token TEXT;
+    CREATE INDEX push_subscriptions_session ON push_subscriptions(session_token) WHERE session_token IS NOT NULL;
+    CREATE TRIGGER sessions_take_push AFTER DELETE ON sessions BEGIN
+      DELETE FROM push_subscriptions WHERE session_token = OLD.token;
+    END;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

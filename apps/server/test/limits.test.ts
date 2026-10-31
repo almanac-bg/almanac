@@ -10,7 +10,8 @@ import { after, test } from 'node:test';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-limits-'));
 process.env.DB_PATH = path.join(tmp, 'limits.db');
 const { network, RateLimiter, wideNetwork } = await import('../src/throttle');
-const { hashingLimits } = await import('../src/auth');
+const { hashingLimits, hashPassword, NetworkBusyError, ServerBusyError } = await import('../src/auth');
+const { availableParallelism } = await import('node:os');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -93,4 +94,21 @@ test('password hashing leaves two pool threads and a CPU core free, and queues a
   assert.deepEqual(hashingLimits(8, 2), { slots: 1, waiting: 8 }, 'a two-core server keeps a core for the game');
   assert.deepEqual(hashingLimits(1, 1), { slots: 1, waiting: 8 }, 'always at least one');
   assert.deepEqual(hashingLimits(64, 64), { slots: 4, waiting: 32 }, 'never more than four (64 MiB each)');
+});
+
+test('one network can take only its share of the hashing queue: it waits, everyone else still gets in (SEC-3)', async () => {
+  const { slots, waiting } = hashingLimits(Number(process.env.UV_THREADPOOL_SIZE) || 4, availableParallelism());
+  const share = Math.max(1, Math.floor(waiting / 4));
+  const outcome = (p: Promise<unknown>) =>
+    p.then(
+      () => 'done',
+      (e) => (e instanceof NetworkBusyError ? 'network' : e instanceof ServerBusyError ? 'busy' : String(e)),
+    );
+  // The hashing slots and one network's share of the queue fill; the next from there is turned away at once.
+  const flood = Array.from({ length: slots + share + 3 }, () => outcome(hashPassword('x', '203.0.113.0/24')));
+  const elsewhere = outcome(hashPassword('y', '198.51.100.0/24'));
+  const results = await Promise.all(flood);
+  assert.equal(results.filter((r) => r === 'network').length, 3, results.join(' '));
+  assert.equal(results.filter((r) => r === 'done').length, slots + share);
+  assert.equal(await elsewhere, 'done', 'another network waits its turn as usual');
 });

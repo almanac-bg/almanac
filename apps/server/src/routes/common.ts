@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
 import { verifyPassword } from '../auth';
 import { ACCOUNT_ONLY } from '../guests';
-import { throttled } from '../throttle';
+import { throttled, wideNetwork } from '../throttle';
 import { getUser, isAdmin, isOwner } from '../users';
 
 /**
@@ -114,7 +114,7 @@ export async function confirmPassword(res: Response, password: string): Promise<
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return false;
   }
-  if (!(await verifyPassword(password, getUser(res.locals.userId)!.password_hash))) {
+  if (!(await verifyPassword(password, getUser(res.locals.userId)!.password_hash, wideNetwork(res.req.ip)))) {
     res.status(400).json({ error: 'Грешна парола.' });
     return false;
   }

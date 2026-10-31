@@ -10,6 +10,8 @@ import { cli, connect, connected, emitAck, http, next, register, startServer, ty
 let srv: TestServer;
 // Error reporting on, pointed at a port nothing listens on (reports are dropped quietly).
 const DSN = 'http://public@127.0.0.1:9/1';
+// The browser's own project: the one DSN the page shows (the server's stays secret).
+const BROWSER_DSN = 'http://browser@127.0.0.1:9/2';
 
 before(async () => {
   // PUBLIC_QUEUES as it ships (unset): every ranked queue is open.
@@ -17,6 +19,7 @@ before(async () => {
     NODE_ENV: 'production',
     PUBLIC_QUEUES: '',
     SENTRY_DSN: DSN,
+    SENTRY_BROWSER_DSN: BROWSER_DSN,
     OPERATOR_NAME: 'Тест Тестов',
     OPERATOR_ADDRESS: 'ул. Примерна 1, София',
     SOURCE_URL: 'https://example.test/almanac',
@@ -403,15 +406,17 @@ test('as it ships every ranked queue is open, and the lobby says so; Трио is
   socket.close();
 });
 
-test('with error reporting on, the page carries the DSN and the tunnel only takes our own project', async () => {
+test('with error reporting on, the page carries the browser’s DSN (never the server’s) and the tunnel takes only it', async () => {
   const envelope = (dsn: string) => `${JSON.stringify({ dsn })}\n{"type":"event"}\n{}\n`;
   const post = (body: string) =>
     fetch(`${srv.url}/api/monitoring`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body });
-  assert.equal((await post(envelope(DSN))).status, 200);
+  assert.equal((await post(envelope(BROWSER_DSN))).status, 200);
+  assert.equal((await post(envelope(DSN))).status, 400, 'the server’s project takes nothing from a browser');
   assert.equal((await post(envelope('https://other@evil.example/1'))).status, 400, 'not an open relay');
   if (fs.existsSync(path.resolve(import.meta.dirname, '../../web/dist/index.html'))) {
     const page = await (await fetch(`${srv.url}/`)).text();
-    assert.ok(page.includes(`<meta name="sentry-dsn" content="${DSN}" />`));
+    assert.ok(page.includes(`<meta name="sentry-dsn" content="${BROWSER_DSN}" />`));
+    assert.ok(!page.includes(DSN), 'the server’s DSN is nowhere in the page');
   }
 });
 

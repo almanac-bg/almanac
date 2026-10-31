@@ -234,6 +234,11 @@ export const api = {
   annulResults: (id: number, grounds: { basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/annul`, grounds),
   dismissPlayerReports: (id: number) => request<{ card: PlayerCard }>('POST', `/admin/players/${id}/dismiss`),
+  /** Every open report one player sent: no violation (a flood from one account). */
+  dismissReporter: (id: number) => request<ReportCases>('POST', `/admin/reporters/${id}/dismiss`),
+  /** No reports from this player for 30 days (bad faith), with grounds they'll read. */
+  stopReports: (id: number, grounds: { basis: ModerationBasis; reason: string }) =>
+    request<ReportCases>('POST', `/admin/reporters/${id}/stop`, grounds),
   renameGroupByModerator: (groupId: number, basis: ModerationBasis, reason: string) =>
     request<{ ok: true }>('POST', `/admin/groups/${groupId}/rename`, { basis, reason }),
   moderationLog: (before?: number) =>

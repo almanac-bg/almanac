@@ -28,11 +28,16 @@ export function emailEventsSecretMatches(secret: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** The subscription is confirmed by visiting the link in it: only one on Scaleway's own servers. */
+/**
+ * The subscription is confirmed by visiting the link in it: only one on Scaleway's Topics and Events servers
+ * (sns.mnq.<region>.scaleway.com), never redirected anywhere else (the 31 October review, SEC-10).
+ */
 function scalewayUrl(raw: unknown): string | null {
   const url = typeof raw === 'string' ? URL.parse(raw) : null;
-  if (url?.protocol !== 'https:') return null;
-  return url.hostname.endsWith('.scaleway.com') || url.hostname.endsWith('.scw.cloud') ? url.href : null;
+  if (url?.protocol !== 'https:' || url.port) return null;
+  if (/^sns\.mnq\.[a-z]+-[a-z]+\.scaleway\.com$/.test(url.hostname)) return url.href;
+  console.warn(`📮 Email events: a subscription link on ${url.hostname} was not followed (not Topics and Events).`);
+  return null;
 }
 
 export async function handleEmailEvent(body: unknown): Promise<'confirmed' | 'handled' | 'ignored'> {
@@ -43,7 +48,11 @@ export async function handleEmailEvent(body: unknown): Promise<'confirmed' | 'ha
   if (type === 'SubscriptionConfirmation') {
     const url = scalewayUrl(subscribeUrl);
     if (!url) return 'ignored';
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    if (!res) {
+      console.log('📮 Email events: subscription not confirmed (no answer, or a redirect)');
+      return 'ignored';
+    }
     console.log(`📮 Email events: subscription ${res.ok ? 'confirmed' : `not confirmed (${res.status})`}`);
     return res.ok ? 'confirmed' : 'ignored';
   }

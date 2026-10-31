@@ -14,7 +14,7 @@ import {
   scrubPaths,
 } from '@quiz/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { ServerBusyError, sessionTokenFromCookieHeader } from './auth';
+import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
@@ -30,6 +30,7 @@ import { siteInfo } from './site';
 import { seedSkillOnce } from './skill';
 import { catchUpTallies, keepTallies } from './tallies';
 import { network, throttled } from './throttle';
+import { getUser } from './users';
 
 // The log, off the server too (monitoring.ts → shipLogs), from the first line after the modules load: in production,
 // with Sentry set up, unless SENTRY_LOGS=off. (A migration's own line, written as the database opens, stays in the
@@ -124,7 +125,10 @@ app.post('/api/monitoring', express.text({ type: () => true, limit: '256kb' }), 
     res.status(429).end();
     return;
   }
-  res.status(typeof req.body === 'string' && forwardEnvelope(req.body) ? 200 : 400).end();
+  // An account's reports have half the budget kept for them (a guest's are anyone's: a guest is one request away).
+  const userId = resolveSession(sessionTokenFromCookieHeader(req.headers.cookie))?.userId;
+  const account = !!userId && !getUser(userId)?.is_guest;
+  res.status(typeof req.body === 'string' && forwardEnvelope(req.body, { account }) ? 200 : 400).end();
 });
 app.use('/api', api);
 // An address under /api that isn't one: JSON like every other answer there, not Express's HTML page.
@@ -135,6 +139,10 @@ app.use('/api', (_req: Request, res: Response) => {
 app.use('/api', (err: unknown, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ServerBusyError) {
     res.status(503).json({ error: err.message });
+    return;
+  }
+  if (err instanceof NetworkBusyError) {
+    res.status(429).json({ error: err.message });
     return;
   }
   // Another writer (Litestream, the command line) held the database past busy_timeout: a busy moment for the player,

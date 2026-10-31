@@ -21,20 +21,26 @@ interface Dsn {
   url: string;
 }
 
-function parseDsn(raw: string | null): Dsn | null {
+function parseDsn(raw: string | null, name = 'SENTRY_DSN'): Dsn | null {
   if (!raw) return null;
   const url = URL.parse(raw);
   const project = url?.pathname.replace(/^\/+|\/+$/g, '');
   if (!url?.username || !project) {
-    console.warn('📡 SENTRY_DSN is not a valid DSN; error reports are off.');
+    console.warn(`📡 ${name} is not a valid DSN; those reports are off.`);
     return null;
   }
   return { raw, key: url.username, url: `${url.protocol}//${url.host}/api/${project}/envelope/` };
 }
 
 const dsn = parseDsn(config.sentryDsn);
-/** The public DSN for the browser SDK (DSNs are meant to be public; they only allow sending events). */
-export const publicDsn = dsn?.raw ?? null;
+const browserDsn = parseDsn(config.sentryBrowserDsn, 'SENTRY_BROWSER_DSN');
+/**
+ * The DSN the page shows, for the browser SDK: the browser's own project or key, never the server's. Anyone can read a
+ * page's DSN and post to it, so with the server's they could send "server" errors and log lines past the tunnel, or
+ * use up the server's quota (the 31 October review, SEC-5).
+ */
+export const publicDsn = browserDsn && browserDsn.raw !== dsn?.raw ? browserDsn.raw : null;
+if (browserDsn && !publicDsn) console.warn('📡 SENTRY_BROWSER_DSN is the server’s own DSN: the page shows none.');
 
 // The free plan allows 5,000 errors a month: a burst (or one bug firing in a loop) mustn't use it up.
 const MAX_PER_MINUTE = 20;
@@ -176,8 +182,9 @@ const MEMORY_LOG_BYTES = 600 * 2 ** 20;
 const MEMORY_REPORT_BYTES = 800 * 2 ** 20;
 
 /**
- * Browser reports use the same monthly quota, and the DSN is public: anyone can post envelopes, from any number of
- * addresses. Past these, they're dropped (the browser SDK already skips repeats on its side).
+ * The browser's DSN is public: anyone can post envelopes, from any number of addresses. Past these, they're dropped
+ * (the browser SDK already skips repeats on its side). Half of each is kept for players with an account, so a flood
+ * from nowhere can't hide their crashes.
  */
 const BROWSER_PER_MINUTE = 10;
 const BROWSER_PER_DAY = 150;
@@ -185,9 +192,11 @@ const BROWSER_PER_DAY = 150;
 /** What a browser's error report holds: anything else (logs, traces, replays, attachments) isn't passed on. */
 const BROWSER_ITEMS = new Set(['event', 'client_report']);
 
-/** The item types in an envelope (after its header line), or null when it isn't one. */
-function itemTypes(body: Buffer, from: number): string[] | null {
-  const types: string[] = [];
+type EnvelopeItem = { header: { type: string; [key: string]: unknown }; payload: Buffer };
+
+/** The items of an envelope (after its header line), or null when it isn't one. */
+function envelopeItems(body: Buffer, from: number): EnvelopeItem[] | null {
+  const items: EnvelopeItem[] = [];
   let i = from;
   while (i < body.length) {
     const end = body.indexOf(10, i);
@@ -201,15 +210,36 @@ function itemTypes(body: Buffer, from: number): string[] | null {
       return null;
     }
     if (typeof header?.type !== 'string') return null;
-    types.push(header.type);
     // The payload: so many bytes when the header says, else a line.
-    if (typeof header.length === 'number') i += header.length + 1;
-    else {
+    let payload: Buffer;
+    if (typeof header.length === 'number') {
+      payload = body.subarray(i, i + header.length);
+      i += header.length + 1;
+    } else {
       const next = body.indexOf(10, i);
+      payload = body.subarray(i, next === -1 ? body.length : next);
       i = next === -1 ? body.length : next + 1;
     }
+    items.push({ header: header as EnvelopeItem['header'], payload });
   }
-  return types;
+  return items;
+}
+
+/**
+ * A browser's error as what it is: from JavaScript in a browser, never a server's report, whatever it says of itself
+ * (a hand-made envelope could claim `platform: node` and a server's name).
+ */
+function asBrowserEvent(payload: Buffer): Buffer | null {
+  let event: unknown;
+  try {
+    event = JSON.parse(payload.toString());
+  } catch {
+    return null;
+  }
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return null;
+  const { server_name: _server, tags, ...rest } = event as Record<string, unknown>;
+  const own = tags && typeof tags === 'object' && !Array.isArray(tags) ? tags : {};
+  return Buffer.from(JSON.stringify({ ...rest, platform: 'javascript', tags: { ...own, origin: 'browser' } }));
 }
 
 /**
@@ -218,8 +248,8 @@ function itemTypes(body: Buffer, from: number): string[] | null {
  * line (which could pass for the server's own) or anything else is accepted and dropped, as is everything over the cap,
  * so the SDK doesn't retry.
  */
-export function forwardEnvelope(body: string): boolean {
-  if (!dsn) return false;
+export function forwardEnvelope(body: string, { account = false } = {}): boolean {
+  if (!browserDsn || !publicDsn) return false;
   const newline = body.indexOf('\n');
   let header: { dsn?: unknown } = {};
   try {
@@ -227,13 +257,19 @@ export function forwardEnvelope(body: string): boolean {
   } catch {
     return false;
   }
-  if (header.dsn !== dsn.raw) return false;
-  const bytes = Buffer.from(body);
-  const types = newline === -1 ? [] : itemTypes(bytes, Buffer.byteLength(body.slice(0, newline)) + 1);
-  if (!types?.length || types.some((t) => !BROWSER_ITEMS.has(t))) return true;
-  if (throttled('monitoring-browser', BROWSER_PER_MINUTE, 60_000)) return true;
-  if (throttled('monitoring-browser-day', BROWSER_PER_DAY, 24 * 60 * 60_000)) return true;
-  void send(dsn.url, body);
+  if (header.dsn !== browserDsn.raw) return false;
+  const items = newline === -1 ? [] : envelopeItems(Buffer.from(body), Buffer.byteLength(body.slice(0, newline)) + 1);
+  if (!items?.length || items.some((item) => !BROWSER_ITEMS.has(item.header.type))) return true;
+  const share = account ? 'account' : 'anyone';
+  if (throttled(`monitoring-browser:${share}`, BROWSER_PER_MINUTE / 2, 60_000)) return true;
+  if (throttled(`monitoring-browser-day:${share}`, BROWSER_PER_DAY / 2, 24 * 60 * 60_000)) return true;
+  const parts = [body.slice(0, newline)];
+  for (const item of items) {
+    const payload = item.header.type === 'event' ? asBrowserEvent(item.payload) : item.payload;
+    if (!payload) return true;
+    parts.push(JSON.stringify({ ...item.header, length: payload.length }), payload.toString());
+  }
+  void send(browserDsn.url, `${parts.join('\n')}\n`);
   return true;
 }
 

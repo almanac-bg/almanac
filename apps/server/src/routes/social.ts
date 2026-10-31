@@ -98,6 +98,11 @@ socialRouter.get('/blocks', requireAuth, requireAccount, (_req, res) => {
 });
 
 socialRouter.post('/blocks/:id', requireAuth, requireAccount, (req, res) => {
+  // The answer names whoever was blocked: a player's ids walked one by one would name every account (SEC-8).
+  if (throttled(`block:${res.locals.userId}`, 30, 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай малко.' });
+    return;
+  }
   const other = idParam(req);
   const done = blockPlayer(res.locals.userId, other);
   if (!done.ok) {

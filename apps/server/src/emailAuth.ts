@@ -8,7 +8,7 @@ import { one, run, tx } from './db';
 import { emailChangedMail, type Mail, resetPasswordMail, sendMail, verifyEmailMail } from './mailer';
 import { reportError } from './monitoring';
 import { disconnectOtherSessions, disconnectUser } from './notify';
-import { throttled } from './throttle';
+import { throttled, wideNetwork } from './throttle';
 import { emailKey, getUser, getUserByEmail, getUserByLogin } from './users';
 
 type Purpose = 'verify' | 'reset';
@@ -57,6 +57,15 @@ function consumeToken(token: string, purpose: Purpose): { userId: number; email:
   return { userId: row.user_id, email: row.email };
 }
 
+/** Whether a link's token could still be used (unused, unexpired, for this), without using it. */
+function tokenLooksUsable(token: string, purpose: Purpose): boolean {
+  const row = one<{ expires_at: number; used_at: number | null; purpose: string }>(
+    'SELECT expires_at, used_at, purpose FROM email_tokens WHERE token_hash = ?',
+    hashToken(token),
+  );
+  return !!row && row.purpose === purpose && row.used_at === null && row.expires_at >= Date.now();
+}
+
 /** Unused reset links die whenever the password or the address changes: a link mailed before can't undo the change. */
 function dropResetLinks(userId: number) {
   run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'", userId);
@@ -79,8 +88,10 @@ export function requestEmailChange(userId: number, email: string, net: string): 
   // strangers in the site's name again and again (their complaints would send password resets to spam).
   const to = emailKey(parsed.data);
   if (
-    // One network's share of the ceiling below: no single sender can use all of it up for everyone else.
+    // One network's share of the ceiling below: no single sender can use all of it up for everyone else — counted by
+    // the wider network around it too, or a /48's many /64s together could (the 31 October review, SEC-4).
     throttled(`verify-mail-net:${net}`, 10, 60 * 60_000) ||
+    throttled(`verify-mail-wide:${wideNetwork(net)}`, 20, 60 * 60_000) ||
     throttled(`email-to-from:${to}:${net}`, 3, 24 * 60 * 60_000) ||
     throttled(`email-to:${to}`, 8, 24 * 60 * 60_000)
   )
@@ -149,8 +160,14 @@ export function requestPasswordReset(login: string) {
 }
 
 /** Sets the new password and logs the account out everywhere. */
-export async function resetPassword(token: string, password: string): Promise<Result<{ userId: number }>> {
-  const hash = await hashPassword(password);
+export async function resetPassword(
+  token: string,
+  password: string,
+  who?: string,
+): Promise<Result<{ userId: number }>> {
+  // A link that can't work is refused before the slow part: a made-up token mustn't cost a password hash (SEC-3).
+  if (!tokenLooksUsable(token, 'reset')) return { ok: false, error: 'Линкът е невалиден или е изтекъл. Поискай нов.' };
+  const hash = await hashPassword(password, who);
   const result = tx((): Result<{ userId: number }> => {
     const t = consumeToken(token, 'reset');
     // Mailed to an address the account no longer has: whoever reads that mailbox now has no say over the account.
@@ -158,6 +175,8 @@ export async function resetPassword(token: string, password: string): Promise<Re
       return { ok: false, error: 'Линкът е невалиден или е изтекъл. Поискай нов.' };
     run('UPDATE users SET password_hash = ? WHERE id = ?', hash, t.userId);
     run('DELETE FROM sessions WHERE user_id = ?', t.userId);
+    // Every device's pushes too: whoever had the account until now hears no more of it (SEC-7).
+    run('DELETE FROM push_subscriptions WHERE user_id = ?', t.userId);
     run("DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'reset'", t.userId);
     return { ok: true, userId: t.userId };
   });
@@ -171,14 +190,22 @@ export async function changePassword(
   current: string,
   next: string,
   keepToken: string | null,
+  who?: string,
 ): Promise<Result> {
   const user = getUser(userId)!;
-  if (!(await verifyPassword(current, user.password_hash))) return { ok: false, error: 'Текущата парола е грешна.' };
-  const hash = await hashPassword(next);
+  if (!(await verifyPassword(current, user.password_hash, who)))
+    return { ok: false, error: 'Текущата парола е грешна.' };
+  const hash = await hashPassword(next, who);
   run('UPDATE users SET password_hash = ? WHERE id = ?', hash, userId);
   dropResetLinks(userId);
   const keep = keepToken ? hashSessionToken(keepToken) : '';
   run('DELETE FROM sessions WHERE user_id = ? AND token != ?', userId, keep);
+  // The other devices' pushes go with their sessions (the trigger), and so do any that predate it (SEC-7).
+  run(
+    'DELETE FROM push_subscriptions WHERE user_id = ? AND (session_token IS NULL OR session_token != ?)',
+    userId,
+    keep,
+  );
   disconnectOtherSessions(userId, keep || null);
   return { ok: true };
 }

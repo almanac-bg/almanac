@@ -6,8 +6,9 @@
 
 `scripts/github-setup.sh almanac-bg/almanac` настройва хранилището в GitHub (може спокойно да се пуска повторно):
 описание, уебсайт и topics, issues и discussions, squash merge, Dependabot alerts и security updates, private
-vulnerability reporting, secret scanning, етикети, защитен `main` (pull request се слива само със зелен CI;
-администраторът може да push-ва направо) и само actions от GitHub и проверени автори, закачени за commit. Някои от тези
+vulnerability reporting, secret scanning, етикети, защитен `main` (историята му не може да се пренаписва или трие от
+никого; pull request се слива само със зелен CI от GitHub Actions, а администраторът може да push-ва направо), само
+actions на самия GitHub, закачени за commit, и CI за pull request отвън само след одобрение. Някои от тези
 настройки съществуват само за публични хранилища, затова пусни скрипта отново, след като направиш хранилището публично.
 Изображението за social preview (`.github/social-preview.png`) се качва ръчно: Settings → General → Social preview.
 

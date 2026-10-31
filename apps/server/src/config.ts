@@ -167,6 +167,11 @@ export const config = {
       : null,
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
+  /**
+   * The browser's reports go to a project (or key) of their own, the one DSN the page shows: the server's stays secret,
+   * so nobody can send "server" reports or use up its quota. Unset, the browser's crashes go to the server's log.
+   */
+  sentryBrowserDsn: process.env.SENTRY_BROWSER_DSN || null,
   /** With SENTRY_DSN in production, the server's log goes to the same project too (monitoring.ts → shipLogs); "off" doesn't. */
   sentryLogs: process.env.SENTRY_LOGS !== 'off',
   /** Tags error reports with the deployed version (e.g. the git commit). */
