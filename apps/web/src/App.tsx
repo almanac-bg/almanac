@@ -82,7 +82,7 @@ const PUBLIC_PATHS = [
   '/teachers',
 ];
 /** Pages that look the same signed in or out (the legal ones, the guides): outside the game's frame. */
-const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path) || /^\/quiz\/[a-z]+$/.test(path);
+const isPublicPath = (path: string) => PUBLIC_PATHS.includes(path) || /^\/quiz\/[a-z]+(-[a-z]+)*$/.test(path);
 /**
  * …and the public pages the server draws (the legal ones, the guides) don't even ask: they read the same either way, so
  * the first draw here must be the page itself, as the server drew it, or hydrating it fails.

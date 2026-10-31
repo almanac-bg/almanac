@@ -34,7 +34,14 @@ import { LETTERS } from '../components/game/answers';
 import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/NavBar';
 import { buttonClass, Card } from '../components/ui';
+import ALPHABET from '../content/alphabet-day.json';
+import BOTEV from '../content/botev.json';
 import CHRISTMAS from '../content/christmas.json';
+import ENLIGHTENERS from '../content/enlighteners-day.json';
+import INDEPENDENCE from '../content/independence-day.json';
+import LEVSKI from '../content/levski.json';
+import LIBERATION from '../content/liberation-day.json';
+import UNIFICATION from '../content/unification-day.json';
 import { useSite } from '../lib/site';
 import { usePublicPageTitle } from '../lib/title';
 import { keepTogether } from '../lib/typography';
@@ -61,8 +68,53 @@ const byCategory = (id: CategoryId) => CHOICE.filter((q) => q.category === id);
 
 type QuizQuestion = { id: string; q: string; options: string[]; answer: number; fact?: string; factSource?: string };
 
-/** Quizzes for a holiday, from a pool of their own (never in the game's bank): their own page each. */
+/**
+ * Quizzes for a holiday, from a pool of their own (never in the game's bank): their own page each, in the order of
+ * the year. A lead names no answer: it's on the page above the questions.
+ */
 const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; questions: QuizQuestion[] }> = {
+  levski: {
+    name: 'Викторина за Васил Левски',
+    icon: '🦁',
+    lead: '19 февруари: Апостола на свободата — животът му, комитетите, идеите му за свободна България и паметта за него.',
+    questions: LEVSKI as QuizQuestion[],
+  },
+  'liberation-day': {
+    name: 'Викторина за 3 март',
+    icon: '🕊️',
+    lead: 'Освобождението: Руско-турската война от 1877–1878 г., боевете, мирът и паметниците.',
+    questions: LIBERATION as QuizQuestion[],
+  },
+  'alphabet-day': {
+    name: 'Викторина за 24 май',
+    icon: '✍️',
+    lead: '24 май, денят на българската азбука, просвета и култура: Кирил и Методий, двете славянски азбуки, учениците им и нашите букви.',
+    questions: ALPHABET as QuizQuestion[],
+  },
+  botev: {
+    name: 'Викторина за Христо Ботев',
+    icon: '⚔️',
+    lead: '2 юни: поетът и революционерът Христо Ботев — стиховете и вестниците му, четата и пътят ѝ.',
+    questions: BOTEV as QuizQuestion[],
+  },
+  'unification-day': {
+    name: 'Викторина за Съединението',
+    icon: '🤝',
+    lead: '6 септември: заговорът, войната, която защитава Съединението, и дипломацията след нея.',
+    questions: UNIFICATION as QuizQuestion[],
+  },
+  'independence-day': {
+    name: 'Викторина за 22 септември',
+    icon: '👑',
+    lead: '22 септември 1908 г.: как е обявена Независимостта, кое прави момента удобен и как светът я признава.',
+    questions: INDEPENDENCE as QuizQuestion[],
+  },
+  'enlighteners-day': {
+    name: 'Викторина за Деня на народните будители',
+    icon: '💡',
+    lead: '1 ноември: възрожденските книжовници и учители, първите училища и как денят става празник.',
+    questions: ENLIGHTENERS as QuizQuestion[],
+  },
   christmas: {
     name: 'Коледна викторина',
     icon: '🌟',
