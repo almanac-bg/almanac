@@ -251,7 +251,8 @@ html {
 }
 @media (min-width: 768px) {
   html {
-    scroll-padding-bottom: 1rem;
+    /* --knocked-out-room: the notice a knocked-out player sees above the emote bar (GamePage). */
+    scroll-padding-bottom: var(--knocked-out-room, 1rem);
   }
 }
 @media (max-height: 480px) {

@@ -18,7 +18,8 @@ export function TopBar({ game, onLeave }: { game: LiveGame; onLeave: () => void 
   // Phones have no room for the dots that mark the knockouts: the next one, in a word.
   const knockout = me && me.eliminatedAt === null && !me.left ? nextElimination(game) : null;
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl">
+    // Pinned while there's room; on a short screen (a phone on its side, 400% zoom) it scrolls away with the page.
+    <header className="sticky top-0 z-30 border-b border-line bg-ink/70 backdrop-blur-xl cramped:static">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-6 flat:h-12">
         <button
           type="button"
