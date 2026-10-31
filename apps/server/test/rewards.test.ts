@@ -26,11 +26,17 @@ process.env.BACKUP_DIR = 'off';
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 // Four questions about 3 March (CALENDAR_DAYS: tag "liberation"), one of each difficulty and two categories.
 const themed = ['history-0', 'history-13', 'history-25', 'general-1'];
+// And four for Christmas, which two days in a row share.
+const christmas = ['general-3', 'general-14', 'music-2', 'music-15'];
 fs.writeFileSync(
   process.env.QUESTIONS_PATH,
   JSON.stringify(
     JSON.parse(fs.readFileSync(process.env.QUESTIONS_PATH, 'utf8')).map((q: { id: string }) =>
-      themed.includes(q.id) ? { ...q, tags: ['liberation'] } : q,
+      themed.includes(q.id)
+        ? { ...q, tags: ['liberation'] }
+        : christmas.includes(q.id)
+          ? { ...q, tags: ['christmas'] }
+          : q,
     ),
   ),
 );
@@ -617,6 +623,21 @@ test('knocked out and answering on, the right answers pay XP and count for what 
 test('a day with a theme takes the questions tagged for it first, as far as its mix allows', () => {
   const march3 = dailyQuestions('2027-03-03', 1).map((q) => q.id);
   for (const id of themed) assert.ok(march3.includes(id), `${id} on 3 March`);
+});
+
+test('a daily asks nothing a daily of the last 30 days asked: 25 December isn’t 24 December again (GAMEPLAY-1)', () => {
+  // Two days in a row with the same theme (Christmas Eve and Christmas Day) are where it showed: the second drew the
+  // first's tagged questions and final again.
+  const days = ['2027-12-24', '2027-12-25', '2027-12-26'];
+  const sets = days.map((day) => dailyQuestions(day, 1).map((q) => q.id));
+  assert.ok(
+    christmas.some((id) => sets[0].includes(id)),
+    'Christmas Eve takes its tagged questions',
+  );
+  for (let i = 1; i < sets.length; i++) {
+    const repeated = sets[i].filter((id) => sets.slice(0, i).some((before) => before.includes(id)));
+    assert.deepEqual(repeated, [], `${days[i]} repeats an earlier day`);
+  }
 });
 
 test('a question hidden before anyone has played the day leaves the day’s set; once someone has, the set stands', () => {

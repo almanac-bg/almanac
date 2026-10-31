@@ -10,11 +10,14 @@ from it. Every batch is verified independently before it goes in.
 
 ## Where things are
 
-- `private/questions.json` — the real bank (~2 000 questions). A clone of the private repo
+- `private/questions.json` — the real bank (about 3 900: 325 four-option, 40 number finals, 15 pictures and 15
+  „Подреди“ per category). A clone of the private repo
   `almanac-bg/almanac-questions`, ignored by this repo. Production pulls it on every deploy (`deploy/deploy.sh`).
   It's private so answers can't be searched or copied: never paste many of its questions anywhere public.
-- `apps/server/src/data/questions.sample.json` — the public sample (12 per category), an older snapshot of 120
-  questions. CI and the browser tests play it. Every Geography question in it has a fact (`apps/web/e2e/facts.spec.ts`
+- `apps/server/src/data/questions.sample.json` — the public sample: 12 four-option questions per category (an older
+  snapshot of 120), plus 20 number finals and a few pictures and „Подреди“. CI and the browser tests play it. It's public with its answers (the /quiz pages, /facts, the landing), and
+  so are the holiday quizzes in `apps/web/src/content/`: the server never deals the real bank's copies of either (same
+  id or same text, `apps/server/src/publicQuestions.ts`), so a question moved into the sample leaves play. Every Geography question in it has a fact (`apps/web/e2e/facts.spec.ts`
   relies on that): a new sample Geography question needs one too.
 - The rules: the zod schema in `apps/server/src/questions.ts` and `apps/server/test/questions.test.ts` (format,
   unique ids and texts, category × difficulty minimums, numeric answers not always in the middle, answer positions
@@ -43,8 +46,8 @@ Node isn't on the tool shell's PATH: `export PATH="$HOME/.nvm/versions/node/v24.
    roadmap) are events after 2018, the Balkan neighbours, women authors, sport after 2017, fewer "най-…"
    superlatives in nature. Grep the bank for the topic first: no near-duplicates.
 2. **Write them** to a scratch JSON array, without ids (`add` gives each the next free one and never reuses a
-   removed question's id, since reports and stats refer to ids). Each with an `answerSource` for the checker (`add`
-   doesn't take it: strip it first):
+   removed question's id, since reports and stats refer to ids). Each with an `answerSource` for the checker; keep
+   it — `add` writes it into the bank, and it's the provenance a later re-check starts from:
    - Bulgarian, for Bulgarian players. Difficulty for them: easy = most adults know it, medium = a well-read person,
      hard = an enthusiast. Text addressing the player is gender-neutral (CONTRIBUTING → Стил).
    - Question 10–150 characters, ending in "?"; four distinct options of at most 45 characters; exactly one
@@ -110,8 +113,8 @@ any batch (`add`, not `fill`), and also:
 Both play in matches (4e): up to two pictures a match between Q2 and Q8 and one in the daily, one order question in
 Дуел/Арена's third round, Solo, links, rooms and Monday's daily. Each format is balanced on its own, like numbers:
 every category the same number (`stats` shows each with its easy/medium/hard split; aim 40/40/20 within it). A match
-skips any a player saw in the last 30 days, so a small pool wears out fast: the target is 40 pictures and 20 orders
-per category. Give writers `briefs/formats-write.md` and checkers `briefs/formats-check.md` (the first batch's, 2026-10-29,
+skips any a player saw in the last 30 days, so a small pool wears out fast: the bank has 15 pictures and 15 orders
+per category (the owner's number; more only on their word). Give writers `briefs/formats-write.md` and checkers `briefs/formats-check.md` (the first batch's, 2026-10-29,
 with a work folder each); the rules:
 
 - **Pictures:** a question with options plus `image`. Only free licences (public domain, CC0, CC BY, CC BY-SA);

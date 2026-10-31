@@ -13,7 +13,7 @@ import {
 import clsx from 'clsx';
 import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { dailyLinkUrl, offBoardLine, placeShown } from '../../lib/daily';
 import { useLoad } from '../../lib/load';
 import { savedDailyShare, shareText } from '../../lib/share';
@@ -104,7 +104,17 @@ export function DailyCard({ className }: { className?: string }) {
           </div>
           <h2 className="mt-3 t-card lg:text-2xl">{MODES.daily.name}</h2>
           <p className="mt-1 text-sm text-fg-2">{MODES.daily.tagline}</p>
-          {theme && <p className="mt-1 text-sm font-semibold text-amber-300">Темата днес: {theme.name}</p>}
+          {theme && (
+            <p className="mt-1 text-sm font-semibold text-amber-300">
+              Темата днес:{' '}
+              <Link
+                to={theme.page}
+                className="underline decoration-amber-300/50 underline-offset-2 hover:decoration-amber-300"
+              >
+                {theme.name}
+              </Link>
+            </p>
+          )}
 
           <div className="mt-auto pt-5">
             {failed ? (

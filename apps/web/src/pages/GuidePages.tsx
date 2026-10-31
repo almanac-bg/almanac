@@ -118,7 +118,7 @@ const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; quest
   christmas: {
     name: 'Коледна викторина',
     icon: '🌟',
-    lead: 'Бъдни вечер, коледари и „Тиха нощ“ — коледни въпроси с отговори.',
+    lead: 'Бъдни вечер, Рождество и „Тиха нощ“ — коледни въпроси с отговори.',
     questions: CHRISTMAS as QuizQuestion[],
   },
 };
@@ -493,6 +493,21 @@ export function QuizCategoryPage() {
           </>
         )}
       </p>
+      {holiday && (
+        <nav aria-label="Други празнични викторини" className="flex flex-wrap gap-2">
+          {Object.entries(HOLIDAYS)
+            .filter(([slug]) => slug !== category)
+            .map(([slug, h]) => (
+              <Link
+                key={slug}
+                to={`/quiz/${slug}`}
+                className="rounded-full border border-line bg-tint/5 px-3 py-1.5 text-sm text-fg-2 hover:text-fg"
+              >
+                <Emoji e={h.icon} /> {h.name}
+              </Link>
+            ))}
+        </nav>
+      )}
       <nav aria-label="Други категории" className="flex flex-wrap gap-2">
         {CATEGORIES.filter((x) => x.id !== c?.id).map((x) => (
           <Link
