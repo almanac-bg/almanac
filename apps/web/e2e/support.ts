@@ -182,7 +182,11 @@ export interface MatchSummary {
  * "В) …", "Г) …"), or on a number question a number in its range, typed on the keypad or slid to — and a round's
  * category, when this player is asked to pick one, the first on offer. Returns once the results are up.
  */
-export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } = {}): Promise<MatchSummary> {
+export async function playMatch(
+  page: Page,
+  /** `onQuestion`: a look at each question before it's answered (its number, from 1). */
+  opts: { moment?: 'pass' | 'keep'; onQuestion?: (index: number) => Promise<void> } = {},
+): Promise<MatchSummary> {
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
@@ -219,6 +223,7 @@ export async function playMatch(page: Page, opts: { moment?: 'pass' | 'keep' } =
     const [index, of] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
     total = of;
     expect(answered.has(index), `question ${index} offered twice`).toBe(false);
+    await opts.onQuestion?.(index);
     if (await ordering.isVisible()) {
       // „Подреди“: А, Б, В, Г in that order (1–4, as for options), Enter locks it — once its items can be pressed (a
       // key on a question still on its way in does nothing, as a tap wouldn't).

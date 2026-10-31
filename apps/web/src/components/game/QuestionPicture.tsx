@@ -16,8 +16,9 @@ export const creditText = (c: ImageCredit) => `${c.credit} · ${LICENSES[c.licen
 
 /**
  * A question's picture: as large as it fits, at most `maxHeight` of the screen (40% in a match, so the question and its
- * options still fit on a phone), its box kept while it loads so nothing below it jumps. Whose it is shows once the
- * answer is out (`credit`): a painter's name would give a painting's answer away.
+ * options still fit on a phone; a parent may set `--pic-h` instead, to cap it by the room left), its box kept while it
+ * loads so nothing below it jumps. Whose it is shows once the answer is out (`credit`): a painter's name would give a
+ * painting's answer away.
  */
 export function QuestionPicture({
   image,
@@ -33,7 +34,10 @@ export function QuestionPicture({
   const [loaded, setLoaded] = useState(false);
   const ratio = image.w / image.h;
   return (
-    <figure className={clsx('mx-auto', className)} style={{ width: `min(100%, calc(${maxHeight} * ${ratio}))` }}>
+    <figure
+      className={clsx('mx-auto', className)}
+      style={{ width: `min(100%, calc(var(--pic-h, ${maxHeight}) * ${ratio}))` }}
+    >
       <div
         className={clsx(
           'relative overflow-hidden rounded-2xl border border-line bg-tint/[0.04]',

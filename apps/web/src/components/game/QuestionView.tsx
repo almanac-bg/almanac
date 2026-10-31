@@ -144,8 +144,15 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             className="pointer-events-none absolute -right-3 -bottom-4 -rotate-12 opacity-[0.18]"
           />
         )}
+        {/* On a laptop or a desktop the screen is wide but short: the picture takes what's left once the question, the
+            four answers and the emote bar have their room (all four had gone below the fold at 1280×720: the review's
+            UX-1), never more than 40% of the height. */}
         {q.image && (
-          <QuestionPicture image={q.image} credit={reveal?.credit} className="relative mb-4 short:mb-2 flat:mb-1.5" />
+          <QuestionPicture
+            image={q.image}
+            credit={reveal?.credit}
+            className="relative mb-4 short:mb-2 md:[--pic-h:clamp(8rem,calc(100svh-36rem),40svh)] flat:mb-1.5"
+          />
         )}
         {/* Phones: the timer floats at the top right and the question wraps around it, instead of a narrow column of
             two-word lines beside it. Wider screens: side by side. */}

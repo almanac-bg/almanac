@@ -64,8 +64,10 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
           {open ? <X className="size-5" /> : <Emoji e="😀" size={24} />}
         </button>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-30 hidden pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] sm:block flat:hidden">
-        <div className="mx-auto mb-3 flex w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl">
+      {/* The strip across the bottom only places the bar: clicks beside it go through to what's underneath (it took the
+          answers' clicks on a laptop: UX-1). */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 hidden pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] sm:block flat:hidden">
+        <div className="pointer-events-auto mx-auto mb-3 flex w-fit max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-2xl border border-line bg-ink-2/80 p-1.5 backdrop-blur-xl">
           {buttons}
         </div>
       </div>
