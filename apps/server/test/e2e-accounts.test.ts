@@ -17,6 +17,7 @@ import {
   connected,
   cookieFrom,
   emitAck,
+  eventually,
   guest,
   http,
   newLog,
@@ -566,8 +567,50 @@ test(
       .prepare('UPDATE sessions SET second_factor_at = ? WHERE token = ?')
       .run(Date.now() - 13 * 60 * 60_000, sessionHash);
     assert.equal((await api.get('/api/admin/reports', M.cookie)).body.code, true);
+    srv.db.prepare("UPDATE users SET email = 'pazitel@example.com' WHERE id = ?").run(M.id);
+    const mailed = () =>
+      srv
+        .mails()
+        .filter((m) => m.to === 'pazitel@example.com')
+        .map((m) => m.subject);
     assert.equal((await api.send('POST', '/api/auth/2fa', M.cookie, { code: first })).status, 400, 'once');
+    // A wrong code after the right password: someone may have the password, and its owner hears of it (SEC-2).
+    await eventually(() => assert.deepEqual(mailed(), ['Грешен код при влизане в модерацията на АЛМАНАХ']));
     assert.equal((await api.send('POST', '/api/auth/2fa', M.cookie, { code: codeAt(secret, now() + 1) })).status, 200);
+    await eventually(() => assert.equal(mailed().at(-1), 'Влизане в модерацията на АЛМАНАХ', 'every sign-in is told'));
+    const log = () =>
+      srv.db
+        .prepare('SELECT action FROM moderation_log WHERE target_user_id = ? OR admin_id = ? ORDER BY id')
+        .all(M.id, M.id)
+        .map((r) => (r as { action: string }).action);
+    assert.deepEqual(log().slice(-2), ['second_factor_failed', 'staff_sign_in']);
+
+    // Past ten wrong codes in a row each next try waits longer, kept across restarts; at 100 it stops until the owner
+    // resets it on the server.
+    const failures = (n: number, at = Date.now()) =>
+      srv.db.prepare('UPDATE users SET totp_failures = ?, totp_failed_at = ? WHERE id = ?').run(n, at, M.id);
+    srv.db.prepare('UPDATE sessions SET second_factor_at = NULL WHERE token = ?').run(sessionHash);
+    failures(10);
+    const waiting = await api.send('POST', '/api/auth/2fa', M.cookie, { code: codeAt(secret, now()) });
+    assert.equal(waiting.status, 429);
+    assert.match(waiting.body.error, /Опитай пак след/);
+    failures(10, Date.now() - 16 * 60_000);
+    assert.equal(
+      (await api.send('POST', '/api/auth/2fa', M.cookie, { code: '000000' })).status,
+      400,
+      'the wait over, one more try',
+    );
+    failures(100);
+    const stopped = await api.send('POST', '/api/auth/2fa', M.cookie, { code: codeAt(secret, now() + 1) });
+    assert.equal(stopped.status, 423, 'even the right code, once stopped');
+    assert.equal(cli(srv.dbPath, 'admin', '2fa-reset', 'pazitel_test').status, 0);
+    assert.equal((srv.db.prepare('SELECT totp_failures AS n FROM users WHERE id = ?').get(M.id) as { n: number }).n, 0);
+    // Set up anew, then a code for the session.
+    const again = await api.send('POST', '/api/auth/2fa/setup', M.cookie);
+    assert.equal(
+      (await api.send('POST', '/api/auth/2fa/enable', M.cookie, { code: codeAt(again.body.secret, now()) })).status,
+      200,
+    );
 
     // Changes want the password given within the hour.
     srv.db.prepare('UPDATE sessions SET confirmed_at = ? WHERE token = ?').run(Date.now() - 61 * 60_000, sessionHash);
@@ -814,6 +857,8 @@ test('data export and account deletion', T, async () => {
   };
   assert.equal(data.account.username, B.user.username);
   assert.ok(data.matches.length > 0 && data.achievements.length > 0 && data.friends.length > 0);
+  // Which moderator reviewed or decided something isn't in it (SEC-8).
+  assert.doesNotMatch(JSON.stringify(data), /"(reviewed|resolved|hidden|undone)_by"/);
 
   const E = await register(srv.url, 'to_be_deleted');
   const se = connect(srv.url, E.cookie);
@@ -1056,5 +1101,58 @@ test(
     const reloaded = await api.send('POST', '/api/admin/bank/reload', A.cookie);
     assert.equal(reloaded.status, 200, reloaded.body.error);
     assert.ok(srv.db.prepare("SELECT 1 AS x FROM moderation_log WHERE action = 'reload_bank'").get(), 'in the log');
+  },
+);
+
+test(
+  'report floods: new accounts’ illegal-content notices come as one mail an hour; one reporter’s reports close together, and can be stopped (MOD-3)',
+  T,
+  async () => {
+    const boss = await register(srv.url, 'nachalnik_mod3');
+    assert.equal(cli(srv.dbPath, 'admin', 'owner', 'nachalnik_mod3').status, 0);
+    srv.db.prepare("UPDATE users SET email = 'nachalnik@example.com' WHERE id = ?").run(boss.user.id);
+    await withSecondFactor(srv.url, boss.cookie);
+    const boss2fa = boss.cookie;
+    const mails = () =>
+      srv
+        .mails()
+        .filter((m) => m.to === 'nachalnik@example.com')
+        .map((m) => m.subject);
+    const fresh = await register(srv.url, 'novak_mod3');
+    const targets = await Promise.all([1, 2, 3].map((i) => register(srv.url, `cel_mod3_${i}`)));
+    for (const t of targets)
+      assert.equal(
+        (await api.send('POST', '/api/reports', fresh.cookie, { username: t.user.username, reason: 'illegal' })).status,
+        200,
+      );
+    // Three notices from an account made a moment ago: one mail for the hour, not three.
+    await eventually(() => assert.equal(mails().filter((s) => s === 'Нови сигнали за незаконно съдържание').length, 1));
+    assert.equal(mails().filter((s) => s.startsWith('Незаконно съдържание:')).length, 0);
+
+    // „Отхвърли всички доклади от …“: every open one it sent, closed in one go (and in the log, to undo).
+    const open = () =>
+      (
+        srv.db
+          .prepare("SELECT COUNT(*) AS n FROM reports WHERE reporter_id = ? AND status = 'open'")
+          .get(fresh.user.id) as {
+          n: number;
+        }
+      ).n;
+    assert.equal(open(), 3);
+    assert.equal((await api.send('POST', `/api/admin/reporters/${fresh.user.id}/dismiss`, boss2fa)).status, 200);
+    assert.equal(open(), 0);
+
+    // „Спри докладите … за 30 дни“: no more from them for now, with why.
+    const stop = await api.send('POST', `/api/admin/reporters/${fresh.user.id}/stop`, boss2fa, {
+      basis: 'abuse',
+      reason: 'Десетки доклади без основание за минута.',
+    });
+    assert.equal(stop.status, 200, JSON.stringify(stop.body));
+    const again = await api.send('POST', '/api/reports', fresh.cookie, {
+      username: targets[0].user.username,
+      reason: 'spam',
+    });
+    assert.equal(again.status, 400);
+    assert.match(again.body.error, /спря докладите ти/);
   },
 );

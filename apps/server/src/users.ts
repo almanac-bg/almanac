@@ -34,6 +34,11 @@ export interface UserRow {
   totp_on_at: number | null;
   /** The last code's step: a code works once. */
   totp_step: number | null;
+  /** Wrong codes in a row for /admin, and when the last one came (secondFactor.ts). */
+  totp_failures: number;
+  totp_failed_at: number | null;
+  /** A moderator stopped this player's reports until then (bad-faith notices, DSA Art. 23). */
+  reports_stopped_until: number | null;
   /** When the opt-in mails were turned on (consent that can be shown), and when the terms were accepted. */
   reminders_on_at: number | null;
   beaten_mails_on_at: number | null;

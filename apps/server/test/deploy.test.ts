@@ -98,8 +98,15 @@ case $url in
     [ -n "$id" ] || exit 22
     printf 'HTTP/2 200\\r\\ndocker-content-digest: %s\\r\\n\\r\\n' "$id" ;;
   *api.github.com/*/attestations/*)
-    if grep -qx "\${url##*/}" "$S/attested" 2>/dev/null; then echo '{"attestations":[{"bundle":{}}]}'
-    else echo '{"attestations":[]}'; fi ;;
+    # The statement names the workflow that built the image: main's ci.yml, or (state/attested-elsewhere) another one.
+    repo=\${url#https://api.github.com/repos/}
+    repo=\${repo%/attestations/*}
+    if grep -qx "\${url##*/}" "$S/attested" 2>/dev/null; then workflow="ci.yml@refs/heads/main"
+    elif grep -qx "\${url##*/}" "$S/attested-elsewhere" 2>/dev/null; then workflow="release.yml@refs/heads/main"
+    else echo '{"attestations":[]}'; exit 0; fi
+    statement=$(printf '{"predicate":{"runDetails":{"builder":{"id":"https://github.com/%s/.github/workflows/%s"}}}}' \
+      "$repo" "$workflow" | base64 | tr -d '\n')
+    printf '{"attestations":[{"bundle":{"dsseEnvelope":{"payload":"%s"}}}]}\n' "$statement" ;;
   *) [ -f "$S/down" ] && exit 7 ;;
 esac
 exit 0
@@ -357,6 +364,19 @@ test('a self-hosted copy: its own image (IMAGE in .env), and a question bank tha
     fs.renameSync(away, bankGit);
     fs.writeFileSync(env, 'DOMAIN=example.test\n');
   }
+});
+
+test('an image attested by some other workflow than main’s CI isn’t deployed (GH-7)', () => {
+  const current = git(checkout, 'rev-parse', 'HEAD');
+  const running = tagged('almanac:latest');
+  const elsewhere = publishCommit(work, 'app.txt', 'v-other-workflow');
+  published(elsewhere, 'sha256:elsewhere', { attested: false });
+  fs.appendFileSync(path.join(state, 'attested-elsewhere'), 'sha256:elsewhere\n');
+  const refused = run('deploy.sh', '--now');
+  assert.equal(refused.status, 1);
+  assert.match(refused.output, /no build provenance/);
+  assert.equal(git(checkout, 'rev-parse', 'HEAD'), current);
+  assert.equal(tagged('almanac:latest'), running);
 });
 
 test('an image without CI’s build provenance isn’t deployed; a rollback to one takes --unverified', () => {

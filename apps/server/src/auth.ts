@@ -71,10 +71,35 @@ const { slots: MAX_HASHING, waiting: MAX_WAITING } = hashingLimits(
 let hashing = 0;
 const waiting: (() => void)[] = [];
 
-async function withHashingSlot<T>(fn: () => Promise<T>): Promise<T> {
+/** Thrown when the asker's network already has its share of the queue: that network waits (429), not everyone. */
+export class NetworkBusyError extends Error {}
+
+/**
+ * How much of the queue one network may hold (`who`: its wider network, throttle.ts → wideNetwork): a burst of made-up
+ * sign-ins from one place then waits its turn, while everyone else's still goes through (the 31 October review, SEC-3).
+ * A quarter, not one: a class signing in together shares one address.
+ */
+const PER_NETWORK = Math.max(1, Math.floor(MAX_WAITING / 4));
+const queuedBy = new Map<string, number>();
+
+async function withHashingSlot<T>(fn: () => Promise<T>, who?: string): Promise<T> {
   if (hashing < MAX_HASHING) hashing++;
   else if (waiting.length >= MAX_WAITING) throw new ServerBusyError('Сървърът е натоварен. Опитай след малко.');
-  else await new Promise<void>((resolve) => waiting.push(resolve)); // a finishing check hands its slot over
+  else {
+    const queued = who ? (queuedBy.get(who) ?? 0) : 0;
+    if (who && queued >= PER_NETWORK)
+      throw new NetworkBusyError('Твърде много опити от твоята мрежа наведнъж. Опитай след малко.');
+    if (who) queuedBy.set(who, queued + 1);
+    try {
+      await new Promise<void>((resolve) => waiting.push(resolve)); // a finishing check hands its slot over
+    } finally {
+      if (who) {
+        const left = (queuedBy.get(who) ?? 1) - 1;
+        if (left > 0) queuedBy.set(who, left);
+        else queuedBy.delete(who);
+      }
+    }
+  }
   try {
     return await fn();
   } finally {
@@ -84,34 +109,45 @@ async function withHashingSlot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export function hashPassword(password: string): Promise<string> {
+/** How long a password check usually takes here (a moving average): what an unknown login waits instead of one. */
+let typicalCheckMs = 100;
+
+/**
+ * An unknown login: as long a wait as a password check, so the answer's timing doesn't tell which names and addresses
+ * have an account, but without taking a hashing slot (a flood of made-up logins used to fill the queue for everyone).
+ */
+export function waitLikeAPasswordCheck(): Promise<void> {
+  const ms = typicalCheckMs * (0.85 + Math.random() * 0.3);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function hashPassword(password: string, who?: string): Promise<string> {
   return withHashingSlot(async () => {
     const salt = randomBytes(16);
     const hash = await scrypt(password, salt, 64, { ...SCRYPT, maxmem: maxmem(SCRYPT) });
     return `scrypt$${paramsText(SCRYPT)}$${salt.toString('base64')}$${hash.toString('base64')}`;
-  });
+  }, who);
 }
 
-export function verifyPassword(password: string, stored: string): Promise<boolean> {
+export function verifyPassword(password: string, stored: string, who?: string): Promise<boolean> {
   return withHashingSlot(async () => {
     const parsed = parseHash(stored);
     if (!parsed) return false;
     const expected = Buffer.from(parsed.hash, 'base64');
+    const started = performance.now();
     const actual = await scrypt(password, Buffer.from(parsed.salt, 'base64'), expected.length, {
       ...parsed.params,
       maxmem: maxmem(parsed.params),
     });
+    typicalCheckMs = typicalCheckMs * 0.9 + (performance.now() - started) * 0.1;
     return timingSafeEqual(actual, expected);
-  });
+  }, who);
 }
 
 /** A hash from an older, cheaper setting: worth redoing while the password is at hand (a successful sign-in). */
 export function needsRehash(stored: string): boolean {
   return !stored.startsWith(`scrypt$${paramsText(SCRYPT)}$`);
 }
-
-/** Checked when the login doesn't exist, so a wrong username takes as long as a wrong password (no account probing). */
-export const DUMMY_PASSWORD_HASH = `scrypt$${paramsText(SCRYPT)}$${randomBytes(16).toString('base64')}$${randomBytes(64).toString('base64')}`;
 
 /** Sessions are stored hashed: a leaked database or backup holds no usable logins. */
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');

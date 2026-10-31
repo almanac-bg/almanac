@@ -11,16 +11,18 @@ permissions:
   contents: read
 
 # A newer push to a pull request's branch makes the run before it pointless. Not on main: every commit there gets its
-# run to the end, and so its image (deploy/rollback.sh <commit> can go back to any of them).
+# run to the end, and so its image (deploy/rollback.sh <commit> can go back to any of them) — so each of main's runs
+# is a group of its own. (One group for main let a third push cancel the second's waiting run: GitHub keeps one run
+# and one waiting per group. The 31 October review, REPO-11.)
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Actions are pinned to a commit (a tag can be moved to other code); Dependabot updates the commit and the comment.
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A hung test would otherwise hold the runner for six hours.
     timeout-minutes: 25
     # Node 24 (development, and the floor in `engines`) and Node 26 (what the Docker image, so production, runs).
@@ -76,7 +78,7 @@ jobs:
   # clicks take far longer than Chrome's).
   # Each engine in two halves on two runners: WebKit alone took nine minutes, the longest job in the run.
   browsers:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -120,7 +122,7 @@ jobs:
 
   # Its own build, so it starts at once beside the others (`image` and `publish` wait for every job).
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -261,7 +263,11 @@ jobs:
           done
           docker logs almanac
           exit 1
-      - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      # The token from the environment, not written into the script (a value in ${{ }} becomes part of the shell code).
+      - run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
       - run: docker push "$IMAGE"
 
   # ghcr.io/…:<commit>, what deploy/deploy.sh pulls: a list of the two, so each server gets its own. With a signed
@@ -278,7 +284,11 @@ jobs:
     env:
       IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
     steps:
-      - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      # The token from the environment, not written into the script (a value in ${{ }} becomes part of the shell code).
+      - run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
       - run: docker buildx imagetools create -t "$IMAGE" "$IMAGE-amd64" "$IMAGE-arm64"
       - name: Both kinds are in it
         id: list

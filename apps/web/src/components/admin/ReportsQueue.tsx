@@ -5,6 +5,7 @@ import {
   REPORT_REASONS,
   type ReportCase,
   type ReportCases,
+  type Reporter,
   type SetQuestion,
   setPictureUrl,
 } from '@quiz/shared';
@@ -61,6 +62,60 @@ export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
           <CaseCard key={`${c.kind}:${c.id}`} item={c} onDecided={setData} onStale={retry} />
         ))}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * A flood of reports from one account: all of them closed as no violation in one go, or no reports from them for 30
+ * days (bad faith; they read why). Both are in the log, and undone from there.
+ */
+function ReporterActions({ reporter, onDone }: { reporter: Reporter; onDone: (next: ReportCases) => void }) {
+  const [stopping, setStopping] = useState(false);
+  const [grounds, setGrounds] = useState<Grounds>({ basis: 'abuse', reason: '' });
+  const [busy, setBusy] = useState(false);
+  async function act(call: () => Promise<ReportCases>, message: string) {
+    setBusy(true);
+    try {
+      onDone(await call());
+      toast({ kind: 'success', title: message });
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={busy && !stopping}
+        onClick={() => void act(() => api.dismissReporter(reporter.id), `Докладите от ${reporter.name} са отхвърлени`)}
+      >
+        <Check className="size-4" /> Отхвърли всички доклади от {reporter.name}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setStopping(!stopping)} aria-expanded={stopping}>
+        <Ban className="size-4" /> Спри докладите на {reporter.name} за 30 дни
+      </Button>
+      {stopping && (
+        <form
+          className="w-full space-y-3 rounded-2xl border border-line p-3"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            if (groundsReady(grounds))
+              void act(
+                () => api.stopReports(reporter.id, { basis: grounds.basis as ModerationBasis, reason: grounds.reason }),
+                `Докладите на ${reporter.name} са спрени за 30 дни`,
+              );
+          }}
+        >
+          <GroundsFields grounds={grounds} onChange={setGrounds} />
+          <Button size="sm" variant="danger" type="submit" loading={busy} disabled={!groundsReady(grounds)}>
+            <Ban className="size-4" /> Спри докладите
+          </Button>
+        </form>
+      )}
     </div>
   );
 }
@@ -174,6 +229,7 @@ function CaseCard({
                   'изтрит профил'
                 )}
               </p>
+              {r.reporter && <ReporterActions reporter={r.reporter} onDone={onDecided} />}
             </li>
           ))}
         </ul>

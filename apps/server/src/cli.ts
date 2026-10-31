@@ -141,14 +141,17 @@ if (command === 'list') {
     );
   } else if (command === 'remove') {
     run(
-      'UPDATE users SET is_admin = 0, staff_role = NULL, totp_secret = NULL, totp_on_at = NULL, totp_step = NULL WHERE id = ?',
+      'UPDATE users SET is_admin = 0, staff_role = NULL, totp_secret = NULL, totp_on_at = NULL, totp_step = NULL, totp_failures = 0, totp_failed_at = NULL WHERE id = ?',
       user.id,
     );
     run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
     logAction({ adminId: null, action: 'staff_remove', userId: user.id });
     console.log(`✅ ${user.username} is no longer staff.`);
   } else {
-    run('UPDATE users SET totp_secret = NULL, totp_on_at = NULL, totp_step = NULL WHERE id = ?', user.id);
+    run(
+      'UPDATE users SET totp_secret = NULL, totp_on_at = NULL, totp_step = NULL, totp_failures = 0, totp_failed_at = NULL WHERE id = ?',
+      user.id,
+    );
     run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
     logAction({ adminId: null, action: 'staff_2fa_reset', userId: user.id });
     console.log(`✅ ${user.username} sets up two-factor sign-in anew on their next visit to /admin.`);

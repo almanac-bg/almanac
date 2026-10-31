@@ -26,7 +26,7 @@ import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession } from '../notify';
 import { PrefsSchema, push, pushEnabled, SubscriptionSchema, setPushPrefs, subscribe, unsubscribe } from '../push';
 import { count } from '../stats';
-import { network, throttled } from '../throttle';
+import { network, throttled, wideNetwork } from '../throttle';
 import { emailKey, getUser, nameTaken, usernameKey } from '../users';
 import { Registration } from './auth';
 import { confirmPassword, parse, passwordChecks, requireAccount } from './common';
@@ -132,6 +132,7 @@ accountRouter.post('/account/password', requireAuth, requireAccount, async (req,
     body.current,
     body.next,
     sessionTokenFromCookieHeader(req.headers.cookie),
+    wideNetwork(req.ip),
   );
   if (!result.ok) {
     res.status(400).json({ error: result.error });
@@ -163,7 +164,7 @@ accountRouter.post('/account/claim', requireAuth, async (req, res) => {
     res.status(409).json({ error: taken });
     return;
   }
-  const hash = await hashPassword(creds.password);
+  const hash = await hashPassword(creds.password, wideNetwork(req.ip));
   // Someone may have taken it, or one that looks the same, while the password was hashing.
   const takenSince = nameTaken(creds.username, me.id);
   if (takenSince) {
@@ -328,7 +329,8 @@ accountRouter.post('/push/subscribe', requireAuth, requireAccount, (req, res) =>
     res.status(429).json({ error: 'Твърде много опити. Опитай утре.' });
     return;
   }
-  if (subscribe(res.locals.userId, sub))
+  const token = sessionTokenFromCookieHeader(req.headers.cookie);
+  if (subscribe(res.locals.userId, sub, token ? hashToken(token) : null))
     push(res.locals.userId, 'hello', {
       title: 'Известията работят ✓',
       body: 'Ще идват само избраните в Настройки — най-много две на ден, нищо нощем.',

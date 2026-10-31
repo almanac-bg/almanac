@@ -41,10 +41,11 @@ function player(prefs = defaultPushPrefs(), streak = 0) {
     streak,
     streak ? '2026-11-01' : null,
   );
-  subscribe(id, {
-    endpoint: `https://fcm.googleapis.com/fcm/send/${id}`,
-    keys: { p256dh: 'k'.repeat(40), auth: 'a'.repeat(16) },
-  });
+  subscribe(
+    id,
+    { endpoint: `https://fcm.googleapis.com/fcm/send/${id}`, keys: { p256dh: 'k'.repeat(40), auth: 'a'.repeat(16) } },
+    null,
+  );
   run('UPDATE users SET push_prefs = ? WHERE id = ?', JSON.stringify(prefs), id);
   return id;
 }
@@ -128,4 +129,31 @@ test('a push within a write goes out once it commits, and not at all if it rolls
   assert.equal(one('SELECT 1 AS x FROM push_sent WHERE user_id = ?', id), undefined, 'nor counts for the day');
   tx(() => push(id, 'duels', message, at(10)));
   assert.equal(sent().length, 1);
+});
+
+test('a device stops getting pushes when the session it subscribed with ends, however it ends (SEC-7)', () => {
+  const id = player();
+  const device = (n: number) => ({
+    endpoint: `https://fcm.googleapis.com/fcm/send/session-${id}-${n}`,
+    keys: { p256dh: 'k'.repeat(40), auth: 'a'.repeat(16) },
+  });
+  for (const n of [1, 2]) {
+    run(
+      'INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, 0, ?)',
+      `hash-${id}-${n}`,
+      id,
+      Date.now() + 60_000,
+    );
+    subscribe(id, device(n), `hash-${id}-${n}`);
+  }
+  const devices = () =>
+    one<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ? AND session_token IS NOT NULL',
+      id,
+    )!.n;
+  assert.equal(devices(), 2);
+  run('DELETE FROM sessions WHERE token = ?', `hash-${id}-1`);
+  assert.equal(devices(), 1, 'signed out there: that device hears no more');
+  run('DELETE FROM sessions WHERE user_id = ?', id);
+  assert.equal(devices(), 0, 'every session gone (a reset password, a ban): every device');
 });

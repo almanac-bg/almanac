@@ -37,6 +37,7 @@ import {
   tellReporters,
   tellReversal,
 } from './statements';
+import { ratesPeople } from './trust';
 import {
   GUEST_NAME,
   getUser,
@@ -111,6 +112,12 @@ const reasonLabel = (r: ReportReason) => REPORT_REASONS.find((x) => x.id === r)!
  * sender gets a receipt.
  */
 export function fileReport(reporterId: number, subject: Subject, reason: unknown, details: string): Result {
+  const reporter = getUser(reporterId);
+  if (reporter?.reports_stopped_until && reporter.reports_stopped_until > Date.now())
+    return {
+      ok: false,
+      error: `Модератор спря докладите ти до ${longDateTime(reporter.reports_stopped_until)}: много от тях бяха без основание. Ако е грешка, пиши на ${config.operator.email}.`,
+    };
   if (subject.owner === reporterId)
     return { ok: false, error: subject.kind === 'player' ? 'Не можеш да докладваш себе си.' : 'Това е твое.' };
   if (!isReason(reason) || !REPORT_REASONS_FOR[subject.kind].includes(reason))
@@ -152,9 +159,24 @@ export function fileReport(reporterId: number, subject: Subject, reason: unknown
   // About staff: the owner's to hear, as to decide.
   const ownerOnly = !!getUser(subject.owner)?.is_admin;
   if (reason === 'illegal') {
-    alertModerators(`case:${subject.kind}:${subject.id}:illegal`, `Незаконно съдържание: ${what}`, [last], {
-      ownerOnly,
-    });
+    // At once from a reporter whose word has weight (a player for a while, or with a report upheld before); from a new
+    // account, one mail an hour for all of them — a few throwaway accounts mustn't flood the moderators' inboxes and
+    // bury a real notice (the 31 October review, MOD-3). Either way the case is first in the queue.
+    if (reporter && (ratesPeople(reporter) || upheldReports(reporterId) > 0))
+      alertModerators(`case:${subject.kind}:${subject.id}:illegal`, `Незаконно съдържание: ${what}`, [last], {
+        ownerOnly,
+      });
+    else {
+      const fresh = one<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM reports WHERE status = 'open' AND reason = 'illegal'",
+      )!.n;
+      alertModerators(
+        'illegal:new-accounts',
+        'Нови сигнали за незаконно съдържание',
+        [`Отворени сигнали за незаконно съдържание: ${fresh}. Най-новите са от нови профили — първи са в опашката.`],
+        { per: 'hour' },
+      );
+    }
     confirmNotice(reporterId, subject.label);
   } else if (waiting >= MODERATION.alertAt)
     alertModerators(`case:${subject.kind}:${subject.id}`, `${waiting} доклада за ${what}`, [last], { ownerOnly });
@@ -191,6 +213,7 @@ function reporterOf(id: number): Reporter | null {
   );
   return r
     ? {
+        id,
         name: r.username,
         days: Math.floor((Date.now() - r.created_at) / DAY),
         matches: r.games_played,
@@ -371,6 +394,8 @@ export function banPlayer(
       targetId,
     );
     run('DELETE FROM sessions WHERE user_id = ?', targetId);
+    // Its devices too, including any subscribed before subscriptions remembered their session (SEC-7).
+    run('DELETE FROM push_subscriptions WHERE user_id = ?', targetId);
     onReport = closeReports(adminId, closes, 'ban', target.username).length > 0;
     logAction({
       adminId,
@@ -595,6 +620,71 @@ function dismiss(adminId: number, kind: ReportSubjectKind, id: string, closes: C
       target: kind === 'player' ? null : id,
       undo: { reports: closed.map((r) => r.id) },
     });
+  });
+  return { ok: true };
+}
+
+const upheldReports = (reporterId: number) =>
+  one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM reports WHERE reporter_id = ? AND status = 'resolved' AND action <> 'dismiss'",
+    reporterId,
+  )!.n;
+
+/**
+ * „Отхвърли всички от …“: every open report one player sent closes as no violation (a flood of them from one account),
+ * except what this moderator can't decide (about themselves or staff); the log keeps which, and an undo opens them
+ * again. The reporter hears it once.
+ */
+export function dismissReporter(adminId: number, reporterId: number): Result {
+  const reporter = getUser(reporterId);
+  if (!reporter) return { ok: false, error: 'Няма такъв играч.' };
+  const open = all<{ id: number; target_id: number }>(
+    "SELECT id, target_id FROM reports WHERE status = 'open' AND reporter_id = ?",
+    reporterId,
+  ).filter((r) => !notTheirs(adminId, r.target_id));
+  if (!open.length) return { ok: false, error: 'Няма отворени доклади от този играч.' };
+  tx(() => {
+    const closed = closeReports(adminId, { reportIds: open.map((r) => r.id) }, 'dismiss', `${open.length} доклада`);
+    logAction({ adminId, action: 'dismiss_reports', userId: reporterId, undo: { reports: closed.map((r) => r.id) } });
+  });
+  return { ok: true };
+}
+
+/**
+ * „Спри докладите му за 30 дни“: a player whose reports are again and again without grounds can't send any for a while
+ * (DSA Art. 23, Terms §3а), after the note it's told. Undone from the log.
+ */
+export function stopReports(
+  adminId: number,
+  reporterId: number,
+  grounds: { basis: ModerationBasis; reason: string },
+): Result {
+  const reporter = getUser(reporterId);
+  if (!reporter) return { ok: false, error: 'Няма такъв играч.' };
+  const mine = notTheirs(adminId, reporterId);
+  if (mine) return { ok: false, error: mine };
+  const problem = checkGrounds(grounds.basis, grounds.reason);
+  if (problem) return { ok: false, error: problem };
+  const until = Date.now() + 30 * DAY;
+  const reason = grounds.reason.trim().slice(0, MODERATION.reasonMax);
+  tx(() => {
+    run('UPDATE users SET reports_stopped_until = ? WHERE id = ?', until, reporterId);
+    logAction({
+      adminId,
+      action: 'stop_reports',
+      userId: reporterId,
+      basis: grounds.basis,
+      reason,
+      undo: { until: reporter.reports_stopped_until },
+    });
+  });
+  tellPlayer(reporterId, {
+    what: `Модератор спря докладите ти до ${longDateTime(until)}: много от тях бяха без основание.`,
+    basis: grounds.basis,
+    reason,
+    onReport: false,
+    subject: `Докладите ти в ${BRAND.name} са спрени за 30 дни`,
+    icon: '🛡️',
   });
   return { ok: true };
 }
@@ -998,6 +1088,11 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
           id,
         );
       if (undo.hidden) hideQuestion(adminId, String(row.target));
+      break;
+    }
+    case 'stop_reports': {
+      if (userId === null) return { ok: false, error: 'Играчът вече го няма.' };
+      run('UPDATE users SET reports_stopped_until = ? WHERE id = ?', (undo.until as number | null) ?? null, userId);
       break;
     }
     case 'dismiss_reports': {

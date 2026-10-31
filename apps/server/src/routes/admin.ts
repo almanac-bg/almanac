@@ -14,6 +14,7 @@ import {
   banPlayer,
   changeBan,
   decideCase,
+  dismissReporter,
   dismissReports,
   openCases,
   openReportCount,
@@ -21,6 +22,7 @@ import {
   renameGroupByModerator,
   renamePlayer,
   searchPlayers,
+  stopReports,
   undoAction,
 } from '../moderation';
 import { logAction, moderationLog } from '../modlog';
@@ -269,6 +271,18 @@ adminRouter.post('/admin/players/:id/annul', change, (req, res) => {
 
 adminRouter.post('/admin/players/:id/dismiss', change, (req, res) => {
   reply(res, dismissReports(res.locals.userId, idParam(req)), cardOf(req));
+});
+
+/** A reporter's flood: every open report they sent, closed as no violation (MOD-3). */
+adminRouter.post('/admin/reporters/:id/dismiss', change, (req, res) => {
+  reply(res, dismissReporter(res.locals.userId, idParam(req)), () => ({ ok: true, ...openCases(res.locals.userId) }));
+});
+
+/** A reporter in bad faith: no reports from them for 30 days (MOD-3). */
+adminRouter.post('/admin/reporters/:id/stop', change, (req, res) => {
+  const body = parse(z.object({ basis: Basis, reason: Reason }), req, res);
+  if (!body) return;
+  reply(res, stopReports(res.locals.userId, idParam(req), body), () => ({ ok: true, ...openCases(res.locals.userId) }));
 });
 
 adminRouter.post('/admin/groups/:id/rename', change, (req, res) => {

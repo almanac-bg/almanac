@@ -2,6 +2,7 @@ import { dayKey, MODERATION, sofiaHour } from '@quiz/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { moderatorMail, sendMail } from './mailer';
+import { throttled } from './throttle';
 
 /**
  * Moderators hear about what waits for them by email (an admin page nobody opens moderates nothing): at once when
@@ -14,25 +15,37 @@ const admins = (ownerOnly = false) =>
      ${ownerOnly ? "AND staff_role = 'owner'" : ''}`,
   );
 
+/** At most this many alert mails an hour, whatever they're about: past it, the morning summary has the rest. */
+export const ALERTS_PER_HOUR = 12;
+let held = 0;
+
 /**
- * Once a day per `key` at most (the same question flagged again is the same alert). `ownerOnly`: about staff, which
- * only the owner decides.
+ * Once a day per `key` at most (the same question flagged again is the same alert), or once an hour (`per`).
+ * `ownerOnly`: about staff, which only the owner decides. Past ALERTS_PER_HOUR in an hour, alerts wait for the
+ * morning summary, and the next one that goes says how many did (the 31 October review, MOD-3).
  */
 export function alertModerators(
   key: string,
   subject: string,
   lines: string[],
-  { now = Date.now(), ownerOnly = false } = {},
+  { now = Date.now(), ownerOnly = false, per = 'day' as 'day' | 'hour' } = {},
 ) {
   const setting = `alert:${key}`;
-  const day = dayKey(now);
-  if (one('SELECT 1 AS x FROM settings WHERE key = ? AND value = ?', setting, day)) return;
+  const when = per === 'hour' ? `${dayKey(now)} ${sofiaHour(now)}` : dayKey(now);
+  if (one('SELECT 1 AS x FROM settings WHERE key = ? AND value = ?', setting, when)) return;
   run(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
     setting,
-    day,
+    when,
   );
-  for (const { email } of admins(ownerOnly)) sendMail(moderatorMail(email, subject, lines, `${config.appUrl}/admin`));
+  if (throttled('moderator-alerts', ALERTS_PER_HOUR, 60 * 60_000)) {
+    held++;
+    return;
+  }
+  const more = held ? [`…и още ${held} известия от последния час чакат в /admin и в сутрешното обобщение.`] : [];
+  held = 0;
+  for (const { email } of admins(ownerOnly))
+    sendMail(moderatorMail(email, subject, [...lines, ...more], `${config.appUrl}/admin`));
 }
 
 /**

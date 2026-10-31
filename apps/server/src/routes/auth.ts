@@ -5,7 +5,6 @@ import { getMe } from '../account';
 import {
   confirmSession,
   createSession,
-  DUMMY_PASSWORD_HASH,
   destroySession,
   hashPassword,
   hashToken,
@@ -18,6 +17,7 @@ import {
   setSessionCookie,
   userIdFromRequest,
   verifyPassword,
+  waitLikeAPasswordCheck,
 } from '../auth';
 import { config } from '../config';
 import { isUniqueViolation, one, run } from '../db';
@@ -30,10 +30,12 @@ import {
   verifyEmailToken,
 } from '../emailAuth';
 import { createGuest } from '../guests';
+import { longDateTime } from '../mailer';
 import { activeBan, nameProblem } from '../moderation';
 import { reportError } from '../monitoring';
 import { nameShape } from '../names';
 import { disconnectSession } from '../notify';
+import { secondFactorFailed, secondFactorHold, secondFactorPassed } from '../secondFactor';
 import { guestsPaused } from '../settings';
 import { count } from '../stats';
 import { network, throttled, throttledNetwork, wideNetwork } from '../throttle';
@@ -90,7 +92,7 @@ authRouter.post('/auth/register', async (req, res) => {
     res.status(409).json({ error: taken });
     return;
   }
-  const hash = await hashPassword(creds.password);
+  const hash = await hashPassword(creds.password, wideNetwork(req.ip));
   // Someone may have taken it, or one that looks the same, while the password was hashing.
   const takenSince = nameTaken(creds.username);
   if (takenSince) {
@@ -151,8 +153,10 @@ authRouter.post('/auth/login', async (req, res) => {
   ) {
     return tooMany();
   }
-  // An unknown login still costs a password check, so timing doesn't reveal which usernames and emails exist.
-  const valid = await verifyPassword(creds.password, user?.password_hash ?? DUMMY_PASSWORD_HASH);
+  // An unknown login waits as long as a password check, so timing doesn't reveal which usernames and emails exist.
+  let valid = false;
+  if (user) valid = await verifyPassword(creds.password, user.password_hash, wideNetwork(req.ip));
+  else await waitLikeAPasswordCheck();
   if (!user || !valid) {
     res.status(401).json({ error: 'Грешно име или парола.' });
     return;
@@ -164,7 +168,11 @@ authRouter.post('/auth/login', async (req, res) => {
   }
   // A hash from before the current cost: redone now, while the password is at hand.
   if (needsRehash(user.password_hash)) {
-    run('UPDATE users SET password_hash = ? WHERE id = ?', await hashPassword(creds.password), user.id);
+    run(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      await hashPassword(creds.password, wideNetwork(req.ip)),
+      user.id,
+    );
   }
   setSessionCookie(res, createSession(user.id));
   setDeviceCookie(res, user.id);
@@ -193,7 +201,7 @@ authRouter.post('/auth/reset', async (req, res) => {
     res.status(429).json({ error: 'Твърде много опити. Опитай по-късно.' });
     return;
   }
-  const result = await resetPassword(body.token, body.password);
+  const result = await resetPassword(body.token, body.password, wideNetwork(req.ip));
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
@@ -314,7 +322,10 @@ authRouter.post('/auth/2fa/enable', requireAuth, requireStaff, (req, res) => {
   res.json({ ok: true });
 });
 
-/** The code for this session (/admin asks for one every 12 hours). Each code works once; ten tries in 15 minutes. */
+/**
+ * The code for this session (/admin asks for one every 12 hours). Each code works once; ten tries in 15 minutes, and
+ * beyond ten wrong ones in a row, a longer wait each time, up to a stop (secondFactor.ts).
+ */
 authRouter.post('/auth/2fa', requireAuth, requireStaff, (req, res) => {
   const body = parse(Code, req, res);
   if (!body) return;
@@ -323,16 +334,30 @@ authRouter.post('/auth/2fa', requireAuth, requireStaff, (req, res) => {
     res.status(400).json({ error: 'Първо включи двуфакторното влизане.' });
     return;
   }
+  const hold = secondFactorHold(user);
+  if (hold?.stopped) {
+    res.status(423).json({
+      error:
+        'Двуфакторното влизане е спряно след твърде много грешни кодове. Собственикът може да го нулира от сървъра.',
+    });
+    return;
+  }
+  if (hold) {
+    res.status(429).json({ error: `Твърде много грешни кодове. Опитай пак след ${longDateTime(hold.until)}.` });
+    return;
+  }
   if (throttled(`2fa:${user.id}`, 10, 15 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
   const step = verifyCode(user.totp_secret, body.code, Date.now(), user.totp_step ?? -1);
   if (step === null) {
+    secondFactorFailed(user);
     res.status(400).json({ error: 'Кодът не е верен или вече е използван.' });
     return;
   }
   run('UPDATE users SET totp_step = ? WHERE id = ?', step, user.id);
+  secondFactorPassed(user);
   secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
   res.json({ ok: true });
 });

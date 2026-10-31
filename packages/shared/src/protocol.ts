@@ -849,6 +849,7 @@ export const REPORT_REASONS_FOR: Record<ReportSubjectKind, readonly ReportReason
 
 /** Who sent a report, as far as it helps to weigh it: how long they've played, and how their reports went before. */
 export interface Reporter {
+  id: number;
   name: string;
   days: number;
   matches: number;
@@ -944,7 +945,11 @@ export type ModerationLogAction =
   | 'reload_bank'
   | 'staff_add'
   | 'staff_remove'
-  | 'staff_2fa_reset';
+  | 'staff_2fa_reset'
+  | 'staff_sign_in'
+  | 'second_factor_failed'
+  | 'second_factor_locked'
+  | 'stop_reports';
 
 export interface ModerationLogEntry {
   id: number;

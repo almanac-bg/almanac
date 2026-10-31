@@ -271,6 +271,46 @@ export function decisionMail(
   };
 }
 
+/**
+ * To a staff member, about their own /admin sign-in: a wrong code after the right password (someone may have the
+ * password), the second factor stopped after too many, or a new sign-in. Each says what to do if it wasn't them.
+ */
+export function staffSignInMail(to: string, username: string, what: 'wrong-code' | 'locked' | 'sign-in', at: number) {
+  const when = longDateTime(at);
+  const said = {
+    'wrong-code': {
+      subject: `Грешен код при влизане в модерацията на ${BRAND.name}`,
+      intro: `На ${when} някой влезе с паролата на профила ти „${username}“, но въведе грешен код за двуфакторното влизане в /admin.`,
+    },
+    locked: {
+      subject: `Двуфакторното влизане в ${BRAND.name} е спряно`,
+      intro: `Профилът ти „${username}“ въведе твърде много грешни кодове за /admin (последният на ${when}), затова двуфакторното влизане е спряно. Собственикът може да го нулира от сървъра.`,
+    },
+    'sign-in': {
+      subject: `Влизане в модерацията на ${BRAND.name}`,
+      intro: `На ${when} профилът ти „${username}“ влезе в /admin с паролата и кода от приложението.`,
+    },
+  }[what];
+  const advice =
+    what === 'sign-in'
+      ? 'Ако не си ти, смени паролата веднага и кажи на собственика да нулира двуфакторното влизане.'
+      : 'Ако не си ти, смени паролата веднага: някой я знае.';
+  return {
+    kind: 'staff-sign-in',
+    to,
+    subject: said.subject,
+    text: `Здравей, ${username}!\n\n${said.intro}\n\n${advice}`,
+    html: layout(
+      `Здравей, ${username}!`,
+      escapeHtml(said.intro),
+      'Към модерацията',
+      `${config.appUrl}/admin`,
+      escapeHtml(advice),
+      said.subject,
+    ),
+  };
+}
+
 /** To a moderator: something waits for them (`now`: an alert that can't wait for the morning summary). */
 export function moderatorMail(to: string, subject: string, lines: string[], link: string): Mail {
   return {

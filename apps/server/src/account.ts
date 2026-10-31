@@ -152,6 +152,8 @@ export function updateLoadout(userId: number, patch: Partial<Loadout>): { ok: tr
 
 // ─── GDPR: export and erasure ────────────────────────────────────────────────
 
+const STAFF_COLUMNS = new Set(['reviewed_by', 'resolved_by', 'hidden_by', 'undone_by']);
+
 /**
  * Everything stored about the player, as a downloadable JSON document: whole rows, so it stays complete as the schema
  * grows. Left out are only secrets (password and token hashes) and other players' identities (who reported you).
@@ -168,7 +170,12 @@ export function exportAccount(userId: number) {
     totp_step: _used,
     ...account
   } = getUser(userId)!;
-  const rows = (sql: string) => all<Record<string, unknown>>(sql, userId);
+  // Which moderator reviewed or decided something is staff's, not the player's to know (the 31 October review, SEC-8):
+  // `*_by` columns name an account, and an id is enough to find its name.
+  const rows = (sql: string) =>
+    all<Record<string, unknown>>(sql, userId).map((row) =>
+      Object.fromEntries(Object.entries(row).filter(([key]) => !STAFF_COLUMNS.has(key))),
+    );
   return {
     exportedAt: new Date().toISOString(),
     account: { ...account, level: levelFromXp(account.xp), createdAt: new Date(account.created_at).toISOString() },
