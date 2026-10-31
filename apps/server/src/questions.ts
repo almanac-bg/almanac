@@ -504,7 +504,10 @@ function loadBank(): {
   // The real bank's copies of what the public pages show with its answer (publicQuestions.ts): never dealt. Not when
   // the sample is the bank itself (development, the tests): then there's nothing else to play.
   const isPublic = (() => {
-    if (QUESTIONS_PATH === SAMPLE_BANK) return () => false;
+    // The sample by name too: a build's own copy is in dist/data, while a test may point at the one in src/data (the
+    // browser tests did, and the whole sample was held back as public: no match could start).
+    if (QUESTIONS_PATH === SAMPLE_BANK || path.basename(QUESTIONS_PATH) === path.basename(SAMPLE_BANK))
+      return () => false;
     const open = publicQuestions(SAMPLE_BANK);
     return (q: PlayableQuestion) =>
       open.ids.has(q.id) ||
