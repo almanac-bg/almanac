@@ -18,6 +18,7 @@ const SMALL: Record<string, string> = {
   question_stats: 'one row per question in the bank',
   question_skill: 'one row per question in the bank',
   hidden_questions: 'questions moderators hid, out of the bank',
+  blocked_pictures: 'pictures in sets moderators hid: their decisions, not every upload',
 };
 
 /**
