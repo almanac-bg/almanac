@@ -1,6 +1,6 @@
 import { fmt } from '@quiz/client';
 import { type ChallengePreview, type DailyPreview, MODES, ROOM_CODE_DIGITS } from '@quiz/shared';
-import { ArrowRight, CalendarDays, DoorOpen, LogIn, RotateCcw, Swords, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowRight, CalendarDays, DoorOpen, LogIn, Play, RotateCcw, Swords, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { LoadFailure } from '../../lib/load';
@@ -56,7 +56,7 @@ export function GuestPlay({
   return (
     <div>
       <Button size="lg" variant={primary ? 'primary' : 'secondary'} className="w-full" loading={busy} onClick={onPlay}>
-        <Zap aria-hidden className="size-5" /> {label}
+        <Play aria-hidden className="size-5" /> {label}
       </Button>
       <p className="mt-2.5 text-center text-sm text-fg-3">
         Без регистрация. Нивото и серията се пазят — запазваш профила с име и парола, когато решиш.
@@ -106,7 +106,7 @@ export function NewcomerStart({
       )}
       <Or>или</Or>
       <Button size="lg" variant="secondary" className="w-full" disabled={busy} onClick={onGuest}>
-        <Zap aria-hidden className="size-5" /> Играй като гост
+        <Play aria-hidden className="size-5" /> Играй като гост
       </Button>
       <p className="mt-2.5 text-center text-sm text-fg-3">Дуели, Роял, Соло — прогресът се пази и без регистрация.</p>
       <div className="mt-4 flex flex-wrap justify-center gap-x-1 text-sm">
@@ -312,7 +312,7 @@ export function ChallengeLanding({
           Няма такова предизвикателство — линкът може да е непълен или вече изтрит. Можеш да играеш и без него.
         </p>
         <Button size="lg" className="mt-6 w-full" loading={busy} onClick={onPlay}>
-          <Zap aria-hidden className="size-5" /> Играй като гост
+          <Play aria-hidden className="size-5" /> Играй като гост
         </Button>
         {failure}
         {signIn}
@@ -367,7 +367,7 @@ export function ChallengeLanding({
             Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и въпросите на деня те чакат.
           </p>
           <Button size="lg" className="mt-5 w-full" loading={busy} onClick={onPlay}>
-            <Zap aria-hidden className="size-5" /> Играй като гост
+            <Play aria-hidden className="size-5" /> Играй като гост
           </Button>
         </>
       ) : (

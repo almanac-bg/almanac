@@ -80,7 +80,7 @@ const manifest = JSON.stringify({
       sizes: '1080x1920',
       type: 'image/webp',
       form_factor: 'narrow',
-      label: 'Соло, дуели, Роял и стаи с приятели',
+      label: 'Соло, дуели, Арена, Роял и стаи с приятели',
     },
     {
       src: '/screenshots/landing-wide.webp',
@@ -93,7 +93,7 @@ const manifest = JSON.stringify({
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-    // Launchers crop these to their own shape; the bolt sits inside the safe zone.
+    // Launchers crop these to their own shape; the rosette sits inside the safe zone.
     { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   ],
 });

@@ -18,11 +18,21 @@ try() { # try <label> <command…>: runs it, reporting success or GitHub's reaso
   if out=$("$@" 2>&1); then ok "$label"; else skip "$label" "$(echo "$out" | grep -oE '"message":"[^"]*"' | head -1 | cut -d'"' -f4 || echo failed)"; fi
 }
 
+here=$(cd "$(dirname "$0")/.." && pwd)
+
 echo "About"
+# The description and the organization's profile come from files beside the code (.github/about/), so they say what
+# the README says and change with it.
 try "description, website and topics" gh repo edit "$repo" \
-  --description "АЛМАНАХ — куиз битки в реално време: дуели, Роял за 8 играчи, дневно предизвикателство и предизвикателства с линк. React, Node.js, Socket.IO, SQLite." \
+  --description "$(cat "$here/.github/about/description.txt")" \
   --homepage "https://almanac.bg" \
   --add-topic quiz,trivia,quiz-game,multiplayer-game,realtime,browser-game,bulgaria,bulgarian,react,typescript,nodejs,socket-io,sqlite,vite,tailwindcss,pwa,self-hosted,agpl
+
+org=${repo%%/*}
+profile_sha=$(gh api "repos/$org/.github/contents/profile/README.md" -q .sha 2>/dev/null || true)
+try "the organization's profile (.github/about/org-profile.md)" gh api -X PUT \
+  "repos/$org/.github/contents/profile/README.md" -f message="Profile: from almanac's .github/about/org-profile.md" \
+  -f content="$(base64 < "$here/.github/about/org-profile.md" | tr -d '\n')" ${profile_sha:+-f sha="$profile_sha"}
 
 echo "Features and merging"
 # Issues and Discussions for the community; the docs live in the repository, so no wiki or projects. Squash merges

@@ -599,7 +599,7 @@ const stopMaintenance = startMaintenance();
 watchEventLoop();
 
 server.listen(config.port, () => {
-  console.log(`⚡ ${BRAND.name} server on http://localhost:${config.port}`);
+  console.log(`${BRAND.mark} ${BRAND.name} server on http://localhost:${config.port}`);
 });
 
 /**
