@@ -159,7 +159,7 @@ test('a security update left waiting: fine for a day, an alarm after two; gone, 
       'tmux/resolute-updates 3.6a-2ubuntu0.2 amd64 [upgradable from: 3.6a-2]\n',
   );
   assert.ok(check().ok, 'just seen');
-  assert.ok(fs.existsSync(stamp));
+  assert.ok(Math.abs(Number(fs.readFileSync(stamp, 'utf8')) - Date.now() / 1000) < 60, 'counted from now');
   fs.writeFileSync(stamp, String(Math.floor((Date.now() - 3 * DAY) / 1000)));
   failed(/security updates have been waiting 3 days: linux-image-virtual(?! tmux)/);
 
