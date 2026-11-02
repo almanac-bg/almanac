@@ -32,6 +32,11 @@ export function applyTheme() {
   if (theme === 'light') document.documentElement.dataset.theme = 'light';
   else delete document.documentElement.dataset.theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', COLORS[theme]);
+  // An iPhone's home-screen app: a white bar with dark text on paper, a black one on ink (black-translucent would put
+  // its white text over a light page). iOS reads it as the app opens, so a change shows from the next launch (VD-16).
+  document
+    .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    ?.setAttribute('content', theme === 'light' ? 'default' : 'black');
 }
 
 export function setTheme(choice: ThemeChoice) {

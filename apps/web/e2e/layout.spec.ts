@@ -298,3 +298,16 @@ test('a long page title keeps its words whole on a phone (UX-13)', async ({ page
     expect(rows, `${width} px`).toBe(1);
   }
 });
+
+test('an iPhone’s status bar follows the theme: black on ink, white with dark text on paper (VD-16)', async ({
+  page,
+}) => {
+  const style = () =>
+    page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute('content', { timeout: 2_000 });
+  await page.goto('/');
+  expect(await style()).toBe('black');
+  // Chosen once: set before the first paint from then on (public/theme.js), as iOS reads it as the app opens.
+  await page.evaluate(() => localStorage.setItem('quiz:theme', 'light'));
+  await page.reload();
+  expect(await style()).toBe('default');
+});
