@@ -115,6 +115,7 @@ export const PrivacyPage = page('legal', 'PrivacyPage');
 export const ProfilePage = page('profile', 'ProfilePage');
 export const ResetPasswordPage = page('account', 'ResetPasswordPage');
 export const RoomPage = page('room', 'RoomPage');
+export const ClassPage = page('room', 'ClassPage');
 export const SettingsPage = page('account', 'SettingsPage');
 export const SetsPage = page('sets', 'SetsPage');
 export const SubmitPage = page('submit', 'SubmitPage');

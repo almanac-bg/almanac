@@ -8,7 +8,19 @@ import {
   setPictureUrl,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, Send, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Flag,
+  ImageOff,
+  ImagePlus,
+  Link2,
+  Plus,
+  Presentation,
+  Send,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { SetVisibilityForm } from '../components/admin/Decisions';
@@ -19,7 +31,7 @@ import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { ReportReasons } from '../components/ReportReasons';
-import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
+import { Button, buttonClass, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
 import { shrinkPicture } from '../lib/pictures';
@@ -91,10 +103,10 @@ function SetList() {
       {data.sets.length ? (
         <ul className="space-y-3">
           {data.sets.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} className="glass flex flex-wrap items-center gap-x-2 gap-y-1 rounded-3xl pr-3">
               <Link
                 to={`/sets/${s.id}`}
-                className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:px-5"
+                className="focus-ring flex min-w-0 flex-1 basis-60 items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:px-5"
               >
                 <span aria-hidden className="text-3xl">
                   <Emoji e="📝" />
@@ -107,6 +119,15 @@ function SetList() {
                   </span>
                 </span>
               </Link>
+              {/* Straight into a room with it, „Само водя“ on (/class): a set is made to be played (UX-4). */}
+              {s.questions > 0 && !s.hidden && (
+                <Link
+                  to={`/class?set=${s.id}`}
+                  className={clsx(buttonClass({ variant: 'secondary', size: 'sm' }), 'mb-3 ml-auto sm:mb-0')}
+                >
+                  <Presentation aria-hidden className="size-4" /> Пусни в стая
+                </Link>
+              )}
             </li>
           ))}
         </ul>
@@ -115,7 +136,7 @@ function SetList() {
           <EmptyState
             icon="📝"
             title="Още нямаш набор"
-            body="Направи си един и го пусни в частна стая: в „Настройки“ → „Въпроси“."
+            body="Направи си един и го пусни в стая — с „Пусни в стая“ до набора, или в стаята от „Въпроси“."
           />
         </Card>
       )}
@@ -345,6 +366,16 @@ function SetEditor({ id }: { id: number }) {
       </Button>
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-6">
+        {/* The saved set, in a room with „Само водя“ (/class); unsaved changes wouldn't be in it, so save first. */}
+        {dirty || data.hidden || !data.questions.length ? (
+          <Button variant="secondary" disabled title={dirty ? 'Запази промените първо' : undefined}>
+            <Presentation className="size-4" /> Пусни в стая
+          </Button>
+        ) : (
+          <Link to={`/class?set=${id}`} className={buttonClass({ variant: 'secondary' })}>
+            <Presentation aria-hidden className="size-4" /> Пусни в стая
+          </Link>
+        )}
         <Button variant="ghost" onClick={() => void copyLink(data.code)} disabled={data.hidden}>
           <Link2 className="size-4" /> Сподели с друг домакин
         </Button>
@@ -763,7 +794,7 @@ function SharedSet({ code }: { code: string }) {
     setBusy(true);
     try {
       const { id } = await api.copySet(code);
-      toast({ kind: 'success', title: 'Копието е твое', body: 'Пусни го в стая от „Настройки“ → „Въпроси“.' });
+      toast({ kind: 'success', title: 'Копието е твое', body: 'Пусни го в стая с „Пусни в стая“ до набора.' });
       navigate(`/sets/${id}`);
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });

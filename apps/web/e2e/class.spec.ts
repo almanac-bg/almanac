@@ -89,6 +89,41 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await expect(teacher.getByText('Мария 7Б')).toBeVisible();
 });
 
+test('a teacher from /teachers: one way in to a room for the class, through sign-up; a set goes into a room from its card (UX-4)', async ({
+  page: teacher,
+}) => {
+  await teacher.goto('/teachers');
+  // The way in at the top, not only after the whole page.
+  await teacher.getByRole('link', { name: 'Отвори стая за класа' }).first().click();
+  await expect(teacher).toHaveURL(/\/class$/);
+  await expect(teacher.getByText('Стая за класа', { exact: true })).toBeVisible();
+  // A room needs a profile: no guest button here.
+  await expect(teacher.getByRole('button', { name: 'Играй като гост', exact: true })).toHaveCount(0);
+  await teacher.getByLabel('Потребителско име', { exact: true }).fill(uniqueName('Учител'));
+  await teacher.getByLabel('Парола', { exact: true }).fill('parola-123');
+  await teacher.getByRole('button', { name: /^Създай профил/ }).click();
+  // Straight into the room, run from the big screen, open to a whole class.
+  await expect(teacher).toHaveURL(/\/room$/);
+  await expect(teacher.getByRole('switch', { name: 'Само водя' })).toBeChecked();
+  await expect(teacher.getByText('Води на голям екран · не играе')).toBeVisible();
+
+  // A set, then „Пусни в стая“ from its card: a new room with that set in it.
+  await teacher.goto('/sets');
+  await teacher.getByRole('button', { name: 'Нов набор' }).click();
+  await expect(teacher).toHaveURL(/\/sets\/\d+$/);
+  await teacher.getByLabel('Име на набора').fill('Урок 6');
+  await teacher.getByRole('button', { name: /^Въпрос 1/ }).click();
+  await teacher.getByRole('button', { name: 'Вярно/невярно' }).last().click();
+  await teacher.getByLabel('Текст на въпрос 1').fill('Дунав се влива в Черно море.');
+  await teacher.getByRole('button', { name: 'Запази' }).click();
+  await expect(teacher.getByText('1 от 50 въпроса · запазено')).toBeVisible();
+  await teacher.goto('/sets');
+  await teacher.getByRole('link', { name: 'Пусни в стая' }).click();
+  await expect(teacher).toHaveURL(/\/room$/);
+  await expect(teacher.getByText('Всичките 1 въпроса, в реда на набора.', { exact: false })).toBeVisible();
+  await expect(teacher.getByRole('switch', { name: 'Само водя' })).toBeChecked();
+});
+
 test('a locked room: a pupil with the code from the landing knocks, the teacher lets them in and swaps a typed name; one not let in is told', async ({
   page: teacher,
   newPlayer,

@@ -142,11 +142,14 @@ function GuideLayout({
   title,
   lead,
   cta = DAILY_CTA,
+  ctaFirst = false,
   children,
 }: {
   title: string;
   lead: ReactNode;
   cta?: GuideCta;
+  /** The way in under the lead as well, where it's what the visitor came for (a teacher, a room). */
+  ctaFirst?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -177,6 +180,14 @@ function GuideLayout({
       <Card className="mt-6 bg-ink-2/70 p-6 sm:p-10">
         <h1 className="t-page">{title}</h1>
         <div className="mt-3 text-[15px] leading-relaxed text-fg-2">{lead}</div>
+        {ctaFirst && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link to={cta.to} className={buttonClass({ variant: 'gold', size: 'lg' })}>
+              {cta.label} <ArrowRight aria-hidden className="size-5" />
+            </Link>
+            {cta.note && <span className="text-sm text-fg-3">{cta.note}</span>}
+          </div>
+        )}
         <div className="mt-8 space-y-10 text-[15px] leading-relaxed text-fg-2 [&_b]:text-fg">{children}</div>
         <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-line pt-6">
           <Link to={cta.to} className={buttonClass({ variant: 'gold', size: 'lg' })}>
@@ -585,8 +596,10 @@ export function TeachersPage() {
   return (
     <GuideLayout
       title={`${BRAND.name} в час`}
-      // A teacher came to run a class, not to play the day's questions: the room is a profile away.
-      cta={{ to: '/', label: 'Създай стая за класа', note: 'С безплатен профил — после „Създай стая“ и „Само водя“.' }}
+      // A teacher came to run a class, not to play the day's questions: straight to a room with „Само водя“ (/class),
+      // through the sign-up form if needed — at the top too, not only after the whole page (UX-4).
+      cta={{ to: '/class', label: 'Отвори стая за класа', note: 'С безплатен профил. Стаята се отваря веднага.' }}
+      ctaFirst
       lead={
         <>
           Викторина за цял клас: учениците влизат с код от телефоните си, а въпросите и класирането са на голям екран.

@@ -41,6 +41,7 @@ import {
   AlmanacPage,
   AuthPage,
   ChallengePage,
+  ClassPage,
   DailyPage,
   FactsPage,
   FriendsPage,
@@ -334,6 +335,7 @@ function SignedIn() {
               <Route path="/" element={<HomePage />} />
               <Route path="/game" element={<GamePage />} />
               <Route path="/room" element={<RoomPage />} />
+              <Route path="/class" element={<ClassPage />} />
               <Route path="/join/:code" element={<JoinRoute />} />
               <Route path="/c/:id" element={<ChallengePage />} />
               <Route path="/daily" element={<DailyPage />} />

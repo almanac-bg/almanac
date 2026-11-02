@@ -33,10 +33,11 @@ import {
   Users,
 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { useId, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { BottomBar } from '../components/BottomBar';
+import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
@@ -996,4 +997,57 @@ function InviteFriends({ room }: { room: RoomState }) {
       )}
     </Card>
   );
+}
+
+/**
+ * /class — the teacher's way in (/teachers, a set's „Пусни в стая“; the 31 October review, UX-4): a room for a class,
+ * made at once and opened — „Само водя“ on (the host runs it on the big screen, the room takes a whole class), and the
+ * set from `?set=` if there is one. Signed out, the address first shows the form (AuthPage); a guest is asked to save
+ * their account, since rooms are made with one.
+ */
+export function ClassPage() {
+  const [params] = useSearchParams();
+  const set = Number(params.get('set')) || null;
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const connected = useStore((s) => s.connected);
+  const navigate = useNavigate();
+  const tried = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  usePageTitle('Стая за класа');
+
+  useEffect(() => {
+    if (guest || !connected || tried.current) return;
+    tried.current = true;
+    void (async () => {
+      const res = await actions.createRoom({ hostPlays: false });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      if (set) actions.roomSettings({ set });
+      navigate('/room', { replace: true });
+    })();
+  }, [guest, connected, set, navigate]);
+
+  if (guest)
+    return (
+      <Card className="mx-auto max-w-lg p-6">
+        <h1 className="t-section">Стая за класа</h1>
+        <p className="mt-2 text-fg-2">
+          Стаи се правят с профил: запази своя (име и парола) и стаята се отваря веднага, с „Само водя“.
+        </p>
+        <GuestNudge className="mt-4">Играеш като гост. Запази профила си, за да отвориш стая за класа.</GuestNudge>
+      </Card>
+    );
+  if (error)
+    return (
+      <Card className="mx-auto max-w-lg p-6">
+        <h1 className="t-section">Стаята не се отвори</h1>
+        <p className="mt-2 text-fg-2">{error}</p>
+        <Link to="/" className="focus-ring mt-4 inline-block rounded font-semibold text-violet-300">
+          Към началото
+        </Link>
+      </Card>
+    );
+  return <Spinner className="mx-auto mt-16 size-6" />;
 }

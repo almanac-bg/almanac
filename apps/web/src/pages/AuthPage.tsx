@@ -1,7 +1,7 @@
 import { ApiError, api, errorMessage, loadRealtime, plural, setState, toast } from '@quiz/client';
 import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowLeft, ArrowRight, DoorOpen, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, DoorOpen, Presentation, UsersRound } from 'lucide-react';
 import { m } from 'motion/react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -50,6 +50,8 @@ export function AuthPage() {
   // The day's questions (/daily), or someone's link to them (/daily/<code>).
   const daily = /^\/daily(?:\/([\w-]{1,16}))?\/?$/.exec(pathname);
   const dailyCode = daily?.[1] ?? null;
+  // A teacher on the way to a room for their class (/class, from /teachers or a set): the form, then the room.
+  const forClass = pathname === '/class';
   // A challenge or daily link's page comes with its own title from the server: "Мария те предизвиква в АЛМАНАХ".
   usePageTitle(challengeId || daily ? undefined : null);
   // Newcomers mostly arrive to play (or sign up); a device that has signed in before most likely wants to sign in again.
@@ -70,7 +72,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(() => (returning ? 'login' : 'register'));
   // A challenge or daily link opens on what it's for, and a new visitor on the day's questions: "Вход" swaps in the
   // form. An invite, or a device that has signed in before, opens on the form.
-  const [formOpen, setFormOpen] = useState(() => !challengeId && !daily && (returning || !!inviteCode));
+  const [formOpen, setFormOpen] = useState(() => !challengeId && !daily && (returning || !!inviteCode || forClass));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -292,6 +294,16 @@ export function AuthPage() {
                       {challengeId ? 'Към предизвикателството' : daily ? 'Към въпросите на деня' : 'Назад'}
                     </button>
                   )}
+                  {forClass && (
+                    <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
+                      <Presentation aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
+                      <span>
+                        <b className="text-fg">Стая за класа</b> се прави с профил (имейлът не е задължителен). След
+                        това стаята се отваря веднага, със „Само водя“ и кода голям на екрана — учениците влизат с него
+                        от телефоните си, без регистрация.
+                      </span>
+                    </p>
+                  )}
                   {roomCode && (
                     <p className="mb-5 flex items-start gap-3 rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3.5 text-sm text-fg-2">
                       <DoorOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-fuchsia-300" />
@@ -432,7 +444,7 @@ export function AuthPage() {
                       {mode === 'login' ? 'Влез' : 'Създай профил и играй'}
                     </Button>
                   </form>
-                  {(returning || (!inviteCode && !challengeId && !daily)) && (
+                  {!forClass && (returning || (!inviteCode && !challengeId && !daily)) && (
                     <>
                       <Or>или</Or>
                       {guest}
