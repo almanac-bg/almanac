@@ -252,7 +252,7 @@ const SLOTS: {
       def: {
         id: 'final90',
         icon: '🎯',
-        text: 'На финала с число бъди поне 90% близо',
+        text: 'Познай финала с число с точност поне 90 %',
         goal: 1,
         xp: 80,
         count: (e) => ((e.finalCloseness ?? 0) >= 0.9 ? 1 : 0),
