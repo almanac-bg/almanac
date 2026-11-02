@@ -20,7 +20,7 @@ import { config } from '../config';
 import { joinBoardAfterSave } from '../daily';
 import { isUniqueViolation, run, tx } from '../db';
 import { changePassword, PasswordSchema, removeEmail, requestEmailChange } from '../emailAuth';
-import { nameProblem } from '../moderation';
+import { chooseOwnName, nameProblem } from '../moderation';
 import { nameShape } from '../names';
 import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession } from '../notify';
@@ -139,6 +139,22 @@ accountRouter.post('/account/password', requireAuth, requireAccount, async (req,
     return;
   }
   res.json({ ok: true });
+});
+
+/** After a moderator's rename, the player picks a name of their own: once (chooseOwnName). */
+accountRouter.post('/account/name', requireAuth, requireAccount, (req, res) => {
+  const body = parse(z.object({ username: z.string().max(40) }), req, res);
+  if (!body) return;
+  if (throttled(`choose-name:${res.locals.userId}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const result = chooseOwnName(res.locals.userId, body.username);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ user: getMe(res.locals.userId) });
 });
 
 /** A guest picks a name and password (and maybe an email): the same account, with everything played so far. */

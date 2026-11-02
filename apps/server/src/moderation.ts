@@ -486,10 +486,15 @@ export function changeBan(adminId: number, targetId: number, days: number | null
   return { ok: true };
 }
 
+/**
+ * A player's name that broke the rules: it becomes „ИграчN“, and the player picks a new one, once, in Settings (the 31
+ * October review, MOD-11) — a moderator no longer invents a name for anyone. `rename.username` from an older page is
+ * ignored.
+ */
 export function renamePlayer(
   adminId: number,
   targetId: number,
-  rename: { username: string; basis: ModerationBasis; reason: string },
+  rename: { username?: string; basis: ModerationBasis; reason: string },
   closes: Closes = { kind: 'player', id: String(targetId) },
 ): Result {
   const target = getUser(targetId);
@@ -498,20 +503,13 @@ export function renamePlayer(
   if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(rename.basis, rename.reason);
   if (problem) return { ok: false, error: problem };
-  const name = rename.username.trim();
-  if (name.length < USERNAME.min || name.length > USERNAME.max || !USERNAME.chars.test(name))
-    return {
-      ok: false,
-      error: `Името трябва да е ${USERNAME.min}–${USERNAME.max} букви, цифри, точка, тире или долна черта.`,
-    };
-  const bad = nameProblem(name);
-  if (bad) return { ok: false, error: bad };
-  const taken = nameTaken(name, targetId);
-  if (taken) return { ok: false, error: taken };
+  const name = [`Играч${targetId}`, `Играч_${targetId}`, `Играч.${targetId}`].find((n) => !nameTaken(n, targetId));
+  if (!name) return { ok: false, error: 'Неутралното име е заето — сменете го ръчно.' };
   const reason = rename.reason.trim().slice(0, MODERATION.reasonMax);
   let onReport = false;
   tx(() => {
     setName(targetId, name);
+    run('UPDATE users SET must_rename = 1 WHERE id = ?', targetId);
     onReport = closeReports(adminId, closes, 'rename', target.username).length > 0;
     logAction({
       adminId,
@@ -524,7 +522,7 @@ export function renamePlayer(
   });
   afterRename(targetId);
   tellPlayer(targetId, {
-    what: `Модератор смени името ти „${target.username}“ на „${name}“.`,
+    what: `Модератор смени името ти „${target.username}“. Докато си избереш ново (в Настройки), си „${name}“.`,
     basis: rename.basis,
     reason,
     onReport,
@@ -532,6 +530,32 @@ export function renamePlayer(
     icon: '✏️',
     link: '/settings',
   });
+  return { ok: true };
+}
+
+/**
+ * After a moderator's rename, the player's own pick: once (must_rename), by the same rules as at sign-up. Logged, so the
+ * moderators see what came of their decision.
+ */
+export function chooseOwnName(userId: number, wanted: string): Result {
+  const user = getUser(userId);
+  if (!user?.must_rename) return { ok: false, error: 'Името ти не може да се сменя.' };
+  const name = wanted.trim();
+  if (name.length < USERNAME.min || name.length > USERNAME.max || !USERNAME.chars.test(name))
+    return {
+      ok: false,
+      error: `Името трябва да е ${USERNAME.min}–${USERNAME.max} букви, цифри, точка, тире или долна черта.`,
+    };
+  const bad = nameProblem(name);
+  if (bad) return { ok: false, error: bad };
+  const taken = nameTaken(name, userId);
+  if (taken) return { ok: false, error: taken };
+  tx(() => {
+    setName(userId, name);
+    run('UPDATE users SET must_rename = 0 WHERE id = ?', userId);
+    logAction({ adminId: null, action: 'choose_name', userId, reason: `„${user.username}“ → „${name}“` });
+  });
+  afterRename(userId);
   return { ok: true };
 }
 
@@ -1023,6 +1047,7 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
       const taken = nameTaken(old, userId);
       if (taken) return { ok: false, error: `„${old}“ вече е заето.` };
       setName(userId, old);
+      run('UPDATE users SET must_rename = 0 WHERE id = ?', userId);
       afterRename(userId);
       tellReversal(userId, `Модератор върна името ти „${old}“.`, reason, '✏️');
       break;

@@ -70,7 +70,8 @@ export function markUndone(id: number, adminId: number, reason: string) {
  */
 const FAMILIES: ModerationLogAction[][] = [
   ['ban', 'unban', 'ban_change'],
-  ['rename'],
+  // The player's own pick after it: undoing the rename would take that away.
+  ['rename', 'choose_name'],
   ['annul'],
   ['hide_question', 'auto_hide_question', 'unhide_question', 'fix_question', 'dismiss_flags'],
   ['hide_set', 'unhide_set'],

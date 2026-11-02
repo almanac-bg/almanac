@@ -269,8 +269,10 @@ export const api = {
   /** Lifts a ban (`days` null) or moves its end. */
   changeBan: (id: number, days: number | null, reason: string) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason }),
-  renamePlayer: (id: number, rename: { username: string; basis: ModerationBasis; reason: string }) =>
+  renamePlayer: (id: number, rename: { basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/rename`, rename),
+  /** After a moderator's rename: the player's own new name (once). */
+  chooseName: (username: string) => request<{ user: MeUser }>('POST', '/account/name', { username }),
   annulResults: (id: number, grounds: { basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/annul`, grounds),
   dismissPlayerReports: (id: number) => request<{ card: PlayerCard }>('POST', `/admin/players/${id}/dismiss`),

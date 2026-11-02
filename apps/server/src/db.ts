@@ -1119,6 +1119,13 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     END;
     `,
   },
+  // v45, a moderator's rename (moderation.ts; the 31 October review, MOD-11): the name becomes „ИграчN“ and the player
+  // picks a new one, once (`must_rename`). Older code doesn't read it (a rollback leaves them on „ИграчN“).
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN must_rename INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

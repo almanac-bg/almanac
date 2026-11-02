@@ -482,42 +482,36 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
       reportIds: await open(),
       decision,
     });
-  assert.equal(
-    (await resolve({ action: 'rename', username: 'kurva_1', basis: 'name', reason: 'Името обижда другите играчи.' }))
-      .status,
-    400,
-    "moderators can't pick offensive names either",
-  );
-  assert.equal(
-    (
-      await resolve({
-        action: 'rename',
-        username: 'm\u0430ria_test',
-        basis: 'name',
-        reason: 'Името обижда другите играчи.',
-      })
-    ).status,
-    400,
-    'or a name that passes for another player',
-  );
   const grounds = { basis: 'name', reason: 'Името обижда другите играчи.' };
   assert.equal(
-    (await resolve({ action: 'rename', username: 'Мирен_играч' })).status,
+    (await resolve({ action: 'rename' })).status,
     400,
     'a decision names its basis and a reason the player reads',
   );
-  assert.equal(
-    (await resolve({ action: 'rename', username: 'Мирен_играч', basis: 'name', reason: 'лошо' })).status,
-    400,
-  );
-  assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч', ...grounds })).status, 200);
+  assert.equal((await resolve({ action: 'rename', basis: 'name', reason: 'лошо' })).status, 400);
+  // A moderator doesn't name anyone (MOD-11): the name becomes „ИграчN“, and the player picks a new one once.
+  assert.equal((await resolve({ action: 'rename', ...grounds })).status, 200);
+  const neutral = `Играч${D.user.id}`;
   const renamed = (await api.get('/api/notifications', D.cookie)).body.notifications[0];
   assert.match(
     renamed.text,
-    /Мирен_играч.*Неподходящо име.*Името обижда.*след сигнал от играч.*човек, не автоматично.*до 6 месеца.*извънсъдебно/,
+    new RegExp(
+      `смени името ти „troll_test“.*„${neutral}“.*Неподходящо име.*Името обижда.*след сигнал от играч.*човек, не автоматично.*до 6 месеца.*извънсъдебно`,
+    ),
     'the player is told what, on what basis and why, that a person decided, and where to appeal',
   );
-  assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
+  let me = (await api.get('/api/me', D.cookie)).body.user;
+  assert.deepEqual([me.username, me.mustRename], [neutral, true]);
+  const choose = (username: string) => api.send('POST', '/api/account/name', D.cookie, { username });
+  assert.equal((await choose('kurva_1')).status, 400, 'the name rules hold for the new one too');
+  assert.equal((await choose('m\u0430ria_test')).status, 400, 'nor one that passes for another player');
+  const chosen = await choose('Мирен_играч');
+  assert.equal(chosen.status, 200, chosen.body.error);
+  me = (await api.get('/api/me', D.cookie)).body.user;
+  assert.deepEqual([me.username, me.mustRename], ['Мирен_играч', false]);
+  assert.match((await choose('Друго_име')).body.error, /не може да се сменя/, 'once');
+  const picked = (await api.get(`/api/admin/players/${D.user.id}`, A.cookie)).body.card.log[0];
+  assert.deepEqual([picked.action, picked.reason], ['choose_name', `„${neutral}“ → „Мирен_играч“`]);
   assert.equal((await api.get('/api/admin/reports', A.cookie)).body.cases.length, 0, 'reports close when resolved');
   assert.match(
     (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,

@@ -123,6 +123,7 @@ export function getMe(userId: number): MeUser | null {
     push: pushPrefs(row),
     shareRuns: row.share_runs === 1,
     moreTime: isMoreTime(row.more_time) ? row.more_time : 'off',
+    mustRename: row.must_rename === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     unreadNotifications: unreadNotifications(userId),

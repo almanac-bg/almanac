@@ -73,6 +73,7 @@ export interface UserRow {
   share_runs: number;
   /** „Повече време“ (MORE_TIME): 'off' for the usual clock. */
   more_time: string;
+  must_rename: number;
   /** Secret in the reminder email's unsubscribe link. */
   reminder_key: string | null;
   /** Opted in to the „X те изпревари на линка ти“ email; the day the last one went (one a day at most). */

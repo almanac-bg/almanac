@@ -194,7 +194,7 @@ adminRouter.get('/admin/reports', (_req, res) => {
 
 const Decision = z.discriminatedUnion('action', [
   z.object({ action: z.literal('dismiss') }),
-  z.object({ action: z.literal('rename'), username: z.string().max(40), basis: Basis, reason: Reason }),
+  z.object({ action: z.literal('rename'), username: z.string().max(40).optional(), basis: Basis, reason: Reason }),
   z.object({
     action: z.literal('ban'),
     days: z.number().int().min(1).max(3650).nullable(),
@@ -319,7 +319,7 @@ adminRouter.post('/admin/players/:id/ban-change', change, (req, res) => {
 });
 
 adminRouter.post('/admin/players/:id/rename', change, (req, res) => {
-  const body = parse(z.object({ username: z.string().max(40), basis: Basis, reason: Reason }), req, res);
+  const body = parse(z.object({ username: z.string().max(40).optional(), basis: Basis, reason: Reason }), req, res);
   if (!body) return;
   reply(res, renamePlayer(res.locals.userId, idParam(req), body), cardOf(req));
 });

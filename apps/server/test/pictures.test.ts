@@ -39,6 +39,7 @@ test('the sets from before (v43) come in with their pictures: those in a set are
       DROP TRIGGER set_pictures_added; DROP TRIGGER set_pictures_changed; DROP TRIGGER picture_used;
       DROP TRIGGER picture_unused; DROP TRIGGER picture_uploaded;
       DROP TABLE unused_pictures; DROP TABLE set_image_uses;
+      ALTER TABLE users DROP COLUMN must_rename; -- v45's, which comes again after v44
       PRAGMA user_version = 43;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'host', 'host', 'x', 0);
     `);

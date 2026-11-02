@@ -254,7 +254,7 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
           <RenameForm
             busy={busy}
             onCancel={() => setMode('idle')}
-            onRename={(r) => void act(() => api.renamePlayer(id, r), `Името е сменено на „${r.username}“`)}
+            onRename={(r) => void act(() => api.renamePlayer(id, r), 'Името е сменено: играчът си избира ново')}
           />
         )}
         {mode === 'annul' && (
