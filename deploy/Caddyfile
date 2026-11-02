@@ -14,17 +14,37 @@
 	}
 }
 
-# Every other address goes straight to https://{$DOMAIN} in one step (not http → https://www → apex).
+# Every other address goes to https://{$DOMAIN}. Behind Cloudflare, an http:// one is sent to https:// at the edge first
+# (Always Use HTTPS; the ACME path comes through), so http://www takes two steps unless the edge redirects www itself;
+# without the proxy it's one step from each.
 http://{$DOMAIN}, http://www.{$DOMAIN}, www.{$DOMAIN} {
 	header -Server
 	redir https://{$DOMAIN}{uri} permanent
+}
+
+# MTA-STS (RFC 8461): mail to the domain's addresses (privacy@, abuse@, postmaster@) goes only over TLS, and only to
+# these MX hosts — Proton Mail's (another mail provider: its own). Senders look for it only once the `_mta-sts` TXT
+# record points to it (docs/self-hosting.md → Имейли). `testing` reports what would fail (to `_smtp._tls`'s address);
+# `enforce`, after two clean weeks, refuses it — and the TXT record's id changes with every edit here.
+mta-sts.{$DOMAIN} {
+	header -Server
+	header Content-Type "text/plain; charset=utf-8"
+	respond /.well-known/mta-sts.txt <<POLICY
+		version: STSv1
+		mode: testing
+		mx: mail.protonmail.ch
+		mx: mailsec.protonmail.ch
+		max_age: 604800
+		POLICY 200
+	respond 404
 }
 
 {$DOMAIN} {
 	encode zstd gzip
 	header {
 		# Browsers remember to use HTTPS only (two years), here and on any subdomain. HSTS_PRELOAD="; preload" in .env
-		# adds the directive the browsers' preload list asks for (almanac.bg is on it: HTTPS even on a first visit).
+		# adds the directive the browsers' preload list asks for (almanac.bg is submitted, still pending on 2 November:
+		# once the browsers ship it, HTTPS even on a first visit; hstspreload.org/api/v2/status?domain=almanac.bg).
 		Strict-Transport-Security "max-age=63072000; includeSubDomains{$HSTS_PRELOAD}"
 		-Server
 	}

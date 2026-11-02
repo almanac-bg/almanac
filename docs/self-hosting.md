@@ -205,6 +205,12 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    HTTPS към `https://<домейнът ти>/api/email-events/<секрета>` (приложението само потвърждава абонамента); после
    Transactional Email → Webhooks → нов webhook за домейна с тази тема и събитията `email_dropped`,
    `email_mailbox_not_found`, `email_spam` и `email_blocklisted`.
+5. **Писмата до теб само по TLS (MTA-STS и TLS-RPT).** Caddy вече сервира политиката на `mta-sts.<домейнът ти>`
+   (`deploy/Caddyfile`; MX записите в нея са на Proton — с друга поща смени ги с нейните). В Cloudflare: A и AAAA
+   `mta-sts` към сървъра (Proxied), после — щом `https://mta-sts.<домейнът ти>/.well-known/mta-sts.txt` отговаря —
+   TXT `_mta-sts` `v=STSv1; id=<дата, напр. 20261102>` и TXT `_smtp._tls` `v=TLSRPTv1; rua=mailto:postmaster@<домейнът
+   ти>`. Политиката е в `mode: testing` (подателите само съобщават какво би се провалило); след две седмици чисти
+   отчети я смени на `enforce` и смени и `id`. DMARC: `sp=reject` от самото начало — поддомейните не пращат писма.
 
 Използвай порт **587** с `?requireTLS=true`: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и
 465 на нови сървъри.
