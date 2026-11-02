@@ -21,8 +21,33 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.mode !== 'navigate') return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE)));
+  event.respondWith(
+    fetch(event.request).then(
+      (res) => (serverDown(res) ? outage(res) : res),
+      () => caches.match(OFFLINE),
+    ),
+  );
 });
+
+/**
+ * Cloudflare's answer for a server it can't reach (520–530: down, refused, timed out, unreachable…). Behind the proxy
+ * an outage is no network error, and its page is Cloudflare's own, in English (the 31 October review, CF-4).
+ */
+const serverDown = (res) => res.status >= 520 && res.status <= 530 && res.headers.get('server') === 'cloudflare';
+
+/**
+ * The offline page in its words for a server that's down: what it says then is in its `data-down` attributes (the page
+ * runs no script). It tries again by itself the same way.
+ */
+async function outage(res) {
+  const page = await caches.match(OFFLINE);
+  if (!page) return res;
+  const html = (await page.text()).replace(/<(\w+) data-down="([^"]*)">[^<]*/g, '<$1>$2');
+  const headers = new Headers(page.headers);
+  for (const name of ['content-length', 'etag', 'last-modified']) headers.delete(name);
+  headers.set('retry-after', '15');
+  return new Response(html, { status: 503, headers });
+}
 
 // Web push (Settings → „Известия на телефона“): what the server sends is shown as it is; a tap opens the app there
 // (a window already open goes to it, rather than a second one).
