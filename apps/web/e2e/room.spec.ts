@@ -47,3 +47,20 @@ test('a private room: a friend joins by its code, the host starts, both play and
   await expectLobby(friend);
   await expect(host.getByText('Играчи 1/8').filter({ visible: true }).first()).toBeVisible();
 });
+
+test('a click in a room on a wide screen leaves the page where it is (the bar hidden there pulled it down) @desktop', async ({
+  page: host,
+}) => {
+  await host.setViewportSize({ width: 1280, height: 720 });
+  await signUp(host, uniqueName('host'), 'tajna-parola-1');
+  await host.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
+  await expect(host).toHaveURL(/\/room$/);
+  // A setting halfway down, the page scrolled a little: a click focuses it, and nothing moves.
+  const teams = host.getByRole('switch', { name: 'Отбори' });
+  await teams.scrollIntoViewIfNeeded();
+  const before = await host.evaluate(() => window.scrollY);
+  await teams.click();
+  await expect(teams).toHaveAttribute('aria-checked', 'true');
+  await host.waitForTimeout(300);
+  expect(await host.evaluate(() => window.scrollY)).toBe(before);
+});

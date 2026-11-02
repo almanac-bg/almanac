@@ -12,11 +12,17 @@ export function useBottomBar<T extends HTMLElement>() {
     const bar = ref.current;
     if (!bar) return;
     const html = document.documentElement;
+    // Pinned to the screen's foot: fixed or sticky, and shown at all. A bar hidden on a wide screen (a room's,
+    // `lg:hidden`) keeps its sticky position in the computed style, and measures as a box at the top of the screen:
+    // taken for pinned, every click that focused something scrolled the page down by it.
+    const pinnedNow = () => {
+      const style = getComputedStyle(bar);
+      return (style.position === 'fixed' || style.position === 'sticky') && bar.getClientRects().length > 0;
+    };
     const measure = () => {
       const style = getComputedStyle(bar);
-      // Not pinned (`cramped:static`, a wide screen's own layout): nothing to keep clear of.
-      const pinned = style.position === 'fixed' || style.position === 'sticky';
-      const room = pinned ? bar.offsetHeight + (Number.parseFloat(style.bottom) || 0) : 0;
+      // Not pinned (`cramped:static`, a wide screen's own layout, hidden): nothing to keep clear of.
+      const room = pinnedNow() ? bar.offsetHeight + (Number.parseFloat(style.bottom) || 0) : 0;
       html.style.setProperty('--bottom-bar', `${Math.ceil(room)}px`);
     };
     measure();
@@ -31,9 +37,12 @@ export function useBottomBar<T extends HTMLElement>() {
       if (!(field instanceof HTMLElement) || bar.contains(field)) return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const style = getComputedStyle(bar);
-        if (style.position !== 'fixed' && style.position !== 'sticky') return;
-        const over = field.getBoundingClientRect().bottom - (bar.getBoundingClientRect().top - 16);
+        if (!pinnedNow()) return;
+        const box = field.getBoundingClientRect();
+        const edge = bar.getBoundingClientRect();
+        // Only what the bar covers: a field below a bar that sits where the page puts it is in view as it is.
+        if (box.top >= edge.bottom) return;
+        const over = box.bottom - (edge.top - 16);
         if (over > 0) window.scrollBy({ top: over, behavior: 'instant' });
       });
     };
