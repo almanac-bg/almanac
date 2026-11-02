@@ -128,7 +128,8 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
         <div className="grid flex-1 place-items-center text-center">
           <div>
             <p className="t-eyebrow text-fg-3">Рунд {game.pick.round + 1}</p>
-            <p className="mt-3 font-display text-3xl font-black lg:text-5xl">
+            {/* A name: the text face (D2). */}
+            <p className="mt-3 text-3xl font-black lg:text-5xl">
               {game.players[game.pick.pickerId]?.name ?? 'Последният'} избира категорията
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">

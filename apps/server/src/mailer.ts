@@ -67,7 +67,10 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
  * The HTML of every mail. Written for the mail apps, not browsers: every text cell names its own colour (Gmail drops
  * the <body>'s styles, and a greeting without one came out dark on dark), the card and the button are tables with
  * `bgcolor` and cell padding (Outlook's Word engine ignores a link's padding and a table's radius), and the footer is
- * light enough to read. `preheader`: the line inbox lists show after the subject (hidden in the mail itself).
+ * light enough to read. `preheader`: the line inbox lists show after the subject (hidden in the mail itself). The
+ * heading is the brand lockup as a picture on the site (apps/web/public/mail/lockup.png, drawn by `npm run lockup`):
+ * one file for every mail, the same for everyone; a mail app that holds back pictures shows its alt text, the name, in
+ * the heading's style.
  */
 function layout(title: string, intro: string, button: string, link: string, outro: string, preheader = '') {
   const font = 'font-family:Arial,Helvetica,sans-serif';
@@ -78,7 +81,7 @@ function layout(title: string, intro: string, button: string, link: string, outr
 ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#0b0915">${escapeHtml(preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>` : ''}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b0915" style="background:#0b0915"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" bgcolor="#15122a" style="width:100%;max-width:480px;background:#15122a;border-radius:20px">
-<tr><td style="padding:32px 32px 0;${font};font-size:26px;font-weight:900;letter-spacing:1px;color:#f5f3ff">${BRAND.name}</td></tr>
+<tr><td style="padding:32px 32px 0;${font};font-size:24px;font-weight:900;letter-spacing:1px;color:#f5f3ff"><img src="${config.appUrl}/mail/lockup.png" width="180" height="21" alt="${BRAND.name}" style="display:block;border:0;width:180px;height:auto;${font};font-size:24px;font-weight:900;color:#f5f3ff"></td></tr>
 <tr><td style="padding:20px 32px 0;${font};font-size:20px;font-weight:bold;color:#f5f3ff">${escapeHtml(title)}</td></tr>
 <tr><td style="padding:12px 32px 0;${font};font-size:15px;line-height:1.6;color:#d4d0ea">${intro}</td></tr>
 <tr><td style="padding:28px 32px">

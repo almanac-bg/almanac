@@ -93,6 +93,8 @@ export function Button({
         else if (ref) (ref as { current: HTMLButtonElement | null }).current = el;
       }}
       type={type}
+      // Which kind it is, for the tests that check one main action per screen.
+      data-variant={variant}
       aria-disabled={loading || undefined}
       aria-busy={loading || undefined}
       onClick={(e) => {

@@ -10,6 +10,13 @@ test('signing up with too short a name or password says why, in Bulgarian', asyn
   const submit = page.getByRole('button', { name: /^Създай профил/ });
   const error = page.getByRole('alert');
 
+  // The form the person asked for leads: its button is the main one, the guest's steps back (UX-5).
+  await expect(submit).toHaveAttribute('data-variant', 'primary');
+  await expect(page.getByRole('button', { name: 'Играй като гост', exact: true })).toHaveAttribute(
+    'data-variant',
+    'secondary',
+  );
+
   // Everything at once, and the first field to fix has the focus.
   await submit.click();
   await expect(error).toHaveText('Избери потребителско име. Избери парола — поне 8 знака.');

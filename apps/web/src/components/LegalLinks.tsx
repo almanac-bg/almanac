@@ -4,7 +4,7 @@ import { useSite } from '../lib/site';
 
 /** Small print where an account is made: under 14 (Bulgaria's age of consent online) the terms ask for a parent's. */
 export const MINORS_NOTICE =
-  'Ако си под 14 години, за профил, за писмата по желание и за известията на устройството е нужно съгласие на родител или настойник.';
+  'Ако си под 14 години, за профил, за писмата по желание и за известията на устройството е нужно съгласие на родител или настойник.';
 
 /** Footer links to the legal pages (kept apart from the pages themselves, which load on demand). */
 export function LegalLinks({ className = '' }: { className?: string }) {
@@ -38,7 +38,7 @@ export function LegalLinks({ className = '' }: { className?: string }) {
         Лицензи
       </a>
       <span className="inline-flex min-h-11 items-center">
-        © {op?.year ?? new Date().getFullYear()} {BRAND.name}
+        ©&nbsp;{op?.year ?? new Date().getFullYear()}&nbsp;{BRAND.name}
       </span>
     </nav>
   );

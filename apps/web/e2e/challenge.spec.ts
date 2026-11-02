@@ -73,7 +73,7 @@ test('a challenge link brings a signed-out friend in to beat the score', async (
   await expect(friend.getByRole('heading', { level: 1 })).toHaveText(/^(Първо място!|2-ро място)$/);
 
   // The link's board lists both, for either of them.
-  await friend.getByRole('button', { name: 'Виж класирането', exact: true }).click();
+  await friend.getByRole('button', { name: 'Виж класацията', exact: true }).click();
   await expect(friend).toHaveURL(new RegExp(`/c/${id}$`));
   await page.goto(`/c/${id}`);
   for (const viewer of [friend, page]) {

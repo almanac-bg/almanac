@@ -19,12 +19,13 @@ import { Emoji } from './Emoji';
 import { PlayerName } from './FitName';
 import { Button, Modal } from './ui';
 
-/** "остават 21 ч.", "остават 35 мин.": how long the second of a duel has to play it. */
+/** "остават 21 ч.", "остава 1 мин.": how long the second of a duel has to play it. */
 export function timeLeft(expiresAt: number, now: number): string {
   const ms = expiresAt - now;
   if (ms <= 0) return 'времето изтече';
   const hours = Math.floor(ms / 3_600_000);
-  return hours >= 1 ? `остават ${hours} ч.` : `остават ${Math.max(1, Math.ceil(ms / 60_000))} мин.`;
+  const [n, unit] = hours >= 1 ? [hours, 'ч.'] : [Math.max(1, Math.ceil(ms / 60_000)), 'мин.'];
+  return `${n === 1 ? 'остава' : 'остават'} ${n} ${unit}`;
 }
 
 /** The two of them so far, you first: "3 : 2" (and the draws, if any). */

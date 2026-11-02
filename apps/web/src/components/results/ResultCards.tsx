@@ -96,7 +96,7 @@ export function DailyCard({
         </>
       ) : (
         <>
-          <h2 className="relative t-card">Днешното класиране</h2>
+          <h2 className="relative t-card">Днешната класация</h2>
           <p className="relative mt-2 text-fg-2 text-pretty">
             Засега го {runs === 1 ? 'изигра' : 'изиграха'} {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом
             станат поне {DAILY_FIELD.placeFrom}.
@@ -144,7 +144,7 @@ export function DailyCard({
           </p>
         </m.div>
       )}
-      <p className="relative mt-3 text-xs text-fg-3">Класирането се променя, докато другите играят — до полунощ.</p>
+      <p className="relative mt-3 text-xs text-fg-3">Класацията се променя, докато другите играят — до полунощ.</p>
       <div className="relative mt-4">
         <Button size="sm" onClick={() => text && shareText(text, 'Линкът и резултатът са копирани')} disabled={!text}>
           <Share2 className="size-4" /> Прати днешните въпроси

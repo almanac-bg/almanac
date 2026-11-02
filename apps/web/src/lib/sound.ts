@@ -3,13 +3,16 @@
  * filtered burst of noise, a low thump — in one key (C major's pentatonic: C D E G A), through one master bus: a gain,
  * a compressor (a chord of effects never clips), and the gain back after it. Levels by role, measured offline: the big
  * moments near −6 dBFS at their peak, an answer's feedback near −10, the taps and ticks near −18 — they were 27 dB
- * apart, too quiet on a phone. A phone's speaker has nothing below ~300 Hz: what has to be felt there has a body in the
- * mids too, the low thump on top for headphones.
+ * apart, too quiet on a phone. Peaks aren't loudness, though: e2e/sounds.spec.ts measures each sound's loudness (LUFS),
+ * on a phone's speaker too, which has nothing below ~300 Hz — so what has to be felt there (a miss, a knockout) has
+ * its body in the mids, the low thump on top for headphones, and a miss reads as clearly as a right answer.
  */
 import { useSyncExternalStore } from 'react';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** While renderOffline plays a sound: the context it renders into, instead of the device's. */
+let offline: OfflineAudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let muted = readMuted();
 const listeners = new Set<() => void>();
@@ -69,24 +72,31 @@ const sleep = () => {
   if (ctx?.state === 'running') void ctx.suspend();
 };
 
+/** The master bus on a context: a gain, a compressor (a chord of effects never clips), and the gain back after it. */
+function bus(ac: BaseAudioContext): GainNode {
+  const compressor = ac.createDynamicsCompressor();
+  compressor.threshold.value = -16;
+  compressor.knee.value = 12;
+  compressor.ratio.value = 4;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.2;
+  const gain = ac.createGain();
+  gain.gain.value = 0.8;
+  // The compressor only brings the loud ones down: the gain after it brings them all up again (+8 dB).
+  const makeup = ac.createGain();
+  makeup.gain.value = 2.5;
+  gain.connect(compressor).connect(makeup).connect(ac.destination);
+  return gain;
+}
+
 /** The audio graph, made the first time a sound plays: the context, and its master bus. */
-function audio(): AudioContext | null {
+function audio(): BaseAudioContext | null {
+  if (offline) return offline;
   if (muted) return null;
   try {
     if (!ctx) {
       ctx = new AudioContext();
-      const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -16;
-      compressor.knee.value = 12;
-      compressor.ratio.value = 4;
-      compressor.attack.value = 0.003;
-      compressor.release.value = 0.2;
-      master = ctx.createGain();
-      master.gain.value = 0.8;
-      // The compressor only brings the loud ones down: the gain after it brings them all up again (+8 dB).
-      const makeup = ctx.createGain();
-      makeup.gain.value = 2.5;
-      master.connect(compressor).connect(makeup).connect(ctx.destination);
+      master = bus(ctx);
     }
     // Suspended until a tap, or asleep (IDLE_MS); „interrupted“ after a call on iOS: it has to be asked to run again.
     if (ctx.state !== 'running') void ctx.resume();
@@ -98,6 +108,9 @@ function audio(): AudioContext | null {
   }
 }
 
+/** Whether the audio engine runs, sleeps or isn't made yet (the sounds test checks it sleeps when it should). */
+export const audioState = (): AudioContextState | 'none' => ctx?.state ?? 'none';
+
 /**
  * iOS (and some Androids) keep audio silent until it's started inside a tap: the first tap, key or click on the page
  * starts it with a moment of silence, so the first real sound — often the countdown, with no tap of its own — plays.
@@ -105,7 +118,7 @@ function audio(): AudioContext | null {
 export function unlockAudioOnFirstTap() {
   const unlock = () => {
     const ac = audio();
-    if (!ac) return;
+    if (!ac || !(ac instanceof AudioContext)) return;
     const silence = ac.createBufferSource();
     silence.buffer = ac.createBuffer(1, 1, ac.sampleRate);
     silence.connect(ac.destination);
@@ -116,10 +129,10 @@ export function unlockAudioOnFirstTap() {
   };
   for (const type of ['pointerdown', 'keydown', 'touchend'] as const)
     window.addEventListener(type, unlock, { passive: true });
-  // In the background it sleeps; back (from a call, another app), it's asked to run again before the next sound.
+  // In the background it sleeps. Back (from a call, another app), it stays asleep until the next sound wakes it
+  // (audio() resumes it and sets the idle timer again): woken here, nothing would put it back to sleep (WEB-4).
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') sleep();
-    else if (ctx && ctx.state !== 'running') void ctx.resume();
   });
 }
 
@@ -146,8 +159,28 @@ const N = {
   C7: 2093,
 } as const;
 
+/**
+ * A sound rendered offline, through the same master bus as on the device — what the sounds test measures (loudness, and
+ * what's left of it on a phone's speaker). Mono, at 48 kHz, `seconds` long.
+ */
+export async function renderOffline(play: (sounds: typeof sfx) => void, seconds = 2.5): Promise<Float32Array> {
+  const rate = 48_000;
+  const ac = new OfflineAudioContext(1, Math.ceil(seconds * rate), rate);
+  const live = { master, noiseBuffer };
+  offline = ac;
+  master = bus(ac);
+  noiseBuffer = null;
+  try {
+    play(sfx);
+  } finally {
+    offline = null;
+    ({ master, noiseBuffer } = live);
+  }
+  return (await ac.startRendering()).getChannelData(0);
+}
+
 /** An envelope on a gain: a quick rise to `peak`, then an exponential fall over `decay`. */
-function envelope(ac: AudioContext, t0: number, peak: number, attack: number, decay: number): GainNode {
+function envelope(ac: BaseAudioContext, t0: number, peak: number, attack: number, decay: number): GainNode {
   const amp = ac.createGain();
   amp.gain.setValueAtTime(0.0001, t0);
   amp.gain.exponentialRampToValueAtTime(peak, t0 + attack);
@@ -195,19 +228,30 @@ function pluck(freq: number, at = 0, decay = 0.18, peak = 0.1, type: OscillatorT
   osc.stop(t0 + decay + 0.05);
 }
 
-/** A detuned pair of saws through a closing filter, sliding: the sour, falling sound of a miss or a knockout. */
-function buzzDown(from: number, to: number, at = 0, length = 0.35, peak = 0.07) {
+/**
+ * A detuned pair through a closing filter, sliding: the sour, falling sound of a miss or a knockout. Squares (odd
+ * harmonics, hollow) or saws (all of them, brighter); the filter stops at `floor`, in the mids a phone still plays.
+ */
+function buzzDown(
+  from: number,
+  to: number,
+  at = 0,
+  length = 0.35,
+  peak = 0.07,
+  type: OscillatorType = 'sawtooth',
+  floor = 300,
+) {
   const ac = audio();
   if (!ac) return;
   const t0 = ac.currentTime + at;
   const filter = ac.createBiquadFilter();
   filter.type = 'lowpass';
   filter.frequency.setValueAtTime(1800, t0);
-  filter.frequency.exponentialRampToValueAtTime(300, t0 + length);
+  filter.frequency.exponentialRampToValueAtTime(floor, t0 + length);
   filter.connect(envelope(ac, t0, peak, 0.01, length));
   for (const detune of [-14, 14]) {
     const osc = ac.createOscillator();
-    osc.type = 'sawtooth';
+    osc.type = type;
     osc.detune.value = detune;
     osc.frequency.setValueAtTime(from, t0);
     osc.frequency.exponentialRampToValueAtTime(to, t0 + length);
@@ -265,8 +309,8 @@ export const sfx = {
     noise(0, 0.05, 2500, 2500, 0.07, 'highpass');
     pluck(N.G5, 0.01, 0.12, 0.12);
   },
-  /** A question coming in: a soft air past, under everything. */
-  question: () => noise(0, 0.22, 450, 2400, 0.2),
+  /** A question coming in: a soft air past, under everything — but there on a phone. */
+  question: () => noise(0, 0.22, 450, 2400, 0.5),
   countdown: () => pluck(N.E5, 0, 0.16, 0.16, 'sine'),
   go: () => {
     noise(0, 0.18, 800, 5000, 0.04);
@@ -276,17 +320,19 @@ export const sfx = {
   correct: () => {
     for (const [i, f] of [N.C6, N.E6, N.G6].entries()) bell(f, i * 0.055, 0.5, 0.058);
   },
-  /** A miss: the sour slide, a dull knock in the mids a phone plays, and the low thump for headphones. */
+  /**
+   * A miss: the sour slide and a dull knock, both hollow squares in the mids — where a phone's speaker plays them, as
+   * loud there as a right answer (measured: e2e/sounds.spec.ts) — and the low thump for headphones.
+   */
   wrong: () => {
-    buzzDown(N.E4, N.C4, 0, 0.3, 0.08);
-    pluck(196, 0, 0.2, 0.12, 'triangle');
-    noise(0, 0.1, 260, 180, 0.16, 'lowpass');
+    buzzDown(N.A4, N.E4, 0, 0.32, 0.13, 'square', 700);
+    pluck(N.A3, 0, 0.22, 0.18, 'square');
     thump(0, 120, 60, 0.2, 0.12);
   },
   /** Out of time, not wrong: two notes stepping down, a clock's, not a buzzer's. */
   timeUp: () => {
-    pluck(N.E5, 0, 0.14, 0.075, 'square');
-    pluck(N.A4, 0.12, 0.32, 0.09, 'triangle');
+    pluck(N.E5, 0, 0.14, 0.11, 'square');
+    pluck(N.A4, 0.12, 0.32, 0.13, 'triangle');
   },
   pop: () => pluck(N.C6, 0, 0.08, 0.12, 'sine'),
   powerup: () => {
@@ -300,10 +346,9 @@ export const sfx = {
   },
   /** You're out: a slow fall through the minor of the key, a heavy knock in the mids, and the floor. */
   knockedOut: () => {
-    buzzDown(N.A4, N.A3, 0, 0.45, 0.08);
-    buzzDown(N.E4, N.C4, 0.18, 0.6, 0.07);
-    pluck(N.A3, 0.02, 0.5, 0.16, 'triangle');
-    noise(0.02, 0.16, 300, 160, 0.14, 'lowpass');
+    buzzDown(N.A4, N.A3, 0, 0.45, 0.1, 'square', 600);
+    buzzDown(N.E4, N.C4, 0.18, 0.6, 0.09, 'sawtooth', 500);
+    pluck(N.A3, 0.02, 0.5, 0.18, 'square');
     thump(0.05, 140, 38, 0.6, 0.18);
   },
   /** A streak of right answers (3, 5, 10…): a rising run, higher the longer it gets. */

@@ -64,7 +64,7 @@ export function ChallengeStanding({
               </span>
               <span className="text-fg-2">от {plural(challenge.total, 'играч', 'играчи')}</span>
             </div>
-            <p className="relative mt-2 text-xs text-fg-3">Класирането се променя, докато другите играят линка.</p>
+            <p className="relative mt-2 text-xs text-fg-3">Класацията се променя, докато другите играят линка.</p>
           </>
         )}
         <div className="relative mt-5 grid gap-2 sm:flex sm:justify-center sm:gap-3">
@@ -72,7 +72,7 @@ export function ChallengeStanding({
             <Share2 className="size-4" /> Сподели линка
           </Button>
           <Button variant="secondary" onClick={onBoard}>
-            <ChartColumn className="size-4" /> Виж класирането
+            <ChartColumn className="size-4" /> Виж класацията
           </Button>
         </div>
       </Card>

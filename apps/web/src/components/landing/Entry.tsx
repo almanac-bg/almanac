@@ -1,6 +1,6 @@
 import { fmt } from '@quiz/client';
 import { type ChallengePreview, type DailyPreview, MODES, ROOM_CODE_DIGITS } from '@quiz/shared';
-import { ArrowRight, CalendarDays, DoorOpen, LogIn, RotateCcw, Swords, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowRight, CalendarDays, DoorOpen, LogIn, Play, RotateCcw, Swords, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { LoadFailure } from '../../lib/load';
@@ -56,7 +56,7 @@ export function GuestPlay({
   return (
     <div>
       <Button size="lg" variant={primary ? 'primary' : 'secondary'} className="w-full" loading={busy} onClick={onPlay}>
-        <Zap aria-hidden className="size-5" /> {label}
+        <Play aria-hidden className="size-5" /> {label}
       </Button>
       <p className="mt-2.5 text-center text-sm text-fg-3">
         Без регистрация. Нивото и серията се пазят — запазваш профила с име и парола, когато решиш.
@@ -94,7 +94,7 @@ export function NewcomerStart({
       <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
         <CalendarDays aria-hidden className="size-3.5" /> {mode.name}
       </p>
-      <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+      <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
       <p className="mt-1.5 text-sm text-fg-3">Около три минути, един опит до полунощ. Без регистрация.</p>
       <Button size="lg" variant="gold" className="mt-5 w-full" loading={busy} onClick={onDaily}>
         Играй въпросите на деня <ArrowRight aria-hidden className="size-5" />
@@ -106,7 +106,7 @@ export function NewcomerStart({
       )}
       <Or>или</Or>
       <Button size="lg" variant="secondary" className="w-full" disabled={busy} onClick={onGuest}>
-        <Zap aria-hidden className="size-5" /> Играй като гост
+        <Play aria-hidden className="size-5" /> Играй като гост
       </Button>
       <p className="mt-2.5 text-center text-sm text-fg-3">Дуели, Роял, Соло — прогресът се пази и без регистрация.</p>
       <div className="mt-4 flex flex-wrap justify-center gap-x-1 text-sm">
@@ -206,8 +206,11 @@ export function DailyLanding({
           <div className="mt-4 flex items-center gap-3">
             <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={52} />
             <div className="min-w-0">
-              {/* A long name wraps rather than losing "те кани" to an ellipsis. */}
-              <h2 className="t-section text-balance [overflow-wrap:anywhere]">{sharer.user.username} те кани</h2>
+              {/* A long name wraps rather than losing "те кани" to an ellipsis. A name in the text face (D2): the
+                  display face's Cyrillic reads as Latin. */}
+              <h2 className="text-2xl font-extrabold tracking-tight text-balance [overflow-wrap:anywhere]">
+                {sharer.user.username} те кани
+              </h2>
               <p className="text-sm text-fg-2 tabular-nums">
                 {sharer.correct}/{mode.questions} · {fmt(sharer.score)} т. — можеш ли повече?
               </p>
@@ -217,10 +220,10 @@ export function DailyLanding({
         </>
       ) : (
         <>
-          <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+          <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
           <p className="mt-1.5 text-sm text-fg-3">
             Около три минути, един опит до полунощ. Без регистрация
-            {players > 0 ? ` · днес вече ${players === 1 ? 'игра 1 човек' : `играха ${fmt(players)} души`}` : ''}.
+            {players > 0 ? ` · днес вече ${players === 1 ? 'игра 1 човек' : `играха ${fmt(players)} души`}` : ''}.
           </p>
         </>
       )}
@@ -312,7 +315,7 @@ export function ChallengeLanding({
           Няма такова предизвикателство — линкът може да е непълен или вече изтрит. Можеш да играеш и без него.
         </p>
         <Button size="lg" className="mt-6 w-full" loading={busy} onClick={onPlay}>
-          <Zap aria-hidden className="size-5" /> Играй като гост
+          <Play aria-hidden className="size-5" /> Играй като гост
         </Button>
         {failure}
         {signIn}
@@ -334,7 +337,7 @@ export function ChallengeLanding({
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
         {creator && <Avatar avatar={creator.avatar} frame={creator.frame} size={64} />}
         <div className="min-w-0 flex-1 basis-48">
-          <h2 className="font-display text-[1.375rem] leading-tight font-bold [overflow-wrap:anywhere] sm:text-2xl">
+          <h2 className="text-[1.375rem] leading-tight font-extrabold [overflow-wrap:anywhere] sm:text-2xl">
             {creator ? (
               <>
                 {creator.username} <span className="text-fg-2">те предизвиква</span>
@@ -367,7 +370,7 @@ export function ChallengeLanding({
             Предизвикателството изтече и вече не може да се играе. Влез в играта — дуелите и въпросите на деня те чакат.
           </p>
           <Button size="lg" className="mt-5 w-full" loading={busy} onClick={onPlay}>
-            <Zap aria-hidden className="size-5" /> Играй като гост
+            <Play aria-hidden className="size-5" /> Играй като гост
           </Button>
         </>
       ) : (
@@ -392,7 +395,8 @@ export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-sunk/20 p-3.5">
       <dt className="text-xs font-semibold tracking-wide text-fg-3 uppercase">{label}</dt>
-      <dd className="mt-1 font-display text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
+      {/* Values come with units („250 т.“, „3 дни“): in the text face, whose „т“ doesn't read as Latin „m“ (D2). */}
+      <dd className="mt-1 text-xl font-extrabold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
     </div>
   );
 }

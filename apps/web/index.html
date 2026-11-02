@@ -34,19 +34,20 @@
          Bulgarian with its own letter forms). */
       html { background: #07060d; }
       html[data-theme='light'] { background: #f4f3f9; }
+      /* The brand lockup (public/brand-lockup.svg, drawn by scripts/lockup.mjs): the rosette and the name as outlines,
+         the same before any font has loaded. Its colours are the game's (--logo-* in styles.css). */
       .boot {
         min-height: 100dvh;
         display: grid;
         place-content: center;
-        grid-auto-flow: column;
-        gap: 0.15em;
-        font: 900 clamp(2rem, 9vw, 3.5rem) / 1 'Segoe UI', Roboto, Arial, sans-serif;
-        letter-spacing: -0.02em;
-        color: #e9d5ff;
-        text-shadow: 0 0 32px rgb(168 85 247 / 0.55);
+        color: #f5f3ff;
         animation: boot-pulse 1.6s ease-in-out infinite alternate;
       }
-      [data-theme='light'] .boot { color: #6d28d9; text-shadow: none; }
+      .boot .lockup { height: calc(0.95 * clamp(2rem, 9vw, 3.5rem)); width: auto; filter: drop-shadow(0 0 28px rgb(168 85 247 / 0.45)); }
+      [data-theme='light'] .boot { color: #16131f; }
+      [data-theme='light'] .boot .lockup { filter: none; }
+      [data-theme='light'] .boot .petal { fill: #6d28d9; }
+      [data-theme='light'] .boot .gold { fill: #f59e0b; }
       @keyframes boot-pulse { from { opacity: 0.55; } to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .boot { animation: none; } }
       .noscript {
@@ -61,7 +62,7 @@
   <body>
     <!-- Painted instantly while the app's code downloads; React replaces it. Between the markers the server may put
          the page itself, already drawn (see src/lib/painted.ts). -->
-    <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><span>%BRAND_NAME%</span><svg aria-hidden="true" viewBox="13 5 38 54" style="height:0.9em;width:auto;align-self:center"><path d="M36 6 14 36h14l-4 22 26-32H36l4-20z" fill="#fbbf24"/></svg></div><!--/app--></div>
+    <div id="root"><!--app--><div class="boot" role="status" aria-label="Зареждане…"><!--lockup--><svg xmlns="http://www.w3.org/2000/svg" class="lockup" role="img" aria-label="АЛМАНАХ" viewBox="0 0 8260 950"><g transform="scale(20.2128) translate(-8.5 -8.5)"><path class="gold" fill="#fbbf24" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" fill="#c4b5fd" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" fill="#c4b5fd" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" fill="#c4b5fd" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></g><path fill="currentColor" d="M1488,724L1488,519L1999,519L1999,724L1488,724ZM1920,100L2249,850L1974,850L1715,214L1781,214L1522,850L1247,850L1576,100L1920,100ZM2406,100L3180,100L3180,850L2922,850L2922,212L3038,328L2550,328L2658,244Q2665,299 2668,351Q2670,403 2670,450Q2670,597 2643,689Q2615,781 2556,824Q2497,867 2402,867Q2358,867 2315,858Q2272,848 2237,830L2237,618Q2282,635 2319,635Q2378,635 2403,584Q2428,532 2428,413Q2428,351 2423,274Q2417,197 2406,100ZM4430,100L4430,850L4185,850L4185,197L4232,203L3980,850L3725,850L3473,206L3520,199L3520,850L3275,850L3275,100L3674,100L3898,711L3809,711L4031,100L4430,100ZM4703,724L4703,519L5214,519L5214,724L4703,724ZM5135,100L5464,850L5189,850L4930,214L4996,214L4737,850L4462,850L4791,100L5135,100ZM5496,100L5754,100L5754,850L5496,850L5496,100ZM6074,100L6332,100L6332,850L6074,850L6074,100ZM5642,353L6175,353L6175,581L5642,581L5642,353ZM6605,724L6605,519L7116,519L7116,724L6605,724ZM7037,100L7366,850L7091,850L6832,214L6898,214L6639,850L6364,850L6693,100L7037,100ZM7894,540L7894,381L8274,850L7957,850L7733,553L7863,553L7637,850L7324,850L7707,381L7707,540L7343,100L7666,100L7868,367L7738,367L7936,100L8255,100L7894,540Z"/></svg><!--/lockup--></div><!--/app--></div>
     <!-- Without scripts (switched off, or blocked) the game can't run: said, rather than a splash that never ends. The
          pages drawn on the server (the guides, the legal ones) read without it. -->
     <noscript><p class="noscript">%BRAND_NAME% е игра в реално време и има нужда от JavaScript. Включи го в браузъра и

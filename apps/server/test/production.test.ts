@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
-import { BRAND, PUBLIC_PAGES, routeKind, type SiteInfo } from '@quiz/shared';
+import { BRAND, LEGAL, PUBLIC_PAGES, routeKind, type SiteInfo } from '@quiz/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -151,6 +151,8 @@ test('each public page has its own title and address; the game says noindex; a w
     assert.equal(page.canonical, `https://almanac.test${route}`, route);
     assert.match(page.robots ?? '', /^index/, route);
     assert.equal(page.robotsHeader, null, route);
+    // A search result shows about 155 characters of the description: no more, or it's cut mid-sentence (COPY-12).
+    assert.ok(meta.description.length <= 155, `${route}: a description of ${meta.description.length} characters`);
   }
   const settings = await head('/settings');
   assert.deepEqual(
@@ -235,8 +237,10 @@ test('search engines get the public pages in a sitemap, the site and its mark on
 
   const data = (html: string) =>
     [...html.matchAll(/<script type="application\/ld\+json">([^<]*)<\/script>/g)].map((m) => JSON.parse(m[1]));
-  // A date only on the pages whose date is known (the legal ones).
+  // A date only on the pages whose date is known (the legal ones), each its own (COPY-11).
   assert.equal([...sitemap.matchAll(/<lastmod>/g)].length, 2);
+  assert.match(sitemap, new RegExp(`/privacy</loc><lastmod>${LEGAL.privacyIso}</lastmod>`));
+  assert.match(sitemap, new RegExp(`/terms</loc><lastmod>${LEGAL.termsIso}</lastmod>`));
   const [home, ...more] = data(await text('/'));
   assert.equal(more.length, 0);
   const [site, org] = home['@graph'];
@@ -248,11 +252,11 @@ test('search engines get the public pages in a sitemap, the site and its mark on
   const [crumbs] = data(await text('/quiz/history'));
   assert.equal(crumbs['@type'], 'BreadcrumbList');
   assert.deepEqual(
-    crumbs.itemListElement.map((i: { position: number; item: string }) => [i.position, i.item]),
+    crumbs.itemListElement.map((i: { position: number; name: string; item: string }) => [i.position, i.name, i.item]),
     [
-      [1, 'https://almanac.test/'],
-      [2, 'https://almanac.test/quiz'],
-      [3, 'https://almanac.test/quiz/history'],
+      [1, BRAND.name, 'https://almanac.test/'],
+      [2, 'Викторини', 'https://almanac.test/quiz'],
+      [3, 'Викторина: История — въпроси с отговори', 'https://almanac.test/quiz/history'],
     ],
   );
   for (const route of ['/privacy', '/settings', '/no-such-page']) assert.deepEqual(data(await text(route)), [], route);
@@ -320,6 +324,28 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.equal(settings.root, '<div id="root">');
   const operator = /<script type="application\/json" id="site">([^<]*)<\/script>/.exec(settings.html)?.[1];
   assert.equal((JSON.parse(operator ?? 'null') as SiteInfo | null)?.name, 'Тест Тестов');
+});
+
+test('in every drawn public page, a number keeps to the word after it (COPY-14)', {
+  skip: !built || !paintable,
+}, async () => {
+  const split: string[] = [];
+  for (const route of Object.keys(PUBLIC_PAGES)) {
+    const html = await (await fetch(`${srv.url}${route}`)).text();
+    // The text a reader sees: what's between the drawn page's tags (React's <!-- --> between two pieces of text too),
+    // entities as characters. The page itself holds no scripts or styles (those are in the head).
+    const text = html
+      .slice(html.indexOf('<div id="root"'), html.indexOf('<!--/app-->'))
+      .split(/<[^>]*>/)
+      .join('')
+      .replace(/&nbsp;/g, '\u00a0')
+      .replace(/&#x27;|&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+    for (const m of text.matchAll(/\d (?=[\p{L}%°])/gu))
+      split.push(`${route}: …${text.slice(Math.max(0, m.index - 20), m.index + 14).replace(/\s+/g, ' ')}…`);
+  }
+  assert.deepEqual(split, [], 'a number and its word with a plain space: keepTogether, or a no-break space');
 });
 
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {

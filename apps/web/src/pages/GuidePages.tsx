@@ -76,43 +76,43 @@ const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; quest
   levski: {
     name: 'Викторина за Васил Левски',
     icon: '🦁',
-    lead: '19 февруари, денят на Апостола: животът му, комитетите, идеите му за свободна България и паметта за него.',
+    lead: '19 февруари, денят на Апостола: животът му, комитетите, идеите му за свободна България и паметта за него.',
     questions: LEVSKI as QuizQuestion[],
   },
   'liberation-day': {
-    name: 'Викторина за 3 март',
+    name: 'Викторина за 3 март',
     icon: '🕊️',
-    lead: 'Освобождението: Руско-турската война от 1877–1878 г., боевете, мирът и паметниците.',
+    lead: 'Освобождението: Руско-турската война от 1877–1878 г., боевете, мирът и паметниците.',
     questions: LIBERATION as QuizQuestion[],
   },
   'alphabet-day': {
-    name: 'Викторина за 24 май',
+    name: 'Викторина за 24 май',
     icon: '✍️',
-    lead: '24 май, денят на българската азбука, просвета и култура: Кирил и Методий, двете славянски азбуки, учениците им и нашите букви.',
+    lead: '24 май, денят на българската азбука, просвета и култура: Кирил и Методий, двете славянски азбуки, учениците им и нашите букви.',
     questions: ALPHABET as QuizQuestion[],
   },
   botev: {
     name: 'Викторина за Христо Ботев',
     icon: '⚔️',
-    lead: '2 юни: поетът и революционерът Христо Ботев — стиховете и вестниците му, четата и пътят ѝ.',
+    lead: '2 юни: поетът и революционерът Христо Ботев — стиховете и вестниците му, четата и пътят ѝ.',
     questions: BOTEV as QuizQuestion[],
   },
   'unification-day': {
     name: 'Викторина за Съединението',
     icon: '🤝',
-    lead: '6 септември: заговорът, войната, която защитава Съединението, и дипломацията след нея.',
+    lead: '6 септември: заговорът, войната, която защитава Съединението, и дипломацията след нея.',
     questions: UNIFICATION as QuizQuestion[],
   },
   'independence-day': {
-    name: 'Викторина за 22 септември',
+    name: 'Викторина за 22 септември',
     icon: '👑',
-    lead: '22 септември 1908 г.: как е обявена Независимостта, кое прави момента удобен и как светът я признава.',
+    lead: '22 септември 1908 г.: как е обявена Независимостта, кое прави момента удобен и как светът я признава.',
     questions: INDEPENDENCE as QuizQuestion[],
   },
   'enlighteners-day': {
     name: 'Викторина за Деня на народните будители',
     icon: '💡',
-    lead: '1 ноември: възрожденските книжовници и учители, първите училища и как денят става празник.',
+    lead: '1 ноември: възрожденските книжовници и учители, първите училища и как денят става празник.',
     questions: ENLIGHTENERS as QuizQuestion[],
   },
   christmas: {
@@ -123,9 +123,8 @@ const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; quest
   },
 };
 
-const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG')} с`;
+const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG')} с`;
 
-/** The guides' frame: the name home, the guides' own links, the page, a way into the game, the legal links. */
 /** What a guide page leads on to: the day's questions, unless the page has a better next step of its own. */
 interface GuideCta {
   to: string;
@@ -138,6 +137,7 @@ const DAILY_CTA: GuideCta = {
   note: 'Безплатно, без регистрация и без реклами.',
 };
 
+/** The guides' frame: the name home, the guides' own links, the page, a way into the game, the legal links. */
 function GuideLayout({
   title,
   lead,
@@ -222,7 +222,7 @@ export function HowToPlayPage() {
           щит (до {STREAK_SHIELDS.max}), който пази серията, ако пропуснеш ден.
         </p>
         <p>
-          <b>Повече време</b> (Настройки): 30 с, 45 с или без часовник за въпрос във Въпросите на деня, линковете и
+          <b>Повече време</b> (Настройки): 30 с, 45 с или без часовник за въпрос във Въпросите на деня, линковете и
           дуелите с приятел. Отговор след 15-ата секунда е верен, но без бонус за бързина; резултатът е извън класацията
           — виждаш мястото, на което щеше да си — а спечелен дуел не носи бонус. „Поправителен“ също е с това време.
         </p>
@@ -239,7 +239,7 @@ export function HowToPlayPage() {
             четене не носи предимство.
           </li>
           <li>
-            Серия от верни отговори: +{SCORING.streakStep} за всеки следващ, до +{SCORING.streakMax}.
+            Серия от верни отговори: +{SCORING.streakStep}&nbsp;за всеки следващ, до +{SCORING.streakMax}.
           </li>
         </ul>
       </Section>
@@ -287,7 +287,7 @@ export function HowToPlayPage() {
           Дуел и Арена се играят в {ROUNDS.count}&nbsp;рунда по&nbsp;{ROUNDS.size}&nbsp;въпроса. Преди всеки следващ
           рунд изоставащият има {seconds(ROUNDS.pickMs)} да избере категорията от&nbsp;
           {ROUNDS.offer === 3 ? 'три' : ROUNDS.offer}. Последният въпрос е <b>финал с число</b>: пишеш година, височина
-          или брой, а точките зависят от това колко близо си — до&nbsp;{NUMBER.points}, плюс {NUMBER.exactBonus} за
+          или брой, а точките зависят от това колко близо си — до&nbsp;{NUMBER.points}, плюс {NUMBER.exactBonus}&nbsp;за
           точния отговор. Финалът се брои ×{NUMBER.finalTimes}, така че може да обърне мача.
         </p>
       </Section>
@@ -303,7 +303,7 @@ export function HowToPlayPage() {
         <p>
           Всеки мач носи опит (XP): качваш нива и отключваш аватари, рамки и титли. Класираните мачове местят рейтинга
           ти, а с него и ранга: {RANK_TIERS.map((t) => t.name).join(', ')}. Сезонът е един месец; в края му идва награда
-          според най-високия ранг в режим, в който имаш поне {SEASON_MIN_GAMES} мача.
+          според най-високия ранг в режим, в който имаш поне {SEASON_MIN_GAMES}&nbsp;мача.
         </p>
       </Section>
 
@@ -317,7 +317,7 @@ export function HowToPlayPage() {
 
       <Section title="Стаи, класове и свои въпроси">
         <p>
-          Частна стая се прави с профил: каниш с код от {ROOM_CODE_DIGITS} цифри или линк, до&nbsp;
+          Частна стая се прави с профил: каниш с код от {ROOM_CODE_DIGITS}&nbsp;цифри или линк, до&nbsp;
           {ROOM_LIMITS.maxPlayers[1]}&nbsp;души, с твоите настройки. С „Само водя“ мачът върви на голям екран, а
           играчите отговарят от телефоните си — за час в клас или за парти. В „Моите въпроси“ пишеш свои набори
           (до&nbsp;
@@ -332,9 +332,9 @@ export function HowToPlayPage() {
       <Section title="Моят алманах, „Поправителен“ и групи">
         <p>
           Всеки „Знаеше ли?“ от въпрос, който познаеш, остава в „Моят алманах“. Сгрешените въпроси се връщат в
-          „Поправителен“ след {REVIEW.afterDays.join(', ').replace(/, (\d+)$/, ' и $1')} дни, докато ги запомниш. Група
-          (клас, офис, семейство) има линк за покана и седмична класация на въпросите на деня. Примерни въпроси по
-          категории има във{' '}
+          „Поправителен“ след {REVIEW.afterDays.join(', ').replace(/, (\d+)$/, '\u00a0и $1')}&nbsp;дни, докато ги
+          запомниш. Група (клас, офис, семейство) има линк за покана и седмична класация на въпросите на деня. Примерни
+          въпроси по категории има във{' '}
           <Link to="/quiz" className="text-violet-300 underline">
             викторините
           </Link>
@@ -387,7 +387,7 @@ export function QuizHubPage() {
               >
                 <Emoji e={h.icon} className="size-8 shrink-0" size="" />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-fg">{h.name}</span>
+                  <span className="block font-semibold text-fg">{keepTogether(h.name)}</span>
                   <span className="text-sm text-fg-3">{h.questions.length}&nbsp;въпроса с отговори</span>
                 </span>
                 <ArrowRight aria-hidden className="size-4 text-fg-3" />
@@ -406,7 +406,7 @@ export function QuizCategoryPage() {
   const holiday = HOLIDAYS[category ?? ''];
   const found = categoryById(category ?? '');
   const c = found && found.id !== 'mixed' ? found : null;
-  const title = holiday ? holiday.name : c ? `Викторина: ${c.name}` : undefined;
+  const title = holiday ? keepTogether(holiday.name) : c ? `Викторина: ${c.name}` : undefined;
   usePublicPageTitle(useLocation().pathname);
   const [picked, setPicked] = useState<Record<string, number>>({});
   if (!holiday && !c) return <NotFoundPage standalone />;
@@ -419,7 +419,7 @@ export function QuizCategoryPage() {
       lead={
         <>
           {holiday
-            ? holiday.lead
+            ? keepTogether(holiday.lead)
             : keepTogether(`„${c!.name}“: ${CATEGORY_ABOUT[c!.id]}. ${questions.length} въпроса с отговори.`)}{' '}
           Натисни отговор, за да видиш дали е верен — или отвори отговора направо.
         </>
@@ -513,7 +513,7 @@ export function QuizCategoryPage() {
                 to={`/quiz/${slug}`}
                 className="rounded-full border border-line bg-tint/5 px-3 py-1.5 text-sm text-fg-2 hover:text-fg"
               >
-                <Emoji e={h.icon} /> {h.name}
+                <Emoji e={h.icon} /> {keepTogether(h.name)}
               </Link>
             ))}
         </nav>
@@ -598,7 +598,7 @@ export function TeachersPage() {
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
             До <b>{ROOM_LIMITS.maxPlayers[1]}&nbsp;души</b> в една стая; учениците влизат с код от&nbsp;
-            {ROOM_CODE_DIGITS} цифри или с линк.
+            {ROOM_CODE_DIGITS}&nbsp;цифри или с линк.
           </li>
           <li>
             <b>Без регистрация за учениците:</b> влизат като гости и си избират име за стаята. Профил е нужен само на
@@ -632,7 +632,7 @@ export function TeachersPage() {
           класът ползва общи таблети.
         </p>
         <p>
-          Ако учениците са под 14 години, за участието им е нужно съгласие на родител или настойник — обикновено то е
+          Ако учениците са под 14 години, за участието им е нужно съгласие на родител или настойник — обикновено то е
           част от съгласията, които училището събира за дигитални занимания. Подробности — в{' '}
           <Link to="/privacy" className="text-violet-300 underline">
             Политиката за поверителност

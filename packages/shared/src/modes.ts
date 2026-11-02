@@ -55,7 +55,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 2, order: true },
     tagline: 'Тренирай ума. Гони рекорда си.',
-    description: '10 въпроса от категория по избор. Само ти и часовникът.',
+    description: '10 въпроса от категория по избор. Само ти и часовникът.',
     accent: ['#22d3ee', '#6366f1'],
   },
   daily: {
@@ -70,7 +70,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     final: true,
     rounds: false,
     formats: { images: 1, order: false },
-    tagline: 'Едни и същи 10 въпроса за цяла България. Един опит.',
+    tagline: 'Едни и същи 10 въпроса за цяла България. Един опит.',
     description: 'Без козове. Класацията се нулира в полунощ.',
     accent: ['#fde047', '#f97316'],
   },
@@ -86,8 +86,8 @@ export const MODES: Record<ModeId, ModeDef> = {
     final: true,
     rounds: false,
     formats: { images: 1, order: true },
-    tagline: 'Твоите 10 въпроса. Кой ще те бие?',
-    description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без козове.',
+    tagline: 'Твоите 10 въпроса. Кой ще те бие?',
+    description: 'Изиграй 10 въпроса и прати линка: всеки, който го отвори, играе същите въпроси веднъж. Без козове.',
     accent: ['#a5b4fc', '#8b5cf6'],
   },
   review: {
@@ -103,13 +103,13 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 0, order: false },
     tagline: 'Сгрешеното се връща. Този път го знаеш.',
-    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
+    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
     accent: ['#fcd34d', '#10b981'],
   },
   duel: {
     id: 'duel',
     name: 'Дуел',
-    short: '1 на 1',
+    short: '1 на 1',
     players: 2,
     questions: 10,
     timeMs: 15_000,
@@ -125,7 +125,7 @@ export const MODES: Record<ModeId, ModeDef> = {
   teams: {
     id: 'teams',
     name: 'Отбори',
-    short: '2 на 2',
+    short: '2 на 2',
     players: 4,
     questions: 10,
     timeMs: 15_000,
@@ -141,7 +141,7 @@ export const MODES: Record<ModeId, ModeDef> = {
   trio: {
     id: 'trio',
     name: 'Трио',
-    short: '3 играчи',
+    short: '3 играчи',
     players: 3,
     questions: 10,
     timeMs: 15_000,
@@ -157,7 +157,7 @@ export const MODES: Record<ModeId, ModeDef> = {
   squad: {
     id: 'squad',
     name: 'Арена',
-    short: '3–5 играчи',
+    short: '3–5 играчи',
     players: 5,
     minPlayers: 3,
     questions: 10,
@@ -175,7 +175,7 @@ export const MODES: Record<ModeId, ModeDef> = {
   royale: {
     id: 'royale',
     name: 'Роял',
-    short: '8 играчи',
+    short: '8 играчи',
     players: 8,
     questions: 15,
     timeMs: 12_000,
@@ -205,7 +205,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     // From EVENING itself (read when asked, as it's defined below): written by hand, it had gone out of step with the
     // cuts (the review's UX-15).
     get description() {
-      return `До ${EVENING.maxPlayers} души наведнъж. ${eveningCutsLine()}.`;
+      return `До ${EVENING.maxPlayers} души наведнъж. ${eveningCutsLine()}.`;
     },
     accent: ['#818cf8', '#f472b6'],
   },

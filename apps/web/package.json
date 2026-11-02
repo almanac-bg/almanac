@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:browser": "playwright test",
     "icons": "node scripts/icons.mjs",
-    "share-images": "node scripts/share-images.mjs"
+    "share-images": "node scripts/share-images.mjs",
+    "lockup": "node scripts/lockup.mjs",
+    "store-shots": "node scripts/store-shots.mjs"
   },
   "dependencies": {
     "@quiz/client": "*",
@@ -34,6 +36,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "esbuild": "^0.28.2",
+    "sharp": "0.35.5",
     "subset-font": "^2.9.0",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.5"
