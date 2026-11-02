@@ -8,7 +8,7 @@ import { pruneAnswers } from './answers';
 import { purgeOldChallenges, tellExpiredDuels } from './challenges';
 import { config } from './config';
 import { liveDailyStreak } from './daily';
-import { all, db, optimize, prunePreMigrationCopies, run } from './db';
+import { all, optimize, prunePreMigrationCopies, run } from './db';
 import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests, purgeRoomGuests } from './guests';
@@ -137,17 +137,30 @@ export function sendStreakReminders(now = Date.now()): number {
  * Today's consistent copy of the database (`quiz-2026-10-25.db`), at most one per day; older ones beyond
  * BACKUP_KEEP_DAYS are deleted, and so are pre-migration copies older than a month. Resolves to the new file, or null if there was nothing to do.
  *
- * The copy is made a few hundred pages at a time off the main thread, so live matches don't stall while it runs.
+ * The copy is made off the main thread, so live matches don't stall while it runs, from a read-only connection of its
+ * own in one step: a read in WAL mode keeps writers going, and nothing can restart it. Copied a few hundred pages at a
+ * time from the app's connection, it started over at every other connection's write (Litestream's, every few seconds
+ * under load) and never finished — and the run the upkeep then started over it rewrote the same file (SERVER-5).
  */
+/** A copy is being made: a run of the upkeep that overlaps it (one counted as stuck) leaves it be. */
+let copying = false;
+
 export async function snapshot(now = Date.now(), dir = config.backupDir): Promise<string | null> {
-  if (!dir) return null;
+  if (!dir || copying) return null;
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `quiz-${dayKey(now)}.db`);
   if (fs.existsSync(file)) return null;
+  copying = true;
   // Write under a temporary name, then rename: a half-written copy never looks like a backup.
   const partial = `${file}.partial`;
-  fs.rmSync(partial, { force: true });
-  await backup(db, partial, { rate: 256 });
+  const source = new DatabaseSync(config.dbPath, { readOnly: true });
+  try {
+    fs.rmSync(partial, { force: true });
+    await backup(source, partial, { rate: 2 ** 30 });
+  } finally {
+    source.close();
+    copying = false;
+  }
   // A self-contained single file (the live database runs in WAL mode, which a copy inherits).
   const copy = new DatabaseSync(partial);
   copy.exec('PRAGMA journal_mode = DELETE');
