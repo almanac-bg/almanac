@@ -94,6 +94,7 @@ export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUnd
               {entry.user.username}
             </Link>
           )}
+          {entry.about && <span className="text-fg-2"> „{entry.about}“</span>}
           {entry.target && (
             <>
               {' '}

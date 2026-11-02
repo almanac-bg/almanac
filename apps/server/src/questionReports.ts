@@ -7,6 +7,7 @@ import {
   type QuestionReportGroup,
   type QuestionReportReason,
   RATED_AFTER,
+  type Reporter,
 } from '@quiz/shared';
 import { alertModerators } from './alerts';
 import { redrawDailyWithout } from './daily';
@@ -176,7 +177,28 @@ const alertFlags = () =>
 export const openQuestionReportCount = () =>
   one<{ n: number }>("SELECT COUNT(DISTINCT question_id) AS n FROM question_reports WHERE status = 'open'")!.n;
 
-/** Questions with open reports, the most reported first. */
+/** Who flagged, for the card: how long they've played, and how their earlier flags went (fixed or hidden, dismissed). */
+function flagger(userId: number): Reporter | null {
+  const r = one<{ username: string; created_at: number; games_played: number; upheld: number; dismissed: number }>(
+    `SELECT u.username, u.created_at, u.games_played,
+       (SELECT COUNT(*) FROM question_reports x WHERE x.user_id = u.id AND x.status = 'resolved') AS upheld,
+       (SELECT COUNT(*) FROM question_reports x WHERE x.user_id = u.id AND x.status = 'dismissed') AS dismissed
+     FROM users u WHERE u.id = ?`,
+    userId,
+  );
+  return r
+    ? {
+        id: userId,
+        name: r.username,
+        days: Math.floor((Date.now() - r.created_at) / (24 * 60 * 60_000)),
+        matches: r.games_played,
+        upheld: r.upheld,
+        dismissed: r.dismissed,
+      }
+    : null;
+}
+
+/** Questions with open reports, the most reported first, with how each is played and who flagged it. */
 export function openQuestionReports(): QuestionReportGroup[] {
   const rows = all<{
     id: number;
@@ -184,25 +206,33 @@ export function openQuestionReports(): QuestionReportGroup[] {
     reason: QuestionReportReason;
     details: string;
     created_at: number;
-    reporter: string | null;
+    user_id: number | null;
   }>(
-    `SELECT r.id, r.question_id, r.reason, r.details, r.created_at, u.username AS reporter
-     FROM question_reports r LEFT JOIN users u ON u.id = r.user_id
-     WHERE r.status = 'open' ORDER BY r.created_at`,
+    `SELECT id, question_id, reason, details, created_at, user_id FROM question_reports
+     WHERE status = 'open' ORDER BY created_at`,
   );
   const groups = new Map<string, QuestionReportGroup>();
+  const flaggers = new Map<number, Reporter | null>();
   for (const r of rows) {
     const q = questionById(r.question_id);
     if (!q) continue; // a community question that no longer exists
-    const group = groups.get(r.question_id) ?? { question: questionInfo(q), reports: [] };
+    let group = groups.get(r.question_id);
+    if (!group) {
+      const stats = one<{ answered: number; correct: number }>(
+        'SELECT answered, correct FROM question_stats WHERE question_id = ?',
+        r.question_id,
+      );
+      group = { question: questionInfo(q), stats: stats ? { ...stats } : null, reports: [] };
+      groups.set(r.question_id, group);
+    }
+    if (r.user_id !== null && !flaggers.has(r.user_id)) flaggers.set(r.user_id, flagger(r.user_id));
     group.reports.push({
       id: r.id,
       reason: r.reason,
       details: r.details,
       createdAt: r.created_at,
-      reporter: r.reporter,
+      reporter: r.user_id === null ? null : (flaggers.get(r.user_id) ?? null),
     });
-    groups.set(r.question_id, group);
   }
   return [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
 }

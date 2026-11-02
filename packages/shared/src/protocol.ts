@@ -1018,6 +1018,8 @@ export interface ModerationLogEntry {
   /** The player it was about, and/or what (a question's id, a set's or group's name), with where to see it. */
   user: PublicUser | null;
   target: string | null;
+  /** What `target` is, to read: a question's text (its id says nothing). */
+  about?: string | null;
   link: string | null;
   basis: ModerationBasis | null;
   reason: string | null;
@@ -1107,7 +1109,16 @@ export interface QuestionInfo {
 /** Open reports about one question, for the moderation queue. */
 export interface QuestionReportGroup {
   question: QuestionInfo;
-  reports: { id: number; reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
+  /** How it's played: answers counted and how many right (null: not yet). */
+  stats: { answered: number; correct: number } | null;
+  /** `reporter`: their account's age and matches, and their earlier flags fixed or hidden (`upheld`) or dismissed. */
+  reports: {
+    id: number;
+    reason: QuestionReportReason;
+    details: string;
+    createdAt: number;
+    reporter: Reporter | null;
+  }[];
 }
 
 /** `fixed`: corrected (its numbers start over, and whoever flagged it is thanked). */

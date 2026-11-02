@@ -28,7 +28,9 @@ const KIND = { player: 'Играч', group: 'Група', set: 'Набор' } as
  * decisions that fit it. A decision answers the reports on screen, and their senders hear what came of it.
  */
 export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
-  const { data, error, retry, setData } = useLoad(() => api.adminReports());
+  // A page more at a time (25 each): the most in need come first.
+  const [limit, setLimit] = useState(25);
+  const { data, error, retry, setData } = useLoad(() => api.adminReports(limit), String(limit));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `onOpen` is recreated on every parent render
   useEffect(() => {
@@ -62,6 +64,13 @@ export function ReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
           <CaseCard key={`${c.kind}:${c.id}`} item={c} onDecided={setData} onStale={retry} />
         ))}
       </AnimatePresence>
+      {data.total > data.cases.length && (
+        <div className="text-center">
+          <Button variant="secondary" onClick={() => setLimit((n) => Math.min(200, n + 25))}>
+            Покажи още {Math.min(25, data.total - data.cases.length)}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

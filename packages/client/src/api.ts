@@ -246,7 +246,8 @@ export const api = {
     }),
   unhideQuestion: (questionId: string) =>
     request<QuestionReports>('POST', `/admin/hidden-questions/${encodeURIComponent(questionId)}/unhide`),
-  adminReports: () => request<ReportCases>('GET', '/admin/reports'),
+  /** The queue's first `limit` cases (25 a page). */
+  adminReports: (limit = 25) => request<ReportCases>('GET', `/admin/reports?limit=${limit}`),
   /** A case decided: the reports seen in it (`reportIds`; a 409 when another moderator decided some meanwhile). */
   decideCase: (c: Pick<ReportCase, 'kind' | 'id'>, reportIds: number[], decision: CaseDecision) =>
     request<ReportCases & { ok: true }>('POST', `/admin/cases/${c.kind}/${encodeURIComponent(c.id)}/resolve`, {

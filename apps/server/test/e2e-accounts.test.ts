@@ -470,6 +470,7 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   assert.equal(queue[0].reports.length, 1);
   assert.equal(queue[0].reports[0].reason, 'name');
   assert.equal(queue[0].reports[0].reporter.name, 'maria_test', 'with who sent it');
+  assert.equal((await api.get('/api/admin/reports?limit=1000', A.cookie)).status, 200, 'a page at most 200');
   assert.deepEqual((await api.get('/api/admin/summary', A.cookie)).body.openReports, 1);
 
   // A decision answers the reports the moderator saw.
@@ -1051,9 +1052,24 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
   assert.equal(open.body.groups.length, 1);
   assert.equal(open.body.groups[0].question.id, id);
   assert.deepEqual(
-    open.body.groups[0].reports.map((r: { reason: string; reporter: string }) => [r.reason, r.reporter]),
+    open.body.groups[0].reports.map((r: { reason: string; reporter: { name: string } }) => [r.reason, r.reporter.name]),
     [['ambiguous', B.user.username]],
   );
+  // The card says who flagged it (how long they've played, how their flags went) and how the question is played.
+  const flagged = open.body.groups[0];
+  assert.deepEqual(Object.keys(flagged.reports[0].reporter).sort(), [
+    'days',
+    'dismissed',
+    'id',
+    'matches',
+    'name',
+    'upheld',
+  ]);
+  srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 20, 5)').run(id);
+  assert.deepEqual((await api.get('/api/admin/question-reports', A.cookie)).body.groups[0].stats, {
+    answered: 20,
+    correct: 5,
+  });
   assert.equal((await api.get('/api/admin/summary', A.cookie)).body.questionReports, 1);
 
   const hidden = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'hide' });
@@ -1115,6 +1131,7 @@ test(
     assert.equal(auto.action, 'auto_hide_question');
     assert.equal(auto.admin, null, 'the game did it');
     assert.equal(auto.target, id);
+    assert.ok(auto.about && auto.about.length > 5, 'with the question in its words');
 
     srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
     const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });

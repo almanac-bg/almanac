@@ -1,4 +1,13 @@
-import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast, useStore } from '@quiz/client';
+import {
+  api,
+  DIFFICULTY_LABEL,
+  errorMessage,
+  plural,
+  type QuestionReports,
+  timeAgo,
+  toast,
+  useStore,
+} from '@quiz/client';
 import {
   categoryById,
   QUESTION_REPORT_REASONS,
@@ -245,16 +254,32 @@ function QuestionReportCard({
             <Flag className="size-3.5" /> {group.reports.length}
           </span>
         </div>
+        {group.stats && group.stats.answered > 0 && (
+          <p className="mt-3 text-xs text-fg-3">
+            Отговорен {plural(group.stats.answered, 'път', 'пъти')} ·{' '}
+            {Math.round((group.stats.correct / group.stats.answered) * 100)}% верни
+          </p>
+        )}
         <ul className="mt-4 space-y-2">
           {group.reports.map((r) => (
             <li key={r.id} className="rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{reasonLabel(r.reason)}</span>
-                <span className="text-xs text-fg-3">
-                  {r.reporter ?? 'изтрит профил'} · {timeAgo(r.createdAt)}
-                </span>
+                <span className="text-xs text-fg-3">{timeAgo(r.createdAt)}</span>
               </div>
               {r.details && <p className="mt-1 text-fg-2">„{r.details}“</p>}
+              <p className="mt-1 text-xs text-fg-3">
+                {r.reporter ? (
+                  <>
+                    {r.reporter.name} · профил{' '}
+                    {r.reporter.days ? `от ${plural(r.reporter.days, 'ден', 'дни')}` : 'от днес'},{' '}
+                    {plural(r.reporter.matches, 'мач', 'мача')} · предишни сигнали: {r.reporter.upheld} прави,{' '}
+                    {r.reporter.dismissed} отхвърлени
+                  </>
+                ) : (
+                  'изтрит профил'
+                )}
+              </p>
             </li>
           ))}
         </ul>

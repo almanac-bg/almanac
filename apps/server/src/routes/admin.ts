@@ -26,7 +26,7 @@ import {
   stopReports,
   undoAction,
 } from '../moderation';
-import { logAction, moderationLog } from '../modlog';
+import { logAction, moderationLog, QUESTION_ACTIONS } from '../modlog';
 import {
   hiddenQuestions,
   openQuestionReportCount,
@@ -34,7 +34,7 @@ import {
   resolveQuestionReports,
   unhideQuestion,
 } from '../questionReports';
-import { bankProblem, reloadQuestionBank } from '../questions';
+import { bankProblem, questionById, reloadQuestionBank } from '../questions';
 import { setForModerator } from '../sets';
 import { launchStats } from '../stats';
 import {
@@ -188,8 +188,10 @@ adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {
 
 // ─── Reports about players, and the players ──────────────────────────────────
 
-adminRouter.get('/admin/reports', (_req, res) => {
-  res.json(openCases(res.locals.userId));
+/** The queue, a page at a time: `limit` grows by 25 with „Покажи още“ (up to 200). */
+adminRouter.get('/admin/reports', (req, res) => {
+  const limit = Math.min(200, Math.max(25, Number(req.query.limit) || 25));
+  res.json(openCases(res.locals.userId, limit));
 });
 
 const Decision = z.discriminatedUnion('action', [
@@ -368,7 +370,12 @@ adminRouter.post('/admin/groups/:id/rename', change, (req, res) => {
 
 adminRouter.get('/admin/log', (req, res) => {
   const before = Number(req.query.before);
-  res.json({ entries: moderationLog(50, Number.isInteger(before) && before > 0 ? before : null) });
+  // A question's entry says which question, in its words.
+  const entries = moderationLog(50, Number.isInteger(before) && before > 0 ? before : null).map((e) => {
+    const q = e.target && QUESTION_ACTIONS.has(e.action) ? questionById(e.target) : undefined;
+    return q ? { ...e, about: q.q.length > 80 ? `${q.q.slice(0, 80)}…` : q.q } : e;
+  });
+  res.json({ entries });
 });
 
 adminRouter.post('/admin/log/:id/undo', change, (req, res) => {
