@@ -4,13 +4,20 @@
  * row. Only for code being shown: a background fetch that fails (prefetchPages) mustn't reload the app under the
  * player, taking whatever they were typing with it.
  */
+/** Long enough for a navigation away to take the page with it, short enough that a reload still feels prompt. */
+const LEAVING_MS = 1500;
+
 export function reloadForNewVersion() {
   if (!navigator.onLine) return;
-  try {
-    if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
-    sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
-  } catch {
-    /* storage unavailable: reload anyway */
-  }
-  window.location.reload();
+  // A moment first. A download cut short because the page is being left (a link out, a typed address) fails the same
+  // way, and a reload then took that navigation over; a page being left is gone before this runs.
+  setTimeout(() => {
+    try {
+      if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
+      sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
+    } catch {
+      /* storage unavailable: reload anyway */
+    }
+    window.location.reload();
+  }, LEAVING_MS);
 }

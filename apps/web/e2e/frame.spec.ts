@@ -22,9 +22,11 @@ test('a piece of the frame that crashes goes quiet: the page and the connection 
   await expect(page.getByRole('navigation').first()).toBeVisible();
   // The crash happened (and was reported); it's the only thing wrong in the browser.
   await expect.poll(() => pageProblems.length).toBeGreaterThan(0);
-  // (Firefox logs React's report of it as a bare "Error" from React's file.)
+  // (Firefox logs React's report of it as a bare "Error" or "JSHandle@object" from React's file.)
   const others = pageProblems.filter(
-    (p) => !/length|null|SeasonRecap|frame/i.test(p) && !/^console: Error \(.*\/assets\/react-[^/]+\.js\)$/.test(p),
+    (p) =>
+      !/length|null|SeasonRecap|frame/i.test(p) &&
+      !/^console: (Error|JSHandle@object) \(.*\/assets\/react-[^/]+\.js\)$/.test(p),
   );
   expect(others).toEqual([]);
   pageProblems.length = 0;

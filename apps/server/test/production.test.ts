@@ -364,7 +364,8 @@ test('a drawn page fetches its own code as it starts, and goes out as brotli to 
   );
   assert.deepEqual(quizzes(await named('/how-to-play')), []);
 
-  // Brotli at the strongest setting, made after start-up (so asked for until it's there), the same page inside it.
+  // Brotli at the strongest setting, made when a browser that takes it first asks (so asked for until it's there),
+  // the same page inside it.
   const plain = await (await fetch(`${srv.url}/quiz/history`, { headers: { 'accept-encoding': 'identity' } })).text();
   let res: Response | null = null;
   for (let tries = 0; tries < 100; tries++) {

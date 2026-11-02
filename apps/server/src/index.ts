@@ -317,9 +317,6 @@ if (fs.existsSync(config.webDist)) {
       ];
     }),
   );
-  // Their brotli copies, made on the thread pool once the server is up (about a tenth of a second a page).
-  for (const pub of publicPages.values())
-    for (const variant of [pub.html, pub.painted, pub.returning]) variant?.compress();
   // A screen of the game at its own address: a link to it previews as that address, not the home page.
   const appPage = (at: string) => withHead(page, { index: false, url: `${config.appUrl}${at}` });
   // An address that isn't one says so in the tab too, before the app does.
@@ -446,53 +443,53 @@ function withEarly(html: string, early: string | undefined): string {
   return html.replace(/<script type="module" crossorigin src="\/assets\/[^"]+"><\/script>/, (entry) => entry + early);
 }
 
-/** A page that's always the same, with its brotli copy once it's made (compress). */
+/** A page that's always the same, and its brotli copy once one is made (sendCompressible). */
 interface Compressible {
   text: string;
   br: Buffer | null;
-  compress(): void;
+  compressing: boolean;
 }
 
-/**
- * The drawn pages go out as brotli at the strongest setting, a quarter smaller than the gzip Caddy makes on the fly
- * (the 31 October review, CF-5): each made once, on the thread pool, after start-up (about a tenth of a second a page,
- * a few seconds for them all, which a start mustn't wait for). Until its copy is ready, a page goes out as before.
- */
 function compressible(text: string): Compressible {
-  const page: Compressible = {
-    text,
-    br: null,
-    compress() {
-      const data = Buffer.from(text);
-      zlib.brotliCompress(
-        data,
-        {
-          params: {
-            [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT,
-            [zlib.constants.BROTLI_PARAM_QUALITY]: 11,
-            [zlib.constants.BROTLI_PARAM_SIZE_HINT]: data.length,
-          },
-        },
-        (err, out) => {
-          if (!err) page.br = out;
-        },
-      );
-    },
-  };
-  return page;
+  return { text, br: null, compressing: false };
 }
 
 /**
- * A page to a browser that takes brotli, as its brotli copy (Caddy leaves an encoded answer as it is); otherwise as
- * text, for Caddy to compress. The answer varies with Accept-Encoding either way, so no cache on the way hands the
- * brotli copy to a browser that didn't ask for it.
+ * A drawn page to a browser that takes brotli goes out as brotli at the strongest setting, a quarter smaller than the
+ * gzip Caddy makes on the fly (the 31 October review, CF-5); Caddy leaves an encoded answer as it is. Each page's copy
+ * is made once, on the thread pool, when a browser first asks for it — that one gets the text, as does a browser that
+ * doesn't take brotli. Not all at start-up: about a tenth of a second a page, they kept the thread pool busy for
+ * seconds, with the files and the password checks of everyone coming back after a deploy waiting behind them. The
+ * answer varies with Accept-Encoding either way, so no cache on the way hands the copy to a browser that didn't ask.
  */
 function sendCompressible(req: Request, res: Response, page: Compressible) {
   res.vary('Accept-Encoding').type('html');
-  if (page.br && /\bbr\b/.test(req.headers['accept-encoding'] ?? '')) {
+  const brotli = /\bbr\b/.test(req.headers['accept-encoding'] ?? '');
+  if (brotli && page.br) {
     res.setHeader('content-encoding', 'br');
     res.send(page.br);
-  } else res.send(page.text);
+    return;
+  }
+  if (brotli && !page.compressing) {
+    page.compressing = true;
+    const data = Buffer.from(page.text);
+    zlib.brotliCompress(
+      data,
+      {
+        params: {
+          [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT,
+          [zlib.constants.BROTLI_PARAM_QUALITY]: 11,
+          [zlib.constants.BROTLI_PARAM_SIZE_HINT]: data.length,
+        },
+      },
+      (err, out) => {
+        if (err)
+          page.compressing = false; // to be tried again by the next one
+        else page.br = out;
+      },
+    );
+  }
+  res.send(page.text);
 }
 
 /**
