@@ -261,13 +261,30 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 </ul>
               )}
             </div>
-            <p className="mt-6 text-lg text-fg-2" aria-live="polite">
-              {reveal
-                ? `${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} ${
-                    q.kind === 'order' ? 'подредиха всичко' : 'познаха'
-                  }`
-                : `Отговориха ${game.answered.length} от ${playing}`}
-            </p>
+            {reveal ? (
+              <p className="mt-6 text-lg text-fg-2" aria-live="polite">
+                {`${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} ${
+                  q.kind === 'order' ? 'подредиха всичко' : 'познаха'
+                }`}
+              </p>
+            ) : (
+              // While it's open, how many have answered as a bar the back row reads (UX-8): a number or an order
+              // question has no options on the screen to fill it.
+              <div className="mt-6 max-w-4xl">
+                <p className="flex items-baseline justify-between text-2xl font-bold" aria-live="polite">
+                  <span>Отговориха</span>
+                  <span className="tabular-nums">
+                    {game.answered.length} от {playing}
+                  </span>
+                </p>
+                <div className="mt-2 h-4 overflow-hidden rounded-full bg-tint/10">
+                  <div
+                    className="h-full rounded-full bg-violet-400 transition-[width] duration-300"
+                    style={{ width: `${playing ? (game.answered.length / playing) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
             {reveal?.fact && (
               <p className="mt-6 max-w-4xl rounded-3xl border border-amber-300/25 bg-amber-400/[0.07] p-5 text-xl text-fg-2 text-pretty">
                 <span className="font-bold text-amber-200">
@@ -316,7 +333,7 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
               {keepTogether(q.order!.items[item])}
             </span>
             {answer?.values && (
-              <span className="font-display text-2xl font-bold text-amber-200 tabular-nums">
+              <span className="text-2xl font-extrabold text-amber-200 tabular-nums">
                 {orderValueText(answer.values[item], answer.unit)}
               </span>
             )}
@@ -332,15 +349,26 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
 function NumberReveal({ game }: { game: LiveGame }) {
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
+  // While it's open: what to write, and the range with its unit, big — the phones have them small (UX-8). Values and
+  // units in the text face (D2).
   if (!reveal || reveal.answerNumber === undefined || !q.number)
-    return <p className="mt-8 text-2xl text-fg-2">Въведете числото на телефоните си.</p>;
+    return (
+      <div className="mt-10">
+        <p className="text-2xl text-fg-2">Напишете число на телефоните си</p>
+        {q.number && (
+          <p className="mt-3 text-[clamp(2rem,4.5vw,4.5rem)] leading-tight font-black tabular-nums">
+            от {numberText(q.number.min, { ...q.number, unit: '' })} до {numberText(q.number.max, q.number)}
+          </p>
+        )}
+      </div>
+    );
   const closest = Object.entries(reveal.results)
     .filter(([, r]) => r.number?.guess != null)
     .sort(([, a], [, b]) => (b.number?.closeness ?? 0) - (a.number?.closeness ?? 0))
     .slice(0, 3);
   return (
     <div className="mt-8">
-      <p className="font-display text-5xl font-black text-emerald-300 lg:text-6xl">
+      <p className="text-5xl font-black text-emerald-300 tabular-nums lg:text-6xl">
         {numberText(reveal.answerNumber, q.number)}
       </p>
       {closest.length > 0 && (
