@@ -20,6 +20,7 @@ import { bannedBefore } from './account';
 import { alertModerators } from './alerts';
 import { config } from './config';
 import { all, one, run, tx } from './db';
+import { groupRunner } from './groups';
 import { longDateTime } from './mailer';
 import {
   laterDecision,
@@ -805,8 +806,10 @@ export function renameGroupByModerator(
       undo: { name: group.name },
     });
   });
-  if (group.owner_id)
-    tellPlayer(group.owner_id, {
+  // Its owner, or whoever runs it since the owner's account went.
+  const runner = groupRunner(groupId);
+  if (runner)
+    tellPlayer(runner, {
       what: `Модератор смени името на групата ти „${group.name}“ на „${name}“. След седмица можеш да ѝ дадеш друго.`,
       basis,
       reason: why,

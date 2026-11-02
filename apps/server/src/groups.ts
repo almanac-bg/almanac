@@ -152,14 +152,25 @@ export function leaveGroup(groupId: number, userId: number) {
   });
 }
 
-/** Whether the player runs the group: its owner, or (an owner gone with their account) its longest member. */
-function runsGroup(g: GroupRow, userId: number) {
-  if (g.owner_id !== null) return g.owner_id === userId;
-  const first = one<{ user_id: number }>(
-    'SELECT user_id FROM group_members WHERE group_id = ? ORDER BY joined_at, user_id LIMIT 1',
-    g.id,
+/** Who runs a group: its owner, or (an owner gone with their account) its longest member; null for none. */
+export function groupRunner(groupId: number): number | null {
+  const g = getGroup(groupId);
+  if (!g) return null;
+  if (g.owner_id !== null) return g.owner_id;
+  return (
+    one<{ user_id: number }>(
+      'SELECT user_id FROM group_members WHERE group_id = ? ORDER BY joined_at, user_id LIMIT 1',
+      g.id,
+    )?.user_id ?? null
   );
-  return first?.user_id === userId;
+}
+
+const runsGroup = (g: GroupRow, userId: number) => groupRunner(g.id) === userId;
+
+/** A group by its invite link, as a report from the invite page names it. */
+export function groupByInvite(code: string): { id: number; name: string } | null {
+  const g = byCode(code);
+  return g ? { id: g.id, name: g.name } : null;
 }
 
 /** What only whoever runs a group may do: rename it, give it a new link, remove someone, delete it. */

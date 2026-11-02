@@ -419,8 +419,21 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
   );
 }
 
-/** A member tells the moderators the group's name breaks the rules (they rename it; its owner hears why). */
-function ReportGroup({ groupId, open, onClose }: { groupId: number; open: boolean; onClose: () => void }) {
+/**
+ * A member — or someone sent its invite (`code`) — tells the moderators the group's name breaks the rules (they rename
+ * it; whoever runs it hears why).
+ */
+function ReportGroup({
+  groupId,
+  code,
+  open,
+  onClose,
+}: {
+  groupId?: number;
+  code?: string;
+  open: boolean;
+  onClose: () => void;
+}) {
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
@@ -429,7 +442,9 @@ function ReportGroup({ groupId, open, onClose }: { groupId: number; open: boolea
     if (!reason) return;
     setBusy(true);
     try {
-      await api.reportGroup(groupId, reason, details);
+      await (code !== undefined
+        ? api.reportGroupInvite(code, reason, details)
+        : api.reportGroup(groupId!, reason, details));
       toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще го прегледа, а ти ще научиш какво решихме.' });
       setDetails('');
       setReason(null);
@@ -572,6 +587,7 @@ function GroupInvite({ code }: { code: string }) {
   const guest = useStore((s) => !!s.me?.isGuest);
   const { data, error, retry } = useLoad(() => api.groupPreview(code), code);
   const [busy, setBusy] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   // Already in it: straight to the group.
   useEffect(() => {
@@ -624,8 +640,15 @@ function GroupInvite({ code }: { code: string }) {
           </Button>
         )}
       </Card>
-      {guest && (
+      {guest ? (
         <GuestNudge>В групата ще се виждаш с името на гост. Запази профила си с име, за да те познаят.</GuestNudge>
+      ) : (
+        <div className="text-center">
+          <Button variant="ghost" size="sm" onClick={() => setReporting(true)}>
+            <Flag className="size-4" /> Сигнал за името на групата
+          </Button>
+          <ReportGroup code={code} open={reporting} onClose={() => setReporting(false)} />
+        </div>
       )}
     </div>
   );

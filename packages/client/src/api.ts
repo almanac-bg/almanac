@@ -346,6 +346,9 @@ export const api = {
   /** A member reports the group (its name). */
   reportGroup: (id: number, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', `/groups/${id}/report`, { reason, details }),
+  /** From the invite page: a group's name reported by someone who isn't in it (yet). */
+  reportGroupInvite: (code: string, reason: ReportReason, details: string) =>
+    request<{ ok: true }>('POST', `/groups/join/${encodeURIComponent(code)}/report`, { reason, details }),
   group: (id: number) => request<GroupInfo>('GET', `/groups/${id}`),
   renameGroup: (id: number, name: string) => request<GroupInfo>('PATCH', `/groups/${id}`, { name }),
   newGroupLink: (id: number) => request<GroupInfo>('POST', `/groups/${id}/code`),

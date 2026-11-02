@@ -4,7 +4,17 @@ import { z } from 'zod';
 import { almanacCategory, almanacOverview } from '../almanac';
 import { requireAuth, userIdFromRequest } from '../auth';
 import { one } from '../db';
-import { createGroup, groupInfo, groupPreview, joinGroup, leaveGroup, manageGroup, myGroups } from '../groups';
+import {
+  createGroup,
+  groupByInvite,
+  groupInfo,
+  groupPreview,
+  groupRunner,
+  joinGroup,
+  leaveGroup,
+  manageGroup,
+  myGroups,
+} from '../groups';
 import { fileReport } from '../moderation';
 import { count } from '../stats';
 import { network, throttled } from '../throttle';
@@ -124,26 +134,41 @@ progress.post('/groups/:id/leave', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-/** A group's name breaks the rules: a member reports it (a report about the group; its owner hears if it's renamed). */
-progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
-  const body = parse(z.object({ reason: z.string(), details: z.string().max(400).default('') }), req, res);
+/**
+ * A group's name breaks the rules: a member reports it, or anyone signed in who was sent its invite (the 31 October
+ * review, MOD-15). A report about the group; whoever runs it (its owner, or the longest member once the owner's account
+ * is gone) hears if it's renamed.
+ */
+const GroupReport = z.object({ reason: z.string(), details: z.string().max(400).default('') });
+
+function reportGroup(req: Request, res: Response, group: { id: number; name: string } | null) {
+  const body = parse(GroupReport, req, res);
   if (!body) return;
-  const id = idParam(req);
-  const group = one<{ name: string; owner_id: number | null }>(
-    `SELECT g.name, g.owner_id FROM player_groups g
-     WHERE g.id = ? AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?)`,
-    id,
-    res.locals.userId,
-  );
-  if (!group?.owner_id) {
+  const runner = group && groupRunner(group.id);
+  if (!group || !runner) {
     res.status(404).json({ error: 'Няма такава група.' });
     return;
   }
-  const subject = { kind: 'group', id: String(id), owner: group.owner_id, label: group.name } as const;
+  const subject = { kind: 'group', id: String(group.id), owner: runner, label: group.name } as const;
   const filed = fileReport(res.locals.userId, subject, body.reason, body.details);
   if (!filed.ok) {
     res.status(400).json({ error: filed.error });
     return;
   }
   res.json({ ok: true });
+}
+
+progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
+  const id = idParam(req);
+  const group = one<{ id: number; name: string }>(
+    `SELECT g.id, g.name FROM player_groups g
+     WHERE g.id = ? AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?)`,
+    id,
+    res.locals.userId,
+  );
+  reportGroup(req, res, group ?? null);
+});
+
+progress.post('/groups/join/:code/report', requireAuth, requireAccount, (req, res) => {
+  reportGroup(req, res, groupByInvite(String(req.params.code)));
 });

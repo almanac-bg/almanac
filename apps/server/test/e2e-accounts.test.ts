@@ -817,6 +817,16 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     'only its members report a group',
   );
   const code = (srv.db.prepare('SELECT code FROM player_groups WHERE id = ?').get(groupId) as { code: string }).code;
+  // …or anyone signed in who was sent its invite (MOD-15): the same case.
+  assert.equal(
+    (await api.send('POST', `/api/groups/join/${code}/report`, B.cookie, { reason: 'name' })).status,
+    200,
+    'from the invite page',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/groups/join/no-such-code/report', B.cookie, { reason: 'name' })).status,
+    404,
+  );
   await api.send('POST', `/api/groups/join/${code}`, B.cookie);
   assert.equal(
     (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'content', details: 'обидно' }))
@@ -856,6 +866,21 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   assert.equal(renameGroup.action, 'rename_group');
   assert.equal((await undo(renameGroup.id)).status, 200);
   assert.equal((await card()).groups[0].name, 'Измамници');
+
+  // Its owner's account gone (owner_id empty): the group is still reported, to whoever runs it since.
+  srv.db.prepare('UPDATE player_groups SET owner_id = NULL WHERE id = ?').run(groupId);
+  assert.equal(
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'name', details: 'пак' })).status,
+    200,
+  );
+  const ownerless = (await api.get('/api/admin/reports', A.cookie)).body.cases.find(
+    (c: { kind: string; id: string }) => c.kind === 'group' && c.id === String(groupId),
+  );
+  assert.equal(ownerless.owner.username, 'izmamnik_test', 'its longest member runs it now');
+  await api.send('POST', `/api/admin/cases/group/${groupId}/resolve`, A.cookie, {
+    reportIds: ownerless.reports.map((r: { id: number }) => r.id),
+    decision: { action: 'dismiss' },
+  });
   await api.send('POST', `/api/groups/${groupId}/leave`, B.cookie);
 });
 
