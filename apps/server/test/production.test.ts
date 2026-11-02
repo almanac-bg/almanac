@@ -332,12 +332,12 @@ test('in every drawn public page, a number keeps to the word after it (COPY-14)'
   const split: string[] = [];
   for (const route of Object.keys(PUBLIC_PAGES)) {
     const html = await (await fetch(`${srv.url}${route}`)).text();
-    // The text a reader sees: the page itself, without its tags (React's <!-- --> between two pieces of text too) and
-    // entities as characters.
+    // The text a reader sees: what's between the drawn page's tags (React's <!-- --> between two pieces of text too),
+    // entities as characters. The page itself holds no scripts or styles (those are in the head).
     const text = html
       .slice(html.indexOf('<div id="root"'), html.indexOf('<!--/app-->'))
-      .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, '')
-      .replace(/<[^>]*>/g, '')
+      .split(/<[^>]*>/)
+      .join('')
       .replace(/&nbsp;/g, '\u00a0')
       .replace(/&#x27;|&#39;/g, "'")
       .replace(/&quot;/g, '"')
