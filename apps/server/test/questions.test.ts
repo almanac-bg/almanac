@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { CATEGORY_IDS } from '@quiz/shared';
+import { CALENDAR_DAYS, CATEGORY_IDS } from '@quiz/shared';
 
 interface Q {
   id: string;
@@ -361,17 +361,147 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
   // A final comes last, so nothing it says gives an earlier question away; but an earlier question (or its fact,
   // shown after it) that names the final's number on the same subject would give the final away.
   test(`${name}: no question or fact gives a final's number away`, () => {
+    // Each question's text and stems once, not once per final (BANK-10: 5.7 of the test's 6.4 s).
+    const prepared = everything.map((other) => {
+      const both = `${other.q} ${other.fact ?? ''}`;
+      return { other, text: ` ${normalize(both)} `, stems: stems(both) };
+    });
     for (const q of numbers) {
       const answer = String(q.number!.answer).replace('.', ',');
       if (answer.length < 3) continue; // "24", "7": too common to judge by the digits
       const words = stems(q.q);
-      for (const other of everything) {
-        if (other === q) continue;
-        const text = ` ${normalize(`${other.q} ${other.fact ?? ''}`)} `;
-        if (!text.includes(` ${normalize(answer)} `)) continue;
-        const shared = [...stems(`${other.q} ${other.fact ?? ''}`)].filter((w) => words.has(w));
+      const token = ` ${normalize(answer)} `;
+      for (const { other, text, stems: theirs } of prepared) {
+        if (other === q || !text.includes(token)) continue;
+        const shared = [...theirs].filter((w) => words.has(w));
         assert.ok(shared.length < 2, `${other.id} gives away ${q.id} (${q.q} → ${answer}; shares ${shared})`);
       }
     }
   });
 }
+
+// ─── The holiday pages (apps/web/src/content): public, with their answers ───────────────────────────────────────────
+
+const CONTENT = path.join(import.meta.dirname, '../../web/src/content');
+/** Each page and the theme whose day it belongs to (CALENDAR_DAYS). */
+const PAGE_THEME: Record<string, string> = {
+  christmas: 'christmas',
+  levski: 'levski',
+  'liberation-day': 'liberation',
+  'alphabet-day': 'alphabet',
+  botev: 'botev',
+  'unification-day': 'unification',
+  'independence-day': 'independence',
+  'enlighteners-day': 'enlighteners',
+};
+const pages = fs
+  .readdirSync(CONTENT)
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => ({
+    slug: f.slice(0, -'.json'.length),
+    questions: JSON.parse(fs.readFileSync(path.join(CONTENT, f), 'utf8')) as Q[],
+  }));
+/** A page's lead, as GuidePages.tsx (HOLIDAYS) writes it above the questions. */
+const guide = fs.readFileSync(path.join(import.meta.dirname, '../../web/src/pages/GuidePages.tsx'), 'utf8');
+const leadOf = (slug: string) =>
+  new RegExp(`'${slug}': \\{[^}]*?lead: '([^']*)'`, 's').exec(guide)?.[1] ??
+  new RegExp(`\\b${slug.replace(/-/g, '_')}: \\{[^}]*?lead: '([^']*)'`, 's').exec(guide)?.[1] ??
+  new RegExp(`${slug}: \\{[^}]*?lead: '([^']*)'`, 's').exec(guide)?.[1] ??
+  '';
+/** An answer as words in a text (whole words, so „Рим“ isn't in „Римини“). */
+const names = (text: string, answer: string) => {
+  const a = normalize(answer);
+  return a.length >= 4 && ` ${normalize(text)} `.includes(` ${a} `);
+};
+
+test('holiday pages: every question keeps the bank’s rules', () => {
+  const problems: string[] = [];
+  const check = (ok: unknown, message: string) => void (ok || problems.push(message));
+  for (const { slug, questions } of pages) {
+    check(slug in PAGE_THEME, `${slug}: a page with no theme in PAGE_THEME`);
+    for (const q of questions) {
+      const where = `${slug} ${q.id}`;
+      check(q.q.length >= 10 && q.q.length <= 150 && q.q.endsWith('?'), `${where}: the question`);
+      check(q.options.length === 4, `${where}: four options`);
+      check(
+        q.options.every((o) => o.length <= 45),
+        `${where}: options of at most 45 characters`,
+      );
+      if (q.fact) {
+        check(q.fact.length >= 20 && q.fact.length <= 200, `${where}: a fact of 20–200 characters (${q.fact.length})`);
+        check(q.fact.endsWith('.'), `${where}: a fact ends with a period`);
+        check(/^https:\/\//.test(q.factSource ?? ''), `${where}: a fact has its source`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('holiday pages: no question gives another on its page away, nor does the lead', () => {
+  const problems: string[] = [];
+  const check = (ok: unknown, message: string) => void (ok || problems.push(message));
+  for (const { slug, questions } of pages) {
+    const lead = leadOf(slug);
+    for (const q of questions) {
+      const answer = q.options[q.answer];
+      check(!names(lead, answer), `${slug}: the lead names ${q.id}'s answer „${answer}“`);
+      for (const other of questions) {
+        if (other === q) continue;
+        // The page shows every question at once: no other question's text names this answer. (Options and facts
+        // repeat answers' words for other reasons — an option is no hint, „дума“ in a fact isn't the answer „Дума“.)
+        const seen = [other.q];
+        for (const text of seen)
+          check(!names(text, answer), `${slug}: ${other.id} names ${q.id}'s answer „${answer}“ in „${text}“`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+const bankFile = path.join(import.meta.dirname, '../../../private/questions.json');
+test('holiday pages: none asks what the bank asks, nor names an answer the bank asks on its day', {
+  skip: !fs.existsSync(bankFile) && 'the private bank isn’t in this checkout',
+}, () => {
+  const problems: string[] = [];
+  const check = (ok: unknown, message: string) => void (ok || problems.push(message));
+  const bank = JSON.parse(fs.readFileSync(bankFile, 'utf8')) as (Q & { tags?: string[] })[];
+  const bankTexts = new Map(bank.map((q) => [normalize(q.q), q.id]));
+  for (const { slug, questions } of pages) {
+    const theme = PAGE_THEME[slug];
+    const day = Object.values(CALENDAR_DAYS).find((d) => d.tag === theme)!;
+    // The bank's answers for that day: a page read before the daily mustn't hold them — except the day's own subject
+    // („Христо Ботев“ on Botev's page), which the day's label names anyway (and the daily keeps such a question back).
+    const themed = bank.filter(
+      (q) =>
+        q.tags?.includes(theme) &&
+        (q.kind === 'number' ||
+          q.kind === 'order' ||
+          ![...stems(q.options[q.answer])].some((s) => stems(day.name).has(s))),
+    );
+    const lead = leadOf(slug);
+    for (const q of questions) {
+      check(!bankTexts.has(normalize(q.q)), `${slug} ${q.id} is the bank's ${bankTexts.get(normalize(q.q))}`);
+      for (const b of themed) {
+        const answer = b.kind === 'number' ? String(b.number!.answer) : b.kind === 'order' ? null : b.options[b.answer];
+        if (!answer) continue;
+        // A year the lead sets as the page's subject („Руско-турската война от 1877–1878 г.“) is the page itself.
+        if (/^\d+$/.test(normalize(answer)) && ` ${normalize(lead)} `.includes(` ${answer} `)) continue;
+        // Named, and about the same thing (two shared word stems): a page that merely mentions an enlightener or a
+        // country isn't the bank's question's crib.
+        for (const text of [q.q, q.fact ?? '', lead]) {
+          const named = b.kind === 'number' ? ` ${normalize(text)} `.includes(` ${answer} `) : names(text, answer);
+          const about = [...stems(b.q)].filter((s) => stems(`${q.q} ${q.fact ?? ''} ${text}`).has(s)).length >= 2;
+          check(!(named && about), `${slug} ${q.id} names the bank's ${b.id} answer „${answer}“: „${text}“`);
+        }
+      }
+      // The same question asked another way: the same answer, and two shared word stems.
+      for (const b of bank) {
+        if (b.kind === 'number' || b.kind === 'order') continue;
+        if (normalize(b.options[b.answer]) !== normalize(q.options[q.answer])) continue;
+        const shared = [...stems(b.q)].filter((s) => stems(q.q).has(s));
+        check(shared.length < 2, `${slug} ${q.id} asks what the bank's ${b.id} asks (${shared.join(', ')})`);
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+});

@@ -19,7 +19,15 @@ import { releaseDailyAttempt, saveDailyProgress } from '../daily';
 import { bestMastery } from '../mastery';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
-import { markSeen, type PreparedQuestion, pickMatch, pickRounds, type RoundPlan, recentFor } from '../questions';
+import {
+  markSeen,
+  type PreparedQuestion,
+  pickMatch,
+  pickRounds,
+  type RoundPlan,
+  recentFor,
+  seenBy,
+} from '../questions';
 import { getRating } from '../seasons';
 import { skillCentre } from '../skill';
 import { getUser } from '../users';
@@ -244,18 +252,28 @@ export class GameRegistry {
     const userIds = opts.humans.map((h) => h.player.userId!);
     const def = MODES[opts.mode];
     const seen = opts.questions ? new Map<string, number>() : recentFor(userIds);
+    // Three or more people: the final and the formats are the ones the fewest of them saw lately, rather than none
+    // (a regular group's evening lost both); a final someone saw counts once (questions.ts → Crowd).
+    const crowd = !opts.questions && userIds.length >= 3 ? seenBy(userIds) : undefined;
     const final = opts.final ?? def.final;
     const inRounds =
       !opts.questions &&
       (opts.inRounds ?? def.rounds) &&
       opts.category === 'mixed' &&
       opts.questionCount === ROUNDS_QUESTIONS
-        ? pickRounds(seen, Math.random, { final, formats: def.formats })
+        ? pickRounds(seen, Math.random, { final, formats: def.formats, crowd })
         : null;
     const questions =
       opts.questions ??
       inRounds?.questions ??
-      pickMatch(opts.questionCount, opts.category, seen, { final, formats: def.formats, pictures: opts.pictures });
+      pickMatch(opts.questionCount, opts.category, seen, {
+        final,
+        formats: def.formats,
+        pictures: opts.pictures,
+        crowd,
+      });
+    const last = questions.at(-1);
+    const finalSeen = !!crowd && last?.kind === 'number' && (crowd.get(last.id) ?? 0) > 0;
     if (questions.length < opts.questionCount) throw new StartError('Няма достатъчно въпроси за тази категория.');
 
     const room = (id: string) => `game:${id}`;
@@ -291,7 +309,7 @@ export class GameRegistry {
         questionSet: opts.questionSet ?? null,
         eveningDay: opts.eveningDay ?? null,
         pace: opts.pace ?? 'normal',
-        finalTimes: opts.finalTimes,
+        finalTimes: opts.finalTimes ?? (finalSeen ? 1 : undefined),
       },
       emitter,
       {

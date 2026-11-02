@@ -495,3 +495,9 @@ test('a mail-events subscription link is followed only on Scaleway’s Topics an
     console.warn = warn;
   }
 });
+
+test('every themed day links to a quiz page that exists', async () => {
+  const { CALENDAR_DAYS, PUBLIC_PAGES } = await import('@quiz/shared');
+  for (const [day, theme] of Object.entries(CALENDAR_DAYS))
+    assert.ok(theme.page in PUBLIC_PAGES, `${day}: ${theme.page} is a public page`);
+});

@@ -14,6 +14,7 @@ import { all, one, run, tx } from './db';
 import { logAction } from './modlog';
 import { notify } from './notifications';
 import {
+  dropFromPlay,
   imageCredit,
   isChoice,
   type PlayableQuestion,
@@ -193,7 +194,7 @@ export function hideQuestion(adminId: number | null, questionId: string) {
     target: questionId,
     undo: {},
   });
-  reloadQuestionBank();
+  dropFromPlay(questionId);
   redrawDailyWithout(questionId);
   tellAuthor(questionId, { byPlayers: adminId === null });
 }

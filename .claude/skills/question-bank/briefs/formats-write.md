@@ -11,7 +11,7 @@ write it as if nobody would check.
 - Never send personal data anywhere: no names or email addresses in User-Agent headers, search queries or URLs. Use the
   User-Agent `AlmanacBank/1.0 (https://almanac.bg)` for every request to Wikimedia.
 - Node isn't on PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`. Run commands from
-  `/Users/hristo/Developer/quiz`.
+  `/Users/hristo/Developer/almanac`.
 - The bank already has over 3000 questions (`private/questions.json`, one per line). Grep it for your topic and answer
   before writing: no near-duplicates, and nothing that gives another question's answer away (a match mixes all
   categories). `node .claude/skills/question-bank/bank.mjs similar <your-draft.json>` lists look-alikes (it reads `q`

@@ -49,6 +49,22 @@ const ids = [
   'sports-25',
   'geography-n0',
 ];
+// Today's daily, set before anything draws it, from questions none of these runs holds: a recording never brings one of
+// the day's ten (records.ts), and on the small test bank a drawn day would take some of them half the time.
+run(
+  'INSERT INTO daily_sets (day, questions) VALUES (?, ?)',
+  dayKey(),
+  JSON.stringify(pickMatch(10, 'mixed', new Map(ids.map((id) => [id, Number.MAX_SAFE_INTEGER])), { final: true })),
+);
+assert.ok(
+  !(
+    JSON.parse(one<{ questions: string }>('SELECT questions FROM daily_sets WHERE day = ?', dayKey())!.questions) as {
+      id: string;
+    }[]
+  ).some((q) => ids.includes(q.id)),
+  'today’s daily and the runs’ questions are apart',
+);
+
 function answers(changed = false) {
   return ids.map((q, i) => {
     const bank = questionById(q)!;
@@ -138,6 +154,29 @@ test("today's daily questions are kept out of every other match until midnight",
   for (let i = 0; i < 30; i++)
     for (const q of pickMatch(10, 'mixed', recentFor([1]), { final: true }))
       assert.ok(!daily.includes(q.id), `${q.id} is one of today's`);
+});
+
+test("a recording never brings one of today's daily questions, however few of them (GAMEPLAY-2)", () => {
+  run('DELETE FROM runs');
+  run('DELETE FROM seen_questions');
+  const today = dailyQuestions(dayKey(), 1).map((q) => q.id);
+  const choice = today.find((id) => isChoice(questionById(id)!))!;
+  // A run like the others, with one of today's ten as its fourth question.
+  const withToday = answers().map((a, i) =>
+    i === 3 ? { ...a, q: choice, c: (questionById(choice) as { answer: number }).answer, ok: 1 } : a,
+  );
+  run(
+    `INSERT INTO runs (match_id, user_id, mode, category, rating, score, correct, answers, played_at)
+     VALUES ('m', 2, 'duel', 'mixed', 1040, 7000, 8, ?, ?)`,
+    JSON.stringify(withToday),
+    Date.now(),
+  );
+  assert.equal(pickRecord(1, 1000), null, 'one of the day’s ten is one too many');
+  if (!ids.some((id) => today.includes(id))) {
+    addRun(2);
+    assert.ok(pickRecord(1, 1000), 'a run without them plays');
+  }
+  run('DELETE FROM runs');
 });
 
 test("the next day, a recording's owner hears how it did, with XP for its wins (at most 50)", () => {

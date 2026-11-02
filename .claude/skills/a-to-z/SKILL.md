@@ -8,8 +8,9 @@ disable-model-invocation: true
 
 The owner asks for this before a big phase of work or after one ships: a full expert review of everything, so the next
 plan comes from evidence. Invoking it (`/a-to-z`) is the owner's opt-in for the Workflow tool: load the
-`workflow-authoring` skill, write the workflow, run it. One run is a few million tokens (the 12-reviewer run of
-2026-10-29 used about four); say so once, in the first message, and go on.
+`workflow-authoring` skill, then run `workflows/review.js` with `{dir}` (the areas and their scopes are in it: adjust
+there, and keep the changes). One run is about ten million tokens (the 16-area run of 2026-10-31 used 9.7 million,
+the 12-reviewer one of 2026-10-29 about four); say so once, in the first message, and go on.
 
 Anything written after `/a-to-z` adjusts the run (e.g. "infrastructure only", "skip the bank"): $ARGUMENTS
 
@@ -45,7 +46,7 @@ Anything written after `/a-to-z` adjusts the run (e.g. "infrastructure only", "s
 1. Write a shared brief to the session scratchpad, `review-<date>/BRIEF.md`: the product and its stack, where to read,
    how to judge, what's decided and planned, the rules below, the report format. Give the areas one each (security,
    server, web-client, gameplay, ux-tour, accessibility, visual-design, copy-seo, legal-privacy, moderation, bank,
-   repo-dx, infra-github, infra-cloudflare, infra-server-email) with a port each from 3101 up.
+   repo-dx, infra-github, infra-cloudflare, infra-server-email, mobile) with a port each from 3101 up.
 2. Reviewers in parallel, each writing `review-<date>/<area>.md` (evidence in `review-<date>/<area>/`): a summary of
    five lines at most, findings most severe first with IDs (`<AREA>-1`…), ideas, checked and fine.
 3. The refute pass over high and medium findings, as soon as each area's report is in.
@@ -57,7 +58,7 @@ Anything written after `/a-to-z` adjusts the run (e.g. "infrastructure only", "s
 
 ## Rules for the reviewers
 
-- **Read-only.** No edits in the repo (build outputs from `npm run build` are fine) and no git command that changes
+- **Read-only.** No edits in the repo (the orchestrator runs `npm run build` once before the reviewers start; reviewers never build, as fifteen of them share `apps/*/dist`) and no git command that changes
   anything.
 - **Production: public GETs only**, a handful, no load. The server only through `deploy/audit.sh`, Cloudflare only
   through its API with the owner's token header file, GitHub through `gh api`; change nothing there either. The owner

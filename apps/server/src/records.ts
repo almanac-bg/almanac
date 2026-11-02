@@ -17,6 +17,7 @@ import type { RecordScript } from './game/Game';
 import { notify } from './notifications';
 import { push } from './push';
 import {
+  dailyHeldBack,
   imageBank,
   numberBank,
   orderBank,
@@ -112,11 +113,12 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
   });
   if (!near.length) return null;
   const seen = recentFor([userId]);
+  const daily = dailyHeldBack();
   const playable = new Map<string, PlayableQuestion>(
     [...questionBank(), ...imageBank(), ...numberBank(), ...orderBank()].map((q) => [q.id, q]),
   );
   for (const r of shuffle(near, rng)) {
-    const pick = fromRun(r, playable, seen, rng);
+    const pick = fromRun(r, playable, seen, rng, daily);
     if (pick) return pick;
   }
   return null;
@@ -128,9 +130,12 @@ function fromRun(
   playable: Map<string, PlayableQuestion>,
   seen: ReadonlyMap<string, number>,
   rng: Rng,
+  daily: ReadonlySet<string> = new Set(),
 ): RecordPick | null {
   const answers = (JSON.parse(r.answers) as RunAnswer[]).sort((a, b) => a.i - b.i);
   if (answers.length !== MODES.duel.questions || answers.some((a, i) => a.i !== i)) return null;
+  // None of today's daily: those stay out of every other match until midnight, not just mostly (GAMEPLAY-2).
+  if (answers.some((a) => daily.has(a.q))) return null;
   if (answers.filter((a) => seen.has(a.q)).length > RECORDS.maxSeen) return null;
   const questions: PreparedQuestion[] = [];
   const script: RecordScript = [];

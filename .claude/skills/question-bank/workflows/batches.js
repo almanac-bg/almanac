@@ -47,7 +47,7 @@ const categoryOf = (slug) => CATEGORY[slug.split('-')[0]]
 
 const write = (slug) =>
   agent(
-    `You write new questions for АЛМАНАХ, a real-time quiz game for Bulgarian players (repo: /Users/hristo/Developer/quiz).
+    `You write new questions for АЛМАНАХ, a real-time quiz game for Bulgarian players (repo: /Users/hristo/Developer/almanac).
 
 Read .claude/skills/question-bank/SKILL.md first: "Adding questions" and "Writing „Знаеше ли?“ facts" are the rules for this task, and they are strict.
 
@@ -74,7 +74,7 @@ Edit no other file (never private/questions.json). Return the summary.`,
 
 const check = (written, slug) =>
   agent(
-    `You are an independent fact-checker for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/quiz). A wrong answer or a wrong fact taught to players is the worst bug the game can ship, so be skeptical: drafts often contain a confident detail no source states.
+    `You are an independent fact-checker for АЛМАНАХ, a quiz game for Bulgarian players (repo: /Users/hristo/Developer/almanac). A wrong answer or a wrong fact taught to players is the worst bug the game can ship, so be skeptical: drafts often contain a confident detail no source states.
 
 Read .claude/skills/question-bank/SKILL.md first (its rules for questions and facts are the standard). Today is ${args.today}.
 

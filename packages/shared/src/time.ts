@@ -133,18 +133,19 @@ export function seasonTitle(season: string): string {
 
 /**
  * Days whose questions are about something (month-day, Sofia time): that day's draw takes the bank's questions tagged
- * with the theme first, as far as the day's mix of difficulties and categories allows, and the daily page names it.
+ * with the theme first, as far as the day's mix of difficulties and categories allows, and the daily page names it,
+ * with a link to the day's own quiz page (`page`: its questions are never the bank's).
  */
-export const CALENDAR_DAYS: Readonly<Record<string, { tag: string; name: string }>> = {
-  '02-19': { tag: 'levski', name: 'Васил Левски' },
-  '03-03': { tag: 'liberation', name: 'Освобождението' },
-  '05-24': { tag: 'alphabet', name: 'Кирил и Методий и българската азбука' },
-  '06-02': { tag: 'botev', name: 'Христо Ботев' },
-  '09-06': { tag: 'unification', name: 'Съединението' },
-  '09-22': { tag: 'independence', name: 'Независимостта' },
-  '11-01': { tag: 'enlighteners', name: 'Народните будители' },
-  '12-24': { tag: 'christmas', name: 'Коледа' },
-  '12-25': { tag: 'christmas', name: 'Коледа' },
+export const CALENDAR_DAYS: Readonly<Record<string, { tag: string; name: string; page: string }>> = {
+  '02-19': { tag: 'levski', name: 'Васил Левски', page: '/quiz/levski' },
+  '03-03': { tag: 'liberation', name: 'Освобождението', page: '/quiz/liberation-day' },
+  '05-24': { tag: 'alphabet', name: 'Кирил и Методий и българската азбука', page: '/quiz/alphabet-day' },
+  '06-02': { tag: 'botev', name: 'Христо Ботев', page: '/quiz/botev' },
+  '09-06': { tag: 'unification', name: 'Съединението', page: '/quiz/unification-day' },
+  '09-22': { tag: 'independence', name: 'Независимостта', page: '/quiz/independence-day' },
+  '11-01': { tag: 'enlighteners', name: 'Народните будители', page: '/quiz/enlighteners-day' },
+  '12-24': { tag: 'christmas', name: 'Коледа', page: '/quiz/christmas' },
+  '12-25': { tag: 'christmas', name: 'Коледа', page: '/quiz/christmas' },
 };
 
 /** The theme of a day's questions (a day key, "2027-03-03"), if it has one. */

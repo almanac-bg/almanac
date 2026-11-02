@@ -672,6 +672,6 @@ switch (command) {
   }
   default:
     fail(
-      'commands: stats · show · add · fill · facts · similar · giveaways · collect · image (see the top of this file)',
+      'commands: stats · show · add · fill · facts · edit · similar · giveaways · collect · image (see the top of this file)',
     );
 }

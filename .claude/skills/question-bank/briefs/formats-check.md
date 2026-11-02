@@ -12,7 +12,7 @@ against reliable sources you actually fetch, never from memory alone.
 - Work only in the folder you're given; never edit the repository or `private/questions.json` (read them freely).
 - Never send personal data anywhere: User-Agent `AlmanacBank/1.0 (https://almanac.bg)` for Wikimedia, no names or
   email addresses in queries or URLs.
-- Node isn't on PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`. Run from `/Users/hristo/Developer/quiz`.
+- Node isn't on PATH: `export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"`. Run from `/Users/hristo/Developer/almanac`.
 
 ## For every question, check
 
