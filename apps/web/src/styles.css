@@ -41,8 +41,11 @@
   --color-line: rgb(255 255 255 / 0.08);
   --color-fg: #f5f3ff;
   --color-fg-2: #b3aed0;
-  /* Muted text that stays above 4.5:1 on the page (5.7), on glass cards (5.2) and on lighter nested panels (4.6). */
-  --color-fg-3: #8a84ab;
+  /*
+   * Muted text that stays above 4.5:1 where it sits: the page (7.2), a card (6.9), and over the backdrop's brightest glow,
+   * bare (5.5) or under a chip (4.8) — not only on flat ink (the 31 October review, A11Y-3; e2e/contrast.spec.ts).
+   */
+  --color-fg-3: #9c95bd;
 
   --color-violet: #8b5cf6;
   --color-fuchsia: #e879f9;
@@ -102,7 +105,8 @@
   --color-line: rgb(22 19 40 / 0.12);
   --color-fg: #16131f;
   --color-fg-2: #4a4462;
-  --color-fg-3: #67617f;
+  /* Above 4.5:1 over the light backdrop's violet glow too, under a chip (4.9): A11Y-3. */
+  --color-fg-3: #57516f;
   --color-violet: #7c3aed;
   --color-fuchsia: #c026d3;
   --color-cyan: #0891b2;
@@ -125,11 +129,13 @@
   --field-edge: #8a84a3;
   --field-focus-edge: #7c3aed;
   --accent-l-min: 0;
-  --accent-l-max: 0.5;
+  /* An accent as text sits on its own tint as often as on paper (an answer's letter badge): a step deeper. */
+  --accent-l-max: 0.45;
   --color-amber-50: oklch(27.9% 0.077 45.635);
   --color-amber-100: oklch(41.4% 0.112 45.904);
   --color-amber-200: oklch(47.3% 0.137 46.201);
-  --color-amber-300: oklch(55.5% 0.163 48.998);
+  /* 300 is the text step („+500“, the daily bonus on its amber chip): deep enough for 4.5:1 on its own tint (A11Y-3). */
+  --color-amber-300: oklch(50% 0.163 48.998);
   --color-amber-400: oklch(66.6% 0.179 58.318);
   --color-amber-600: oklch(82.8% 0.189 84.429);
   --color-amber-700: oklch(87.9% 0.169 91.605);
@@ -189,7 +195,7 @@
   --color-orange-50: oklch(26.6% 0.079 36.259);
   --color-orange-100: oklch(40.8% 0.123 38.172);
   --color-orange-200: oklch(47% 0.157 37.304);
-  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-300: oklch(50% 0.195 38.402);
   --color-orange-400: oklch(64.6% 0.222 41.116);
   --color-orange-600: oklch(75% 0.183 55.934);
   --color-orange-700: oklch(83.7% 0.128 66.29);
