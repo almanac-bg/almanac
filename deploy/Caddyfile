@@ -1,6 +1,20 @@
 {
 	# The certificate authorities' contact for this site (expiry notices; ZeroSSL, Caddy's second CA, needs one).
 	email postmaster@{$DOMAIN}
+	# Caddy's own log (a broken-off response is logged with its request) keeps no visitor: no address, no headers, no
+	# query (where an unsubscribe key or a reset token can be) — the privacy policy says IPs aren't recorded (§2; the
+	# 31 October review, LEGAL-8).
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request>remote_ip delete
+				request>client_ip delete
+				request>headers delete
+				request>uri regexp \?.* ""
+			}
+		}
+	}
 	servers {
 		# Slow clients that never finish sending their headers don't hold connections open.
 		timeouts {
