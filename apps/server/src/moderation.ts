@@ -55,6 +55,7 @@ import {
   isAdmin,
   isOwner,
   nameTaken,
+  reportsVisibleTo,
   toPublicUser,
   type UserRow,
   usernameKey,
@@ -272,12 +273,7 @@ function describe(kind: ReportSubjectKind, id: string, ownerId: number): Omit<Re
 }
 
 /** Reports about staff (or what they made) are the owner's to see and decide: SQL on `reports r` for a viewer. */
-const forViewer = (viewerId: number) => {
-  const viewer = getUser(viewerId);
-  return viewer && isOwner(viewer)
-    ? '1'
-    : 'NOT EXISTS (SELECT 1 FROM users s WHERE s.id = r.target_id AND s.is_admin = 1)';
-};
+const forViewer = (viewerId: number) => reportsVisibleTo(getUser(viewerId));
 
 /**
  * The queue: one case per reported thing, with every open report about it and who sent each. Those in most need first
