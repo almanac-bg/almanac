@@ -197,7 +197,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'almanac_100',
     name: 'Първа глава',
-    description: 'Събери 100 факта в „Моят алманах“.',
+    description: 'Събери 100 факта в „Моите знания“.',
     icon: '📖',
     rarity: 'rare',
     xp: 250,
@@ -206,7 +206,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'almanac_500',
     name: 'Дебел том',
-    description: 'Събери 500 факта в „Моят алманах“.',
+    description: 'Събери 500 факта в „Моите знания“.',
     icon: '📚',
     rarity: 'epic',
     xp: 750,
@@ -215,7 +215,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'almanac_1000',
     name: 'Хиляда факта',
-    description: 'Събери 1000 факта в „Моят алманах“.',
+    description: 'Събери 1000 факта в „Моите знания“.',
     icon: '🏛️',
     rarity: 'legendary',
     xp: 1500,

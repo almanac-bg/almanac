@@ -84,7 +84,7 @@ apps/server       Express + Socket.IO + SQLite
   src/groups.ts           Групи със седмична класация и корона
   src/sets.ts             Наборите с въпроси на учителите и техните картини
   src/history.ts          Историята на мачовете в граници (редовете на ботовете 30 дни, мачовете две години)
-  src/almanac.ts, src/mastery.ts  „Моят алманах“, „Поправителен“ и майсторството по категории
+  src/almanac.ts, src/mastery.ts  „Моите знания“, „Поправителен“ и майсторството по категории
   src/push.ts             Известия на устройството (web push)
   src/moderation.ts, src/modlog.ts, src/statements.ts  Модерация, дневникът ѝ и решенията, които играчите получават
   src/friends.ts          Покани за приятелство и кой е онлайн

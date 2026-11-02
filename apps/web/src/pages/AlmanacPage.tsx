@@ -11,7 +11,7 @@ import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 import { NotFoundPage } from './NotFoundPage';
 
-/** „Моят алманах“ (/almanac), or one of its categories (/almanac/<category>). */
+/** „Моите знания“ (/almanac; „Моят алманах“ until 2 November 2026), or one of its categories (/almanac/<category>). */
 export function AlmanacPage() {
   const { category } = useParams();
   if (category === undefined) return <Overview />;
@@ -20,19 +20,19 @@ export function AlmanacPage() {
 
 /** Every fact the player has made theirs, by category, with „Поправителен“ for the questions they missed. */
 function Overview() {
-  usePageTitle('Моят алманах');
+  usePageTitle('Моите знания');
   // A match just played may have added some: loaded afresh each time the facts or the queue change.
   const version = useStore((s) => `${s.me?.almanac.facts}:${s.me?.almanac.due}`);
   const { data, error, retry } = useLoad(() => api.almanac(), version);
-  if (!data && error) return <LoadError title="Алманахът не се зареди" error={error} onRetry={retry} />;
+  if (!data && error) return <LoadError title="Знанията не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
-        <p className="t-eyebrow text-fg-3">Моят алманах</p>
+        <p className="t-eyebrow text-fg-3">Моите знания</p>
         <h1 className="mt-2 font-display text-4xl font-black sm:text-5xl">
-          <span className="sr-only">Моят алманах: </span>
+          <span className="sr-only">Моите знания: </span>
           {fmt(data.facts)} <span className="text-2xl font-bold text-fg-3 sm:text-3xl">от {fmt(data.total)} факта</span>
         </h1>
         <ProgressBar value={data.total ? data.facts / data.total : 0} className="mt-4 max-w-md" />
@@ -105,11 +105,11 @@ const matches = (f: AlmanacFact, words: string[]) => {
 /** One category's facts, newest first, with a search once there are enough to need one. */
 function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id'] }) {
   const cat = categoryById(category)!;
-  usePageTitle(`${cat.name} · Моят алманах`);
+  usePageTitle(`${cat.name} · Моите знания`);
   const { data, error, retry } = useLoad(() => api.almanacCategory(category), category);
   const [query, setQuery] = useState('');
   const words = useDeferredValue(query).toLocaleLowerCase('bg').split(/\s+/u).filter(Boolean);
-  if (!data && error) return <LoadError title="Алманахът не се зареди" error={error} onRetry={retry} />;
+  if (!data && error) return <LoadError title="Знанията не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
   const shown = words.length ? data.facts.filter((f) => matches(f, words)) : data.facts;
 
@@ -119,7 +119,7 @@ function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id
         to="/almanac"
         className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-fg-3 hover:text-fg-2"
       >
-        <ArrowLeft aria-hidden className="size-4" /> Моят алманах
+        <ArrowLeft aria-hidden className="size-4" /> Моите знания
       </Link>
       <header className="flex flex-wrap items-center gap-4">
         <span aria-hidden className="text-5xl leading-none">

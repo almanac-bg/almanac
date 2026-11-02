@@ -161,7 +161,7 @@ export function ProfilePage() {
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
           <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
           <Stat
-            label="Факти в алманаха"
+            label="Научени факти"
             value={
               <>
                 <Emoji e="📖" /> {fmt(data.almanac.facts)}

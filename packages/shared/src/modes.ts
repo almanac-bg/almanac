@@ -103,7 +103,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 0, order: false },
     tagline: 'Сгрешеното се връща. Този път го знаеш.',
-    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
+    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моите знания“.',
     accent: ['#fcd34d', '#10b981'],
   },
   duel: {

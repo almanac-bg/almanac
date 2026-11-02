@@ -74,7 +74,7 @@ export interface MeUser extends PublicUser {
   pendingEmail: string | null;
   /** Category mastery earned (MASTERY_TIERS), for the titles it unlocks. */
   mastery: CategoryMastery[];
-  /** „Моят алманах“: facts collected, and how many missed questions „Поправителен“ has ready (`due`). */
+  /** „Моите знания“: facts collected, and how many missed questions „Поправителен“ has ready (`due`). */
   almanac: { facts: number; due: number };
   /** Groups the player is in. */
   groups: number;
@@ -467,7 +467,7 @@ export interface MatchRewards {
   challenge: { id: string; rank: number; total: number; duel: DuelStanding | null; moreTime?: boolean } | null;
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
   soloBest: number | null;
-  /** „Моят алманах“: facts this match added, and how many there are now. */
+  /** „Моите знания“: facts this match added, and how many there are now. */
   almanac: { added: number; total: number };
   /** Category mastery tiers this match earned. */
   mastery: CategoryMastery[];
@@ -724,7 +724,7 @@ export interface ProfileStats {
   modes: { mode: ModeId; games: number; wins: number; avgPlacement: number | null; rating: number | null }[];
   /** `tier`: the category mastery earned there (null: none yet). */
   categories: { category: CategoryId; answered: number; correct: number; tier: number | null }[];
-  /** „Моят алманах“: facts collected, of how many there are. */
+  /** „Моите знания“: facts collected, of how many there are. */
   almanac: { facts: number; total: number };
   recent: {
     matchId: string;
@@ -1285,7 +1285,7 @@ export interface SiteInfo {
   push: boolean;
 }
 
-// ─── „Моят алманах“ ──────────────────────────────────────────────────────────
+// ─── „Моите знания“ ──────────────────────────────────────────────────────────
 
 /** One fact in a player's almanac: the question it's behind, its answer, and when it became theirs. */
 export interface AlmanacFact {

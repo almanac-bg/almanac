@@ -499,7 +499,7 @@ export function Results({ game }: { game: LiveGame }) {
                 </>
               ) : review && !moreReview ? (
                 <>
-                  <BookOpen className="size-5" /> Моят алманах
+                  <BookOpen className="size-5" /> Моите знания
                 </>
               ) : (MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening' ? (
                 <>

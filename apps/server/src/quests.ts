@@ -218,7 +218,7 @@ const SLOTS: {
       def: {
         id: 'almanac5',
         icon: '📖',
-        text: 'Добави 5 факта в алманаха си',
+        text: 'Добави 5 факта в „Моите знания“',
         goal: 5,
         xp: 70,
         count: (e) => e.facts,

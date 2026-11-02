@@ -20,7 +20,7 @@ import { count } from '../stats';
 import { network, throttled } from '../throttle';
 import { idParam, parse, requireAccount } from './common';
 
-/** „Моят алманах“ and groups: what a player builds up over time. */
+/** „Моите знания“ and groups: what a player builds up over time. */
 export const progress = Router();
 
 // ─── „Моят алманах“ ──────────────────────────────────────────────────────────

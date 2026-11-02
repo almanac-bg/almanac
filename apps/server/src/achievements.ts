@@ -39,7 +39,7 @@ export interface Aggregate {
   friends: number;
   approvedQuestions: number;
   bestSeasonTier: number;
-  /** Facts in „Моят алманах“. */
+  /** Facts in „Моите знания“. */
   facts: number;
   eveningWins: number;
 }

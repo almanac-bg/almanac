@@ -1,4 +1,4 @@
-// What a player builds up: „Моят алманах“ and „Поправителен“ (almanac.ts), category mastery (mastery.ts), groups and
+// What a player builds up: „Моите знания“ and „Поправителен“ (almanac.ts), category mastery (mastery.ts), groups and
 // their weekly boards (groups.ts); and how everyone did, on a question (answers.ts) and on a day (daily.ts).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -110,7 +110,7 @@ test('„X% знаят“: each option’s share in the match’s own order, onl
   assert.deepEqual(crowdFor(number), { known: 0.8, picks: null, answers: 30 });
 });
 
-test('„Моят алманах“: a fact is yours once you get its question right (or stop to read it)', () => {
+test('„Моите знания“: a fact is yours once you get its question right (or stop to read it)', () => {
   const player = account();
   // Even questions of the fixture bank have a fact; odd ones don't.
   const added = noteMatch(

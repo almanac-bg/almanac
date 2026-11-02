@@ -1,6 +1,6 @@
 import { expect, playMatch, signUp, startAsGuest, startSolo, test, uniqueName } from './support';
 
-test('„Моят алманах“ keeps the facts a run taught, and the missed questions wait for „Поправителен“', async ({
+test('„Моите знания“ keep the facts a run taught, and the missed questions wait for „Поправителен“', async ({
   page,
 }) => {
   await startAsGuest(page);
@@ -9,11 +9,11 @@ test('„Моят алманах“ keeps the facts a run taught, and the missed
   await playMatch(page);
   const line = await page.getByText(/ точки · \d+ от 10 верни$/).textContent();
   const right = Number(line!.match(/(\d+) от 10 верни/)![1]);
-  if (right > 0) await expect(page.getByRole('link', { name: `+${right} в алманаха ти` })).toBeVisible();
+  if (right > 0) await expect(page.getByRole('link', { name: `+${right} в „Моите знания“` })).toBeVisible();
 
   await page.goto('/almanac');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    new RegExp(`^Моят алманах: ${right} от \\d+ факта$`),
+    new RegExp(`^Моите знания: ${right} от \\d+ факта$`),
   );
   // Every miss waits, except a final's number guessed half-way close or nearer (nearly known).
   const missed = 10 - right;
