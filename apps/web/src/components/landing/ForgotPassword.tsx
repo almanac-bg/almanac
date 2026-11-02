@@ -41,7 +41,7 @@ export function ForgotPassword({ initial, onBack }: { initial: string; onBack: (
           <p className="rounded-2xl bg-emerald-500/10 p-4 text-emerald-200">
             <MailCheck className="mb-2 size-6" />
             Ако профилът има потвърден имейл, изпратихме линк за нова парола. Провери пощата си (и папката за спам).
-            Линкът е валиден 1 час.
+            Линкът е валиден 1 час.
           </p>
           <p className="text-fg-3">Без потвърден имейл паролата не може да се възстанови — тогава създай нов профил.</p>
         </div>

@@ -3,13 +3,16 @@
 // offline page (public/offline.html) and Caddy's page while the app restarts (deploy/Caddyfile). Written to
 // public/brand-lockup.svg and between the `lockup` markers in those three; test/brand.test.ts (server) checks they
 // match. The name takes `currentColor`; the petals have the classes `gold` and `petal`, with the dark theme's colours
-// as their default fill, for each page's own CSS.
+// as their default fill, for each page's own CSS. Also drawn from it: the mails' heading (public/mail/lockup.png, at
+// twice the size it's shown, on the mails' dark card) and the logo for BIMI (public/bimi.svg, SVG Tiny PS: the
+// rosette on its tile, square), which mail apps show beside the sender once DMARC refuses what fails.
 //
 //   npm run lockup -w @quiz/web      (after a change to the name, the mark or the font)
 import fs from 'node:fs';
 import path from 'node:path';
 import fontverter from 'fontverter';
 import { Blob, Face, Font, Buffer as Glyphs, shape, Variation } from 'harfbuzzjs';
+import sharp from 'sharp';
 
 const root = path.join(import.meta.dirname, '..', '..', '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -84,3 +87,24 @@ for (const file of ['apps/web/index.html', 'apps/web/public/offline.html', 'depl
   fs.writeFileSync(path.join(root, file), text.replace(marked, `<!--lockup-->${svg}<!--/lockup-->`));
 }
 console.log(`brand-lockup.svg: ${name}, ${width} × ${markSize}, ${svg.length} bytes`);
+
+// The mails' heading: shown 180 px wide (mailer.ts), drawn at twice that, the name in the mails' text colour on
+// their card's.
+const mailWidth = 360;
+const mailPng = await sharp(Buffer.from(svg.replace('fill="currentColor"', 'fill="#f5f3ff"')), { density: 300 })
+  .resize(mailWidth)
+  .flatten({ background: '#15122a' })
+  .png({ palette: true, compressionLevel: 9 })
+  .toBuffer();
+fs.mkdirSync(path.join(root, 'apps/web/public/mail'), { recursive: true });
+fs.writeFileSync(path.join(root, 'apps/web/public/mail/lockup.png'), mailPng);
+console.log(`mail/lockup.png: ${mailWidth} × ${Math.round((mailWidth * markSize) / width)}, ${mailPng.length} bytes`);
+
+// BIMI's logo: SVG Tiny PS — a title, a square solid ground, nothing external, no script.
+const tile = /<rect [^>]*fill="(#[0-9a-f]{6})"/.exec(read('apps/web/public/favicon.svg'))?.[1] ?? '#140f26';
+const bimi =
+  `<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 64 64">` +
+  `<title>${name}</title><rect width="64" height="64" fill="${tile}"/>` +
+  `<g transform="translate(6.4 6.4) scale(0.8)">${mark.replaceAll(/ class="\w+"/g, '')}</g></svg>`;
+fs.writeFileSync(path.join(root, 'apps/web/public/bimi.svg'), `${bimi}\n`);
+console.log(`bimi.svg: ${bimi.length} bytes`);

@@ -26,9 +26,9 @@ import { usePageTitle } from '../lib/title';
 
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
-  { icon: '🗓️', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класиране до полунощ' },
+  { icon: '🗓️', title: 'Въпросите на деня', body: 'Едни и същи 10 за цяла България, класация до полунощ' },
   { icon: '🔗', title: 'Предизвикай приятел', body: 'Пращаш линк — приятелят играе същите въпроси, когато може' },
-  { icon: '⚔️', title: 'Дуел, Арена, Роял', body: 'Битки в реално време — от 1 на 1 до 50 души вечер' },
+  { icon: '⚔️', title: 'Дуел, Арена, Роял', body: 'Битки в реално време — от 1 на 1 до 50 души вечер' },
 ];
 
 /** The modes the page below the first screen describes, in the order a newcomer meets them. */
@@ -215,17 +215,17 @@ export function AuthPage() {
               linked && 'max-sm:hidden',
             )}
           >
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Нови 10 въпроса всеки ден
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Нови 10 въпроса всеки ден
           </span>
           {/* Sized for the rosette and its gap (1.25 em) beside the word: at 12.5cqw it ran 7–13 px past its column. */}
           <h1 ref={wordmark} className="text-[min(11.6cqw,5.8rem)] leading-[0.9] whitespace-nowrap">
             <Logo />
             {/* What the name is, for screen readers and search results: the logo alone says only "АЛМАНАХ". */}
-            <span className="sr-only"> — онлайн викторина на български: 10 въпроса на деня</span>
+            <span className="sr-only"> — онлайн викторина на български: 10 въпроса на деня</span>
           </h1>
           <p className="mt-3 font-display text-sm font-bold tracking-[0.35em] text-fg-3 uppercase">{BRAND.domain}</p>
           <p className={clsx('mt-4 max-w-md text-base text-fg-2 sm:mt-6 sm:text-xl', linked && 'max-sm:hidden')}>
-            10 въпроса на деня — едни и същи за цяла България. Три минути, една класация.{' '}
+            10 въпроса на деня — едни и същи за цяла България. Три минути, една класация.{' '}
             <br className="max-sm:hidden" />
             <span className="text-fg">Кой знае най-много?</span>
           </p>
@@ -342,7 +342,7 @@ export function AuthPage() {
                   <p className="mt-1 text-sm text-fg-3">
                     {mode === 'login'
                       ? 'Влез и продължи там, където спря.'
-                      : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
+                      : 'Отнема 10 секунди. Пазим нивото и статистиката ти.'}
                   </p>
                   <form onSubmit={submit} noValidate className="mt-6 space-y-4">
                     <Field

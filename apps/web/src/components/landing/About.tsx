@@ -106,7 +106,7 @@ export function AboutGame({ cta }: { cta: ReactNode }) {
 
       <div className="mt-10 grid gap-x-16 gap-y-10 lg:grid-cols-2">
         <div>
-          <h3 className="t-card">{CATEGORIES.length} категории въпроси</h3>
+          <h3 className="t-card">{CATEGORIES.length}&nbsp;категории въпроси</h3>
           <p className="mt-1.5 text-sm text-fg-3">Избираш категория в „Соло“ или играеш микс от всички.</p>
           {/* Each to its guide (/quiz/…): what it asks about, with sample questions. */}
           <ul className="mt-4 flex flex-wrap gap-2">

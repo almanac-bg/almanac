@@ -94,7 +94,7 @@ export function NewcomerStart({
       <p className="flex items-center gap-1.5 t-eyebrow" style={{ color: accentText(mode.accent[0]) }}>
         <CalendarDays aria-hidden className="size-3.5" /> {mode.name}
       </p>
-      <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+      <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
       <p className="mt-1.5 text-sm text-fg-3">Около три минути, един опит до полунощ. Без регистрация.</p>
       <Button size="lg" variant="gold" className="mt-5 w-full" loading={busy} onClick={onDaily}>
         Играй въпросите на деня <ArrowRight aria-hidden className="size-5" />
@@ -220,10 +220,10 @@ export function DailyLanding({
         </>
       ) : (
         <>
-          <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
+          <h2 className="mt-2 t-section">10 въпроса, едни и същи за цяла България</h2>
           <p className="mt-1.5 text-sm text-fg-3">
             Около три минути, един опит до полунощ. Без регистрация
-            {players > 0 ? ` · днес вече ${players === 1 ? 'игра 1 човек' : `играха ${fmt(players)} души`}` : ''}.
+            {players > 0 ? ` · днес вече ${players === 1 ? 'игра 1 човек' : `играха ${fmt(players)} души`}` : ''}.
           </p>
         </>
       )}

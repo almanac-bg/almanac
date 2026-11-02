@@ -10,14 +10,14 @@ export const BRAND = {
 
 /** The privacy policy's and terms' versions. Who runs a site (name, address…) is its own configuration (see .env). */
 export const LEGAL = {
-  privacyUpdated: '2 ноември 2026 г.',
+  privacyUpdated: '2 ноември 2026 г.',
   /** What that change changed, shown at the top of the policy (§12): a line or three, the newest change only. */
   privacyChanges: [
-    'Историята на мачовете има граници: редовете на ботовете се махат след 30 дни, мачовете — след две години (т. 6).',
+    'Историята на мачовете има граници: редовете на ботовете се махат след 30 дни, мачовете — след две години (т. 6).',
     'Спрян профил сам може да изтегли данните си или да се изтрие при вход с паролата (т. 8); известията на устройството искат потвърждение, че си на 14, както писмата по желание (т. 10).',
     'Уточнения: кои писма пращаме, за какво служи IP адресът, колко пазим писмата до нас и на какво основание са записите на мачовете (т. 2, 3, 5, 6).',
   ] as string[],
-  termsUpdated: '2 ноември 2026 г.',
+  termsUpdated: '2 ноември 2026 г.',
   /** The later of the two, for the sitemap. */
   updatedIso: '2026-11-02',
 } as const;

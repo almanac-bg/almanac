@@ -217,7 +217,7 @@ export class RoomManager {
   /** The host lets someone at the locked room's door in, or doesn't (then they can't knock again). */
   admit(userId: number, playerId: string, admit: boolean): AckResult {
     const room = this.hostRoom(userId);
-    if (!room) return { ok: false, error: 'Само домакинът пуска в стаята, между игрите.' };
+    if (!room) return { ok: false, error: 'Само домакинът пуска в стаята, между мачовете.' };
     const target = Number(playerId.replace(/^u/, ''));
     if (!room.knocks.has(target)) return { ok: false, error: 'Вече не чака на вратата.' };
     if (!admit) {

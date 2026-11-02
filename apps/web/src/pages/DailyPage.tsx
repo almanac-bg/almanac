@@ -174,7 +174,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                     <Share2 className="size-4" /> Прати днешните въпроси
                   </Button>
                   <Button variant="secondary" onClick={() => navigate('/leaderboard?board=daily')}>
-                    <ChartColumn className="size-4" /> Класиране
+                    <ChartColumn className="size-4" /> Класация
                   </Button>
                 </div>
                 <p className="mt-3 text-xs text-fg-3 tabular-nums">Нови въпроси след {countdown(info.endsAt - now)}</p>

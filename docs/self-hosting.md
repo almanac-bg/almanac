@@ -231,6 +231,10 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    TXT `_mta-sts` `v=STSv1; id=<дата, напр. 20261102>` и TXT `_smtp._tls` `v=TLSRPTv1; rua=mailto:postmaster@<домейнът
    ти>`. Политиката е в `mode: testing` (подателите само съобщават какво би се провалило); след две седмици чисти
    отчети я смени на `enforce` и смени и `id`. DMARC: `sp=reject` от самото начало — поддомейните не пращат писма.
+6. **Знакът до името на подателя (BIMI)** — щом DMARC отказва или слага в спам каквото не мине (`p=quarantine` или
+   `p=reject`, не `none`): TXT `default._bimi` `v=BIMI1; l=https://<домейнът ти>/bimi.svg;` (`bimi.svg` е в
+   `apps/web/public`, нарисуван от `npm run lockup -w @quiz/web`). Yahoo, Fastmail, Apple Mail и др. го показват; Gmail
+   иска и платен сертификат за марката (VMC), без който просто не го показва.
 
 Използвай порт **587** с `?requireTLS=true`: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и
 465 на нови сървъри.

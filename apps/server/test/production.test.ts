@@ -322,6 +322,28 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.equal((JSON.parse(operator ?? 'null') as SiteInfo | null)?.name, 'Тест Тестов');
 });
 
+test('in every drawn public page, a number keeps to the word after it (COPY-14)', {
+  skip: !built || !paintable,
+}, async () => {
+  const split: string[] = [];
+  for (const route of Object.keys(PUBLIC_PAGES)) {
+    const html = await (await fetch(`${srv.url}${route}`)).text();
+    // The text a reader sees: the page itself, without its tags (React's <!-- --> between two pieces of text too) and
+    // entities as characters.
+    const text = html
+      .slice(html.indexOf('<div id="root"'), html.indexOf('<!--/app-->'))
+      .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, '\u00a0')
+      .replace(/&#x27;|&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+    for (const m of text.matchAll(/\d (?=[\p{L}%°])/gu))
+      split.push(`${route}: …${text.slice(Math.max(0, m.index - 20), m.index + 14).replace(/\s+/g, ' ')}…`);
+  }
+  assert.deepEqual(split, [], 'a number and its word with a plain space: keepTogether, or a no-break space');
+});
+
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {
   const app = fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src/App.tsx'), 'utf8');
   // A category's quiz is a public page for each real category (an unknown one is a 404): one stands for them.
