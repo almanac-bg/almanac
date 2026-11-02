@@ -1056,6 +1056,8 @@ export interface PlayerCard {
   /** Groups they made and sets they share: what a report about them is often about. */
   groups: { id: number; name: string; members: number }[];
   sets: { code: string; name: string; hidden: boolean }[];
+  /** How many of their sets moderators have hidden so far (deleted since or not): a repeat weighs more. */
+  setsHidden: number;
   log: ModerationLogEntry[];
 }
 

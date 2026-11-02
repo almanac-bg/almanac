@@ -716,6 +716,20 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     made.body.id,
     'its owner still sees it',
   );
+
+  // Hidden, it stays so (MOD-9): the same questions (in another order, in other case) can't make a new set, its owner
+  // can't delete it while it can be appealed, and the card counts it.
+  const again = await api.send('POST', '/api/sets', A.cookie, {
+    ...set,
+    name: 'Урок по история 2',
+    questions: [...set.questions].reverse().map((q) => ({ ...q, q: q.q.toUpperCase() })),
+  });
+  assert.equal(again.status, 400);
+  assert.match(again.body.error, /скрит от модератор/);
+  const removed = await api.send('DELETE', `/api/sets/${made.body.id}`, A.cookie);
+  assert.match(removed.body.error, /6 месеца/);
+  assert.equal((await api.get(`/api/sets/${made.body.id}`, A.cookie)).status, 200, 'still there');
+  assert.equal((await api.get(`/api/admin/players/${A.user.id}`, N.cookie)).body.card.setsHidden, 1);
 });
 
 test('forfeit frees the player', T, async () => {

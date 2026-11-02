@@ -225,6 +225,7 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
             {card.reports.open} отворени · {card.reports.resolved} решени
           </Stat>
           <Stat label="Доклади от играча">{card.reports.filed}</Stat>
+          {card.setsHidden > 0 && <Stat label="Скрити набори досега">{card.setsHidden}</Stat>}
           <Stat label="Предложени въпроси">
             {card.submissions.approved} одобрени · {card.submissions.rejected} отхвърлени · {card.submissions.pending}{' '}
             чакат

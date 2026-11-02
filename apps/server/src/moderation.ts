@@ -1047,6 +1047,10 @@ export function playerCard(id: number): PlayerCard | null {
       'SELECT code, name, hidden FROM question_sets WHERE owner_id = ? ORDER BY updated_at DESC LIMIT 30',
       id,
     ).map((r) => ({ code: r.code, name: r.name, hidden: r.hidden === 1 })),
+    setsHidden: count(
+      "SELECT COUNT(*) AS n FROM moderation_log WHERE target_user_id = ? AND action = 'hide_set' AND undone_at IS NULL",
+      id,
+    ),
     log: playerLog(id),
   };
 }

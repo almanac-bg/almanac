@@ -69,7 +69,11 @@ setsRouter.put('/sets/:id', requireAuth, requireAccount, (req, res) => {
 });
 
 setsRouter.delete('/sets/:id', requireAuth, requireAccount, (req, res) => {
-  deleteSet(idParam(req), res.locals.userId);
+  const done = deleteSet(idParam(req), res.locals.userId);
+  if (!done.ok) {
+    res.status(400).json({ error: done.error });
+    return;
+  }
   res.json({ ok: true });
 });
 
