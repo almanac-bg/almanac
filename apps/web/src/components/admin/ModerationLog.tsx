@@ -38,6 +38,7 @@ const ACTION: Record<ModerationLogAction, string> = {
   export_data: 'изтегли данните по искане на',
   erase_request: 'изтри профил по искане',
   choose_name: 'си избра ново име след смяна от модератор',
+  delete_picture: 'изтри навсякъде снимка с незаконно съдържание',
 };
 
 /**

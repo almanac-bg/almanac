@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import {
   type QuestionSetInfo,
   type QuestionSetSummary,
+  RATED_AFTER,
   type RoomSettings,
   SETS,
   type SetImage,
@@ -10,6 +11,7 @@ import {
   setPictureUrl,
 } from '@quiz/shared';
 import { z } from 'zod';
+import { alertModerators } from './alerts';
 import { all, one, run, tx } from './db';
 import { longDateTime } from './mailer';
 import { textProblem } from './names';
@@ -17,6 +19,9 @@ import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
+import { throttled } from './throttle';
+import { ratesPeople } from './trust';
+import { getUser } from './users';
 
 /**
  * „Моите въпроси“: a host's own question sets (SETS), for their private rooms — a teacher's quiz on the lesson, an
@@ -285,6 +290,24 @@ export function uploadPicture(
   if (!Buffer.isBuffer(upload) || Array.isArray(upload) || typeof upload === 'string')
     return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
   if (upload.length > SETS.imageBytes) return { ok: false, error: 'Снимката е твърде голяма.' };
+  // Pictures are stored and served: only from an account that has played a while or confirmed an e-mail address,
+  // within a day's budget for everyone (the 31 October review, MOD-6).
+  const user = getUser(userId);
+  if (!user || !(ratesPeople(user) || user.email))
+    return {
+      ok: false,
+      error: `Снимки могат да добавят профили с потвърден имейл или с поне ${RATED_AFTER.games} мача отпреди ден.`,
+    };
+  if (throttled('set-images:all', SETS.imagesPerDay, 24 * 60 * 60_000)) {
+    if (!throttled('set-images:all:alerted', 1, 24 * 60 * 60_000))
+      alertModerators(
+        'pictures-budget',
+        'Дневният лимит за снимки е стигнат',
+        [`Днес са качени ${SETS.imagesPerDay} снимки в набори: нови се отказват до утре.`],
+        { ownerOnly: true },
+      );
+    return { ok: false, error: 'Днес са качени много снимки. Опитай утре.' };
+  }
   const pic = readPicture(upload);
   if (!pic) return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
   const bytes = pic.bytes;
@@ -589,7 +612,47 @@ export function setForModerator(code: string): (QuestionSetInfo & { author: stri
     'SELECT s.*, u.username FROM question_sets s LEFT JOIN users u ON u.id = s.owner_id WHERE s.code = ?',
     code,
   );
-  return row ? { ...info(row), author: row.username } : null;
+  if (!row) return null;
+  // Its pictures from the moderators' own address, which serves a blocked one too: an appeal, an undo, is decided
+  // seeing what the decision was about (the 31 October review, MOD-6).
+  const set = info(row);
+  return {
+    ...set,
+    questions: set.questions.map((q) =>
+      'image' in q && q.image ? { ...q, image: { ...q.image, url: `/api/admin/pictures/${q.image.id}` } } : q,
+    ),
+    author: row.username,
+  };
+}
+
+/** A picture for a moderator's eyes: blocked or not, while its bytes are kept (deletePicture takes them). */
+export const pictureForModerator = (id: string) =>
+  one<{ type: string; bytes: Uint8Array }>('SELECT type, bytes FROM set_images WHERE id = ? LIMIT 1', id);
+
+/**
+ * „Изтрий снимката“: a picture with illegal content goes everywhere at once — its bytes from every uploader's copy, its
+ * place in every set (the questions stay, without it) — and stays blocked by its hash, so it can't come back. For good:
+ * the written procedure (docs/operations.md → „Незаконна снимка“) says when, and what is reported first. Returns the
+ * sets it was in, their owners and names, to tell them.
+ */
+export function deletePicture(id: string): { ownerId: number; name: string }[] {
+  const sets = all<SetRow>(
+    'SELECT s.* FROM question_sets s JOIN set_image_uses u ON u.set_id = s.id WHERE u.image_id = ?',
+    id,
+  );
+  tx(() => {
+    run('INSERT OR IGNORE INTO blocked_pictures (id, blocked_at) VALUES (?, ?)', id, Date.now());
+    for (const s of sets) {
+      const questions = questionsOf(s).map((q) => {
+        if (!('image' in q) || q.image?.id !== id) return q;
+        const { image: _, ...rest } = q;
+        return rest as SetQuestion;
+      });
+      run('UPDATE question_sets SET questions = ? WHERE id = ?', JSON.stringify(questions), s.id);
+    }
+    run('DELETE FROM set_images WHERE id = ?', id);
+  });
+  return sets.map((s) => ({ ownerId: s.owner_id, name: s.name }));
 }
 
 /** A set its owner can play in a room: theirs, not hidden, with questions in it. */

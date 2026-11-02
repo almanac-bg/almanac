@@ -500,9 +500,13 @@ test('a set’s picture is a still WebP or JPEG of a sensible size; a photo’s 
 
 test('a host uploads pictures, saves them with a set, plays them; a moderator blocks them; unused ones go', () => {
   run(
-    `INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES
-     (11, 'teacher', 'teacher', 'x', 0), (12, 'other', 'other', 'x', 0)`,
+    `INSERT INTO users (id, username, username_key, password_hash, created_at, email, email_key) VALUES
+     (11, 'teacher', 'teacher', 'x', 0, 't@example.test', 't@example.test'),
+     (12, 'other', 'other', 'x', 0, 'o@example.test', 'o@example.test'),
+     (13, 'newcomer', 'newcomer', 'x', 0, NULL, NULL)`,
   );
+  // Pictures are stored and served: an account with a confirmed address, or one that has played a while (MOD-6).
+  assert.match(String((uploadPicture(13, webp(800, 600)) as { error: string }).error), /потвърден имейл/);
   const up = uploadPicture(11, webp(800, 600));
   assert.ok(up.ok);
   assert.deepEqual(uploadPicture(11, webp(800, 600)), up, 'the same picture twice is one');

@@ -586,6 +586,10 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   assert.match(bad.body.error, /^Въпрос 1: .*еднакви/);
   // A picture as Safari's canvas writes it (EXIF and APP13 in the JPEG): kept without them, and served only by the
   // signed address the server gives, never to another site.
+  // An account with a confirmed address may add pictures (MOD-6).
+  srv.db
+    .prepare("UPDATE users SET email = 'ivan@example.test', email_key = 'ivan@example.test' WHERE id = ?")
+    .run(A.user.id);
   const uploaded = await fetch(`${srv.url}/api/sets/images`, {
     method: 'POST',
     headers: { cookie: A.cookie, 'content-type': 'image/jpeg' },
@@ -730,6 +734,50 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   assert.match(removed.body.error, /6 месеца/);
   assert.equal((await api.get(`/api/sets/${made.body.id}`, A.cookie)).status, 200, 'still there');
   assert.equal((await api.get(`/api/admin/players/${A.user.id}`, N.cookie)).body.card.setsHidden, 1);
+
+  // A picture with illegal content (MOD-6): a moderator sees it from their own address (blocked or not), and the owner
+  // deletes it everywhere — the question stays without it, and it can't come back.
+  const withPicture = await api.send('POST', '/api/sets', A.cookie, {
+    name: 'Снимков урок',
+    questions: [
+      {
+        kind: 'truefalse',
+        q: 'На снимката има крепост?',
+        answer: true,
+        image: { id: picture.id, w: 320, h: 240, alt: 'Крепост' },
+      },
+    ],
+  });
+  assert.equal(withPicture.status, 200, withPicture.body.error);
+  const pictured = (await api.get(`/api/sets/${withPicture.body.id}`, A.cookie)).body;
+  const read = (await api.get(`/api/admin/sets/${pictured.code}`, N.cookie)).body.set;
+  assert.equal(read.questions[0].image.url, `/api/admin/pictures/${picture.id}`);
+  const seen = await fetch(`${srv.url}/api/admin/pictures/${picture.id}`, { headers: { cookie: N.cookie } });
+  assert.equal(seen.status, 200);
+  assert.equal(seen.headers.get('cache-control'), 'no-store');
+  assert.equal(
+    (await fetch(`${srv.url}/api/admin/pictures/${picture.id}`, { headers: { cookie: B.cookie } })).status,
+    403,
+  );
+  const del = (cookie: string, reason: string) =>
+    api.send('POST', `/api/admin/pictures/${picture.id}/delete`, cookie, { reason });
+  assert.equal((await del(N.cookie, 'кратко')).status, 400, 'with why');
+  assert.equal((await del(N.cookie, 'Снимката е с незаконно съдържание.')).status, 200);
+  assert.equal((await api.get(`/api/sets/${withPicture.body.id}`, A.cookie)).body.questions[0].image, undefined);
+  assert.equal(
+    (await fetch(`${srv.url}/api/admin/pictures/${picture.id}`, { headers: { cookie: N.cookie } })).status,
+    404,
+  );
+  const again2 = await fetch(`${srv.url}/api/sets/images`, {
+    method: 'POST',
+    headers: { cookie: A.cookie, 'content-type': 'image/jpeg' },
+    body: jpeg(320, 240),
+  });
+  assert.match(((await again2.json()) as { error: string }).error, /спряна от модератор/, "and can't come back");
+  assert.match(
+    (await api.get('/api/notifications', A.cookie)).body.notifications[0].text,
+    /изтри снимка от набора ти „Снимков урок“/,
+  );
 });
 
 test('forfeit frees the player', T, async () => {

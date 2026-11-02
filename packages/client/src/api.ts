@@ -260,6 +260,9 @@ export const api = {
   adminPlayers: (query: string) =>
     request<{ players: PlayerSearchHit[] }>('GET', `/admin/players?q=${encodeURIComponent(query)}`),
   adminPlayer: (id: number) => request<{ card: PlayerCard }>('GET', `/admin/players/${id}`),
+  /** A picture with illegal content deleted everywhere (the owner's, under the written procedure). */
+  deletePicture: (id: string, reason: string) =>
+    request<{ ok: true; sets: number }>('POST', `/admin/pictures/${id}/delete`, { reason }),
   /** The owner, on a request by mail: a player's data as a file, or the account erased (`reason`: how it came). */
   adminExportPlayer: (id: number, reason: string) =>
     request<Blob>('POST', `/admin/players/${id}/export`, { reason }, true, true),

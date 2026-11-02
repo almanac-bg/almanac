@@ -1,4 +1,4 @@
-import { ApiError, api, errorMessage, plural, timeAgo, toast } from '@quiz/client';
+import { ApiError, api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/client';
 import {
   type CaseDecision,
   type ModerationBasis,
@@ -375,6 +375,21 @@ function GroupRenameForm({
 /** A reported set, read in full: every question, its answer and its picture (a report is judged on what's in it). */
 function SetReader({ code }: { code: string }) {
   const { data, error, retry } = useLoad(() => api.adminSet(code), code);
+  // A picture with illegal content: the owner deletes it everywhere (docs/operations.md → „Незаконна снимка“).
+  const owner = useStore((s) => s.me?.staffRole === 'owner');
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [why, setWhy] = useState('');
+  async function remove(id: string) {
+    try {
+      const { sets } = await api.deletePicture(id, why.trim());
+      toast({ kind: 'success', title: 'Снимката е изтрита навсякъде', body: `От ${plural(sets, 'набор', 'набора')}.` });
+      setDeleting(null);
+      setWhy('');
+      retry();
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err) });
+    }
+  }
   if (error) return <LoadError title="Наборът не се зареди" error={error} onRetry={retry} />;
   if (!data) return <Spinner className="mt-3 size-6 text-violet-400" />;
   return (
@@ -394,6 +409,31 @@ function SetReader({ code }: { code: string }) {
               loading="lazy"
               className="mt-2 max-h-48 w-auto rounded-xl"
             />
+          )}
+          {'image' in q && q.image && owner && (
+            <div className="mt-2">
+              {deleting === q.image.id ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={why}
+                    onChange={(e) => setWhy(e.target.value)}
+                    aria-label="Защо се изтрива"
+                    placeholder="Незаконно съдържание: какво (за дневника и за собственика)"
+                    className="field h-9 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                  />
+                  <Button size="sm" variant="danger" onClick={() => void remove(q.image!.id)}>
+                    Изтрий завинаги
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDeleting(null)}>
+                    Отказ
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="ghost" className="text-rose-300" onClick={() => setDeleting(q.image!.id)}>
+                  Изтрий снимката навсякъде
+                </Button>
+              )}
+            </div>
           )}
           <p className="mt-1 text-fg-2">{answerOf(q)}</p>
         </li>

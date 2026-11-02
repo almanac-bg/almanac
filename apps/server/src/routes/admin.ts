@@ -36,7 +36,8 @@ import {
   unhideQuestion,
 } from '../questionReports';
 import { bankProblem, questionById, reloadQuestionBank } from '../questions';
-import { setForModerator } from '../sets';
+import { deletePicture, pictureForModerator, setForModerator } from '../sets';
+import { tellPlayer } from '../statements';
 import { launchStats } from '../stats';
 import {
   approveSubmission,
@@ -236,6 +237,56 @@ adminRouter.post('/admin/cases/:kind/:id/resolve', change, (req, res) => {
 });
 
 /** A reported set, all of it, for the moderator to read (hidden or not). */
+/** A set's picture for a moderator's eyes, blocked or not (setForModerator points here): never cached, never framed. */
+adminRouter.get('/admin/pictures/:id', (req, res) => {
+  const id = String(req.params.id);
+  const file = /^[0-9a-f]{16}$/.test(id) ? pictureForModerator(id) : undefined;
+  if (!file) {
+    res.status(404).json({ error: 'Няма такава снимка.' });
+    return;
+  }
+  res.set({
+    'Content-Type': file.type,
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex',
+    'Content-Security-Policy': "default-src 'none'",
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  });
+  res.send(Buffer.from(file.bytes));
+});
+
+/**
+ * „Изтрий снимката“ (the owner's, under the written procedure for illegal pictures — docs/operations.md): its bytes go
+ * from every copy and every set, its hash stays blocked. Logged; whoever had it in a set hears why. For good.
+ */
+adminRouter.post('/admin/pictures/:id/delete', requireOwner, change, (req, res) => {
+  const body = parse(z.object({ reason: Reason }), req, res);
+  if (!body) return;
+  const id = String(req.params.id);
+  const reason = body.reason.trim();
+  if (!/^[0-9a-f]{16}$/.test(id) || !pictureForModerator(id)) {
+    res.status(404).json({ error: 'Няма такава снимка.' });
+    return;
+  }
+  if (reason.length < MODERATION.reasonMin) {
+    res.status(400).json({ error: `Напиши защо (поне ${MODERATION.reasonMin} знака).` });
+    return;
+  }
+  const sets = deletePicture(id);
+  logAction({ adminId: res.locals.userId, action: 'delete_picture', target: id, basis: 'content', reason });
+  for (const s of sets)
+    tellPlayer(s.ownerId, {
+      what: `Модератор изтри снимка от набора ти „${s.name}“: въпросът остава без нея.`,
+      basis: 'content',
+      reason,
+      onReport: true,
+      subject: 'Снимка от набора ти е изтрита',
+      icon: '🖼️',
+      link: '/sets',
+    });
+  res.json({ ok: true, sets: sets.length });
+});
+
 adminRouter.get('/admin/sets/:code', (req, res) => {
   const set = setForModerator(String(req.params.code).slice(0, 32));
   if (!set) {

@@ -1008,7 +1008,9 @@ export type ModerationLogAction =
   | 'export_data'
   | 'erase_request'
   /** The player picked a name of their own after a moderator's rename. */
-  | 'choose_name';
+  | 'choose_name'
+  /** A picture with illegal content deleted everywhere (its bytes; its hash stays blocked). */
+  | 'delete_picture';
 
 export interface ModerationLogEntry {
   id: number;
@@ -1459,6 +1461,8 @@ export const SETS = {
   imageSide: 1200,
   imageBytes: 150_000,
   imageAlt: 150,
+  /** New pictures a day, from everyone together (past it, uploads wait for tomorrow and the owner hears). */
+  imagesPerDay: 500,
 } as const;
 
 /** A set as its owner keeps and edits it. */
