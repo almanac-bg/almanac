@@ -194,3 +194,34 @@ test('on a phone the answer just tapped stays under the finger when the answer c
   expect(moved.length, 'questions with options measured').toBeGreaterThan(0);
   for (const dy of moved) expect(Math.abs(dy), `moved ${moved.join(', ')} px`).toBeLessThanOrEqual(2);
 });
+
+test('the bank’s letters are drawn in the game’s font, not the system’s (VD-13)', async ({ page, browserName }) => {
+  // Which font drew a node is only reported by Chromium's DevTools protocol.
+  test.skip(browserName !== 'chromium', 'Chromium only');
+  await page.goto('/');
+  // ѝ and Ѝ aren't in Onest: drawn from и, И and the combining grave, which its subset keeps.
+  const letters = ['ѝ', 'Ѝ', 'Ж', 'Š', 'ș', 'ț', 'ă', 'ǎ', 'ć', 'ő', '„', '“', '—', '№'];
+  await page.evaluate((letters) => {
+    const box = document.createElement('div');
+    box.style.fontFamily = 'var(--font-sans)';
+    for (const [i, letter] of letters.entries()) {
+      const span = document.createElement('span');
+      span.id = `letter${i}`;
+      span.textContent = letter;
+      box.append(span);
+    }
+    document.body.append(box);
+    return document.fonts.ready.then(() => undefined);
+  }, letters);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('DOM.enable');
+  await cdp.send('CSS.enable');
+  const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+  const drawnBy: Record<string, string> = {};
+  for (const [i, letter] of letters.entries()) {
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `#letter${i}` });
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    drawnBy[letter] = fonts.map((f) => f.familyName).join(', ');
+  }
+  expect(Object.entries(drawnBy).filter(([, font]) => font !== 'Onest')).toEqual([]);
+});
