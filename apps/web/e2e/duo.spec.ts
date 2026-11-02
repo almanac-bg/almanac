@@ -22,4 +22,11 @@ test('Отбори: one asks a friend from the mode card, the friend says yes, a
   await Promise.all([anna, boris].map((p) => expect(p).toHaveURL(/\/game$/, { timeout: gameMs(15_000) })));
   const [a, b] = await Promise.all([playMatch(anna), playMatch(boris)]);
   expect([a.total, b.total]).toEqual([10, 10]);
+
+  // On the results the friend is a teammate, not an opponent, and home is offered once (it's the main button).
+  for (const p of [anna, boris]) {
+    await expect(p.getByText('Още един мач заедно?').filter({ visible: true })).toBeVisible();
+    await expect(p.getByText(/Реванш срещу/)).toHaveCount(0);
+    await expect(p.getByRole('button', { name: /^(Начало|Към началото)$/ })).toHaveCount(1);
+  }
 });

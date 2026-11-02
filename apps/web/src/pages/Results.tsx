@@ -501,12 +501,23 @@ export function Results({ game }: { game: LiveGame }) {
               <span className="max-sm:hidden">Сподели</span>
             </Button>
           )}
-          {!(challenge && guest) && !(duel && !duel.outcome && !duel.expired) && (
-            <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
-              <Home className="size-5" />
-              <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
-            </Button>
-          )}
+          {/* Not when the main button above already goes home: an undecided duel, a guest's link, a team match or the
+              evening Роял (their "again" is the home screen). */}
+          {!(challenge && guest) &&
+            !(duel && !duel.outcome && !duel.expired) &&
+            !(
+              !daily &&
+              !duel &&
+              !challenge &&
+              end.mode !== 'custom' &&
+              !(review && !moreReview) &&
+              ((MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening')
+            ) && (
+              <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
+                <Home className="size-5" />
+                <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
+              </Button>
+            )}
         </div>
       </div>
     </div>
