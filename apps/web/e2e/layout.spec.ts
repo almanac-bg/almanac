@@ -225,3 +225,52 @@ test('the bank’s letters are drawn in the game’s font, not the system’s (V
   }
   expect(Object.entries(drawnBy).filter(([, font]) => font !== 'Onest')).toEqual([]);
 });
+
+/**
+ * Tabs through a page and lists every focused element the screen hides entirely (WCAG 2.4.11): each of nine points of
+ * it off the screen or under a bar pinned over the page (the header, the tab bar, a page's own: `data-bottom-bar`).
+ */
+async function hiddenWhenFocused(page: Page, steps: number): Promise<string[]> {
+  const hidden: string[] = [];
+  for (let i = 0; i < steps; i++) {
+    await page.keyboard.press('Tab');
+    const seen = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return null;
+      const r = el.getBoundingClientRect();
+      const name = `${el.tagName} ${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 30) ?? ''}`;
+      const bars = 'header, nav, [data-bottom-bar]';
+      // Something in a bar is shown by it.
+      if (el.closest(bars)) return { name, shown: true };
+      for (const fx of [0.1, 0.5, 0.9])
+        for (const fy of [0.1, 0.5, 0.9]) {
+          const x = r.left + r.width * fx;
+          const y = r.top + r.height * fy;
+          if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
+          if (!document.elementFromPoint(x, y)?.closest(bars)) return { name, shown: true };
+        }
+      return { name, shown: false };
+    });
+    if (seen && !seen.shown) hidden.push(seen.name);
+  }
+  return hidden;
+}
+
+for (const [where, size] of [
+  ['phone', { width: 390, height: 844 }],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test(`the set editor never hides the focused field behind its save bar (2.4.11, ${where})`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await signUp(page, uniqueName('Учител'), 'parola-123');
+    await page.goto('/sets');
+    await page.getByRole('button', { name: 'Нов набор' }).click();
+    await expect(page).toHaveURL(/\/sets\/\d+$/);
+    await page.getByRole('button', { name: /^Въпрос 1/ }).click();
+    await page.getByLabel('Текст на въпрос 1').fill('Коя е столицата на България?');
+    await page.getByRole('button', { name: /^Въпрос 2/ }).click();
+    // From the top of the page, every stop of the keyboard through the editor: the name, the questions, their answers.
+    await page.getByLabel('Име на набора').focus();
+    expect(await hiddenWhenFocused(page, 30)).toEqual([]);
+  });
+}

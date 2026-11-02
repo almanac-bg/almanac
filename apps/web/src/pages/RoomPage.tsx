@@ -36,6 +36,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
+import { BottomBar } from '../components/BottomBar';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
@@ -379,7 +380,7 @@ export function RoomPage() {
       <FreshPowerupNotes />
 
       {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
-      <div
+      <BottomBar
         className={clsx(
           // The tab bar steps aside in a room: the bar sits at the very bottom, clear of the home indicator.
           'sticky bottom-0 z-30 -mx-4 flex items-center gap-3 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden',
@@ -398,7 +399,7 @@ export function RoomPage() {
             <Play className="size-5" /> Започни
           </Button>
         )}
-      </div>
+      </BottomBar>
 
       <Modal open={!!kickTarget} onClose={() => setKicking(null)} title="Премахване от стаята">
         <p className="text-fg-2">

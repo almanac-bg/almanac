@@ -247,12 +247,13 @@
  */
 html {
   scroll-padding-top: 5rem;
-  scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  /* --bottom-bar: a page's own pinned bar, from the screen's foot to its top (lib/bottomBar.ts: A11Y-1). */
+  scroll-padding-bottom: calc(max(5rem, var(--bottom-bar, 0px) + 1rem) + env(safe-area-inset-bottom));
 }
 @media (min-width: 768px) {
   html {
     /* --knocked-out-room: the notice a knocked-out player sees above the emote bar (GamePage). */
-    scroll-padding-bottom: var(--knocked-out-room, 1rem);
+    scroll-padding-bottom: max(var(--knocked-out-room, 1rem), var(--bottom-bar, 0px) + 1rem);
   }
 }
 @media (max-height: 480px) {
