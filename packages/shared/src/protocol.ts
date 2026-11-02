@@ -1048,7 +1048,8 @@ export interface PlayerCard {
   staff: 'owner' | 'moderator' | null;
   /** A deleted account with this verified e-mail was banned (in the last 12 months): the same person starting over. */
   bannedBefore: { basis: ModerationBasis | null; until: number | null; erasedAt: number } | null;
-  ban: { until: number; basis: ModerationBasis | null; reason: string | null } | null;
+  /** `annulled`: this season's results were annulled with it (lifting it can give them back). */
+  ban: { until: number; basis: ModerationBasis | null; reason: string | null; annulled: boolean } | null;
   gamesPlayed: number;
   reports: { open: number; resolved: number; filed: number };
   submissions: { pending: number; approved: number; rejected: number };

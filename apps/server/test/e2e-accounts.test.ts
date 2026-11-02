@@ -796,6 +796,21 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     .get(E.user.id) as { text: string };
   assert.match(told.text, /върна резултатите ти.*Причина: Обжалване: беше грешка\./, 'the player hears each undo');
 
+  // A ban that came with an annulment, lifted on appeal: the results come back with it, in one statement (MOD-10).
+  const again = await act('ban', { days: 30, basis: 'cheating', reason: 'Отговаря с програма.', annul: true });
+  assert.equal(again.body.card.ban.annulled, true, 'the card says the results went with it');
+  assert.deepEqual(results(), { rating: 0, daily: 1, evening: 1 });
+  const lifted = await act('ban-change', { days: null, reason: 'Обжалването е уважено.', restore: true });
+  assert.equal(lifted.body.card.ban, null);
+  assert.deepEqual(results(), before, 'the results back with the lift');
+  const [liftEntry, annulEntry] = await log();
+  assert.equal(liftEntry.action, 'unban');
+  assert.deepEqual([annulEntry.action, annulEntry.undoReason], ['annul', 'Обжалването е уважено.']);
+  const both = srv.db
+    .prepare('SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 1')
+    .get(E.user.id) as { text: string };
+  assert.match(both.text, /свали спирането на профила ти и върна резултатите ти от този сезон/);
+
   // A rename, undone while the old name is free.
   assert.equal(
     (await act('rename', { username: 'chesten_test', basis: 'name', reason: 'Името подвежда играчите.' })).status,

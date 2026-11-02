@@ -391,6 +391,7 @@ export function banPlayer(
   const reason = ban.reason.trim().slice(0, MODERATION.reasonMax);
   const until = ban.days === null ? FOREVER : Date.now() + ban.days * DAY;
   let onReport = false;
+  let banLog = 0;
   tx(() => {
     run(
       'UPDATE users SET banned_until = ?, ban_reason = ?, ban_basis = ? WHERE id = ?',
@@ -403,7 +404,7 @@ export function banPlayer(
     // Its devices too, including any subscribed before subscriptions remembered their session (SEC-7).
     run('DELETE FROM push_subscriptions WHERE user_id = ?', targetId);
     onReport = closeReports(adminId, closes, 'ban', target.username).length > 0;
-    logAction({
+    banLog = logAction({
       adminId,
       action: 'ban',
       userId: targetId,
@@ -412,7 +413,7 @@ export function banPlayer(
       undo: { bannedUntil: target.banned_until, reason: target.ban_reason, basis: target.ban_basis },
     });
   });
-  if (ban.annul) annulResults(adminId, targetId, { basis: ban.basis, reason }, { told: false });
+  if (ban.annul) annulResults(adminId, targetId, { basis: ban.basis, reason }, { told: false, ban: banLog });
   removeFromPlay(targetId);
   disconnectUser(targetId);
   // Signed out for the ban: what they read is at sign-in (activeBan) and in the mail.
@@ -438,8 +439,17 @@ const banEnd = (until: number) => (until >= FOREVER ? 'за постоянно' 
 const BANNED_DATA = () =>
   `Докато профилът е спрян, при вход с паролата си пак можеш да изтеглиш данните си или да изтриеш профила; или ни пиши на ${config.operator.email}.`;
 
-/** Lifts a ban now, or moves its end (`days` from now). */
-export function changeBan(adminId: number, targetId: number, days: number | null, reason: string): Result {
+/**
+ * Lifts a ban now, or moves its end (`days` from now). Lifting one that came with an annulment can give the results
+ * back too (`restore`), said in the same statement: „ако сме сгрешили, … връщаме каквото е отнето“ (Terms §3а).
+ */
+export function changeBan(
+  adminId: number,
+  targetId: number,
+  days: number | null,
+  reason: string,
+  { restore = false } = {},
+): Result {
   const target = getUser(targetId);
   if (!target) return { ok: false, error: 'Няма такъв играч.' };
   const mine = notTheirs(adminId, targetId);
@@ -448,6 +458,7 @@ export function changeBan(adminId: number, targetId: number, days: number | null
   if (reason.trim().length < MODERATION.reasonMin)
     return { ok: false, error: `Напиши защо (поне ${MODERATION.reasonMin} знака).` };
   const until = days === null ? null : Date.now() + days * DAY;
+  const annulled = until === null && restore ? annulledWithBan(targetId) : null;
   tx(() => {
     run(
       'UPDATE users SET banned_until = ?, ban_reason = CASE WHEN ? IS NULL THEN NULL ELSE ban_reason END, ban_basis = CASE WHEN ? IS NULL THEN NULL ELSE ban_basis END WHERE id = ?',
@@ -463,9 +474,20 @@ export function changeBan(adminId: number, targetId: number, days: number | null
       reason: `${until === null ? '' : `Нов край след ${days} дни. `}${reason.trim().slice(0, MODERATION.reasonMax)}`,
       undo: { bannedUntil: target.banned_until, reason: target.ban_reason, basis: target.ban_basis },
     });
+    if (annulled) {
+      restoreResults(targetId, annulled.undo);
+      markUndone(annulled.id, adminId, reason.trim().slice(0, MODERATION.reasonMax));
+    }
   });
   if (until === null)
-    tellReversal(targetId, 'Модератор свали спирането на профила ти: можеш да играеш отново.', reason, '🕊️');
+    tellReversal(
+      targetId,
+      annulled
+        ? 'Модератор свали спирането на профила ти и върна резултатите ти от този сезон: можеш да играеш отново.'
+        : 'Модератор свали спирането на профила ти: можеш да играеш отново.',
+      reason,
+      '🕊️',
+    );
   else
     tellPlayer(
       targetId,
@@ -575,6 +597,49 @@ interface AnnulUndo {
   ratings: { season: string; mode: string; rating: number; peak: number; games: number; wins: number }[];
   daily: { day: string; own_set: number | null }[];
   evening: { day: string; placement: number; score: number; players: number }[];
+  /** The ban's log entry it came with (a case decided „Спри“ with „Анулирай“): lifting that ban can give them back. */
+  ban?: number;
+}
+
+/** An annulment taken back: the season's ratings, dailies and evening places as they were. */
+function restoreResults(userId: number, a: AnnulUndo) {
+  tx(() => {
+    for (const r of a.ratings)
+      run(
+        `INSERT OR REPLACE INTO season_ratings (user_id, season, mode, rating, peak, games, wins)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        userId,
+        r.season,
+        r.mode,
+        r.rating,
+        r.peak,
+        r.games,
+        r.wins,
+      );
+    for (const d of a.daily)
+      run('UPDATE daily_results SET own_set = ? WHERE user_id = ? AND day = ?', d.own_set, userId, d.day);
+    for (const e of a.evening)
+      run(
+        'INSERT OR IGNORE INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, ?, ?, ?)',
+        e.day,
+        userId,
+        e.placement,
+        e.score,
+        e.players,
+      );
+  });
+}
+
+/** The annulment that came with the player's standing ban, still standing itself (the 31 October review, MOD-10). */
+function annulledWithBan(userId: number): { id: number; undo: AnnulUndo } | null {
+  const row = one<{ id: number; undo: string }>(
+    `SELECT a.id, a.undo FROM moderation_log a WHERE a.target_user_id = ? AND a.action = 'annul' AND a.undone_at IS NULL
+     AND json_extract(a.undo, '$.ban') = (SELECT b.id FROM moderation_log b WHERE b.target_user_id = ? AND b.action = 'ban'
+       AND b.undone_at IS NULL ORDER BY b.id DESC LIMIT 1)`,
+    userId,
+    userId,
+  );
+  return row ? { id: row.id, undo: JSON.parse(row.undo) as AnnulUndo } : null;
 }
 
 /**
@@ -586,7 +651,7 @@ export function annulResults(
   adminId: number,
   targetId: number,
   grounds: { basis: ModerationBasis; reason: string },
-  { told = true } = {},
+  { told = true, ban }: { told?: boolean; ban?: number } = {},
 ): Result {
   if (!getUser(targetId)) return { ok: false, error: 'Няма такъв играч.' };
   const mine = notTheirs(adminId, targetId);
@@ -613,6 +678,7 @@ export function annulResults(
         targetId,
         `${season}-01`,
       ),
+      ...(ban !== undefined && { ban }),
     };
     run('DELETE FROM season_ratings WHERE user_id = ? AND season = ?', targetId, season);
     run('UPDATE daily_results SET own_set = 1 WHERE user_id = ? AND day >= ?', targetId, `${season}-01`);
@@ -954,7 +1020,12 @@ export function playerCard(id: number): PlayerCard | null {
     staff: isAdmin(u) ? (u.staff_role ?? 'moderator') : null,
     bannedBefore: bannedBefore(u.email),
     ban: banned
-      ? { until: u.banned_until!, basis: (u.ban_basis as ModerationBasis | null) ?? null, reason: u.ban_reason }
+      ? {
+          until: u.banned_until!,
+          basis: (u.ban_basis as ModerationBasis | null) ?? null,
+          reason: u.ban_reason,
+          annulled: !!annulledWithBan(id),
+        }
       : null,
     gamesPlayed: u.games_played,
     reports: {
@@ -1053,32 +1124,7 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
     }
     case 'annul': {
       if (userId === null) return { ok: false, error: 'Играчът вече го няма.' };
-      const a = undo as unknown as AnnulUndo;
-      tx(() => {
-        for (const r of a.ratings)
-          run(
-            `INSERT OR REPLACE INTO season_ratings (user_id, season, mode, rating, peak, games, wins)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            userId,
-            r.season,
-            r.mode,
-            r.rating,
-            r.peak,
-            r.games,
-            r.wins,
-          );
-        for (const d of a.daily)
-          run('UPDATE daily_results SET own_set = ? WHERE user_id = ? AND day = ?', d.own_set, userId, d.day);
-        for (const e of a.evening)
-          run(
-            'INSERT OR IGNORE INTO evening_results (day, user_id, placement, score, players) VALUES (?, ?, ?, ?, ?)',
-            e.day,
-            userId,
-            e.placement,
-            e.score,
-            e.players,
-          );
-      });
+      restoreResults(userId, undo as unknown as AnnulUndo);
       tellReversal(userId, 'Модератор върна резултатите ти от този сезон.', reason, '🧾');
       break;
     }

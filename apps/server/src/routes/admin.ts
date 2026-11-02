@@ -313,9 +313,21 @@ adminRouter.post('/admin/players/:id/ban', change, (req, res) => {
 
 /** Lifts a ban (`days` null) or moves its end. */
 adminRouter.post('/admin/players/:id/ban-change', change, (req, res) => {
-  const body = parse(z.object({ days: z.number().int().min(1).max(3650).nullable(), reason: Reason }), req, res);
+  const body = parse(
+    z.object({
+      days: z.number().int().min(1).max(3650).nullable(),
+      reason: Reason,
+      restore: z.boolean().default(false),
+    }),
+    req,
+    res,
+  );
   if (!body) return;
-  reply(res, changeBan(res.locals.userId, idParam(req), body.days, body.reason), cardOf(req));
+  reply(
+    res,
+    changeBan(res.locals.userId, idParam(req), body.days, body.reason, { restore: body.restore }),
+    cardOf(req),
+  );
 });
 
 adminRouter.post('/admin/players/:id/rename', change, (req, res) => {

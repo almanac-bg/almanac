@@ -241,11 +241,16 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
         {mode === 'change' && (
           <ChangeBanForm
             busy={busy}
+            annulled={!!ban?.annulled}
             onCancel={() => setMode('idle')}
-            onChange={(days, reason) =>
+            onChange={(days, reason, restore) =>
               void act(
-                () => api.changeBan(id, days, reason),
-                days === null ? 'Спирането е свалено' : `Спирането вече е за ${days} дни от днес`,
+                () => api.changeBan(id, days, reason, restore),
+                days === null
+                  ? restore
+                    ? 'Спирането е свалено, резултатите са върнати'
+                    : 'Спирането е свалено'
+                  : `Спирането вече е за ${days} дни от днес`,
               )
             }
           />
@@ -379,25 +384,40 @@ const CHANGE_OPTIONS: { value: string; label: string }[] = [
 
 function ChangeBanForm({
   busy,
+  annulled,
   onChange,
   onCancel,
 }: {
   busy: boolean;
-  onChange: (days: number | null, reason: string) => void;
+  /** The ban came with an annulment: lifting it offers the results back (on unless unticked). */
+  annulled: boolean;
+  onChange: (days: number | null, reason: string, restore: boolean) => void;
   onCancel: () => void;
 }) {
   const [days, setDays] = useState('lift');
   const [grounds, setGrounds] = useState<Grounds>({ basis: 'other', reason: '' });
+  const [restore, setRestore] = useState(true);
   return (
     <form
       className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (groundsReady(grounds)) onChange(days === 'lift' ? null : Number(days), grounds.reason.trim());
+        if (groundsReady(grounds))
+          onChange(
+            days === 'lift' ? null : Number(days),
+            grounds.reason.trim(),
+            annulled && days === 'lift' && restore,
+          );
       }}
     >
       <Segmented value={days} onChange={setDays} options={CHANGE_OPTIONS} />
       <p className="text-xs text-fg-3">{days === 'lift' ? '' : 'Новият край се брои от днес.'}</p>
+      {annulled && days === 'lift' && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={restore} onChange={(e) => setRestore(e.target.checked)} />
+          Върни и резултатите от този сезон (анулирани заедно със спирането)
+        </label>
+      )}
       <GroundsFields grounds={grounds} onChange={setGrounds} withBasis={false} reasonLabel="Защо (за дневника)" />
       <div className="flex gap-2">
         <Button size="sm" type="submit" loading={busy} disabled={!groundsReady(grounds)}>

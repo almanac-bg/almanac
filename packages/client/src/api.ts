@@ -267,8 +267,9 @@ export const api = {
   banPlayer: (id: number, ban: { days: number | null; basis: ModerationBasis; reason: string; annul?: boolean }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban`, ban),
   /** Lifts a ban (`days` null) or moves its end. */
-  changeBan: (id: number, days: number | null, reason: string) =>
-    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason }),
+  /** `restore`: lifting a ban that came with an annulment gives the results back too. */
+  changeBan: (id: number, days: number | null, reason: string, restore = false) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason, restore }),
   renamePlayer: (id: number, rename: { basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/rename`, rename),
   /** After a moderator's rename: the player's own new name (once). */
