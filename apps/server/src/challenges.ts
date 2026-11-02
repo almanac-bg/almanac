@@ -60,7 +60,8 @@ interface ChallengeRow {
   rival_id: number | null;
 }
 
-type ResultRow = UserRow & { score: number; correct: number; time_ms: number };
+/** `more_time`: played with „Повече време“, off the board. */
+type ResultRow = UserRow & { score: number; correct: number; time_ms: number; more_time: number };
 
 const getChallenge = (id: string) => one<ChallengeRow>('SELECT * FROM challenges WHERE id = ?', id);
 
@@ -138,7 +139,12 @@ export function challengeQuestions(id: string, userId: number): PreparedQuestion
  * One attempt per player and link — except one a server restart cut short before any of its answers was revealed. Once
  * one was, the run ends with the score saved at its last reveal.
  */
-export function claimChallengeAttempt(id: string, userId: number): { ok: true } | { ok: false; error: string } {
+export function claimChallengeAttempt(
+  id: string,
+  userId: number,
+  /** Played with „Повече време“: off the link's board, with the place it would have had (D6). */
+  moreTime = false,
+): { ok: true } | { ok: false; error: string } {
   const challenge = getChallenge(id);
   if (!challenge) return { ok: false, error: 'Няма такова предизвикателство.' };
   if (challenge.rival_id !== null && userId !== challenge.rival_id && userId !== challenge.creator_id) {
@@ -163,11 +169,12 @@ export function claimChallengeAttempt(id: string, userId: number): { ok: true } 
     return { ok: false, error: 'Вече изигра това предизвикателство — всеки има по един опит.' };
   }
   run(
-    `INSERT INTO challenge_results (challenge_id, user_id, started_at) VALUES (?, ?, ?)
-     ON CONFLICT (challenge_id, user_id) DO UPDATE SET started_at = excluded.started_at`,
+    `INSERT INTO challenge_results (challenge_id, user_id, started_at, more_time) VALUES (?, ?, ?, ?)
+     ON CONFLICT (challenge_id, user_id) DO UPDATE SET started_at = excluded.started_at, more_time = excluded.more_time`,
     id,
     userId,
     Date.now(),
+    moreTime ? 1 : 0,
   );
   count('challenge_runs');
   if (userId !== challenge.creator_id) count('link_uses:challenge');
@@ -213,11 +220,14 @@ export function releaseChallengeAttempt(id: string, userId: number) {
 /** How many rows of a link's board are sent: the page shows these, and the viewer's own further down. */
 const BOARD_ROWS = 50;
 
+/** On the link's board: a finished run, by someone not banned, at the usual clock (one with „Повече време“ is off it). */
+const ON_BOARD = `r.finished_at IS NOT NULL AND r.more_time = 0 AND ${NOT_BANNED}`;
+
 /** The link's best runs, best first: higher score, then faster, then earlier. */
 function finished(id: string, limit = BOARD_ROWS): ResultRow[] {
   return all<ResultRow>(
-    `SELECT u.*, r.score, r.correct, r.time_ms FROM challenge_results r JOIN users u ON u.id = r.user_id
-     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}
+    `SELECT u.*, r.score, r.correct, r.time_ms, r.more_time FROM challenge_results r JOIN users u ON u.id = r.user_id
+     WHERE r.challenge_id = ? AND ${ON_BOARD}
      ORDER BY r.score DESC, r.time_ms ASC, r.finished_at ASC LIMIT ?`,
     id,
     limit,
@@ -228,17 +238,19 @@ function finished(id: string, limit = BOARD_ROWS): ResultRow[] {
 const boardSize = (id: string) =>
   one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM challenge_results r JOIN users u ON u.id = r.user_id
-     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}`,
+     WHERE r.challenge_id = ? AND ${ON_BOARD}`,
     id,
   )!.n;
 
 /**
  * A player's run on the link and its place on the board (counted, not found in a list: a link shared widely can have
- * thousands of runs). Null if they have no finished run on it.
+ * thousands of runs) — for a run off the board („Повече време“), the place it would have had. Null if they have no
+ * finished run on it.
  */
 function placeOf(id: string, userId: number): (ResultRow & { rank: number }) | null {
   const mine = one<ResultRow & { finished_at: number }>(
-    `SELECT u.*, r.score, r.correct, r.time_ms, r.finished_at FROM challenge_results r JOIN users u ON u.id = r.user_id
+    `SELECT u.*, r.score, r.correct, r.time_ms, r.finished_at, r.more_time FROM challenge_results r
+     JOIN users u ON u.id = r.user_id
      WHERE r.challenge_id = ? AND r.user_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED}`,
     id,
     userId,
@@ -246,7 +258,7 @@ function placeOf(id: string, userId: number): (ResultRow & { rank: number }) | n
   if (!mine) return null;
   const ahead = one<{ n: number }>(
     `SELECT COUNT(*) AS n FROM challenge_results r JOIN users u ON u.id = r.user_id
-     WHERE r.challenge_id = ? AND r.finished_at IS NOT NULL AND ${NOT_BANNED} AND (r.score > ?
+     WHERE r.challenge_id = ? AND ${ON_BOARD} AND (r.score > ?
        OR (r.score = ? AND r.time_ms < ?) OR (r.score = ? AND r.time_ms = ? AND r.finished_at < ?))`,
     id,
     mine.score,
@@ -308,7 +320,16 @@ export function recordChallengeResult(
   const player = placeOf(id, userId);
   const rank = player?.rank ?? 0;
   const creator = getChallenge(id)?.creator_id;
-  if (creator && creator !== userId && player) {
+  const moreTime = player?.more_time === 1;
+  // With „Повече време“ the run is off the board: the creator hears it was played, not that anyone's place changed.
+  if (creator && creator !== userId && player && moreTime) {
+    notify(creator, {
+      icon: '🔗',
+      text: `${player.username} изигра предизвикателството ти с „Повече време“: ${score} точки (извън класирането).`,
+      link: `/c/${id}`,
+      replace: true,
+    });
+  } else if (creator && creator !== userId && player) {
     // Kept for the creator (they're rarely on the page when a friend plays): the reason to come back and send another.
     const creatorPlace = placeOf(id, creator)?.rank ?? 0;
     const beaten = rank === 1 && creatorPlace > 1;
@@ -330,7 +351,7 @@ export function recordChallengeResult(
     });
     if (beaten) mailBeaten(creator, player.username, score, creatorPlace, id);
   }
-  return { id, rank, total: boardSize(id), duel: null };
+  return { id, rank, total: boardSize(id), duel: null, ...(moreTime && { moreTime }) };
 }
 
 /** The creator asked to hear by email when someone takes the lead on their link: at most once a day. */
@@ -356,13 +377,15 @@ interface DuelRun {
   score: number;
   correct: number;
   time_ms: number;
+  /** Played with „Повече време“ (not read where only the outcome is). */
+  more_time?: number;
 }
 
 const finishedRun = (id: string, userId: number | null) =>
   userId === null
     ? undefined
     : one<DuelRun>(
-        'SELECT score, correct, time_ms FROM challenge_results WHERE challenge_id = ? AND user_id = ? AND finished_at IS NOT NULL',
+        'SELECT score, correct, time_ms, more_time FROM challenge_results WHERE challenge_id = ? AND user_id = ? AND finished_at IS NOT NULL',
         id,
         userId,
       );
@@ -416,7 +439,8 @@ function mayPick(userId: number, friendId: number): boolean {
   return !!last && outcomeOf(last[0], last[1]) === 'lost';
 }
 
-const runView = (r: DuelRun | undefined) => (r ? { score: r.score, correct: r.correct, timeMs: r.time_ms } : null);
+const runView = (r: DuelRun | undefined) =>
+  r ? { score: r.score, correct: r.correct, timeMs: r.time_ms, ...(r.more_time === 1 && { moreTime: true }) } : null;
 
 /** A friend duel as one of its two sees it; null for anyone else (or when the other's account is gone). */
 function standingFor(c: ChallengeRow, viewerId: number, now = Date.now()): DuelStanding | null {
@@ -452,7 +476,9 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
   if (!standing.theirs) {
     notify(friendId, {
       icon: '⚔️',
-      text: `${me.username} те предизвика на дуел: ${score} точки за биене. Имаш ${DUEL.hours} часа да го изиграеш.`,
+      text: `${me.username} те предизвика на дуел: ${score} точки за биене${
+        standing.mine?.moreTime ? ' (изиграни с „Повече време“)' : ''
+      }. Имаш ${DUEL.hours} часа да го изиграеш.`,
       link,
       replace: true,
     });
@@ -464,7 +490,8 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
     });
   } else {
     const theirs = standing.outcome === 'won' ? 'lost' : standing.outcome === 'lost' ? 'won' : 'draw';
-    const paid = theirs === 'won' && payDuelWin(friendId, userId);
+    // A win played with „Повече време“ stands, marked, but pays no bonus (D6).
+    const paid = theirs === 'won' && !standing.theirs.moreTime && payDuelWin(friendId, userId);
     if (paid) grantXp(friendId, DUEL.winXp);
     notify(friendId, {
       icon: theirs === 'won' ? '🏆' : theirs === 'lost' ? '⚔️' : '🤝',
@@ -540,6 +567,8 @@ export function challengeInfo(id: string, viewerId: number): ChallengeInfo | nul
     correct: r.correct,
     timeMs: r.time_ms,
     you: r.id === viewerId,
+    // Only the viewer's own can be: the board itself is the runs at the usual clock.
+    ...(r.more_time === 1 && { moreTime: true }),
   });
   const entries = finished(id).map((r, i) => entry(r, i + 1));
   const mine = entries.some((e) => e.you) ? null : placeOf(id, viewerId);

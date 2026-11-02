@@ -1,7 +1,7 @@
 import { CATEGORIES, MODES, RANK_TIERS, RARITIES, TEAMS } from '@quiz/shared';
 import { accentText, OPTION_COLORS } from '../src/components/game/answers';
 import { PRESENCE } from '../src/components/presence';
-import { expect, test } from './support';
+import { expect, startAsGuest, test } from './support';
 
 /**
  * Every accent colour the game writes text in (a category's, a mode's, a rank's, a rarity's, a team's, an answer's, a
@@ -68,9 +68,142 @@ for (const theme of ['dark', 'light'] as const)
           const r = ratio('var(--color-on-fill)', fill);
           if (r < 4.5) out.push(`text-on-fill on ${fill}: ${r.toFixed(2)}`);
         }
+        // Gradient text (big titles: .text-gradient, a win's .text-win) clipped to its letters, stop by stop: 3:1, as
+        // large text needs. A scan of the page reads it as transparent and skips it: the light theme's win was pale
+        // gold on paper at 1.1–2.0:1 (VD-5).
+        for (const stop of ['--gradient-a', '--gradient-b', '--gradient-c', '--win-a', '--win-b'])
+          for (const background of ['var(--color-ink)', 'var(--color-ink-2)']) {
+            const r = ratio(`var(${stop})`, background);
+            if (r < 3) out.push(`gradient stop ${stop} on ${background}: ${r.toFixed(2)}`);
+          }
         return out;
       },
       { theme, texts: [...new Set(asText)].map((c) => [accentText(c), c]), fills: underDarkText },
     );
+    expect(failures).toEqual([]);
+  });
+
+/**
+ * Text as it sits in the game, not on flat ink: on a card, a chip, an accent's own tint, and over the backdrop's
+ * brightest glow (Background.tsx: violet-600 at 25%), each surface painted as the browser layers it. The 31 October
+ * review measured the pixels there at 3.6–4.4:1 (muted labels over the glow, the answers' letter badges, „+500“, the
+ * streak and the daily-bonus chips: A11Y-3) while the flat check above passed them.
+ */
+const GLOW = ['var(--color-violet-600)', 0.25] as const;
+type Layer = string | readonly [string, number];
+const surfaces = (theme: 'dark' | 'light'): Record<string, Layer[]> => ({
+  page: ['var(--color-ink)'],
+  card: theme === 'light' ? ['#fff'] : ['var(--color-ink)', ['#fff', 0.055]],
+  'the glow': ['var(--color-ink)', GLOW],
+  'a card over the glow': theme === 'light' ? ['#fff'] : ['var(--color-ink)', GLOW, ['#fff', 0.055]],
+  'a chip over the glow': ['var(--color-ink)', GLOW, ['var(--color-tint)', 0.05]],
+});
+/** Text on its own tinted chip, on a card: [text, the chip's colour, its alpha]. */
+const onTints: [string, string, number][] = [
+  ...OPTION_COLORS.map((c): [string, string, number] => [accentText(c), c, 0x22 / 255]),
+  ['var(--color-amber-300)', 'var(--color-amber-400)', 0.15],
+  ['var(--color-orange-300)', 'var(--color-orange-500)', 0.15],
+];
+
+for (const theme of ['dark', 'light'] as const)
+  test(`muted text, chips and badges read on the surfaces they sit on, ${theme} theme`, async ({ page }) => {
+    await page.goto('/privacy');
+    const failures = await page.evaluate(
+      ({ theme, surfaces, onTints, card }) => {
+        if (theme === 'light') document.documentElement.dataset.theme = 'light';
+        else delete document.documentElement.dataset.theme;
+        const root = getComputedStyle(document.documentElement);
+        const resolve = (css: string) =>
+          css.replace(/var\((--[\w-]+)\)/g, (_, name) => root.getPropertyValue(name).trim());
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext('2d', { willReadFrequently: true })!;
+        /** Layers painted one over the other (a colour, or a colour at an alpha), read back as the eye gets them. */
+        const paint = (layers: (string | readonly [string, number])[]) => {
+          context.clearRect(0, 0, 1, 1);
+          for (const layer of layers) {
+            const [color, alpha] = typeof layer === 'string' ? [layer, 1] : layer;
+            context.globalAlpha = alpha;
+            context.fillStyle = '#000';
+            context.fillStyle = resolve(color);
+            context.fillRect(0, 0, 1, 1);
+          }
+          context.globalAlpha = 1;
+          return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+        };
+        const luminance = (c: number[]) =>
+          c
+            .map((v) => v / 255)
+            .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+            .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const ratio = (text: string, under: (string | readonly [string, number])[]) => {
+          const [hi, lo] = [luminance(paint([text])), luminance(paint(under))].sort((x, y) => y - x);
+          return (hi + 0.05) / (lo + 0.05);
+        };
+        const out: string[] = [];
+        for (const [where, layers] of Object.entries(surfaces))
+          for (const text of ['var(--color-fg-3)', 'var(--color-fg-2)']) {
+            const r = ratio(text, layers);
+            if (r < 4.5) out.push(`${text} on ${where}: ${r.toFixed(2)}`);
+          }
+        for (const [text, chip, alpha] of onTints) {
+          const r = ratio(text, [...card, [chip, alpha]]);
+          if (r < 4.5) out.push(`${text} on its ${chip} tint: ${r.toFixed(2)}`);
+        }
+        return out;
+      },
+      { theme, surfaces: surfaces(theme), onTints, card: surfaces(theme).card },
+    );
+    expect(failures).toEqual([]);
+  });
+
+for (const theme of ['dark', 'light'] as const)
+  test(`an open dialog's text reads on it, ${theme} theme (VD-4)`, async ({ page }) => {
+    await startAsGuest(page);
+    await page.evaluate((theme) => {
+      if (theme === 'light') document.documentElement.dataset.theme = 'light';
+      else delete document.documentElement.dataset.theme;
+    }, theme);
+    await page.getByRole('button', { name: 'Играй Соло', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Избери категория' });
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(500); // in, at rest
+    const failures = await dialog.evaluate((box, theme) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d', { willReadFrequently: true })!;
+      // The page, the scrim and the dialog as the browser stacks them.
+      const scrim = box.parentElement!;
+      context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim();
+      context.fillRect(0, 0, 1, 1);
+      for (const layer of [scrim, box]) {
+        context.fillStyle = getComputedStyle(layer).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+      }
+      const under = [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      const out: string[] = [];
+      // Paper on the light theme: at 80% over a dark scrim it came out grey, and looked dirty and disabled.
+      if (theme === 'light' && under.join() !== '255,255,255')
+        out.push(`the dialog is rgb(${under.join(' ')}), not white`);
+      const rgb = (css: string) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = css;
+        context.fillRect(0, 0, 1, 1);
+        return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      };
+      const luminance = (c: number[]) =>
+        c
+          .map((v) => v / 255)
+          .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+          .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+      // Every bit of text right on the dialog (not on a tile or a button of its own).
+      for (const el of box.querySelectorAll<HTMLElement>('p, legend, span'))
+        if (el.closest('button') === null && el.textContent?.trim() && el.offsetParent !== null) {
+          const [hi, lo] = [luminance(rgb(getComputedStyle(el).color)), luminance(under)].sort((x, y) => y - x);
+          const ratio = (hi + 0.05) / (lo + 0.05);
+          if (ratio < 4.5) out.push(`„${el.textContent.trim().slice(0, 30)}“: ${ratio.toFixed(2)}`);
+        }
+      return out;
+    }, theme);
     expect(failures).toEqual([]);
   });

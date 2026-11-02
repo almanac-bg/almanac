@@ -1,7 +1,16 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { type ButtonHTMLAttributes, type ReactNode, type Ref, type RefObject, useEffect, useId, useRef } from 'react';
+import {
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { Emoji } from './Emoji';
 
@@ -305,7 +314,8 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <m.div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
+          // On paper a lighter scrim: a dark one turned the white card grey (the review's VD-4).
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md light:bg-[rgb(22_19_40/0.35)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -319,7 +329,8 @@ export function Modal({
             aria-label={title || labelledBy ? undefined : label}
             tabIndex={-1}
             className={clsx(
-              'glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none sm:p-8',
+              // Solid paper on the light theme: at 80% over the scrim it was grey, and its muted text fell below 4.5:1.
+              'glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none light:bg-ink-2 sm:p-8',
               className,
             )}
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -360,15 +371,43 @@ export function Segmented<T extends string | number>({
   options: { value: T; label: ReactNode }[];
   onChange: (v: T) => void;
   disabled?: boolean;
-  /** On phones one row that scrolls sideways, instead of wrapping onto a second (many or long options). */
+  /**
+   * On phones one row that scrolls sideways, instead of wrapping onto a second (many or long options); an edge with more
+   * beyond it fades out, so the row says it goes on.
+   */
   scroll?: boolean;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = row.current;
+    if (!scroll || !el) return;
+    const look = () => setMore({ left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 });
+    look();
+    el.addEventListener('scroll', look, { passive: true });
+    const resized = new ResizeObserver(look);
+    resized.observe(el);
+    return () => {
+      el.removeEventListener('scroll', look);
+      resized.disconnect();
+    };
+  }, [scroll]);
+  const fade = (side: 'left' | 'right') => (more[side] ? 'transparent, black 2rem' : 'black, black');
   return (
     <div
+      ref={row}
       className={clsx(
         'inline-flex gap-1 rounded-2xl border border-line bg-sunk/20 p-1',
         scroll ? 'max-w-full overflow-x-auto max-sm:flex-nowrap max-sm:whitespace-nowrap sm:flex-wrap' : 'flex-wrap',
       )}
+      style={
+        scroll && (more.left || more.right)
+          ? {
+              maskImage: `linear-gradient(to right, ${fade('left')}), linear-gradient(to left, ${fade('right')})`,
+              maskComposite: 'intersect',
+            }
+          : undefined
+      }
     >
       {options.map((o) => (
         <button

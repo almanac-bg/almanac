@@ -3,6 +3,7 @@ import {
   expectLobby,
   expectNoSideScroll,
   gameMs,
+  hiddenWhenFocused,
   type Page,
   playMatch,
   signUp,
@@ -224,4 +225,106 @@ test('the bank’s letters are drawn in the game’s font, not the system’s (V
     drawnBy[letter] = fonts.map((f) => f.familyName).join(', ');
   }
   expect(Object.entries(drawnBy).filter(([, font]) => font !== 'Onest')).toEqual([]);
+});
+
+for (const [where, size] of [
+  ['phone', { width: 390, height: 844 }],
+  ['desktop', { width: 1280, height: 800 }],
+] as const) {
+  test(`the set editor never hides the focused field behind its save bar (2.4.11, ${where})`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await signUp(page, uniqueName('Учител'), 'parola-123');
+    await page.goto('/sets');
+    await page.getByRole('button', { name: 'Нов набор' }).click();
+    await expect(page).toHaveURL(/\/sets\/\d+$/);
+    await page.getByRole('button', { name: /^Въпрос 1/ }).click();
+    await page.getByLabel('Текст на въпрос 1').fill('Коя е столицата на България?');
+    await page.getByRole('button', { name: /^Въпрос 2/ }).click();
+    // From the top of the page, every stop of the keyboard through the editor: the name, the questions, their answers.
+    await page.getByLabel('Име на набора').focus();
+    expect(await hiddenWhenFocused(page, 30)).toEqual([]);
+  });
+}
+
+test('the landing’s wordmark stays inside its column, on phones and a laptop (VD-9)', async ({ page }) => {
+  // One page, resized: it's sized by its container, and Firefox aborts a load of the page it's already on.
+  await page.goto('/');
+  for (const width of [320, 390, 430, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(150); // refitted in the next frame (lib/fitWidth.ts)
+    const over = await page.evaluate(() => {
+      const h1 = document.querySelector('main h1')!;
+      const column = h1.parentElement!;
+      const edge = column.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(column).paddingRight);
+      return Math.round((h1.firstElementChild as HTMLElement).getBoundingClientRect().right - edge);
+    });
+    expect(over, `${width} px: past its column by`).toBeLessThanOrEqual(0);
+  }
+});
+
+test('320 px with WCAG’s text spacing never scrolls sideways (1.4.12)', async ({ page }) => {
+  // Line height 1.5, letter spacing 0.12 em, word spacing 0.16 em, 2 em after paragraphs: what a reader may set.
+  const spacing =
+    '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }';
+  // Set as a reader's stylesheet is: before the page draws.
+  await page.addInitScript((css) => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.append(style);
+    });
+  }, spacing);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  await expectNoSideScroll(page, 'the landing');
+  // In from the landing as it is (loading it again, WebKit calls the second load an interrupted one).
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
+  await expectLobby(page);
+  // The lobby as it opened (Firefox aborts a load of the page it's already on), then the others.
+  await expectNoSideScroll(page, 'the lobby');
+  for (const path of ['/achievements', '/leaderboard', '/locker', '/settings', '/almanac', '/profile']) {
+    // Settled before the next: Firefox aborts a load while the last page still fetches its parts.
+    await page.waitForLoadState('networkidle');
+    await page.goto(path);
+    await expectNoSideScroll(page, path);
+  }
+});
+
+test('a long page title never leaves a letter or two of a word alone on a line (UX-13)', async ({ page }) => {
+  await page.goto('/privacy');
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 800 });
+    // The longest word of „Политика за поверителност“: whole, or hyphenated where the language allows (Firefox
+    // does „повери-/телност“), never „поверителнос/т“. How many of its letters each row holds.
+    const rows = await page.locator('main h1').evaluate((h1) => {
+      const text = h1.firstChild!;
+      const word = 'поверителност';
+      const at = text.textContent!.indexOf(word);
+      const perRow = new Map<number, number>();
+      for (let i = 0; i < word.length; i++) {
+        const range = document.createRange();
+        range.setStart(text, at + i);
+        range.setEnd(text, at + i + 1);
+        const top = Math.round(range.getBoundingClientRect().top);
+        perRow.set(top, (perRow.get(top) ?? 0) + 1);
+      }
+      return [...perRow.values()];
+    });
+    expect(Math.min(...rows), `${width} px: ${rows.join(' + ')} letters a row`).toBeGreaterThanOrEqual(3);
+  }
+});
+
+test('an iPhone’s status bar follows the theme: black on ink, white with dark text on paper (VD-16)', async ({
+  page,
+}) => {
+  const style = () =>
+    page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute('content', { timeout: 2_000 });
+  await page.goto('/');
+  expect(await style()).toBe('black');
+  // Chosen once: set before the first paint from then on (public/theme.js), as iOS reads it as the app opens. (The
+  // page settled first: WebKit fails a module still loading when the page reloads under it.)
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => localStorage.setItem('quiz:theme', 'light'));
+  await page.reload();
+  expect(await style()).toBe('default');
 });

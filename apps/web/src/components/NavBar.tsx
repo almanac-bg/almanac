@@ -194,13 +194,14 @@ export function NavBar() {
             {/* A lost connection also shows on your avatar (a pulsing dot, plus the words under your name where there's
                 room); ConnectionBanner says it in words and to screen readers. */}
             {/* Phones have room for four buttons: with an account the bell takes the sound's place (the match screen and
-                Settings have the switch). */}
+                Settings have the switch). Under 360 px a guest's „Запази“ needs the sound's room too (with a reader's
+                letter spacing the row ran 10 px past a 320 px screen: A11Y-9). */}
             <button
               type="button"
               onClick={() => setMuted(!muted)}
               aria-label={muted ? 'Включи звука' : 'Изключи звука'}
               title={muted ? 'Включи звука' : 'Изключи звука'}
-              className={clsx(ICON_BUTTON, !me.isGuest && 'max-sm:hidden')}
+              className={clsx(ICON_BUTTON, me.isGuest ? 'max-[22.5rem]:hidden' : 'max-sm:hidden')}
             >
               {muted ? <VolumeX className="size-4.5" /> : <Volume2 className="size-4.5" />}
             </button>

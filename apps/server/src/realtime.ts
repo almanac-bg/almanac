@@ -4,6 +4,8 @@ import {
   type ClientToServerEvents,
   isCategoryChoice,
   isCategoryId,
+  isMoreTime,
+  isPace,
   isQueueMode,
   isSoloPace,
   type LobbyStats,
@@ -13,6 +15,7 @@ import {
   POWERUPS,
   type PowerupId,
   type Presence,
+  paceFor,
   type QueueModeId,
   REVIEW,
   ROUNDS,
@@ -287,6 +290,11 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     const busyError = () => (games.forUser(userId) ? 'Вече си в мач.' : draining ? DRAINING : null);
     /** Guests play; friends, rooms of their own and challenge links wait until they claim the account. */
     const guest = () => getUser(userId)?.is_guest === 1;
+    // „Повече време“, as set in Settings: the clock of the daily, links and friend duels (MORE_TIME).
+    const moreTime = () => {
+      const setting = getUser(userId)?.more_time;
+      return isMoreTime(setting) ? setting : 'off';
+    };
     /** Going on to something new: off the queue, and any rematch offer from the last match is declined. */
     const moveOn = () => {
       matchmaker.leave(userId);
@@ -386,7 +394,8 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const via = str(obj(typeof p === 'function' ? null : p).via, 16) || null;
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
-      const claim = claimDailyAttempt(userId, via);
+      const pace = paceFor(moreTime());
+      const claim = claimDailyAttempt(userId, via, pace !== 'normal');
       if (!claim.ok) return reply(ack, claim);
       moveOn();
       rooms.leave(userId);
@@ -405,6 +414,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           questions: dailyQuestions(claim.day, userId),
           humans: [buildHuman(userId, 'daily')],
           bots: [],
+          pace,
         });
         reply(ack, { ok: true });
       } catch (err) {
@@ -439,7 +449,8 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           id = duel.id;
         } else id = createChallenge(userId);
       }
-      const claim = claimChallengeAttempt(id, userId);
+      const pace = paceFor(moreTime());
+      const claim = claimChallengeAttempt(id, userId, pace !== 'normal');
       if (!claim.ok) return reply(ack, claim);
       moveOn();
       rooms.leave(userId);
@@ -459,6 +470,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           questions: challengeQuestions(id, userId),
           humans: [buildHuman(userId, 'challenge')],
           bots: [],
+          pace,
         });
         reply(ack, { ok: true, id });
       } catch (err) {
@@ -467,7 +479,12 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       }
     });
 
-    on('review:start', (ack) => {
+    // „Поправителен“ is played alone and is no competition: any pace, chosen or the one in Settings (A11Y-2).
+    on('review:start', (p, maybeAck) => {
+      // A tab from before paces here sends the answer callback alone.
+      const ack = typeof p === 'function' ? (p as unknown as typeof maybeAck) : maybeAck;
+      const chosen = obj(typeof p === 'function' ? null : p).pace;
+      const pace = isPace(chosen) ? chosen : paceFor(moreTime());
       const busy = busyError();
       if (busy) return reply(ack, { ok: false, error: busy });
       const questions = reviewQuestions(userId);
@@ -492,6 +509,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
           questions,
           humans: [buildHuman(userId, 'review')],
           bots: [],
+          pace,
         });
         reply(ack, { ok: true });
       } catch (err) {

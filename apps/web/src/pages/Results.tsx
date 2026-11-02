@@ -5,6 +5,7 @@ import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swor
 import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
 import { DuelCard, RematchButton } from '../components/duels';
 import { Emoji } from '../components/Emoji';
@@ -270,11 +271,7 @@ export function Results({ game }: { game: LiveGame }) {
                 ? 'text-[clamp(1.75rem,8.5vw,4.5rem)]'
                 : 'text-[clamp(2.25rem,7vw,4.5rem)]',
             'text-balance',
-            won
-              ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'
-              : lost
-                ? 'text-fg'
-                : 'text-gradient',
+            won ? 'text-win' : lost ? 'text-fg' : 'text-gradient',
           )}
         >
           {headline}
@@ -431,7 +428,7 @@ export function Results({ game }: { game: LiveGame }) {
 
       {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a
           rematch offer, which can arrive at any moment. Wider screens: a floating bar in the middle. */}
-      <div className="sticky bottom-0 z-30 -mx-4 mt-10 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
+      <BottomBar className="sticky bottom-0 z-30 -mx-4 mt-10 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:bottom-5 sm:mx-auto sm:w-fit sm:rounded-2xl sm:border sm:px-3 sm:py-3">
         {rematch && <RematchStrip rematch={rematch} bar className="mb-3 sm:hidden" />}
         <div className="flex gap-2 sm:flex-wrap sm:justify-center sm:gap-3">
           {daily && rewards?.daily?.offBoard ? (
@@ -536,7 +533,7 @@ export function Results({ game }: { game: LiveGame }) {
               </Button>
             )}
         </div>
-      </div>
+      </BottomBar>
     </div>
   );
 }

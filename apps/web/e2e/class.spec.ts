@@ -41,7 +41,7 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.getByRole('switch', { name: 'Само водя' }).click();
   await expect(teacher.getByText('Води на голям екран · не играе')).toBeVisible();
   const code = (await teacher
-    .getByRole('button', { name: /^Код [\d ]+ — копирай/ })
+    .getByRole('button', { name: /^\d{6} — копирай/ })
     .first()
     .textContent())!.match(/\d{6}/)![0];
 
@@ -94,7 +94,7 @@ test('a locked room: a pupil with the code from the landing knocks, the teacher 
   await teacher.getByRole('switch', { name: 'Заключи стаята' }).click();
   await expect(teacher.getByRole('switch', { name: 'Заключи стаята' })).toHaveAttribute('aria-checked', 'true');
   const code = (await teacher
-    .getByRole('button', { name: /^Код [\d ]+ — копирай/ })
+    .getByRole('button', { name: /^\d{6} — копирай/ })
     .first()
     .textContent())!.match(/\d{6}/)![0];
 

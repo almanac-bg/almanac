@@ -11,6 +11,7 @@ import { DuelCard } from '../components/duels';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
+import { MoreTimeNote } from '../components/MoreTimeNote';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { shareText } from '../lib/share';
@@ -210,6 +211,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
                 >
                   <Swords aria-hidden className="size-5 max-sm:hidden" /> Приеми предизвикателството
                 </Button>
+                <MoreTimeNote duel={!!info.duelOnly} className="w-full" />
               </div>
             )}
           </div>

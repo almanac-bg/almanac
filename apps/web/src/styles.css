@@ -31,6 +31,8 @@
 @custom-variant cramped (@media (max-height: 480px));
 /* A big screen, wide and tall: the match grows into it instead of leaving its lower half empty. */
 @custom-variant large (@media (min-width: 1024px) and (min-height: 820px));
+/* The light theme (data-theme="light" on <html>), for a utility that must beat another one there (`light:bg-ink-2`). */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
 
 @theme {
   --font-sans: 'Onest Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -41,8 +43,11 @@
   --color-line: rgb(255 255 255 / 0.08);
   --color-fg: #f5f3ff;
   --color-fg-2: #b3aed0;
-  /* Muted text that stays above 4.5:1 on the page (5.7), on glass cards (5.2) and on lighter nested panels (4.6). */
-  --color-fg-3: #8a84ab;
+  /*
+   * Muted text that stays above 4.5:1 where it sits: the page (7.2), a card (6.9), and over the backdrop's brightest glow,
+   * bare (5.5) or under a chip (4.8) — not only on flat ink (the 31 October review, A11Y-3; e2e/contrast.spec.ts).
+   */
+  --color-fg-3: #9c95bd;
 
   --color-violet: #8b5cf6;
   --color-fuchsia: #e879f9;
@@ -102,7 +107,8 @@
   --color-line: rgb(22 19 40 / 0.12);
   --color-fg: #16131f;
   --color-fg-2: #4a4462;
-  --color-fg-3: #67617f;
+  /* Above 4.5:1 over the light backdrop's violet glow too, under a chip (4.9): A11Y-3. */
+  --color-fg-3: #57516f;
   --color-violet: #7c3aed;
   --color-fuchsia: #c026d3;
   --color-cyan: #0891b2;
@@ -119,17 +125,21 @@
   --gradient-a: #c026d3;
   --gradient-b: #7c3aed;
   --gradient-c: #0891b2;
+  --win-a: #b45309;
+  --win-b: #92400e;
   --field: #fff;
   --field-focus: #fff;
   /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
   --field-edge: #8a84a3;
   --field-focus-edge: #7c3aed;
   --accent-l-min: 0;
-  --accent-l-max: 0.5;
+  /* An accent as text sits on its own tint as often as on paper (an answer's letter badge): a step deeper. */
+  --accent-l-max: 0.45;
   --color-amber-50: oklch(27.9% 0.077 45.635);
   --color-amber-100: oklch(41.4% 0.112 45.904);
   --color-amber-200: oklch(47.3% 0.137 46.201);
-  --color-amber-300: oklch(55.5% 0.163 48.998);
+  /* 300 is the text step („+500“, the daily bonus on its amber chip): deep enough for 4.5:1 on its own tint (A11Y-3). */
+  --color-amber-300: oklch(50% 0.163 48.998);
   --color-amber-400: oklch(66.6% 0.179 58.318);
   --color-amber-600: oklch(82.8% 0.189 84.429);
   --color-amber-700: oklch(87.9% 0.169 91.605);
@@ -189,7 +199,7 @@
   --color-orange-50: oklch(26.6% 0.079 36.259);
   --color-orange-100: oklch(40.8% 0.123 38.172);
   --color-orange-200: oklch(47% 0.157 37.304);
-  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-300: oklch(50% 0.195 38.402);
   --color-orange-400: oklch(64.6% 0.222 41.116);
   --color-orange-600: oklch(75% 0.183 55.934);
   --color-orange-700: oklch(83.7% 0.128 66.29);
@@ -227,6 +237,9 @@
   --gradient-a: #f0abfc;
   --gradient-b: #a78bfa;
   --gradient-c: #22d3ee;
+  /* A win's gold (.text-win). */
+  --win-a: #fde68a;
+  --win-b: #f59e0b;
   --field: rgb(0 0 0 / 0.3);
   --field-focus: rgb(0 0 0 / 0.4);
   /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
@@ -247,12 +260,13 @@
  */
 html {
   scroll-padding-top: 5rem;
-  scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  /* --bottom-bar: a page's own pinned bar, from the screen's foot to its top (lib/bottomBar.ts: A11Y-1). */
+  scroll-padding-bottom: calc(max(5rem, var(--bottom-bar, 0px) + 1rem) + env(safe-area-inset-bottom));
 }
 @media (min-width: 768px) {
   html {
     /* --knocked-out-room: the notice a knocked-out player sees above the emote bar (GamePage). */
-    scroll-padding-bottom: var(--knocked-out-room, 1rem);
+    scroll-padding-bottom: max(var(--knocked-out-room, 1rem), var(--bottom-bar, 0px) + 1rem);
   }
 }
 @media (max-height: 480px) {
@@ -285,8 +299,11 @@ body {
  */
 /* A long word („предизвикателство“ in the display face) breaks rather than pushing a narrow or zoomed page sideways. */
 @utility t-page {
-  /* A size down under 360 px: „Политика за поверителност“ split mid-word at the usual size. */
-  @apply font-display text-3xl font-bold tracking-tight wrap-anywhere hyphens-auto max-[22.5rem]:text-2xl sm:text-4xl;
+  /*
+   * Grows with a phone's width up to the usual size: „Политика за поверителност“ split „поверителнос/т“ at 390 px when
+   * only screens under 360 px stepped down (UX-13).
+   */
+  @apply font-display text-[clamp(1.375rem,6.8vw,1.875rem)] font-bold tracking-tight wrap-anywhere hyphens-auto sm:text-4xl;
 }
 @utility t-section {
   @apply font-display text-2xl font-bold tracking-tight wrap-anywhere hyphens-auto;
@@ -347,6 +364,14 @@ body {
       var(--gradient-a) 100%
     );
     background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* A win's headline („Победа!“): gold — pale on ink, deep amber on paper (pale gold there was 1.1–2.0:1: VD-5). */
+  .text-win {
+    background: linear-gradient(100deg, var(--win-a), var(--win-b), var(--win-a));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

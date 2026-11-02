@@ -12,6 +12,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, 
 import { type FormEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { SetVisibilityForm } from '../components/admin/Decisions';
+import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
 import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
@@ -353,7 +354,7 @@ function SetEditor({ id }: { id: number }) {
       </div>
 
       {/* The save stays in reach while the questions scroll by. */}
-      <div
+      <BottomBar
         className={clsx(
           'fixed inset-x-0 z-30 border-t border-line bg-ink/90 py-3 cramped:static pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] backdrop-blur-xl',
           ABOVE_TAB_BAR,
@@ -368,7 +369,7 @@ function SetEditor({ id }: { id: number }) {
             Запази
           </Button>
         </div>
-      </div>
+      </BottomBar>
 
       <Modal open={deleting} onClose={() => setDeleting(false)} title="Изтриване на набора">
         <p className="text-fg-2">Наборът „{data.name}“ ще изчезне. Копията, които други са взели, остават техни.</p>

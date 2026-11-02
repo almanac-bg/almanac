@@ -40,6 +40,8 @@ export interface HumanEntry {
   player: GamePlayer;
   powerups: PowerupId[];
   emotes: string[];
+  /** „Повече време“ is on: twice the time to pick a round's category. */
+  longPick?: boolean;
 }
 
 /** Loads a user's in-game identity: loadout, level, rating and unlocked toys. */
@@ -65,6 +67,7 @@ export function buildHuman(userId: number, mode: ModeId): HumanEntry {
     // else all of them for everyone, from the first match: a result isn't decided by who has played longer.
     powerups: mode === 'daily' || mode === 'challenge' || mode === 'review' ? [] : POWERUPS.map((p) => p.id),
     emotes: unlockedIds('emote', ctx),
+    longPick: row.more_time !== 'off',
   };
 }
 

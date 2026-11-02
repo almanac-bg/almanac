@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar } from '../components/Avatar';
 import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
+import { MoreTimeNote } from '../components/MoreTimeNote';
 import { DayField } from '../components/results/DayField';
 import { Button, Card, Spinner } from '../components/ui';
 import { dailyLinkUrl, offBoardLine, placeShown } from '../lib/daily';
@@ -159,6 +160,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                     {offBoardLine({
                       guest: me.isGuest,
                       madeToday: dayKey(me.createdAt) === info.day,
+                      moreTime: info.moreTime,
                       rank: info.played.rank,
                       total: info.total,
                     })}
@@ -184,6 +186,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
                 <Button variant="gold" size="lg" onClick={() => void play()} loading={starting}>
                   Играй днешните <ArrowRight className="size-5" />
                 </Button>
+                <MoreTimeNote className="mt-2" />
                 <p className="mt-3 text-sm text-fg-3">
                   {MODE.questions} въпроса, около три минути, без козове. Един опит до полунощ
                   {info.total > 0

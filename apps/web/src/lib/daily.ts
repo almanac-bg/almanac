@@ -6,7 +6,13 @@ import { DAILY_FIELD } from '@quiz/shared';
  * once the profile is saved (made before today: that day; made today: the next), a new account from tomorrow. A second
  * account costs seconds, so one made today could be there only to read the answers off for another.
  */
-export function offBoardLine(d: { guest: boolean; madeToday: boolean; rank: number; total: number }) {
+export function offBoardLine(d: {
+  guest: boolean;
+  madeToday: boolean;
+  moreTime?: boolean;
+  rank: number;
+  total: number;
+}) {
   if (!placeShown(d.total + 1)) return offBoardWhy(d);
   return `Щеше да си на ${ordinal(d.rank)} място от ${d.total + 1}. ${offBoardWhy(d)}`;
 }
@@ -15,7 +21,8 @@ export function offBoardLine(d: { guest: boolean; madeToday: boolean; rank: numb
 export const placeShown = (runs: number) => runs >= DAILY_FIELD.placeFrom;
 
 /** offBoardLine without the place: when the place is shown on its own. */
-export function offBoardWhy(d: { guest: boolean; madeToday: boolean }) {
+export function offBoardWhy(d: { guest: boolean; madeToday: boolean; moreTime?: boolean }) {
+  if (d.moreTime) return 'С „Повече време“ резултатът е извън класацията.';
   if (!d.guest) return 'Новият ти профил влиза в класацията от утре.';
   return d.madeToday ? 'Запази профила — от утре влизаш в класацията.' : 'Запази профила и влизаш в класацията.';
 }

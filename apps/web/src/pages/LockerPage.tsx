@@ -289,7 +289,8 @@ function Item({
         // and a press does nothing — not disabled, which dropped the focus and read as "unavailable".
         aria-pressed={unlocked && onEquip ? !!equipped : undefined}
         onClick={!unlocked ? () => setInfo(true) : clickable ? onEquip : undefined}
-        aria-label={unlocked ? undefined : `${name || 'Емоция'}: заключено — ${requirementLabel(req)}`}
+        // What the tile shows first (WCAG 2.5.3), then that it's locked; what it takes is on a tap.
+        aria-label={unlocked ? undefined : `${name || 'Емоция'}, ${requirementLabel(req, true)} (заключено)`}
         title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
         className={clsx(
           'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',
@@ -300,11 +301,12 @@ function Item({
         )}
       >
         <span className={clsx(!unlocked && 'opacity-30 grayscale')}>{children}</span>
-        {name && <span className="w-full truncate text-xs font-semibold">{name}</span>}
+        {/* Two lines rather than „Демон на ск…“ (A11Y-9, UX-13). */}
+        {name && <span className="line-clamp-2 w-full text-xs leading-tight font-semibold">{name}</span>}
         {!unlocked && (
           <span className="flex max-w-full items-center gap-1 text-xs leading-tight text-fg-3">
             {'level' in req && <Lock className="size-3 shrink-0" />}
-            <span className="truncate">{requirementLabel(req, true)}</span>
+            <span className="line-clamp-2 min-w-0">{requirementLabel(req, true)}</span>
           </span>
         )}
         {equipped && (

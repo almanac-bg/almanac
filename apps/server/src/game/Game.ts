@@ -24,6 +24,7 @@ import {
   ORDER,
   orderPoints,
   ordinal,
+  type Pace,
   type PickPayload,
   type PlayerResult,
   POWERUPS,
@@ -36,7 +37,6 @@ import {
   readingMs,
   SCORING,
   type ServerToClientEvents,
-  type SoloPace,
   START_RATING,
   type Standing,
   snapNumber,
@@ -156,7 +156,8 @@ export interface GameSetup {
   questions: PreparedQuestion[];
   /** A match in ROUNDS (Дуел); empty otherwise. */
   rounds: RoundPlan[];
-  humans: { player: GamePlayer; powerups: PowerupId[]; emotes: string[] }[];
+  /** `longPick`: „Повече време“ is on — a round's category takes them twice ROUNDS.pickMs to pick. */
+  humans: { player: GamePlayer; powerups: PowerupId[]; emotes: string[]; longPick?: boolean }[];
   bots: { player: GamePlayer; brain: BotBrain }[];
   /** Real players' matches, played back (records.ts): their answers as they gave them, and whose they are. */
   records?: { player: GamePlayer; script: RecordScript; runId: number; ownerId: number }[];
@@ -168,8 +169,8 @@ export interface GameSetup {
   questionSet?: string | null;
   /** The evening Роял of this day (its places are kept for the night's top and the champion). */
   eveningDay?: string | null;
-  /** Соло's clock (SOLO_PACES): 'normal' unless the player chose otherwise. */
-  pace?: SoloPace;
+  /** A run alone's clock: Соло's pace (SOLO_PACES), or „Повече време“ (MORE_TIME); 'normal' otherwise. */
+  pace?: Pace;
   /**
    * How many times over a number final counts: NUMBER.finalTimes, unless the set was made before it did (a day's
    * questions, a link: everyone who plays the same questions plays them by the same rules).
@@ -330,9 +331,9 @@ export class Game {
   cutShort = false;
   /** Nobody else in it (solo, the daily, a challenge link): no one is waiting on its player. */
   readonly alone: boolean;
-  /** Соло's clock; every other mode plays the usual one. */
-  get pace(): SoloPace {
-    return this.setup.mode === 'solo' ? (this.setup.pace ?? 'normal') : 'normal';
+  /** A run alone's clock (Соло's pace, „Повече време“); a match with others plays the usual one. */
+  get pace(): Pace {
+    return this.alone ? (this.setup.pace ?? 'normal') : 'normal';
   }
 
   /** At the match's last question, its final. „Поправителен“ has none: just the questions coming back. */
@@ -380,7 +381,16 @@ export class Game {
   /** The open question's reading window (readingMs): its speed bonus drains only after it. */
   private readMs = 0;
   /** A round's category being picked: by whom, from what, since when. */
-  private picking: { round: number; pickerId: string; options: CategoryId[]; startedAt: number } | null = null;
+  private picking: {
+    round: number;
+    pickerId: string;
+    options: CategoryId[];
+    startedAt: number;
+    /** How long they have: ROUNDS.pickMs, twice that for someone with „Повече време“. */
+    pickMs: number;
+  } | null = null;
+  /** Who has „Повече време“ on (a longer round pick). */
+  private longPick = new Set<string>();
   private timers = new Set<NodeJS.Timeout>();
   private questionTimer: NodeJS.Timeout | null = null;
   private abandonTimer: NodeJS.Timeout | null = null;
@@ -398,6 +408,7 @@ export class Game {
     this.rounds = setup.rounds.map((r) => ({ from: r.from, size: r.size, category: r.category, pickedBy: null }));
     for (const h of setup.humans)
       this.participants.set(h.player.id, this.newParticipant(h.player, null, h.powerups, h.emotes));
+    for (const h of setup.humans) if (h.longPick) this.longPick.add(h.player.id);
     for (const b of setup.bots)
       this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_JOKERS], []));
     for (const r of setup.records ?? []) {
@@ -838,7 +849,13 @@ export class Game {
             ? Math.min(IMAGE.timeMs, this.setup.timeMs)
             : this.setup.timeMs;
     this.limitMs =
-      this.pace === 'relaxed' ? this.scoreLimitMs * 2 : this.pace === 'untimed' ? UNTIMED_MS : this.scoreLimitMs;
+      this.pace === 'relaxed'
+        ? this.scoreLimitMs * 2
+        : this.pace === 'triple'
+          ? this.scoreLimitMs * 3
+          : this.pace === 'untimed'
+            ? UNTIMED_MS
+            : this.scoreLimitMs;
     this.readMs =
       readingMs(q.q, isChoice(q) ? q.options : q.kind === 'order' ? q.items.map((i) => i.text) : []) +
       (image ? IMAGE.readExtraMs : 0);
@@ -866,15 +883,17 @@ export class Game {
   }
 
   /**
-   * Before a round: whoever is behind picks its category from the ones on offer, within ROUNDS.pickMs (a bot picks its
-   * strongest); otherwise one is drawn.
+   * Before a round: whoever is behind picks its category from the ones on offer, within ROUNDS.pickMs (twice that with
+   * „Повече време“: the options take longer to hear than 5 seconds — the review's A11Y-2; a bot picks its strongest);
+   * otherwise one is drawn.
    */
   private startPick(round: number) {
     this.phase = 'pick';
     this.movedAt = Date.now();
     const picker = this.trailing();
     const options = this.setup.rounds[round].offers.map((o) => o.category);
-    this.picking = { round, pickerId: picker.player.id, options, startedAt: gameClock.now() };
+    const pickMs = ROUNDS.pickMs * (this.longPick.has(picker.player.id) ? 2 : 1);
+    this.picking = { round, pickerId: picker.player.id, options, startedAt: gameClock.now(), pickMs };
     this.toGame('game:pick', this.pickPayload()!);
     if (picker.brain) {
       const brain = picker.brain;
@@ -882,7 +901,7 @@ export class Game {
       const [favourite] = shuffle(options).sort((a, b) => lean(a) - lean(b));
       this.later(BOT_PICK_MS * (1 + Math.random()), () => this.pick(picker.player.id, round, favourite));
     }
-    this.later(ROUNDS.pickMs + GRACE_MS, () => this.decideRound(shuffle(options)[0], null));
+    this.later(pickMs + GRACE_MS, () => this.decideRound(shuffle(options)[0], null));
   }
 
   /** Who picks the next round: whoever is behind on points; on a tie the lower-rated, then the one with fewer right. */
@@ -935,9 +954,9 @@ export class Game {
 
   private pickPayload(): PickPayload | null {
     if (this.phase !== 'pick' || !this.picking) return null;
-    const { round, pickerId, options, startedAt } = this.picking;
+    const { round, pickerId, options, startedAt, pickMs } = this.picking;
     const elapsed = (gameClock.now() - startedAt) / config.gameTimeScale;
-    return { round, pickerId, options, durationMs: ROUNDS.pickMs, remainingMs: Math.max(0, ROUNDS.pickMs - elapsed) };
+    return { round, pickerId, options, durationMs: pickMs, remainingMs: Math.max(0, pickMs - elapsed) };
   }
 
   private maybeRevealEarly() {
@@ -992,9 +1011,9 @@ export class Game {
       p.answerMs += Math.min(p.answer?.timeMs ?? this.scoreLimitMs, this.scoreLimitMs);
       if (correct && p.answer) {
         const timeMs = Math.min(p.answer.timeMs, this.scoreLimitMs);
-        // In the 30-second pace a right answer past the usual clock still counts, but it breaks the streak, as the rules
-        // say: a look-up mustn't build a streak's bonus (the review's GAMEPLAY-5).
-        p.streak = this.pace === 'relaxed' && p.answer.timeMs > this.scoreLimitMs ? 0 : p.streak + 1;
+        // At a longer pace (Соло's, „Повече време“) a right answer past the usual clock still counts, but it breaks the
+        // streak, as the rules say: a look-up mustn't build a streak's bonus (the review's GAMEPLAY-5).
+        p.streak = p.answer.timeMs > this.scoreLimitMs ? 0 : p.streak + 1;
         p.correct++;
         p.correctByDifficulty[q.difficulty]++;
         cat.correct++;

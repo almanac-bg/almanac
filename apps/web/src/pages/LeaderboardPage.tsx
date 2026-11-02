@@ -77,7 +77,8 @@ export function LeaderboardPage() {
             </p>
           )}
         </div>
-        <Segmented value={board} onChange={setBoard} options={boards} />
+        {/* Six boards: one row that scrolls on a phone, not four and two (UX-13). */}
+        <Segmented value={board} onChange={setBoard} options={boards} scroll />
       </div>
 
       {board === 'daily' && !me.isGuest && (

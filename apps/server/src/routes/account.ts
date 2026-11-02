@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { levelFromXp } from '@quiz/shared';
+import { levelFromXp, MORE_TIME, type MoreTime } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
@@ -251,6 +251,14 @@ accountRouter.post('/account/share-runs', requireAuth, requireAccount, (req, res
   const body = parse(z.object({ on: z.boolean() }), req, res);
   if (!body) return;
   run('UPDATE users SET share_runs = ? WHERE id = ?', body.on ? 1 : 0, res.locals.userId);
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+/** „Повече време“: the clock of the runs played alone, and a longer round pick (MORE_TIME). A guest's too. */
+accountRouter.post('/account/more-time', requireAuth, (req, res) => {
+  const body = parse(z.object({ value: z.enum(MORE_TIME.map((m) => m.id) as [MoreTime, ...MoreTime[]]) }), req, res);
+  if (!body) return;
+  run('UPDATE users SET more_time = ? WHERE id = ?', body.value, res.locals.userId);
   res.json({ user: getMe(res.locals.userId) });
 });
 

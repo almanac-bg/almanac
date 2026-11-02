@@ -57,6 +57,8 @@ export interface MeUser extends PublicUser {
   push: PushPrefs | null;
   /** Others may play against your recorded matches (a recording plays when nobody's there for a Дуел). */
   shareRuns: boolean;
+  /** „Повече време“ (MORE_TIME): 'off' for the usual clock. */
+  moreTime: MoreTime;
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
@@ -324,11 +326,38 @@ export type SoloPace = (typeof SOLO_PACES)[number]['id'];
 
 export const isSoloPace = (v: unknown): v is SoloPace => SOLO_PACES.some((p) => p.id === v);
 
+/** A run's clock: Соло's paces, and three times the usual (`triple`) — „Повече време“ (MORE_TIME). */
+export type Pace = SoloPace | 'triple';
+
+export const isPace = (v: unknown): v is Pace => isSoloPace(v) || v === 'triple';
+
+/**
+ * „Повече време“ (Settings → Достъпност), kept with the profile: the clock of the runs played alone — the daily,
+ * challenge links and friend duels, and „Поправителен“ — and, in a live match, twice the time to pick a round's
+ * category. With it on, the daily and a link count off their boards (the place it would have been is shown), as a
+ * newcomer's first day does; a friend duel is marked and pays no win bonus. An answer past the usual 15 seconds is right,
+ * without the speed bonus, the streak or what it says about knowing (the review's A11Y-2, D6).
+ */
+export const MORE_TIME = [
+  // Labelled as Соло's paces are (a picture's clock is shorter, as it is there).
+  { id: 'off', label: '15 с', pace: 'normal' },
+  { id: 'relaxed', label: '30 с', pace: 'relaxed' },
+  { id: 'triple', label: '45 с', pace: 'triple' },
+  { id: 'untimed', label: 'Без часовник', pace: 'untimed' },
+] as const satisfies readonly { id: string; label: string; pace: Pace }[];
+
+export type MoreTime = (typeof MORE_TIME)[number]['id'];
+
+export const isMoreTime = (v: unknown): v is MoreTime => MORE_TIME.some((m) => m.id === v);
+
+/** The clock a setting of „Повече време“ gives. */
+export const paceFor = (more: MoreTime): Pace => MORE_TIME.find((m) => m.id === more)?.pace ?? 'normal';
+
 export interface GameStartPayload {
   gameId: string;
   mode: ModeId;
-  /** Соло's clock (SOLO_PACES); every other mode plays 'normal'. */
-  pace: SoloPace;
+  /** The clock of a run played alone (Соло's pace, or „Повече време“); every other match plays 'normal'. */
+  pace: Pace;
   ranked: boolean;
   roomCode: string | null;
   players: GamePlayer[];
@@ -421,6 +450,8 @@ export interface MatchRewards {
     total: number;
     /** A guest's run, or an account's made today: the same questions, kept off the board (see the server's trust.ts). */
     offBoard: boolean;
+    /** Off the board for being played with „Повече време“ (MORE_TIME). */
+    moreTime?: boolean;
     streak: number;
     shieldsUsed: number;
     shieldEarned: boolean;
@@ -430,7 +461,8 @@ export interface MatchRewards {
     field: DailyField | null;
   } | null;
   /** A challenge-link run: where it placed among everyone who played that link; a friend duel's, how it stands. */
-  challenge: { id: string; rank: number; total: number; duel: DuelStanding | null } | null;
+  /** `moreTime`: played with „Повече време“ — off the link's board, `rank` the place it would have had. */
+  challenge: { id: string; rank: number; total: number; duel: DuelStanding | null; moreTime?: boolean } | null;
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
   soloBest: number | null;
   /** „Моят алманах“: facts this match added, and how many there are now. */
@@ -602,7 +634,8 @@ export interface ClientToServerEvents {
    */
   'challenge:start': (p: { id?: string; rival?: number; categories?: CategoryId[] }, ack: Ack<{ id: string }>) => void;
   /** „Поправителен“: the missed questions that are due (REVIEW). */
-  'review:start': (ack: Ack) => void;
+  /** `pace`: its clock (any of them: it's no competition); else the one „Повече време“ sets. */
+  'review:start': (p: { pace?: Pace }, ack: Ack) => void;
   /** The evening Роял's lobby: in (while it's open), or out. */
   'evening:join': (ack: Ack) => void;
   'evening:leave': () => void;
@@ -747,6 +780,8 @@ export interface DailyInfo {
    * another would have been). The questions are everyone's.
    */
   offBoard: boolean;
+  /** Today's run was played with „Повече време“ (MORE_TIME): that's why it's off the board. */
+  moreTime?: boolean;
   /** Off the board, `rank` is where the run would stand on it. */
   played: { score: number; correct: number; rank: number; field: DailyField | null } | null;
   total: number;
@@ -1095,6 +1130,8 @@ export interface ChallengeEntry {
   correct: number;
   timeMs: number;
   you: boolean;
+  /** Your run, played with „Повече време“: off the board, `rank` the place it would have had. */
+  moreTime?: boolean;
 }
 
 export interface ChallengeInfo {
@@ -1126,9 +1163,9 @@ export interface DuelRecord {
 /** A friend duel as one of its two players sees it. */
 export interface DuelStanding {
   friend: PublicUser;
-  /** Each side's run, once played. */
-  mine: { score: number; correct: number; timeMs: number } | null;
-  theirs: { score: number; correct: number; timeMs: number } | null;
+  /** Each side's run, once played (`moreTime`: with „Повече време“ — it stands, marked, without the win bonus). */
+  mine: { score: number; correct: number; timeMs: number; moreTime?: boolean } | null;
+  theirs: { score: number; correct: number; timeMs: number; moreTime?: boolean } | null;
   /** Null until both have played (or it ran out). */
   outcome: 'won' | 'lost' | 'draw' | null;
   /** The two of them over all their duels. */

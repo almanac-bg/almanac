@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 import {
   ACHIEVEMENTS,
   dayKey,
+  isMoreTime,
   isUnlocked,
   type Loadout,
   levelFromXp,
@@ -120,6 +121,7 @@ export function getMe(userId: number): MeUser | null {
     beatenMails: row.beaten_mails === 1,
     push: pushPrefs(row),
     shareRuns: row.share_runs === 1,
+    moreTime: isMoreTime(row.more_time) ? row.more_time : 'off',
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     unreadNotifications: unreadNotifications(userId),
