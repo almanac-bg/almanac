@@ -20,7 +20,7 @@ import {
 } from '@quiz/shared';
 import type { GameEmitter } from '../src/game/Game';
 import type { OrderQuestion, PreparedQuestion } from '../src/questions';
-import { app, jpeg, writeFixtureQuestions } from './helpers';
+import { app, jpeg, photo, writeFixtureQuestions } from './helpers';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-formats-'));
 process.env.DB_PATH = path.join(tmp, 'formats.db');
@@ -106,7 +106,7 @@ const giveaways = [
 const fixture = JSON.parse(fs.readFileSync(process.env.QUESTIONS_PATH, 'utf8'));
 fs.writeFileSync(process.env.QUESTIONS_PATH, JSON.stringify([...fixture, ...extra, ...giveaways]));
 
-const { one, run } = await import('../src/db');
+const { all, one, run } = await import('../src/db');
 const { Game, gameClock } = await import('../src/game/Game');
 gameClock.now = () => Date.now();
 const {
@@ -130,10 +130,13 @@ const {
   pictureFile,
   prepareSet,
   readPicture,
+  remakeOldPictures,
   saveSet,
   sweepPictures,
   uploadPicture,
 } = await import('../src/sets');
+const { remakePicture, samePicture } = await import('../src/pictures');
+const { default: sharp } = await import('sharp');
 
 const isPicture = (q: PreparedQuestion) => isChoice(q) && !!q.image;
 
@@ -469,8 +472,8 @@ test('a picture: its two sizes go with the question, whose it is with the answer
 // ─── A host's own sets ───────────────────────────────────────────────────────
 
 /** The smallest WebP a canvas makes, of the given size (lossless, VP8L). */
-function webp(w: number, h: number, extra = 0): Buffer {
-  const b = Buffer.alloc(30 + extra);
+function webp(w: number, h: number): Buffer {
+  const b = Buffer.alloc(30);
   b.write('RIFF', 0, 'latin1');
   b.writeUInt32LE(b.length - 8, 4);
   b.write('WEBPVP8L', 8, 'latin1');
@@ -498,7 +501,7 @@ test('a set’s picture is a still WebP or JPEG of a sensible size; a photo’s 
   assert.equal(readPicture(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')), null);
 });
 
-test('a host uploads pictures, saves them with a set, plays them; a moderator blocks them; unused ones go', () => {
+test('a host uploads pictures, saves them with a set, plays them; a moderator blocks them; unused ones go', async () => {
   run(
     `INSERT INTO users (id, username, username_key, password_hash, created_at, email, email_key) VALUES
      (11, 'teacher', 'teacher', 'x', 0, 't@example.test', 't@example.test'),
@@ -506,13 +509,14 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
      (13, 'newcomer', 'newcomer', 'x', 0, NULL, NULL)`,
   );
   // Pictures are stored and served: an account with a confirmed address, or one that has played a while (MOD-6).
-  assert.match(String((uploadPicture(13, webp(800, 600)) as { error: string }).error), /потвърден имейл/);
-  const up = uploadPicture(11, webp(800, 600));
+  const first = await photo(800, 600);
+  assert.match(String(((await uploadPicture(13, first)) as { error: string }).error), /потвърден имейл/);
+  const up = await uploadPicture(11, first);
   assert.ok(up.ok);
-  assert.deepEqual(uploadPicture(11, webp(800, 600)), up, 'the same picture twice is one');
-  const spare = uploadPicture(11, webp(400, 300, 4));
+  assert.deepEqual(await uploadPicture(11, first), up, 'the same picture twice is one');
+  const spare = await uploadPicture(11, await photo(400, 300, { seed: 2, type: 'webp' }));
   assert.ok(spare.ok);
-  assert.equal(uploadPicture(11, Buffer.alloc(SETS.imageBytes + 1)).ok, false);
+  assert.equal((await uploadPicture(11, Buffer.alloc(SETS.imageBytes + 1))).ok, false);
 
   const unknown = createSet(11, {
     name: 'Урок',
@@ -634,16 +638,101 @@ test('a host uploads pictures, saves them with a set, plays them; a moderator bl
   assert.ok(hideSet(code, true));
   assert.equal(pictureFile(up.id), undefined);
   assert.equal(prepareSet(made.id, 11), null, 'a hidden set isn’t played');
-  assert.deepEqual(uploadPicture(12, webp(800, 600)), { ok: false, error: 'Тази снимка е спряна от модератор.' });
+  const refused = { ok: false, error: 'Тази снимка е спряна от модератор.' };
+  assert.deepEqual(await uploadPicture(12, first), refused);
+  // Nor made into another file: re-encoded, resized, a shade lighter (its print, SEC-9).
+  for (const [how, copy] of [
+    ['re-encoded', await sharp(first).jpeg({ quality: 50 }).toBuffer()],
+    ['as WebP', await sharp(first).webp({ quality: 70 }).toBuffer()],
+    ['resized', await sharp(first).resize(600).jpeg().toBuffer()],
+    ['lighter', await sharp(first).modulate({ brightness: 1.1 }).jpeg().toBuffer()],
+  ] as const)
+    assert.deepEqual(await uploadPicture(12, copy), refused, how);
+  assert.ok((await uploadPicture(12, await photo(800, 600, { seed: 3 }))).ok, 'another picture is taken');
   assert.match(String((saveSet(made.id, 11, { name: 'Урок 6', questions: [] }) as { error: string }).error), /скрит/);
   assert.ok(hideSet(code, false));
   assert.ok(pictureFile(up.id), 'shown again: served again');
 
-  // A day on, the picture no set uses goes; the one in the set stays.
-  assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 1);
+  // A day on, the pictures no set uses go (the spare, the other host's); the one in the set stays.
+  assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 2);
   assert.ok(one('SELECT 1 AS x FROM set_images WHERE id = ?', up.id));
   assert.ok(!one('SELECT 1 AS x FROM set_images WHERE id = ?', spare.ok ? spare.id : ''));
   assert.equal(sweepPictures(Date.now() + 25 * 60 * 60_000), 0, 'gone once');
+});
+
+test('what is kept is a picture made anew: a still WebP from the pixels alone, whatever rode along (SEC-9)', async () => {
+  // Bytes hidden in the scan (after the picture's last block, before its end), which readPicture's structure lets by.
+  const real = await photo(320, 240);
+  const smuggled = Buffer.concat([real.subarray(0, -2), Buffer.from('SMUGGLED <script>'), real.subarray(-2)]);
+  const checked = readPicture(smuggled);
+  assert.ok(checked);
+  assert.ok(checked.bytes.includes('SMUGGLED'), 'the structure alone keeps them');
+  const made = await remakePicture(checked.bytes);
+  assert.ok(made);
+  assert.equal(made.type, 'image/webp');
+  assert.equal(made.bytes.toString('latin1', 8, 12), 'WEBP');
+  assert.ok(!made.bytes.includes('SMUGGLED'), 'made anew: gone');
+  assert.deepEqual([made.w, made.h], [320, 240]);
+  assert.ok(made.bytes.length <= SETS.imageBytes);
+  // Only JPEG and WebP reach a decoder: libvips' other loaders are shut (a PNG, an SVG, a GIF).
+  const raw = { raw: { width: 32, height: 32, channels: 3 } } as const;
+  for (const other of [
+    await sharp(Buffer.alloc(32 * 32 * 3, 90), raw)
+      .png()
+      .toBuffer(),
+    await sharp(Buffer.alloc(32 * 32 * 3, 90), raw)
+      .gif()
+      .toBuffer(),
+    Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32"/></svg>'),
+  ])
+    assert.equal(await remakePicture(other), null);
+  assert.equal(await remakePicture(real.subarray(0, 600)), null, 'cut short');
+
+  // Prints: the same picture made again matches; another doesn't; a plain one (a flat colour) only by its bytes.
+  const again = await remakePicture(await sharp(real).jpeg({ quality: 40 }).toBuffer());
+  const other = await remakePicture(await photo(320, 240, { seed: 5 }));
+  const flat = await remakePicture(
+    await sharp(Buffer.alloc(320 * 240 * 3, 200), { raw: { ...raw.raw, width: 320, height: 240 } })
+      .jpeg()
+      .toBuffer(),
+  );
+  assert.ok(again && other && flat);
+  assert.ok(samePicture(made.print, again.print));
+  assert.ok(!samePicture(made.print, other.print));
+  assert.ok(!samePicture(flat.print, flat.print), 'too plain to match by print');
+
+  // Pictures kept from before (v48): made anew under the same id, with the print given to a block on them too; one
+  // that can't be decoded is left as it was, and not tried again.
+  run(
+    `INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES
+     (21, 'before', 'before', 'x', 0), (22, 'copier', 'copier', 'x', 0)`,
+  );
+  const old = 'a'.repeat(16);
+  const broken = 'b'.repeat(16);
+  const keep = run.bind(
+    null,
+    'INSERT INTO set_images (owner_id, id, type, bytes, w, h, created_at) VALUES (?, ?, ?, ?, 320, 240, 0)',
+  );
+  keep(21, old, 'image/jpeg', checked.bytes);
+  keep(22, old, 'image/jpeg', checked.bytes);
+  keep(21, broken, 'image/webp', Buffer.from('RIFF....WEBPVP8 '));
+  run('INSERT INTO blocked_pictures (id, blocked_at) VALUES (?, 0)', old);
+  assert.deepEqual(await remakeOldPictures(), { remade: 1, failed: [broken] });
+  const rows = all<{ type: string; bytes: Uint8Array; print: string }>(
+    'SELECT type, bytes, print FROM set_images WHERE id = ?',
+    old,
+  );
+  assert.equal(rows.length, 2);
+  for (const row of rows) {
+    assert.equal(row.type, 'image/webp');
+    assert.ok(!Buffer.from(row.bytes).includes('SMUGGLED'), 'every copy');
+    assert.ok(samePicture(row.print, made.print));
+  }
+  assert.equal(one<{ print: string }>('SELECT print FROM blocked_pictures WHERE id = ?', old)!.print, rows[0].print);
+  assert.equal(one<{ print: string }>('SELECT print FROM set_images WHERE id = ?', broken)!.print, '');
+  assert.deepEqual(await remakeOldPictures(), { remade: 0, failed: [] }, 'once');
+  run('DELETE FROM blocked_pictures WHERE id = ?', old);
+  run('DELETE FROM users WHERE id IN (21, 22)');
 });
 
 test('a giveaway in another form: a final’s number in an order item or an answer, a word with its ending, an abbreviation', async () => {

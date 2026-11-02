@@ -17,8 +17,9 @@ await build({
   format: 'esm',
   target: 'node24',
   sourcemap: true,
-  // ws probes these optional native speedups inside try/catch.
-  external: ['bufferutil', 'utf-8-validate'],
+  // ws probes these optional native speedups inside try/catch. sharp (pictures.ts) is a native library: it stays a
+  // package beside the bundle (the Dockerfile copies it into the image).
+  external: ['bufferutil', 'utf-8-validate', 'sharp'],
   // CommonJS dependencies bundled into ESM still call require() for Node built-ins.
   banner: {
     js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",

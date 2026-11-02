@@ -147,6 +147,14 @@ jobs:
           done
           docker logs almanac
           exit 1
+      # The picture codec (sharp, the one package beside the bundle) loads and encodes in the image.
+      - run: >-
+          docker run --rm -w /app almanac
+          node --input-type=module -e "import sharp from 'sharp';
+          const jpeg = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#c33' } }).jpeg().toBuffer();
+          const webp = await sharp(jpeg).webp().toBuffer();
+          if (webp.toString('latin1', 8, 12) !== 'WEBP') process.exit(1);
+          console.log('libvips', sharp.versions.vips)"
       # Backups, end to end with the production Litestream config: stream the live database to S3-compatible storage
       # (moto stands in for the real thing), write more, then restore it the way docs/operations.md does on a new server and
       # run the app on the restored copy — it must be able to write there too. A backup that has never been restored
@@ -263,6 +271,14 @@ jobs:
           done
           docker logs almanac
           exit 1
+      - name: The picture codec loads and encodes on this platform
+        run: >-
+          docker run --rm -w /app "$IMAGE"
+          node --input-type=module -e "import sharp from 'sharp';
+          const jpeg = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#c33' } }).jpeg().toBuffer();
+          const webp = await sharp(jpeg).webp().toBuffer();
+          if (webp.toString('latin1', 8, 12) !== 'WEBP') process.exit(1);
+          console.log('libvips', sharp.versions.vips)"
       # The token from the environment, not written into the script (a value in ${{ }} becomes part of the shell code).
       - run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
         env:

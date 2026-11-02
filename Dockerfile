@@ -10,7 +10,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ── Runtime: plain Node, no node_modules (the server bundle is self-contained) ──
+# ── Runtime: plain Node and the server bundle, with one package beside it (sharp) ──
 FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
 # UV_THREADPOOL_SIZE: password hashing shares libuv's threads with file reads and DNS lookups; 8 instead of the
 # default 4 leaves them room while hashes run (see hashingLimits in apps/server/src/auth.ts).
@@ -22,6 +22,12 @@ WORKDIR /app
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
 COPY --from=build /app/apps/web/dist-ssr apps/web/dist-ssr
+# sharp, which makes set pictures anew (apps/server/src/pictures.ts): a native library, so it can't be bundled. With its
+# three small dependencies and the one libvips build npm ci installed for this image's platform (linuxmusl-x64 or -arm64).
+COPY --from=build /app/node_modules/sharp node_modules/sharp
+COPY --from=build /app/node_modules/@img node_modules/@img
+COPY --from=build /app/node_modules/detect-libc node_modules/detect-libc
+COPY --from=build /app/node_modules/semver node_modules/semver
 # The server needs node alone: no package manager in the running image to fetch or run anything else.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm \
       /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* \
