@@ -5,6 +5,7 @@ import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useId, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
+import { Radio } from '../controls';
 import { Emoji } from '../Emoji';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
@@ -289,16 +290,15 @@ function ReportQuestion({
           <label
             key={r.id}
             className={clsx(
-              'flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
+              'relative flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition-colors',
               reason === r.id ? 'border-amber-400/50 bg-amber-500/10' : 'border-line hover:bg-tint/5',
             )}
           >
-            <input
-              type="radio"
+            <Radio
               name="question-reason"
               checked={reason === r.id}
               onChange={() => setReason(r.id)}
-              className="accent-amber-400"
+              tone="text-amber-400"
             />
             {r.label}
           </label>

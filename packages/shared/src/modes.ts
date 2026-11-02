@@ -103,7 +103,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 0, order: false },
     tagline: 'Сгрешеното се връща. Този път го знаеш.',
-    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моят алманах“.',
+    description: 'Въпросите, които сгреши, се връщат след 3, 7 и 21 дни. Познатите влизат в „Моите знания“.',
     accent: ['#fcd34d', '#10b981'],
   },
   duel: {
@@ -358,8 +358,12 @@ export interface RoomSettings {
 export const ROOM_LIMITS = {
   maxPlayers: [2, 40],
   questions: [5, 10, 15, 20],
-  /** Up to a minute: a class with a pupil who reads slowly, or answers with a switch, has the time it needs. */
-  timeMs: [10_000, 15_000, 20_000, 30_000, 45_000, 60_000],
+  /**
+   * Up to a minute — and 0, „Без часовник“: a question stays open until everyone has answered or the host shows the
+   * answer (the 31 October review, A11Y-5; WCAG 2.2.1 asks for a limit that can be turned off). A class with a pupil
+   * who reads slowly, or answers with a switch, has the time it needs.
+   */
+  timeMs: [10_000, 15_000, 20_000, 30_000, 45_000, 60_000, 0],
   /** Knockouts one at a time only work for a few: with them on, a room takes at most this many. */
   eliminationPlayers: 8,
 } as const;

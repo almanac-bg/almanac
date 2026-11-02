@@ -175,7 +175,7 @@ function Arena({ game }: { game: LiveGame }) {
         >
           {watching ? (
             <p className="text-balance text-rose-200">
-              <Emoji e="💀" /> Отпадна — отговаряй до края: за XP и алманаха, извън класирането
+              <Emoji e="💀" /> Отпадна — отговаряй до края: за XP и знанията, извън класирането
             </p>
           ) : finishing ? (
             <p className="text-balance text-rose-200" role="status">
@@ -187,7 +187,7 @@ function Arena({ game }: { game: LiveGame }) {
                 <Emoji e="💀" /> Отпадна. Останаха само ботове
               </p>
               <p className="col-span-2 text-xs text-fg-2">
-                Довърши въпросите в твоето темпо — за XP и алманаха — или виж резултата веднага.
+                Довърши въпросите в твоето темпо — за XP и знанията — или виж резултата веднага.
               </p>
               <Button size="sm" variant="secondary" className="col-start-2 row-start-1" onClick={finish}>
                 Към резултата

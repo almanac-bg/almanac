@@ -1,4 +1,4 @@
-// What a player builds up: „Моят алманах“ and „Поправителен“ (almanac.ts), category mastery (mastery.ts), groups and
+// What a player builds up: „Моите знания“ and „Поправителен“ (knowledge.ts), category mastery (mastery.ts), groups and
 // their weekly boards (groups.ts); and how everyone did, on a question (answers.ts) and on a day (daily.ts).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,16 +21,15 @@ import type { AnswerLogEntry } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
 // Server modules open the database on import — point them at a throwaway one first.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-collection-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-collection-'));
 process.env.DB_PATH = path.join(tmp, 'collection.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { all, one, run } = await import('../src/db');
 const { isChoice, questionById, reloadQuestionBank, reorderOptions } = await import('../src/questions');
 const { crowdFor, recordAnswers } = await import('../src/answers');
-const { almanacCategory, almanacOverview, factCount, learn, noteMatch, reviewQueue, reviewQuestions } = await import(
-  '../src/almanac'
-);
+const { knowledgeCategory, knowledgeOverview, factCount, learn, noteMatch, reviewQueue, reviewQuestions } =
+  await import('../src/knowledge');
 const { bestMastery, currentTier, forgetMasteryCutoffs, masteryCutoffs, settleMastery } = await import(
   '../src/mastery'
 );
@@ -110,7 +109,7 @@ test('„X% знаят“: each option’s share in the match’s own order, onl
   assert.deepEqual(crowdFor(number), { known: 0.8, picks: null, answers: 30 });
 });
 
-test('„Моят алманах“: a fact is yours once you get its question right (or stop to read it)', () => {
+test('„Моите знания“: a fact is yours once you get its question right (or stop to read it)', () => {
   const player = account();
   // Even questions of the fixture bank have a fact; odd ones don't.
   const added = noteMatch(
@@ -123,15 +122,15 @@ test('„Моят алманах“: a fact is yours once you get its question r
   assert.equal(learn(player, ['science-2', 'science-0']), 0, 'already theirs');
   assert.equal(factCount(player), 3);
 
-  const overview = almanacOverview(player);
+  const overview = knowledgeOverview(player);
   const science = overview.categories.find((c) => c.category === 'science')!;
   assert.deepEqual([science.facts, science.total], [3, 15], 'every other question in the fixture bank has a fact');
   assert.equal(overview.recent.length, 3);
-  const page = almanacCategory(player, 'science');
+  const page = knowledgeCategory(player, 'science');
   assert.deepEqual(page.facts.map((f) => f.id).sort(), ['science-0', 'science-2', 'science-4']);
   assert.equal(page.facts.find((f) => f.id === 'science-0')!.answer, 'Верен ✓ 0');
 
-  // A question hidden by a moderator leaves the almanac (and its count) with the bank.
+  // A question hidden by a moderator leaves „Моите знания“ (and its count) with the bank.
   run("INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES ('science-4', NULL, 0)");
   reloadQuestionBank();
   assert.equal(factCount(player), 2);

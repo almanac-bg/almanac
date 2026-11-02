@@ -32,8 +32,13 @@ export function NotificationsPage() {
   if (!items) return <PageSpinner />;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="t-page">Известия</h1>
+    <div className="space-y-6">
+      <header>
+        <h1 className="t-page">Известия</h1>
+        <p className="mt-2 text-fg-2">
+          Кой изигра линковете ти, кой те покани или поиска реванш, какво стана с въпросите ти.
+        </p>
+      </header>
       {items.length === 0 ? (
         <Card>
           <EmptyState

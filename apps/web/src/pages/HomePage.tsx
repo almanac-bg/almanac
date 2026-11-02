@@ -14,7 +14,6 @@ import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { useStartReview } from '../components/almanac';
 import { useDuels, usePlayDuel } from '../components/duels';
 import { Emoji } from '../components/Emoji';
 import { ChallengeCard } from '../components/home/ChallengeCard';
@@ -28,6 +27,7 @@ import { ModeCard, RankInfo, SoloPicker } from '../components/home/ModeCard';
 import { useOpenQueues } from '../components/home/openQueues';
 import { ProfileCard } from '../components/home/ProfileCard';
 import { QuestsCard } from '../components/home/QuestsCard';
+import { useStartReview } from '../components/knowledge';
 import { Button } from '../components/ui';
 import { usePageTitle } from '../lib/title';
 
@@ -194,7 +194,7 @@ function queueSpan(i: number, n: number) {
 
 /** „Поправителен“ ready: a run of the missed questions that came back (how many it plays, not the pile), a tap away. */
 function ReviewTurn() {
-  const due = useStore((s) => s.me?.almanac.due ?? 0);
+  const due = useStore((s) => s.me?.knowledge.due ?? 0);
   const { busy, start } = useStartReview();
   if (due < REVIEW.min) return null;
   return (

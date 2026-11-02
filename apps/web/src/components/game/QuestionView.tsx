@@ -11,7 +11,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
-import { PAUSED_NOTE } from './Announcer';
+import { PAUSED_NOTE, QUESTION_PAUSED_NOTE } from './Announcer';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
@@ -26,10 +26,12 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   // Соло without a clock: each answer waits for „Продължи“.
   // Without a clock (Соло's, or „Повече време“ in a run alone): every answer waits for „Продължи“.
-  const untimedRun = game.start.pace === 'untimed';
+  // A run alone without a clock (Соло, „Повече време“): its own waits and „Още време“. A room without one waits for its
+  // host instead.
+  const untimedRun = game.start.pace === 'untimed' && !game.start.roomCode;
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
-  // Knocked out: the questions go on, and can still be answered — for XP and the almanac, outside the race.
+  // Knocked out: the questions go on, and can still be answered — for XP and „Моите знания“, outside the race.
   const out = game.eliminated.includes(youId);
   const active = !reveal && !game.resyncing;
   const mine = reveal?.results[youId];
@@ -192,7 +194,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             <TimerRing
               deadline={game.closesAt ?? game.deadline}
               duration={q.durationMs}
-              stopped={!!reveal}
+              // A class's teacher paused the question: its time stands still (it goes on from there).
+              stopped={!!reveal || game.paused === q.index}
               untimed={q.speedMs === null}
             />
             {/* A number has no speed bonus (what it's worth is how close it is), and an order's comes only with all of it
@@ -225,6 +228,12 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
                   : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ')}
             </p>
             {q.author && <p className="mt-3 text-xs font-medium text-fg-3">✍️ Въпрос от {q.author}</p>}
+            {/* Said by MatchAnnouncer, which is always there. */}
+            {!reveal && game.paused === q.index && (
+              <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-fg-2">
+                <Pause aria-hidden className="size-4 shrink-0" /> {QUESTION_PAUSED_NOTE}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -627,6 +636,8 @@ function TimerRing({
   const [frozen, setFrozen] = useState<number | null>(null);
   useEffect(() => {
     if (stopped && frozen === null) setFrozen(Math.max(0, deadline - Date.now()));
+    // Going on after a class's pause: the clock again, from the deadline the server moved.
+    else if (!stopped && frozen !== null) setFrozen(null);
   }, [stopped, frozen, deadline]);
   const remaining = frozen ?? Math.max(0, deadline - now);
   const secs = Math.ceil(remaining / 1000);

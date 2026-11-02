@@ -80,6 +80,11 @@ export function LockerPage() {
 
   return (
     <div className="space-y-6">
+      {/* The page's name at the top, as on every other page (it stood beside the avatar card). */}
+      <header>
+        <h1 className="t-page">Колекция</h1>
+        <p className="mt-2 text-fg-2">Аватари, рамки, титли, емоции и козове — каквото си отключил и как изглеждаш.</p>
+      </header>
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         {/* Phones: one row (avatar beside the name), so the collection itself starts on the first screen. */}
         <Card className="relative flex items-center gap-4 overflow-hidden p-4 lg:sticky lg:top-24 lg:flex-col lg:gap-0 lg:self-start lg:p-8 lg:text-center">
@@ -107,7 +112,6 @@ export function LockerPage() {
         <div className="min-w-0 space-y-5">
           {me.choices.length > 0 && <ChoicesWaiting key={me.choices[0].level} />}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="t-section">Колекция</h1>
             <Segmented
               scroll
               value={tab}

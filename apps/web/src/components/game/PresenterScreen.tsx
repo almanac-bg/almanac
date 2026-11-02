@@ -1,16 +1,17 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { BRAND, categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Lightbulb, Pause, Users } from 'lucide-react';
+import { ArrowRight, Check, Eye, Lightbulb, Pause, Play, Users } from 'lucide-react';
 import { m } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { sfx } from '../../lib/sound';
+import { louder, sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';
+import { Logo } from '../NavBar';
 import { burst } from '../results/confetti';
 import { Button } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
@@ -35,35 +36,58 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     actions.closeGame();
     navigate('/room');
   };
-  // The room's speakers carry the match as the phones do for each player: the last seconds ticking, everyone in, the
-  // answer.
-  const left = q && !reveal && !end ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  // The room's speakers carry the match as the phones do for each player — louder, for a room (VD-17): the countdown
+  // and the start, the last seconds ticking, everyone in, and the answer as the room did: right when at least half
+  // knew it, a softer step down when most didn't.
+  const counting = game.phase === 'countdown' ? Math.max(0, Math.ceil((game.countdownEndsAt - now) / 1000)) : null;
   useEffect(() => {
-    if (left !== null && left > 0 && left <= 5) sfx.tick(left);
+    if (counting !== null && counting > 0) louder(() => sfx.countdown());
+  }, [counting]);
+  const opening = q?.index === 0 && !reveal ? 0 : null;
+  useEffect(() => {
+    if (opening === 0) louder(() => sfx.go());
+  }, [opening]);
+  // While the class has the question paused its clock stands still: the time left as it was at the pause.
+  const pausedQuestion = !!q && !reveal && !end && game.paused === q.index;
+  const [frozen, setFrozen] = useState<number | null>(null);
+  useEffect(() => {
+    setFrozen(pausedQuestion ? Math.max(0, game.deadline - Date.now()) : null);
+  }, [pausedQuestion, game.deadline]);
+  const remainingMs = frozen ?? Math.max(0, game.deadline - now);
+  const left = q && !reveal && !end && q.speedMs !== null ? Math.ceil(remainingMs / 1000) : null;
+  useEffect(() => {
+    if (left !== null && left > 0 && left <= 5) louder(() => sfx.tick(left));
   }, [left]);
   const allIn = !!q && !reveal && playing > 0 && game.answered.length >= playing;
   useEffect(() => {
-    if (allIn) sfx.lock();
+    if (allIn) louder(() => sfx.lock());
   }, [allIn]);
   const revealed = reveal?.index ?? null;
+  const knew = reveal ? Object.values(reveal.results).filter((r) => r.correct).length : 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per answer shown, with how the room did then
   useEffect(() => {
-    if (revealed !== null) sfx.correct();
+    if (revealed === null) return;
+    louder(() => (knew * 2 >= playing ? sfx.correct() : sfx.timeUp()));
   }, [revealed]);
 
-  // The teacher sets the pace on an answer: „Пауза“ to talk it through, „Следващ“ to go on now — from the screen, or a
-  // presenter's clicker (→ or PageDown), Space pausing and going on.
-  const paused = revealed !== null && game.paused === revealed;
-  const steer = (action: 'pause' | 'next') => {
-    if (revealed !== null) void actions.steer(revealed, action);
+  // The teacher sets the pace: on an open question „Пауза“ / „Продължи“ (its clock stops; answers still come) and
+  // „Покажи отговора“ (a room without a clock waits for it); on an answer „Пауза“ to talk it through, „Следващ“ to go on
+  // now — from the screen, or a presenter's clicker (→ or PageDown: the next step, whichever it is), Space pausing and
+  // going on.
+  const open = q && !reveal && !end && game.phase === 'question' ? q.index : null;
+  const paused = (revealed !== null && game.paused === revealed) || (open !== null && game.paused === open);
+  const steer = (action: 'pause' | 'next' | 'reveal') => {
+    const at = open ?? revealed;
+    if (at !== null && (action !== 'reveal' || open !== null)) void actions.steer(at, action);
   };
-  const keys = useRef({ steer, paused });
-  keys.current = { steer, paused };
+  const keys = useRef({ steer, paused, open: open !== null });
+  keys.current = { steer, paused, open: open !== null };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       // A focused button takes its own Space.
       if (e.target instanceof Element && e.target.closest('button, a, input, textarea, select')) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') keys.current.steer('next');
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') keys.current.steer(keys.current.open ? 'reveal' : 'next');
       else if (e.key === ' ') keys.current.steer(keys.current.paused ? 'next' : 'pause');
       else return;
       e.preventDefault();
@@ -74,9 +98,17 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-ink px-6 py-5 lg:px-12 lg:py-8">
+      {/* The mark and where this is, on every screen of the match (VD-8): the projector is the class's whole view of it.
+          No line to join: a match under way takes nobody new (rooms.ts). */}
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Logo className="text-2xl lg:text-3xl" />
         {game.start.roomCode && (
-          <p className="font-mono text-2xl font-bold tracking-[0.25em] text-fg-2 lg:text-3xl">{game.start.roomCode}</p>
+          <p className="text-lg text-fg-2 lg:text-xl">
+            {BRAND.domain} · код{' '}
+            <span className="font-mono font-bold tracking-[0.15em] text-fg">
+              {game.start.roomCode.slice(0, 3)} {game.start.roomCode.slice(3)}
+            </span>
+          </p>
         )}
         <p className="inline-flex items-center gap-2 text-fg-3">
           <Users aria-hidden className="size-5" /> {playing} {playing === 1 ? 'играч' : 'играчи'}
@@ -85,6 +117,26 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
           <p className="ml-auto font-display text-xl font-bold text-fg-2 lg:text-2xl">
             Въпрос {q.index + 1} от {q.total}
           </p>
+        )}
+        {open !== null &&
+          (paused ? (
+            <>
+              <span className="inline-flex items-center gap-2 font-semibold text-fg-2">
+                <Pause aria-hidden className="size-5" /> На пауза
+              </span>
+              <Button variant="secondary" onClick={() => steer('next')}>
+                <Play aria-hidden className="size-4" /> Продължи
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" onClick={() => steer('pause')}>
+              <Pause aria-hidden className="size-4" /> Пауза
+            </Button>
+          ))}
+        {open !== null && (
+          <Button variant="secondary" onClick={() => steer('reveal')}>
+            <Eye aria-hidden className="size-4" /> Покажи отговора
+          </Button>
         )}
         {q && reveal && !end && (
           <div className="flex items-center gap-3">
@@ -183,7 +235,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 <div className="h-3 flex-1 overflow-hidden rounded-full bg-tint/10">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)] transition-[width] duration-300 ease-linear"
-                    style={{ width: `${Math.max(0, (game.deadline - now) / q.durationMs) * 100}%` }}
+                    style={{ width: `${Math.max(0, remainingMs / q.durationMs) * 100}%` }}
                   />
                 </div>
                 <span
@@ -252,13 +304,30 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 </ul>
               )}
             </div>
-            <p className="mt-6 text-lg text-fg-2" aria-live="polite">
-              {reveal
-                ? `${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} ${
-                    q.kind === 'order' ? 'подредиха всичко' : 'познаха'
-                  }`
-                : `Отговориха ${game.answered.length} от ${playing}`}
-            </p>
+            {reveal ? (
+              <p className="mt-6 text-lg text-fg-2" aria-live="polite">
+                {`${Object.values(reveal.results).filter((r) => r.correct).length} от ${playing} ${
+                  q.kind === 'order' ? 'подредиха всичко' : 'познаха'
+                }`}
+              </p>
+            ) : (
+              // While it's open, how many have answered as a bar the back row reads (UX-8): a number or an order
+              // question has no options on the screen to fill it.
+              <div className="mt-6 max-w-4xl">
+                <p className="flex items-baseline justify-between text-2xl font-bold" aria-live="polite">
+                  <span>Отговориха</span>
+                  <span className="tabular-nums">
+                    {game.answered.length} от {playing}
+                  </span>
+                </p>
+                <div className="mt-2 h-4 overflow-hidden rounded-full bg-tint/10">
+                  <div
+                    className="h-full rounded-full bg-violet-400 transition-[width] duration-300"
+                    style={{ width: `${playing ? (game.answered.length / playing) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
             {reveal?.fact && (
               <p className="mt-6 max-w-4xl rounded-3xl border border-amber-300/25 bg-amber-400/[0.07] p-5 text-xl text-fg-2 text-pretty">
                 <span className="font-bold text-amber-200">
@@ -307,7 +376,7 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
               {keepTogether(q.order!.items[item])}
             </span>
             {answer?.values && (
-              <span className="font-display text-2xl font-bold text-amber-200 tabular-nums">
+              <span className="text-2xl font-extrabold text-amber-200 tabular-nums">
                 {orderValueText(answer.values[item], answer.unit)}
               </span>
             )}
@@ -323,15 +392,26 @@ function OrderOnScreen({ game }: { game: LiveGame }) {
 function NumberReveal({ game }: { game: LiveGame }) {
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
+  // While it's open: what to write, and the range with its unit, big — the phones have them small (UX-8). Values and
+  // units in the text face (D2).
   if (!reveal || reveal.answerNumber === undefined || !q.number)
-    return <p className="mt-8 text-2xl text-fg-2">Въведете числото на телефоните си.</p>;
+    return (
+      <div className="mt-10">
+        <p className="text-2xl text-fg-2">Напишете число на телефоните си</p>
+        {q.number && (
+          <p className="mt-3 text-[clamp(2rem,4.5vw,4.5rem)] leading-tight font-black tabular-nums">
+            от {numberText(q.number.min, { ...q.number, unit: '' })} до {numberText(q.number.max, q.number)}
+          </p>
+        )}
+      </div>
+    );
   const closest = Object.entries(reveal.results)
     .filter(([, r]) => r.number?.guess != null)
     .sort(([, a], [, b]) => (b.number?.closeness ?? 0) - (a.number?.closeness ?? 0))
     .slice(0, 3);
   return (
     <div className="mt-8">
-      <p className="font-display text-5xl font-black text-emerald-300 lg:text-6xl">
+      <p className="text-5xl font-black text-emerald-300 tabular-nums lg:text-6xl">
         {numberText(reveal.answerNumber, q.number)}
       </p>
       {closest.length > 0 && (

@@ -3,6 +3,7 @@ import { PUSH, PUSH_KINDS, type PushKind, type PushPrefs } from '@quiz/shared';
 import clsx from 'clsx';
 import { BellRing, Share } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
+import { Select } from './controls';
 import { Button, Card, Modal, SwitchTrack } from './ui';
 
 /** The key as the browser wants it (the server gives it base64url). */
@@ -170,21 +171,14 @@ export function PushSettings() {
               Напомняне за въпросите на деня
               <span className="block text-xs font-normal text-fg-3">Само ако дотогава въпросите още те чакат</span>
             </label>
-            <select
-              id={timeId}
-              value={prefs.daily ?? ''}
-              onChange={(e) => void save({ ...prefs, daily: e.target.value === '' ? null : Number(e.target.value) })}
-              className="field h-10 rounded-xl pr-10 pl-3 text-sm"
-            >
-              <option value="" className="bg-ink-2">
-                Без
-              </option>
-              {DAILY_TIMES.map((m) => (
-                <option key={m} value={m} className="bg-ink-2">
-                  {clock(m)}
-                </option>
-              ))}
-            </select>
+            <div className="w-32">
+              <Select<number>
+                id={timeId}
+                value={prefs.daily ?? -1}
+                onChange={(m) => void save({ ...prefs, daily: m === -1 ? null : m })}
+                options={[{ value: -1, label: 'Без' }, ...DAILY_TIMES.map((m) => ({ value: m, label: clock(m) }))]}
+              />
+            </div>
           </div>
           {PUSH_KINDS.map((k) => (
             <button

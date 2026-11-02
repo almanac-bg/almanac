@@ -89,8 +89,10 @@ function setup(opts: {
   presenter?: number;
   /** A number final's weight (a set made before it counted double: 1). */
   finalTimes?: number;
-  /** Соло at this pace (the match is then a Соло). */
+  /** Соло at this pace (the match is then a Соло) — or, with `room`, a room's („Без часовник“). */
   pace?: 'normal' | 'relaxed' | 'triple' | 'untimed';
+  /** Played in a private room (a code), not alone. */
+  room?: boolean;
   /** People with „Повече време“ on, by user id (a longer round pick). */
   longPick?: number[];
   /** The save finds the database locked this many times (SQLITE_BUSY) before it gets through. */
@@ -108,10 +110,10 @@ function setup(opts: {
   let settled = 0;
   const game = new Game(
     {
-      mode: opts.daily ? 'daily' : opts.pace ? 'solo' : 'custom',
+      mode: opts.daily ? 'daily' : opts.pace && !opts.room ? 'solo' : 'custom',
       pace: opts.pace,
       ranked: false,
-      roomCode: null,
+      roomCode: opts.room ? '123456' : null,
       hostUserId: null,
       timeMs: TIME,
       category: 'mixed',
@@ -843,6 +845,73 @@ test('a class’s big screen sets the pace: „Пауза“ holds the next ques
   advance(4_500);
   assert.equal(g.game.index, drained + 1);
   assert.equal(g.game.steer(9, toReveal(), 'pause'), false);
+});
+
+test('a room without a clock: a question waits for everyone, or for the host’s „Покажи отговора“ (A11Y-5)', () => {
+  const g = setup({ humans: [1, 2], presenter: 9, room: true, pace: 'untimed' });
+  assert.equal(g.game.pace, 'untimed');
+  const at = g.game.index;
+  assert.equal(g.of<{ speedMs: number | null }>('game:question').at(-1)?.speedMs, null, 'no clock on the phones');
+  g.right(1);
+  advance(TIME * 4);
+  assert.equal(g.game.phase, 'question', 'long past the usual clock, one still to answer: open');
+  assert.equal(g.game.steer(1, at, 'reveal'), false, 'only the host');
+  assert.equal(g.game.steer(9, at + 1, 'reveal'), false, 'only the question on screen');
+  assert.equal(g.game.steer(9, at, 'reveal'), true);
+  assert.equal(g.game.phase, 'reveal');
+  assert.equal(g.game.steer(9, at, 'reveal'), false, 'once');
+  // Everyone in: revealed by itself, as ever.
+  advance(5_000);
+  assert.equal(g.game.phase, 'question');
+  g.right(1);
+  g.right(2);
+  advance(700);
+  assert.equal(g.game.phase, 'reveal');
+  // A room with its clock plays the usual one, and its host can show the answer early too.
+  const timed = setup({ humans: [1, 2], presenter: 9, room: true });
+  assert.equal(timed.game.pace, 'normal');
+  assert.equal(timed.game.steer(9, timed.game.index, 'reveal'), true);
+  assert.equal(timed.game.phase, 'reveal');
+});
+
+test('a class’s host pauses an open question: its clock stands still, answers still come, and it goes on from there (A11Y-5)', () => {
+  const g = setup({ humans: [1, 2], presenter: 9, room: true });
+  const at = g.game.index;
+  advance(TIME / 2);
+  assert.equal(g.game.steer(1, at, 'pause'), false, 'only the host');
+  assert.equal(g.game.steer(9, at, 'pause'), true);
+  assert.deepEqual(g.of('game:paused').at(-1), { index: at, paused: true });
+  assert.equal(g.game.steer(9, at, 'pause'), false, 'paused already');
+  advance(TIME * 3);
+  assert.equal(g.game.phase, 'question', 'three clocks later, still open');
+  g.right(1);
+  assert.equal(g.game.phase, 'question', 'an answer comes in a pause, the other is still awaited');
+  assert.equal(g.game.steer(9, at, 'next'), true);
+  const resumed = g.of<{ paused: boolean; remainingMs: number }>('game:paused').at(-1)!;
+  assert.equal(resumed.paused, false);
+  assert.ok(Math.abs(resumed.remainingMs - TIME / 2) < 50, `half the clock left: ${resumed.remainingMs}`);
+  advance(TIME / 2 - 300);
+  assert.equal(g.game.phase, 'question', 'not before its time');
+  advance(1_000);
+  assert.equal(g.game.phase, 'reveal', 'then on as ever');
+
+  // Everyone answers while it's paused: the pause ends with the question.
+  advance(5_000);
+  const next = g.game.index;
+  assert.equal(g.game.steer(9, next, 'pause'), true);
+  g.right(1);
+  g.right(2);
+  advance(700);
+  assert.equal(g.game.phase, 'reveal');
+  assert.deepEqual(g.of('game:paused').at(-1), { index: next, paused: false });
+
+  // A pause left alone runs out (ten minutes), and the server draining ends one.
+  advance(5_000);
+  const left = g.game.index;
+  assert.equal(g.game.steer(9, left, 'pause'), true);
+  g.drain();
+  assert.equal(g.of<{ paused: boolean }>('game:paused').at(-1)?.paused, false);
+  assert.equal(g.game.steer(9, left, 'pause'), false, 'no new pause while the server drains');
 });
 
 test('bots made up their minds when the question opened: once every person has answered, they answer at once', () => {

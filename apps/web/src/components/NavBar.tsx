@@ -24,7 +24,7 @@ import { ClaimAccountModal } from './ClaimAccount';
 // phones the profile has a tab and „Колекция“ doesn't. „Постижения“ opens from the profile everywhere.
 const LINKS = [
   { to: '/', label: 'Играй', icon: Gamepad2, end: true, mobile: true, header: true },
-  { to: '/almanac', label: 'Алманах', icon: BookOpen, mobile: true, header: true },
+  { to: '/knowledge', label: 'Знания', icon: BookOpen, mobile: true, header: true },
   { to: '/friends', label: 'Приятели', icon: Users, mobile: true, header: true },
   { to: '/profile', label: 'Профил', icon: User, mobile: true, header: false },
   { to: '/locker', label: 'Колекция', icon: Shirt, mobile: false, header: true },

@@ -7,9 +7,9 @@ import {
   tierIndex,
   type XpLine,
 } from '@quiz/shared';
-import { factCount } from './almanac';
 import { all, one, run } from './db';
 import { eveningWins } from './evening';
+import { factCount } from './knowledge';
 import { bestSeasonTier } from './seasons';
 import { modeTallies } from './tallies';
 import { getUser } from './users';
@@ -39,7 +39,7 @@ export interface Aggregate {
   friends: number;
   approvedQuestions: number;
   bestSeasonTier: number;
-  /** Facts in „Моят алманах“. */
+  /** Facts in „Моите знания“. */
   facts: number;
   eveningWins: number;
 }
@@ -97,9 +97,9 @@ const RULES: Record<string, Rule> = {
   correct_1000: { progress: (a) => a.correct },
   polymath: { progress: (a) => a.categoriesCovered },
   specialist: { progress: (a) => a.maxCategoryCorrect },
-  almanac_100: { progress: (a) => a.facts },
-  almanac_500: { progress: (a) => a.facts },
-  almanac_1000: { progress: (a) => a.facts },
+  knowledge_100: { progress: (a) => a.facts },
+  knowledge_500: { progress: (a) => a.facts },
+  knowledge_1000: { progress: (a) => a.facts },
   evening_3: { progress: (a) => a.eveningWins },
   high_scorer: { progress: (a) => a.bestSoloScore },
   power_player: { progress: (a) => a.powerupsUsed },

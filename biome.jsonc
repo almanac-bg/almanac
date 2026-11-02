@@ -44,6 +44,10 @@
       "style": {
         // `!` marks values the code has already made sure of (a row just read, a player in their own match).
         "noNonNullAssertion": "off"
+      },
+      "a11y": {
+        // Our radio button and checkbox (components/controls.tsx) are inputs: a <label> round one labels it.
+        "noLabelWithoutControl": { "level": "error", "options": { "inputComponents": ["Radio", "Checkbox"] } }
       }
     }
   },

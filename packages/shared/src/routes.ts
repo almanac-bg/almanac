@@ -102,6 +102,7 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
 const APP_PATHS = [
   /^\/game$/,
   /^\/room$/,
+  /^\/class$/,
   /^\/join\/[^/]+$/,
   /^\/c\/[^/]+$/,
   /^\/daily(\/[^/]+)?$/,
@@ -110,7 +111,7 @@ const APP_PATHS = [
   /^\/locker$/,
   /^\/leaderboard$/,
   /^\/friends$/,
-  /^\/almanac(\/[^/]+)?$/,
+  /^\/knowledge(\/[^/]+)?$/,
   /^\/groups(\/[^/]+)?$/,
   /^\/groups\/join\/[^/]+$/,
   /^\/sets(\/[^/]+)?$/,

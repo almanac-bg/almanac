@@ -364,7 +364,15 @@ function bind(s: GameSocket) {
     patchGame((g) => ({ myChoice: null, retryPrompt: true, removed: [...g.removed, wrong] }));
   });
 
-  s.on('game:paused', ({ index, paused }) => patchGame(() => ({ paused: paused ? index : null })));
+  // A question that goes on after its pause: its new deadline (the pause counted for nobody).
+  s.on('game:paused', ({ index, paused, remainingMs }) =>
+    patchGame((g) => ({
+      paused: paused ? index : null,
+      ...(!paused && remainingMs !== undefined && g.phase === 'question' && g.question?.index === index
+        ? { deadline: Date.now() + remainingMs }
+        : {}),
+    })),
+  );
 
   s.on('game:closing', ({ index, remainingMs }) =>
     patchGame((g) =>
@@ -779,7 +787,7 @@ export const actions = {
   },
   resumeAfterFact: () => getSocket().emit('game:resume'),
   /** The big screen's host sets a class's pace on a reveal: hold the next question, or bring it on now. */
-  steer: async (index: number, action: 'pause' | 'next') =>
+  steer: async (index: number, action: 'pause' | 'next' | 'reveal') =>
     (await ask(() => withTimeout().emitWithAck('game:steer', { index, action }))).ok,
   /** Emotes are for the moment: one that can't go out now is dropped. */
   react: (emote: string) => void sendMove('game:react', emote),

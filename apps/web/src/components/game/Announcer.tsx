@@ -7,6 +7,8 @@ import { orderValueText } from './OrderQuestion';
 
 /** A class's host stopped the big screen on an answer: on the pupils' screens, and said to their screen readers. */
 export const PAUSED_NOTE = 'Пауза на големия екран — следващият въпрос идва след нея.';
+/** A class's teacher paused an open question: its time stands still, and the answer can still be given. */
+export const QUESTION_PAUSED_NOTE = 'Пауза на големия екран — времето е спряно, можеш да отговориш.';
 
 /**
  * What a screen reader hears during a match: what it is as it starts, a round's pick (yours: what to choose from), each
@@ -125,11 +127,16 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
     if (game.retryPrompt) setMessage('Грешно, но имаш още един опит — за половин точки.');
   }, [game.retryPrompt]);
 
-  // A class's teacher stops on this answer to talk it through (the note on screen says it too).
+  // A class's teacher stops on this answer to talk it through, or pauses the open question (the note on screen says it
+  // too).
   const paused = !!reveal && game.paused === reveal.index;
   useEffect(() => {
     if (paused) setMessage(PAUSED_NOTE);
   }, [paused]);
+  const questionPaused = !!q && !reveal && game.paused === q.index;
+  useEffect(() => {
+    if (questionPaused) setMessage(QUESTION_PAUSED_NOTE);
+  }, [questionPaused]);
 
   // Knocked out and still answering: the others have, and the question stays open only a few seconds more.
   const closesAt = q && !reveal ? game.closesAt : null;

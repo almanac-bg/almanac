@@ -142,11 +142,14 @@ function GuideLayout({
   title,
   lead,
   cta = DAILY_CTA,
+  ctaFirst = false,
   children,
 }: {
   title: string;
   lead: ReactNode;
   cta?: GuideCta;
+  /** The way in under the lead as well, where it's what the visitor came for (a teacher, a room). */
+  ctaFirst?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -177,6 +180,14 @@ function GuideLayout({
       <Card className="mt-6 bg-ink-2/70 p-6 sm:p-10">
         <h1 className="t-page">{title}</h1>
         <div className="mt-3 text-[15px] leading-relaxed text-fg-2">{lead}</div>
+        {ctaFirst && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link to={cta.to} className={buttonClass({ variant: 'gold', size: 'lg' })}>
+              {cta.label} <ArrowRight aria-hidden className="size-5" />
+            </Link>
+            {cta.note && <span className="text-sm text-fg-3">{cta.note}</span>}
+          </div>
+        )}
         <div className="mt-8 space-y-10 text-[15px] leading-relaxed text-fg-2 [&_b]:text-fg">{children}</div>
         <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-line pt-6">
           <Link to={cta.to} className={buttonClass({ variant: 'gold', size: 'lg' })}>
@@ -275,7 +286,7 @@ export function HowToPlayPage() {
           </li>
           <li>
             <b>Играй до края</b> — отпадналият в Роял, във вечерния Роял или в стая с елиминации може да отговаря до
-            края: за XP и алманаха, без точки и извън класирането. Щом останалите отговорят, въпросът го чака още
+            края: за XP и знанията, без точки и извън класирането. Щом останалите отговорят, въпросът го чака още
             до&nbsp;4&nbsp;секунди. Останат ли само ботове, въпросите идват в неговото темпо; пропусне ли въпрос или
             натисне „Към резултата“, резултатът идва веднага.
           </li>
@@ -329,9 +340,9 @@ export function HowToPlayPage() {
         </p>
       </Section>
 
-      <Section title="Моят алманах, „Поправителен“ и групи">
+      <Section title="Моите знания, „Поправителен“ и групи">
         <p>
-          Всеки „Знаеше ли?“ от въпрос, който познаеш, остава в „Моят алманах“. Сгрешените въпроси се връщат в
+          Всеки „Знаеше ли?“ от въпрос, който познаеш, остава в „Моите знания“. Сгрешените въпроси се връщат в
           „Поправителен“ след {REVIEW.afterDays.join(', ').replace(/, (\d+)$/, '\u00a0и $1')}&nbsp;дни, докато ги
           запомниш. Група (клас, офис, семейство) има линк за покана и седмична класация на въпросите на деня. Примерни
           въпроси по категории има във{' '}
@@ -543,7 +554,7 @@ export function FactsPage() {
       lead={
         <>
           След всеки отговор в {BRAND.name} идва факт за него — нещо вярно и изненадващо, с източник. Ето някои от тях;
-          всички, които научиш в играта, се събират в „Моят алманах“.
+          всички, които научиш в играта, се събират в „Моите знания“.
         </>
       }
     >
@@ -585,8 +596,10 @@ export function TeachersPage() {
   return (
     <GuideLayout
       title={`${BRAND.name} в час`}
-      // A teacher came to run a class, not to play the day's questions: the room is a profile away.
-      cta={{ to: '/', label: 'Създай стая за класа', note: 'С безплатен профил — после „Създай стая“ и „Само водя“.' }}
+      // A teacher came to run a class, not to play the day's questions: straight to a room with „Само водя“ (/class),
+      // through the sign-up form if needed — at the top too, not only after the whole page (UX-4).
+      cta={{ to: '/class', label: 'Отвори стая за класа', note: 'С безплатен профил. Стаята се отваря веднага.' }}
+      ctaFirst
       lead={
         <>
           Викторина за цял клас: учениците влизат с код от телефоните си, а въпросите и класирането са на голям екран.
@@ -628,8 +641,8 @@ export function TeachersPage() {
         <p>
           Учениците влизат като гости — без имейл и парола. Името за стаята си избират сами: по-добре само първо име или
           прякор. Гост, влязъл с линка или кода на стаята, се изтрива до час, след като ученикът излезе, заедно с
-          отговорите му; в историята на стаята остава „Изтрит играч“. Името не остава и на устройството — важно, когато
-          класът ползва общи таблети.
+          отговорите му (в резервните копия — до 30&nbsp;дни, без достъп до тях); в историята на стаята остава „Изтрит
+          играч“. Името не остава и на устройството — важно, когато класът ползва общи таблети.
         </p>
         <p>
           Ако учениците са под 14 години, за участието им е нужно съгласие на родител или настойник — обикновено то е

@@ -38,9 +38,9 @@ import { useRouteFocus } from './lib/routeFocus';
 import {
   AchievementsPage,
   AdminPage,
-  AlmanacPage,
   AuthPage,
   ChallengePage,
+  ClassPage,
   DailyPage,
   FactsPage,
   FriendsPage,
@@ -48,6 +48,7 @@ import {
   GroupsPage,
   HomePage,
   HowToPlayPage,
+  KnowledgePage,
   LeaderboardPage,
   LockerPage,
   NotificationsPage,
@@ -305,6 +306,12 @@ function SignedIn() {
   const gameId = useStore((s) => s.game?.start.gameId);
   const maintenance = useStore((s) => !!s.maintenance);
   const inGame = location.pathname === '/game';
+  // A room's host with „Само водя“: the room page is the class's projector lobby — no app chrome round it, as in the
+  // match it leads to (it has its own header, with the way out).
+  const projecting = useStore(
+    (s) => location.pathname === '/room' && !!s.room && !s.room.settings.hostPlays && s.room.hostId === `u${s.me?.id}`,
+  );
+  const bare = inGame || projecting;
 
   // Jump into a match the moment one starts (queue pop, room start, reconnect).
   const lastGame = useRef<string | undefined>(undefined);
@@ -315,17 +322,21 @@ function SignedIn() {
 
   return (
     <>
-      {!inGame && <NavBar />}
+      {!bare && <NavBar />}
       {/* Right after the header, not after the page: an invite lasts a minute, and a keyboard reached it after the
           whole lobby (22 Tabs and more). */}
       <Invites />
-      {!inGame && <MaintenanceBanner />}
-      {!inGame && <ActiveMatchBar />}
+      {!bare && <MaintenanceBanner />}
+      {!bare && <ActiveMatchBar />}
       <main
         id="content"
         tabIndex={-1}
         className={
-          inGame ? 'outline-none' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
+          inGame
+            ? 'outline-none'
+            : projecting
+              ? 'mx-auto max-w-7xl px-6 py-6 outline-none lg:px-12'
+              : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
         }
       >
         <PageBoundary>
@@ -334,6 +345,7 @@ function SignedIn() {
               <Route path="/" element={<HomePage />} />
               <Route path="/game" element={<GamePage />} />
               <Route path="/room" element={<RoomPage />} />
+              <Route path="/class" element={<ClassPage />} />
               <Route path="/join/:code" element={<JoinRoute />} />
               <Route path="/c/:id" element={<ChallengePage />} />
               <Route path="/daily" element={<DailyPage />} />
@@ -345,8 +357,8 @@ function SignedIn() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/friends" element={<FriendsPage />} />
-              <Route path="/almanac" element={<AlmanacPage />} />
-              <Route path="/almanac/:category" element={<AlmanacPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />} />
+              <Route path="/knowledge/:category" element={<KnowledgePage />} />
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/groups/:id" element={<GroupsPage />} />
               <Route path="/groups/join/:code" element={<GroupsPage />} />
@@ -360,9 +372,9 @@ function SignedIn() {
             </Routes>
           </Suspense>
         </PageBoundary>
-        {!inGame && <LegalLinks className="mt-16 justify-center" />}
+        {!bare && <LegalLinks className="mt-16 justify-center" />}
       </main>
-      {!inGame && <QueueOverlay />}
+      {!bare && <QueueOverlay />}
       <ConnectionBanner explained={!inGame && maintenance} />
       <SeasonRecap />
       <PasswordConfirm />
@@ -376,6 +388,9 @@ function PageLoading() {
   return <PageSpinner />;
 }
 
+/** What the server says to a code no room has (rooms.ts → join). */
+const NO_SUCH_ROOM = 'Няма стая с този код.';
+
 /**
  * Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. A locked
  * room keeps you at its door until the host lets you in or not; leaving this page leaves the door.
@@ -383,6 +398,8 @@ function PageLoading() {
 function JoinRoute() {
   const { code = '' } = useParams();
   const navigate = useNavigate();
+  // The name given on the way here, when a mistyped code was corrected: joined with it at once (UX-11).
+  const carried = (useLocation().state as { nickname?: string } | null)?.nickname ?? null;
   const connected = useStore((s) => s.connected);
   const guest = useStore((s) => !!s.me?.isGuest);
   const inside = useStore((s) => s.room?.code === code);
@@ -416,12 +433,23 @@ function JoinRoute() {
     });
   }, [guest, connected, code, navigate]);
 
-  async function joinAs(nickname: string) {
+  async function joinAs(nickname: string, corrected?: string) {
+    // Another code typed in: that room's address, the name with it.
+    if (corrected && corrected !== code) {
+      setError(null);
+      navigate(`/join/${corrected}`, { replace: true, state: { nickname } });
+      return;
+    }
     setBusy(true);
     const res = await actions.joinRoom(code, nickname);
     setBusy(false);
     if (!res.ok) setError(res.error);
   }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per code, with the name carried to it
+  useEffect(() => {
+    if (guest && connected && carried) void joinAs(carried);
+  }, [code, guest, connected]);
 
   if (knock)
     return (
@@ -435,7 +463,15 @@ function JoinRoute() {
   return (
     <div className="mx-auto max-w-md">
       <Card className="p-6 sm:p-8">
-        <RoomNickname code={code} busy={busy} error={error} onJoin={(n) => void joinAs(n)} />
+        <RoomNickname
+          key={code}
+          code={code}
+          busy={busy}
+          error={error}
+          // No room with this code: the code itself to check, beside the name (it was a dead end).
+          wrongCode={error === NO_SUCH_ROOM}
+          onJoin={(n, corrected) => void joinAs(n, corrected)}
+        />
       </Card>
     </div>
   );

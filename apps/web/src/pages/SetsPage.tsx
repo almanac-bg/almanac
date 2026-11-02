@@ -8,18 +8,31 @@ import {
   setPictureUrl,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowDown, ArrowLeft, ArrowUp, Flag, ImageOff, ImagePlus, Link2, Plus, Send, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Flag,
+  ImageOff,
+  ImagePlus,
+  Link2,
+  Plus,
+  Presentation,
+  Send,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { SetVisibilityForm } from '../components/admin/Decisions';
 import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
+import { Radio } from '../components/controls';
 import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { ReportReasons } from '../components/ReportReasons';
-import { Button, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
+import { Button, buttonClass, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
 import { shrinkPicture } from '../lib/pictures';
@@ -75,7 +88,7 @@ function SetList() {
   if (!data && error) return <LoadError title="Наборите не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="t-page">Моите въпроси</h1>
@@ -89,12 +102,13 @@ function SetList() {
         </Button>
       </header>
       {data.sets.length ? (
-        <ul className="space-y-3">
+        // Two across on a wide screen, as wide as the other pages.
+        <ul className="grid gap-3 lg:grid-cols-2">
           {data.sets.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} className="glass flex flex-wrap items-center gap-x-2 gap-y-1 rounded-3xl pr-3">
               <Link
                 to={`/sets/${s.id}`}
-                className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:px-5"
+                className="focus-ring flex min-w-0 flex-1 basis-60 items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06] sm:px-5"
               >
                 <span aria-hidden className="text-3xl">
                   <Emoji e="📝" />
@@ -107,6 +121,15 @@ function SetList() {
                   </span>
                 </span>
               </Link>
+              {/* Straight into a room with it, „Само водя“ on (/class): a set is made to be played (UX-4). */}
+              {s.questions > 0 && !s.hidden && (
+                <Link
+                  to={`/class?set=${s.id}`}
+                  className={clsx(buttonClass({ variant: 'secondary', size: 'sm' }), 'mb-3 ml-auto sm:mb-0')}
+                >
+                  <Presentation aria-hidden className="size-4" /> Пусни в стая
+                </Link>
+              )}
             </li>
           ))}
         </ul>
@@ -115,7 +138,7 @@ function SetList() {
           <EmptyState
             icon="📝"
             title="Още нямаш набор"
-            body="Направи си един и го пусни в частна стая: в „Настройки“ → „Въпроси“."
+            body="Направи си един и го пусни в стая — с „Пусни в стая“ до набора, или в стаята от „Въпроси“."
           />
         </Card>
       )}
@@ -289,7 +312,7 @@ function SetEditor({ id }: { id: number }) {
   if (!data) return <PageSpinner />;
 
   return (
-    <form onSubmit={save} className="mx-auto max-w-3xl space-y-6 pb-24">
+    <form onSubmit={save} className="space-y-6 pb-24">
       <Link
         to="/sets"
         className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-fg-3 hover:text-fg-2"
@@ -345,6 +368,16 @@ function SetEditor({ id }: { id: number }) {
       </Button>
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-6">
+        {/* The saved set, in a room with „Само водя“ (/class); unsaved changes wouldn't be in it, so save first. */}
+        {dirty || data.hidden || !data.questions.length ? (
+          <Button variant="secondary" disabled title={dirty ? 'Запази промените първо' : undefined}>
+            <Presentation className="size-4" /> Пусни в стая
+          </Button>
+        ) : (
+          <Link to={`/class?set=${id}`} className={buttonClass({ variant: 'secondary' })}>
+            <Presentation aria-hidden className="size-4" /> Пусни в стая
+          </Link>
+        )}
         <Button variant="ghost" onClick={() => void copyLink(data.code)} disabled={data.hidden}>
           <Link2 className="size-4" /> Сподели с друг домакин
         </Button>
@@ -360,7 +393,7 @@ function SetEditor({ id }: { id: number }) {
           ABOVE_TAB_BAR,
         )}
       >
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 sm:px-2">
           <p className={clsx('min-w-0 flex-1 text-sm', problem ? 'text-rose-300' : 'text-fg-3')} aria-live="polite">
             {problem ??
               (dirty ? 'Има незапазени промени.' : `${drafts.length} от ${SETS.maxQuestions} въпроса · запазено`)}
@@ -464,7 +497,8 @@ function QuestionCard({
       )}
       {d.kind === 'order' && <OrderFields draft={d} onChange={onChange} />}
       {d.kind === 'choice' && (
-        <fieldset className="mt-3 space-y-2">
+        // А Б above В Г on a wide screen, as the answers sit in a match.
+        <fieldset className="mt-3 grid gap-2 md:grid-cols-2">
           <legend className="sr-only">Отговори; отбележи верния</legend>
           {d.options.map((o, i) => (
             <div
@@ -472,14 +506,16 @@ function QuestionCard({
               key={i}
               className="flex items-center gap-2"
             >
-              <input
-                type="radio"
-                name={`${id}-answer`}
-                checked={d.answer === i}
-                onChange={() => onChange({ ...d, answer: i })}
-                aria-label={`${LETTERS[i]} е верният`}
-                className="size-5 shrink-0 accent-emerald-400"
-              />
+              {/* The whole 44 px square picks it (the mark alone is small to hit). */}
+              <label className="relative grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl hover:bg-tint/5">
+                <Radio
+                  name={`${id}-answer`}
+                  checked={d.answer === i}
+                  onChange={() => onChange({ ...d, answer: i })}
+                  aria-label={`${LETTERS[i]} е верният`}
+                  tone="text-emerald-400"
+                />
+              </label>
               <span className="w-5 shrink-0 font-display font-bold" style={{ color: accentText(OPTION_COLORS[i]) }}>
                 {LETTERS[i]}
               </span>
@@ -763,7 +799,7 @@ function SharedSet({ code }: { code: string }) {
     setBusy(true);
     try {
       const { id } = await api.copySet(code);
-      toast({ kind: 'success', title: 'Копието е твое', body: 'Пусни го в стая от „Настройки“ → „Въпроси“.' });
+      toast({ kind: 'success', title: 'Копието е твое', body: 'Пусни го в стая с „Пусни в стая“ до набора.' });
       navigate(`/sets/${id}`);
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });

@@ -1,10 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import {
+  choose,
   expect,
   gameMs,
   hiddenWhenFocused,
   playMatch,
+  roomCode,
   signUp,
   startAsGuest,
   startSolo,
@@ -114,15 +116,9 @@ for (const device of ['phone', 'desktop'] as const)
           await teacher.goto('/');
           await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
           await expect(teacher).toHaveURL(/\/room$/);
-          const sets = teacher.getByLabel('Въпроси', { exact: true });
-          const set = sets.locator('option', { hasText: 'Достъпност (1)' });
-          await expect(set).toHaveCount(1, { timeout: 15_000 });
-          await sets.selectOption((await set.getAttribute('value'))!);
+          await choose(teacher, 'Въпроси', /^Достъпност/);
           await teacher.getByRole('switch', { name: 'Само водя' }).click();
-          const code = (await teacher
-            .getByRole('button', { name: /^\d{6} — копирай/ })
-            .first()
-            .textContent())!.match(/\d{6}/)![0];
+          const code = await roomCode(teacher);
           const pupil = await newPlayer();
           await pupil.goto(`/join/${code}`);
           await pupil.getByRole('button', { name: 'Влез като гост' }).first().click();

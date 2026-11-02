@@ -25,6 +25,7 @@ import {
   Plus,
   Presentation,
   Send,
+  Settings2,
   Share2,
   Skull,
   Target,
@@ -33,18 +34,23 @@ import {
   Users,
 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { useId, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { BottomBar } from '../components/BottomBar';
+import { GuestNudge } from '../components/ClaimAccount';
+import { Select, Slider } from '../components/controls';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
+import { Logo, Rosette } from '../components/NavBar';
 import { PRESENCE } from '../components/presence';
+import { QrCode } from '../components/QrCode';
 import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { useForcedTheme } from '../lib/theme';
 import { usePageTitle } from '../lib/title';
 
 export function RoomPage() {
@@ -57,6 +63,7 @@ export function RoomPage() {
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [kicking, setKicking] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!room) return settled ? <Navigate to="/" replace /> : <Restoring what="в стаята" />;
 
@@ -126,6 +133,149 @@ export function RoomPage() {
 
   const update = (patch: RoomSettingsPatch) => actions.roomSettings(patch);
 
+  // Every setting, once: in the card beside the players, or in the projector lobby's drawer.
+  const settingsFields = (
+    <>
+      <MaxPlayers
+        value={s.maxPlayers}
+        min={Math.max(ROOM_LIMITS.maxPlayers[0], room.players.length)}
+        max={s.elimination ? ROOM_LIMITS.eliminationPlayers : ROOM_LIMITS.maxPlayers[1]}
+        disabled={!isHost}
+        onChange={(maxPlayers) => update({ maxPlayers })}
+      />
+
+      <QuestionSource room={room} isHost={isHost} onChange={(set) => update({ set })} />
+
+      {!s.set && (
+        <Setting label="Брой въпроси">
+          <Segmented
+            disabled={!isHost || s.rounds}
+            value={s.questions}
+            onChange={(questions) => update({ questions })}
+            options={ROOM_LIMITS.questions.map((n) => ({ value: n, label: n }))}
+          />
+          {s.rounds && <p className="mt-2 text-xs text-fg-3">Три рунда по три въпроса и финал.</p>}
+        </Setting>
+      )}
+
+      <Setting label="Време за въпрос">
+        <Segmented
+          disabled={!isHost}
+          value={s.timeMs}
+          onChange={(timeMs) => update({ timeMs })}
+          options={ROOM_LIMITS.timeMs.map((ms) => ({ value: ms, label: ms ? `${ms / 1000} с` : 'Без часовник' }))}
+        />
+        {s.timeMs === 0 && (
+          <p className="mt-2 text-xs text-fg-3">
+            Въпросът стои, докато всички отговорят или докато натиснеш „Покажи отговора“ (или → от дистанционното). Без
+            бонус за бързина.
+          </p>
+        )}
+      </Setting>
+
+      {!s.set && (
+        <Setting label="Категории">
+          <Segmented
+            disabled={!isHost}
+            value={categoryMode}
+            onChange={(mode) =>
+              update(
+                mode === 'one'
+                  ? { category: s.category === 'mixed' ? CATEGORIES[0].id : s.category, rounds: false }
+                  : { category: 'mixed', rounds: mode === 'rounds' },
+              )
+            }
+            options={[
+              { value: 'mixed', label: 'Микс' },
+              { value: 'rounds', label: 'Избира последният' },
+              { value: 'one', label: 'Една' },
+            ]}
+          />
+          <p className="mt-2 text-xs text-fg-3">
+            {categoryMode === 'mixed'
+              ? 'По малко от всичко.'
+              : categoryMode === 'rounds'
+                ? 'Преди всеки рунд последният по точки избира категорията от три.'
+                : 'Всички въпроси от една категория:'}
+          </p>
+          {categoryMode === 'one' && (
+            <div className="mt-2">
+              <Select<CategoryChoice>
+                aria-label="Категория"
+                disabled={!isHost}
+                value={s.category}
+                onChange={(category) => update({ category })}
+                options={CATEGORIES.map((c) => ({ value: c.id, label: c.name, icon: <Emoji e={c.icon} /> }))}
+              />
+            </div>
+          )}
+        </Setting>
+      )}
+
+      {!s.set && (
+        <Toggle
+          checked={s.final}
+          disabled={!isHost}
+          onChange={(final) => update({ final })}
+          icon={<Target className="size-4 text-amber-300" />}
+          title="Финал с число"
+          hint="Последният въпрос е число за въвеждане — година, височина, брой"
+        />
+      )}
+
+      {!s.set && (
+        <Toggle
+          checked={s.pictures}
+          disabled={!isHost}
+          onChange={(pictures) => update({ pictures })}
+          icon={<ImageIcon className="size-4 text-emerald-300" />}
+          title="Картини"
+          hint="Въпроси със снимка: знамена, места, картини, животни (докъдето стигнат — после обикновени)"
+        />
+      )}
+
+      <Toggle
+        checked={!s.hostPlays}
+        disabled={!isHost}
+        onChange={(presenting) => update({ hostPlays: !presenting })}
+        icon={<Presentation className="size-4 text-fuchsia-300" />}
+        title="Само водя"
+        hint="Играта е на твоя екран (проектор, телевизор), а играчите отговарят от телефоните си"
+      />
+
+      <Toggle
+        checked={s.teams}
+        disabled={!isHost}
+        onChange={(teams) => update({ teams })}
+        icon={<Users className="size-4 text-sky-300" />}
+        title="Отбори"
+        hint="2 отбора, точките се събират (при неравни — по средно на играч)"
+      />
+
+      <Toggle
+        checked={s.elimination}
+        disabled={!isHost || s.teams || (crowded && !s.elimination)}
+        onChange={(elimination) => update({ elimination })}
+        icon={<Skull className="size-4 text-rose-300" />}
+        title="Отпадане"
+        hint={
+          s.teams
+            ? 'Не важи при отборен мач'
+            : crowded
+              ? `До ${ROOM_LIMITS.eliminationPlayers} играчи`
+              : `Последният отпада на всеки няколко въпроса (до ${ROOM_LIMITS.eliminationPlayers} играчи)`
+        }
+      />
+    </>
+  );
+
+  // „Само водя“: the host's screen is the class's projector — a lobby to read from across the room, not a settings page.
+  const projector = isHost && !s.hostPlays;
+  const leave = () => {
+    actions.leaveRoom();
+    navigate('/');
+  };
+
   const startButton = (
     <Button size="lg" className="w-full" onClick={start} loading={starting} disabled={!canStart}>
       <Play className="size-5" /> Започни мача
@@ -134,272 +284,160 @@ export function RoomPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="t-eyebrow text-fuchsia-300">Частна стая</h1>
-          <button
-            type="button"
-            onClick={copy}
-            className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl"
-            title="Копирай линк за покана"
-            // Named for what it shows first, then what it does (WCAG 2.5.3: a voice user says the code they see).
-            aria-label={`${room.code} — копирай линк за покана`}
-          >
-            <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
-            <span className="grid size-9 place-items-center rounded-xl bg-tint/5 text-fg-2 group-hover:bg-tint/10">
-              {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
-            </span>
-          </button>
-          <p className="mt-1 text-sm text-fg-3" aria-live="polite">
-            {copied ? 'Линкът е копиран — прати го на приятели!' : 'Натисни кода, за да копираш линк за покана.'}
-          </p>
-          {/* Where to type it, for a class reading the code off a projector: the site's own address. */}
-          <p className="mt-2 text-fg-2 sm:text-lg">
-            На телефона: <b className="text-fg">{BRAND.domain}</b> → „Имам код за стая“ → {room.code}
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
-          <Button variant="secondary" className="flex-1 sm:flex-none" onClick={share}>
-            {copied ? <Check className="size-4 text-emerald-400" /> : <Share2 className="size-4" />} Покани
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              actions.leaveRoom();
-              navigate('/');
-            }}
-          >
-            <LogOut className="size-4" /> Напусни стаята
-          </Button>
-        </div>
-        {/* Wide screens start from up here, in view however long the settings run (narrower ones from the bar pinned
-            to the bottom). */}
-        <div className="hidden w-full justify-end lg:flex">
-          {isHost ? (
-            <div className="flex items-center gap-3">
-              {startHint && <p className="max-w-xs text-right text-sm text-fg-3">{startHint}</p>}
-              <div className="w-56">{startButton}</div>
-            </div>
-          ) : (
-            <p className="rounded-2xl bg-tint/5 px-4 py-2.5 text-sm text-fg-2">Чакаме домакина да започне…</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-6">
-          <Card className="p-4 sm:p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="t-card">
-                Играчи{' '}
-                <span className="text-fg-3">
-                  {room.players.length}/{s.maxPlayers}
+      {projector ? (
+        <ProjectorLobby
+          room={room}
+          meId={me.id}
+          inviteUrl={inviteUrl}
+          copied={copied}
+          onCopy={copy}
+          start={startButton}
+          startHint={startHint}
+          onSettings={() => setSettingsOpen(true)}
+          onLeave={leave}
+          onKick={kick}
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <h1 className="t-eyebrow text-fuchsia-300">Частна стая</h1>
+              <button
+                type="button"
+                onClick={copy}
+                className="focus-ring group mt-1 flex min-h-11 items-center gap-3 rounded-xl"
+                title="Копирай линк за покана"
+                // Named for what it shows first, then what it does (WCAG 2.5.3: a voice user says the code they see).
+                aria-label={`${room.code} — копирай линк за покана`}
+              >
+                <span className="font-mono text-4xl font-bold tracking-[0.25em] sm:text-5xl">{room.code}</span>
+                <span className="grid size-9 place-items-center rounded-xl bg-tint/5 text-fg-2 group-hover:bg-tint/10">
+                  {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
                 </span>
-              </h2>
-              {isHost && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => actions.roomBot('add')}
-                    disabled={room.players.length >= s.maxPlayers}
-                  >
-                    <Bot className="size-4" /> Добави бот
-                  </Button>
-                  {hasBots && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => actions.roomBot('remove')}
-                      aria-label="Махни бот"
-                      title="Махни бот"
-                    >
-                      <Minus className="size-4" />
-                    </Button>
-                  )}
+              </button>
+              <p className="mt-1 text-sm text-fg-3" aria-live="polite">
+                {copied ? 'Линкът е копиран — прати го на приятели!' : 'Натисни кода, за да копираш линк за покана.'}
+              </p>
+              {/* Where to type it, for a class reading the code off a projector: the site's own address. */}
+              <p className="mt-2 text-fg-2 sm:text-lg">
+                На телефона: <b className="text-fg">{BRAND.domain}</b> → „Имам код за стая“ → {room.code}
+              </p>
+            </div>
+            <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
+              <Button variant="secondary" className="flex-1 sm:flex-none" onClick={share}>
+                {copied ? <Check className="size-4 text-emerald-400" /> : <Share2 className="size-4" />} Покани
+              </Button>
+              <Button variant="ghost" onClick={leave}>
+                <LogOut className="size-4" /> Напусни стаята
+              </Button>
+            </div>
+            {/* Wide screens start from up here, in view however long the settings run (narrower ones from the bar pinned
+            to the bottom). */}
+            <div className="hidden w-full justify-end lg:flex">
+              {isHost ? (
+                <div className="flex items-center gap-3">
+                  {startHint && <p className="max-w-xs text-right text-sm text-fg-3">{startHint}</p>}
+                  <div className="w-56">{startButton}</div>
                 </div>
+              ) : (
+                <p className="rounded-2xl bg-tint/5 px-4 py-2.5 text-sm text-fg-2">Чакаме домакина да започне…</p>
               )}
             </div>
-            {s.teams ? (
-              <TeamColumns room={room} meId={me.id} isHost={isHost} onKick={kick} />
-            ) : (
-              <Seats room={room} meId={me.id} isHost={isHost} onKick={kick} />
-            )}
-            {isHost ? (
-              <Door room={room} />
-            ) : (
-              room.locked && (
-                <p className="mt-4 flex items-center gap-2 text-sm text-fg-3">
-                  <Lock aria-hidden className="size-4 shrink-0" /> Стаята е заключена: нови играчи влизат само с
-                  разрешение на домакина.
-                </p>
-              )
-            )}
-          </Card>
-
-          {/* Guests have no friends list (the room link above works for everyone). */}
-          {!me.isGuest && <InviteFriends room={room} />}
-        </div>
-
-        <Card className="space-y-5 self-start p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <h2 className="t-card">Настройки</h2>
-            {!isHost && <span className="text-xs text-fg-3">Само домакинът ги променя</span>}
           </div>
 
-          <MaxPlayers
-            value={s.maxPlayers}
-            min={Math.max(ROOM_LIMITS.maxPlayers[0], room.players.length)}
-            max={s.elimination ? ROOM_LIMITS.eliminationPlayers : ROOM_LIMITS.maxPlayers[1]}
-            disabled={!isHost}
-            onChange={(maxPlayers) => update({ maxPlayers })}
-          />
-
-          <QuestionSource room={room} isHost={isHost} onChange={(set) => update({ set })} />
-
-          {!s.set && (
-            <Setting label="Брой въпроси">
-              <Segmented
-                disabled={!isHost || s.rounds}
-                value={s.questions}
-                onChange={(questions) => update({ questions })}
-                options={ROOM_LIMITS.questions.map((n) => ({ value: n, label: n }))}
-              />
-              {s.rounds && <p className="mt-2 text-xs text-fg-3">Три рунда по три въпроса и финал.</p>}
-            </Setting>
-          )}
-
-          <Setting label="Време за въпрос">
-            <Segmented
-              disabled={!isHost}
-              value={s.timeMs}
-              onChange={(timeMs) => update({ timeMs })}
-              options={ROOM_LIMITS.timeMs.map((ms) => ({ value: ms, label: `${ms / 1000} с` }))}
-            />
-          </Setting>
-
-          {!s.set && (
-            <Setting label="Категории">
-              <Segmented
-                disabled={!isHost}
-                value={categoryMode}
-                onChange={(mode) =>
-                  update(
-                    mode === 'one'
-                      ? { category: s.category === 'mixed' ? CATEGORIES[0].id : s.category, rounds: false }
-                      : { category: 'mixed', rounds: mode === 'rounds' },
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="min-w-0 space-y-6">
+              <Card className="p-4 sm:p-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="t-card">
+                    Играчи{' '}
+                    <span className="text-fg-3">
+                      {room.players.length}/{s.maxPlayers}
+                    </span>
+                  </h2>
+                  {isHost && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => actions.roomBot('add')}
+                        disabled={room.players.length >= s.maxPlayers}
+                      >
+                        <Bot className="size-4" /> Добави бот
+                      </Button>
+                      {hasBots && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => actions.roomBot('remove')}
+                          aria-label="Махни бот"
+                          title="Махни бот"
+                        >
+                          <Minus className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {s.teams ? (
+                  <TeamColumns room={room} meId={me.id} isHost={isHost} onKick={kick} />
+                ) : (
+                  <Seats room={room} meId={me.id} isHost={isHost} onKick={kick} />
+                )}
+                {isHost ? (
+                  <Door room={room} />
+                ) : (
+                  room.locked && (
+                    <p className="mt-4 flex items-center gap-2 text-sm text-fg-3">
+                      <Lock aria-hidden className="size-4 shrink-0" /> Стаята е заключена: нови играчи влизат само с
+                      разрешение на домакина.
+                    </p>
                   )
-                }
-                options={[
-                  { value: 'mixed', label: 'Микс' },
-                  { value: 'rounds', label: 'Избира последният' },
-                  { value: 'one', label: 'Една' },
-                ]}
-              />
-              <p className="mt-2 text-xs text-fg-3">
-                {categoryMode === 'mixed'
-                  ? 'По малко от всичко.'
-                  : categoryMode === 'rounds'
-                    ? 'Преди всеки рунд последният по точки избира категорията от три.'
-                    : 'Всички въпроси от една категория:'}
+                )}
+              </Card>
+
+              {/* Guests have no friends list (the room link above works for everyone). */}
+              {!me.isGuest && <InviteFriends room={room} />}
+            </div>
+
+            <Card className="space-y-5 self-start p-5 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <h2 className="t-card">Настройки</h2>
+                {!isHost && <span className="text-xs text-fg-3">Само домакинът ги променя</span>}
+              </div>
+
+              {settingsFields}
+            </Card>
+          </div>
+
+          {/* Waiting for the host is time to read what the козове do (the countdown only names them). */}
+          <FreshPowerupNotes />
+
+          {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
+          <BottomBar
+            className={clsx(
+              // The tab bar steps aside in a room: the bar sits at the very bottom, clear of the home indicator.
+              'sticky bottom-0 z-30 -mx-4 flex items-center gap-3 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden',
+            )}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                Играчи {room.players.length}/{s.maxPlayers}
               </p>
-              {categoryMode === 'one' && (
-                <select
-                  aria-label="Категория"
-                  disabled={!isHost}
-                  value={s.category}
-                  onChange={(e) => update({ category: e.target.value as CategoryChoice })}
-                  className="field mt-2 h-11 w-full rounded-2xl pr-10 pl-3 text-sm disabled:opacity-70"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id} className="bg-ink-2">
-                      {c.icon} {c.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Setting>
-          )}
+              <p className="text-xs text-fg-3">
+                {isHost ? (startHint ?? 'Всичко е готово за старт.') : 'Чакаме домакина да започне…'}
+              </p>
+            </div>
+            {isHost && (
+              <Button size="lg" className="shrink-0" onClick={start} loading={starting} disabled={!canStart}>
+                <Play className="size-5" /> Започни
+              </Button>
+            )}
+          </BottomBar>
+        </>
+      )}
 
-          {!s.set && (
-            <Toggle
-              checked={s.final}
-              disabled={!isHost}
-              onChange={(final) => update({ final })}
-              icon={<Target className="size-4 text-amber-300" />}
-              title="Финал с число"
-              hint="Последният въпрос е число за въвеждане — година, височина, брой"
-            />
-          )}
-
-          {!s.set && (
-            <Toggle
-              checked={s.pictures}
-              disabled={!isHost}
-              onChange={(pictures) => update({ pictures })}
-              icon={<ImageIcon className="size-4 text-emerald-300" />}
-              title="Картини"
-              hint="Въпроси със снимка: знамена, места, картини, животни (докъдето стигнат — после обикновени)"
-            />
-          )}
-
-          <Toggle
-            checked={!s.hostPlays}
-            disabled={!isHost}
-            onChange={(presenting) => update({ hostPlays: !presenting })}
-            icon={<Presentation className="size-4 text-fuchsia-300" />}
-            title="Само водя"
-            hint="Играта е на твоя екран (проектор, телевизор), а играчите отговарят от телефоните си"
-          />
-
-          <Toggle
-            checked={s.teams}
-            disabled={!isHost}
-            onChange={(teams) => update({ teams })}
-            icon={<Users className="size-4 text-sky-300" />}
-            title="Отбори"
-            hint="2 отбора, точките се събират (при неравни — по средно на играч)"
-          />
-
-          <Toggle
-            checked={s.elimination}
-            disabled={!isHost || s.teams || (crowded && !s.elimination)}
-            onChange={(elimination) => update({ elimination })}
-            icon={<Skull className="size-4 text-rose-300" />}
-            title="Отпадане"
-            hint={
-              s.teams
-                ? 'Не важи при отборен мач'
-                : crowded
-                  ? `До ${ROOM_LIMITS.eliminationPlayers} играчи`
-                  : `Последният отпада на всеки няколко въпроса (до ${ROOM_LIMITS.eliminationPlayers} играчи)`
-            }
-          />
-        </Card>
-      </div>
-
-      {/* Waiting for the host is time to read what the козове do (the countdown only names them). */}
-      <FreshPowerupNotes />
-
-      {/* Phones and tablets: the start (or the wait) stays in view above the tab bar instead of under all the settings. */}
-      <BottomBar
-        className={clsx(
-          // The tab bar steps aside in a room: the bar sits at the very bottom, clear of the home indicator.
-          'sticky bottom-0 z-30 -mx-4 flex items-center gap-3 cramped:static border-t border-line bg-ink/85 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden',
-        )}
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">
-            Играчи {room.players.length}/{s.maxPlayers}
-          </p>
-          <p className="text-xs text-fg-3">
-            {isHost ? (startHint ?? 'Всичко е готово за старт.') : 'Чакаме домакина да започне…'}
-          </p>
-        </div>
-        {isHost && (
-          <Button size="lg" className="shrink-0" onClick={start} loading={starting} disabled={!canStart}>
-            <Play className="size-5" /> Започни
-          </Button>
-        )}
-      </BottomBar>
+      <Modal open={projector && settingsOpen} onClose={() => setSettingsOpen(false)} title="Настройки">
+        <div className="space-y-5">{settingsFields}</div>
+      </Modal>
 
       <Modal open={!!kickTarget} onClose={() => setKicking(null)} title="Премахване от стаята">
         <p className="text-fg-2">
@@ -442,6 +480,142 @@ export function RoomPage() {
 }
 
 /**
+ * The projector's lobby, with „Само водя“ on (the 31 October review, VD-8): the class reads it from across the room —
+ * where to go and the code, huge, a QR code of the invite link for a phone's camera, and each name as it comes in. The
+ * settings wait in a drawer, and the screen is light, as a projector needs (the match goes on light as well).
+ */
+function ProjectorLobby({
+  room,
+  meId,
+  inviteUrl,
+  copied,
+  onCopy,
+  start,
+  startHint,
+  onSettings,
+  onLeave,
+  onKick,
+}: {
+  room: RoomState;
+  meId: number;
+  inviteUrl: string;
+  copied: boolean;
+  onCopy: () => void;
+  start: ReactNode;
+  startHint: string | null;
+  onSettings: () => void;
+  onLeave: () => void;
+  onKick: (p: RoomPlayer) => void;
+}) {
+  useForcedTheme('light');
+  const pupils = room.players.filter((p) => !p.isHost);
+  const code = `${room.code.slice(0, 3)} ${room.code.slice(3)}`;
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Logo className="text-3xl" />
+        <p className="text-lg text-fg-2">{BRAND.domain} · стая за класа</p>
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
+          {/* The link for a class chat; named by the code first, as the room page's own button (WCAG 2.5.3). */}
+          <Button variant="ghost" onClick={onCopy} aria-label={`${room.code} — копирай линк за покана`}>
+            {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />} Копирай линк
+          </Button>
+          <Button variant="secondary" onClick={onSettings}>
+            <Settings2 className="size-4" /> Настройки
+          </Button>
+          <Button variant="ghost" onClick={onLeave}>
+            <LogOut className="size-4" /> Напусни стаята
+          </Button>
+        </div>
+      </header>
+
+      <div className="grid items-center gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <h1>
+            <span className="block text-[clamp(1rem,1.6vw,1.5rem)] font-bold tracking-[0.12em] text-fg-3 uppercase">
+              Влезте от телефона
+            </span>
+            <span className="mt-1 block font-display text-[clamp(1.5rem,2.8vw,2.75rem)] leading-tight font-bold">
+              <span className="text-violet-300">{BRAND.domain}</span> → „Имам код за стая“
+            </span>
+          </h1>
+          <p className="mt-3 font-mono text-[clamp(3.5rem,10vw,10rem)] leading-none font-black tracking-[0.08em] whitespace-nowrap tabular-nums">
+            {/* Read digit by digit; the eye gets them in two groups. */}
+            <span className="sr-only">Кодът на стаята: {room.code.split('').join(' ')}</span>
+            <span aria-hidden>{code}</span>
+          </p>
+        </div>
+        <figure className="justify-self-center text-center">
+          <QrCode
+            text={inviteUrl}
+            label={`QR код, който отваря стая ${room.code}`}
+            className="size-[clamp(10rem,18vw,17rem)] rounded-2xl shadow-lg"
+          />
+          <figcaption className="mt-3 text-fg-2">или с камерата на телефона</figcaption>
+        </figure>
+      </div>
+
+      <section aria-labelledby="projector-players">
+        <h2 id="projector-players" className="t-card">
+          В стаята: {pupils.length} <span className="font-normal text-fg-3">от {room.settings.maxPlayers}</span>
+        </h2>
+        {room.settings.teams ? (
+          <div className="mt-4">
+            <TeamColumns room={room} meId={meId} isHost onKick={onKick} />
+          </div>
+        ) : pupils.length ? (
+          <ul className="mt-4 flex flex-wrap gap-3" aria-live="polite">
+            <AnimatePresence initial={false}>
+              {pupils.map((p) => (
+                <m.li
+                  key={p.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center gap-1 rounded-2xl border border-line bg-tint/5 py-1.5 pr-1.5 pl-4"
+                >
+                  <span className="text-xl font-bold [overflow-wrap:anywhere]">{p.name}</span>
+                  {/* A name not for the projector: „Играч“ and a number, as on the room's own page. */}
+                  {p.isGuest && !/^Играч \d+$/.test(p.name) && (
+                    <button
+                      type="button"
+                      onClick={() => actions.roomRename(p.id)}
+                      className="focus-ring grid size-9 place-items-center rounded-xl text-fg-3 hover:bg-tint/10 hover:text-fg"
+                      aria-label={`Смени името ${p.name} на „Играч“ с номер`}
+                      title="Смени името на „Играч“ с номер"
+                    >
+                      <UserPen className="size-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onKick(p)}
+                    className="focus-ring grid size-9 place-items-center rounded-xl text-fg-3 hover:bg-tint/10 hover:text-fg"
+                    aria-label={`Премахни ${p.name}`}
+                    title="Премахни"
+                  >
+                    <UserMinus className="size-4" />
+                  </button>
+                </m.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        ) : (
+          <p className="mt-3 text-lg text-fg-3">Още няма никой — кодът е горе.</p>
+        )}
+        <Door room={room} />
+      </section>
+
+      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        {startHint && <p className="text-fg-3">{startHint}</p>}
+        <div className="w-full sm:w-64">{start}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Where the questions come from: the bank (АЛМАНАХ), or one of the host's own sets („Моите въпроси“) — all of it, in
  * its order. The others see which.
  */
@@ -461,21 +635,24 @@ function QuestionSource({
   return (
     <Setting label="Въпроси">
       {isHost && !guest ? (
-        <select
+        <Select<number>
           aria-label="Въпроси"
-          value={current?.id ?? ''}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-          className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm"
-        >
-          <option value="" className="bg-ink-2">
-            От АЛМАНАХ
-          </option>
-          {playable.map((x) => (
-            <option key={x.id} value={x.id} className="bg-ink-2">
-              📝 {x.name} ({x.questions})
-            </option>
-          ))}
-        </select>
+          value={current?.id ?? 0}
+          onChange={(id) => onChange(id || null)}
+          options={[
+            { value: 0, label: 'От АЛМАНАХ', icon: <Rosette className="h-4 w-auto" /> },
+            // The set in the room, while the list of them is still on its way.
+            ...(current && !playable.some((x) => x.id === current.id)
+              ? [{ value: current.id, label: current.name, icon: <Emoji e="📝" /> }]
+              : []),
+            ...playable.map((x) => ({
+              value: x.id,
+              label: x.name,
+              icon: <Emoji e="📝" />,
+              hint: plural(x.questions, 'въпрос', 'въпроса'),
+            })),
+          ]}
+        />
       ) : (
         <p className="text-sm text-fg-2">
           {current ? (
@@ -530,15 +707,14 @@ function MaxPlayers({
         >
           <Minus className="size-4" />
         </Button>
-        <input
+        <Slider
           id={id}
-          type="range"
           min={min}
           max={max}
           value={Math.min(Math.max(value, min), max)}
           disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="min-w-0 flex-1 accent-violet-400 disabled:opacity-60"
+          className="flex-1"
         />
         <Button
           variant="secondary"
@@ -996,4 +1172,57 @@ function InviteFriends({ room }: { room: RoomState }) {
       )}
     </Card>
   );
+}
+
+/**
+ * /class — the teacher's way in (/teachers, a set's „Пусни в стая“; the 31 October review, UX-4): a room for a class,
+ * made at once and opened — „Само водя“ on (the host runs it on the big screen, the room takes a whole class), and the
+ * set from `?set=` if there is one. Signed out, the address first shows the form (AuthPage); a guest is asked to save
+ * their account, since rooms are made with one.
+ */
+export function ClassPage() {
+  const [params] = useSearchParams();
+  const set = Number(params.get('set')) || null;
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const connected = useStore((s) => s.connected);
+  const navigate = useNavigate();
+  const tried = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  usePageTitle('Стая за класа');
+
+  useEffect(() => {
+    if (guest || !connected || tried.current) return;
+    tried.current = true;
+    void (async () => {
+      const res = await actions.createRoom({ hostPlays: false });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      if (set) actions.roomSettings({ set });
+      navigate('/room', { replace: true });
+    })();
+  }, [guest, connected, set, navigate]);
+
+  if (guest)
+    return (
+      <Card className="mx-auto max-w-lg p-6">
+        <h1 className="t-section">Стая за класа</h1>
+        <p className="mt-2 text-fg-2">
+          Стаи се правят с профил: запази своя (име и парола) и стаята се отваря веднага, с „Само водя“.
+        </p>
+        <GuestNudge className="mt-4">Играеш като гост. Запази профила си, за да отвориш стая за класа.</GuestNudge>
+      </Card>
+    );
+  if (error)
+    return (
+      <Card className="mx-auto max-w-lg p-6">
+        <h1 className="t-section">Стаята не се отвори</h1>
+        <p className="mt-2 text-fg-2">{error}</p>
+        <Link to="/" className="focus-ring mt-4 inline-block rounded font-semibold text-violet-300">
+          Към началото
+        </Link>
+      </Card>
+    );
+  return <Spinner className="mx-auto mt-16 size-6" />;
 }

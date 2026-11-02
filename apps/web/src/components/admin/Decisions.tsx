@@ -1,6 +1,8 @@
 import { MODERATION, MODERATION_BASES, type ModerationBasis } from '@quiz/shared';
 import { Ban, Eye, EyeOff, PenLine } from 'lucide-react';
 import { useId, useState } from 'react';
+import { Checkbox, Select } from '../controls';
+
 import { Button, Segmented } from '../ui';
 
 /**
@@ -45,21 +47,12 @@ export function GroundsFields({
           <label htmlFor={`${id}-basis`} className="mb-1.5 block text-xs font-semibold text-fg-2">
             Основание (от условията)
           </label>
-          <select
+          <Select<ModerationBasis>
             id={`${id}-basis`}
-            value={grounds.basis}
-            onChange={(e) => onChange({ ...grounds, basis: e.target.value as ModerationBasis | '' })}
-            className="field h-10 w-full rounded-xl pr-10 pl-3 text-sm"
-          >
-            <option value="" className="bg-ink-2">
-              Избери…
-            </option>
-            {MODERATION_BASES.map((b) => (
-              <option key={b.id} value={b.id} className="bg-ink-2">
-                {b.label}
-              </option>
-            ))}
-          </select>
+            value={grounds.basis || null}
+            onChange={(basis) => onChange({ ...grounds, basis })}
+            options={MODERATION_BASES.map((b) => ({ value: b.id, label: b.label }))}
+          />
         </div>
       )}
       <div>
@@ -128,12 +121,12 @@ export function BanForm({
           setGrounds(g);
         }}
       />
-      <label className="flex items-start gap-2 text-sm text-fg-2">
-        <input
-          type="checkbox"
+      <label className="relative flex cursor-pointer items-start gap-2 text-sm text-fg-2">
+        <Checkbox
           checked={annul}
           onChange={(e) => setAnnul(e.target.checked)}
-          className="mt-0.5 size-4 accent-rose-400"
+          tone="text-rose-400"
+          className="mt-0.5"
         />
         <span>
           Анулирай резултатите от сезона: рейтинги, дневни и вечерни класирания
@@ -239,12 +232,12 @@ export function SetVisibilityForm({
         reasonLabel={hidden ? 'Защо го показваш отново — собственикът ще го прочете' : undefined}
       />
       {!hidden && (
-        <label className="flex items-start gap-2 text-sm text-fg-2">
-          <input
-            type="checkbox"
+        <label className="relative flex cursor-pointer items-start gap-2 text-sm text-fg-2">
+          <Checkbox
             checked={copies}
             onChange={(e) => setCopies(e.target.checked)}
-            className="mt-0.5 size-4 accent-rose-400"
+            tone="text-rose-400"
+            className="mt-0.5"
           />
           <span>
             Скрий и копията, които други домакини са взели от него

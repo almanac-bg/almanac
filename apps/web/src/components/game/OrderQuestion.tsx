@@ -258,7 +258,7 @@ export function OrderSummary({ result }: { result: PlayerResult }) {
 }
 
 /**
- * An order's answer in a list of questions (the review, the almanac): the things in their right order with their
+ * An order's answer in a list of questions (the review, „Моите знания“): the things in their right order with their
  * numbers, marking the ones `given` had in place.
  */
 export function RightOrderList({

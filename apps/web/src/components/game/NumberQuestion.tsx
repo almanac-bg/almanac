@@ -15,6 +15,7 @@ import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { matchKeysOn } from '../../lib/matchKeys';
 import { Avatar } from '../Avatar';
+import { Slider } from '../controls';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';
 import { lineRange, maxDigits, numberText, offText, placeOn, unitFor } from './numbers';
@@ -173,8 +174,7 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
             >
               <Minus className="size-5" />
             </StepButton>
-            <input
-              type="range"
+            <Slider
               min={n.min}
               max={n.max}
               step={n.step}
@@ -184,7 +184,7 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
               aria-label="Твоят отговор"
               // Resting in the middle until it's moved: no answer yet, and said so (it read „50“).
               aria-valuetext={value === null ? 'не е избрано' : numberText(value, n)}
-              className="h-11 flex-1 accent-violet-400"
+              className="flex-1"
             />
             <StepButton
               label="Повече"

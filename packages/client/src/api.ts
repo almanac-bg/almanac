@@ -1,8 +1,6 @@
 import type {
   AchievementProgress,
   AdminSummary,
-  AlmanacCategoryPage,
-  AlmanacOverview,
   AppNotification,
   CaseDecision,
   CategoryId,
@@ -16,6 +14,8 @@ import type {
   GroupInfo,
   GroupPreview,
   GroupSummary,
+  KnowledgeCategoryPage,
+  KnowledgeOverview,
   LaunchStats,
   LeaderboardBoard,
   LeaderboardResponse,
@@ -343,8 +343,8 @@ export const api = {
   editCommunityQuestion: (questionId: string, draft: QuestionDraft, reason: string) =>
     request<{ ok: true }>('PUT', `/admin/questions/${encodeURIComponent(questionId)}`, { ...draft, reason }),
 
-  almanac: () => request<AlmanacOverview>('GET', '/almanac'),
-  almanacCategory: (category: CategoryId) => request<AlmanacCategoryPage>('GET', `/almanac/${category}`),
+  knowledge: () => request<KnowledgeOverview>('GET', '/knowledge'),
+  knowledgeCategory: (category: CategoryId) => request<KnowledgeCategoryPage>('GET', `/knowledge/${category}`),
 
   groups: () => request<{ groups: GroupSummary[] }>('GET', '/groups'),
   createGroup: (name: string) => request<{ id: number }>('POST', '/groups', { name }),

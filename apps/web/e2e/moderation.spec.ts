@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { codeAt, stepAt } from '../../server/src/totp';
-import { expect, type Page, signIn, signUp, test, uniqueName } from './support';
+import { choose, expect, type Page, signIn, signUp, test, uniqueName } from './support';
 
 // The server the tests run against (playwright.config.ts): its database, and the admin command line next to it.
 const root = path.resolve(import.meta.dirname, '../../..');
@@ -70,7 +70,7 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   await page.getByRole('button', { name: 'Спри профила', exact: true }).click();
   const stop = page.getByRole('button', { name: 'Спри профила', exact: true }).last();
   await expect(stop, 'not without grounds').toBeDisabled();
-  await page.getByLabel('Основание (от условията)').selectOption('cheating');
+  await choose(page, 'Основание (от условията)', /^Нечестна игра/);
   await page.getByLabel('Причина — играчът ще я прочете').fill('Отговаря с програма.');
   await stop.click();
   await expect(page.getByText(/^Спрян до/)).toBeVisible();
@@ -140,7 +140,7 @@ test('a report about a set is a case: the moderator reads the set and hides it, 
   await card.getByRole('button', { name: 'Прочети набора' }).click();
   await expect(card.getByText('Това е въпрос с обида към някого?')).toBeVisible();
   await card.getByRole('button', { name: 'Скрий набора' }).click();
-  await card.getByLabel('Основание (от условията)').selectOption('content');
+  await choose(card, 'Основание (от условията)', 'Неподходящо или незаконно съдържание');
   await card.getByLabel('Причина — играчът ще я прочете').fill('Въпросът обижда човек.');
   await card.getByRole('button', { name: 'Скрий набора' }).click();
   await expect(page.getByText('Наборът е скрит')).toBeVisible();

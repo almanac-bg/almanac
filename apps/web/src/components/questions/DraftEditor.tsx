@@ -2,6 +2,7 @@ import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMI
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import { useId } from 'react';
+import { Select } from '../controls';
 import { Emoji } from '../Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
 import { Segmented } from '../ui';
@@ -38,17 +39,12 @@ export function DraftEditor({
     <div className="space-y-5">
       <Field label="Категория">
         {compact ? (
-          <select
+          <Select<CategoryId>
+            aria-label="Категория"
             value={draft.category}
-            onChange={(e) => set({ category: e.target.value as CategoryId })}
-            className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id} className="bg-ink-2">
-                {c.icon} {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(category) => set({ category })}
+            options={CATEGORIES.map((c) => ({ value: c.id, label: c.name, icon: <Emoji e={c.icon} /> }))}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {CATEGORIES.map((c) => {

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, gameMs, me, playMatch, png, signUp, test, uniqueName } from './support';
+import { choose, expect, gameMs, me, playMatch, png, roomCode, signUp, test, uniqueName } from './support';
 
 /** The test server's database (playwright.config.ts): what the tests can't do through the app. */
 const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
@@ -39,16 +39,13 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.goto('/');
   await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
   await expect(teacher).toHaveURL(/\/room$/);
-  // By its value, found by its text: engines differ on an option's label once it starts with an emoji.
-  const sets = teacher.getByLabel('Въпроси', { exact: true });
-  await sets.selectOption((await sets.locator('option', { hasText: 'Урок 5 (2)' }).getAttribute('value'))!);
+  await choose(teacher, 'Въпроси', /^Урок 5/);
   await expect(teacher.getByText('Всичките 2 въпроса, в реда на набора.', { exact: false })).toBeVisible();
   await teacher.getByRole('switch', { name: 'Само водя' }).click();
-  await expect(teacher.getByText('Води на голям екран · не играе')).toBeVisible();
-  const code = (await teacher
-    .getByRole('button', { name: /^\d{6} — копирай/ })
-    .first()
-    .textContent())!.match(/\d{6}/)![0];
+  // The projector's lobby (VD-8): where to go and the code, big, and a QR code of the invite link.
+  await expect(teacher.getByRole('heading', { name: /^Влезте от телефона/ })).toBeVisible();
+  await expect(teacher.getByRole('img', { name: /^QR код, който отваря стая \d{6}$/ })).toBeVisible();
+  const code = await roomCode(teacher);
 
   // A pupil with the link and no account: in as a guest, then a name for the room.
   const pupil = await newPlayer();
@@ -74,6 +71,8 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   });
   // The teacher stops on the answer to talk it through, then goes on from the keyboard (a presenter's clicker sends →).
   await pupil.getByRole('button', { name: /^[АБВГ]\) София/ }).click();
+  // On the answer (an open question has its own „Пауза“, which stops its clock).
+  await expect(teacher.getByText(/ познаха$/)).toBeVisible({ timeout: gameMs(3_000) });
   await teacher.getByRole('button', { name: 'Пауза', exact: true }).click({ timeout: gameMs(3_000) });
   await expect(teacher.getByText('На пауза', { exact: true })).toBeVisible();
   await expect(pupil.locator('p:not([aria-live])', { hasText: 'Пауза на големия екран' })).toBeVisible();
@@ -87,6 +86,48 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   expect(run).toEqual({ answered: 1, total: 2 });
   await expect(teacher.getByRole('heading', { name: 'Край!' })).toBeVisible();
   await expect(teacher.getByText('Мария 7Б')).toBeVisible();
+  // The pupil's results: what happens to a room's guest, the questions — and nothing celebrated as theirs (UX-2).
+  await expect(pupil.getByText('Влезе като гост за стаята', { exact: false })).toBeVisible();
+  await expect(pupil.getByRole('heading', { name: 'Награди', exact: true })).toHaveCount(0);
+  await expect(pupil.getByRole('dialog')).toHaveCount(0);
+});
+
+test('a teacher from /teachers: one way in to a room for the class, through sign-up; a set goes into a room from its card (UX-4)', async ({
+  page: teacher,
+}) => {
+  await teacher.goto('/teachers');
+  // The way in at the top, not only after the whole page.
+  await teacher.getByRole('link', { name: 'Отвори стая за класа' }).first().click();
+  await expect(teacher).toHaveURL(/\/class$/);
+  await expect(teacher.getByText('Стая за класа', { exact: true })).toBeVisible();
+  // A room needs a profile: no guest button here.
+  await expect(teacher.getByRole('button', { name: 'Играй като гост', exact: true })).toHaveCount(0);
+  await teacher.getByLabel('Потребителско име', { exact: true }).fill(uniqueName('Учител'));
+  await teacher.getByLabel('Парола', { exact: true }).fill('parola-123');
+  await teacher.getByRole('button', { name: /^Създай профил/ }).click();
+  // Straight into the room, run from the big screen, open to a whole class.
+  await expect(teacher).toHaveURL(/\/room$/);
+  await expect(teacher.getByRole('heading', { name: /^Влезте от телефона/ })).toBeVisible();
+  await teacher.getByRole('button', { name: 'Настройки', exact: true }).click();
+  await expect(teacher.getByRole('switch', { name: 'Само водя' })).toBeChecked();
+  await teacher.keyboard.press('Escape');
+
+  // A set, then „Пусни в стая“ from its card: a new room with that set in it.
+  await teacher.goto('/sets');
+  await teacher.getByRole('button', { name: 'Нов набор' }).click();
+  await expect(teacher).toHaveURL(/\/sets\/\d+$/);
+  await teacher.getByLabel('Име на набора').fill('Урок 6');
+  await teacher.getByRole('button', { name: /^Въпрос 1/ }).click();
+  await teacher.getByRole('button', { name: 'Вярно/невярно' }).last().click();
+  await teacher.getByLabel('Текст на въпрос 1').fill('Дунав се влива в Черно море.');
+  await teacher.getByRole('button', { name: 'Запази' }).click();
+  await expect(teacher.getByText('1 от 50 въпроса · запазено')).toBeVisible();
+  await teacher.goto('/sets');
+  await teacher.getByRole('link', { name: 'Пусни в стая' }).click();
+  await expect(teacher).toHaveURL(/\/room$/);
+  await teacher.getByRole('button', { name: 'Настройки', exact: true }).click();
+  await expect(teacher.getByText('Всичките 1 въпроса, в реда на набора.', { exact: false })).toBeVisible();
+  await expect(teacher.getByRole('switch', { name: 'Само водя' })).toBeChecked();
 });
 
 test('a locked room: a pupil with the code from the landing knocks, the teacher lets them in and swaps a typed name; one not let in is told', async ({
@@ -98,10 +139,7 @@ test('a locked room: a pupil with the code from the landing knocks, the teacher 
   await expect(teacher).toHaveURL(/\/room$/);
   await teacher.getByRole('switch', { name: 'Заключи стаята' }).click();
   await expect(teacher.getByRole('switch', { name: 'Заключи стаята' })).toHaveAttribute('aria-checked', 'true');
-  const code = (await teacher
-    .getByRole('button', { name: /^\d{6} — копирай/ })
-    .first()
-    .textContent())!.match(/\d{6}/)![0];
+  const code = await roomCode(teacher);
 
   // „almanac.bg, код …“ on the board: the landing takes the code, its page makes a guest for the room.
   const knock = async (name: string) => {
@@ -170,4 +208,33 @@ test('a picture for a set’s question: picked on the device, made small, upload
   await page.getByLabel('Какво има на снимката — за незрящите, без да издава отговора').fill('Крепост на хълм');
   await page.getByRole('button', { name: 'Запази' }).click();
   await expect(page.getByText('1 от 50 въпроса · запазено')).toBeVisible();
+});
+
+test('a pupil who mistyped the room’s code corrects it where the error is, the name kept (UX-11)', async ({
+  page: teacher,
+  newPlayer,
+}) => {
+  await signUp(teacher, uniqueName('Учител'), 'parola-123');
+  await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
+  await expect(teacher).toHaveURL(/\/room$/);
+  const code = await roomCode(teacher);
+  const wrong = code.startsWith('1') ? '222222' : '111111';
+
+  const pupil = await newPlayer();
+  await pupil.goto('/');
+  await pupil.getByRole('button', { name: 'Имам код за стая' }).click();
+  await pupil.getByLabel('Код на стая').fill(wrong);
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  await pupil.getByRole('button', { name: 'Влез като гост' }).first().click();
+  await pupil.getByLabel('Име в стаята').fill('Ния');
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  // Not a dead end: the code to check, the name still there.
+  const field = pupil.getByLabel('Код на стаята');
+  await expect(field).toHaveValue(wrong);
+  await expect(pupil.getByText(`Няма стая с код ${wrong}`, { exact: false })).toBeVisible();
+  await expect(pupil.getByLabel('Име в стаята')).toHaveValue('Ния');
+  await field.fill(code);
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  await expect(pupil).toHaveURL(/\/room$/);
+  await expect(teacher.getByText('Ния', { exact: true })).toBeVisible();
 });

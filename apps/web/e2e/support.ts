@@ -105,6 +105,25 @@ export async function expectLobby(page: Page) {
 }
 
 /**
+ * Picks an option of one of the game's selects (components/controls.tsx): the select by its name, then the option by
+ * its — the list is drawn over the page, so it's looked for there.
+ */
+export async function choose(scope: Page | Locator, select: string, option: string | RegExp) {
+  await scope.getByRole('combobox', { name: select, exact: true }).click();
+  const page = 'page' in scope ? scope.page() : scope;
+  await page.getByRole('option', typeof option === 'string' ? { name: option, exact: true } : { name: option }).click();
+}
+
+/**
+ * A room's code, from its „копирай линк за покана“ button: named by the code first (the room page's big code, the
+ * projector lobby's „Копирай линк“), whatever text it shows.
+ */
+export async function roomCode(page: Page): Promise<string> {
+  const button = page.getByRole('button', { name: /^\d{6} — копирай/ }).first();
+  return (await button.getAttribute('aria-label'))!.match(/\d{6}/)![0];
+}
+
+/**
  * The landing page's "Играй като гост" (the card's: the page repeats it under the game's description): a guest
  * account, straight into the lobby.
  */
@@ -192,7 +211,10 @@ export async function playMatch(
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
-  const results = page.getByRole('heading', { name: 'Награди', exact: true });
+  // The results: their rewards — or, for a pupil in a class (a guest only for the room), what happens to that guest.
+  const results = page
+    .getByRole('heading', { name: 'Награди', exact: true })
+    .or(page.getByText(/^Влезе като гост за стаята/));
   // Соло without a clock: each answer waits for „Продължи“.
   const goOn = page.getByRole('button', { name: 'Продължи', exact: true });
   const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });

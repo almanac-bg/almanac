@@ -161,14 +161,14 @@ export function ProfilePage() {
           <Stat label="Средно време (верни)" value={o.avgCorrectMs !== null ? seconds(o.avgCorrectMs) : '—'} />
           <Stat label="Рекорд в „Соло“" value={fmt(o.bestSoloScore)} />
           <Stat
-            label="Факти в алманаха"
+            label="Научени факти"
             value={
               <>
-                <Emoji e="📖" /> {fmt(data.almanac.facts)}
+                <Emoji e="📖" /> {fmt(data.knowledge.facts)}
               </>
             }
-            hint={`от ${fmt(data.almanac.total)}`}
-            to={isMe ? '/almanac' : undefined}
+            hint={`от ${fmt(data.knowledge.total)}`}
+            to={isMe ? '/knowledge' : undefined}
           />
           <Stat
             label="Дневна серия"
@@ -556,7 +556,7 @@ function ReportButton({ username }: { username: string }) {
   );
 }
 
-/** A number with what it is; `to`: where its details are (your own almanac). */
+/** A number with what it is; `to`: where its details are (your own „Моите знания“). */
 function Stat({ label, value, hint, to }: { label: string; value: ReactNode; hint?: string; to?: string }) {
   const body = (
     <>

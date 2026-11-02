@@ -14,12 +14,12 @@ import {
   seasonName,
 } from '@quiz/shared';
 import { Router } from 'express';
-import { factCount, factsInAll } from '../almanac';
 import { requireAuth } from '../auth';
 import { duelRecord } from '../challenges';
 import { dailyInfo, liveDailyStreak } from '../daily';
 import { all, one } from '../db';
 import { friendship } from '../friends';
+import { factCount, factsInAll } from '../knowledge';
 import { getRatings, seasonHistory } from '../seasons';
 import { modeTallies } from '../tallies';
 import { getUser, getUserByName, NOT_BANNED, toPublicUser, type UserRow } from '../users';
@@ -102,7 +102,7 @@ function profileStats(u: UserRow, viewerId: number): ProfileStats {
        LEFT JOIN mastery m ON m.user_id = c.user_id AND m.category = c.category WHERE c.user_id = ?`,
       u.id,
     ).map((c) => ({ ...c })),
-    almanac: { facts: factCount(u.id), total: factsInAll() },
+    knowledge: { facts: factCount(u.id), total: factsInAll() },
     recent: recent.map((r) => ({
       matchId: r.id,
       mode: r.mode,

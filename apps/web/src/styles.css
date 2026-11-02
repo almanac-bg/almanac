@@ -415,7 +415,7 @@ body {
     outline-color: transparent;
   }
   /*
-   * A text field, select or textarea (or `field-box`: a box around a bare input). The border alone was too faint a cue
+   * A text field or textarea, our select's button (or `field-box`: a box around a bare input). The border alone was too faint a cue
    * of which field you're typing in, so focus also brings a solid edge and a glow.
    */
   .field,
@@ -431,17 +431,129 @@ body {
   .field::placeholder {
     color: var(--color-fg-3);
   }
-  /* Each browser puts its own select arrow where it likes, off-centre on a styled field: ours sits the same everywhere,
-     centred on the text (the select leaves room for it with pr-10). */
-  select.field {
+  /*
+   * The game's slider (controls.tsx → Slider): a rounded track filled up to the thumb (--fill), a white thumb with the
+   * accent's ring — the same in every browser, instead of each one's own.
+   */
+  .slider {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b3aed0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.875rem center;
-    background-size: 1.125rem;
+    height: 2.75rem;
+    min-width: 0;
+    background: transparent;
+    cursor: pointer;
   }
-  :root[data-theme='light'] select.field {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a4462' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  .slider:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .slider::-webkit-slider-runnable-track {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--color-violet) var(--fill, 0%),
+      color-mix(in oklab, var(--color-fg) 14%, transparent) var(--fill, 0%)
+    );
+  }
+  .slider::-moz-range-track {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-fg) 14%, transparent);
+  }
+  .slider::-moz-range-progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-violet);
+  }
+  .slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: -0.5rem;
+    border: 3px solid var(--color-violet);
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+    transition: transform 150ms;
+  }
+  .slider::-moz-range-thumb {
+    width: 1.5rem;
+    height: 1.5rem;
+    box-sizing: border-box;
+    border: 3px solid var(--color-violet);
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  }
+  .slider:not(:disabled):active::-webkit-slider-thumb {
+    transform: scale(1.12);
+  }
+  .slider:focus-visible {
+    outline: none;
+  }
+  .slider:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+  .slider:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+  /*
+   * A radio button or a checkbox (controls.tsx → Radio, Checkbox): the native input stays, unseen and the size of a
+   * pixel, for its focus, keys and name; the mark after it is ours, in the colour of its text (`tone`).
+   */
+  .choice {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+  }
+  .choice-mark {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--field-edge);
+    background-color: var(--field);
+    transition:
+      border-color 150ms,
+      background-color 150ms;
+  }
+  .choice-mark:not(.choice-box)::after {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: currentColor;
+    transform: scale(0);
+    transition: transform 150ms;
+  }
+  .choice:checked + .choice-mark {
+    border-color: currentColor;
+  }
+  .choice:checked + .choice-mark:not(.choice-box)::after {
+    transform: scale(1);
+  }
+  .choice-box > svg {
+    color: var(--color-ink);
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .choice:checked + .choice-box {
+    background-color: currentColor;
+  }
+  .choice:checked + .choice-box > svg {
+    opacity: 1;
+  }
+  .choice:focus-visible + .choice-mark {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+  .choice:disabled + .choice-mark {
+    opacity: 0.5;
   }
   .field:focus-visible,
   .field-box:focus-within {
