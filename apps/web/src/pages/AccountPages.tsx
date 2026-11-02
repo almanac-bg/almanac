@@ -193,7 +193,7 @@ export function SettingsPage() {
   usePageTitle('Настройки');
   const me = useStore((s) => s.me)!;
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="t-page">Настройки</h1>
@@ -202,26 +202,30 @@ export function SettingsPage() {
           </p>
         </div>
       </div>
-      {me.mustRename && <ChooseNameSettings />}
-      {/* A guest has no email or password yet: saving the account comes first, and brings both. */}
-      {me.isGuest ? (
-        <ClaimSettings />
-      ) : (
-        <>
-          <EmailSettings />
-          <PushSettings />
-          <ReminderSettings />
-          <BeatenMailSettings />
-          <RecordSettings />
-          <BlockedSettings />
-        </>
-      )}
-      <ThemeSettings />
-      <SoundSettings />
-      <MoreTimeSettings />
-      <MatchKeySettings />
-      {!me.isGuest && <PasswordSettings />}
-      <DataSettings />
+      {/* As wide as the other pages: the cards in two columns on a wide screen, each whole in its column (the profile's
+          things in the first, then how the game looks and plays, the password and the data). */}
+      <div className="gap-6 lg:columns-2 [&>*]:mb-6 [&>*]:break-inside-avoid">
+        {me.mustRename && <ChooseNameSettings />}
+        {/* A guest has no email or password yet: saving the account comes first, and brings both. */}
+        {me.isGuest ? (
+          <ClaimSettings />
+        ) : (
+          <>
+            <EmailSettings />
+            <PushSettings />
+            <ReminderSettings />
+            <BeatenMailSettings />
+            <RecordSettings />
+            <BlockedSettings />
+          </>
+        )}
+        <ThemeSettings />
+        <SoundSettings />
+        <MoreTimeSettings />
+        <MatchKeySettings />
+        {!me.isGuest && <PasswordSettings />}
+        <DataSettings />
+      </div>
       {/* Last: leaving is the rarest thing done here, and the least to be hit by mistake. */}
       <div className="flex justify-center pt-2">
         <LogoutButton />

@@ -68,7 +68,7 @@ function GroupList() {
   const full = data.groups.length >= GROUPS.perPlayer;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="t-page">Групи</h1>
         <p className="mt-2 max-w-xl text-fg-2 text-pretty">
@@ -77,55 +77,61 @@ function GroupList() {
         </p>
       </header>
 
-      {data.groups.length > 0 ? (
-        <ul className="space-y-3">
-          {data.groups.map((g) => (
-            <li key={g.id}>
-              <GroupRow group={g} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Card>
-          <EmptyState
-            icon="🫂"
-            title="Още не си в група"
-            body="Създай една и прати линка — или отвори линк, който са ти пратили."
-          />
-        </Card>
-      )}
-
-      {me.isGuest ? (
-        <GuestNudge>
-          Група се създава с профил: запази своя с име и парола (в чужда група можеш да влезеш и като гост).
-        </GuestNudge>
-      ) : full ? (
-        <p className="text-sm text-fg-3">Можеш да си в най-много {GROUPS.perPlayer} групи.</p>
-      ) : (
-        <Card className="p-5 sm:p-6">
-          <h2 className="t-card">Нова група</h2>
-          <form onSubmit={create} className="mt-4 flex flex-wrap gap-3">
-            <input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setTooShort(false);
-              }}
-              maxLength={GROUPS.name[1]}
-              aria-label="Име на групата"
-              aria-invalid={tooShort}
-              aria-describedby={`${hintId}-length`}
-              placeholder="Например „10 Б клас“ или „Офис 3“"
-              className={clsx(INPUT, 'min-w-0 flex-1 basis-56')}
-            />
-            {/* Not disabled while the name is short: Enter on it went nowhere without a word. */}
-            <Button type="submit" size="lg" loading={busy}>
-              Създай
-            </Button>
-          </form>
-          <NameLength id={`${hintId}-length`} tooShort={tooShort} />
-        </Card>
-      )}
+      {/* The groups, and beside them on a wide screen the way to make one: the page as wide as the others. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start">
+        <div className="min-w-0">
+          {data.groups.length > 0 ? (
+            <ul className="space-y-3">
+              {data.groups.map((g) => (
+                <li key={g.id}>
+                  <GroupRow group={g} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Card>
+              <EmptyState
+                icon="🫂"
+                title="Още не си в група"
+                body="Създай една и прати линка — или отвори линк, който са ти пратили."
+              />
+            </Card>
+          )}
+        </div>
+        <div className="min-w-0">
+          {me.isGuest ? (
+            <GuestNudge>
+              Група се създава с профил: запази своя с име и парола (в чужда група можеш да влезеш и като гост).
+            </GuestNudge>
+          ) : full ? (
+            <p className="text-sm text-fg-3">Можеш да си в най-много {GROUPS.perPlayer} групи.</p>
+          ) : (
+            <Card className="p-5 sm:p-6">
+              <h2 className="t-card">Нова група</h2>
+              <form onSubmit={create} className="mt-4 flex flex-wrap gap-3">
+                <input
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setTooShort(false);
+                  }}
+                  maxLength={GROUPS.name[1]}
+                  aria-label="Име на групата"
+                  aria-invalid={tooShort}
+                  aria-describedby={`${hintId}-length`}
+                  placeholder="Например „10 Б клас“ или „Офис 3“"
+                  className={clsx(INPUT, 'min-w-0 flex-1 basis-56')}
+                />
+                {/* Not disabled while the name is short: Enter on it went nowhere without a word. */}
+                <Button type="submit" size="lg" loading={busy}>
+                  Създай
+                </Button>
+              </form>
+              <NameLength id={`${hintId}-length`} tooShort={tooShort} />
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -184,7 +190,7 @@ function GroupView({ id }: { id: number }) {
   const removable = (userId: number) => g.isOwner && userId !== me.id;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link
         to="/groups"
         className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-fg-3 hover:text-fg-2"
@@ -207,113 +213,121 @@ function GroupView({ id }: { id: number }) {
         )}
       </header>
 
-      <Card className="p-5 sm:p-6">
-        <h2 className="t-card">Покани</h2>
-        <p className="mt-1 text-sm text-fg-2">Който отвори линка, влиза в групата — с профил или като гост.</p>
-        <p className="mt-3 truncate rounded-xl bg-tint/5 px-3 py-2 font-mono text-sm text-fg-2">{inviteUrl(g.code)}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={() => shareInvite(g)}>
-            <Share2 className="size-4" /> Прати линка
-          </Button>
-          {g.isOwner && (
-            <Button
-              variant="ghost"
-              onClick={() => void change(() => api.newGroupLink(id), 'Новият линк е готов — старият вече не работи.')}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start">
+        <div className="min-w-0 space-y-6">
+          {!me.daily.played && (
+            <Link
+              to="/daily"
+              className="focus-ring flex items-center gap-3 rounded-3xl border border-amber-300/25 bg-amber-400/10 p-4 text-amber-100 hover:bg-amber-400/15"
             >
-              <Link2 className="size-4" /> Нов линк
-            </Button>
+              <span aria-hidden className="text-2xl">
+                <Emoji e="📅" />
+              </span>
+              <span className="min-w-0 flex-1 text-sm">
+                <b className="text-fg">Днешните въпроси</b> те чакат — всеки ден е шанс за точки в групата.
+              </span>
+              <ArrowRight aria-hidden className="size-4 shrink-0" />
+            </Link>
+          )}
+
+          <section>
+            <div className="mb-4">
+              <h2 className="t-section">Тази седмица</h2>
+              <p className="mt-1 text-sm text-fg-3">{weekName(g.week.start)}</p>
+            </div>
+            {g.week.entries.length ? (
+              <Card className="overflow-hidden">
+                <ol className="divide-y divide-line">
+                  {g.week.entries.map((e) => (
+                    <BoardRow
+                      key={e.user.id}
+                      entry={e}
+                      you={e.user.id === me.id}
+                      onRemove={removable(e.user.id) ? () => setRemoving(e.user) : null}
+                    />
+                  ))}
+                </ol>
+              </Card>
+            ) : (
+              <Card>
+                <EmptyState
+                  icon="📅"
+                  title="Седмицата тепърва започва"
+                  body="Който изиграе въпросите на деня, влиза в класацията."
+                />
+              </Card>
+            )}
+            <p className="mt-2 text-xs text-fg-3">
+              Сбор от най-добрите {GROUPS.bestDays} дни на всеки до неделя вечер. Победителят носи <Emoji e="👑" />{' '}
+              цялата следваща седмица.
+            </p>
+          </section>
+
+          {g.week.waiting.length > 0 && (
+            <section>
+              <SectionTitle>Още не са играли</SectionTitle>
+              <Card className="divide-y divide-line">
+                {g.week.waiting.map((u) => (
+                  <div key={u.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                    <Link
+                      to={`/profile/${encodeURIComponent(u.username)}`}
+                      className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+                    >
+                      <Avatar avatar={u.avatar} frame={u.frame} size={36} />
+                      <PlayerTag name={u.username} title={u.title} level={u.level} />
+                    </Link>
+                    {removable(u.id) && <RemoveButton name={u.username} onClick={() => setRemoving(u)} />}
+                  </div>
+                ))}
+              </Card>
+            </section>
           )}
         </div>
-      </Card>
-
-      {!me.daily.played && (
-        <Link
-          to="/daily"
-          className="focus-ring flex items-center gap-3 rounded-3xl border border-amber-300/25 bg-amber-400/10 p-4 text-amber-100 hover:bg-amber-400/15"
-        >
-          <span aria-hidden className="text-2xl">
-            <Emoji e="📅" />
-          </span>
-          <span className="min-w-0 flex-1 text-sm">
-            <b className="text-fg">Днешните въпроси</b> те чакат — всеки ден е шанс за точки в групата.
-          </span>
-          <ArrowRight aria-hidden className="size-4 shrink-0" />
-        </Link>
-      )}
-
-      <section>
-        <div className="mb-4">
-          <h2 className="t-section">Тази седмица</h2>
-          <p className="mt-1 text-sm text-fg-3">{weekName(g.week.start)}</p>
-        </div>
-        {g.week.entries.length ? (
-          <Card className="overflow-hidden">
-            <ol className="divide-y divide-line">
-              {g.week.entries.map((e) => (
-                <BoardRow
-                  key={e.user.id}
-                  entry={e}
-                  you={e.user.id === me.id}
-                  onRemove={removable(e.user.id) ? () => setRemoving(e.user) : null}
-                />
-              ))}
-            </ol>
-          </Card>
-        ) : (
-          <Card>
-            <EmptyState
-              icon="📅"
-              title="Седмицата тепърва започва"
-              body="Който изиграе въпросите на деня, влиза в класацията."
-            />
-          </Card>
-        )}
-        <p className="mt-2 text-xs text-fg-3">
-          Сбор от най-добрите {GROUPS.bestDays} дни на всеки до неделя вечер. Победителят носи <Emoji e="👑" /> цялата
-          следваща седмица.
-        </p>
-      </section>
-
-      {g.week.waiting.length > 0 && (
-        <section>
-          <SectionTitle>Още не са играли</SectionTitle>
-          <Card className="divide-y divide-line">
-            {g.week.waiting.map((u) => (
-              <div key={u.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
-                <Link
-                  to={`/profile/${encodeURIComponent(u.username)}`}
-                  className="focus-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+        <div className="min-w-0 space-y-6">
+          <Card className="p-5 sm:p-6">
+            <h2 className="t-card">Покани</h2>
+            <p className="mt-1 text-sm text-fg-2">Който отвори линка, влиза в групата — с профил или като гост.</p>
+            <p className="mt-3 truncate rounded-xl bg-tint/5 px-3 py-2 font-mono text-sm text-fg-2">
+              {inviteUrl(g.code)}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button onClick={() => shareInvite(g)}>
+                <Share2 className="size-4" /> Прати линка
+              </Button>
+              {g.isOwner && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    void change(() => api.newGroupLink(id), 'Новият линк е готов — старият вече не работи.')
+                  }
                 >
-                  <Avatar avatar={u.avatar} frame={u.frame} size={36} />
-                  <PlayerTag name={u.username} title={u.title} level={u.level} />
-                </Link>
-                {removable(u.id) && <RemoveButton name={u.username} onClick={() => setRemoving(u)} />}
-              </div>
-            ))}
+                  <Link2 className="size-4" /> Нов линк
+                </Button>
+              )}
+            </div>
           </Card>
-        </section>
-      )}
-
-      {g.history.length > 0 && (
-        <section>
-          <SectionTitle>Победители</SectionTitle>
-          <Card className="divide-y divide-line">
-            {g.history.map((h) => (
-              <div key={h.week} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm sm:px-5">
-                <span className="min-w-0 flex-1 basis-44 text-fg-3">{weekName(h.week)}</span>
-                {h.winner ? (
-                  <span className="font-semibold">
-                    <Emoji e="👑" /> {h.winner.username}{' '}
-                    <span className="font-normal text-fg-3">· {fmt(h.score)} т.</span>
-                  </span>
-                ) : (
-                  <span className="text-fg-3">никой не игра</span>
-                )}
-              </div>
-            ))}
-          </Card>
-        </section>
-      )}
+          {g.history.length > 0 && (
+            <section>
+              <SectionTitle>Победители</SectionTitle>
+              <Card className="divide-y divide-line">
+                {g.history.map((h) => (
+                  <div key={h.week} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm sm:px-5">
+                    <span className="min-w-0 flex-1 basis-44 text-fg-3">{weekName(h.week)}</span>
+                    {h.winner ? (
+                      <span className="font-semibold">
+                        <Emoji e="👑" /> {h.winner.username}{' '}
+                        <span className="font-normal text-fg-3">· {fmt(h.score)} т.</span>
+                      </span>
+                    ) : (
+                      <span className="text-fg-3">никой не игра</span>
+                    )}
+                  </div>
+                ))}
+              </Card>
+            </section>
+          )}
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-6">
         <Button variant="ghost" onClick={() => setLeaving(true)}>

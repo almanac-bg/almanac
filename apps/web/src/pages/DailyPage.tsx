@@ -97,7 +97,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="space-y-5">
       <Card className="relative overflow-hidden p-6 sm:p-8">
         <div
           aria-hidden

@@ -88,7 +88,7 @@ function SetList() {
   if (!data && error) return <LoadError title="Наборите не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="t-page">Моите въпроси</h1>
@@ -102,7 +102,8 @@ function SetList() {
         </Button>
       </header>
       {data.sets.length ? (
-        <ul className="space-y-3">
+        // Two across on a wide screen, as wide as the other pages.
+        <ul className="grid gap-3 lg:grid-cols-2">
           {data.sets.map((s) => (
             <li key={s.id} className="glass flex flex-wrap items-center gap-x-2 gap-y-1 rounded-3xl pr-3">
               <Link
@@ -311,7 +312,7 @@ function SetEditor({ id }: { id: number }) {
   if (!data) return <PageSpinner />;
 
   return (
-    <form onSubmit={save} className="mx-auto max-w-3xl space-y-6 pb-24">
+    <form onSubmit={save} className="space-y-6 pb-24">
       <Link
         to="/sets"
         className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-fg-3 hover:text-fg-2"
@@ -392,7 +393,7 @@ function SetEditor({ id }: { id: number }) {
           ABOVE_TAB_BAR,
         )}
       >
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 sm:px-2">
           <p className={clsx('min-w-0 flex-1 text-sm', problem ? 'text-rose-300' : 'text-fg-3')} aria-live="polite">
             {problem ??
               (dirty ? 'Има незапазени промени.' : `${drafts.length} от ${SETS.maxQuestions} въпроса · запазено`)}
@@ -496,7 +497,8 @@ function QuestionCard({
       )}
       {d.kind === 'order' && <OrderFields draft={d} onChange={onChange} />}
       {d.kind === 'choice' && (
-        <fieldset className="mt-3 space-y-2">
+        // А Б above В Г on a wide screen, as the answers sit in a match.
+        <fieldset className="mt-3 grid gap-2 md:grid-cols-2">
           <legend className="sr-only">Отговори; отбележи верния</legend>
           {d.options.map((o, i) => (
             <div

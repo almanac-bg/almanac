@@ -32,7 +32,7 @@ export function NotificationsPage() {
   if (!items) return <PageSpinner />;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <h1 className="t-page">Известия</h1>
       {items.length === 0 ? (
         <Card>
