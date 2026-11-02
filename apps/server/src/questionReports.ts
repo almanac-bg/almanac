@@ -11,7 +11,7 @@ import { alertModerators } from './alerts';
 import { config } from './config';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
-import { logAction } from './modlog';
+import { logAction, OWN_QUESTION, questionAuthor } from './modlog';
 import { notify } from './notifications';
 import {
   dropFromPlay,
@@ -193,6 +193,7 @@ export function hideQuestion(adminId: number | null, questionId: string) {
   logAction({
     adminId,
     action: adminId === null ? 'auto_hide_question' : 'hide_question',
+    userId: questionAuthor(questionId),
     target: questionId,
     undo: {},
   });
@@ -208,6 +209,8 @@ export function hideQuestion(adminId: number | null, questionId: string) {
  */
 export function resolveQuestionReports(adminId: number, questionId: string, action: QuestionReportAction): Result {
   if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
+  const author = questionAuthor(questionId);
+  if (action !== 'hide' && author === adminId) return { ok: false, error: OWN_QUESTION };
   const open = all<{ id: number; user_id: number }>(
     "SELECT id, user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
     questionId,
@@ -229,12 +232,13 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
     if (action === 'fixed') {
       run('DELETE FROM question_stats WHERE question_id = ?', questionId);
       run('DELETE FROM question_skill WHERE question_id = ?', questionId);
-      logAction({ adminId, action: 'fix_question', target: questionId });
+      logAction({ adminId, action: 'fix_question', userId: author, target: questionId });
     } else if (action === 'dismiss')
       // Which flags, and whether it was hidden: an undo opens them again and hides it again.
       logAction({
         adminId,
         action: 'dismiss_flags',
+        userId: author,
         target: questionId,
         undo: { flags: open.map((r) => r.id), hidden: shown },
       });
@@ -264,6 +268,8 @@ export function hiddenQuestions(): QuestionInfo[] {
  * an undo opens them again: in the unhide's entry, or (undoing a hide) in a „Въпросът е наред“ entry of its own.
  */
 export function unhideQuestion(questionId: string, adminId: number, { undoing = false } = {}): Result {
+  const author = questionAuthor(questionId);
+  if (author === adminId) return { ok: false, error: OWN_QUESTION };
   const flags = tx(() => {
     if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) return null;
     const open = all<{ id: number }>(
@@ -276,9 +282,16 @@ export function unhideQuestion(questionId: string, adminId: number, { undoing = 
       adminId,
       questionId,
     );
-    if (!undoing) logAction({ adminId, action: 'unhide_question', target: questionId, undo: { flags: open } });
+    if (!undoing)
+      logAction({ adminId, action: 'unhide_question', userId: author, target: questionId, undo: { flags: open } });
     else if (open.length)
-      logAction({ adminId, action: 'dismiss_flags', target: questionId, undo: { flags: open, hidden: true } });
+      logAction({
+        adminId,
+        action: 'dismiss_flags',
+        userId: author,
+        target: questionId,
+        undo: { flags: open, hidden: true },
+      });
     return open;
   });
   if (!flags) return { ok: false, error: 'Въпросът не е скрит.' };

@@ -18,6 +18,7 @@ import {
   answer,
   autoPlay,
   type Client,
+  cli,
   connect,
   connected,
   emitAck,
@@ -583,6 +584,79 @@ test('community questions', T, async () => {
   assert.ok(stillHidden.some((q: { id: string }) => q.id === questionId));
   await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
 });
+
+test(
+  'a moderator never decides about their own question: another moderator or the owner does (MOD-4, D10)',
+  T,
+  async () => {
+    const M = await register(srv.url, 'redaktor_test');
+    assert.equal(cli(srv.dbPath, 'admin', 'add', 'redaktor_test').status, 0);
+    await withSecondFactor(srv.url, M.cookie);
+    // Far enough along to propose questions (level 3).
+    srv.db.prepare('UPDATE users SET xp = 5000 WHERE id = ?').run(M.user.id);
+    const own = /Това е твой въпрос/;
+    const draft = {
+      category: 'history',
+      difficulty: 'medium',
+      q: 'Тестов въпрос на модератор за крепостите?',
+      options: ['Верен ✓ мод', 'Грешен a', 'Грешен b', 'Грешен c'],
+      answer: 0,
+      answerSource: 'https://bg.wikipedia.org/wiki/Крепост',
+    };
+    const sub = await api.send('POST', '/api/submissions', M.cookie, draft);
+    assert.equal(sub.status, 201, sub.body.error);
+    const id = sub.body.submission.id;
+    for (const [what, res] of [
+      ['approve', await api.send('POST', `/api/admin/submissions/${id}/approve`, M.cookie, {})],
+      ['reject', await api.send('POST', `/api/admin/submissions/${id}/reject`, M.cookie, { reason: 'Не е ясно.' })],
+    ] as const) {
+      assert.equal(res.status, 400, what);
+      assert.match(res.body.error, own, what);
+    }
+    // The owner approves it: the entry is on the author's card.
+    assert.equal((await api.send('POST', `/api/admin/submissions/${id}/approve`, A.cookie, {})).status, 200);
+    const qid = `usr-${id}`;
+    const card = async () =>
+      (
+        srv.db
+          .prepare('SELECT action FROM moderation_log WHERE target = ? AND target_user_id = ? ORDER BY id')
+          .all(qid, M.user.id) as { action: string }[]
+      ).map((r) => r.action);
+    assert.deepEqual(await card(), ['approve']);
+
+    // In play now: its author can't correct it, clear its flags, put it back, or undo a decision on it.
+    const edit = await api.send('PUT', `/api/admin/questions/${qid}`, M.cookie, {
+      ...draft,
+      q: `${draft.q} (поправен)`,
+    });
+    assert.match(edit.body.error, own);
+    for (const action of ['dismiss', 'fixed']) {
+      const res = await api.send('POST', `/api/admin/question-reports/${qid}/resolve`, M.cookie, { action });
+      assert.match(res.body.error, own, action);
+    }
+    // Hiding their own is no conflict; putting it back is another's to decide.
+    assert.equal(
+      (await api.send('POST', `/api/admin/question-reports/${qid}/resolve`, M.cookie, { action: 'hide' })).status,
+      200,
+    );
+    assert.match((await api.send('POST', `/api/admin/hidden-questions/${qid}/unhide`, M.cookie)).body.error, own);
+    const [hide] = (await api.get('/api/admin/log', M.cookie)).body.entries.filter(
+      (e: { action: string; target: string }) => e.action === 'hide_question' && e.target === qid,
+    );
+    assert.match(
+      (await api.send('POST', `/api/admin/log/${hide.id}/undo`, M.cookie, { reason: 'Беше наред всъщност.' })).body
+        .error,
+      own,
+    );
+    assert.equal((await api.send('POST', `/api/admin/hidden-questions/${qid}/unhide`, A.cookie)).status, 200);
+    const fixed = await api.send('PUT', `/api/admin/questions/${qid}`, A.cookie, {
+      ...draft,
+      q: `${draft.q} (поправен)`,
+    });
+    assert.equal(fixed.status, 200, fixed.body.error);
+    assert.deepEqual(await card(), ['approve', 'hide_question', 'unhide_question', 'edit_question']);
+  },
+);
 
 test('season settlement', T, async () => {
   srv.db

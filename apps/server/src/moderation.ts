@@ -21,7 +21,16 @@ import { alertModerators } from './alerts';
 import { config } from './config';
 import { all, one, run, tx } from './db';
 import { longDateTime } from './mailer';
-import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
+import {
+  laterDecision,
+  logAction,
+  logRow,
+  markUndone,
+  OWN_QUESTION,
+  parseUndo,
+  playerLog,
+  QUESTION_ACTIONS,
+} from './modlog';
 import { hasBlockedWords, mixesScripts, nameShape, passesForTheGame } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
 import { hideQuestion, reopenFlags, unhideQuestion } from './questionReports';
@@ -965,7 +974,12 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
   if (reason.length < MODERATION.reasonMin)
     return { ok: false, error: `Напиши защо го отменяш (поне ${MODERATION.reasonMin} знака).` };
   const userId = row.target_user_id;
-  const mine = notTheirs(adminId, userId);
+  // A question's decision names its author, but isn't about them: only the author is kept out of it (D10).
+  const mine = QUESTION_ACTIONS.has(row.action)
+    ? userId === adminId
+      ? OWN_QUESTION
+      : null
+    : notTheirs(adminId, userId);
   if (mine) return { ok: false, error: mine };
   switch (row.action) {
     case 'ban':

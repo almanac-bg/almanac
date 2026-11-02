@@ -78,6 +78,28 @@ const FAMILIES: ModerationLogAction[][] = [
 ];
 const ABOUT_PLAYER = new Set<ModerationLogAction>(['ban', 'unban', 'ban_change', 'rename', 'annul']);
 
+/** Who wrote a player's question (null: one of the bank's, which has no author in the game). */
+export const questionAuthor = (questionId: string): number | null =>
+  one<{ author_id: number | null }>('SELECT author_id FROM questions WHERE id = ?', questionId)?.author_id ?? null;
+
+/**
+ * Nobody decides about their own question — approving it, clearing its flags, putting it back, editing it, undoing a
+ * decision on it (the 31 October review, MOD-4, D10): another moderator or the owner does. Hiding it is no conflict.
+ */
+export const OWN_QUESTION = 'Това е твой въпрос — нека го реши друг модератор.';
+
+/** Decisions about a question, which name its author as the player they're about (the author's card shows them). */
+export const QUESTION_ACTIONS = new Set<ModerationLogAction>([
+  'approve',
+  'reject',
+  'edit_question',
+  'hide_question',
+  'auto_hide_question',
+  'unhide_question',
+  'fix_question',
+  'dismiss_flags',
+]);
+
 /** The later decision, still standing, that undoing this one would override; undefined when there's none. */
 export function laterDecision(r: LogRow): LogRow | undefined {
   const family = FAMILIES.find((f) => f.includes(r.action)) ?? [r.action];

@@ -13,7 +13,7 @@ import {
 import { z } from 'zod';
 import { grantXp } from './account';
 import { all, one, run, tx } from './db';
-import { logAction } from './modlog';
+import { logAction, OWN_QUESTION, questionAuthor } from './modlog';
 import { notify } from './notifications';
 import { questionBank, reloadQuestionBank } from './questions';
 import { sentence } from './statements';
@@ -296,6 +296,7 @@ export function approveSubmission(
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };
+  if (row.user_id === adminId) return { ok: false, error: OWN_QUESTION };
   const final: QuestionDraft = edits ?? {
     category: row.category,
     difficulty: row.difficulty,
@@ -364,6 +365,7 @@ export function rejectSubmission(
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };
+  if (row.user_id === adminId) return { ok: false, error: OWN_QUESTION };
   // The author learns why: a „не“ alone teaches nothing about the next one.
   const why = reason.trim().slice(0, 300);
   if (why.length < MODERATION.reasonMin)
@@ -395,6 +397,8 @@ export function editCommunityQuestion(
 ): { ok: true } | { ok: false; error: string } {
   const before = one<{ q: string }>('SELECT q FROM questions WHERE id = ?', questionId);
   if (!before) return { ok: false, error: 'Няма такъв въпрос на играч.' };
+  const author = questionAuthor(questionId);
+  if (author === adminId) return { ok: false, error: OWN_QUESTION };
   tx(() => {
     run(
       `UPDATE questions SET category = ?, difficulty = ?, q = ?, options = ?, answer = ?, answer_source = ?, fact = ?,
@@ -423,7 +427,13 @@ export function editCommunityQuestion(
       draft.fact ? (draft.factSource ?? null) : null,
       questionId,
     );
-    logAction({ adminId, action: 'edit_question', target: questionId, reason: `Беше: „${before.q}“` });
+    logAction({
+      adminId,
+      action: 'edit_question',
+      userId: author,
+      target: questionId,
+      reason: `Беше: „${before.q}“`,
+    });
   });
   reloadQuestionBank();
   return { ok: true };
