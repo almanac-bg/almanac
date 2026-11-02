@@ -162,8 +162,14 @@ export function RoomPage() {
           disabled={!isHost}
           value={s.timeMs}
           onChange={(timeMs) => update({ timeMs })}
-          options={ROOM_LIMITS.timeMs.map((ms) => ({ value: ms, label: `${ms / 1000} с` }))}
+          options={ROOM_LIMITS.timeMs.map((ms) => ({ value: ms, label: ms ? `${ms / 1000} с` : 'Без часовник' }))}
         />
+        {s.timeMs === 0 && (
+          <p className="mt-2 text-xs text-fg-3">
+            Въпросът стои, докато всички отговорят или докато натиснеш „Покажи отговора“ (или → от дистанционното). Без
+            бонус за бързина.
+          </p>
+        )}
       </Setting>
 
       {!s.set && (

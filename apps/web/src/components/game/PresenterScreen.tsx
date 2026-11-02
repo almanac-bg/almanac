@@ -1,7 +1,7 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { BRAND, categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Lightbulb, Pause, Users } from 'lucide-react';
+import { ArrowRight, Check, Eye, Lightbulb, Pause, Users } from 'lucide-react';
 import { m } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
@@ -51,20 +51,24 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     if (revealed !== null) sfx.correct();
   }, [revealed]);
 
-  // The teacher sets the pace on an answer: „Пауза“ to talk it through, „Следващ“ to go on now — from the screen, or a
-  // presenter's clicker (→ or PageDown), Space pausing and going on.
+  // The teacher sets the pace: on an open question „Покажи отговора“ (a room without a clock waits for it); on an
+  // answer „Пауза“ to talk it through, „Следващ“ to go on now — from the screen, or a presenter's clicker (→ or
+  // PageDown: the next step, whichever it is), Space pausing and going on.
   const paused = revealed !== null && game.paused === revealed;
-  const steer = (action: 'pause' | 'next') => {
-    if (revealed !== null) void actions.steer(revealed, action);
+  const open = q && !reveal && !end && game.phase === 'question' ? q.index : null;
+  const steer = (action: 'pause' | 'next' | 'reveal') => {
+    if (action === 'reveal') {
+      if (open !== null) void actions.steer(open, 'reveal');
+    } else if (revealed !== null) void actions.steer(revealed, action);
   };
-  const keys = useRef({ steer, paused });
-  keys.current = { steer, paused };
+  const keys = useRef({ steer, paused, open: open !== null });
+  keys.current = { steer, paused, open: open !== null };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       // A focused button takes its own Space.
       if (e.target instanceof Element && e.target.closest('button, a, input, textarea, select')) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') keys.current.steer('next');
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') keys.current.steer(keys.current.open ? 'reveal' : 'next');
       else if (e.key === ' ') keys.current.steer(keys.current.paused ? 'next' : 'pause');
       else return;
       e.preventDefault();
@@ -94,6 +98,11 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
           <p className="ml-auto font-display text-xl font-bold text-fg-2 lg:text-2xl">
             Въпрос {q.index + 1} от {q.total}
           </p>
+        )}
+        {open !== null && (
+          <Button variant="secondary" onClick={() => steer('reveal')}>
+            <Eye aria-hidden className="size-4" /> Покажи отговора
+          </Button>
         )}
         {q && reveal && !end && (
           <div className="flex items-center gap-3">

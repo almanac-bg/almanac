@@ -380,7 +380,9 @@ export class RoomManager {
         roomCode: room.code,
         hostUserId: room.hostUserId,
         questionCount: questions?.length ?? room.settings.questions,
-        timeMs: room.settings.timeMs,
+        // „Без часовник“ (0): the run's untimed pace, its points without the speed bonus counted on the usual clock.
+        timeMs: room.settings.timeMs || DEFAULT_ROOM_SETTINGS.timeMs,
+        ...(room.settings.timeMs === 0 && { pace: 'untimed' as const }),
         category: own ? 'mixed' : room.settings.category,
         inRounds: !own && room.settings.rounds,
         final: room.settings.final,

@@ -26,7 +26,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   // Соло without a clock: each answer waits for „Продължи“.
   // Without a clock (Соло's, or „Повече време“ in a run alone): every answer waits for „Продължи“.
-  const untimedRun = game.start.pace === 'untimed';
+  // A run alone without a clock (Соло, „Повече време“): its own waits and „Още време“. A room without one waits for its
+  // host instead.
+  const untimedRun = game.start.pace === 'untimed' && !game.start.roomCode;
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
   // Knocked out: the questions go on, and can still be answered — for XP and the almanac, outside the race.

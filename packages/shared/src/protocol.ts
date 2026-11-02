@@ -692,7 +692,7 @@ export interface ClientToServerEvents {
   'game:hold': (p: { index: number }, ack: Ack) => void;
   'game:resume': () => void;
   /** A room's host, on the big screen: hold the next question on this reveal, or bring it on now. */
-  'game:steer': (p: { index: number; action: 'pause' | 'next' }, ack: Ack) => void;
+  'game:steer': (p: { index: number; action: 'pause' | 'next' | 'reveal' }, ack: Ack) => void;
 }
 
 // ─── REST ────────────────────────────────────────────────────────────────────

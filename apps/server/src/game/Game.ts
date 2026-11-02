@@ -339,9 +339,13 @@ export class Game {
   settling = false;
   /** Nobody else in it (solo, the daily, a challenge link): no one is waiting on its player. */
   readonly alone: boolean;
-  /** A run alone's clock (Соло's pace, „Повече време“); a match with others plays the usual one. */
+  /**
+   * A run alone's clock (Соло's pace, „Повече време“); a match with others plays the usual one — but a room's host can
+   * turn the clock off („Без часовник“): a question then waits for everyone, or for the host to show the answer.
+   */
   get pace(): Pace {
-    return this.alone ? (this.setup.pace ?? 'normal') : 'normal';
+    if (this.alone) return this.setup.pace ?? 'normal';
+    return this.setup.roomCode && this.setup.pace === 'untimed' ? 'untimed' : 'normal';
   }
 
   /** At the match's last question, its final. „Поправителен“ has none: just the questions coming back. */
@@ -604,11 +608,18 @@ export class Game {
   }
 
   /**
-   * A class's pace, from the host's big screen: „Пауза“ on a reveal holds the next question while the teacher talks the
-   * answer through (HOST_PAUSE_MS at most); „Следващ“ brings it on now, paused or not. Everyone sees the pause.
+   * A class's pace, from the host's big screen: „Покажи отговора“ closes the open question now (one without a clock
+   * waits for it); „Пауза“ on a reveal holds the next question while the teacher talks the answer through
+   * (HOST_PAUSE_MS at most); „Следващ“ brings it on now, paused or not. Everyone sees the pause.
    */
-  steer(userId: number, index: number, action: 'pause' | 'next'): boolean {
-    if (userId !== this.setup.presenter || this.phase !== 'reveal' || index !== this.index) return false;
+  steer(userId: number, index: number, action: 'pause' | 'next' | 'reveal'): boolean {
+    if (userId !== this.setup.presenter || index !== this.index) return false;
+    if (action === 'reveal') {
+      if (this.phase !== 'question') return false;
+      this.guard(() => this.reveal());
+      return true;
+    }
+    if (this.phase !== 'reveal') return false;
     if (action === 'pause') {
       // Not while the server drains: a pause would hold the match until it's cut short.
       if (this.paused || this.hooks.draining()) return false;
@@ -1482,7 +1493,8 @@ export class Game {
     const guessed = isChoice(q) ? 1 / q.options.length : 0;
     const knows = Math.random() < Math.max(0, (chance - guessed) / (1 - guessed));
     const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
-    const afterMs = Math.max(900, fraction * this.limitMs);
+    // On the question's own clock: one without a clock waits minutes, a bot doesn't.
+    const afterMs = Math.max(900, fraction * (this.pace === 'untimed' ? this.scoreLimitMs : this.limitMs));
     if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance), order: null };
     if (q.kind === 'order') return { knows, afterMs, joker: null, guess: null, order: this.botOrder(q, knows, chance) };
     const playable = (id: PowerupId) =>

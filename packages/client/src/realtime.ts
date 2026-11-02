@@ -779,7 +779,7 @@ export const actions = {
   },
   resumeAfterFact: () => getSocket().emit('game:resume'),
   /** The big screen's host sets a class's pace on a reveal: hold the next question, or bring it on now. */
-  steer: async (index: number, action: 'pause' | 'next') =>
+  steer: async (index: number, action: 'pause' | 'next' | 'reveal') =>
     (await ask(() => withTimeout().emitWithAck('game:steer', { index, action }))).ok,
   /** Emotes are for the moment: one that can't go out now is dropped. */
   react: (emote: string) => void sendMove('game:react', emote),
