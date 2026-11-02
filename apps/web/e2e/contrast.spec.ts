@@ -68,6 +68,14 @@ for (const theme of ['dark', 'light'] as const)
           const r = ratio('var(--color-on-fill)', fill);
           if (r < 4.5) out.push(`text-on-fill on ${fill}: ${r.toFixed(2)}`);
         }
+        // Gradient text (big titles: .text-gradient, a win's .text-win) clipped to its letters, stop by stop: 3:1, as
+        // large text needs. A scan of the page reads it as transparent and skips it: the light theme's win was pale
+        // gold on paper at 1.1–2.0:1 (VD-5).
+        for (const stop of ['--gradient-a', '--gradient-b', '--gradient-c', '--win-a', '--win-b'])
+          for (const background of ['var(--color-ink)', 'var(--color-ink-2)']) {
+            const r = ratio(`var(${stop})`, background);
+            if (r < 3) out.push(`gradient stop ${stop} on ${background}: ${r.toFixed(2)}`);
+          }
         return out;
       },
       { theme, texts: [...new Set(asText)].map((c) => [accentText(c), c]), fills: underDarkText },

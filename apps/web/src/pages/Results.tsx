@@ -271,11 +271,7 @@ export function Results({ game }: { game: LiveGame }) {
                 ? 'text-[clamp(1.75rem,8.5vw,4.5rem)]'
                 : 'text-[clamp(2.25rem,7vw,4.5rem)]',
             'text-balance',
-            won
-              ? 'bg-[linear-gradient(100deg,#fde68a,#f59e0b,#fde68a)] bg-clip-text text-transparent'
-              : lost
-                ? 'text-fg'
-                : 'text-gradient',
+            won ? 'text-win' : lost ? 'text-fg' : 'text-gradient',
           )}
         >
           {headline}

@@ -125,6 +125,8 @@
   --gradient-a: #c026d3;
   --gradient-b: #7c3aed;
   --gradient-c: #0891b2;
+  --win-a: #b45309;
+  --win-b: #92400e;
   --field: #fff;
   --field-focus: #fff;
   /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
@@ -235,6 +237,9 @@
   --gradient-a: #f0abfc;
   --gradient-b: #a78bfa;
   --gradient-c: #22d3ee;
+  /* A win's gold (.text-win). */
+  --win-a: #fde68a;
+  --win-b: #f59e0b;
   --field: rgb(0 0 0 / 0.3);
   --field-focus: rgb(0 0 0 / 0.4);
   /* A field's edge, a selected segment's, an off switch's: 3:1 on a card (WCAG 1.4.11), not a hint of a line. */
@@ -356,6 +361,14 @@ body {
       var(--gradient-a) 100%
     );
     background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* A win's headline („Победа!“): gold — pale on ink, deep amber on paper (pale gold there was 1.1–2.0:1: VD-5). */
+  .text-win {
+    background: linear-gradient(100deg, var(--win-a), var(--win-b), var(--win-a));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
