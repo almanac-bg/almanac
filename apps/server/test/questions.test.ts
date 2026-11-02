@@ -295,6 +295,8 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
       assert.ok(['PD', 'CC0', 'CC BY', 'CC BY-SA'].includes(image.license), `${where} — licence`);
       assert.ok(image.license === 'PD' || /^[1-4]\.[05]$/.test(image.licenseVersion ?? ''), `${where} — its version`);
       assert.ok(image.credit.trim() && new URL(image.sourceUrl).protocol === 'https:', `${where} — credit and source`);
+      // With the licence and „чрез Wikimedia Commons“ it takes two lines at most on a 320 px phone (QuestionPicture).
+      assert.ok(image.credit.length <= 60, `${where} — credit "${image.credit}" over 60`);
       assert.ok(image.alt.trim().length >= 3 && image.alt.length <= 150, `${where} — alt text`);
       const answer = normalize(q.options[q.answer]);
       assert.ok(

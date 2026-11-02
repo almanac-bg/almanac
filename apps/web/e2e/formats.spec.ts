@@ -43,13 +43,10 @@ test('a solo match plays a picture (whose it is shows with the answer) and „П
       expect(await picture.getAttribute('alt')).toBeTruthy();
       await expect(page.locator('main figcaption'), 'whose it is: not before the answer').toHaveCount(0);
       await open.first().click({ timeout: gameMs(2_500) });
-      await expect(page.locator('main figcaption')).toContainText('обществено достояние', { timeout: gameMs(5_000) });
-    } else if (await lock.isVisible()) {
-      const range = (await page.getByText(/^от .+ до .+$/).textContent())!;
-      await page.keyboard.type(range.slice(3, range.indexOf(' до ')).replace(/[^\d]/g, ''));
-      await page.keyboard.press('Enter');
-    } else {
-      await open.first().click({ timeout: gameMs(2_500) });
+      // Licence first, then the author (the sample's flags are Commons' own: „чрез Wikimedia Commons“ isn't said twice).
+      await expect(page.locator('main figcaption')).toHaveText('обществено достояние · Wikimedia Commons', {
+        timeout: gameMs(5_000),
+      });
     }
   }
   expect(pictures).toBe(2);
