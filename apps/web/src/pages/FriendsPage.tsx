@@ -226,7 +226,7 @@ function Friends() {
                 <PersonLink entry={f} hint={`изпратена ${timeAgo(f.since)}`} />
                 <div className="flex w-full justify-end sm:w-auto">
                   <Button size="sm" variant="ghost" onClick={() => mutate(() => api.removeFriend(f.user.id))}>
-                    Откажи поканата
+                    Оттегли поканата
                   </Button>
                 </div>
               </div>

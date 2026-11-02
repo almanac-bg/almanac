@@ -97,8 +97,8 @@ export function DailyCard({
         <>
           <h2 className="relative t-card">Днешното класиране</h2>
           <p className="relative mt-2 text-fg-2 text-pretty">
-            Засега са го изиграли {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом станат поне{' '}
-            {DAILY_FIELD.placeFrom}.
+            Засега го {runs === 1 ? 'изигра' : 'изиграха'} {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом
+            станат поне {DAILY_FIELD.placeFrom}.
           </p>
         </>
       )}
@@ -415,6 +415,7 @@ export function UnlockReveal({ rewards, celebrated = false }: { rewards: MatchRe
   const avatar = unlock.kind === 'avatar' ? unlock.id : me.avatar;
   const frame = unlock.kind === 'frame' ? unlock.id : me.frame;
   const worn = state === 'worn' || (unlock.kind === 'avatar' ? me.avatar === unlock.id : me.frame === unlock.id);
+  const it = unlock.kind === 'avatar' ? 'го' : 'я';
 
   async function wear() {
     setState('saving');
@@ -442,11 +443,11 @@ export function UnlockReveal({ rewards, celebrated = false }: { rewards: MatchRe
         <p className="mt-1 text-lg font-extrabold">{name}</p>
         {worn ? (
           <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
-            <Check aria-hidden className="size-4" /> Носиш го
+            <Check aria-hidden className="size-4" /> Носиш {it}
           </p>
         ) : (
           <Button size="sm" className="mt-3" onClick={() => void wear()} loading={state === 'saving'}>
-            Сложи го
+            Сложи {it}
           </Button>
         )}
       </div>

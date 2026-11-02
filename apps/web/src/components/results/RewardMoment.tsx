@@ -145,6 +145,8 @@ function Unlocked({ unlock, more }: { unlock: UnlockRef; more: number }) {
   if (!me) return null;
   const { name } = unlockPreview(unlock);
   const worn = state === 'worn' || (unlock.kind === 'avatar' ? me.avatar === unlock.id : me.frame === unlock.id);
+  // „го“ for an avatar, „я“ for a frame (рамка): „Сложи го“ under a frame read wrong (the review's UX-14).
+  const it = unlock.kind === 'avatar' ? 'го' : 'я';
 
   async function wear() {
     setState('saving');
@@ -177,11 +179,11 @@ function Unlocked({ unlock, more }: { unlock: UnlockRef; more: number }) {
       {more > 0 && <p className="mt-1 text-sm text-fg-2">и още {more} — в „Колекция“</p>}
       {worn ? (
         <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
-          <Check aria-hidden className="size-4" /> Носиш го
+          <Check aria-hidden className="size-4" /> Носиш {it}
         </p>
       ) : (
         <Button className="mt-4" onClick={() => void wear()} loading={state === 'saving'}>
-          Сложи го
+          Сложи {it}
         </Button>
       )}
     </>

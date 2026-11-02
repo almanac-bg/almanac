@@ -326,7 +326,10 @@ export function NumberLine({ game, q, reveal }: { game: LiveGame; q: QuestionPay
                 isExact(g.guess, { answer, step: n.step }) ? 'bg-amber-400/25 text-amber-200' : 'bg-tint/10 text-fg-2',
               )}
             >
-              {offText(g.guess, answer, n)}
+              {/* Yours with the number you gave too („0 % · −84,6“): the difference alone left you working it out. */}
+              {g.id === youId
+                ? `${numberText(g.guess, n)} · ${offText(g.guess, answer, n)}`
+                : offText(g.guess, answer, n)}
             </span>
             <span className={clsx('rounded-full', g.id === youId && 'ring-2 ring-violet-300')} title={g.player.name}>
               <Avatar avatar={g.player.avatar} frame={g.player.frame} size={28} />
