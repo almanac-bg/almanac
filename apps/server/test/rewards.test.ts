@@ -550,6 +550,17 @@ test('Соло with double time: an answer past the usual clock scores, but says
     fast,
     'and the answer log',
   );
+  // A slow answer breaks the streak (GAMEPLAY-5): the best one is the quick first half, and the run is no record.
+  assert.equal(
+    one<{ best: number }>('SELECT best_streak AS best FROM users WHERE id = ?', solo)!.best,
+    fast,
+    'the streak stops at the first slow answer',
+  );
+  assert.equal(
+    one<{ best: number }>('SELECT best_solo_score AS best FROM users WHERE id = ?', solo)!.best,
+    0,
+    'the Соло record is the usual pace’s',
+  );
 });
 
 test('knocked out and answering on, the right answers pay XP and count for what the player knows', () => {

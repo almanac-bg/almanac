@@ -5,6 +5,9 @@ import { LETTERS } from './answers';
 import { numberText } from './numbers';
 import { orderValueText } from './OrderQuestion';
 
+/** A class's host stopped the big screen on an answer: on the pupils' screens, and said to their screen readers. */
+export const PAUSED_NOTE = 'Пауза на големия екран — следващият въпрос идва след нея.';
+
 /**
  * What a screen reader hears during a match: what it is as it starts, a round's pick (yours: what to choose from), each
  * question as it opens (the question itself is read where the focus lands, its heading, which carries the options:
@@ -121,6 +124,20 @@ export function MatchAnnouncer({ game }: { game: LiveGame }) {
   useEffect(() => {
     if (game.retryPrompt) setMessage('Грешно, но имаш още един опит — за половин точки.');
   }, [game.retryPrompt]);
+
+  // A class's teacher stops on this answer to talk it through (the note on screen says it too).
+  const paused = !!reveal && game.paused === reveal.index;
+  useEffect(() => {
+    if (paused) setMessage(PAUSED_NOTE);
+  }, [paused]);
+
+  // Knocked out and still answering: the others have, and the question stays open only a few seconds more.
+  const closesAt = q && !reveal ? game.closesAt : null;
+  useEffect(() => {
+    if (!closesAt) return;
+    const left = Math.max(1, Math.round((closesAt - Date.now()) / 1000));
+    setMessage(`Другите вече отговориха: още ${left} ${left === 1 ? 'секунда' : 'секунди'}.`);
+  }, [closesAt]);
 
   return (
     <p className="sr-only" aria-live="polite" aria-atomic="true">

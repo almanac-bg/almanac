@@ -11,13 +11,16 @@ export const PICTURE_SIZES = '(min-width: 768px) 720px, 100vw';
 
 const LICENSES: Record<string, string> = { PD: 'обществено достояние' };
 
-/** Whose a picture is: „Иван Мърквичка · обществено достояние“, „Ivo Ivanov · CC BY-SA 4.0“. */
-export const creditText = (c: ImageCredit) => `${c.credit} · ${LICENSES[c.license] ?? c.license}`;
+// Said once: some credits are Commons itself.
+const fromCommons = (c: ImageCredit) =>
+  !!c.sourceUrl?.startsWith('https://commons.wikimedia.org/') && !/wikimedia/i.test(c.credit);
 
 /**
  * A question's picture: as large as it fits, at most `maxHeight` of the screen (40% in a match, so the question and its
- * options still fit on a phone), its box kept while it loads so nothing below it jumps. Whose it is shows once the
- * answer is out (`credit`): a painter's name would give a painting's answer away.
+ * options still fit on a phone; a parent may set `--pic-h` instead, to cap it by the room left), its box kept while it
+ * loads so nothing below it jumps. Whose it is shows once the answer is out (`credit`): a painter's name would give a
+ * painting's answer away. It comes over the picture's foot, so nothing moves when it does (on a phone the answers are
+ * right below): the licence first, linked to its deed, then the author and where it's from, two lines at most.
  */
 export function QuestionPicture({
   image,
@@ -33,7 +36,10 @@ export function QuestionPicture({
   const [loaded, setLoaded] = useState(false);
   const ratio = image.w / image.h;
   return (
-    <figure className={clsx('mx-auto', className)} style={{ width: `min(100%, calc(${maxHeight} * ${ratio}))` }}>
+    <figure
+      className={clsx('relative mx-auto', className)}
+      style={{ width: `min(100%, calc(var(--pic-h, ${maxHeight}) * ${ratio}))` }}
+    >
       <div
         className={clsx(
           'relative overflow-hidden rounded-2xl border border-line bg-tint/[0.04]',
@@ -62,23 +68,25 @@ export function QuestionPicture({
         <m.figcaption
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-1.5 truncate text-right text-xs text-fg-3"
+          // Over the picture, on a scrim: white on dark whatever the theme, as the picture's own frame is.
+          className="absolute inset-x-px bottom-px line-clamp-2 rounded-b-2xl bg-linear-to-t from-black/80 via-black/60 to-transparent px-3 pt-5 pb-1.5 text-right text-[11px] leading-snug text-white/85 [overflow-wrap:anywhere] sm:text-xs"
         >
-          {credit.sourceUrl ? (
-            <a
-              href={credit.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline-offset-2 hover:underline"
-            >
-              {creditText(credit)}
-            </a>
-          ) : (
-            creditText(credit)
-          )}
+          <Linked href={credit.licenseUrl}>{LICENSES[credit.license] ?? credit.license}</Linked>
+          {' · '}
+          <Linked href={credit.sourceUrl}>{credit.credit}</Linked>
+          {fromCommons(credit) && ' · чрез Wikimedia Commons'}
         </m.figcaption>
       )}
     </figure>
+  );
+}
+
+function Linked({ href, children }: { href?: string | null; children: string }) {
+  if (!href) return children;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">
+      {children}
+    </a>
   );
 }
 

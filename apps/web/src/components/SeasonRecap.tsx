@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from 'react';
 import { sfx } from '../lib/sound';
 import { Emoji } from './Emoji';
 import { accentText } from './game/answers';
+import { UnlockIcon } from './UnlockIcon';
 import { Button, Modal } from './ui';
 
 /** Shown once after a season ends: the best rank reached, its XP and the cosmetics it unlocked. */
@@ -67,13 +68,13 @@ export function SeasonRecap() {
           {reward.unlocks.length > 0 && (
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {reward.unlocks.map((u) => {
-                const { icon, name } = unlockPreview(u);
+                const { name } = unlockPreview(u);
                 return (
                   <span
                     key={`${u.kind}:${u.id}`}
                     className="inline-flex items-center gap-2 rounded-xl border border-line bg-tint/5 px-3 py-2 text-sm"
                   >
-                    <span className="text-lg leading-none">{icon}</span>
+                    <UnlockIcon unlock={u} size={20} />
                     {name}
                   </span>
                 );

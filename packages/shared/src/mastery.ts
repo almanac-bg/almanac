@@ -22,6 +22,12 @@ export const MASTERY = {
    * fixed skill (`fixed`) decides, since a share of a handful of players means little.
    */
   population: 50,
+  /**
+   * A tier needs the steady skill (the server's average over the last answers) this far past its cut-off. It's kept
+   * for good once reached, and a number checked after every match touches its own high points: without the margin,
+   * most players 50 short of Майстор would get there within a few hundred answers.
+   */
+  margin: 30,
 } as const;
 
 /** A player's tier in one category, as the profile and the match intro show it. */

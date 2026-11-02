@@ -114,10 +114,10 @@ function Picked({ item, className }: { item: UnlockRef; className?: string }) {
       </p>
       {slot &&
         (worn ? (
-          <p className="mt-2 text-sm text-fg-2">Носиш го.</p>
+          <p className="mt-2 text-sm text-fg-2">Носиш {slot === 'avatar' ? 'го' : 'я'}.</p>
         ) : (
           <Button className="mt-3" onClick={() => void wear()} loading={saving}>
-            Сложи го
+            Сложи {slot === 'avatar' ? 'го' : 'я'}
           </Button>
         ))}
     </div>

@@ -30,7 +30,7 @@ import {
 import clsx from 'clsx';
 import { ArrowUp, Check, Share2 } from 'lucide-react';
 import { animate, m } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { dailyLinkUrl, offBoardWhy, placeShown } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
@@ -39,6 +39,7 @@ import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { PlayerName } from '../FitName';
 import { accentText } from '../game/answers';
+import { UnlockIcon } from '../UnlockIcon';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 import { DayField } from './DayField';
@@ -97,8 +98,8 @@ export function DailyCard({
         <>
           <h2 className="relative t-card">Днешното класиране</h2>
           <p className="relative mt-2 text-fg-2 text-pretty">
-            Засега са го изиграли {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом станат поне{' '}
-            {DAILY_FIELD.placeFrom}.
+            Засега го {runs === 1 ? 'изигра' : 'изиграха'} {plural(runs, 'човек', 'души')}: мястото ти се вижда, щом
+            станат поне {DAILY_FIELD.placeFrom}.
           </p>
         </>
       )}
@@ -315,11 +316,23 @@ export function RatingChip({ rating }: { rating: { before: number; after: number
   );
 }
 
-export function AchievementsCard({ ids }: { ids: string[] }) {
+/**
+ * `held`: the reward dialog is open over the page — its sound waits until the dialog is gone (it played on top of the
+ * dialog's own, behind it, before: the review's VD-6).
+ */
+export function AchievementsCard({ ids, held = false }: { ids: string[]; held?: boolean }) {
+  const played = useRef(false);
+  const shownAt = useRef(Date.now());
   useEffect(() => {
-    const t = setTimeout(sfx.achievement, 1200);
+    if (held || played.current) return;
+    // After the page's own sting (1.2 s in), or a moment after the dialog closes.
+    const wait = Math.max(600, 1200 - (Date.now() - shownAt.current));
+    const t = setTimeout(() => {
+      played.current = true;
+      sfx.achievement();
+    }, wait);
     return () => clearTimeout(t);
-  }, []);
+  }, [held]);
   return (
     <Card className="p-6">
       <h2 className="t-card">Нови постижения</h2>
@@ -415,6 +428,7 @@ export function UnlockReveal({ rewards, celebrated = false }: { rewards: MatchRe
   const avatar = unlock.kind === 'avatar' ? unlock.id : me.avatar;
   const frame = unlock.kind === 'frame' ? unlock.id : me.frame;
   const worn = state === 'worn' || (unlock.kind === 'avatar' ? me.avatar === unlock.id : me.frame === unlock.id);
+  const it = unlock.kind === 'avatar' ? 'го' : 'я';
 
   async function wear() {
     setState('saving');
@@ -442,11 +456,11 @@ export function UnlockReveal({ rewards, celebrated = false }: { rewards: MatchRe
         <p className="mt-1 text-lg font-extrabold">{name}</p>
         {worn ? (
           <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
-            <Check aria-hidden className="size-4" /> Носиш го
+            <Check aria-hidden className="size-4" /> Носиш {it}
           </p>
         ) : (
           <Button size="sm" className="mt-3" onClick={() => void wear()} loading={state === 'saving'}>
-            Сложи го
+            Сложи {it}
           </Button>
         )}
       </div>
@@ -468,7 +482,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {rewards.unlocks.map((u, i) => {
-          const { icon, name } = unlockPreview(u);
+          const { name } = unlockPreview(u);
           return (
             <m.span
               key={`${u.kind}:${u.id}`}
@@ -477,7 +491,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
               transition={{ delay: 1.2 + i * 0.06 }}
               className="inline-flex items-center gap-2 rounded-xl border border-line bg-tint/5 px-3 py-2 text-sm"
             >
-              <Emoji e={icon} size="1.25rem" />
+              <UnlockIcon unlock={u} size={20} />
               {name}
             </m.span>
           );

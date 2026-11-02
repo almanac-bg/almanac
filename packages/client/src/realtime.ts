@@ -6,6 +6,7 @@ import {
   type CategoryId,
   type ClientToServerEvents,
   type GameStartPayload,
+  HOLD,
   type Invite,
   type PowerupId,
   powerupById,
@@ -251,6 +252,7 @@ function bind(s: GameSocket) {
         countdownEndsAt: now + start.startsInMs,
         question: null,
         deadline: now,
+        closesAt: null,
         answered: [],
         myChoice: null,
         myGuess: null,
@@ -307,6 +309,7 @@ function bind(s: GameSocket) {
         phase: 'question',
         question,
         deadline: now + question.remainingMs,
+        closesAt: null,
         answered: question.answered,
         myChoice: mine.guess !== null || mine.order ? -1 : mine.choice,
         myGuess: mine.guess,
@@ -330,6 +333,7 @@ function bind(s: GameSocket) {
       phase: 'question',
       question,
       deadline: Date.now() + question.remainingMs,
+      closesAt: null,
       answered: question.answered,
       myChoice: lockedIn ? (same?.myChoice ?? -1) : null,
       myGuess: lockedIn ? (same?.myGuess ?? null) : null,
@@ -361,6 +365,14 @@ function bind(s: GameSocket) {
   });
 
   s.on('game:paused', ({ index, paused }) => patchGame(() => ({ paused: paused ? index : null })));
+
+  s.on('game:closing', ({ index, remainingMs }) =>
+    patchGame((g) =>
+      g.phase === 'question' && g.question?.index === index
+        ? { closesAt: Math.min(g.deadline, Date.now() + remainingMs) }
+        : {},
+    ),
+  );
 
   s.on('game:reveal', (reveal) => {
     const before = getState().game;
@@ -747,12 +759,28 @@ export const actions = {
    * Resolves to whether the server took it (it may have moved on already).
    */
   holdOnFact: async (index: number) => (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok,
+  /** „Без часовник“: keep the open question open HOLD.untimedMs more (its last seconds offer it). */
+  moreTime: async (index: number) => {
+    const ok = (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok;
+    if (ok)
+      patchGame((g) =>
+        g.phase === 'question' && g.question?.index === index ? { deadline: Date.now() + HOLD.untimedMs } : {},
+      );
+    return ok;
+  },
   resumeAfterFact: () => getSocket().emit('game:resume'),
   /** The big screen's host sets a class's pace on a reveal: hold the next question, or bring it on now. */
   steer: async (index: number, action: 'pause' | 'next') =>
     (await ask(() => withTimeout().emitWithAck('game:steer', { index, action }))).ok,
   /** Emotes are for the moment: one that can't go out now is dropped. */
   react: (emote: string) => void sendMove('game:react', emote),
+  /**
+   * Knocked out with only bots left: the result now, not the rest of the questions („Към резултата“). Like a leave, it
+   * may queue: landing after a reconnect it still means the same.
+   */
+  finishOn: () => {
+    getSocket().emit('game:finish');
+  },
   /** Unlike a move, a leave made offline should still land after the reconnect, so this one may queue. */
   leaveGame: () => {
     leftGameId = getState().game?.start.gameId ?? null;

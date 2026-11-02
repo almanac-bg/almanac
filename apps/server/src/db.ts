@@ -982,6 +982,18 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     END;
     `,
   },
+  // v41, mastery from a steady skill (skill.ts, mastery.ts; the 31 October review, GAMEPLAY-7): each skill keeps the
+  // average of its estimate over about the last SKILL.steady answers, so a tier, kept for good, isn't won on a lucky
+  // peak of a noisy number. It starts at the skill as it is; a row older code adds has none (NULL: the skill stands for
+  // it until the next answer). The index of those ranked follows (older code still finds them, without it).
+  {
+    compatible: `
+    ALTER TABLE player_skill ADD COLUMN steady REAL;
+    UPDATE player_skill SET steady = rating;
+    DROP INDEX player_skill_ranked;
+    CREATE INDEX player_skill_ranked ON player_skill(category, COALESCE(steady, rating)) WHERE answers >= 60;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

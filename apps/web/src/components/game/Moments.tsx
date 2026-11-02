@@ -116,42 +116,75 @@ export function EliminationBanner({ game }: { game: LiveGame }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {shown.map((id) => {
-            const p = game.players[id];
-            const me = id === game.start.youId;
-            return (
-              <m.div
-                key={id}
-                initial={{ scale: 1.6, opacity: 0, rotate: -6 }}
-                animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 16 }}
-                className="flex flex-col items-center text-center"
-              >
-                <Avatar avatar={p.avatar} frame={p.frame} size={110} dim />
-                {/* On a plate of its own: over the answers, bare text ran into them. */}
-                <div className="mx-4 mt-4 rounded-3xl border border-rose-400/40 bg-ink-2/95 px-6 py-4 shadow-2xl">
-                  <p className="text-4xl font-black text-rose-300">{me ? 'Отпадна!' : `${p.name} отпада!`}</p>
-                  <p className="mt-1 text-fg-2">Най-нисък резултат след въпрос {(game.question?.index ?? 0) + 1}</p>
-                </div>
-                {me && alive > 0 && (
-                  // Within the screen on a phone (it can take two lines there).
-                  <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">
-                    {othersStillIn(game) === 0 ? (
-                      'Останаха само ботове — финалът им се решава веднага.'
-                    ) : (
-                      <>
-                        {`${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели`}{' '}
-                        <Emoji e="👀" />
-                      </>
-                    )}
-                  </p>
-                )}
-              </m.div>
-            );
-          })}
+          <KnockoutPlate game={game} ids={shown} alive={alive} />
         </m.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/** How many of the others a cut shows by face: the rest are counted („и още 9“). */
+const FACES = 8;
+
+/**
+ * One plate for a cut, however many it takes (the evening Роял cuts a dozen at once, and a plate each stacked up the
+ * screen: the review's UX-7): yours big, with the others as a line of small faces; or theirs, the one by name, more as
+ * „Отпаднаха 12“. It says once what comes next: the bar along the bottom waits until the plate has gone (GamePage).
+ */
+function KnockoutPlate({ game, ids, alive }: { game: LiveGame; ids: string[]; alive: number }) {
+  const me = ids.includes(game.start.youId);
+  const others = ids.filter((id) => id !== game.start.youId).map((id) => game.players[id]);
+  const after = `Най-нисък резултат след въпрос ${(game.question?.index ?? 0) + 1}`;
+  const faces = (list: typeof others) => (
+    <span className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+      {list.slice(0, FACES).map((p) => (
+        <Avatar key={p.id} avatar={p.avatar} frame={p.frame} size={32} dim />
+      ))}
+      {list.length > FACES && <span className="text-sm font-semibold text-fg-2">и още {list.length - FACES}</span>}
+    </span>
+  );
+  const head = me ? 'Отпадна!' : others.length === 1 ? `${others[0].name} отпада!` : `Отпаднаха ${others.length}`;
+  return (
+    <m.div
+      initial={{ scale: 1.6, opacity: 0, rotate: -6 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+      className="flex flex-col items-center text-center"
+    >
+      {(me || others.length === 1) && (
+        <Avatar
+          avatar={(me ? game.players[game.start.youId] : others[0]).avatar}
+          frame={(me ? game.players[game.start.youId] : others[0]).frame}
+          size={110}
+          dim
+        />
+      )}
+      {/* On a plate of its own: over the answers, bare text ran into them. */}
+      <div className="mx-4 mt-4 max-w-md rounded-3xl border border-rose-400/40 bg-ink-2/95 px-6 py-4 shadow-2xl">
+        <p className="text-4xl font-black text-rose-300">{head}</p>
+        <p className="mt-1 text-fg-2">{after}</p>
+        {!me && others.length > 1 && faces(others)}
+        {me && others.length > 0 && (
+          <p className="mt-3 text-sm text-fg-2">
+            С теб {others.length === 1 ? `отпада и ${others[0].name}` : `отпадат още ${others.length}`}
+            {others.length > 1 && faces(others)}
+          </p>
+        )}
+      </div>
+      {me && alive > 0 && (
+        // Within the screen on a phone (it can take two lines there).
+        <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">
+          {othersStillIn(game) === 0 ? (
+            'Останаха само ботове — довърши въпросите за XP или виж резултата.'
+          ) : (
+            <>
+              {`${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели`}{' '}
+              <Emoji e="👀" />
+            </>
+          )}
+        </p>
+      )}
+    </m.div>
   );
 }

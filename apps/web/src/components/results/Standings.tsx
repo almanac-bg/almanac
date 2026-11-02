@@ -166,6 +166,20 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
           );
         })}
       </ol>
+      {/* Equal points on the podium: how the places were decided, rather than leave it a mystery (the review's UX-9). */}
+      {/* Only for a tie the points can't explain: someone who stayed longer in a Роял, or didn't leave, is ahead anyway. */}
+      {top.some(
+        (s, i) =>
+          i > 0 &&
+          s.score === top[i - 1].score &&
+          s.eliminatedAt === top[i - 1].eliminatedAt &&
+          !s.left &&
+          !top[i - 1].left,
+      ) && (
+        <p className="mx-auto mt-3 max-w-xl text-center text-sm text-fg-3">
+          При равни точки по-напред е който има повече верни отговори, после — по-бързият.
+        </p>
+      )}
       {rest.length > 0 && (
         <Card className="mx-auto mt-0 max-w-xl rounded-t-none p-2">
           {rest.map((s, i) => {

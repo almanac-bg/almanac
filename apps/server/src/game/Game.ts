@@ -30,6 +30,7 @@ import {
   type PowerupId,
   placedRight,
   type QuestionPayload,
+  type RevealPayload,
   ROUNDS,
   type RoundInfo,
   readingMs,
@@ -66,6 +67,8 @@ const COUNTDOWN_MS = 3_500;
 const GRACE_MS = 400;
 /** Pause between the last answer arriving and the reveal. */
 const EARLY_REVEAL_MS = 600;
+/** Less clock than this left when the race's reveal comes: not worth holding the question for the knocked-out. */
+const MIN_HOLD_MS = 1_000;
 const REVEAL_MS = 4_000;
 /** The longest a room host's „Пауза“ holds the next question: a big screen left paused doesn't keep the room forever. */
 const HOST_PAUSE_MS = 10 * 60_000;
@@ -111,7 +114,8 @@ type Args<E extends keyof Events> = Parameters<Events[E]>;
 export interface GameEmitter {
   toGame<E extends keyof Events>(event: E, ...args: Args<E>): void;
   toUser<E extends keyof Events>(userId: number, event: E, ...args: Args<E>): void;
-  toGameExcept<E extends keyof Events>(userId: number, event: E, ...args: Args<E>): void;
+  /** To everyone in the match but these people. */
+  toGameExcept<E extends keyof Events>(userIds: number[], event: E, ...args: Args<E>): void;
 }
 
 export interface GameHooks {
@@ -228,6 +232,10 @@ export interface Participant {
   /** Was strictly last at the halfway point (for the comeback achievement). */
   lastAtHalfway: boolean;
   lastReactionAt: number;
+  /** The last question this person gave an answer to (−1: none yet). Someone knocked out who still answers is waited for. */
+  lastAnswered: number;
+  /** Knocked out with only bots left, they asked for the result („Към резултата“): no longer waited for. */
+  doneOn: boolean;
   // Per-question state, reset by nextQuestion():
   /**
    * `value`: the number given on a number question; `order`: the order given on an order question (the shown items'
@@ -351,6 +359,15 @@ export class Game {
   private waitingForReader = false;
   /** The reveal's own wait for the next question, which the host's „Следващ“ cuts short. */
   private revealTimer: NodeJS.Timeout | null = null;
+  /**
+   * „Играй до края“ with people still in the race: the knocked-out still answering the question the race has already
+   * closed. Their reveal (`heldReveal`, the race's) waits until they answer or their clock ends (REVEAL_MS at most), and
+   * the next question waits until they've had it on screen as long as the others (`releasedAt`, game clock).
+   */
+  private holding = new Set<string>();
+  private heldReveal: RevealPayload | null = null;
+  private holdUntil = 0;
+  private releasedAt = 0;
 
   private questionStartedAt = 0;
   /** The open question's clock: the match's, or a number's (longer: it's typed in). */
@@ -429,7 +446,7 @@ export class Game {
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
-      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      if (!this.open(p, index)) return reject('late');
       const q = this.questions[this.index];
       if (!isChoice(q) || !Number.isInteger(choice) || choice < 0 || choice >= q.options.length) return;
       if (p.removed.includes(choice)) return reject('removed');
@@ -445,8 +462,7 @@ export class Game {
         return;
       }
       p.answer = { choice, timeMs: Math.min(elapsed, limit), retried: p.firstWrong !== null };
-      this.answered(p);
-      this.maybeRevealEarly();
+      this.taken(p);
     });
   }
 
@@ -458,7 +474,7 @@ export class Game {
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
-      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      if (!this.open(p, index)) return reject('late');
       const q = this.questions[this.index];
       if (q.kind !== 'number' || typeof value !== 'number' || !Number.isFinite(value)) return;
       const elapsed = this.elapsed();
@@ -469,8 +485,7 @@ export class Game {
         timeMs: Math.min(elapsed, this.limitMs),
         retried: false,
       };
-      this.answered(p);
-      this.maybeRevealEarly();
+      this.taken(p);
     });
   }
 
@@ -482,14 +497,13 @@ export class Game {
       const reject = (reason: AnswerRejection) => {
         if (p.player.userId !== null) this.emit.toUser(p.player.userId, 'game:rejected', { index, reason });
       };
-      if (this.phase !== 'question' || index !== this.index) return reject('late');
+      if (!this.open(p, index)) return reject('late');
       const q = this.questions[this.index];
       if (q.kind !== 'order' || !isOrder(order, q.items.length)) return;
       const elapsed = this.elapsed();
       if (elapsed > this.limitMs + GRACE_MS) return reject('late');
       p.answer = { choice: -1, order: [...order], timeMs: Math.min(elapsed, this.limitMs), retried: false };
-      this.answered(p);
-      this.maybeRevealEarly();
+      this.taken(p);
     });
   }
 
@@ -528,7 +542,7 @@ export class Game {
           if (p.player.userId === null) this.toGame('game:powerup', { playerId, powerup });
           else {
             this.emit.toUser(userId, 'game:powerup', { playerId, powerup, removed: p.removed });
-            this.emit.toGameExcept(userId, 'game:powerup', { playerId, powerup });
+            this.emit.toGameExcept([userId], 'game:powerup', { playerId, powerup });
           }
           break;
         }
@@ -552,8 +566,17 @@ export class Game {
   hold(playerId: string, index: number): boolean {
     // Not while the server drains: stopping on fact after fact would keep the run going until it's cut short.
     if (this.hooks.draining()) return false;
-    if (!this.alone || this.phase !== 'reveal' || index !== this.index || this.reading) return false;
-    if (!this.participants.has(playerId)) return false;
+    if (!this.alone || index !== this.index || this.reading || !this.participants.has(playerId)) return false;
+    // „Без часовник“ still closes a question walked away from (UNTIMED_MS); its last seconds offer „Още време“, which
+    // starts that wait again (the review's A11Y-10, WCAG 2.2.1).
+    if (this.phase === 'question') {
+      if (this.pace !== 'untimed') return false;
+      this.limitMs = this.elapsed() + UNTIMED_MS;
+      if (this.questionTimer) clearTimeout(this.questionTimer);
+      this.questionTimer = this.later(UNTIMED_MS + GRACE_MS, () => this.reveal());
+      return true;
+    }
+    if (this.phase !== 'reveal') return false;
     if (this.setup.mode !== 'solo' && !this.questions[this.index]?.fact) return false;
     const seq = ++this.readingSeq;
     this.reading = seq;
@@ -623,11 +646,28 @@ export class Game {
       p.left = true;
       p.leftOrder = ++this.leaves;
       p.connected = false;
+      // Gone while held past the race's reveal: nobody to show it to, and nothing to wait for.
+      this.holding.delete(playerId);
       this.toGame('game:presence', { playerId, connected: false, left: true });
       if (this.decided()) this.endedByWalkout = true;
       if (this.humans.every((h) => h.left) || this.decided()) return this.end();
       this.maybeRevealEarly();
       this.checkAbandoned();
+    });
+  }
+
+  /**
+   * „Към резултата“: knocked out with only bots left in the race, this player stops answering on. Once nobody does, the
+   * rest plays out at once and the result comes. With people still in, the match goes on as it would.
+   */
+  finishOn(playerId: string) {
+    this.guard(() => {
+      const p = this.participants.get(playerId);
+      if (!p || !this.playsOn(p) || p.doneOn || this.phase === 'ended') return;
+      p.doneOn = true;
+      if (this.racing) return;
+      if (![...this.participants.values()].some((h) => this.answersOn(h) && h.connected)) this.finishUnattended(true);
+      else this.maybeRevealEarly();
     });
   }
 
@@ -670,9 +710,11 @@ export class Game {
     return {
       start: this.startPayload(playerId, 0),
       question:
-        this.phase === 'question'
+        this.phase === 'question' || this.holding.has(playerId)
           ? {
               ...this.questionPayload(),
+              // Held past the race's reveal: their clock is the hold's.
+              ...(this.holding.has(playerId) && { remainingMs: this.heldRemainingMs() }),
               mine: {
                 choice: p.answer && p.answer.choice >= 0 ? p.answer.choice : null,
                 guess: p.answer?.value ?? null,
@@ -752,8 +794,10 @@ export class Game {
 
   /**
    * On to the next question, unless nobody is left to play it. A run played alone waits for its player (a locked phone
-   * or a tunnel shouldn't cost the day's one attempt); and once every person in a match is knocked out, the bots' final
-   * is decided at once rather than keeping the knocked-out waiting minutes for their result.
+   * or a tunnel shouldn't cost the day's one attempt). Once every person in a match is knocked out, whoever is still
+   * answering finishes at their own pace (the bots answer as soon as they have: „Довърши за XP“); with nobody answering
+   * the last question, or once they ask for the result, the bots' final is decided at once rather than keeping the
+   * knocked-out waiting minutes for it.
    */
   private advance() {
     if (this.reading || this.paused) {
@@ -765,13 +809,17 @@ export class Game {
       this.held = true;
       return;
     }
-    if (this.participants.size > 1 && !this.humans.some((h) => this.isActive(h))) return this.finishUnattended(true);
+    if (this.participants.size > 1 && !this.racing && !this.humans.some((h) => this.finishesOn(h)))
+      return this.finishUnattended(true);
     const round = this.roundDue();
     if (round !== null) return this.startPick(round);
     this.nextQuestion();
   }
 
   private nextQuestion() {
+    // A host's „Следващ“ can come while someone knocked out is still held: their reveal goes out first.
+    for (const id of [...this.holding]) this.release(id);
+    this.heldReveal = null;
     this.index++;
     if (this.index >= this.questions.length) return this.end();
     this.phase = 'question';
@@ -897,9 +945,14 @@ export class Game {
     const now = gameClock.now();
     const reconnecting = (p: Participant) =>
       p.disconnectedAt !== null && now - p.disconnectedAt < DISCONNECT_GRACE_MS * config.gameTimeScale;
-    // Alone, the clock is the only limit: nobody else is waiting for the question to close.
+    // Alone, the clock is the only limit: nobody else is waiting for the question to close. With only bots left in the
+    // race, it's the knocked-out still answering on who set the pace.
+    const racing = this.racing;
     const undecided = [...this.participants.values()].filter(
-      (p) => this.isActive(p) && !p.answer && (this.alone || p.connected || machine(p) || reconnecting(p)),
+      (p) =>
+        (this.isActive(p) || (!racing && this.answersOn(p))) &&
+        !p.answer &&
+        (this.alone || p.connected || machine(p) || reconnecting(p)),
     );
     if (undecided.some((p) => !machine(p))) return;
     // Only bots left: they made up their minds when the question opened, so they answer now, with the time they took,
@@ -939,7 +992,9 @@ export class Game {
       p.answerMs += Math.min(p.answer?.timeMs ?? this.scoreLimitMs, this.scoreLimitMs);
       if (correct && p.answer) {
         const timeMs = Math.min(p.answer.timeMs, this.scoreLimitMs);
-        p.streak++;
+        // In the 30-second pace a right answer past the usual clock still counts, but it breaks the streak, as the rules
+        // say: a look-up mustn't build a streak's bonus (the review's GAMEPLAY-5).
+        p.streak = this.pace === 'relaxed' && p.answer.timeMs > this.scoreLimitMs ? 0 : p.streak + 1;
         p.correct++;
         p.correctByDifficulty[q.difficulty]++;
         cat.correct++;
@@ -1017,6 +1072,18 @@ export class Game {
       };
     }
 
+    // „Играй до края“ with people still in: whoever is knocked out but still answering keeps this question until they
+    // answer or their clock ends, rather than seeing it vanish once the race is done with it — REVEAL_MS at most, so
+    // the others never wait long. Taken before this question's own knockouts (those were in the race).
+    const holdMs = Math.min(REVEAL_MS, this.limitMs + GRACE_MS - this.elapsed());
+    const held =
+      this.quiet || holdMs < MIN_HOLD_MS
+        ? []
+        : [...this.participants.values()].filter(
+            (p) => this.answersOn(p) && p.connected && !p.answer && this.index - p.lastAnswered <= 2,
+          );
+    this.releasedAt = 0;
+
     const questionNo = this.index + 1;
     if (questionNo === Math.floor(this.questions.length / 2)) this.markHalfwayLast();
 
@@ -1039,7 +1106,7 @@ export class Game {
     }
 
     const nextInMs = REVEAL_MS + (eliminated.length ? ELIMINATION_EXTRA_MS : 0);
-    this.toGame('game:reveal', {
+    const payload: RevealPayload = {
       index: this.index,
       correct: isChoice(q) ? q.answer : -1,
       ...(number && { answerNumber: number.answer }),
@@ -1055,7 +1122,24 @@ export class Game {
       nextInMs,
       fact: q.fact ?? null,
       crowd: this.crowdOf(q),
-    });
+    };
+    if (held.length) {
+      this.holding = new Set(held.map((p) => p.player.id));
+      this.heldReveal = payload;
+      this.holdUntil = gameClock.now() + holdMs * config.gameTimeScale;
+      this.emit.toGameExcept(
+        held.map((p) => p.player.userId!),
+        'game:reveal',
+        payload,
+      );
+      for (const p of held)
+        this.emit.toUser(p.player.userId!, 'game:closing', { index: this.index, remainingMs: holdMs });
+      this.later(holdMs, () => {
+        for (const id of [...this.holding]) this.release(id);
+      });
+    } else {
+      this.toGame('game:reveal', payload);
+    }
     this.botReactions(results);
     // Соло without a clock has no clock on its answers either: each one waits for „Продължи“ (a hold the player ends),
     // up to the untimed question's own limit, rather than moving on after a few seconds.
@@ -1065,7 +1149,44 @@ export class Game {
       this.reading = seq;
       if (player) this.later(UNTIMED_MS, () => this.resume(player.player.id, seq));
     }
-    this.revealTimer = this.later(nextInMs, () => this.advance());
+    this.revealTimer = this.later(nextInMs, () => this.afterReveal());
+  }
+
+  /** The reveal's time is up: on, once whoever was held has had theirs on screen as long (it can't be more than REVEAL_MS). */
+  private afterReveal() {
+    for (const id of [...this.holding]) this.release(id);
+    const seen = this.releasedAt ? (gameClock.now() - this.releasedAt) / config.gameTimeScale : REVEAL_MS;
+    if (seen >= REVEAL_MS) return this.advance();
+    this.revealTimer = this.later(REVEAL_MS - seen, () => this.advance());
+  }
+
+  /** A held player's reveal goes out: the race's, with their own answer judged if they gave one in time. */
+  private release(id: string) {
+    if (!this.holding.delete(id) || !this.heldReveal) return;
+    const p = this.participants.get(id);
+    if (!p || p.player.userId === null) return;
+    const q = this.questions[this.index];
+    const results = p.answer ? { ...this.heldReveal.results, [id]: this.answeredOn(p, q) } : this.heldReveal.results;
+    this.emit.toUser(p.player.userId, 'game:reveal', { ...this.heldReveal, results });
+    this.releasedAt = gameClock.now();
+  }
+
+  /** What's left of the hold, in game time. */
+  private heldRemainingMs() {
+    return Math.max(0, (this.holdUntil - gameClock.now()) / config.gameTimeScale);
+  }
+
+  /** The question `index` still takes this player's answer: it's open, or the race's reveal is holding it for them. */
+  private open(p: Participant, index: number) {
+    if (index !== this.index) return false;
+    return this.phase === 'question' || (this.phase === 'reveal' && this.holding.has(p.player.id));
+  }
+
+  /** An answer is in: tell whoever should hear it, then close the question if that was the last one awaited. */
+  private taken(p: Participant) {
+    this.answered(p);
+    if (this.holding.has(p.player.id)) this.release(p.player.id);
+    else this.maybeRevealEarly();
   }
 
   /** How a player's answer to the open question came out: the number or order given, how close, and whether it's right. */
@@ -1464,8 +1585,27 @@ export class Game {
     return this.isActive(p) || this.playsOn(p);
   }
 
+  /** A person is still in the race (else only bots, or recordings, are). */
+  private get racing() {
+    return this.humans.some((h) => this.isActive(h));
+  }
+
+  /** Knocked out, still answering on, and hasn't asked for the result. */
+  private answersOn(p: Participant) {
+    return this.playsOn(p) && !p.doneOn;
+  }
+
+  /**
+   * With only bots left in the race, the match goes on for this knocked-out person („Довърши за XP“): here, answering
+   * on, and they answered the question just played (one let go means they've stopped: the result comes at once).
+   */
+  private finishesOn(p: Participant) {
+    return this.answersOn(p) && p.connected && p.lastAnswered >= this.index;
+  }
+
   /** Who has answered: to everyone — or, from someone knocked out, to that player alone (no part of the race). */
   private answered(p: Participant) {
+    p.lastAnswered = this.index;
     if (this.isActive(p)) this.toGame('game:answered', { playerId: p.player.id });
     else this.emit.toUser(p.player.userId!, 'game:answered', { playerId: p.player.id });
   }
@@ -1697,6 +1837,8 @@ export class Game {
       disconnectedAt: null,
       lastAtHalfway: false,
       lastReactionAt: -Infinity,
+      lastAnswered: -1,
+      doneOn: false,
       answer: null,
       doubled: false,
       removed: [],

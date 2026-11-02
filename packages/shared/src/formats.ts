@@ -49,7 +49,10 @@ export interface QuestionImage {
 /** Whose a picture is and on what licence: shown with the answer (a painter's name would give a painting away). */
 export interface ImageCredit {
   credit: string;
+  /** „CC BY-SA 3.0“, „PD“. */
   license: string;
+  /** The licence's deed (CC 2.0–3.0 ask for its address with every copy); none for the public domain. */
+  licenseUrl?: string | null;
   sourceUrl: string | null;
 }
 

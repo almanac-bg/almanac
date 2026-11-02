@@ -311,7 +311,7 @@ export const SOLO_PACES = [
   {
     id: 'relaxed',
     label: '30 с',
-    hint: 'Двойно време. Бонусът за бързина и майсторството — както при 15 с: отговор след 15-ата секунда не се брои.',
+    hint: 'Двойно време. Отговор след 15-ата секунда е верен, но без бонус за бързина, без серия и без майсторство.',
   },
   {
     id: 'untimed',
@@ -556,6 +556,11 @@ export interface ServerToClientEvents {
   /** An answer you sent wasn't taken (the client showed it as locked in). */
   'game:rejected': (p: { index: number; reason: AnswerRejection }) => void;
   'game:reveal': (p: RevealPayload) => void;
+  /**
+   * Knocked out and still answering („Играй до края“): the race has its answer, and this question stays open for you
+   * `remainingMs` more (your reveal comes when you answer, or then).
+   */
+  'game:closing': (p: { index: number; remainingMs: number }) => void;
   /** A room's host paused the big screen on this reveal (the next question waits), or the pause ran out. */
   'game:paused': (p: { index: number; paused: boolean }) => void;
   /** A round's category is being picked (also re-sent to a client that reconnects meanwhile). */
@@ -636,7 +641,12 @@ export interface ClientToServerEvents {
   'game:powerup': (p: { index: number; powerup: PowerupId }) => void;
   'game:react': (emote: string) => void;
   'game:leave': () => void;
-  /** A run played alone: stop on this question's fact, to read it. The next question waits for game:resume. */
+  /** Knocked out with only bots left in the race („Към резултата“): stop answering on; the result comes at once. */
+  'game:finish': () => void;
+  /**
+   * A run played alone: stop on this question's fact, to read it (the next question waits for game:resume) — or, on an
+   * open question without a clock, keep it open HOLD.untimedMs more.
+   */
   'game:hold': (p: { index: number }, ack: Ack) => void;
   'game:resume': () => void;
   /** A room's host, on the big screen: hold the next question on this reveal, or bring it on now. */

@@ -281,10 +281,10 @@ export class GameRegistry {
     const emitter: GameEmitter = {
       toGame: (event, ...args) => this.io.to(room(game.id)).emit(event, ...args),
       toUser: (userId, event, ...args) => this.io.to(`user:${userId}`).emit(event, ...args),
-      toGameExcept: (userId, event, ...args) =>
+      toGameExcept: (userIds, event, ...args) =>
         this.io
           .to(room(game.id))
-          .except(`user:${userId}`)
+          .except(userIds.map((id) => `user:${id}`))
           .emit(event, ...args),
     };
     game = new Game(
@@ -309,7 +309,9 @@ export class GameRegistry {
         questionSet: opts.questionSet ?? null,
         eveningDay: opts.eveningDay ?? null,
         pace: opts.pace ?? 'normal',
-        finalTimes: opts.finalTimes ?? (finalSeen ? 1 : undefined),
+        // Once, not twice: a final someone in a big match saw lately, and an own set's last number question unless the
+        // room has its final on (a host's set ends where its author put the number, not on a final: GAMEPLAY-9).
+        finalTimes: opts.finalTimes ?? (finalSeen || (opts.questionSet && !final) ? 1 : undefined),
       },
       emitter,
       {

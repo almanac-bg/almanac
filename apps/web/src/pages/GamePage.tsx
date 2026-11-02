@@ -80,11 +80,34 @@ function Arena({ game }: { game: LiveGame }) {
   const offline = !useStore((s) => s.connected);
   const single = game.start.players.length === 1;
   const meEliminated = game.eliminated.includes(game.start.youId);
+  // Wider screens: the knocked-out notice floats above the emote bar, so a focused answer scrolled under it would be
+  // hidden (WCAG 2.4.11): the page keeps that much more room at the bottom while it shows.
+  // The bar comes once the knockout's plate has gone (Moments → EliminationBanner holds it 4.7 s): one message at a
+  // time, not the same news twice on screen (UX-7).
+  const [outNotice, setOutNotice] = useState(false);
+  useEffect(() => {
+    if (!meEliminated) return setOutNotice(false);
+    const later = setTimeout(() => setOutNotice(true), 4800);
+    return () => clearTimeout(later);
+  }, [meEliminated]);
+  useEffect(() => {
+    if (!meEliminated) return;
+    const html = document.documentElement;
+    html.style.setProperty('--knocked-out-room', '10rem');
+    return () => {
+      html.style.removeProperty('--knocked-out-room');
+    };
+  }, [meEliminated]);
   // In a private room leaving the match leaves the room too, so that's no place to suggest it.
   const freeToGo = meEliminated && !game.start.roomCode;
-  // Knocked out with only bots left: the server plays their final out at once, so the bar says the result is coming
-  // rather than inviting you to stay and watch.
+  // Knocked out with only bots left: the match goes on at your pace while you answer (the bots answer as soon as you
+  // have), and „Към резултата“ plays their final out at once.
   const watching = meEliminated && othersStillIn(game) > 0;
+  const [finishing, setFinishing] = useState(false);
+  const finish = () => {
+    setFinishing(true);
+    actions.finishOn();
+  };
   const leave = () => leaveMatchScreen(actions.leaveGame);
 
   // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
@@ -104,8 +127,6 @@ function Arena({ game }: { game: LiveGame }) {
           // Room under the answers for the emotes' button; a match alone has none, only the phone's own edge.
           single ? 'pb-[max(1.5rem,env(safe-area-inset-bottom))]' : 'pb-28',
           !single && 'lg:grid-cols-[minmax(0,1fr)_320px]',
-          // Room for the spectator bar under the last answer.
-          meEliminated && 'max-sm:pb-40',
         )}
       >
         <div className="relative min-w-0 max-sm:flex max-sm:flex-1 max-sm:flex-col">
@@ -141,23 +162,36 @@ function Arena({ game }: { game: LiveGame }) {
       <StreakBurst game={game} />
       <EliminationBanner game={game} />
       <MatchAnnouncer game={game} />
-      {meEliminated && game.phase !== 'countdown' && (
-        // Phones: at the bottom edge (the emotes are in the page there). Wider: above the emote bar. The button goes
-        // beside the first line and the second line runs under both, so a narrow phone loses as little of the screen.
+      {meEliminated && outNotice && game.phase !== 'countdown' && (
+        // Phones: in the page, under the match, so it never covers an answer (at 400% zoom it took half the screen over
+        // the focused one: the review's A11Y-4). Wider: above the emote bar, with the scroll padding grown to match
+        // (useEffect above). The button goes beside the first line and the second line runs under both.
         <div
           className={clsx(
-            'fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto grid w-fit max-w-[calc(100vw-1.5rem)] items-center gap-x-3 gap-y-0.5 rounded-2xl border border-rose-400/30 bg-ink-2/90 py-2 pl-4 text-sm backdrop-blur sm:bottom-20',
-            freeToGo && watching ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
+            'z-30 mx-auto mb-[max(0.75rem,env(safe-area-inset-bottom))] grid w-fit max-w-[calc(100vw-1.5rem)] items-center gap-x-3 gap-y-0.5 rounded-2xl border border-rose-400/30 bg-ink-2/90 py-2 pl-4 text-sm backdrop-blur sm:fixed sm:inset-x-0 sm:bottom-20 sm:mb-0',
+            (freeToGo && watching) || (!watching && !finishing) ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
           )}
         >
           {watching ? (
             <p className="text-balance text-rose-200">
               <Emoji e="💀" /> Отпадна — отговаряй до края: за XP и алманаха, извън класирането
             </p>
-          ) : (
-            <p className="text-balance text-rose-200">
-              <Emoji e="💀" /> Отпадна. Останаха само ботове — резултатът идва след миг.
+          ) : finishing ? (
+            <p className="text-balance text-rose-200" role="status">
+              <Emoji e="💀" /> Отпадна. Резултатът идва след миг…
             </p>
+          ) : (
+            <>
+              <p className="text-balance text-rose-200">
+                <Emoji e="💀" /> Отпадна. Останаха само ботове
+              </p>
+              <p className="col-span-2 text-xs text-fg-2">
+                Довърши въпросите в твоето темпо — за XP и алманаха — или виж резултата веднага.
+              </p>
+              <Button size="sm" variant="secondary" className="col-start-2 row-start-1" onClick={finish}>
+                Към резултата
+              </Button>
+            </>
           )}
           {freeToGo && watching && (
             <>

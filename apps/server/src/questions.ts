@@ -372,7 +372,16 @@ export function imageCredit(q: PreparedQuestion): ImageCredit | null {
   const image = 'image' in q ? q.image : undefined;
   if (!image || !('file' in image)) return null;
   const license = image.licenseVersion ? `${image.license} ${image.licenseVersion}` : image.license;
-  return { credit: image.credit, license, sourceUrl: image.sourceUrl };
+  return { credit: image.credit, license, licenseUrl: licenseDeed(image), sourceUrl: image.sourceUrl };
+}
+
+/** A Creative Commons licence's deed, in Bulgarian (CC falls back to English where it has none). */
+function licenseDeed(image: { license: string; licenseVersion?: string }): string | null {
+  const version = image.licenseVersion ?? '1.0';
+  if (image.license === 'CC0') return `https://creativecommons.org/publicdomain/zero/${version}/deed.bg`;
+  if (image.license === 'CC BY') return `https://creativecommons.org/licenses/by/${version}/deed.bg`;
+  if (image.license === 'CC BY-SA') return `https://creativecommons.org/licenses/by-sa/${version}/deed.bg`;
+  return null;
 }
 
 /**

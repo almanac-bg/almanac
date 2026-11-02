@@ -147,7 +147,7 @@ export function ProfilePage() {
             hint={o.questionsAnswered ? `${fmt(o.correctAnswers)} от ${fmt(o.questionsAnswered)} верни` : undefined}
           />
           <Stat
-            label="Най-дълга серия"
+            label="Най-много верни подред"
             value={
               <>
                 <Emoji e="🔥" /> {o.bestStreak}

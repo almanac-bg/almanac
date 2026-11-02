@@ -34,6 +34,7 @@ const { almanacCategory, almanacOverview, factCount, learn, noteMatch, reviewQue
 const { bestMastery, currentTier, forgetMasteryCutoffs, masteryCutoffs, settleMastery } = await import(
   '../src/mastery'
 );
+const { recordSkill } = await import('../src/skill');
 const groups = await import('../src/groups');
 const { recordDailyResult } = await import('../src/daily');
 const { champions, eveningWins, lastNight, recordEvening, retireChampionTitles } = await import('../src/evening');
@@ -305,8 +306,47 @@ test('category mastery: fixed skill while few are ranked, the top 50/20/5% after
   assert.equal(currentTier(player, 'history'), null);
   assert.deepEqual(settleMastery(player, ['history']), [], 'below the cut-off now, but Експерт stays earned');
   assert.equal(one<{ tier: number }>('SELECT tier FROM mastery WHERE user_id = ?', player)!.tier, 1);
-  skill(player, 1480);
+  // A tier needs the steady skill MASTERY.margin past its cut-off: touching it isn't enough.
+  skill(player, 1490);
+  assert.deepEqual(settleMastery(player, ['history']), [], 'Майстор needs 1500 here, not 1490');
+  skill(player, 1470 + MASTERY.margin);
   assert.deepEqual(settleMastery(player, ['history']), [{ category: 'history', tier: 2 }]);
+});
+
+test('mastery goes by the steady skill: a run of luck lifts the estimate, not the tier', () => {
+  forgetMasteryCutoffs();
+  const player = account();
+  run(
+    `INSERT INTO player_skill (user_id, category, rating, answers, steady) VALUES (?, 'geography', 1200, 300, 1200)`,
+    player,
+  );
+  // Twelve hard ones right in a row: the estimate climbs past Експерт (1250), the steady skill only a little.
+  const log = Array.from({ length: 12 }, (_, i) => ({
+    questionId: `steady-${i}`,
+    index: i,
+    category: 'geography' as const,
+    difficulty: 'hard' as const,
+    choice: 0,
+    guess: null,
+    closeness: null,
+    arranged: null,
+    placed: null,
+    correct: true,
+    timeMs: 3_000,
+    points: 1_000,
+    powerup: null,
+    retried: false,
+    slow: false,
+    out: false,
+  }));
+  recordSkill(player, log);
+  const { rating, steady } = one<{ rating: number; steady: number }>(
+    "SELECT rating, steady FROM player_skill WHERE user_id = ? AND category = 'geography'",
+    player,
+  )!;
+  assert.ok(rating - MASTERY.margin >= 1250, `the estimate is at ${Math.round(rating)}`);
+  assert.ok(steady < 1250 - MASTERY.margin && steady > 1200, `the steady skill is at ${Math.round(steady)}`);
+  assert.equal(currentTier(player, 'geography'), 0, 'Познавач, not Експерт');
 });
 
 test('groups: an invite link, at most 200 in one and 5 per player; the owner hands over on leaving', () => {

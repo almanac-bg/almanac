@@ -1,7 +1,7 @@
 import { actions, getState, type LiveGame, useNow, useStore } from '@quiz/client';
 import { type GamePlayer, isQueueMode } from '@quiz/shared';
 import clsx from 'clsx';
-import { Check, Swords } from 'lucide-react';
+import { Check, RotateCcw, Swords } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
@@ -24,6 +24,11 @@ export interface Rematch {
   opponents: GamePlayer[];
   /** Of them, who already asked. */
   ready: Set<string>;
+  /**
+   * Whose side the others were on: `with` you (a team match with only your teammates left — one more match together,
+   * not a rematch against them), `mixed` (teammates and opponents), or `against` you.
+   */
+  sides: 'with' | 'mixed' | 'against';
   /** Local time the offer runs out. */
   until: number;
   /** You asked, or someone asked you: worth saying so when it falls through. */
@@ -49,6 +54,9 @@ export function useRematch(game: LiveGame): Rematch | null {
     return stayed.filter((p): p is GamePlayer => !!p && p.id !== youId && !p.isBot && p.userId !== null);
   }, [end, game.players, youId]);
   const eligible = opponents.length > 0;
+  const yourTeam = game.players[youId]?.team ?? null;
+  const teammates = yourTeam === null ? 0 : opponents.filter((p) => p.team === yourTeam).length;
+  const sides = teammates === 0 ? 'against' : teammates === opponents.length ? 'with' : 'mixed';
 
   const offer = useStore((s) => (s.rematch?.gameId === gameId ? s.rematch : null));
   const [until] = useState(() => {
@@ -100,6 +108,7 @@ export function useRematch(game: LiveGame): Rematch | null {
     status,
     opponents,
     ready,
+    sides,
     until,
     involved: asked || seen,
     request: () => {
@@ -131,16 +140,24 @@ export function RematchStrip({ rematch: r, bar, className }: { rematch: Rematch;
   const pending = r.opponents.filter((p) => !r.ready.has(p.id));
   const invited = r.status === 'invited';
 
+  // Teammates aren't opponents: with them it's one more match side by side.
+  const sameSide = r.sides === 'with';
   const title =
     r.status === 'over'
-      ? 'Реваншът няма да се състои.'
+      ? sameSide
+        ? 'Още един мач няма да има.'
+        : 'Реваншът няма да се състои.'
       : r.status === 'waiting'
         ? `Чакаме ${names(pending)}…`
         : invited
-          ? `${names(readyPlayers)} ${readyPlayers.length === 1 ? 'иска' : 'искат'} реванш!`
-          : r.opponents.length === 1
-            ? `Реванш срещу ${r.opponents[0].name}?`
-            : 'Реванш със същите съперници?';
+          ? `${names(readyPlayers)} ${readyPlayers.length === 1 ? 'иска' : 'искат'} ${sameSide ? 'още един мач' : 'реванш'}!`
+          : sameSide
+            ? 'Още един мач заедно?'
+            : r.sides === 'mixed'
+              ? 'Реванш със същите играчи?'
+              : r.opponents.length === 1
+                ? `Реванш срещу ${r.opponents[0].name}?`
+                : 'Реванш със същите съперници?';
   const detail =
     r.status === 'waiting'
       ? 'Мачът започва, щом всички поискат'
@@ -195,7 +212,8 @@ export function RematchStrip({ rematch: r, bar, className }: { rematch: Rematch;
         <Spinner className="mr-2 size-4 shrink-0 text-fg-3" />
       ) : r.status !== 'over' ? (
         <Button size="sm" variant={invited ? 'gold' : 'secondary'} onClick={r.request} className="shrink-0">
-          <Swords className="size-4" /> {invited ? 'Приеми' : 'Реванш'}
+          {sameSide ? <RotateCcw className="size-4" /> : <Swords className="size-4" />}{' '}
+          {invited ? 'Приеми' : sameSide ? 'Още един' : 'Реванш'}
         </Button>
       ) : null}
     </div>

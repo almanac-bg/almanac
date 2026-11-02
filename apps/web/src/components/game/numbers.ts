@@ -22,9 +22,12 @@ const ONE: Record<string, string> = {
 export function numberText(value: number, n: Pick<NumberInput, 'unit' | 'step'>): string {
   const digits = decimalsOf(n.step);
   const text = value.toLocaleString('bg-BG', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const unit = value === 1 ? (ONE[n.unit] ?? n.unit) : n.unit;
+  const unit = unitFor(value, n.unit);
   return unit ? `${text} ${unit}` : text;
 }
+
+/** A number's unit as it goes with it: „година“ after 1, „години“ after the rest. */
+export const unitFor = (value: number | null, unit: string) => (value === 1 ? (ONE[unit] ?? unit) : unit);
 
 /**
  * How far off a guess is, in a few characters: "точно", "+3", "−120 км"; on a log scale by a factor ("×2,5", "÷1,3"),

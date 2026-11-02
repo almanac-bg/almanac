@@ -32,6 +32,9 @@ import { Button, Card } from '../components/ui';
 import { matchShareText, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
+/** How long the win or loss sting has to itself before the reward dialog's first cue (the level-up's run). */
+const STING_MS = 900;
+
 export function Results({ game }: { game: LiveGame }) {
   const end = game.end!;
   const navigate = useNavigate();
@@ -90,11 +93,14 @@ export function Results({ game }: { game: LiveGame }) {
   const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
-  // The match just ended: start from the top, with focus (and screen readers) on the outcome.
+  // The match just ended: start from the top, with focus (and screen readers) on the outcome — once the reward dialog,
+  // if there is one, has closed: while it's open, focus is its, and the page behind is no place to read (A11Y-6).
   useEffect(() => {
     window.scrollTo(0, 0);
-    headlineRef.current?.focus({ preventScroll: true });
   }, []);
+  useEffect(() => {
+    if (!moment) headlineRef.current?.focus({ preventScroll: true });
+  }, [moment]);
 
   // Off to another page (a board, the back button): the finished match is dropped once this screen is gone. Dropping
   // it before the route changes would make /game send the player home first. Checked a tick later, so a new match
@@ -109,12 +115,16 @@ export function Results({ game }: { game: LiveGame }) {
     [gameId],
   );
 
+  // The end of a match has one order to its sounds: this sting first, then the reward dialog's (RewardMoment, `after`),
+  // then the achievements card's once the dialog is gone — and one burst of confetti.
+  const fanfare = won || (single && perfect && !lostLink) || newBest;
+  const sting = fanfare || !single;
   useEffect(() => {
-    if (won || (single && perfect && !lostLink) || newBest) {
+    if (fanfare) {
       sfx.win();
       burst(1.2);
     } else if (!single) sfx.lose();
-  }, [won, single, perfect, newBest, lostLink]);
+  }, [fanfare, single]);
 
   async function again() {
     const mode = end.mode;
@@ -232,7 +242,14 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
-      <RewardMoment steps={steps} open={moment} quiet={quiet} onDone={() => setMoment(false)} />
+      <RewardMoment
+        steps={steps}
+        open={moment}
+        quiet={quiet}
+        after={sting ? STING_MS : 0}
+        burst={!fanfare}
+        onDone={() => setMoment(false)}
+      />
       <m.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
           {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
@@ -363,25 +380,30 @@ export function Results({ game }: { game: LiveGame }) {
           !rewardsCard && !sideCards && 'hidden',
         )}
       >
+        {/* The day's standing first on a phone — it's what the daily was for, and under the rewards it was a scroll
+            away (the review's UX-3); beside them, on top of the side column, on a wider screen. */}
+        {sideCards && rewards.daily && (
+          <div className="md:col-start-2 md:row-start-1">
+            <DailyCard
+              daily={rewards.daily}
+              history={game.history}
+              total={game.start.totalQuestions}
+              score={mine.score}
+            />
+          </div>
+        )}
         {!rewardsCard ? null : rewards ? (
-          <div className="space-y-4">
-            <UnlockReveal rewards={rewards} celebrated={steps.length > 0} />
+          <div className="space-y-4 md:col-start-1 md:row-span-2 md:row-start-1">
+            {/* The reward moment offered the new avatar or frame already („Сложи го“): not a second time here. */}
+            {steps.length === 0 && <UnlockReveal rewards={rewards} />}
             <RewardsCard rewards={rewards} quiet={quiet} celebrated={steps.length > 0} />
           </div>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}
         {sideCards && (
-          <div className="space-y-4">
-            {rewards.daily && (
-              <DailyCard
-                daily={rewards.daily}
-                history={game.history}
-                total={game.start.totalQuestions}
-                score={mine.score}
-              />
-            )}
-            {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
+          <div className="space-y-4 md:col-start-2">
+            {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} held={moment} />}
             {!!rewards.mastery?.length && <MasteryCard mastery={rewards.mastery} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
             {rewards.rating && <RatingCard rating={rewards.rating} />}
@@ -496,12 +518,23 @@ export function Results({ game }: { game: LiveGame }) {
               <span className="max-sm:hidden">Сподели</span>
             </Button>
           )}
-          {!(challenge && guest) && !(duel && !duel.outcome && !duel.expired) && (
-            <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
-              <Home className="size-5" />
-              <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
-            </Button>
-          )}
+          {/* Not when the main button above already goes home: an undecided duel, a guest's link, a team match or the
+              evening Роял (their "again" is the home screen). */}
+          {!(challenge && guest) &&
+            !(duel && !duel.outcome && !duel.expired) &&
+            !(
+              !daily &&
+              !duel &&
+              !challenge &&
+              end.mode !== 'custom' &&
+              !(review && !moreReview) &&
+              ((MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening')
+            ) && (
+              <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
+                <Home className="size-5" />
+                <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
+              </Button>
+            )}
         </div>
       </div>
     </div>

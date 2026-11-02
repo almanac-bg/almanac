@@ -33,6 +33,26 @@ interface Q {
   factSource?: string;
 }
 
+/** What the text font draws (scripts/subset-fonts.mjs writes it): ranges of code points. */
+const ONEST = (
+  JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../web/src/fonts/coverage.json'), 'utf8')) as {
+    onest: [number, number][];
+  }
+).onest;
+/**
+ * What the bank may show though Onest can't draw it, so the system's font does: Greek (a word quoted in its own
+ * script), super- and subscripts (CO₂, 10⁻⁹) and a few signs. Anything else outside Onest is a new script or a slip:
+ * add it to the subset if Onest has it (scripts/subset-fonts.mjs), else here (the 31 October review, VD-13).
+ */
+const SYSTEM_FONT = /^[\u0370-\u03ff\u2070-\u209f′″∞⌘☮Ѣѣ]$/u;
+const inOnest = (c: string) => {
+  const u = c.codePointAt(0)!;
+  return ONEST.some(([from, to]) => u >= from && u <= to);
+};
+// A letter the font lacks but has the parts of (ѝ: и and the combining grave) is drawn from them (HarfBuzz, in Chrome
+// and Firefox).
+const drawn = (c: string) => inOnest(c) || [...c.normalize('NFD')].every(inOnest) || SYSTEM_FONT.test(c);
+
 /** A WebP's size, from its header (VP8, VP8L or VP8X). */
 function webpSize(b: Buffer): { w: number; h: number } | null {
   if (b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WEBP') return null;
@@ -295,6 +315,8 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
       assert.ok(['PD', 'CC0', 'CC BY', 'CC BY-SA'].includes(image.license), `${where} — licence`);
       assert.ok(image.license === 'PD' || /^[1-4]\.[05]$/.test(image.licenseVersion ?? ''), `${where} — its version`);
       assert.ok(image.credit.trim() && new URL(image.sourceUrl).protocol === 'https:', `${where} — credit and source`);
+      // With the licence and „чрез Wikimedia Commons“ it takes two lines at most on a 320 px phone (QuestionPicture).
+      assert.ok(image.credit.length <= 60, `${where} — credit "${image.credit}" over 60`);
       assert.ok(image.alt.trim().length >= 3 && image.alt.length <= 150, `${where} — alt text`);
       const answer = normalize(q.options[q.answer]);
       assert.ok(
@@ -337,6 +359,27 @@ for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balance
         );
       }
     }
+  });
+
+  // In the game's own letters: a character outside the font comes in the system's, mid-word (Š, ș in SF Pro).
+  test(`${name}: every character shown is in the text font, or one it leaves to the system's`, () => {
+    const odd = new Map<string, string[]>();
+    for (const q of everything) {
+      const shown = [
+        q.q,
+        ...(q.options ?? []),
+        q.fact ?? '',
+        ...(q.items ?? []).map((i) => i.text),
+        q.number?.unit ?? '',
+        q.unit ?? '',
+        q.image?.credit ?? '',
+      ];
+      for (const c of new Set([...shown.join('')])) if (!drawn(c)) odd.set(c, [...(odd.get(c) ?? []), q.id]);
+    }
+    assert.deepEqual(
+      [...odd].map(([c, ids]) => `${c} U+${c.codePointAt(0)!.toString(16).toUpperCase()} (${ids.join(', ')})`),
+      [],
+    );
   });
 
   // Pictures and orders are balanced on their own, as the numbers are: every category as many.

@@ -587,8 +587,9 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
       const game = games.forUser(userId);
       const index = int(obj(p).index);
       const held = !!game?.hold(game.playerIdFor(userId), index);
-      // Stopped to read its fact: the fact is theirs (right or wrong). A plain pause (Соло, no fact) is neither.
-      if (held && game!.questions[index].fact) {
+      // Stopped to read its fact: the fact is theirs (right or wrong). A plain pause (Соло, no fact) is neither, nor is
+      // more time on an open question („Без часовник“).
+      if (held && game!.phase === 'reveal' && game!.questions[index].fact) {
         count('fact_holds');
         learn(userId, [game!.questions[index].id]);
       }
@@ -615,6 +616,12 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
 
     on('rematch:request', (p) => rematches.request(userId, str(obj(p).gameId, 64)));
     on('rematch:decline', (p) => rematches.decline(userId, str(obj(p).gameId, 64)));
+
+    // Knocked out with only bots left: the result now, not the rest of the questions.
+    on('game:finish', () => {
+      const game = games.forUser(userId);
+      if (game) game.finishOn(game.playerIdFor(userId));
+    });
 
     on('game:leave', () => {
       const game = games.forUser(userId);

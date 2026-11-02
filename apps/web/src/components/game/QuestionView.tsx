@@ -3,13 +3,15 @@ import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type Que
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, m, useReducedMotion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
+import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
+import { PAUSED_NOTE } from './Announcer';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
@@ -63,6 +65,33 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
     return map;
   }, [reveal, game.players, youId, eliminated]);
 
+  // Phones float what comes after the answer above the answers (see there); wider screens put it under them.
+  const wide = useMediaQuery('(min-width: 40rem)');
+  // The row under the answers, measured while the question is open (see there).
+  const row = useRef<HTMLDivElement>(null);
+  const rowHeight = useRef(0);
+  useLayoutEffect(() => {
+    if (!reveal && row.current) rowHeight.current = row.current.offsetHeight;
+  });
+  const afterAnswer = reveal && (
+    <>
+      {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). Without
+          a clock, every answer waits for „Продължи“ (the server holds it). */}
+      {reveal.fact && game.start.players.length === 1 && (
+        <FactNote index={q.index} fact={reveal.fact} waiting={untimedRun} />
+      )}
+      {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
+      {!reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} waiting={untimedRun} />}
+      {/* A class whose teacher stopped on this answer to talk it through. */}
+      {game.paused === reveal.index && (
+        // Said by MatchAnnouncer, which is always there: a status inserted holding its text often isn't read.
+        <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
+          <Pause aria-hidden className="size-4 shrink-0" /> {PAUSED_NOTE}
+        </p>
+      )}
+    </>
+  );
+
   return (
     // The clock is already running: the last question gets out of the way at once (the next one waits for it to
     // leave), and the new one is readable within a fifth of a second, while it settles into place.
@@ -113,8 +142,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           </m.span>
         )}
         {out && (
+          // Held past the race's reveal (game:closing): the ring counts down what's left of the hold.
           <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
-            <Emoji e="💀" /> Отпадна · отговаряш за XP
+            <Emoji e="💀" /> Отпадна · {game.closesAt && !reveal ? 'другите вече отговориха' : 'отговаряш за XP'}
           </span>
         )}
         {inDropZone(game).has(youId) && !reveal && (
@@ -144,22 +174,30 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
             className="pointer-events-none absolute -right-3 -bottom-4 -rotate-12 opacity-[0.18]"
           />
         )}
+        {/* On a laptop or a desktop the screen is wide but short: the picture takes what's left once the question, the
+            four answers and the emote bar have their room (all four had gone below the fold at 1280×720: the review's
+            UX-1), never more than 40% of the height. */}
         {q.image && (
-          <QuestionPicture image={q.image} credit={reveal?.credit} className="relative mb-4 short:mb-2 flat:mb-1.5" />
+          <QuestionPicture
+            image={q.image}
+            credit={reveal?.credit}
+            className="relative mb-4 short:mb-2 md:[--pic-h:clamp(8rem,calc(100svh-36rem),40svh)] flat:mb-1.5"
+          />
         )}
         {/* Phones: the timer floats at the top right and the question wraps around it, instead of a narrow column of
             two-word lines beside it. Wider screens: side by side. */}
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
             <TimerRing
-              deadline={game.deadline}
+              deadline={game.closesAt ?? game.deadline}
               duration={q.durationMs}
               stopped={!!reveal}
               untimed={q.speedMs === null}
             />
             {/* A number has no speed bonus (what it's worth is how close it is), and an order's comes only with all of it
                 right. */}
-            {!reveal && !number && !order && <LivePoints game={game} q={q} />}
+            {/* Knocked out, an answer earns XP, not points. */}
+            {!reveal && !number && !order && !out && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
             {/* Where the focus lands as the question opens: read there whole — which one, a picture's description, the
@@ -190,7 +228,11 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         </div>
       </div>
 
-      <div className="max-sm:mt-auto">
+      <div className="relative max-sm:mt-auto">
+        {/* Phones: the fact and the stop float just above the answers — in the room the question leaves, or over the
+            foot of its card — so the tile just tapped stays under the finger (the answers sit at the bottom, and
+            anything added below them pushed them up by up to 200 px: the review's UX-10). */}
+        {!wide && afterAnswer && <div className="absolute inset-x-0 bottom-full z-10 pb-1">{afterAnswer}</div>}
         <AnimatePresence>
           {game.retryPrompt && !reveal && (
             <m.div
@@ -252,7 +294,21 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           )}
         </div>
 
-        <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
+        {/* On a reveal the row keeps the height it had (the козове are taller than the result, a result with the crowd's
+            note can be taller than the козове): on a phone the answers sit on it, and any change would move them. */}
+        <div
+          ref={row}
+          // Phones: exactly that height (a taller result hangs below, where nothing follows now that the fact floats
+          // above the answers). Wider: at least that, with the fact under it.
+          style={
+            reveal && rowHeight.current
+              ? wide
+                ? { minHeight: rowHeight.current }
+                : { height: rowHeight.current }
+              : undefined
+          }
+          className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5"
+        >
           <AnimatePresence mode="wait">
             {reveal && mine ? (
               number && reveal.answerNumber !== undefined ? (
@@ -278,21 +334,8 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           </AnimatePresence>
           {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
         </div>
-        {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). Without
-            a clock, every answer waits for „Продължи“ (the server holds it). */}
-        {reveal?.fact && game.start.players.length === 1 && (
-          <FactNote index={q.index} fact={reveal.fact} waiting={untimedRun} />
-        )}
-        {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
-        {reveal && !reveal.fact && game.start.mode === 'solo' && (
-          <PauseAfterAnswer index={q.index} waiting={untimedRun} />
-        )}
-        {/* A class whose teacher stopped on this answer to talk it through. */}
-        {reveal && game.paused === reveal.index && (
-          <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
-            <Pause aria-hidden className="size-4 shrink-0" /> Пауза на големия екран — следващият въпрос идва след нея.
-          </p>
-        )}
+        {wide && afterAnswer}
+        {untimedRun && !reveal && <UntimedEnding index={q.index} deadline={game.deadline} />}
       </div>
     </m.section>
   );
@@ -335,7 +378,8 @@ function FactNote({ index, fact, waiting }: { index: number; fact: string; waiti
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
+      // On the page's own colour (before:), so on a phone, floating over the foot of the question's card, it reads.
+      className="relative isolate mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:bg-ink short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
     >
       <p className="text-sm text-fg-2 text-pretty sm:text-[15px]">
         <span className="font-bold text-amber-200">
@@ -391,6 +435,44 @@ function PauseAfterAnswer({ index, waiting }: { index: number; waiting: boolean 
  * A hold goes on by itself after a while (HOLD): its last seconds are said, once, rather than the next question
  * arriving out of nowhere (WCAG 2.2.1).
  */
+/**
+ * „Без часовник“ still closes a question walked away from (HOLD.untimedMs): its last HOLD.warnMs say so, with
+ * „Още време“ to keep it open (the review's A11Y-10, WCAG 2.2.1). The status line is always there and filled when the
+ * warning starts: one inserted holding its text often isn't read.
+ */
+function UntimedEnding({ index, deadline }: { index: number; deadline: number }) {
+  const [warn, setWarn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setWarn(false);
+    const t = setTimeout(() => setWarn(true), Math.max(0, deadline - HOLD.warnMs - Date.now()));
+    return () => clearTimeout(t);
+  }, [deadline]);
+  const now = useNow(1000, warn);
+  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const more = async () => {
+    setBusy(true);
+    await actions.moreTime(index);
+    setBusy(false);
+  };
+  return (
+    // No room taken until it warns: on a phone the answers sit on what's below them (UX-10).
+    <div className={clsx('flex items-center justify-end gap-3 text-xs text-fg-3', warn && 'mt-3')}>
+      <span role="status" className="sr-only">
+        {warn ? `Въпросът се затваря след ${HOLD.warnMs / 1000} секунди. „Още време“ го държи отворен.` : ''}
+      </span>
+      {warn && (
+        <>
+          <span aria-hidden>Въпросът се затваря след {left} с</span>
+          <Button size="sm" variant="secondary" onClick={() => void more()} loading={busy}>
+            Още време
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function HoldEnding({ holdMs }: { holdMs: number }) {
   const [since] = useState(() => Date.now());
   const now = useNow(1000);

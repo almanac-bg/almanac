@@ -456,6 +456,8 @@ test('a picture: its two sizes go with the question, whose it is with the answer
   assert.deepEqual(reveal.credit, {
     credit: 'Иван Иванов',
     license: 'CC BY-SA 4.0',
+    // The deed, which CC 2.0–3.0 ask to go with every copy (LEGAL-10).
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/deed.bg',
     sourceUrl: 'https://commons.wikimedia.org/wiki/File:Example.jpg',
   });
   const room = play([b, picture], { roomCode: '123456' });
