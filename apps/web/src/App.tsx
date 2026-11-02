@@ -388,6 +388,9 @@ function PageLoading() {
   return <PageSpinner />;
 }
 
+/** What the server says to a code no room has (rooms.ts → join). */
+const NO_SUCH_ROOM = 'Няма стая с този код.';
+
 /**
  * Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. A locked
  * room keeps you at its door until the host lets you in or not; leaving this page leaves the door.
@@ -395,6 +398,8 @@ function PageLoading() {
 function JoinRoute() {
   const { code = '' } = useParams();
   const navigate = useNavigate();
+  // The name given on the way here, when a mistyped code was corrected: joined with it at once (UX-11).
+  const carried = (useLocation().state as { nickname?: string } | null)?.nickname ?? null;
   const connected = useStore((s) => s.connected);
   const guest = useStore((s) => !!s.me?.isGuest);
   const inside = useStore((s) => s.room?.code === code);
@@ -428,12 +433,23 @@ function JoinRoute() {
     });
   }, [guest, connected, code, navigate]);
 
-  async function joinAs(nickname: string) {
+  async function joinAs(nickname: string, corrected?: string) {
+    // Another code typed in: that room's address, the name with it.
+    if (corrected && corrected !== code) {
+      setError(null);
+      navigate(`/join/${corrected}`, { replace: true, state: { nickname } });
+      return;
+    }
     setBusy(true);
     const res = await actions.joinRoom(code, nickname);
     setBusy(false);
     if (!res.ok) setError(res.error);
   }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per code, with the name carried to it
+  useEffect(() => {
+    if (guest && connected && carried) void joinAs(carried);
+  }, [code, guest, connected]);
 
   if (knock)
     return (
@@ -447,7 +463,15 @@ function JoinRoute() {
   return (
     <div className="mx-auto max-w-md">
       <Card className="p-6 sm:p-8">
-        <RoomNickname code={code} busy={busy} error={error} onJoin={(n) => void joinAs(n)} />
+        <RoomNickname
+          key={code}
+          code={code}
+          busy={busy}
+          error={error}
+          // No room with this code: the code itself to check, beside the name (it was a dead end).
+          wrongCode={error === NO_SUCH_ROOM}
+          onJoin={(n, corrected) => void joinAs(n, corrected)}
+        />
       </Card>
     </div>
   );

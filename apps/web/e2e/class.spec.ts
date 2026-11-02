@@ -207,3 +207,32 @@ test('a picture for a set’s question: picked on the device, made small, upload
   await page.getByRole('button', { name: 'Запази' }).click();
   await expect(page.getByText('1 от 50 въпроса · запазено')).toBeVisible();
 });
+
+test('a pupil who mistyped the room’s code corrects it where the error is, the name kept (UX-11)', async ({
+  page: teacher,
+  newPlayer,
+}) => {
+  await signUp(teacher, uniqueName('Учител'), 'parola-123');
+  await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
+  await expect(teacher).toHaveURL(/\/room$/);
+  const code = await roomCode(teacher);
+  const wrong = code.startsWith('1') ? '222222' : '111111';
+
+  const pupil = await newPlayer();
+  await pupil.goto('/');
+  await pupil.getByRole('button', { name: 'Имам код за стая' }).click();
+  await pupil.getByLabel('Код на стая').fill(wrong);
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  await pupil.getByRole('button', { name: 'Влез като гост' }).first().click();
+  await pupil.getByLabel('Име в стаята').fill('Ния');
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  // Not a dead end: the code to check, the name still there.
+  const field = pupil.getByLabel('Код на стаята');
+  await expect(field).toHaveValue(wrong);
+  await expect(pupil.getByText(`Няма стая с код ${wrong}`, { exact: false })).toBeVisible();
+  await expect(pupil.getByLabel('Име в стаята')).toHaveValue('Ния');
+  await field.fill(code);
+  await pupil.getByRole('button', { name: 'Влез в стаята' }).click();
+  await expect(pupil).toHaveURL(/\/room$/);
+  await expect(teacher.getByText('Ния', { exact: true })).toBeVisible();
+});

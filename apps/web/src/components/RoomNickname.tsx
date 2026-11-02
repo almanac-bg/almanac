@@ -1,4 +1,4 @@
-import { nicknameProblem, ROOM_NICKNAME, tidyNickname } from '@quiz/shared';
+import { nicknameProblem, ROOM_CODE_DIGITS, ROOM_NICKNAME, tidyNickname } from '@quiz/shared';
 import { DoorClosed } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Button, INPUT, Spinner } from './ui';
@@ -26,14 +26,23 @@ export function RoomNickname({
   code,
   busy,
   error,
+  wrongCode = false,
   onJoin,
 }: {
   code: string;
   busy: boolean;
   error: string | null;
-  onJoin: (nickname: string) => void;
+  /** No room has this code: it can be corrected here, the name kept (the 31 October review, UX-11). */
+  wrongCode?: boolean;
+  onJoin: (nickname: string, code?: string) => void;
 }) {
   const [name, setName] = useState(remembered);
+  const [typed, setTyped] = useState(code);
+  const codeId = useId();
+  const codeField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (wrongCode) codeField.current?.select();
+  }, [wrongCode]);
   const [problem, setProblem] = useState<string | null>(null);
   const id = useId();
   // Its one field takes the focus: it comes in place of the button that led here (Enter then went nowhere).
@@ -51,15 +60,37 @@ export function RoomNickname({
     } catch {
       /* not remembered: asked again next time */
     }
-    onJoin(clean);
+    onJoin(clean, wrongCode && typed.length === ROOM_CODE_DIGITS ? typed : undefined);
   }
 
-  const message = problem ?? error;
+  const message = problem ?? (wrongCode ? null : error);
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-fg-2">
-        Влизаш в стая <b className="font-mono tracking-widest text-fg">{code}</b>. Как да те виждат там?
-      </p>
+      {wrongCode ? (
+        <div>
+          <label htmlFor={codeId} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+            Код на стаята
+          </label>
+          <input
+            ref={codeField}
+            id={codeId}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value.replace(/\D/g, '').slice(0, ROOM_CODE_DIGITS))}
+            inputMode="numeric"
+            autoComplete="off"
+            aria-invalid={typed === code}
+            aria-describedby={`${codeId}-error`}
+            className={`${INPUT} font-mono text-lg tracking-[0.3em]`}
+          />
+          <p id={`${codeId}-error`} className="mt-2 text-sm text-rose-300">
+            Няма стая с код {code} — провери го: {ROOM_CODE_DIGITS} цифри, както са на дъската.
+          </p>
+        </div>
+      ) : (
+        <p className="text-fg-2">
+          Влизаш в стая <b className="font-mono tracking-widest text-fg">{code}</b>. Как да те виждат там?
+        </p>
+      )}
       <div>
         <label htmlFor={id} className="mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase">
           Име в стаята
