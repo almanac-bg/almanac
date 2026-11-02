@@ -1,11 +1,15 @@
 #!/bin/sh
-# Daily: what an uptime check from outside can't see — the HTTPS certificate is being renewed, the disk has room,
-# every container runs, no reboot has been waiting for days. With a heartbeat URL as the argument, a good run pings
-# it; a failed one says why on the heartbeat's /fail (an alert at once, with the reason), and a run that never
-# happens is a missing ping (see docs/self-hosting.md, step 10). Run from cron as root.
+# Daily: what an uptime check from outside can't see — the HTTPS certificates are being renewed, the clock is right,
+# the disk has room, every container runs, the security updates install and no reboot has been waiting for days. With
+# a heartbeat URL as the argument, a good run pings it; a failed one says why on the heartbeat's /fail (an alert at
+# once, with the reason), and a run that never happens is a missing ping (see docs/self-hosting.md, step 10). Run from
+# cron as root. (CHECK_ROOT: where the host's files are, for apps/server/test/check.test.ts.)
 set -eu
 cd "$(dirname "$0")/.."
 heartbeat=${1:-}
+root=${CHECK_ROOT:-}
+# How many whole days ago a file was last changed.
+days_since() { echo $((($(date +%s) - $(date -r "$1" +%s)) / 86400)); }
 fail() {
   echo "$(date -u +%FT%TZ) check failed: $*"
   [ -z "$heartbeat" ] || curl -fsS -m 10 --retry 3 --data-raw "$*" "$heartbeat/fail" >/dev/null || true
@@ -14,11 +18,18 @@ fail() {
 
 domain=$(sed -n 's/^DOMAIN=//p' .env)
 domain=${domain:-almanac.bg}
-# Caddy renews 30 days before expiry: two weeks left means renewal has been failing for two weeks.
-end=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$domain" 2>/dev/null |
-  openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
-[ -n "$end" ] || fail "no certificate for $domain"
-[ "$(date -d "$end" +%s)" -gt "$(($(date +%s) + 14 * 86400))" ] || fail "the certificate for $domain expires $end"
+# Caddy renews 30 days before expiry: two weeks left means renewal has been failing for two weeks. Both names Caddy
+# holds one for (deploy/Caddyfile): an expired www one makes Cloudflare answer 526 there, which no uptime check watches.
+for name in "$domain" "www.$domain"; do
+  cert=$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$name" 2>/dev/null | openssl x509 2>/dev/null) ||
+    cert=
+  [ -n "$cert" ] || fail "no certificate for $name"
+  echo "$cert" | openssl x509 -noout -checkend $((14 * 86400)) >/dev/null ||
+    fail "the certificate for $name expires $(echo "$cert" | openssl x509 -noout -enddate | cut -d= -f2)"
+done
+
+# Sessions, reset links, the staff's codes and TLS all go by the clock.
+[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] || fail "the clock isn't synchronized (NTP)"
 
 # Early enough to act: a full disk fails every write (results, sign-ups) and the backups with them.
 used=$(df --output=pcent / | tail -1 | tr -dc 0-9)
@@ -36,15 +47,40 @@ docker compose exec -T app wget -qO- http://127.0.0.1:3001/api/health >/dev/null
 app=$(docker compose ps -q app)
 [ "$(docker inspect -f '{{.State.OOMKilled}}' "$app")" != true ] || fail "the app was stopped for running out of memory"
 restarts=$(docker inspect -f '{{.RestartCount}}' "$app")
-state=/var/tmp/almanac-app-restarts
+state=$root/var/tmp/almanac-app-restarts
 before=$(cat "$state" 2>/dev/null || echo "$restarts")
 echo "$restarts" >"$state"
 [ "$restarts" -le "$before" ] || fail "the app restarted by itself $((restarts - before)) time(s) since the last check"
 
 # Security updates reboot the server by themselves at night (docs/self-hosting.md, step 1); one still waiting means that broke.
-if [ -f /var/run/reboot-required ]; then
-  waiting=$((($(date +%s) - $(stat -c %Y /var/run/reboot-required)) / 86400))
-  [ "$waiting" -lt 3 ] || fail "a reboot for updates has been waiting $waiting days: $(tr '\n' ' ' </var/run/reboot-required.pkgs 2>/dev/null)"
+if [ -f "$root/var/run/reboot-required" ]; then
+  waiting=$(days_since "$root/var/run/reboot-required")
+  [ "$waiting" -lt 3 ] || fail "a reboot for updates has been waiting $waiting days: $(tr '\n' ' ' <"$root/var/run/reboot-required.pkgs" 2>/dev/null)"
+fi
+
+# And the updates themselves installing (the 31 October review, OPS-2): each way that stops leaves no reboot waiting.
+# An install cut short (a power loss, the night's reboot mid-way) stops every one after it.
+[ -z "$(ls -A "$root/var/lib/dpkg/updates" 2>/dev/null)" ] || fail "an install was cut short: run dpkg --configure -a"
+# The nightly run happened lately, and its last run had no error (a conffile question, a broken package).
+log=$root/var/log/unattended-upgrades/unattended-upgrades.log
+if [ -f "$log" ]; then
+  [ "$(days_since "$log")" -lt 2 ] || fail "the security updates haven't run for $(days_since "$log") days"
+  error=$(awk '/Starting unattended upgrades script/ { run = "" } { run = run $0 "\n" } END { printf "%s", run }' "$log" |
+    grep -m1 ' ERROR ' || true)
+  [ -z "$error" ] || fail "the security updates' last run failed: $error"
+else
+  fail "no log of the security updates (unattended-upgrades)"
+fi
+# A security update the nightly run keeps leaving (it needs a package it won't take): counted from the first check that
+# saw one waiting.
+security=$(apt list --upgradable 2>/dev/null | grep -- '-security' | cut -d/ -f1 | tr '\n' ' ' | sed 's/ $//')
+seen=$root/var/tmp/almanac-security-update
+if [ -z "$security" ]; then
+  rm -f "$seen"
+else
+  [ -f "$seen" ] || date +%s >"$seen"
+  waiting=$((($(date +%s) - $(cat "$seen")) / 86400))
+  [ "$waiting" -lt 2 ] || fail "security updates have been waiting $waiting days: $security"
 fi
 
 # Cloudflare's ranges, as deploy/Caddyfile trusts them: one added there and missing here would make every visitor
@@ -73,7 +109,7 @@ esac
 # (docs/operations.md → Обновяване). Counted from the first check that saw it.
 docker_packages='docker-ce|docker-ce-cli|containerd\.io|docker-compose-plugin|docker-buildx-plugin'
 docker_updates=$(apt list --upgradable 2>/dev/null | grep -o -E "^($docker_packages)/" | tr -d / | tr '\n' ' ')
-seen=/var/tmp/almanac-docker-update
+seen=$root/var/tmp/almanac-docker-update
 if [ -z "$docker_updates" ]; then
   rm -f "$seen"
 else
