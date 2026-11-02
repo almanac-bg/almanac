@@ -19,12 +19,12 @@ const origin = `https://${BRAND.domain}`;
  * it's known, the legal pages': one date on every page said that a change of the terms changed them all (and a search
  * engine stops trusting dates that are always the same).
  */
+const LASTMOD: Record<string, string> = { '/privacy': LEGAL.privacyIso, '/terms': LEGAL.termsIso };
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${Object.keys(PUBLIC_PAGES)
   .map(
-    (path) =>
-      `  <url><loc>${origin}${path}</loc>${path === '/privacy' || path === '/terms' ? `<lastmod>${LEGAL.updatedIso}</lastmod>` : ''}</url>`,
+    (path) => `  <url><loc>${origin}${path}</loc>${LASTMOD[path] ? `<lastmod>${LASTMOD[path]}</lastmod>` : ''}</url>`,
   )
   .join('\n')}
 </urlset>

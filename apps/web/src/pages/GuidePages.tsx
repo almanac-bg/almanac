@@ -125,7 +125,6 @@ const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; quest
 
 const seconds = (ms: number) => `${(ms / 1000).toLocaleString('bg-BG')} с`;
 
-/** The guides' frame: the name home, the guides' own links, the page, a way into the game, the legal links. */
 /** What a guide page leads on to: the day's questions, unless the page has a better next step of its own. */
 interface GuideCta {
   to: string;
@@ -138,6 +137,7 @@ const DAILY_CTA: GuideCta = {
   note: 'Безплатно, без регистрация и без реклами.',
 };
 
+/** The guides' frame: the name home, the guides' own links, the page, a way into the game, the legal links. */
 function GuideLayout({
   title,
   lead,

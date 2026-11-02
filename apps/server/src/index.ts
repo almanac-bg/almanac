@@ -411,14 +411,10 @@ function withApp(html: string, app: string, painted: 'signed-out' | '', returnin
 }
 
 /**
- * What the home page tells search engines about the site, as structured data: its name (the one shown above a search
- * result instead of the bare domain) and who runs it. Only the WebSite type: a game's own type (VideoGame) asks for
- * ratings, and without them Search Console would list it as an error.
- */
-/**
- * What a search engine may show beside a public page: on the home page the site and its mark (WebSite, Organization),
- * on the quiz pages where they sit (a BreadcrumbList: АЛМАНАХ › Викторини › История). Nothing claimed that isn't so:
- * no FAQ or Quiz markup, which isn't what these pages are.
+ * What a search engine may show beside a public page: on the home page the site and its mark (WebSite, Organization;
+ * no VideoGame, which asks for ratings), on the quiz pages where they sit (a BreadcrumbList: АЛМАНАХ › Викторини ›
+ * История — the middle step short, as a result line has room for, and right for a holiday page too). Nothing claimed
+ * that isn't so: no FAQ or Quiz markup, which isn't what these pages are.
  */
 function structuredData(route: string): object | undefined {
   const home = `${config.appUrl}/`;
@@ -442,7 +438,7 @@ function structuredData(route: string): object | undefined {
   if (route !== '/quiz' && !route.startsWith('/quiz/')) return undefined;
   const trail = [
     { name: BRAND.name, url: home },
-    { name: name('/quiz'), url: `${config.appUrl}/quiz` },
+    { name: 'Викторини', url: `${config.appUrl}/quiz` },
     ...(route === '/quiz' ? [] : [{ name: name(route), url: `${config.appUrl}${route}` }]),
   ];
   return {

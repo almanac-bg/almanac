@@ -29,7 +29,7 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
   '/': {
     title: `${BRAND.name} — онлайн викторина на български: 10 въпроса на деня`,
     description:
-      'Безплатна онлайн викторина: 10 въпроса на деня за цяла България, дуели с приятели и Роял. С „Знаеше ли?“ след много от отговорите. Без регистрация и реклами.',
+      'Безплатна онлайн викторина: 10 въпроса на деня за цяла България, дуели с приятели и Роял, „Знаеше ли?“ след много от отговорите. Без регистрация и реклами.',
   },
   '/privacy': {
     title: `Политика за поверителност — ${BRAND.name}`,
@@ -52,7 +52,7 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
       `/quiz/${c.id}`,
       {
         title: `Викторина: ${c.name} — въпроси с отговори — ${BRAND.name}`,
-        description: `Викторина „${c.name}“: ${CATEGORY_ABOUT[c.id]}. Въпроси с верните отговори — опитай, после играй с часовник и класация в ${BRAND.name}.`,
+        description: `Викторина „${c.name}“: ${CATEGORY_ABOUT[c.id]}. С верните отговори — опитай, после играй в ${BRAND.name}.`,
       },
     ]),
   ),

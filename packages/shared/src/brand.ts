@@ -18,6 +18,7 @@ export const LEGAL = {
     'Уточнения: кои писма пращаме, за какво служи IP адресът, колко пазим писмата до нас и на какво основание са записите на мачовете (т. 2, 3, 5, 6).',
   ] as string[],
   termsUpdated: '2 ноември 2026 г.',
-  /** The later of the two, for the sitemap. */
-  updatedIso: '2026-11-02',
+  /** Each one's date, for the sitemap: a page's own, never the other's (COPY-11). */
+  privacyIso: '2026-11-02',
+  termsIso: '2026-11-02',
 } as const;
