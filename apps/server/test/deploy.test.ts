@@ -71,6 +71,11 @@ case "$1" in
   run) [ -f "$S/bank-refused" ] && exit 1 ;;
   compose)
     shift
+    # Whether Litestream runs (COMPOSE_PROFILES=backup): state/litestream-runs.
+    if [ "$1 $2 $3" = "ps -q litestream" ]; then
+      [ -f "$S/litestream-runs" ] && echo litestream-id
+      exit 0
+    fi
     # The app's live report (deploy.sh asks it for a quiet moment): busy for as many asks as state/busy says.
     if [ "$1 $2 $3" = "exec -T app" ]; then
       n=$(cat "$S/busy" 2>/dev/null || echo 0)
@@ -309,6 +314,33 @@ test('a changed Caddyfile is reloaded into Caddy; one it refuses fails the deplo
   } finally {
     fs.rmSync(path.join(state, 'caddy-refuses'));
   }
+});
+
+test('a changed litestream.yml restarts Litestream where it runs; an unchanged one leaves it be', () => {
+  const restart = 'restart litestream';
+  fs.writeFileSync(path.join(state, 'litestream-runs'), '');
+  try {
+    const changed = publishCommit(work, 'deploy/litestream.yml', 'heartbeat-interval: 5m\n');
+    published(changed, 'sha256:litestream-1');
+    const first = run('deploy.sh');
+    assert.equal(first.status, 0, first.output);
+    assert.ok(
+      compose().some((line) => line.endsWith(restart)),
+      compose().join('\n'),
+    );
+
+    const other = publishCommit(work, 'app.txt', 'v-litestream');
+    published(other, 'sha256:litestream-2');
+    assert.equal(run('deploy.sh').status, 0);
+    assert.ok(!compose().some((line) => line.endsWith(restart)), 'the same config: no restart');
+  } finally {
+    fs.rmSync(path.join(state, 'litestream-runs'));
+  }
+  // Without the backup profile there's no Litestream to restart.
+  const without = publishCommit(work, 'deploy/litestream.yml', 'heartbeat-interval: 6m\n');
+  published(without, 'sha256:litestream-3');
+  assert.equal(run('deploy.sh').status, 0);
+  assert.ok(!compose().some((line) => line.endsWith(restart)));
 });
 
 test('a deploy waits for a quiet moment (a class mid-match), up to 20 minutes; --now doesn’t wait', () => {
