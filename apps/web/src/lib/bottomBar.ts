@@ -23,8 +23,25 @@ export function useBottomBar<T extends HTMLElement>() {
     const resized = new ResizeObserver(measure);
     resized.observe(bar);
     window.addEventListener('resize', measure);
+    // WebKit scrolls a focused field into view without the scroll padding (Safari's Tab put „Отговор Г“ under the
+    // bar all the same): after the browser's own scroll, whatever is still under the bar is scrolled clear of it.
+    let frame = 0;
+    const keepClear = (event: FocusEvent) => {
+      const field = event.target;
+      if (!(field instanceof HTMLElement) || bar.contains(field)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const style = getComputedStyle(bar);
+        if (style.position !== 'fixed' && style.position !== 'sticky') return;
+        const over = field.getBoundingClientRect().bottom - (bar.getBoundingClientRect().top - 16);
+        if (over > 0) window.scrollBy({ top: over, behavior: 'instant' });
+      });
+    };
+    document.addEventListener('focusin', keepClear);
     return () => {
       resized.disconnect();
+      cancelAnimationFrame(frame);
+      document.removeEventListener('focusin', keepClear);
       window.removeEventListener('resize', measure);
       html.style.removeProperty('--bottom-bar');
     };

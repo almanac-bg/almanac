@@ -360,6 +360,9 @@ export async function hiddenWhenFocused(page: Page, steps: number): Promise<stri
   const hidden: string[] = [];
   for (let i = 0; i < steps; i++) {
     await page.keyboard.press('Tab');
+    // As the page settles after the move: the browser's own scroll, and ours where it falls short (lib/bottomBar.ts
+    // corrects WebKit's in the next frame).
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
     const seen = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
       if (!el || el === document.body) return null;

@@ -20,7 +20,18 @@ import {
  */
 async function check(page: Page, screen: string) {
   const scan = async () => {
-    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+    // At rest, as far as it comes to rest: a big screen's clock runs all question long (and slower engines play the
+    // match slower), and a loop never ends. Whatever is still fading is measured again by the poll below.
+    await page
+      .waitForFunction(
+        () =>
+          document
+            .getAnimations()
+            .every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Number.POSITIVE_INFINITY),
+        undefined,
+        { timeout: 2_000 },
+      )
+      .catch(() => {});
     const { violations } = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();
@@ -104,7 +115,9 @@ for (const device of ['phone', 'desktop'] as const)
           await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
           await expect(teacher).toHaveURL(/\/room$/);
           const sets = teacher.getByLabel('Въпроси', { exact: true });
-          await sets.selectOption((await sets.locator('option', { hasText: 'Достъпност (1)' }).getAttribute('value'))!);
+          const set = sets.locator('option', { hasText: 'Достъпност (1)' });
+          await expect(set).toHaveCount(1, { timeout: 15_000 });
+          await sets.selectOption((await set.getAttribute('value'))!);
           await teacher.getByRole('switch', { name: 'Само водя' }).click();
           const code = (await teacher
             .getByRole('button', { name: /^\d{6} — копирай/ })
