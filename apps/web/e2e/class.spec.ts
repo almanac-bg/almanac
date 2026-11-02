@@ -71,7 +71,9 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await pupil.getByRole('button', { name: /^[АБВГ]\) София/ }).click();
   await teacher.getByRole('button', { name: 'Пауза', exact: true }).click({ timeout: gameMs(3_000) });
   await expect(teacher.getByText('На пауза', { exact: true })).toBeVisible();
-  await expect(pupil.getByText('Пауза на големия екран', { exact: false })).toBeVisible();
+  await expect(pupil.locator('p:not([aria-live])', { hasText: 'Пауза на големия екран' })).toBeVisible();
+  // …and said to a screen reader by the match's live region, which is always there (one inserted with its text isn't).
+  await expect(pupil.locator('[aria-live="polite"]').filter({ hasText: 'Пауза на големия екран' })).toHaveCount(1);
   await teacher.waitForTimeout(gameMs(2_000));
   await expect(teacher.getByText('Въпрос 1 от 2', { exact: true })).toBeVisible();
   await teacher.keyboard.press('ArrowRight');

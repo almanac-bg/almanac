@@ -11,6 +11,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
+import { PAUSED_NOTE } from './Announcer';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
@@ -83,8 +84,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
       {!reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} waiting={untimedRun} />}
       {/* A class whose teacher stopped on this answer to talk it through. */}
       {game.paused === reveal.index && (
-        <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
-          <Pause aria-hidden className="size-4 shrink-0" /> Пауза на големия екран — следващият въпрос идва след нея.
+        // Said by MatchAnnouncer, which is always there: a status inserted holding its text often isn't read.
+        <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
+          <Pause aria-hidden className="size-4 shrink-0" /> {PAUSED_NOTE}
         </p>
       )}
     </>

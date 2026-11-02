@@ -17,7 +17,7 @@ import { matchKeysOn } from '../../lib/matchKeys';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';
-import { lineRange, maxDigits, numberText, offText, placeOn } from './numbers';
+import { lineRange, maxDigits, numberText, offText, placeOn, unitFor } from './numbers';
 
 type Input = NonNullable<QuestionPayload['number']>;
 
@@ -141,7 +141,7 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
             {n.unit && (
               <span className="font-sans text-xl font-semibold text-fg-2">
                 <span className="sr-only"> </span>
-                {n.unit}
+                {unitFor(shown, n.unit)}
               </span>
             )}
           </>
