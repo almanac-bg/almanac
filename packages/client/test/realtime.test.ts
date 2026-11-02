@@ -4,7 +4,14 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { beforeEach, mock, test } from 'node:test';
-import type { GamePlayer, GameStartPayload, QuestionPayload, Standing } from '@quiz/shared';
+import type {
+  GameEndPayload,
+  GamePlayer,
+  GameStartPayload,
+  MatchRewards,
+  QuestionPayload,
+  Standing,
+} from '@quiz/shared';
 
 class FakeManager extends EventEmitter {
   delayMs = 1000;
@@ -401,4 +408,46 @@ test('a restart the server announced: the tab comes back at a random moment in t
   socket.drop();
   socket.connect();
   assert.deepEqual([socket.io.delayMs, socket.io.jitter], [1000, 0.5], 'back in: a later drop retries as usual');
+});
+
+test('a match whose result is still being saved shows it at once, and its rewards when they come (SERVER-1)', () => {
+  const { gameId } = inMatch();
+  const end: GameEndPayload = {
+    gameId,
+    mode: 'duel',
+    ranked: true,
+    roomCode: null,
+    standings: [],
+    teamScores: null,
+    rewards: null,
+    noContest: false,
+    saving: true,
+  };
+  socket.deliver('game:end', end);
+  assert.equal(game().phase, 'ended');
+  assert.deepEqual([game().end!.saving, game().end!.rewards], [true, null], 'the result now, the rewards to follow');
+
+  const rewards = { xpGained: 120, xpBefore: 0, xpAfter: 120 } as MatchRewards;
+  socket.deliver('game:rewards', { gameId: 'another', rewards });
+  assert.equal(game().end!.rewards, null, 'another match’s rewards are not these');
+  socket.deliver('game:rewards', { gameId, rewards });
+  assert.deepEqual([game().end!.saving, game().end!.rewards], [false, rewards]);
+  assert.equal(game().phase, 'ended');
+});
+
+test('a save given up after its minute: no rewards, and no longer „saving“', () => {
+  const { gameId } = inMatch();
+  socket.deliver('game:end', {
+    gameId,
+    mode: 'duel',
+    ranked: true,
+    roomCode: null,
+    standings: [],
+    teamScores: null,
+    rewards: null,
+    noContest: false,
+    saving: true,
+  } satisfies GameEndPayload);
+  socket.deliver('game:rewards', { gameId, rewards: null });
+  assert.deepEqual([game().end!.saving, game().end!.rewards], [false, null]);
 });

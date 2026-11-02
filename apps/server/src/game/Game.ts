@@ -67,6 +67,8 @@ const COUNTDOWN_MS = 3_500;
 const GRACE_MS = 400;
 /** Pause between the last answer arriving and the reveal. */
 const EARLY_REVEAL_MS = 600;
+/** How long a match's results are retried while another writer holds the database (Game.settle). */
+const SAVE_RETRY_MS = 60_000;
 /** Less clock than this left when the race's reveal comes: not worth holding the question for the knocked-out. */
 const MIN_HOLD_MS = 1_000;
 const REVEAL_MS = 4_000;
@@ -121,6 +123,10 @@ export interface GameEmitter {
 export interface GameHooks {
   /** Persist results; returns per-user rewards. */
   finalize(game: Game, standings: FinalStanding[]): Map<number, MatchRewards>;
+  /** The database was locked by another writer: worth trying the save again (db.ts → isBusy). */
+  busy?(err: unknown): boolean;
+  /** A match closed while its results were still saving has saved them, or given up (Game.settling). */
+  onSettled?(game: Game): void;
   /**
    * A one-attempt run ended without a result (cut short by us, or saving failed): the attempt is the player's again if
    * nothing was revealed, else it stands with the score saved by progress().
@@ -329,6 +335,8 @@ export class Game {
   endedByWalkout = false;
   /** Ended by us, not by the game: the server stopping, or a bug in this match. */
   cutShort = false;
+  /** Over, its results still being saved (the database was busy: settle() retries; a stopping server waits for it). */
+  settling = false;
   /** Nobody else in it (solo, the daily, a challenge link): no one is waiting on its player. */
   readonly alone: boolean;
   /** A run alone's clock (Соло's pace, „Повече време“); a match with others plays the usual one. */
@@ -1308,16 +1316,63 @@ export class Game {
 
     const teamScores = this.setup.teams ? this.teamScores() : null;
     const standings = this.finalStandings(teamScores);
+    this.settle(standings, teamScores, 0);
+  }
+
+  /**
+   * Saves the match's results and tells its players. When another writer holds the database (hooks.busy: the breaker
+   * in db.ts fails such a write at once), the players hear how it ended at once, with „записваме…“, and their rewards
+   * when a retry gets through (after 1, 2, 4… s; SAVE_RETRY_MS at most): a match's result is never lost to a lock
+   * (the 31 October review, SERVER-1). Anything else is reported, and the result goes out without rewards.
+   */
+  private settle(standings: FinalStanding[], teamScores: GameEndPayload['teamScores'], waited: number) {
     let rewards = new Map<number, MatchRewards>();
     try {
       rewards = this.hooks.finalize(this, standings);
     } catch (err) {
-      void reportError(err, 'match results', { extra: { match: this.id, mode: this.setup.mode } });
+      const busy = this.hooks.busy?.(err) ?? false;
+      if (busy && waited < SAVE_RETRY_MS) {
+        // Its people are free to play on meanwhile: the rewards follow wherever they are.
+        if (waited === 0) {
+          this.settling = true;
+          this.deliver(standings, teamScores, null);
+          this.hooks.onClosed(this);
+        }
+        const wait = Math.max(1_000, waited);
+        setTimeout(() => this.guard(() => this.settle(standings, teamScores, waited + wait)), wait);
+        return;
+      }
+      void reportError(err, 'match results', { extra: { match: this.id, mode: this.setup.mode, waited } });
+      // Given up on a lock: a daily or challenge-link run mustn't cost the player their one try (a lock leaves the
+      // registry's finalize to us).
+      if (busy) {
+        try {
+          this.hooks.release(this);
+        } catch (releaseErr) {
+          void reportError(releaseErr, 'release attempt', { extra: { match: this.id } });
+        }
+      }
     }
+    this.deliver(standings, teamScores, rewards, waited > 0);
+    if (waited === 0) return this.hooks.onClosed(this);
+    this.settling = false;
+    this.hooks.onSettled?.(this);
+  }
+
+  /**
+   * How the match ended, to each of its people (and the host's big screen). `rewards` null: still being saved
+   * (`saving`), they follow in game:rewards; `late`: this is that follow-up.
+   */
+  private deliver(
+    standings: FinalStanding[],
+    teamScores: GameEndPayload['teamScores'],
+    rewards: Map<number, MatchRewards> | null,
+    late = false,
+  ) {
     // `humans` leaves out anyone who deleted their account mid-match (finalize forgets their user id).
     for (const p of this.humans) {
       const userId = p.player.userId!;
-      const mine = rewards.get(userId) ?? null;
+      const mine = rewards?.get(userId) ?? null;
       if (p.left) {
         // Knocked out, then off to something else: just say how it ended.
         const placement = standings.find((s) => s.id === p.player.id)?.placement;
@@ -1336,11 +1391,14 @@ export class Game {
         teamScores,
         rewards: mine,
         noContest: this.noContest,
+        ...(rewards === null && { saving: true }),
       };
-      this.emit.toUser(userId, 'game:end', payload);
+      if (late) this.emit.toUser(userId, 'game:rewards', { gameId: this.id, rewards: mine });
+      else this.emit.toUser(userId, 'game:end', payload);
+      // Kept for when they're back (the later one, with the rewards, replaces the first).
       if (!p.connected) this.hooks.undelivered(userId, this.startPayload(p.player.id, 0), payload);
     }
-    if (this.setup.presenter) {
+    if (this.setup.presenter && !late) {
       this.emit.toUser(this.setup.presenter, 'game:end', {
         gameId: this.id,
         mode: this.setup.mode,
@@ -1352,7 +1410,6 @@ export class Game {
         noContest: this.noContest,
       });
     }
-    this.hooks.onClosed(this);
   }
 
   // ─── Teams ───────────────────────────────────────────────────────────────

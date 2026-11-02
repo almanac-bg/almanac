@@ -512,6 +512,14 @@ function bind(s: GameSocket) {
     void refreshMe();
   });
 
+  // The rewards of a match whose results were still being saved when it ended (GameEndPayload.saving).
+  s.on('game:rewards', ({ gameId, rewards }) => {
+    const g = getState().game;
+    if (!g?.end || g.end.gameId !== gameId) return;
+    patchGame(() => ({ end: { ...g.end!, rewards, saving: false } }));
+    void refreshMe();
+  });
+
   // A one-attempt run we cut short: no result to show, and the attempt can be played again.
   s.on('game:aborted', ({ gameId, message }) => {
     if (getState().game?.start.gameId !== gameId) return;

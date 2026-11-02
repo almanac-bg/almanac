@@ -11,7 +11,7 @@ import type { Difficulty } from '@quiz/shared';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-tallies-'));
 process.env.DB_PATH = path.join(tmp, 'tallies.db');
 const { all, one, run } = await import('../src/db');
-const { accurateAnswerers, catchUpTallies, keepTallies, modeTallies, tallyMatchPlayer } = await import(
+const { accurateAnswerers, catchUpTallies, keepTallies, markTallied, modeTallies, tallyMatchPlayer } = await import(
   '../src/tallies'
 );
 const { ANSWER_LOG_DAYS, pruneAnswers, recordAnswers } = await import('../src/answers');
@@ -132,7 +132,7 @@ test('matches add up per mode, the way counting every match did', () => {
   assert.deepEqual(table(), kept);
 });
 
-test('a clean stop marks them kept; the next start uses them, and the one after a crash counts again', () => {
+test('a clean stop or a save marks them kept; a start uses them, and rows moved past both are counted again', () => {
   keepTallies();
   run('UPDATE mode_stats SET games = 99 WHERE user_id = 4');
   assert.equal(catchUpTallies(), false, 'kept: nothing counted');
@@ -156,6 +156,14 @@ test('a clean stop marks them kept; the next start uses them, and the one after 
   );
   assert.equal(catchUpTallies(), true, 'played in between: counted again');
   assert.equal(one<{ games: number }>("SELECT games FROM mode_stats WHERE user_id = 4 AND mode = 'squad'")!.games, 2);
+
+  // Every transaction that settles a match (or prunes, or erases) says where the rows stand: a crash right after it
+  // leaves nothing to count again — it recounted everything after every crash, with the site down meanwhile (SERVER-3).
+  markTallied();
+  run('UPDATE mode_stats SET games = 99 WHERE user_id = 4');
+  assert.equal(catchUpTallies(), false, 'a crash after a save: nothing counted');
+  assert.equal(one<{ games: number }>("SELECT games FROM mode_stats WHERE user_id = 4 AND mode = 'squad'")!.games, 99);
+  run('UPDATE mode_stats SET games = 2 WHERE user_id = 4');
 });
 
 function answer(questionId: string, difficulty: Difficulty, correct: boolean): AnswerLogEntry {
@@ -195,6 +203,8 @@ test('the flag list’s tallies: harder answers only, and old ones leave them as
   assert.deepEqual({ ...tally(2) }, { answered: 1, correct: 1, last_at: now });
 
   const kept = all('SELECT * FROM answer_tallies ORDER BY user_id');
+  // The prune marked them kept (markTallied); without the mark (a release from before it) they're counted again.
+  run("DELETE FROM settings WHERE key = 'tallied_to'");
   assert.equal(catchUpTallies(), true);
   assert.deepEqual(all('SELECT * FROM answer_tallies ORDER BY user_id'), kept, 'counting again gives the same');
 

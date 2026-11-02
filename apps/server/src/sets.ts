@@ -1,6 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
-  dayKey,
   type QuestionSetInfo,
   type QuestionSetSummary,
   type RoomSettings,
@@ -351,34 +350,16 @@ function withPictures(questions: SetQuestion[]): Result<{ questions: SetQuestion
 
 /**
  * Pictures no set has used for a day go (an upload left behind by an editor closed before saving, a question changed
- * since): `SETS.images` is about what a host keeps, not what they ever tried. It reads every set, so it runs once a
- * day (the upkeep's first run of the day). Returns how many went.
+ * since): `SETS.images` is about what a host keeps, not what they ever tried. Since when each has been unused is kept
+ * by the database itself (v44's triggers), so each upkeep finds them by index. Returns how many went.
  */
 export function sweepPictures(now = Date.now()): number {
-  const today = dayKey(now);
-  if (one("SELECT 1 AS x FROM settings WHERE key = 'pictures_swept' AND value = ?", today)) return 0;
-  run(
-    "INSERT INTO settings (key, value) VALUES ('pictures_swept', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-    today,
-  );
-  const used = new Set(
-    all<{ id: string }>(
-      `SELECT DISTINCT json_extract(q.value, '$.image.id') AS id FROM question_sets s, json_each(s.questions) q
-       WHERE json_extract(q.value, '$.image.id') IS NOT NULL`,
-    ).map((r) => r.id),
-  );
-  let swept = 0;
-  tx(() => {
-    for (const r of all<{ owner_id: number; id: string }>(
-      'SELECT owner_id, id FROM set_images WHERE created_at < ?',
+  return Number(
+    run(
+      'DELETE FROM set_images WHERE (owner_id, id) IN (SELECT owner_id, id FROM unused_pictures WHERE since < ?)',
       now - 24 * 60 * 60_000,
-    )) {
-      if (used.has(r.id)) continue;
-      run('DELETE FROM set_images WHERE owner_id = ? AND id = ?', r.owner_id, r.id);
-      swept++;
-    }
-  });
-  return swept;
+    ).changes,
+  );
 }
 
 /** A set's questions to show: each picture with an address that works for now. */
@@ -526,8 +507,8 @@ export function hideSet(code: string, hidden: boolean): { ownerId: number; name:
 /** Another hidden set has this picture too: it stays blocked when one of them is shown again. */
 const stillHidden = (id: string) =>
   !!one(
-    `SELECT 1 AS x FROM question_sets s, json_each(s.questions) q
-     WHERE s.hidden = 1 AND json_extract(q.value, '$.image.id') = ? LIMIT 1`,
+    `SELECT 1 AS x FROM set_image_uses u JOIN question_sets s ON s.id = u.set_id
+     WHERE u.image_id = ? AND s.hidden = 1 LIMIT 1`,
     id,
   );
 

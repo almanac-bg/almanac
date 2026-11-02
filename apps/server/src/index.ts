@@ -18,10 +18,10 @@ import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCook
 import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
-import { db, isBusy, one } from './db';
+import { db, isBusy, lockedRecently, one } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
-import { flushLogs, forwardEnvelope, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
+import { forwardEnvelope, lastResort, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
 import { bankProblem, IMAGE_PATH, imageDir, questionBank } from './questions';
 import { createRealtime } from './realtime';
 import { api } from './routes/api';
@@ -92,6 +92,12 @@ app.get('/api/health', (_req, res) => {
     db.prepare('SELECT 1').get();
   } catch {
     res.status(503).json({ ok: false, problem: 'database' });
+    return;
+  }
+  // Another writer held the database past the wait in the last minute: reads go on (WAL), so a read alone stayed
+  // green through a 16-second lock while every match froze and results failed to save (SERVER-1).
+  if (lockedRecently()) {
+    res.status(503).json({ ok: false, problem: 'locked' });
     return;
   }
   // The bank on disk can't be loaded: matches go on with the one loaded before, but a restart would fail.
@@ -567,14 +573,9 @@ function challengePage(html: string, id: string, signedOut: boolean): string | n
     .replace('<div id="root">', signedOut ? '<div id="root" data-signed-out="1">' : '<div id="root">');
 }
 
-// Last resort: a bug no guard caught. Report it, then exit (state may be broken); Docker restarts the server.
-for (const event of ['uncaughtException', 'unhandledRejection'] as const) {
-  process.on(event, (err) => {
-    // The report and the log lines waiting to go (this one among them) leave before the process does.
-    void Promise.all([reportError(err, event), flushLogs()]).finally(() => process.exit(1));
-    setTimeout(() => process.exit(1), 3000).unref();
-  });
-}
+// A bug no guard caught: a failed promise is reported, a throw is reported and the server restarts (lastResort).
+for (const event of ['uncaughtException', 'unhandledRejection'] as const)
+  process.on(event, (err) => lastResort(event, err));
 
 // A public service must say who runs it (GDPR чл. 13: the identity and contact details; the name and CONTACT_EMAIL
 // are those). A postal address is optional: ЗЕТ чл. 4 asks for one from services provided for remuneration, which a

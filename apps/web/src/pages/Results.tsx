@@ -29,7 +29,7 @@ import {
 } from '../components/results/ResultCards';
 import { RewardMoment, rewardSteps } from '../components/results/RewardMoment';
 import { ChallengeStanding, Podium, TeamResult } from '../components/results/Standings';
-import { Button, Card } from '../components/ui';
+import { Button, Card, Spinner } from '../components/ui';
 import { matchShareText, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
@@ -395,6 +395,12 @@ export function Results({ game }: { game: LiveGame }) {
             {steps.length === 0 && <UnlockReveal rewards={rewards} />}
             <RewardsCard rewards={rewards} quiet={quiet} celebrated={steps.length > 0} />
           </div>
+        ) : end.saving ? (
+          // The database was busy: the result is kept and saved in a moment (game:rewards brings it, and this page
+          // draws again with it).
+          <Card className="flex items-center gap-3 p-6 text-sm text-fg-2" role="status">
+            <Spinner className="size-4 shrink-0" /> Записваме наградите от мача… идват след миг.
+          </Card>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}

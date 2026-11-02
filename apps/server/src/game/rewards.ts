@@ -21,7 +21,7 @@ import { factCount, factsSince, noteMatch } from '../almanac';
 import { recordAnswers } from '../answers';
 import { DUEL, payDuelWin, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
-import { all, run, tx } from '../db';
+import { all, one, run, tx } from '../db';
 import { recordEvening } from '../evening';
 import { settleMastery } from '../mastery';
 import { advanceQuests } from '../quests';
@@ -30,7 +30,7 @@ import { recordRun } from '../runs';
 import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
-import { tallyMatchPlayer } from '../tallies';
+import { markTallied, TEAM_WIN, tallyMatchPlayer } from '../tallies';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
@@ -181,6 +181,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       }
       run('UPDATE match_players SET xp_gained = ? WHERE match_id = ? AND player_id = ?', r.xpGained, game.id, s.id);
     }
+    markTallied();
   });
 
   return rewards;
@@ -242,6 +243,14 @@ function rewardHuman(
   const realWin = won && (!setup.roomCode || rivals.length > 0);
   // Before the achievements below: the per-mode wins they count include this one.
   run('UPDATE match_players SET won = ? WHERE match_id = ? AND player_id = ?', realWin ? 1 : 0, game.id, s.id);
+  // Whether it was a team win as the tallies count it, kept on the row: it reads the bots' rows, which go after a month.
+  if (setup.teams)
+    run(
+      `UPDATE match_players AS mp SET team_win = ${TEAM_WIN('(SELECT room_code FROM matches WHERE id = mp.match_id)')}
+       WHERE mp.match_id = ? AND mp.player_id = ?`,
+      game.id,
+      s.id,
+    );
   tallyMatchPlayer(game.id, s.id);
 
   // ── XP ──
@@ -562,17 +571,33 @@ function overplayedPairs(game: Game): Set<string> {
   const ids = game.humans.map((h) => h.player.userId).filter((id): id is number => id !== null);
   const pairs = new Set<string>();
   if (ids.length < 2) return pairs;
+  const since = Date.now() - 24 * 60 * 60 * 1000;
+  // Only the last day's rows: a match's players go in as it ends, so the first of the day's first match is where they
+  // start, and the person index (it holds the row id) reads from there — not each person's whole history, which grew
+  // with every match they ever played (163 ms for a regular's Роял; the 31 October review, SERVER-2).
+  const firstMatch = one<{ id: string }>(
+    'SELECT id FROM matches WHERE ended_at > ? ORDER BY ended_at LIMIT 1',
+    since,
+  )?.id;
+  if (!firstMatch) return pairs;
+  const from = one<{ row: number | null }>(
+    'SELECT MIN(rowid) AS row FROM match_players WHERE match_id = ?',
+    firstMatch,
+  )?.row;
+  if (from == null) return pairs;
+  const marks = ids.map(() => '?').join(',');
   const rows = all<{ a: number; b: number; n: number }>(
     `SELECT a.user_id AS a, b.user_id AS b, COUNT(*) AS n
      FROM match_players a
      JOIN match_players b ON b.match_id = a.match_id AND b.user_id > a.user_id
      JOIN matches m ON m.id = a.match_id
-     WHERE a.user_id IN (${ids.map(() => '?').join(',')}) AND b.user_id IN (${ids.map(() => '?').join(',')})
+     WHERE a.user_id IN (${marks}) AND a.rowid >= ? AND b.user_id IN (${marks})
        AND m.ranked = 1 AND m.ended_at > ? AND m.id != ? AND a.rating_delta IS NOT NULL AND b.rating_delta IS NOT NULL
      GROUP BY a.user_id, b.user_id`,
     ...ids,
+    from,
     ...ids,
-    Date.now() - 24 * 60 * 60 * 1000,
+    since,
     game.id,
   );
   for (const r of rows) if (r.n >= RATED_GAMES_PER_PAIR) pairs.add(`${r.a}:${r.b}`);

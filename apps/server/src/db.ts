@@ -10,11 +10,53 @@ import { nameShape } from './names';
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
 export const db = new DatabaseSync(config.dbPath);
+/**
+ * How long a write waits for another connection's lock. Litestream's ordinary checkpoint holds it for milliseconds;
+ * past this, the breaker below takes over. Not seconds: node:sqlite waits synchronously, the whole server with it.
+ */
+const BUSY_WAIT_MS = 1000;
 // WAL + a busy timeout is also what Litestream (continuous backups) needs. synchronous = NORMAL is safe in WAL mode
 // (a power cut can lose the last commits, never corrupt the file) and saves an fsync per write.
 db.exec(
-  'PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;',
+  `PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_WAIT_MS};`,
 );
+
+/**
+ * The breaker. Another writer held the lock past BUSY_WAIT_MS (Litestream's emergency checkpoint writes a whole
+ * snapshot under it; an ad-hoc session; `cli notice` over every account): until it lets go, writes fail at once instead
+ * of each sleeping the server — N queued writes were N × 5 s of a frozen event loop, every match with it (the 31
+ * October review, SERVER-1). A probe from a timer finds when the lock is free.
+ */
+const PROBE_MS = 250;
+/** How long after the last busy write /api/health still says so. */
+const LOCKED_FOR_MS = 60_000;
+let breaker: NodeJS.Timeout | null = null;
+let lockedAt = 0;
+
+function tripBreaker() {
+  lockedAt = Date.now();
+  if (breaker) return;
+  db.exec('PRAGMA busy_timeout = 0');
+  breaker = setInterval(() => {
+    // Between two turns of the event loop: no transaction of ours is open (they're synchronous).
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      db.exec('ROLLBACK');
+    } catch {
+      return;
+    }
+    if (breaker) clearInterval(breaker);
+    breaker = null;
+    db.exec(`PRAGMA busy_timeout = ${BUSY_WAIT_MS}`);
+  }, PROBE_MS);
+  breaker.unref();
+}
+
+/** The database was locked by another writer in the last minute (the health check says so). */
+export const lockedRecently = (now = Date.now()) => lockedAt > 0 && now - lockedAt < LOCKED_FOR_MS;
+
+/** Writes fail at once just now: another writer holds the lock (the breaker is open). */
+export const writesHeld = () => breaker !== null;
 
 type Step = string | (() => void);
 
@@ -27,6 +69,10 @@ type Step = string | (() => void);
  * simply doesn't use) lets the release before it run on the database as it is (see schemaFloor), so a rollback is
  * the image alone. Make steps compatible whenever possible; what an older release leaves out meanwhile is filled in
  * by repair() on the next start.
+ *
+ * A step that rewrites a big table (an UPDATE or a copy of matches, answers, runs…) goes in batches from repair() or a
+ * one-off command, not here in one transaction: past Litestream's truncate-page-n (≈ 500 MB of WAL) it takes the write
+ * lock for a whole snapshot, and every write waits (the breaker above keeps the server going, but nothing saves).
  */
 const MIGRATIONS: (Step | { compatible: Step })[] = [
   `
@@ -1004,6 +1050,75 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE challenge_results ADD COLUMN more_time INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  // v43, match history kept within bounds (history.ts; the 31 October review, SERVER-4, D7): bots' rows go after 30
+  // days and whole matches after two years, so what the tallies need from the others is kept on each person's row —
+  // whether it was a team win as they count it. Rows from before are filled in by the upkeep, in batches (the index
+  // finds them, and empties as it goes). Older code doesn't read the column.
+  {
+    compatible: `
+    ALTER TABLE match_players ADD COLUMN team_win INTEGER;
+    CREATE INDEX match_players_team_unsettled ON match_players(match_id)
+      WHERE team IS NOT NULL AND user_id IS NOT NULL AND team_win IS NULL;
+    `,
+  },
+  // v44, set pictures by index (sets.ts; the 31 October review, SERVER-10): which set uses which picture, as rows
+  // (`set_image_uses`), and since when each picture no set uses has been unused (`unused_pictures`, beside the
+  // pictures: a flag on their rows would write the picture again each time it flipped) — the sweep deletes those a day
+  // on by index, where it read every set's questions. Triggers keep both, so whatever writes a set (older code too,
+  // after a rollback) or deletes it (an account erased: the cascade) keeps them right.
+  {
+    compatible: `
+    CREATE TABLE set_image_uses (
+      image_id TEXT NOT NULL,
+      set_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+      PRIMARY KEY (image_id, set_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX set_image_uses_set ON set_image_uses(set_id);
+    INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+      SELECT json_extract(q.value, '$.image.id'), s.id FROM question_sets s, json_each(s.questions) q
+      WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+
+    CREATE TABLE unused_pictures (
+      owner_id INTEGER NOT NULL,
+      id TEXT NOT NULL,
+      since INTEGER NOT NULL,
+      PRIMARY KEY (id, owner_id),
+      FOREIGN KEY (owner_id, id) REFERENCES set_images(owner_id, id) ON DELETE CASCADE
+    ) WITHOUT ROWID;
+    CREATE INDEX unused_pictures_since ON unused_pictures(since);
+    INSERT INTO unused_pictures (owner_id, id, since)
+      SELECT owner_id, id, created_at FROM set_images i
+      WHERE NOT EXISTS (SELECT 1 FROM set_image_uses u WHERE u.image_id = i.id);
+
+    CREATE TRIGGER set_pictures_added AFTER INSERT ON question_sets BEGIN
+      INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+        SELECT json_extract(q.value, '$.image.id'), NEW.id FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+    END;
+    CREATE TRIGGER set_pictures_changed AFTER UPDATE OF questions ON question_sets BEGIN
+      DELETE FROM set_image_uses WHERE set_id = NEW.id AND image_id NOT IN (
+        SELECT json_extract(q.value, '$.image.id') FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL);
+      INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+        SELECT json_extract(q.value, '$.image.id'), NEW.id FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+    END;
+    CREATE TRIGGER picture_used AFTER INSERT ON set_image_uses BEGIN
+      DELETE FROM unused_pictures WHERE id = NEW.image_id;
+    END;
+    CREATE TRIGGER picture_unused AFTER DELETE ON set_image_uses
+      WHEN NOT EXISTS (SELECT 1 FROM set_image_uses WHERE image_id = OLD.image_id)
+    BEGIN
+      INSERT OR IGNORE INTO unused_pictures (owner_id, id, since)
+        SELECT owner_id, id, CAST(unixepoch('subsec') * 1000 AS INTEGER) FROM set_images WHERE id = OLD.image_id;
+    END;
+    CREATE TRIGGER picture_uploaded AFTER INSERT ON set_images
+      WHEN NOT EXISTS (SELECT 1 FROM set_image_uses WHERE image_id = NEW.id)
+    BEGIN
+      INSERT OR IGNORE INTO unused_pictures (owner_id, id, since) VALUES (NEW.owner_id, NEW.id, NEW.created_at);
+    END;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
@@ -1153,7 +1268,12 @@ export function all<T>(sql: string, ...params: SQLInputValue[]): T[] {
 }
 
 export function run(sql: string, ...params: SQLInputValue[]) {
-  return stmt(sql).run(...params);
+  try {
+    return stmt(sql).run(...params);
+  } catch (err) {
+    if (isBusy(err)) tripBreaker();
+    throw err;
+  }
 }
 
 /** Another connection held the write lock for longer than busy_timeout (SQLITE_BUSY and its extended codes). */
@@ -1190,7 +1310,12 @@ export function tx<T>(fn: () => T): T {
   // IMMEDIATE: the write lock is taken up front, waiting out busy_timeout if Litestream (or the admin command line)
   // holds it. A plain BEGIN that reads first and writes later fails at once instead, with no wait, whenever another
   // connection wrote in between.
-  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+  } catch (err) {
+    if (isBusy(err)) tripBreaker();
+    throw err;
+  }
   txDepth++;
   let committed = false;
   try {
@@ -1199,7 +1324,13 @@ export function tx<T>(fn: () => T): T {
     committed = true;
     return result;
   } catch (err) {
-    db.exec('ROLLBACK');
+    // SQLite rolls back by itself on a full disk, an I/O error or no memory: a ROLLBACK then fails ("no transaction is
+    // active") and was what got reported, not why (the 31 October review, SERVER-6). The error that matters goes on.
+    try {
+      if (db.isTransaction) db.exec('ROLLBACK');
+    } catch {
+      // Already undone.
+    }
     throw err;
   } finally {
     txDepth--;
@@ -1220,8 +1351,15 @@ function savepoint<T>(fn: () => T): T {
     db.exec(`RELEASE ${name}`);
     return result;
   } catch (err) {
-    db.exec(`ROLLBACK TO ${name}`);
-    db.exec(`RELEASE ${name}`);
+    // As in tx(): SQLite may have rolled the whole transaction back already (and the savepoint with it).
+    try {
+      if (db.isTransaction) {
+        db.exec(`ROLLBACK TO ${name}`);
+        db.exec(`RELEASE ${name}`);
+      }
+    } catch {
+      // Already undone.
+    }
     onCommit.length = waiting;
     throw err;
   } finally {

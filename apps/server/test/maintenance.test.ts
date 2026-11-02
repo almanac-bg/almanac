@@ -87,6 +87,30 @@ test('daily snapshots: one per day, a working copy, only the newest kept', async
   assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-03.db', 'quiz-2026-10-04.db', 'quiz-2026-10-05.db']);
 });
 
+test('the daily copy finishes while another connection keeps writing, and a second run leaves one being made be', async () => {
+  const dir = path.join(tmp, 'backups-busy');
+  const day = Date.UTC(2026, 9, 10, 12);
+  // Litestream's writes, every few milliseconds: copied a step at a time from the app's connection, the copy started
+  // over at each one and never finished on a big database (SERVER-5).
+  const other = new DatabaseSync(process.env.DB_PATH!);
+  const writer = setInterval(() => {
+    other.exec(
+      "INSERT INTO settings (key, value) VALUES ('busy', '1') ON CONFLICT (key) DO UPDATE SET value = value + 1",
+    );
+  }, 2);
+  try {
+    const [made, overlapping] = await Promise.all([snapshot(day, dir), snapshot(day, dir)]);
+    assert.ok(made?.endsWith('quiz-2026-10-10.db'));
+    assert.equal(overlapping, null, 'the run that came over it left it be');
+  } finally {
+    clearInterval(writer);
+    other.close();
+  }
+  const copy = new DatabaseSync(path.join(dir, 'quiz-2026-10-10.db'), { readOnly: true });
+  assert.equal((copy.prepare('SELECT username FROM users WHERE id = 1').get() as { username: string }).username, 'a');
+  copy.close();
+});
+
 test('copies from before migrations: the newest two are kept, none past a month', () => {
   const dir = path.join(tmp, 'before-migrations');
   fs.mkdirSync(dir);

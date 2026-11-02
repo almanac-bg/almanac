@@ -9,22 +9,31 @@ import { all, one, run, tx } from './db';
  * - `answer_tallies`: per player, the medium and hard answers in the log (ANSWER_LOG_DAYS) and how many were right.
  *
  * They're added to as matches are settled (tallyMatchPlayer, recordAnswers) and taken from as old answers go
- * (pruneAnswers). Whatever ran without keeping them — a crash between a write and its tally can't happen (one
- * transaction), but a release from before them can, after a rollback — is caught at the next start: only a stop of
- * this code marks them as kept (keepTallies), with where the rows stood then, and a start that finds no mark, or rows
- * that moved since (an older release played and pruned in between, leaving the mark as it was), counts them again.
+ * (pruneAnswers). A crash between a write and its tally can't happen (one transaction), and every such transaction
+ * says where the rows stand then (markTallied: `tallied_to`); a clean stop does too (keepTallies). A start that finds
+ * the rows where either mark says counts nothing again, a crash or not; only rows that moved past both (a release from
+ * before the marks played or pruned in between, after a rollback) are counted again, all of them. It recounted after
+ * every crash before, 4 s and more on a big history, with the site down meanwhile (the 31 October review, SERVER-3).
  */
+
+/**
+ * A person's row (mp) of a match (room_code: the match's) as a team win the tallies count: won, two a side or more,
+ * and in a private room against at least one person. It reads the match's other rows — bots' among them — so it's
+ * decided as the match is settled and kept on the row (match_players.team_win: history.ts prunes bots' rows later).
+ */
+export const TEAM_WIN = (roomCode: string) => `(mp.won IS 1 AND mp.team IS NOT NULL
+  AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
+  AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
+  AND (${roomCode} IS NULL OR EXISTS (
+    SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team)))`;
 
 /** Each match a player played (mp, with its match m), as it adds to their tally in that mode. */
 const MODE_TALLY = `
   SELECT mp.user_id, m.mode, COUNT(*),
     SUM(mp.placement = 1 AND m.player_count > 1 AND mp.left_match = 0),
     SUM(mp.won IS 1),
-    SUM(mp.won IS 1 AND mp.team IS NOT NULL
-      AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
-      AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
-      AND (m.room_code IS NULL OR EXISTS (
-        SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team))),
+    -- Kept on the row since v43; a row from before (still being filled in: history.ts) works it out.
+    SUM(COALESCE(mp.team_win, ${TEAM_WIN('m.room_code')})),
     SUM(m.player_count > 1),
     SUM(CASE WHEN m.player_count > 1 THEN mp.placement ELSE 0 END)
   FROM match_players mp JOIN matches m ON m.id = mp.match_id`;
@@ -105,6 +114,17 @@ function rowsMark(): string {
   return `${r.ended ?? 0}:${r.logged ?? 0}:${r.oldest ?? 0}`;
 }
 
+/**
+ * The tallies are kept up to the rows as they stand: called at the end of every transaction that settles a match,
+ * prunes answers or erases an account (after its rows are in), so a crash right after leaves nothing to recount.
+ */
+export function markTallied() {
+  run(
+    "INSERT INTO settings (key, value) VALUES ('tallied_to', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    rowsMark(),
+  );
+}
+
 /** Marks the tallies as kept up to now: at a clean stop, the only time nothing is half-way. */
 export function keepTallies() {
   run(
@@ -120,7 +140,10 @@ export function keepTallies() {
  */
 export function catchUpTallies(): boolean {
   const mark = one<{ value: string }>("SELECT value FROM settings WHERE key = 'tallies_kept'")?.value;
-  const kept = mark === rowsMark();
+  const tallied = one<{ value: string }>("SELECT value FROM settings WHERE key = 'tallied_to'")?.value;
+  const now = rowsMark();
+  // Nothing to count on a new database either.
+  const kept = mark === now || tallied === now || now === '0:0:0';
   tx(() => {
     run("DELETE FROM settings WHERE key = 'tallies_kept'");
     if (kept) return;

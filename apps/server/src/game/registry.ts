@@ -16,6 +16,7 @@ import { unlockContext } from '../account';
 import { crowdFor } from '../answers';
 import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';
 import { releaseDailyAttempt, saveDailyProgress } from '../daily';
+import { isBusy } from '../db';
 import { bestMastery } from '../mastery';
 import { reportError } from '../monitoring';
 import { friendsChanged } from '../notify';
@@ -167,6 +168,8 @@ export class GameRegistry {
   private missed = new Map<number, { start: GameStartPayload; end: GameEndPayload; until: number }>();
   private closedListeners: ((game: Game) => void)[] = [];
   private idleWaiters: (() => void)[] = [];
+  /** Matches over, whose results are still being saved (the database was busy: Game.settle retries). */
+  private settling = new Set<Game>();
   private draining = false;
 
   constructor(private io: IO) {
@@ -239,9 +242,9 @@ export class GameRegistry {
     return live.length;
   }
 
-  /** Resolves once no match is running (or after `maxMs`). */
+  /** Resolves once no match is running and none is still saving its results (or after `maxMs`). */
   idle(maxMs: number): Promise<void> {
-    if (this.games.size === 0 || maxMs <= 0) return Promise.resolve();
+    if (this.quiet || maxMs <= 0) return Promise.resolve();
     return new Promise((resolve) => {
       const timer = setTimeout(resolve, maxMs);
       this.idleWaiters.push(() => {
@@ -322,11 +325,13 @@ export class GameRegistry {
           try {
             return finalizeMatch(g, standings);
           } catch (err) {
-            // Nothing of the match was saved: a daily or challenge-link run must not cost the player their one try.
-            releaseAttempts(g);
+            // Nothing of the match was saved: a daily or challenge-link run must not cost the player their one try —
+            // unless the database was only busy, when the match tries again (and releases it if it gives up).
+            if (!isBusy(err)) releaseAttempts(g);
             throw err;
           }
         },
+        busy: isBusy,
         release: releaseAttempts,
         progress: saveProgress,
         draining: () => this.draining,
@@ -336,6 +341,7 @@ export class GameRegistry {
         },
         undelivered: (userId, start, end) => this.keepMissed(userId, start, end),
         onClosed: (g) => this.close(g),
+        onSettled: (g) => this.settled(g),
       },
     );
 
@@ -413,6 +419,21 @@ export class GameRegistry {
     this.io.in(`game:${game.id}`).socketsLeave(`game:${game.id}`);
     friendsChanged(...userIds);
     for (const listener of this.closedListeners) listener(game);
-    if (this.games.size === 0) for (const done of this.idleWaiters.splice(0)) done();
+    if (game.settling) this.settling.add(game);
+    this.wakeIdle();
+  }
+
+  /** A match that closed while its results were saving has saved them (or given up). */
+  private settled(game: Game) {
+    this.settling.delete(game);
+    this.wakeIdle();
+  }
+
+  private get quiet() {
+    return this.games.size === 0 && this.settling.size === 0;
+  }
+
+  private wakeIdle() {
+    if (this.quiet) for (const done of this.idleWaiters.splice(0)) done();
   }
 }

@@ -31,6 +31,7 @@ import { questsInfo } from './quests';
 import { bestSeasonTier, getRatings, settleSeasons, unseenSeasonRewards } from './seasons';
 import { pictureUrl } from './sets';
 import { installationSecret } from './settings';
+import { markTallied } from './tallies';
 import { achievementSet, DELETED_NAME, emailKey, getUser, isAdmin, toPublicUser, type UserRow } from './users';
 
 export function unlockContext(userId: number): UnlockContext {
@@ -339,6 +340,7 @@ export function eraseAccount(userId: number) {
     run('DELETE FROM users WHERE id = ?', userId);
     // A group they were the last in goes with them.
     dropEmptyGroups(groups);
+    markTallied();
   });
   disconnectUser(userId);
 }

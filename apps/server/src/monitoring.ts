@@ -352,6 +352,27 @@ export function shipLogs(): () => Promise<void> {
 /** Sends the log lines waiting to go (before the process exits on a crash); nothing when logs aren't shipped. */
 export let flushLogs: () => Promise<void> = async () => {};
 
+/**
+ * The last resort for a bug no guard caught (index.ts listens with it). A promise that failed with nobody to hear it is
+ * reported, and play goes on: the jobs left running on their own are side jobs (a push, a mail, a report), and exiting
+ * for one would end every live match (the 31 October review, SERVER-7) — as a client event that throws only fails that
+ * request (realtime.ts). A throw that reached the event loop may have left things half-changed: it is reported, and
+ * once the report and the log lines waiting to go (that one among them) are out, the process exits and Docker starts
+ * it again.
+ */
+export function lastResort(
+  event: 'uncaughtException' | 'unhandledRejection',
+  err: unknown,
+  exit: (code: number) => void = (code) => process.exit(code),
+) {
+  if (event === 'unhandledRejection') {
+    void reportError(err, event);
+    return;
+  }
+  void Promise.all([reportError(err, event), flushLogs()]).finally(() => exit(1));
+  setTimeout(() => exit(1), 3000).unref();
+}
+
 type LogLevel = 'info' | 'warn' | 'error';
 interface LogItem {
   timestamp: number;
