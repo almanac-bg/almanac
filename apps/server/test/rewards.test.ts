@@ -297,6 +297,20 @@ test(`the same two people move each other's rating ${RATED_GAMES_PER_PAIR} times
   assert.equal(capped.unrated, 'pair');
 });
 
+test('only the last day counts for that limit, however long the two have played each other', () => {
+  const [a, b] = [account(), account()];
+  for (let i = 0; i < RATED_GAMES_PER_PAIR; i++) duel(a, b, 3);
+  // Those were yesterday's: the limit reads the last day's rows only (SERVER-2), not their whole history.
+  run(
+    'UPDATE matches SET ended_at = ended_at - 25 * 60 * 60 * 1000 WHERE id IN (SELECT match_id FROM match_players WHERE user_id = ?)',
+    a,
+  );
+  for (let i = 0; i < RATED_GAMES_PER_PAIR; i++) {
+    assert.notEqual(duel(a, b, 3).end.rewards!.rating, null, `today's game ${i + 1} is rated`);
+  }
+  assert.equal(duel(a, b, 3).end.rewards!.unrated, 'pair');
+});
+
 test('a walkout during the countdown is no game between the two for that limit, whoever walked out', () => {
   // The leaver has the lower account number: their row is the one with a rating change.
   const [low, high] = [account(), account()];
