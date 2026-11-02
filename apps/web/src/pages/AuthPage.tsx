@@ -3,18 +3,18 @@ import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PAS
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, Presentation, UsersRound } from 'lucide-react';
 import { m } from 'motion/react';
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { BannedData } from '../components/BannedData';
 import { Emoji } from '../components/Emoji';
 import { LegalLinks } from '../components/LegalLinks';
+import { Logo } from '../components/Logo';
 import { AboutGame, ProofLine } from '../components/landing/About';
 import { DESKTOP } from '../components/landing/device';
-import { ChallengeLanding, Consent, DailyLanding, GuestPlay, NewcomerStart, Or } from '../components/landing/Entry';
+import { Consent, GuestPlay, NewcomerStart, Or } from '../components/landing/Entry';
 import { ForgotPassword } from '../components/landing/ForgotPassword';
-import { Logo } from '../components/NavBar';
 import { PasswordField } from '../components/PasswordField';
-import { Button, Card, Field, INPUT, Segmented } from '../components/ui';
+import { Button, Card, Field, INPUT, Segmented, Spinner } from '../components/ui';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { embeddedChallenge } from '../lib/embedded';
 import { useFitWidth } from '../lib/fitWidth';
@@ -23,6 +23,7 @@ import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
 import { focusPageHeading } from '../lib/routeFocus';
 import { usePageTitle } from '../lib/title';
+import { ChallengeLanding, DailyLanding, prefetchApp } from './lazy';
 
 // What works with nobody else online comes first: the day's questions (everyone's the same) and a link to a friend.
 const FEATURES = [
@@ -115,8 +116,10 @@ export function AuthPage() {
     setError(null);
     setDataToken(null);
     setBusy(true);
-    // The realtime library comes while the sign-in is on its way: the lobby connects the moment it opens.
+    // The realtime library and the page signing in opens on (the lobby, mostly) come while the sign-in is on its way:
+    // it opens, and connects, the moment the answer is in.
     void loadRealtime().catch(() => {});
+    prefetchApp(pathname);
     try {
       const { user, emailNotSent } =
         mode === 'login'
@@ -146,6 +149,7 @@ export function AuthPage() {
     try {
       // From a room's link: a guest only for the room (a pupil in a class), erased within an hour of leaving.
       void loadRealtime().catch(() => {}); // as for a sign-in
+      prefetchApp(landing?.to ?? pathname);
       const { user } = await api.guest(!!roomCode);
       // Same render as signing in, so the signed-in app opens straight on the right page.
       if (landing) navigate(landing.to, { replace: true, state: landing.state });
@@ -249,13 +253,15 @@ export function AuthPage() {
             {/* Nearly opaque: the floating emoji behind it would otherwise drift across the fields. */}
             <Card className="relative bg-ink-2/95 p-5 sm:p-8">
               {daily && !formOpen ? (
-                <DailyLanding
-                  preview={dailyPreview.data}
-                  busy={guestBusy}
-                  guestError={guestError}
-                  onPlay={() => playAsGuest(guestLanding)}
-                  onSignIn={() => openForm('login')}
-                />
+                <Suspense fallback={<InvitationLoading />}>
+                  <DailyLanding
+                    preview={dailyPreview.data}
+                    busy={guestBusy}
+                    guestError={guestError}
+                    onPlay={() => playAsGuest(guestLanding)}
+                    onSignIn={() => openForm('login')}
+                  />
+                </Suspense>
               ) : !linked && !formOpen ? (
                 <NewcomerStart
                   busy={guestBusy}
@@ -265,15 +271,17 @@ export function AuthPage() {
                   onForm={openForm}
                 />
               ) : challengeId && !formOpen ? (
-                <ChallengeLanding
-                  preview={preview.data}
-                  error={preview.error}
-                  onRetry={preview.retry}
-                  busy={guestBusy}
-                  guestError={guestError}
-                  onPlay={() => playAsGuest(guestLanding)}
-                  onSignIn={() => openForm('login')}
-                />
+                <Suspense fallback={<InvitationLoading />}>
+                  <ChallengeLanding
+                    preview={preview.data}
+                    error={preview.error}
+                    onRetry={preview.retry}
+                    busy={guestBusy}
+                    guestError={guestError}
+                    onPlay={() => playAsGuest(guestLanding)}
+                    onSignIn={() => openForm('login')}
+                  />
+                </Suspense>
               ) : mode === 'forgot' ? (
                 <ForgotPassword
                   initial={username}
@@ -493,5 +501,14 @@ export function AuthPage() {
         />
       )}
     </>
+  );
+}
+
+/** While the player whose link it is comes (their part of the landing is a file of its own: pages/lazy.ts). */
+function InvitationLoading() {
+  return (
+    <div className="grid place-items-center py-16">
+      <Spinner className="size-8 text-amber-300" />
+    </div>
   );
 }

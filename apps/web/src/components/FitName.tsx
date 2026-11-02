@@ -88,8 +88,12 @@ export function PlayerName({ name, className }: { name: string; className?: stri
   );
 }
 
-/** The name with line-break chances after "_", "." and "-", and where letters meet digits. */
+/**
+ * The name with line-break chances after "_", "." and "-", and where letters meet digits. Nothing for a name that
+ * isn't there (a player gone from the data): no crash for want of one.
+ */
 function Breakable({ name }: { name: string }) {
+  if (typeof name !== 'string' || !name) return null;
   return name.split(/(?<=[_.-])|(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u).map((part, i) => (
     // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one name, in order
     <Fragment key={i}>

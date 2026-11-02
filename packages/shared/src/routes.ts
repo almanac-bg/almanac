@@ -132,6 +132,22 @@ export function routeKind(path: string): 'public' | 'app' | 'unknown' {
 }
 
 /**
+ * The code a public page needs to come alive, as the web app splits it: its page file (the landing's sign-in, the
+ * legal pages or the guides) and the quiz it shows — a holiday's own questions (by its slug) or the public sample.
+ * The app loads them before it hydrates the drawn page, and the web build lists their files for the server, which
+ * names them in the page so the browser fetches them with it (the 31 October review, WEB-6 and WEB-7).
+ */
+export function publicPageCode(path: string): { page: 'auth' | 'legal' | 'guide'; quiz?: string } | null {
+  if (path === '/') return { page: 'auth' };
+  if (path === '/privacy' || path === '/terms') return { page: 'legal' };
+  if (routeKind(path) !== 'public') return null;
+  if (path === '/facts') return { page: 'guide', quiz: 'sample' };
+  const slug = /^\/quiz\/([a-z-]+)$/.exec(path)?.[1];
+  if (!slug) return { page: 'guide' };
+  return { page: 'guide', quiz: CATEGORIES.some((c) => c.id === slug) ? 'sample' : slug };
+}
+
+/**
  * Addresses as error reports and the server's log keep them, in a URL or anywhere in a line of text: the path alone (a
  * query can carry a password-reset or unsubscribe token), and no part that names a player or opens something private —
  * a profile, a room, a link to a challenge, a day's questions, a group or a set, a set's picture, the email-events

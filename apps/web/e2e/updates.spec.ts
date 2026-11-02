@@ -1,5 +1,5 @@
 import type { WebSocketRoute } from '@playwright/test';
-import { expect, startAsGuest, startSolo, test } from './support';
+import { expect, expectLobby, startAsGuest, startSolo, test } from './support';
 
 // The app's service worker answers file requests from its cache in some engines, out of page.route()'s sight: here
 // every download goes over the network, where the tests decide how it ends.
@@ -15,7 +15,7 @@ const LEGAL_CODE = /\/assets\/LegalPages-[^/]+\.js$/;
  */
 function forgive(problems: string[]) {
   const expected = (p: string) =>
-    /LegalPages|GamePage|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520|#422/.test(
+    /LegalPages|GamePage|AuthPage|dynamically imported module|Importing a module script failed|Failed to load resource|MIME type|#520|#422/.test(
       p,
     ) || /^console: (Error|JSHandle@object) \(.*\/assets\/react-[^/]+\.js\)$/.test(p);
   problems.splice(0, problems.length, ...problems.filter((p) => !expected(p)));
@@ -59,7 +59,9 @@ test('a deploy mid-session: the server says so, the tab comes back to the new on
   await reloaded;
   await expect(page.getByRole('heading', { name: 'Политика за поверителност', exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/privacy$/);
-  expect(asked).toBe(2);
+  // The old file, then the new one. (With page.route on, the browser's cache is off: the drawn /privacy's early fetch
+  // of its code and the app's import then both reach the server.)
+  expect(asked).toBeGreaterThanOrEqual(2);
   forgive(pageProblems);
 });
 
@@ -83,8 +85,8 @@ test('a page whose code won’t download: one reload to fetch it again, then a w
   await expect(page.getByRole('heading', { name: 'Страницата не се зареди', exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  // A moment more: no second reload comes.
-  await page.waitForTimeout(1_500);
+  // A moment more (longer than a reload waits, lib/reload.ts): no second reload comes.
+  await page.waitForTimeout(2_500);
   expect(loads, 'reloaded once to try again').toBe(1);
 
   // The deploy is through: „Опитай пак“ asks for the page anew, in every engine. (WebKit once kept the failed file for
@@ -110,5 +112,30 @@ test('a page whose code was lost while the lobby fetched it in the background st
   await expect.poll(() => lost, { message: 'the background fetch asked for the match’s code' }).toBeGreaterThan(0);
   await startSolo(page, 'Микс');
   await expect(page.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: 15_000 });
+  forgive(pageProblems);
+});
+
+test('a drawn page whose code is lost as the page fetches it ahead still comes alive, without a reload', async ({
+  page,
+  pageProblems,
+}) => {
+  // The landing fetches its sign-in's code as it starts (public/early.js, from the list the server put on its tag):
+  // that first download doesn't arrive. The app's own import asks again, and the page never notices. (WebKit, which
+  // fetches nothing early, loses its first import instead, and asks again with the next. A failed preload link — and
+  // once a `modulepreload` — it keeps failed for the tab, even through a reload: the 31 October review, WEB-2.)
+  let asked = 0;
+  await page.route(/\/assets\/AuthPage-[^/]+\.js$/, (route) =>
+    asked++ === 0 ? route.abort('internetdisconnected') : route.continue(),
+  );
+  let loads = 0;
+  page.on('load', () => loads++);
+  await page.goto('/');
+  await expect.poll(() => asked, { message: 'asked again' }).toBeGreaterThan(1);
+  // Taken over (lib/painted.ts), and never loaded anew.
+  await expect(page.locator('#root[data-painted]')).toHaveCount(0);
+  await page.waitForTimeout(1_000);
+  expect(loads).toBe(1);
+  await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
+  await expectLobby(page);
   forgive(pageProblems);
 });

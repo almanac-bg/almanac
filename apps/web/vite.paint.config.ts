@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { quizCounts } from './vite.quizzes.ts';
 
 /**
  * The server's renderer of the pages it sends already drawn (src/paint.tsx → dist-ssr/paint.mjs). One file with its
@@ -6,6 +7,8 @@ import { defineConfig } from 'vite';
  */
 export default defineConfig({
   publicDir: false,
+  // The hub's counts, as the client build has them (vite.quizzes.ts).
+  plugins: [quizCounts()],
   ssr: { noExternal: true },
   // React's production build only (the server runs in production; development has the plain page).
   define: { 'process.env.NODE_ENV': '"production"' },

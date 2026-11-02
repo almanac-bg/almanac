@@ -100,3 +100,33 @@ export function PageBoundary({ children }: { children: ReactNode }) {
     </ErrorBoundary>
   );
 }
+
+/**
+ * Round one piece of the frame around the pages (the nav, an invite, the queue's overlay, a banner, a prompt): its
+ * crash is reported and it draws nothing — the page, the other pieces and the connection stay. Without it the root
+ * boundary unmounted the whole app, and with it the socket (the 31 October review, WEB-8); these pieces draw the
+ * server's data (a sender, a recap, the queue's players), where an odd field has crashed one before. `name` says which
+ * in the report; a navigation lets it try again.
+ */
+export class FrameBoundary extends Component<
+  { children: ReactNode; name: string; resetKey?: string },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    if (!isChunkFailure(error)) reportCrash('render', error, `frame: ${this.props.name}\n${info.componentStack ?? ''}`);
+  }
+
+  componentDidUpdate(prev: { resetKey?: string }) {
+    if (this.state.failed && prev.resetKey !== this.props.resetKey) this.setState({ failed: false });
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}

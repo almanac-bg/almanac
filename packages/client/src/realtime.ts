@@ -18,6 +18,7 @@ import {
 import type { io as connect, Socket } from 'socket.io-client';
 import { api } from './api';
 import { clientConfig, effect, preloadImage } from './config';
+import { loadRealtime } from './library';
 import { getState, type LiveGame, patchGame, setState, signedOut, toast } from './store';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -58,19 +59,6 @@ const RECONNECT = { delayMs: 1000, jitter: 0.5 };
  * (test/load.ts on 2000 players: up to half a second); spread out, it's a handful a millisecond.
  */
 const AFTER_RESTART = { delayMs: 2500, jitter: 1 };
-
-/**
- * The realtime library, a file of its own: fetched when someone signs in or plays as a guest (while that request is on
- * its way), not only after — on a slow line it sat on the path to the first connection.
- */
-let library: Promise<typeof import('socket.io-client')> | null = null;
-export function loadRealtime() {
-  library ??= import('socket.io-client').catch((err: unknown) => {
-    library = null; // to be asked for again
-    throw err;
-  });
-  return library;
-}
 
 /** Wanted connected: a sign-out while the library was still loading doesn't connect it afterwards. */
 let wanted = false;

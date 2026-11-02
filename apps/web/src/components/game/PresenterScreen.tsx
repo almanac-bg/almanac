@@ -11,7 +11,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';
-import { Logo } from '../NavBar';
+import { Logo } from '../Logo';
 import { burst } from '../results/confetti';
 import { Button } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';

@@ -1,9 +1,9 @@
+import { QUIZ_COUNTS } from 'virtual:quiz-counts';
 import { fmt } from '@quiz/client';
 import {
   BRAND,
   CATEGORIES,
   CATEGORY_ABOUT,
-  type CategoryId,
   categoryById,
   EVENING,
   IMAGE,
@@ -27,99 +27,62 @@ import clsx from 'clsx';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-// The public sample questions (the same file is in the open-source repository): the real bank never leaves the server.
-import SAMPLE from '../../../server/src/data/questions.sample.json';
 import { Emoji } from '../components/Emoji';
 import { LETTERS } from '../components/game/answers';
 import { LegalLinks } from '../components/LegalLinks';
-import { Logo } from '../components/NavBar';
+import { Logo } from '../components/Logo';
 import { buttonClass, Card } from '../components/ui';
-import ALPHABET from '../content/alphabet-day.json';
-import BOTEV from '../content/botev.json';
-import CHRISTMAS from '../content/christmas.json';
-import ENLIGHTENERS from '../content/enlighteners-day.json';
-import INDEPENDENCE from '../content/independence-day.json';
-import LEVSKI from '../content/levski.json';
-import LIBERATION from '../content/liberation-day.json';
-import UNIFICATION from '../content/unification-day.json';
+import { type QuizQuestion, useQuiz } from '../content/quizzes';
 import { useSite } from '../lib/site';
 import { usePublicPageTitle } from '../lib/title';
 import { keepTogether } from '../lib/typography';
 import { NotFoundPage } from './NotFoundPage';
 
-interface SampleQuestion {
-  id: string;
-  category: CategoryId;
-  kind?: string;
-  q: string;
-  options?: string[];
-  answer?: number;
-  fact?: string;
-  factSource?: string;
-  image?: unknown;
-}
-
-/** The sample's plain four-option questions (pictures need the game's own files; numbers and orders its screens). */
-const CHOICE = (SAMPLE as SampleQuestion[]).filter(
-  (q): q is SampleQuestion & { options: string[]; answer: number } =>
-    (q.kind ?? 'choice') === 'choice' && !q.image && !!q.options && q.answer !== undefined,
-);
-const byCategory = (id: CategoryId) => CHOICE.filter((q) => q.category === id);
-
-type QuizQuestion = { id: string; q: string; options: string[]; answer: number; fact?: string; factSource?: string };
-
 /**
  * Quizzes for a holiday, from a pool of their own (never in the game's bank): their own page each, in the order of
- * the year. A lead names no answer: it's on the page above the questions.
+ * the year, with its questions in a file of its own (src/content/<slug>.json, fetched with that page alone). A lead
+ * names no answer: it's on the page above the questions.
  */
-const HOLIDAYS: Record<string, { name: string; icon: string; lead: string; questions: QuizQuestion[] }> = {
+const HOLIDAYS: Record<string, { name: string; icon: string; lead: string }> = {
   levski: {
     name: 'Викторина за Васил Левски',
     icon: '🦁',
     lead: '19 февруари, денят на Апостола: животът му, комитетите, идеите му за свободна България и паметта за него.',
-    questions: LEVSKI as QuizQuestion[],
   },
   'liberation-day': {
     name: 'Викторина за 3 март',
     icon: '🕊️',
     lead: 'Освобождението: Руско-турската война от 1877–1878 г., боевете, мирът и паметниците.',
-    questions: LIBERATION as QuizQuestion[],
   },
   'alphabet-day': {
     name: 'Викторина за 24 май',
     icon: '✍️',
     lead: '24 май, денят на българската азбука, просвета и култура: Кирил и Методий, двете славянски азбуки, учениците им и нашите букви.',
-    questions: ALPHABET as QuizQuestion[],
   },
   botev: {
     name: 'Викторина за Христо Ботев',
     icon: '⚔️',
     lead: '2 юни: поетът и революционерът Христо Ботев — стиховете и вестниците му, четата и пътят ѝ.',
-    questions: BOTEV as QuizQuestion[],
   },
   'unification-day': {
     name: 'Викторина за Съединението',
     icon: '🤝',
     lead: '6 септември: заговорът, войната, която защитава Съединението, и дипломацията след нея.',
-    questions: UNIFICATION as QuizQuestion[],
   },
   'independence-day': {
     name: 'Викторина за 22 септември',
     icon: '👑',
     lead: '22 септември 1908 г.: как е обявена Независимостта, кое прави момента удобен и как светът я признава.',
-    questions: INDEPENDENCE as QuizQuestion[],
   },
   'enlighteners-day': {
     name: 'Викторина за Деня на народните будители',
     icon: '💡',
     lead: '1 ноември: възрожденските книжовници и учители, първите училища и как денят става празник.',
-    questions: ENLIGHTENERS as QuizQuestion[],
   },
   christmas: {
     name: 'Коледна викторина',
     icon: '🌟',
     lead: 'Бъдни вечер, Рождество и „Тиха нощ“ — коледни въпроси с отговори.',
-    questions: CHRISTMAS as QuizQuestion[],
   },
 };
 
@@ -381,7 +344,7 @@ export function QuizHubPage() {
               <Emoji e={c.icon} className="size-8 shrink-0" size="" />
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-fg">{c.name}</span>
-                <span className="text-sm text-fg-3">{byCategory(c.id).length}&nbsp;въпроса с отговори</span>
+                <span className="text-sm text-fg-3">{QUIZ_COUNTS[c.id]}&nbsp;въпроса с отговори</span>
               </span>
               <ArrowRight aria-hidden className="size-4 text-fg-3" />
             </Link>
@@ -399,7 +362,7 @@ export function QuizHubPage() {
                 <Emoji e={h.icon} className="size-8 shrink-0" size="" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-fg">{keepTogether(h.name)}</span>
-                  <span className="text-sm text-fg-3">{h.questions.length}&nbsp;въпроса с отговори</span>
+                  <span className="text-sm text-fg-3">{QUIZ_COUNTS[slug]}&nbsp;въпроса с отговори</span>
                 </span>
                 <ArrowRight aria-hidden className="size-4 text-fg-3" />
               </Link>
@@ -420,8 +383,10 @@ export function QuizCategoryPage() {
   const title = holiday ? keepTogether(holiday.name) : c ? `Викторина: ${c.name}` : undefined;
   usePublicPageTitle(useLocation().pathname);
   const [picked, setPicked] = useState<Record<string, number>>({});
+  // A holiday's own questions, or the category's from the public sample.
+  const quiz = useQuiz(holiday ? category! : c ? 'sample' : null);
   if (!holiday && !c) return <NotFoundPage standalone />;
-  const questions: QuizQuestion[] = holiday ? holiday.questions : byCategory(c!.id);
+  const questions: QuizQuestion[] = holiday ? quiz : quiz.filter((q) => q.category === c!.id);
   const answered = questions.filter((q) => picked[q.id] !== undefined);
   const right = answered.filter((q) => picked[q.id] === q.answer).length;
   return (
@@ -548,6 +513,7 @@ export function QuizCategoryPage() {
 
 export function FactsPage() {
   usePublicPageTitle(useLocation().pathname);
+  const sample = useQuiz('sample');
   return (
     <GuideLayout
       title="Знаеше ли?"
@@ -559,7 +525,7 @@ export function FactsPage() {
       }
     >
       {CATEGORIES.map((c) => {
-        const facts = byCategory(c.id).filter((q) => q.fact);
+        const facts = sample.filter((q) => q.category === c.id && q.fact);
         if (!facts.length) return null;
         return (
           <Section key={c.id} title={`${c.name}`}>

@@ -45,7 +45,7 @@ import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
-import { Logo, Rosette } from '../components/NavBar';
+import { Logo, Rosette } from '../components/Logo';
 import { PRESENCE } from '../components/presence';
 import { QrCode } from '../components/QrCode';
 import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';

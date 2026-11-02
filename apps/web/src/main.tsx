@@ -5,14 +5,14 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { PICTURE_SIZES } from './components/game/QuestionPicture';
+import { PICTURE_SIZES } from './components/game/pictureSizes';
 import { dropOldShares } from './lib/device';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
 import { upgradeReturning } from './lib/returning';
 import { buzz, sfx, unlockAudioOnFirstTap } from './lib/sound';
 import { watchSystemTheme } from './lib/theme';
-import { prefetchLobby, preloadPage } from './pages/lazy';
+import { prefetchStart, preloadPage } from './pages/lazy';
 import './styles.css';
 
 // Every page opens at the top (App scrolls there on each move). Left to the browser, a step back through history also
@@ -90,8 +90,8 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 // The landing page the server drew for a visitor without a session (lib/painted.ts): no need to ask who's signed in
 // before showing it. (The app still asks, in the background.)
-// A challenge link opened without a session (the server says so on the root, and put the preview in the page): the
-// same, so the challenge shows at once.
+// Any other page of the game opened without a session (the server says so on the root; a challenge link's page has
+// the challenge's preview in it too): the same, so the sign-in, or the challenge, shows at once.
 const signedOut = paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1';
 if (signedOut) setState({ authChecked: true, me: null });
 upgradeReturning();
@@ -108,9 +108,10 @@ const app = (
   </StrictMode>
 );
 // A page the server drew is hydrated, not drawn again: it stays on screen as it is and becomes interactive (a tap
-// that comes before that is replayed). Its code first, for the legal pages, which load on demand.
+// that comes before that is replayed). Its code first, and the quiz it shows (pages/lazy.ts → preloadPage). A page
+// the browser draws: what it will show is asked for now, beside /api/me rather than after it.
 const drawn = isPainted();
-if (!drawn && !signedOut && window.location.pathname === '/') prefetchLobby();
+if (!drawn) prefetchStart(window.location.pathname, signedOut);
 preloadPage(window.location.pathname, drawn && signedOut)
   .catch(() => {})
   .then(() => (drawn ? hydrateRoot(container, app) : createRoot(container).render(app)));
