@@ -26,6 +26,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { SetVisibilityForm } from '../components/admin/Decisions';
 import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
+import { Radio } from '../components/controls';
 import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
@@ -503,14 +504,16 @@ function QuestionCard({
               key={i}
               className="flex items-center gap-2"
             >
-              <input
-                type="radio"
-                name={`${id}-answer`}
-                checked={d.answer === i}
-                onChange={() => onChange({ ...d, answer: i })}
-                aria-label={`${LETTERS[i]} е верният`}
-                className="size-5 shrink-0 accent-emerald-400"
-              />
+              {/* The whole 44 px square picks it (the mark alone is small to hit). */}
+              <label className="relative grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl hover:bg-tint/5">
+                <Radio
+                  name={`${id}-answer`}
+                  checked={d.answer === i}
+                  onChange={() => onChange({ ...d, answer: i })}
+                  aria-label={`${LETTERS[i]} е верният`}
+                  tone="text-emerald-400"
+                />
+              </label>
               <span className="w-5 shrink-0 font-display font-bold" style={{ color: accentText(OPTION_COLORS[i]) }}>
                 {LETTERS[i]}
               </span>

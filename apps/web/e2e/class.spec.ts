@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, gameMs, me, playMatch, png, roomCode, signUp, test, uniqueName } from './support';
+import { choose, expect, gameMs, me, playMatch, png, roomCode, signUp, test, uniqueName } from './support';
 
 /** The test server's database (playwright.config.ts): what the tests can't do through the app. */
 const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
@@ -39,9 +39,7 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await teacher.goto('/');
   await teacher.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
   await expect(teacher).toHaveURL(/\/room$/);
-  // By its value, found by its text: engines differ on an option's label once it starts with an emoji.
-  const sets = teacher.getByLabel('Въпроси', { exact: true });
-  await sets.selectOption((await sets.locator('option', { hasText: 'Урок 5 (2)' }).getAttribute('value'))!);
+  await choose(teacher, 'Въпроси', /^Урок 5/);
   await expect(teacher.getByText('Всичките 2 въпроса, в реда на набора.', { exact: false })).toBeVisible();
   await teacher.getByRole('switch', { name: 'Само водя' }).click();
   // The projector's lobby (VD-8): where to go and the code, big, and a QR code of the invite link.

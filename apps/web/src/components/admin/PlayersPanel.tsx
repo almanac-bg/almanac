@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useLoad } from '../../lib/load';
 import { Avatar, LevelBadge } from '../Avatar';
+import { Checkbox } from '../controls';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Segmented, Spinner } from '../ui';
 import {
@@ -414,8 +415,8 @@ function ChangeBanForm({
       <Segmented value={days} onChange={setDays} options={CHANGE_OPTIONS} />
       <p className="text-xs text-fg-3">{days === 'lift' ? '' : 'Новият край се брои от днес.'}</p>
       {annulled && days === 'lift' && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={restore} onChange={(e) => setRestore(e.target.checked)} />
+        <label className="relative flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox checked={restore} onChange={(e) => setRestore(e.target.checked)} />
           Върни и резултатите от този сезон (анулирани заедно със спирането)
         </label>
       )}

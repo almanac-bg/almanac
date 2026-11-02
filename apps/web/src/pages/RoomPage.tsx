@@ -39,12 +39,13 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
 import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
+import { Select, Slider } from '../components/controls';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
 import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
-import { Logo } from '../components/NavBar';
+import { Logo, Rosette } from '../components/NavBar';
 import { PRESENCE } from '../components/presence';
 import { QrCode } from '../components/QrCode';
 import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';
@@ -198,19 +199,15 @@ export function RoomPage() {
                 : 'Всички въпроси от една категория:'}
           </p>
           {categoryMode === 'one' && (
-            <select
-              aria-label="Категория"
-              disabled={!isHost}
-              value={s.category}
-              onChange={(e) => update({ category: e.target.value as CategoryChoice })}
-              className="field mt-2 h-11 w-full rounded-2xl pr-10 pl-3 text-sm disabled:opacity-70"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id} className="bg-ink-2">
-                  {c.icon} {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-2">
+              <Select<CategoryChoice>
+                aria-label="Категория"
+                disabled={!isHost}
+                value={s.category}
+                onChange={(category) => update({ category })}
+                options={CATEGORIES.map((c) => ({ value: c.id, label: c.name, icon: <Emoji e={c.icon} /> }))}
+              />
+            </div>
           )}
         </Setting>
       )}
@@ -638,21 +635,24 @@ function QuestionSource({
   return (
     <Setting label="Въпроси">
       {isHost && !guest ? (
-        <select
+        <Select<number>
           aria-label="Въпроси"
-          value={current?.id ?? ''}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-          className="field h-11 w-full rounded-2xl pr-10 pl-3 text-sm"
-        >
-          <option value="" className="bg-ink-2">
-            От АЛМАНАХ
-          </option>
-          {playable.map((x) => (
-            <option key={x.id} value={x.id} className="bg-ink-2">
-              📝 {x.name} ({x.questions})
-            </option>
-          ))}
-        </select>
+          value={current?.id ?? 0}
+          onChange={(id) => onChange(id || null)}
+          options={[
+            { value: 0, label: 'От АЛМАНАХ', icon: <Rosette className="h-4 w-auto" /> },
+            // The set in the room, while the list of them is still on its way.
+            ...(current && !playable.some((x) => x.id === current.id)
+              ? [{ value: current.id, label: current.name, icon: <Emoji e="📝" /> }]
+              : []),
+            ...playable.map((x) => ({
+              value: x.id,
+              label: x.name,
+              icon: <Emoji e="📝" />,
+              hint: plural(x.questions, 'въпрос', 'въпроса'),
+            })),
+          ]}
+        />
       ) : (
         <p className="text-sm text-fg-2">
           {current ? (
@@ -707,15 +707,14 @@ function MaxPlayers({
         >
           <Minus className="size-4" />
         </Button>
-        <input
+        <Slider
           id={id}
-          type="range"
           min={min}
           max={max}
           value={Math.min(Math.max(value, min), max)}
           disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="min-w-0 flex-1 accent-violet-400 disabled:opacity-60"
+          className="flex-1"
         />
         <Button
           variant="secondary"
