@@ -6,9 +6,10 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin, type Rolldown } from 'vite';
 import { BRAND, LEGAL } from '../../packages/shared/src/brand.ts';
-import { PUBLIC_PAGES } from '../../packages/shared/src/routes.ts';
+import { PUBLIC_PAGES, publicPageCode } from '../../packages/shared/src/routes.ts';
+import { quizCounts } from './vite.quizzes.ts';
 
 const server = process.env.API_URL ?? 'http://localhost:3001';
 
@@ -105,10 +106,69 @@ const ogVersion = createHash('sha256')
   .digest('base64url')
   .slice(0, 8);
 
+/** The source of each piece of code a public page needs (packages/shared → publicPageCode, src/pages/lazy.ts). */
+const PAGE_FILES = {
+  auth: 'src/pages/AuthPage.tsx',
+  legal: 'src/pages/LegalPages.tsx',
+  guide: 'src/pages/GuidePages.tsx',
+};
+const quizFile = (quiz: string) =>
+  quiz === 'sample' ? '../server/src/data/questions.sample.json' : `src/content/${quiz}.json`;
+/** The motion features, loaded by every page right after its first draw (App.tsx → loadMotion). */
+const MOTION = 'src/lib/motionFeatures.ts';
+
+/**
+ * What a drawn public page needs to come alive beyond the app's first file and its imports — its page file and its
+ * quiz, with their imports, and the motion features every page loads right after its first draw — listed per page in
+ * `.vite/page-code.json` for the server, which names it on the page's early script (public/early.js) so the browser
+ * fetches it with the page instead of each file only once the one before has run (the 31 October review, WEB-6). The
+ * app's first file and its imports are listed too (`entry`), for the browser tests. A missing file fails the build: a
+ * page would otherwise load slower unnoticed.
+ */
+function pageCode(): Plugin {
+  /** A chunk's file and every file it imports, however deep (not what it imports on demand). */
+  function closure(bundle: Rolldown.OutputBundle, file: string, into = new Set<string>()): Set<string> {
+    const chunk = bundle[file];
+    if (into.has(file) || chunk?.type !== 'chunk') return into;
+    into.add(file);
+    for (const imported of chunk.imports) closure(bundle, imported, into);
+    return into;
+  }
+  function chunkOf(bundle: Rolldown.OutputBundle, source: string): string {
+    const id = path.resolve(import.meta.dirname, source);
+    const chunk = Object.values(bundle).find((c) => c.type === 'chunk' && c.facadeModuleId === id);
+    if (!chunk) throw new Error(`page code: no file of its own for ${source}`);
+    return chunk.fileName;
+  }
+  return {
+    name: 'page-code',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const entry = closure(bundle, Object.values(bundle).find((c) => c.type === 'chunk' && c.isEntry)!.fileName);
+      const motion = closure(bundle, chunkOf(bundle, MOTION));
+      const pages: Record<string, string[]> = {};
+      for (const route of Object.keys(PUBLIC_PAGES)) {
+        const code = publicPageCode(route);
+        if (!code) continue;
+        const files = closure(bundle, chunkOf(bundle, PAGE_FILES[code.page]), new Set(motion));
+        if (code.quiz) closure(bundle, chunkOf(bundle, quizFile(code.quiz)), files);
+        pages[route] = [...files].filter((f) => !entry.has(f));
+      }
+      this.emitFile({
+        type: 'asset',
+        fileName: '.vite/page-code.json',
+        source: JSON.stringify({ entry: [...entry], pages }, null, 1),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    quizCounts(),
+    pageCode(),
     {
       name: 'brand',
       transformIndexHtml: (html) =>
@@ -199,7 +259,9 @@ export default defineConfig({
           if (!ctx.bundle) return html;
           const fonts = Object.keys(ctx.bundle).filter((f) => /^assets\/(onest|unbounded)-[\w-]+\.woff2$/.test(f));
           const links = fonts.map((f) => `<link rel="preload" href="/${f}" as="font" type="font/woff2" crossorigin />`);
-          return html.replace('</head>', `${links.join('\n    ')}\n  </head>`);
+          // Before the stylesheet: a page the server draws carries the styles inside it (apps/server/src/index.ts),
+          // and a link after them would be found only once those 20 KB had arrived.
+          return html.replace(/<link rel="stylesheet"/, (tag) => `${links.join('\n    ')}\n    ${tag}`);
         },
       },
     },

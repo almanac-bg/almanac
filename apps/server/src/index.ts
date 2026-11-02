@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import zlib from 'node:zlib';
 import {
   BRAND,
   MODES,
@@ -292,6 +293,7 @@ if (fs.existsSync(config.webDist)) {
   // Each public page with its own title, description and address in the page itself (link previews and search
   // engines read the page, not the app), and the page itself already drawn; the rest of the game says "don't index".
   const drawn = await paintPages();
+  const early = pageCode();
   const publicPages = new Map(
     Object.entries(PUBLIC_PAGES).map(([route, meta]) => {
       const html = withHead(page, {
@@ -302,16 +304,22 @@ if (fs.existsSync(config.webDist)) {
       });
       const pictured = drawn.get(route);
       const mark = route === '/' ? 'signed-out' : '';
+      // A drawn page names the code it needs to come alive (its own and its quiz's): the browser fetches it with the page.
+      const full = (app: string, returning = false) =>
+        styled(withEarly(withApp(html, app, mark, returning), early.get(route)));
       return [
         route,
         {
-          html,
-          painted: pictured ? styled(withApp(html, pictured.app, mark)) : html,
-          returning: pictured?.returning ? styled(withApp(html, pictured.returning, mark, true)) : null,
+          html: compressible(html),
+          painted: compressible(pictured ? full(pictured.app) : html),
+          returning: pictured?.returning ? compressible(full(pictured.returning, true)) : null,
         },
       ];
     }),
   );
+  // Their brotli copies, made on the thread pool once the server is up (about a tenth of a second a page).
+  for (const pub of publicPages.values())
+    for (const variant of [pub.html, pub.painted, pub.returning]) variant?.compress();
   // A screen of the game at its own address: a link to it previews as that address, not the home page.
   const appPage = (at: string) => withHead(page, { index: false, url: `${config.appUrl}${at}` });
   // An address that isn't one says so in the tab too, before the app does.
@@ -329,29 +337,38 @@ if (fs.existsSync(config.webDist)) {
     res.setHeader('cache-control', 'no-cache');
     const kind = routeKind(req.path);
     if (kind !== 'public') res.setHeader('x-robots-tag', 'noindex');
+    const cookie = req.headers.cookie;
+    const session = sessionTokenFromCookieHeader(cookie) !== null;
+    // A screen of the game for a browser without a session cookie says so on its root: the app shows the sign-in (or
+    // what the link opens) at once, and fetches its code with the page's own, instead of asking the server first
+    // (apps/web/src/main.tsx). With a cookie the app asks: a session can have ended.
+    const forApp = (html: string) => {
+      res.vary('Cookie');
+      return session ? html : signedOutRoot(html);
+    };
     const challenge = /^\/c\/([^/]+)$/.exec(req.path)?.[1];
     if (challenge) {
       // A link that never existed is a 404 (its page says so); an expired one still has a page to show.
-      const html = challengePage(page, challenge, sessionTokenFromCookieHeader(req.headers.cookie) === null);
+      const html = challengePage(page, challenge);
       res
         .status(html ? 200 : 404)
         .type('html')
-        .send(html ?? appPage(req.path));
+        .send(forApp(html ?? appPage(req.path)));
       return;
     }
     const daily = /^\/daily(?:\/([^/]+))?$/.exec(req.path);
     if (daily) {
-      res.type('html').send(dailyPage(page, req.path, daily[1] ?? null));
+      res.type('html').send(forApp(dailyPage(page, req.path, daily[1] ?? null)));
       return;
     }
     const join = /^\/join\/([^/]+)$/.exec(req.path)?.[1];
     if (join) {
-      res.type('html').send(joinPage(page, req.path, join));
+      res.type('html').send(forApp(joinPage(page, req.path, join)));
       return;
     }
     const group = /^\/groups\/join\/([^/]+)$/.exec(req.path)?.[1];
     if (group) {
-      res.type('html').send(groupInvitePage(page, req.path, group));
+      res.type('html').send(forApp(groupInvitePage(page, req.path, group)));
       return;
     }
     const pub = publicPages.get(req.path);
@@ -359,17 +376,15 @@ if (fs.existsSync(config.webDist)) {
       // The landing page is drawn for a visitor without a session (in the version for a device that has signed in
       // before, if it says so); with a session, the app opens the lobby instead.
       if (req.path === '/') res.vary('Cookie');
-      const cookie = req.headers.cookie;
-      const session = req.path === '/' && sessionTokenFromCookieHeader(cookie) !== null;
       const returning = !!pub.returning && /(?:^|;\s*)quiz_returning=1(?:;|$)/.test(cookie ?? '');
-      res.type('html').send(session ? pub.html : returning ? pub.returning! : pub.painted);
+      sendCompressible(req, res, req.path === '/' && session ? pub.html : returning ? pub.returning! : pub.painted);
       return;
     }
     // A screen of the game (its own title comes with it), or an address that isn't one: the app shows "not found".
     res
       .status(kind === 'app' ? 200 : 404)
       .type('html')
-      .send(kind === 'app' ? appPage(req.path) : notFoundPage);
+      .send(kind === 'app' ? forApp(appPage(req.path)) : notFoundPage);
   });
 }
 
@@ -403,6 +418,81 @@ async function paintPages(): Promise<Drawn> {
     void reportError(err, 'drawing the public pages');
   }
   return drawn;
+}
+
+/**
+ * The code each drawn public page needs to come alive beyond the app's first file — its page file and its quiz, with
+ * their imports, and the motion features — as the web build lists it (apps/web/vite.config.ts → pageCode), made into
+ * the page's early script (apps/web/public/early.js), which fetches it as the page starts: the app's imports then
+ * find it in the browser's cache instead of asking for each file once the one before has run (the 31 October review,
+ * WEB-6). Not a preload link, which WebKit keeps failed for the tab after one failed download (WEB-2). Without the
+ * list (development), none.
+ */
+function pageCode(): Map<string, string> {
+  const file = path.join(config.webDist, '.vite', 'page-code.json');
+  if (!fs.existsSync(file)) return new Map();
+  const { pages } = JSON.parse(fs.readFileSync(file, 'utf8')) as { pages: Record<string, string[]> };
+  return new Map(
+    Object.entries(pages).map(([route, files]) => [
+      route,
+      `<script async src="/early.js" data-code="${files.map((f) => `/${f}`).join(' ')}"></script>`,
+    ]),
+  );
+}
+
+/** A page with its early script right after the app's own: in the first bytes, where the browser finds it at once. */
+function withEarly(html: string, early: string | undefined): string {
+  if (!early) return html;
+  return html.replace(/<script type="module" crossorigin src="\/assets\/[^"]+"><\/script>/, (entry) => entry + early);
+}
+
+/** A page that's always the same, with its brotli copy once it's made (compress). */
+interface Compressible {
+  text: string;
+  br: Buffer | null;
+  compress(): void;
+}
+
+/**
+ * The drawn pages go out as brotli at the strongest setting, a quarter smaller than the gzip Caddy makes on the fly
+ * (the 31 October review, CF-5): each made once, on the thread pool, after start-up (about a tenth of a second a page,
+ * a few seconds for them all, which a start mustn't wait for). Until its copy is ready, a page goes out as before.
+ */
+function compressible(text: string): Compressible {
+  const page: Compressible = {
+    text,
+    br: null,
+    compress() {
+      const data = Buffer.from(text);
+      zlib.brotliCompress(
+        data,
+        {
+          params: {
+            [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT,
+            [zlib.constants.BROTLI_PARAM_QUALITY]: 11,
+            [zlib.constants.BROTLI_PARAM_SIZE_HINT]: data.length,
+          },
+        },
+        (err, out) => {
+          if (!err) page.br = out;
+        },
+      );
+    },
+  };
+  return page;
+}
+
+/**
+ * A page to a browser that takes brotli, as its brotli copy (Caddy leaves an encoded answer as it is); otherwise as
+ * text, for Caddy to compress. The answer varies with Accept-Encoding either way, so no cache on the way hands the
+ * brotli copy to a browser that didn't ask for it.
+ */
+function sendCompressible(req: Request, res: Response, page: Compressible) {
+  res.vary('Accept-Encoding').type('html');
+  if (page.br && /\bbr\b/.test(req.headers['accept-encoding'] ?? '')) {
+    res.setHeader('content-encoding', 'br');
+    res.send(page.br);
+  } else res.send(page.text);
 }
 
 /**
@@ -543,10 +633,9 @@ function groupInvitePage(html: string, at: string, code: string): string {
  */
 /**
  * A challenge link's page: its own title and preview (link previews show it), and the preview itself in the page, so
- * the app shows the challenge at once. Opened without a session (`signedOut`), the root says so: the app doesn't wait
- * to ask who's signed in.
+ * the app shows the challenge at once.
  */
-function challengePage(html: string, id: string, signedOut: boolean): string | null {
+function challengePage(html: string, id: string): string | null {
   const preview = challengePreview(id);
   if (!preview) return null;
   const name = preview.creator?.username ?? 'Някой';
@@ -568,12 +657,15 @@ function challengePage(html: string, id: string, signedOut: boolean): string | n
     description,
     url: `${config.appUrl}/c/${encodeURIComponent(preview.id)}`,
     index: false,
-  })
-    .replace(
-      '</head>',
-      () => `<script type="application/json" id="challenge-preview">${jsonInHtml(preview)}</script></head>`,
-    )
-    .replace('<div id="root">', signedOut ? '<div id="root" data-signed-out="1">' : '<div id="root">');
+  }).replace(
+    '</head>',
+    () => `<script type="application/json" id="challenge-preview">${jsonInHtml(preview)}</script></head>`,
+  );
+}
+
+/** A page of the game for a browser without a session cookie: its root says so (apps/web/src/main.tsx). */
+function signedOutRoot(html: string): string {
+  return html.replace('<div id="root">', '<div id="root" data-signed-out="1">');
 }
 
 // A bug no guard caught: a failed promise is reported, a throw is reported and the server restarts (lastResort).

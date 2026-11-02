@@ -2,7 +2,7 @@ import { BRAND, LEGAL } from '@quiz/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { LegalLinks } from '../components/LegalLinks';
-import { Logo } from '../components/NavBar';
+import { Logo } from '../components/Logo';
 import { Card } from '../components/ui';
 import { useSite } from '../lib/site';
 import { usePageTitle } from '../lib/title';

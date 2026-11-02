@@ -1,74 +1,46 @@
-import {
-  ApiError,
-  actions,
-  api,
-  connectRealtime,
-  disconnectRealtime,
-  getState,
-  setState,
-  toast,
-  useStore,
-} from '@quiz/client';
+import { ApiError, api, getState, setState, useStore } from '@quiz/client';
 import { routeKind } from '@quiz/shared';
 import { LazyMotion, MotionConfig } from 'motion/react';
-import { type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
-import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
-import { ActiveMatchBar } from './components/ActiveMatchBar';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { Background } from './components/Background';
-import { ConnectionBanner } from './components/ConnectionBanner';
-import { FrameBoundary, PageBoundary } from './components/ErrorBoundary';
-import { Invites } from './components/Invites';
-import { LegalLinks } from './components/LegalLinks';
-import { MaintenanceBanner } from './components/MaintenanceBanner';
-import { NavBar } from './components/NavBar';
-import { PasswordConfirm } from './components/PasswordConfirm';
-import { QueueOverlay } from './components/QueueOverlay';
+import { PageBoundary } from './components/ErrorBoundary';
 import { ReloadForUpdate } from './components/ReloadForUpdate';
-import { RoomDoor, RoomNickname } from './components/RoomNickname';
-import { SeasonRecap } from './components/SeasonRecap';
-import { SecondFactorPrompt } from './components/SecondFactor';
 import { SkipLink } from './components/SkipLink';
 import { Toasts } from './components/Toasts';
-import { Button, Card, PageSpinner, Spinner } from './components/ui';
+import { Button, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
-import { keepPushUp } from './lib/pushUpkeep';
+import { reloadForNewVersion } from './lib/reload';
 import { markReturning } from './lib/returning';
 import { useRouteFocus } from './lib/routeFocus';
 import {
-  AchievementsPage,
-  AdminPage,
   AuthPage,
-  ChallengePage,
-  ClassPage,
-  DailyPage,
   FactsPage,
-  FriendsPage,
-  GamePage,
-  GroupsPage,
-  HomePage,
   HowToPlayPage,
-  KnowledgePage,
-  LeaderboardPage,
-  LockerPage,
-  NotificationsPage,
   PrivacyPage,
-  ProfilePage,
   prefetchPages,
   QuizCategoryPage,
   QuizHubPage,
   ResetPasswordPage,
-  RoomPage,
-  reloadForNewVersion,
-  SetsPage,
-  SettingsPage,
-  SubmitPage,
+  SignedIn,
   TeachersPage,
   TermsPage,
   UnsubscribePage,
   VerifyEmailPage,
 } from './pages/lazy';
 import { NotFoundPage } from './pages/NotFoundPage';
+
+/**
+ * The connection's own code (packages/client/src/realtime.ts), fetched once someone is signed in: the landing never
+ * needs it. One promise for every caller, so a connect and the disconnect after it run in the order they were asked.
+ */
+let realtimeCode: Promise<typeof import('@quiz/client/realtime')> | null = null;
+const realtime = () =>
+  (realtimeCode ??= import('@quiz/client/realtime').catch((err: unknown) => {
+    realtimeCode = null; // to be asked for again
+    throw err;
+  }));
 
 /** Email links and legal pages work whether or not you're signed in. */
 const PUBLIC_PATHS = [
@@ -183,15 +155,17 @@ export function App() {
     // offline, asked for again once the device is back online or the tab comes back.
     let missing = false;
     const connect = () =>
-      connectRealtime().then(
-        () => {
-          missing = false;
-        },
-        () => {
-          missing = true;
-          reloadForNewVersion();
-        },
-      );
+      realtime()
+        .then((r) => r.connectRealtime())
+        .then(
+          () => {
+            missing = false;
+          },
+          () => {
+            missing = true;
+            reloadForNewVersion();
+          },
+        );
     const again = () => {
       if (missing && document.visibilityState === 'visible') void connect();
     };
@@ -201,14 +175,18 @@ export function App() {
     return () => {
       window.removeEventListener('online', again);
       document.removeEventListener('visibilitychange', again);
-      disconnectRealtime();
+      // Only once its code is here (or on its way): never loaded, never connected.
+      void realtimeCode?.then(
+        (r) => r.disconnectRealtime(),
+        () => {},
+      );
     };
   }, [userId]);
 
   // An account's push subscription on this device, kept up (a day at a time).
   const pushable = !!me && !me.isGuest;
   useEffect(() => {
-    if (pushable) void keepPushUp().catch(() => {});
+    if (pushable) void import('./lib/pushUpkeep').then((push) => push.keepPushUp()).catch(() => {});
   }, [pushable]);
 
   // A notification tapped while the app is open: the worker brings this window up and says where (public/sw.js).
@@ -262,7 +240,12 @@ export function App() {
         <Background />
         <Toasts />
         {me && !isPublicPath(pathname) ? (
-          <SignedIn />
+          // The frame's own file: here already once a session was on its way (pages/lazy.ts → prefetchApp).
+          <PageBoundary>
+            <Suspense fallback={<AppLoading />}>
+              <SignedIn />
+            </Suspense>
+          </PageBoundary>
         ) : (
           // The page itself (SignedIn has its header and tab bar around its own <main>).
           <main id="content" tabIndex={-1} className="outline-none">
@@ -300,186 +283,16 @@ export function App() {
   );
 }
 
-function SignedIn() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const gameId = useStore((s) => s.game?.start.gameId);
-  const maintenance = useStore((s) => !!s.maintenance);
-  const inGame = location.pathname === '/game';
-  // A room's host with „Само водя“: the room page is the class's projector lobby — no app chrome round it, as in the
-  // match it leads to (it has its own header, with the way out).
-  const projecting = useStore(
-    (s) => location.pathname === '/room' && !!s.room && !s.room.settings.hostPlays && s.room.hostId === `u${s.me?.id}`,
-  );
-  const bare = inGame || projecting;
-
-  // Jump into a match the moment one starts (queue pop, room start, reconnect).
-  const lastGame = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (gameId && gameId !== lastGame.current && !inGame) navigate('/game');
-    lastGame.current = gameId;
-  }, [gameId, inGame, navigate]);
-
-  // Each piece of the frame on its own: one that crashes goes quiet, the page and the connection stay (WEB-8).
-  const frame = (name: string, piece: ReactNode) => (
-    <FrameBoundary name={name} resetKey={location.pathname}>
-      {piece}
-    </FrameBoundary>
-  );
-
-  return (
-    <>
-      {!bare && frame('nav', <NavBar />)}
-      {/* Right after the header, not after the page: an invite lasts a minute, and a keyboard reached it after the
-          whole lobby (22 Tabs and more). */}
-      {frame('invites', <Invites />)}
-      {!bare && frame('maintenance', <MaintenanceBanner />)}
-      {!bare && frame('active match', <ActiveMatchBar />)}
-      <main
-        id="content"
-        tabIndex={-1}
-        className={
-          inGame
-            ? 'outline-none'
-            : projecting
-              ? 'mx-auto max-w-7xl px-6 py-6 outline-none lg:px-12'
-              : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
-        }
-      >
-        <PageBoundary>
-          <Suspense fallback={<PageLoading />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/game" element={<GamePage />} />
-              <Route path="/room" element={<RoomPage />} />
-              <Route path="/class" element={<ClassPage />} />
-              <Route path="/join/:code" element={<JoinRoute />} />
-              <Route path="/c/:id" element={<ChallengePage />} />
-              <Route path="/daily" element={<DailyPage />} />
-              <Route path="/daily/:code" element={<DailyPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/profile/:username" element={<ProfilePage />} />
-              <Route path="/achievements" element={<AchievementsPage />} />
-              <Route path="/locker" element={<LockerPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
-              <Route path="/friends" element={<FriendsPage />} />
-              <Route path="/knowledge" element={<KnowledgePage />} />
-              <Route path="/knowledge/:category" element={<KnowledgePage />} />
-              <Route path="/groups" element={<GroupsPage />} />
-              <Route path="/groups/:id" element={<GroupsPage />} />
-              <Route path="/groups/join/:code" element={<GroupsPage />} />
-              <Route path="/sets" element={<SetsPage />} />
-              <Route path="/sets/:id" element={<SetsPage />} />
-              <Route path="/sets/shared/:code" element={<SetsPage />} />
-              <Route path="/submit" element={<SubmitPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-        </PageBoundary>
-        {!bare && <LegalLinks className="mt-16 justify-center" />}
-      </main>
-      {!bare && frame('queue', <QueueOverlay />)}
-      {frame('connection', <ConnectionBanner explained={!inGame && maintenance} />)}
-      {frame('season recap', <SeasonRecap />)}
-      {frame('password prompt', <PasswordConfirm />)}
-      {frame('second factor', <SecondFactorPrompt />)}
-    </>
-  );
-}
-
 /** While a page's code arrives (only on a first visit before the background prefetch finishes). */
 function PageLoading() {
   return <PageSpinner />;
 }
 
-/** What the server says to a code no room has (rooms.ts → join). */
-const NO_SUCH_ROOM = 'Няма стая с този код.';
-
-/**
- * Invite links: /join/123456 drops you straight into the room — a guest first says what to call them there. A locked
- * room keeps you at its door until the host lets you in or not; leaving this page leaves the door.
- */
-function JoinRoute() {
-  const { code = '' } = useParams();
-  const navigate = useNavigate();
-  // The name given on the way here, when a mistyped code was corrected: joined with it at once (UX-11).
-  const carried = (useLocation().state as { nickname?: string } | null)?.nickname ?? null;
-  const connected = useStore((s) => s.connected);
-  const guest = useStore((s) => !!s.me?.isGuest);
-  const inside = useStore((s) => s.room?.code === code);
-  const knock = useStore((s) => (s.knock?.code === code ? s.knock : null));
-  const tried = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // In: straight away, or once the host opens the door (the room's state comes before any answer to joining).
-  useEffect(() => {
-    if (inside) navigate('/room', { replace: true });
-  }, [inside, navigate]);
-
-  useEffect(
-    () => () => {
-      const { knock } = getState();
-      if (knock?.code !== code) return;
-      if (knock.refused) setState({ knock: null });
-      else actions.leaveRoom();
-    },
-    [code],
-  );
-
-  useEffect(() => {
-    if (guest || !connected || tried.current) return;
-    tried.current = true;
-    actions.joinRoom(code).then((res) => {
-      if (res.ok) return;
-      toast({ kind: 'error', title: res.error });
-      navigate('/', { replace: true });
-    });
-  }, [guest, connected, code, navigate]);
-
-  async function joinAs(nickname: string, corrected?: string) {
-    // Another code typed in: that room's address, the name with it.
-    if (corrected && corrected !== code) {
-      setError(null);
-      navigate(`/join/${corrected}`, { replace: true, state: { nickname } });
-      return;
-    }
-    setBusy(true);
-    const res = await actions.joinRoom(code, nickname);
-    setBusy(false);
-    if (!res.ok) setError(res.error);
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per code, with the name carried to it
-  useEffect(() => {
-    if (guest && connected && carried) void joinAs(carried);
-  }, [code, guest, connected]);
-
-  if (knock)
-    return (
-      <div className="mx-auto max-w-md">
-        <Card className="p-6 sm:p-8">
-          <RoomDoor code={code} refused={knock.refused} onLeave={() => navigate('/', { replace: true })} />
-        </Card>
-      </div>
-    );
-  if (!guest) return <PageSpinner />;
+/** While the signed-in frame's code arrives (a first start whose download didn't begin early enough). */
+function AppLoading() {
   return (
-    <div className="mx-auto max-w-md">
-      <Card className="p-6 sm:p-8">
-        <RoomNickname
-          key={code}
-          code={code}
-          busy={busy}
-          error={error}
-          // No room with this code: the code itself to check, beside the name (it was a dead end).
-          wrongCode={error === NO_SUCH_ROOM}
-          onJoin={(n, corrected) => void joinAs(n, corrected)}
-        />
-      </Card>
+    <div className="grid min-h-dvh place-items-center">
+      <Spinner className="size-8 text-violet-400" />
     </div>
   );
 }

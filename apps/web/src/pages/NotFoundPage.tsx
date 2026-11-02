@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Link } from 'react-router';
-import { Logo } from '../components/NavBar';
+import { Logo } from '../components/Logo';
 import { buttonClass, Card } from '../components/ui';
 import { usePageTitle } from '../lib/title';
 

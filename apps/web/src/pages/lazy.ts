@@ -1,5 +1,8 @@
-import { routeKind } from '@quiz/shared';
+import { publicPageCode, routeKind } from '@quiz/shared';
 import { type ComponentType, createElement, lazy, useState } from 'react';
+import { matchPath } from 'react-router';
+import { loadQuiz } from '../content/quizzes';
+import { reloadForNewVersion } from '../lib/reload';
 
 /**
  * Pages beyond the first screen load on demand, so visitors download the sign-in page or the lobby first.
@@ -10,6 +13,11 @@ const loaders = {
   // The landing's sign-in and the lobby: each in a file of its own, so a visitor downloads only the one they see.
   auth: () => import('./AuthPage'),
   home: () => import('./HomePage'),
+  // The signed-in app around the pages (header, tab bar, invites, the queue, the prompts): with the lobby, never on the
+  // landing.
+  frame: () => import('../SignedIn'),
+  // Someone's link opened signed out (their day's questions, their challenge): the landing with that player.
+  invitation: () => import('../components/landing/Invitation'),
   achievements: () => import('./AchievementsPage'),
   knowledge: () => import('./KnowledgePage'),
   admin: () => import('./AdminPage'),
@@ -32,6 +40,10 @@ const loaders = {
 
 type Loader = keyof typeof loaders;
 type Module = Record<string, ComponentType>;
+type Exports<L extends Loader> = Awaited<ReturnType<(typeof loaders)[L]>>;
+type PropsOf<T> = T extends ComponentType<infer P> ? P : never;
+/** A page (or a piece of one) that loads on demand, and which file it's in. */
+type LazyPage<P = object> = ComponentType<P> & { loader: Loader };
 
 /** The modules that have arrived: a page from one of them renders at once, without a moment of "loading". */
 const ready = new Map<Loader, Module>();
@@ -41,23 +53,6 @@ function load(loader: Loader): Promise<Module> {
     ready.set(loader, mod as unknown as Module);
     return mod as unknown as Module;
   });
-}
-
-/**
- * A page that's about to be shown didn't arrive. A tab opened before a deploy asks for files that are gone: one reload
- * gets the new version. Not while offline (that would only swap the app for the offline page), and not twice in a
- * row. Only for a page being shown: a background fetch that fails (prefetchPages) mustn't reload the app under the
- * player, taking whatever they were typing with it.
- */
-export function reloadForNewVersion() {
-  if (!navigator.onLine) return;
-  try {
-    if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
-    sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
-  } catch {
-    /* storage unavailable: reload anyway */
-  }
-  window.location.reload();
 }
 
 /** Pages whose code didn't arrive: asked for anew only when the player says to (retryFailedPages). */
@@ -73,12 +68,15 @@ export function retryFailedPages() {
   failed.clear();
 }
 
-function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeof loaders)[L]>>) {
+function page<L extends Loader, N extends keyof Exports<L> & string>(
+  loader: L,
+  name: N,
+): LazyPage<PropsOf<Exports<L>[N]>> {
   let Lazy: ComponentType | null = null;
   const loading = () =>
     (Lazy ??= lazy(() =>
       load(loader).then(
-        (mod) => ({ default: mod[name as string] }),
+        (mod) => ({ default: mod[name] }),
         (err: unknown) => {
           failed.add(() => {
             Lazy = null;
@@ -89,15 +87,18 @@ function page<L extends Loader>(loader: L, name: keyof Awaited<ReturnType<(typeo
       ),
     ));
   // biome-ignore lint/correctness/noComponentHookFactories: made once per page when this module loads, never in a render, so each page's component stays the same
-  function Page(props: object) {
+  function Page(props: PropsOf<Exports<L>[N]>) {
     // Decided once per mount: a page whose code is here already renders at once (no "loading" in between, and a page
     // the server drew hydrates as it is); otherwise it loads. Never switched while mounted, which would remount it.
-    const [Component] = useState<ComponentType>(() => ready.get(loader)?.[name as string] ?? loading());
-    return createElement(Component, props);
+    const [Component] = useState<ComponentType>(() => ready.get(loader)?.[name] ?? loading());
+    return createElement(Component, props as object);
   }
-  return Page;
+  return Object.assign(Page, { loader });
 }
 
+export const SignedIn = page('frame', 'SignedIn');
+export const ChallengeLanding = page('invitation', 'ChallengeLanding');
+export const DailyLanding = page('invitation', 'DailyLanding');
 export const AchievementsPage = page('achievements', 'AchievementsPage');
 export const AuthPage = page('auth', 'AuthPage');
 export const HomePage = page('home', 'HomePage');
@@ -128,28 +129,90 @@ export const TeachersPage = page('guide', 'TeachersPage');
 export const UnsubscribePage = page('unsubscribe', 'UnsubscribePage');
 export const VerifyEmailPage = page('account', 'VerifyEmailPage');
 
-/** Rarely opened, or only by moderators: loaded when asked for, not in the background. */
-const ON_REQUEST: Loader[] = ['legal', 'unsubscribe', 'admin'];
+/**
+ * The signed-in app's pages by address: SignedIn routes them, and a cold start on one fetches its code beside /api/me
+ * (prefetchStart). The invite links (/join/<code>) are SignedIn's own.
+ */
+export const APP_PAGES: [path: string, page: LazyPage][] = [
+  ['/', HomePage],
+  ['/game', GamePage],
+  ['/room', RoomPage],
+  ['/class', ClassPage],
+  ['/c/:id', ChallengePage],
+  ['/daily', DailyPage],
+  ['/daily/:code', DailyPage],
+  ['/profile', ProfilePage],
+  ['/profile/:username', ProfilePage],
+  ['/achievements', AchievementsPage],
+  ['/locker', LockerPage],
+  ['/notifications', NotificationsPage],
+  ['/leaderboard', LeaderboardPage],
+  ['/friends', FriendsPage],
+  ['/knowledge', KnowledgePage],
+  ['/knowledge/:category', KnowledgePage],
+  ['/groups', GroupsPage],
+  ['/groups/:id', GroupsPage],
+  ['/groups/join/:code', GroupsPage],
+  ['/sets', SetsPage],
+  ['/sets/:id', SetsPage],
+  ['/sets/shared/:code', SetsPage],
+  ['/submit', SubmitPage],
+  ['/admin', AdminPage],
+  ['/settings', SettingsPage],
+];
 
-/** Warms the browser's module cache with the pages a player moves between (each loads once; later imports reuse it). */
-export function prefetchPages({ admin }: { admin: boolean }) {
-  for (const loader of Object.keys(loaders) as Loader[])
-    if (!ON_REQUEST.includes(loader) || (admin && loader === 'admin')) void load(loader).catch(() => {});
+/**
+ * Not in the background: rarely opened (the legal pages, an email's unsubscribe link), only by moderators, or not by
+ * a signed-in player (the guides and the sign-in, which a player almost never opens).
+ */
+const ON_REQUEST: Loader[] = ['legal', 'unsubscribe', 'admin', 'guide', 'auth', 'invitation'];
+
+/** A line the player pays for or waits on (Save-Data, or 2G): nothing fetched on the off chance. */
+function sparing(): boolean {
+  const line = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !!line && (line.saveData === true || /2g/.test(line.effectiveType ?? ''));
 }
 
 /**
- * The code of the page at this address, when the server drew it and it loads on demand: fetched before the app first
- * draws it, so the drawn page never blinks to "loading" (main.tsx). The legal pages, the guides (PUBLIC_PAGES) and the
- * sign-in a page drawn for a visitor without a session shows (`signedOut`).
+ * Warms the browser's module cache with the pages a player moves between (each loads once; later imports reuse it).
+ * The match first: a queue that pops or a room that starts can't wait for its page. On a sparing line, only the match.
+ */
+export function prefetchPages({ admin }: { admin: boolean }) {
+  const wanted = (Object.keys(loaders) as Loader[]).filter(
+    (loader) => loader !== 'game' && (!ON_REQUEST.includes(loader) || (admin && loader === 'admin')),
+  );
+  for (const loader of sparing() ? ['game' as const] : ['game' as const, ...wanted]) void load(loader).catch(() => {});
+}
+
+/**
+ * The code a public page needs before the app first draws it (main.tsx): its page file and the quiz it shows (a
+ * holiday's own questions, or the public sample), so a page the server drew hydrates as it is, without a blink to
+ * "loading". The landing's sign-in only for a visitor without a session (`signedOut`): with one, the lobby comes.
  */
 export function preloadPage(pathname: string, signedOut: boolean): Promise<unknown> {
-  if (pathname === '/privacy' || pathname === '/terms') return load('legal');
-  if (pathname !== '/' && routeKind(pathname) === 'public') return load('guide');
-  return signedOut ? load('auth') : Promise.resolve();
+  const code = publicPageCode(pathname);
+  if (!code || (code.page === 'auth' && !signedOut)) return Promise.resolve();
+  return Promise.all([load(code.page), code.quiz && loadQuiz(code.quiz)]);
 }
 
 /**
- * The lobby's code, asked for as the page starts (not waited for): a "/" the server didn't draw was opened with a
- * session, so the lobby is what comes once the app knows who's signed in — fetched meanwhile, not after.
+ * The signed-in app at this address: its frame and the page (an invite link leads to its room). Asked for the moment a
+ * session is on its way (signing in, a guest's start), or as a page with one starts (prefetchStart).
  */
-export const prefetchLobby = () => void load('home').catch(() => {});
+export function prefetchApp(pathname: string) {
+  const page = APP_PAGES.find(([path]) => matchPath(path, pathname))?.[1];
+  const loader = page?.loader ?? (pathname.startsWith('/join/') ? 'room' : null);
+  for (const l of ['frame', loader] as const) if (l) void load(l).catch(() => {});
+}
+
+/**
+ * A start on a page the server didn't draw: what it will show is fetched as the page starts, beside /api/me rather than
+ * after it — the sign-in for a visitor the server knows has no session (with the player whose link it is, for a
+ * challenge or the day's questions), otherwise the signed-in app at this address.
+ */
+export function prefetchStart(pathname: string, signedOut: boolean) {
+  if (routeKind(pathname) !== 'app' && pathname !== '/') return; // a public page: preloadPage's
+  if (!signedOut) return prefetchApp(pathname);
+  const invited = /^\/(c|daily)(\/|$)/.test(pathname);
+  for (const l of ['auth', invited && 'invitation'] as const) if (l) void load(l).catch(() => {});
+}

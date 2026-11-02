@@ -2,12 +2,7 @@ import type { ImageCredit, QuestionImage } from '@quiz/shared';
 import clsx from 'clsx';
 import { m } from 'motion/react';
 import { useState } from 'react';
-
-/**
- * How wide a question's picture shows, for the browser to pick a size by (the preload in main.tsx picks with the same,
- * so the file fetched during the reveal before is the one used).
- */
-export const PICTURE_SIZES = '(min-width: 768px) 720px, 100vw';
+import { PICTURE_SIZES } from './pictureSizes';
 
 const LICENSES: Record<string, string> = { PD: 'обществено достояние' };
 

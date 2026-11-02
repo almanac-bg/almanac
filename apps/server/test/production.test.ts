@@ -320,10 +320,64 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.match(landing.html, /src="\/assets\/[0-9a-f-]+-[\w-]+\.webp"/, 'the landing draws its art from files');
 
   // Every page carries who runs the site, for the footer and the legal pages; the game's own screens aren't drawn.
+  // Opened without a session, a screen of the game says so on its root: the app shows the sign-in at once, without
+  // asking first (and fetches its code with the page's own). With a cookie, the app asks.
   const settings = await get('/settings');
-  assert.equal(settings.root, '<div id="root">');
+  assert.equal(settings.root, '<div id="root" data-signed-out="1">');
+  assert.match(settings.vary ?? '', /cookie/i);
+  assert.equal((await get('/settings', session)).root, '<div id="root">');
   const operator = /<script type="application\/json" id="site">([^<]*)<\/script>/.exec(settings.html)?.[1];
   assert.equal((JSON.parse(operator ?? 'null') as SiteInfo | null)?.name, 'Тест Тестов');
+});
+
+test('a drawn page fetches its own code as it starts, and goes out as brotli to a browser that takes it', {
+  skip: !built || !paintable,
+}, async () => {
+  // What the web build listed (apps/web/vite.config.ts → pageCode): the page's file and its quiz, with their imports.
+  const listed = JSON.parse(
+    fs.readFileSync(path.resolve(import.meta.dirname, '../../web/dist/.vite/page-code.json'), 'utf8'),
+  ) as { entry: string[]; pages: Record<string, string[]> };
+  const named = async (route: string) => {
+    const html = await (await fetch(`${srv.url}${route}`)).text();
+    return /<script async src="\/early\.js" data-code="([^"]+)"><\/script>/.exec(html)?.[1].split(' ') ?? [];
+  };
+  for (const route of ['/', '/how-to-play', '/quiz/history', '/quiz/levski', '/facts', '/privacy']) {
+    const code = await named(route);
+    assert.deepEqual(
+      code,
+      listed.pages[route]?.map((f) => `/${f}`),
+      route,
+    );
+    for (const file of code) assert.equal((await fetch(`${srv.url}${file}`)).status, 200, `${route}: ${file}`);
+    // Never the app's first file or its imports (those the page's own script tag brings).
+    assert.ok(!code.some((f) => listed.entry.includes(f.slice(1))), route);
+  }
+  // A holiday's page fetches its own questions alone; a category's, the public sample; a guide, neither.
+  const quizzes = (code: string[]) => code.filter((f) => /\/assets\/(questions\.sample|levski|botev)-/.test(f));
+  assert.deepEqual(
+    quizzes(await named('/quiz/levski')).map((f) => f.split('-')[0]),
+    ['/assets/levski'],
+  );
+  assert.deepEqual(
+    quizzes(await named('/quiz/history')).map((f) => f.split('-')[0]),
+    ['/assets/questions.sample'],
+  );
+  assert.deepEqual(quizzes(await named('/how-to-play')), []);
+
+  // Brotli at the strongest setting, made after start-up (so asked for until it's there), the same page inside it.
+  const plain = await (await fetch(`${srv.url}/quiz/history`, { headers: { 'accept-encoding': 'identity' } })).text();
+  let res: Response | null = null;
+  for (let tries = 0; tries < 100; tries++) {
+    res = await fetch(`${srv.url}/quiz/history`, { headers: { 'accept-encoding': 'gzip, br' } });
+    if (res.headers.get('content-encoding') === 'br') break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.equal(res?.headers.get('content-encoding'), 'br');
+  assert.match(res?.headers.get('vary') ?? '', /accept-encoding/i);
+  assert.equal(await res?.text(), plain);
+  // A browser that doesn't take brotli gets the page as text (Caddy compresses it on the way).
+  const other = await fetch(`${srv.url}/quiz/history`, { headers: { 'accept-encoding': 'gzip' } });
+  assert.equal(other.headers.get('content-encoding'), null);
 });
 
 test('in every drawn public page, a number keeps to the word after it (COPY-14)', {
@@ -349,12 +403,15 @@ test('in every drawn public page, a number keeps to the word after it (COPY-14)'
 });
 
 test('the server knows every screen of the app (else it would answer it with a 404)', () => {
-  const app = fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src/App.tsx'), 'utf8');
+  const read = (file: string) => fs.readFileSync(path.resolve(import.meta.dirname, '../../web/src', file), 'utf8');
+  // The public pages' routes (App.tsx), the signed-in app's own (SignedIn.tsx) and its pages' table (pages/lazy.ts).
+  const paths = [
+    ...[...`${read('App.tsx')}${read('SignedIn.tsx')}`.matchAll(/<Route path="([^"*]+)"/g)].map((m) => m[1]),
+    ...[...read('pages/lazy.ts').matchAll(/^\s+\['(\/[^']*)', [A-Z]\w+\],$/gm)].map((m) => m[1]),
+  ];
   // A category's quiz is a public page for each real category (an unknown one is a 404): one stands for them.
-  const routes = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((m) =>
-    m[1].replace('/quiz/:category', '/quiz/history').replace(/:[a-z]+/g, 'x1'),
-  );
-  assert.ok(routes.length > 15, `found ${routes.length} routes`);
+  const routes = paths.map((p) => p.replace('/quiz/:category', '/quiz/history').replace(/:[a-z]+/g, 'x1'));
+  assert.ok(routes.length > 30, `found ${routes.length} routes`);
   for (const route of routes) assert.notEqual(routeKind(route), 'unknown', route);
 });
 

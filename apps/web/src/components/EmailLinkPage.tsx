@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { Logo } from './NavBar';
+import { Logo } from './Logo';
 import { Card } from './ui';
 
 /** A page an email's link opens (reset the password, confirm the address, unsubscribe): the logo, then one card. */
