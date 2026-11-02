@@ -86,6 +86,11 @@ export interface LiveGame {
   question: QuestionPayload | null;
   /** Local timestamp when the current question closes. */
   deadline: number;
+  /**
+   * Knocked out and still answering („Играй до края“): the race already has its answer, and the question stays open for
+   * you until this local time (sooner than `deadline`). Null otherwise.
+   */
+  closesAt: number | null;
   answered: string[];
   /**
    * Your pick (-1 = locked in with no option to show: before a reconnect, or a number). It's in once `answered`

@@ -113,8 +113,9 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           </m.span>
         )}
         {out && (
+          // Held past the race's reveal (game:closing): the ring counts down what's left of the hold.
           <span className="rounded-full bg-tint/5 px-2.5 py-1 text-xs font-semibold text-fg-2">
-            <Emoji e="💀" /> Отпадна · отговаряш за XP
+            <Emoji e="💀" /> Отпадна · {game.closesAt && !reveal ? 'другите вече отговориха' : 'отговаряш за XP'}
           </span>
         )}
         {inDropZone(game).has(youId) && !reveal && (
@@ -159,14 +160,15 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         <div className="relative sm:flex sm:items-start sm:gap-5">
           <div className="float-right mb-1 ml-3 sm:order-2 sm:float-none sm:ml-0">
             <TimerRing
-              deadline={game.deadline}
+              deadline={game.closesAt ?? game.deadline}
               duration={q.durationMs}
               stopped={!!reveal}
               untimed={q.speedMs === null}
             />
             {/* A number has no speed bonus (what it's worth is how close it is), and an order's comes only with all of it
                 right. */}
-            {!reveal && !number && !order && <LivePoints game={game} q={q} />}
+            {/* Knocked out, an answer earns XP, not points. */}
+            {!reveal && !number && !order && !out && <LivePoints game={game} q={q} />}
           </div>
           <div className="sm:flex-1">
             {/* Where the focus lands as the question opens: read there whole — which one, a picture's description, the

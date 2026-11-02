@@ -616,6 +616,12 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     on('rematch:request', (p) => rematches.request(userId, str(obj(p).gameId, 64)));
     on('rematch:decline', (p) => rematches.decline(userId, str(obj(p).gameId, 64)));
 
+    // Knocked out with only bots left: the result now, not the rest of the questions.
+    on('game:finish', () => {
+      const game = games.forUser(userId);
+      if (game) game.finishOn(game.playerIdFor(userId));
+    });
+
     on('game:leave', () => {
       const game = games.forUser(userId);
       if (game?.setup.roomCode) rooms.leave(userId);

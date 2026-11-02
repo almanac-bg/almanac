@@ -86,7 +86,8 @@ function setup(opts: {
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
-  const events: { to: string; event: string; payload: unknown }[] = [];
+  /** `except`: sent to the match but not to these players. */
+  const events: { to: string; event: string; payload: unknown; except?: string[] }[] = [];
   let standings: FinalStanding[] | null = null;
   const missed: number[] = [];
   let released = 0;
@@ -118,7 +119,8 @@ function setup(opts: {
     {
       toGame: (event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
       toUser: (userId, event, ...args) => events.push({ to: `u${userId}`, event, payload: args[0] }),
-      toGameExcept: (_userId, event, ...args) => events.push({ to: 'game', event, payload: args[0] }),
+      toGameExcept: (userIds, event, ...args) =>
+        events.push({ to: 'game', event, payload: args[0], except: userIds.map((id) => `u${id}`) }),
     } satisfies GameEmitter,
     {
       finalize: (_game, final) => {
@@ -344,6 +346,116 @@ test("once every person is knocked out, the bots' final is decided at once (and 
   assert.equal(g.game.participants.get('b1')!.faced, 10, 'the rest was played out');
   assert.equal(g.events.filter((e) => e.event === 'game:question').length, questionsBefore, 'nothing flashed by');
   assert.ok(g.placement('u1'));
+});
+
+/** Moves the mocked clock until `done()` (at most `max` ms): for flows whose timing depends on who answered when. */
+const until = (done: () => boolean, max = 60_000) => {
+  for (let t = 0; t < max && !done(); t += 50) mock.timers.tick(50);
+  assert.ok(done(), 'it came in time');
+};
+
+/** Plays questions 1–4 with u1 answering wrong at once (out after 4) and `others` answering right at once. */
+function knockOutAfterFour(g: ReturnType<typeof setup>, others: number[] = []) {
+  for (let i = 0; i < 4; i++) {
+    until(() => g.game.phase === 'question' && g.game.index === i);
+    g.wrong(1);
+    for (const id of others) g.right(id);
+  }
+  until(() => g.game.phase === 'reveal' && g.game.index === 3);
+  assert.equal(g.game.participants.get('u1')!.eliminatedAt, 4);
+}
+
+test('knocked out with only bots left, a person who answers on finishes at their own pace; one let go ends it', () => {
+  const g = setup({
+    humans: [1],
+    bots: [bot('b1', 'strong'), bot('b2', 'strong'), bot('b3', 'strong')],
+    elimination: true,
+  });
+  knockOutAfterFour(g);
+  // „Довърши за XP“: the match goes on for them…
+  until(() => g.game.phase === 'question' && g.game.index === 4);
+  const u1 = g.game.participants.get('u1')!;
+  const logged = u1.log.length;
+  // …at their pace: the bots answer as soon as they have, so the answer is out in under a second.
+  g.right(1);
+  advance(1_000);
+  const result = g.reveals().find((r) => r.index === 4)!.results.u1;
+  assert.deepEqual([result.correct, result.points], [true, 0]);
+  assert.equal(u1.log.length, logged + 1);
+  assert.equal(u1.log.at(-1)!.out, true);
+  // A question let go by: they've stopped, so the bots' final is decided at once, with nothing more flashing by.
+  until(() => g.game.phase === 'question' && g.game.index === 5);
+  const questionsBefore = g.events.filter((e) => e.event === 'game:question').length;
+  until(() => g.game.phase === 'ended', 2 * TIME + 10_000);
+  assert.equal(g.game.participants.get('b1')!.faced, 10, 'the rest was played out');
+  assert.equal(g.events.filter((e) => e.event === 'game:question').length, questionsBefore);
+  assert.ok(g.placement('u1'));
+});
+
+test('knocked out with only bots left, „Към резултата“ brings the result at once', () => {
+  const g = setup({
+    humans: [1],
+    bots: [bot('b1', 'strong'), bot('b2', 'strong'), bot('b3', 'strong')],
+    elimination: true,
+  });
+  knockOutAfterFour(g);
+  until(() => g.game.phase === 'question' && g.game.index === 4);
+  g.game.finishOn('u1');
+  assert.equal(g.game.phase, 'ended');
+  assert.equal(g.game.participants.get('b1')!.faced, 10);
+  // Still in the race, nobody can ask for it.
+  const h = setup({ humans: [1, 2], bots: [bot('b1', 'strong'), bot('b2', 'strong')], elimination: true });
+  h.game.finishOn('u1');
+  assert.equal(h.game.phase, 'question');
+});
+
+test('knocked out with people still in: the question waits for an answer on, up to REVEAL_MS more', () => {
+  const g = setup({ humans: [1, 2], bots: [bot('b1', 'strong'), bot('b2', 'strong')], elimination: true });
+  knockOutAfterFour(g, [2]);
+  until(() => g.game.phase === 'question' && g.game.index === 4);
+  // The race is done with question 5 at once (u2 and the bots); u1 still has it, and is told how long for.
+  g.right(2);
+  advance(700);
+  assert.equal(g.game.phase, 'reveal');
+  const raceReveal = g.events.find((e) => e.event === 'game:reveal' && (e.payload as RevealPayload).index === 4)!;
+  assert.deepEqual(raceReveal.except, ['u1']);
+  const closing = g.events.find((e) => e.event === 'game:closing' && e.to === 'u1')!.payload as {
+    remainingMs: number;
+  };
+  assert.equal(closing.remainingMs, 4_000);
+  // u1 answers a second later: their own reveal, with their answer judged (no points, logged as answered on).
+  advance(1_000);
+  g.right(1);
+  const own = g.events.filter((e) => e.event === 'game:reveal' && e.to === 'u1').at(-1)!.payload as RevealPayload;
+  assert.equal(own.index, 4);
+  assert.deepEqual([own.results.u1.correct, own.results.u1.points], [true, 0]);
+  assert.equal(g.game.participants.get('u1')!.log.at(-1)!.out, true);
+  // The next question gives them as long with it as the others had: REVEAL_MS after theirs, not after the race's.
+  advance(3_300);
+  assert.equal(g.game.phase, 'reveal', 'held a second longer than usual');
+  advance(800);
+  assert.deepEqual([g.game.phase, g.game.index], ['question', 5]);
+});
+
+test('knocked out with people still in: unanswered, the hold ends with the clock, and two let go end the holds', () => {
+  const g = setup({ humans: [1, 2], bots: [bot('b1', 'strong'), bot('b2', 'strong')], elimination: true });
+  knockOutAfterFour(g, [2]);
+  for (const index of [4, 5, 6]) {
+    until(() => g.game.phase === 'question' && g.game.index === index);
+    g.right(2);
+    advance(700);
+    const race = g.events.find((e) => e.event === 'game:reveal' && (e.payload as RevealPayload).index === index)!;
+    // Held after one and two let go (they had answered question 4); not after a third.
+    assert.deepEqual(race.except ?? [], index < 6 ? ['u1'] : [], `question ${index + 1}`);
+    if (index === 6) break;
+    advance(4_000);
+    const own = g.events.filter((e) => e.event === 'game:reveal' && e.to === 'u1').at(-1)!.payload as RevealPayload;
+    assert.equal(own.index, index, 'the hold ended with its clock');
+    assert.equal(own.results.u1, undefined, 'nothing answered, nothing judged');
+    // Too late now.
+    g.right(1);
+    assert.equal(g.events.at(-1)!.event, 'game:rejected');
+  }
 });
 
 test("an answer the server didn't take is answered with the reason", () => {

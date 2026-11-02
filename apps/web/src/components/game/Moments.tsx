@@ -176,7 +176,7 @@ function KnockoutPlate({ game, ids, alive }: { game: LiveGame; ids: string[]; al
         // Within the screen on a phone (it can take two lines there).
         <p className="mx-4 mt-5 max-w-xs rounded-2xl border border-line bg-ink-2/80 px-4 py-2 text-sm font-semibold text-balance text-fg">
           {othersStillIn(game) === 0 ? (
-            'Останаха само ботове — финалът им се решава веднага.'
+            'Останаха само ботове — довърши въпросите за XP или виж резултата.'
           ) : (
             <>
               {`${alive === 1 ? 'Остава един' : `Остават ${plural(alive, 'играч', 'играчи')}`} — гледай кой ще спечели`}{' '}

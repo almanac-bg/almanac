@@ -281,10 +281,10 @@ export class GameRegistry {
     const emitter: GameEmitter = {
       toGame: (event, ...args) => this.io.to(room(game.id)).emit(event, ...args),
       toUser: (userId, event, ...args) => this.io.to(`user:${userId}`).emit(event, ...args),
-      toGameExcept: (userId, event, ...args) =>
+      toGameExcept: (userIds, event, ...args) =>
         this.io
           .to(room(game.id))
-          .except(`user:${userId}`)
+          .except(userIds.map((id) => `user:${id}`))
           .emit(event, ...args),
     };
     game = new Game(

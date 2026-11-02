@@ -100,9 +100,14 @@ function Arena({ game }: { game: LiveGame }) {
   }, [meEliminated]);
   // In a private room leaving the match leaves the room too, so that's no place to suggest it.
   const freeToGo = meEliminated && !game.start.roomCode;
-  // Knocked out with only bots left: the server plays their final out at once, so the bar says the result is coming
-  // rather than inviting you to stay and watch.
+  // Knocked out with only bots left: the match goes on at your pace while you answer (the bots answer as soon as you
+  // have), and „Към резултата“ plays their final out at once.
   const watching = meEliminated && othersStillIn(game) > 0;
+  const [finishing, setFinishing] = useState(false);
+  const finish = () => {
+    setFinishing(true);
+    actions.finishOn();
+  };
   const leave = () => leaveMatchScreen(actions.leaveGame);
 
   // The back button asks first, like ✕ does; pressed again it dismisses the question, as back does on Android.
@@ -164,17 +169,29 @@ function Arena({ game }: { game: LiveGame }) {
         <div
           className={clsx(
             'z-30 mx-auto mb-[max(0.75rem,env(safe-area-inset-bottom))] grid w-fit max-w-[calc(100vw-1.5rem)] items-center gap-x-3 gap-y-0.5 rounded-2xl border border-rose-400/30 bg-ink-2/90 py-2 pl-4 text-sm backdrop-blur sm:fixed sm:inset-x-0 sm:bottom-20 sm:mb-0',
-            freeToGo && watching ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
+            (freeToGo && watching) || (!watching && !finishing) ? 'grid-cols-[minmax(0,1fr)_auto] pr-2' : 'pr-4',
           )}
         >
           {watching ? (
             <p className="text-balance text-rose-200">
               <Emoji e="💀" /> Отпадна — отговаряй до края: за XP и алманаха, извън класирането
             </p>
-          ) : (
-            <p className="text-balance text-rose-200">
-              <Emoji e="💀" /> Отпадна. Останаха само ботове — резултатът идва след миг.
+          ) : finishing ? (
+            <p className="text-balance text-rose-200" role="status">
+              <Emoji e="💀" /> Отпадна. Резултатът идва след миг…
             </p>
+          ) : (
+            <>
+              <p className="text-balance text-rose-200">
+                <Emoji e="💀" /> Отпадна. Останаха само ботове
+              </p>
+              <p className="col-span-2 text-xs text-fg-2">
+                Довърши въпросите в твоето темпо — за XP и алманаха — или виж резултата веднага.
+              </p>
+              <Button size="sm" variant="secondary" className="col-start-2 row-start-1" onClick={finish}>
+                Към резултата
+              </Button>
+            </>
           )}
           {freeToGo && watching && (
             <>
