@@ -289,7 +289,8 @@ function Item({
         // and a press does nothing — not disabled, which dropped the focus and read as "unavailable".
         aria-pressed={unlocked && onEquip ? !!equipped : undefined}
         onClick={!unlocked ? () => setInfo(true) : clickable ? onEquip : undefined}
-        aria-label={unlocked ? undefined : `${name || 'Емоция'}: заключено — ${requirementLabel(req)}`}
+        // What the tile shows first (WCAG 2.5.3), then that it's locked; what it takes is on a tap.
+        aria-label={unlocked ? undefined : `${name || 'Емоция'}, ${requirementLabel(req, true)} (заключено)`}
         title={unlocked ? name : `${name} — ${requirementLabel(req)}`}
         className={clsx(
           'focus-ring glass relative flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center transition-[translate,background-color]',

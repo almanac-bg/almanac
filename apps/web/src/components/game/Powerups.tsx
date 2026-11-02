@@ -2,7 +2,7 @@ import { actions, type LiveGame } from '@quiz/client';
 import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
 import clsx from 'clsx';
 import { AnimatePresence, m } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
 import { Emoji } from '../Emoji';
 
@@ -196,6 +196,7 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
   const keys = useMatchKeysOn();
   const [hint, setHint] = useState<{ id: PowerupId; text: string } | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const describedBy = useId();
   useEffect(() => () => clearTimeout(hintTimer.current), []);
   if (game.start.powerups.length === 0) return null;
   const powerups = POWERUPS.filter((p) => game.start.powerups.includes(p.id));
@@ -254,7 +255,9 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               aria-disabled={!!blocked || undefined}
               onClick={() => (blocked ? explain(p, blocked) : actions.powerup(p.id))}
               title={blocked ? `${p.name} — ${blocked}` : `${p.name} (${POWERUP_KEYS[p.id]}): ${p.description}`}
-              aria-label={`${p.name}: ${p.description}${blocked ? ` (${blocked})` : ''}`}
+              // Named by its name, which the label on screen is (or a word of: „Шанс“), described apart (WCAG 2.5.3).
+              aria-label={p.name}
+              aria-describedby={`${describedBy}-${p.id}`}
               aria-keyshortcuts={keys ? POWERUP_KEYS[p.id] : undefined}
               className={clsx(
                 'focus-ring relative inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:h-12 max-sm:min-w-10 max-sm:max-w-16 max-sm:flex-1 max-sm:flex-col max-sm:justify-center max-sm:gap-0.5 max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
@@ -271,6 +274,10 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
               <span className="max-sm:hidden flat:hidden">{p.name}</span>
               <span aria-hidden className="text-xs leading-none font-semibold sm:hidden flat:hidden">
                 {p.short}
+              </span>
+              <span id={`${describedBy}-${p.id}`} className="sr-only">
+                {p.description}
+                {blocked ? ` (${blocked})` : ''}
               </span>
               {!used && (
                 <KeyHint className="absolute -top-2 -right-1.5 bg-ink-2 leading-4 max-sm:hidden! flat:hidden!">
