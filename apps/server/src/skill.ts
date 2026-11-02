@@ -20,6 +20,11 @@ export const SKILL = {
   question: { k: 16, settled: 4, after: 100 },
   /** Answers a player's skill needs before bots are sized by it (three matches or so). */
   reliableAfter: 30,
+  /**
+   * The steady skill (mastery.ts): an average of the estimate over about this many answers (a moving average, each
+   * answer weighing 2 / (n + 1)). One answer moves the estimate by up to K: its peaks say more about luck than skill.
+   */
+  steady: 60,
 };
 
 /** The chance that a player of skill `skill` gets a question rated `rating` right. */
@@ -61,13 +66,21 @@ export function questionRating(questionId: string, difficulty: Difficulty) {
   );
 }
 
+const STEADY_WEIGHT = 2 / (SKILL.steady + 1);
+
 function savePlayer(userId: number, category: CategoryId | 'all', rating: number) {
+  // A row without a steady skill yet (added by older code) starts it from this answer's.
   run(
-    `INSERT INTO player_skill (user_id, category, rating, answers) VALUES (?, ?, ?, 1)
-     ON CONFLICT (user_id, category) DO UPDATE SET rating = excluded.rating, answers = answers + 1`,
+    `INSERT INTO player_skill (user_id, category, rating, answers, steady) VALUES (?, ?, ?, 1, ?)
+     ON CONFLICT (user_id, category) DO UPDATE SET
+       rating = excluded.rating,
+       answers = answers + 1,
+       steady = COALESCE(steady, excluded.rating) + (excluded.rating - COALESCE(steady, excluded.rating)) * ?`,
     userId,
     category,
     rating,
+    rating,
+    STEADY_WEIGHT,
   );
 }
 
