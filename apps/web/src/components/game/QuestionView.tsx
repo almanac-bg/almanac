@@ -335,6 +335,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
         </div>
         {wide && afterAnswer}
+        {untimedRun && !reveal && <UntimedEnding index={q.index} deadline={game.deadline} />}
       </div>
     </m.section>
   );
@@ -434,6 +435,44 @@ function PauseAfterAnswer({ index, waiting }: { index: number; waiting: boolean 
  * A hold goes on by itself after a while (HOLD): its last seconds are said, once, rather than the next question
  * arriving out of nowhere (WCAG 2.2.1).
  */
+/**
+ * „Без часовник“ still closes a question walked away from (HOLD.untimedMs): its last HOLD.warnMs say so, with
+ * „Още време“ to keep it open (the review's A11Y-10, WCAG 2.2.1). The status line is always there and filled when the
+ * warning starts: one inserted holding its text often isn't read.
+ */
+function UntimedEnding({ index, deadline }: { index: number; deadline: number }) {
+  const [warn, setWarn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setWarn(false);
+    const t = setTimeout(() => setWarn(true), Math.max(0, deadline - HOLD.warnMs - Date.now()));
+    return () => clearTimeout(t);
+  }, [deadline]);
+  const now = useNow(1000, warn);
+  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const more = async () => {
+    setBusy(true);
+    await actions.moreTime(index);
+    setBusy(false);
+  };
+  return (
+    // No room taken until it warns: on a phone the answers sit on what's below them (UX-10).
+    <div className={clsx('flex items-center justify-end gap-3 text-xs text-fg-3', warn && 'mt-3')}>
+      <span role="status" className="sr-only">
+        {warn ? `Въпросът се затваря след ${HOLD.warnMs / 1000} секунди. „Още време“ го държи отворен.` : ''}
+      </span>
+      {warn && (
+        <>
+          <span aria-hidden>Въпросът се затваря след {left} с</span>
+          <Button size="sm" variant="secondary" onClick={() => void more()} loading={busy}>
+            Още време
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function HoldEnding({ holdMs }: { holdMs: number }) {
   const [since] = useState(() => Date.now());
   const now = useNow(1000);

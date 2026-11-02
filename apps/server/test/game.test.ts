@@ -9,6 +9,7 @@ import {
   type CategoryId,
   type FinalStanding,
   type GamePlayer,
+  HOLD,
   NUMBER,
   type PickPayload,
   type PowerupId,
@@ -83,6 +84,8 @@ function setup(opts: {
   presenter?: number;
   /** A number final's weight (a set made before it counted double: 1). */
   finalTimes?: number;
+  /** Соло at this pace (the match is then a Соло). */
+  pace?: 'normal' | 'relaxed' | 'untimed';
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -94,7 +97,8 @@ function setup(opts: {
   let draining = false;
   const game = new Game(
     {
-      mode: opts.daily ? 'daily' : 'custom',
+      mode: opts.daily ? 'daily' : opts.pace ? 'solo' : 'custom',
+      pace: opts.pace,
       ranked: false,
       roomCode: null,
       hostUserId: null,
@@ -456,6 +460,27 @@ test('knocked out with people still in: unanswered, the hold ends with the clock
     g.right(1);
     assert.equal(g.events.at(-1)!.event, 'game:rejected');
   }
+});
+
+test('„Без часовник“: an open question closes after HOLD.untimedMs, and „Още време“ starts that wait again', () => {
+  const g = setup({ humans: [1], pace: 'untimed' });
+  advance(HOLD.untimedMs - HOLD.warnMs);
+  assert.equal(g.game.phase, 'question', 'no clock: it waits');
+  // The warning's „Още време“, 20 seconds before the end.
+  assert.equal(g.game.hold('u1', 0), true);
+  assert.equal(g.game.hold('u1', 1), false, 'only the question on screen');
+  advance(HOLD.warnMs + 5_000);
+  assert.equal(g.game.phase, 'question', 'kept open past the old end');
+  g.right(1);
+  advance(1_000);
+  assert.equal(g.reveals()[0].results.u1.correct, true, 'and the answer counts');
+  // Without it, the question walked away from closes.
+  const h = setup({ humans: [1], pace: 'untimed' });
+  advance(HOLD.untimedMs + 1_000);
+  assert.equal(h.game.phase, 'reveal');
+  // A timed Соло has nothing to extend.
+  const t = setup({ humans: [1], pace: 'normal' });
+  assert.equal(t.game.hold('u1', 0), false);
 });
 
 test("an answer the server didn't take is answered with the reason", () => {

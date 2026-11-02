@@ -566,8 +566,17 @@ export class Game {
   hold(playerId: string, index: number): boolean {
     // Not while the server drains: stopping on fact after fact would keep the run going until it's cut short.
     if (this.hooks.draining()) return false;
-    if (!this.alone || this.phase !== 'reveal' || index !== this.index || this.reading) return false;
-    if (!this.participants.has(playerId)) return false;
+    if (!this.alone || index !== this.index || this.reading || !this.participants.has(playerId)) return false;
+    // „Без часовник“ still closes a question walked away from (UNTIMED_MS); its last seconds offer „Още време“, which
+    // starts that wait again (the review's A11Y-10, WCAG 2.2.1).
+    if (this.phase === 'question') {
+      if (this.pace !== 'untimed') return false;
+      this.limitMs = this.elapsed() + UNTIMED_MS;
+      if (this.questionTimer) clearTimeout(this.questionTimer);
+      this.questionTimer = this.later(UNTIMED_MS + GRACE_MS, () => this.reveal());
+      return true;
+    }
+    if (this.phase !== 'reveal') return false;
     if (this.setup.mode !== 'solo' && !this.questions[this.index]?.fact) return false;
     const seq = ++this.readingSeq;
     this.reading = seq;

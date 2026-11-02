@@ -6,6 +6,7 @@ import {
   type CategoryId,
   type ClientToServerEvents,
   type GameStartPayload,
+  HOLD,
   type Invite,
   type PowerupId,
   powerupById,
@@ -758,6 +759,15 @@ export const actions = {
    * Resolves to whether the server took it (it may have moved on already).
    */
   holdOnFact: async (index: number) => (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok,
+  /** „Без часовник“: keep the open question open HOLD.untimedMs more (its last seconds offer it). */
+  moreTime: async (index: number) => {
+    const ok = (await ask(() => withTimeout().emitWithAck('game:hold', { index }))).ok;
+    if (ok)
+      patchGame((g) =>
+        g.phase === 'question' && g.question?.index === index ? { deadline: Date.now() + HOLD.untimedMs } : {},
+      );
+    return ok;
+  },
   resumeAfterFact: () => getSocket().emit('game:resume'),
   /** The big screen's host sets a class's pace on a reveal: hold the next question, or bring it on now. */
   steer: async (index: number, action: 'pause' | 'next') =>

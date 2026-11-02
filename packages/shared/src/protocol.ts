@@ -643,7 +643,10 @@ export interface ClientToServerEvents {
   'game:leave': () => void;
   /** Knocked out with only bots left in the race („Към резултата“): stop answering on; the result comes at once. */
   'game:finish': () => void;
-  /** A run played alone: stop on this question's fact, to read it. The next question waits for game:resume. */
+  /**
+   * A run played alone: stop on this question's fact, to read it (the next question waits for game:resume) — or, on an
+   * open question without a clock, keep it open HOLD.untimedMs more.
+   */
   'game:hold': (p: { index: number }, ack: Ack) => void;
   'game:resume': () => void;
   /** A room's host, on the big screen: hold the next question on this reveal, or bring it on now. */
