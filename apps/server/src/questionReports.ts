@@ -123,8 +123,10 @@ export function reportQuestion(userId: number, questionId: string, reason: strin
     if (counted >= MODERATION.alertAt) alertFlags();
     return { ok: true };
   }
+  // Counted from the log, where a hide stays when a moderator puts the question back: an unhide frees no slot (the 31
+  // October review, MOD-2).
   const hiddenToday = one<{ n: number }>(
-    'SELECT COUNT(*) AS n FROM hidden_questions WHERE hidden_by IS NULL AND hidden_at > ?',
+    "SELECT COUNT(*) AS n FROM moderation_log WHERE created_at > ? AND action = 'auto_hide_question'",
     now - 24 * 60 * 60_000,
   )!.n;
   if (hiddenToday >= MODERATION.autoHidesPerDay) {
@@ -255,13 +257,52 @@ export function hiddenQuestions(): QuestionInfo[] {
     .map(questionInfo);
 }
 
-export function unhideQuestion(questionId: string, adminId: number | null = null): Result {
-  if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) {
-    return { ok: false, error: 'Въпросът не е скрит.' };
-  }
-  // From the hidden list (an undo from the log is logged as one already).
-  if (adminId !== null) logAction({ adminId, action: 'unhide_question', target: questionId, undo: {} });
+/**
+ * A moderator puts a hidden question back: from the hidden list („Върни в играта“), or by undoing its hide in the log
+ * (`undoing`). Either says the question is fine, so its open flags are dismissed as „Въпросът е наред“ dismisses them:
+ * the same players can't hide it again with the next flag (the 31 October review, MOD-2). Which flags is logged, so
+ * an undo opens them again: in the unhide's entry, or (undoing a hide) in a „Въпросът е наред“ entry of its own.
+ */
+export function unhideQuestion(questionId: string, adminId: number, { undoing = false } = {}): Result {
+  const flags = tx(() => {
+    if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) return null;
+    const open = all<{ id: number }>(
+      "SELECT id FROM question_reports WHERE question_id = ? AND status = 'open'",
+      questionId,
+    ).map((r) => r.id);
+    run(
+      "UPDATE question_reports SET status = 'dismissed', resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",
+      Date.now(),
+      adminId,
+      questionId,
+    );
+    if (!undoing) logAction({ adminId, action: 'unhide_question', target: questionId, undo: { flags: open } });
+    else if (open.length)
+      logAction({ adminId, action: 'dismiss_flags', target: questionId, undo: { flags: open, hidden: true } });
+    return open;
+  });
+  if (!flags) return { ok: false, error: 'Въпросът не е скрит.' };
   reloadQuestionBank();
   tellAuthor(questionId, null);
   return { ok: true };
+}
+
+/**
+ * Flags dismissed with a put-back (or „Въпросът е наред“), open again: its undo. A player who has flagged it again since
+ * has an open flag already (one each): that one stands, and the dismissed one goes, so it counts again.
+ */
+export function reopenFlags(ids: number[]) {
+  tx(() => {
+    for (const id of ids) {
+      run(
+        `DELETE FROM question_reports AS d WHERE d.id = ? AND d.status = 'dismissed' AND EXISTS (
+           SELECT 1 FROM question_reports o WHERE o.question_id = d.question_id AND o.user_id = d.user_id AND o.status = 'open')`,
+        id,
+      );
+      run(
+        "UPDATE question_reports SET status = 'open', resolved_at = NULL, resolved_by = NULL WHERE id = ? AND status = 'dismissed'",
+        id,
+      );
+    }
+  });
 }

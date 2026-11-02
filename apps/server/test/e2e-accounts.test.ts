@@ -964,7 +964,7 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
 });
 
 test(
-  'flags hide a question only from players who were shown it and rate others; „Поправен“ starts it over; dismissed flags never count again; a few a day',
+  'flags hide a question only from players who were shown it and rate others; „Поправен“ starts it over; dismissed or put-back flags never count again; a few a day',
   T,
   async () => {
     const id = 'history-7';
@@ -1035,9 +1035,53 @@ test(
     assert.deepEqual(await hidden(), [], 'their flags were dismissed once: they wait for a moderator now');
     await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'dismiss' });
 
-    // Past MODERATION.autoHidesPerDay a day, flags alert the moderators but hide nothing more.
+    // Put back by any other way a moderator says „it's fine“ (MOD-2): the flags are dismissed with it, and the same
+    // players' next flags don't hide it again.
+    const putBack = 'history-9';
+    const openFlags = () =>
+      srv.db
+        .prepare("SELECT COUNT(*) AS n FROM question_reports WHERE question_id = ? AND status = 'open'")
+        .get(putBack) as { n: number };
+    const flagAll = async () => {
+      for (const u of [A, B, F]) {
+        show(u.user.id, putBack);
+        await flag(u.cookie, putBack);
+      }
+    };
+    const entry = async (action: string) =>
+      (await api.get('/api/admin/log', A.cookie)).body.entries.find(
+        (e: { action: string; target: string; undoneAt: number | null }) =>
+          e.action === action && e.target === putBack && e.undoneAt === null,
+      );
+    const undo = (id: number) =>
+      api.send('POST', `/api/admin/log/${id}/undo`, A.cookie, { reason: 'Проверено от модератор.' });
+    await flagAll();
+    assert.ok((await hidden()).includes(putBack));
+    // 1. The auto-hide undone from the log, as the alert mail says to.
+    assert.equal((await undo((await entry('auto_hide_question')).id)).status, 200);
+    assert.ok(!(await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 0, 'dismissed with the undo');
+    await flagAll();
+    assert.ok(!(await hidden()).includes(putBack), 'the same flags don’t hide it again');
+    // …and that dismissal is logged: taken back, the flags are open and the question hidden again.
+    assert.equal((await undo((await entry('dismiss_flags')).id)).status, 200);
+    assert.ok((await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 3);
+    // 2. „Върни в играта“ from the hidden list: the same, and its undo opens the flags again.
+    const unhid = await api.send('POST', `/api/admin/hidden-questions/${putBack}/unhide`, A.cookie, {});
+    assert.equal(unhid.status, 200, unhid.body.error);
+    assert.equal(openFlags().n, 0);
+    await flagAll();
+    assert.ok(!(await hidden()).includes(putBack));
+    assert.equal((await undo((await entry('unhide_question')).id)).status, 200);
+    assert.ok((await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 3);
+    await api.send('POST', `/api/admin/question-reports/${putBack}/resolve`, A.cookie, { action: 'dismiss' });
+
+    // Past MODERATION.autoHidesPerDay a day, flags alert the moderators but hide nothing more — counted from the log,
+    // so a hide put back since still counts.
     const insert = srv.db.prepare(
-      'INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, NULL, ?)',
+      "INSERT INTO moderation_log (admin_id, action, target, created_at) VALUES (NULL, 'auto_hide_question', ?, ?)",
     );
     for (let i = 0; i < 5; i++) insert.run(`cap-${i}`, Date.now());
     const other = 'history-8';
@@ -1046,7 +1090,7 @@ test(
       await flag(u.cookie, other);
     }
     assert.ok(!(await hidden()).includes(other), 'five hidden by flags today already');
-    srv.db.prepare("DELETE FROM hidden_questions WHERE question_id LIKE 'cap-%'").run();
+    srv.db.prepare("DELETE FROM moderation_log WHERE target LIKE 'cap-%'").run();
     await api.send('POST', `/api/admin/question-reports/${other}/resolve`, A.cookie, { action: 'dismiss' });
   },
 );

@@ -24,7 +24,7 @@ import { longDateTime } from './mailer';
 import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
 import { hasBlockedWords, mixesScripts, nameShape, passesForTheGame } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
-import { hideQuestion, unhideQuestion } from './questionReports';
+import { hideQuestion, reopenFlags, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { copiesOf, hideSet } from './sets';
 import {
@@ -1053,11 +1053,13 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
     }
     case 'hide_question':
     case 'auto_hide_question': {
-      const done = unhideQuestion(String(row.target));
+      const done = unhideQuestion(String(row.target), adminId, { undoing: true });
       if (!done.ok) return done;
       break;
     }
     case 'unhide_question':
+      // The flags the put-back dismissed open again, with the hide.
+      reopenFlags((undo.flags as number[] | undefined) ?? []);
       hideQuestion(adminId, String(row.target));
       break;
     case 'hide_set':
@@ -1082,11 +1084,7 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
       break;
     case 'dismiss_flags': {
       // „Въпросът е наред“ taken back: the flags open again, and a question they had hidden is hidden again.
-      for (const id of (undo.flags as number[] | undefined) ?? [])
-        run(
-          "UPDATE question_reports SET status = 'open', resolved_at = NULL, resolved_by = NULL WHERE id = ? AND status = 'dismissed'",
-          id,
-        );
+      reopenFlags((undo.flags as number[] | undefined) ?? []);
       if (undo.hidden) hideQuestion(adminId, String(row.target));
       break;
     }
