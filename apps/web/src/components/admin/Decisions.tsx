@@ -155,38 +155,33 @@ export function BanForm({
   );
 }
 
-/** A new name, on what basis and why. */
+/**
+ * A name taken away, on what basis and why: it becomes „ИграчN“, and the player picks a new one once, in Settings (a
+ * moderator doesn't name anyone).
+ */
 export function RenameForm({
   busy,
   onRename,
   onCancel,
 }: {
   busy: boolean;
-  onRename: (rename: { username: string; basis: ModerationBasis; reason: string }) => void;
+  onRename: (rename: { basis: ModerationBasis; reason: string }) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState('');
   const [grounds, setGrounds] = useState<Grounds>({ basis: 'name', reason: '' });
-  const ready = name.trim().length >= 3 && groundsReady(grounds);
+  const ready = groundsReady(grounds);
   return (
     <form
       noValidate
       className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready)
-          onRename({ username: name.trim(), basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim() });
+        if (ready) onRename({ basis: grounds.basis as ModerationBasis, reason: grounds.reason.trim() });
       }}
     >
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Ново име"
-        aria-label="Ново име"
-        // biome-ignore lint/a11y/noAutofocus: it appears on clicking "Смени името", so focus moves to it
-        autoFocus
-        className="field h-10 w-full rounded-xl px-3 text-sm"
-      />
+      <p className="text-sm text-fg-2">
+        Името става неутрално („Играч“ и номерът на профила), а играчът си избира ново веднъж, в Настройки.
+      </p>
       <GroundsFields grounds={grounds} onChange={setGrounds} />
       <div className="flex gap-2">
         <Button size="sm" type="submit" loading={busy} disabled={!ready}>

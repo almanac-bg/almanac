@@ -37,6 +37,8 @@ export interface Statement {
   link?: string | null;
   /** Said after the rest (a banned player: how to get their data or have the account deleted). */
   after?: string;
+  /** Decided by automated means, not a person (DSA Art. 17(3)(c)): said instead of who looked and HUMAN. */
+  automated?: string;
 }
 
 export function statementLines(s: Statement): string[] {
@@ -44,7 +46,8 @@ export function statementLines(s: Statement): string[] {
   return [
     sentence(s.what),
     `${basis ? `Основание: ${basis}. ` : ''}Причина: ${sentence(s.reason)}`,
-    `${s.onReport ? 'Разгледахме го след сигнал от играч.' : 'Забелязахме го при наша проверка.'} ${HUMAN}`,
+    s.automated ??
+      `${s.onReport ? 'Разгледахме го след сигнал от играч.' : 'Забелязахме го при наша проверка.'} ${HUMAN}`,
     appealLine(),
     ...(s.after ? [s.after] : []),
   ];
@@ -98,10 +101,11 @@ export function tellReporters(
     if (r.reporter_id === null || told.has(r.reporter_id)) continue;
     told.add(r.reporter_id);
     const text = `Разгледахме доклада ти за „${about}“: ${OUTCOMES[outcome]}. Благодарим, че ни каза!`;
-    notify(r.reporter_id, { icon: '🛡️', text });
-    const user = reports.some((x) => x.reporter_id === r.reporter_id && x.reason === 'illegal')
-      ? getUser(r.reporter_id)
-      : undefined;
+    const notice = reports.some((x) => x.reporter_id === r.reporter_id && x.reason === 'illegal');
+    // A notice of illegal content is answered in full in the game too, not only by mail (DSA Art. 16(5)): that a person
+    // decided, and where to contest it (the 31 October review, LEGAL-5).
+    notify(r.reporter_id, { icon: '🛡️', text: notice ? `${text} ${HUMAN} ${appealLine()}` : text });
+    const user = notice ? getUser(r.reporter_id) : undefined;
     if (user?.email && user.email_bounced_at === null)
       sendMail(
         decisionMail(user.email, user.username, 'Решение по сигнала ти', [text, HUMAN, appealLine()], {

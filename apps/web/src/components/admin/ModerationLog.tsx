@@ -35,6 +35,9 @@ const ACTION: Record<ModerationLogAction, string> = {
   second_factor_failed: 'отбеляза грешен код за двуфакторното влизане на',
   second_factor_locked: 'спря двуфакторното влизане след твърде много грешни кодове на',
   stop_reports: 'спря сигналите за 30 дни на',
+  export_data: 'изтегли данните по искане на',
+  erase_request: 'изтри профил по искане',
+  choose_name: 'си избра ново име след смяна от модератор',
 };
 
 /**
@@ -66,9 +69,24 @@ export function LogEntry({ entry, onUndone }: { entry: ModerationLogEntry; onUnd
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <p className="min-w-0 flex-1">
           {/* No moderator behind it: the game's own (flags hid a question), or the command line on the server. */}
-          <b>{entry.admin ?? (entry.action.startsWith('staff_') ? 'Командният ред' : 'Играта')}</b>{' '}
+          {entry.action === 'choose_name' && entry.user ? (
+            // The player did it: their own new name, after a moderator's rename.
+            <Link
+              to={`/admin?tab=players&player=${entry.user.id}`}
+              className="font-semibold text-violet-300 hover:underline"
+            >
+              {entry.user.username}
+            </Link>
+          ) : (
+            <b>
+              {entry.admin ??
+                (entry.action.startsWith('staff_') || entry.action === 'export_data' || entry.action === 'erase_request'
+                  ? 'Командният ред'
+                  : 'Играта')}
+            </b>
+          )}{' '}
           {ACTION[entry.action]}{' '}
-          {entry.user && (
+          {entry.user && entry.action !== 'choose_name' && (
             <Link
               to={`/admin?tab=players&player=${entry.user.id}`}
               className="font-semibold text-violet-300 hover:underline"

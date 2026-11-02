@@ -249,3 +249,38 @@ test('moderators get one email a day about what waits, from 09:00, and an alert 
   alertModerators('question:y', 'Сигнали', ['…'], { now: later });
   assert.equal(toModerator().length, 3, 'one alert per question per day');
 });
+
+test('the morning digest counts cases, illegal ones too, as each recipient’s queue shows them (MOD-13)', async () => {
+  const { moderatorDigest } = await import('../src/alerts');
+  run(
+    `INSERT INTO users (id, username, username_key, password_hash, created_at, email, email_key, is_admin, staff_role)
+     VALUES (21, 'owner', 'owner', 'x', 0, 'owner@example.test', 'owner@example.test', 1, 'owner'),
+            (22, 'troll', 'troll', 'x', 0, NULL, NULL, 0, NULL),
+            (23, 'reporter', 'reporter', 'x', 0, NULL, NULL, 0, NULL),
+            (24, 'reporter2', 'reporter2', 'x', 0, NULL, NULL, 0, NULL)`,
+  );
+  const report = (reporter: number, target: number, reason: string) =>
+    run(
+      `INSERT INTO reports (reporter_id, target_id, subject_kind, reason, created_at) VALUES (?, ?, 'player', ?, ?)`,
+      reporter,
+      target,
+      reason,
+      Date.now(),
+    );
+  // Two notices of illegal content about one player (one case), and a report about the moderator (staff: the owner's).
+  report(23, 22, 'illegal');
+  report(24, 22, 'illegal');
+  report(23, 20, 'behavior');
+  run("DELETE FROM settings WHERE key = 'mod_digest_day'");
+  assert.equal(moderatorDigest(Date.UTC(2026, 10, 3, 8)), true);
+  const digest = (to: string) =>
+    fs
+      .readdirSync(process.env.MAIL_OUTBOX!)
+      .map((f) => JSON.parse(fs.readFileSync(path.join(process.env.MAIL_OUTBOX!, f), 'utf8')))
+      .filter((m) => m.to === to && m.subject === 'Модерацията днес')
+      .at(-1).text as string;
+  assert.match(digest('owner@example.test'), /Случаи с незаконно съдържание: 1 /, 'one case, two reports');
+  assert.match(digest('owner@example.test'), /Доклади \(играчи, групи, набори\): 2/);
+  assert.match(digest('mod@example.test'), /Доклади \(играчи, групи, набори\): 1/, 'not the case about staff');
+  run('DELETE FROM reports');
+});

@@ -20,11 +20,21 @@ import { bannedBefore } from './account';
 import { alertModerators } from './alerts';
 import { config } from './config';
 import { all, one, run, tx } from './db';
+import { groupRunner } from './groups';
 import { longDateTime } from './mailer';
-import { laterDecision, logAction, logRow, markUndone, parseUndo, playerLog } from './modlog';
+import {
+  laterDecision,
+  logAction,
+  logRow,
+  markUndone,
+  OWN_QUESTION,
+  parseUndo,
+  playerLog,
+  QUESTION_ACTIONS,
+} from './modlog';
 import { hasBlockedWords, mixesScripts, nameShape, passesForTheGame } from './names';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
-import { hideQuestion, unhideQuestion } from './questionReports';
+import { hideQuestion, reopenFlags, unhideQuestion } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { copiesOf, hideSet } from './sets';
 import {
@@ -45,6 +55,7 @@ import {
   isAdmin,
   isOwner,
   nameTaken,
+  reportsVisibleTo,
   toPublicUser,
   type UserRow,
   usernameKey,
@@ -262,12 +273,7 @@ function describe(kind: ReportSubjectKind, id: string, ownerId: number): Omit<Re
 }
 
 /** Reports about staff (or what they made) are the owner's to see and decide: SQL on `reports r` for a viewer. */
-const forViewer = (viewerId: number) => {
-  const viewer = getUser(viewerId);
-  return viewer && isOwner(viewer)
-    ? '1'
-    : 'NOT EXISTS (SELECT 1 FROM users s WHERE s.id = r.target_id AND s.is_admin = 1)';
-};
+const forViewer = (viewerId: number) => reportsVisibleTo(getUser(viewerId));
 
 /**
  * The queue: one case per reported thing, with every open report about it and who sent each. Those in most need first
@@ -430,7 +436,7 @@ const banEnd = (until: number) => (until >= FOREVER ? 'за постоянно' 
 
 /** A banned player can't sign in to Settings: their data and the account's deletion are a mail away (GDPR Art. 15, 17). */
 const BANNED_DATA = () =>
-  `Докато профилът е спрян, можеш да поискаш данните си или да изтрием профила — пиши ни на ${config.operator.email}.`;
+  `Докато профилът е спрян, при вход с паролата си пак можеш да изтеглиш данните си или да изтриеш профила; или ни пиши на ${config.operator.email}.`;
 
 /** Lifts a ban now, or moves its end (`days` from now). */
 export function changeBan(adminId: number, targetId: number, days: number | null, reason: string): Result {
@@ -477,10 +483,15 @@ export function changeBan(adminId: number, targetId: number, days: number | null
   return { ok: true };
 }
 
+/**
+ * A player's name that broke the rules: it becomes „ИграчN“, and the player picks a new one, once, in Settings (the 31
+ * October review, MOD-11) — a moderator no longer invents a name for anyone. `rename.username` from an older page is
+ * ignored.
+ */
 export function renamePlayer(
   adminId: number,
   targetId: number,
-  rename: { username: string; basis: ModerationBasis; reason: string },
+  rename: { username?: string; basis: ModerationBasis; reason: string },
   closes: Closes = { kind: 'player', id: String(targetId) },
 ): Result {
   const target = getUser(targetId);
@@ -489,20 +500,13 @@ export function renamePlayer(
   if (mine) return { ok: false, error: mine };
   const problem = checkGrounds(rename.basis, rename.reason);
   if (problem) return { ok: false, error: problem };
-  const name = rename.username.trim();
-  if (name.length < USERNAME.min || name.length > USERNAME.max || !USERNAME.chars.test(name))
-    return {
-      ok: false,
-      error: `Името трябва да е ${USERNAME.min}–${USERNAME.max} букви, цифри, точка, тире или долна черта.`,
-    };
-  const bad = nameProblem(name);
-  if (bad) return { ok: false, error: bad };
-  const taken = nameTaken(name, targetId);
-  if (taken) return { ok: false, error: taken };
+  const name = [`Играч${targetId}`, `Играч_${targetId}`, `Играч.${targetId}`].find((n) => !nameTaken(n, targetId));
+  if (!name) return { ok: false, error: 'Неутралното име е заето — сменете го ръчно.' };
   const reason = rename.reason.trim().slice(0, MODERATION.reasonMax);
   let onReport = false;
   tx(() => {
     setName(targetId, name);
+    run('UPDATE users SET must_rename = 1 WHERE id = ?', targetId);
     onReport = closeReports(adminId, closes, 'rename', target.username).length > 0;
     logAction({
       adminId,
@@ -515,7 +519,7 @@ export function renamePlayer(
   });
   afterRename(targetId);
   tellPlayer(targetId, {
-    what: `Модератор смени името ти „${target.username}“ на „${name}“.`,
+    what: `Модератор смени името ти „${target.username}“. Докато си избереш ново (в Настройки), си „${name}“.`,
     basis: rename.basis,
     reason,
     onReport,
@@ -523,6 +527,32 @@ export function renamePlayer(
     icon: '✏️',
     link: '/settings',
   });
+  return { ok: true };
+}
+
+/**
+ * After a moderator's rename, the player's own pick: once (must_rename), by the same rules as at sign-up. Logged, so the
+ * moderators see what came of their decision.
+ */
+export function chooseOwnName(userId: number, wanted: string): Result {
+  const user = getUser(userId);
+  if (!user?.must_rename) return { ok: false, error: 'Името ти не може да се сменя.' };
+  const name = wanted.trim();
+  if (name.length < USERNAME.min || name.length > USERNAME.max || !USERNAME.chars.test(name))
+    return {
+      ok: false,
+      error: `Името трябва да е ${USERNAME.min}–${USERNAME.max} букви, цифри, точка, тире или долна черта.`,
+    };
+  const bad = nameProblem(name);
+  if (bad) return { ok: false, error: bad };
+  const taken = nameTaken(name, userId);
+  if (taken) return { ok: false, error: taken };
+  tx(() => {
+    setName(userId, name);
+    run('UPDATE users SET must_rename = 0 WHERE id = ?', userId);
+    logAction({ adminId: null, action: 'choose_name', userId, reason: `„${user.username}“ → „${name}“` });
+  });
+  afterRename(userId);
   return { ok: true };
 }
 
@@ -772,8 +802,10 @@ export function renameGroupByModerator(
       undo: { name: group.name },
     });
   });
-  if (group.owner_id)
-    tellPlayer(group.owner_id, {
+  // Its owner, or whoever runs it since the owner's account went.
+  const runner = groupRunner(groupId);
+  if (runner)
+    tellPlayer(runner, {
       what: `Модератор смени името на групата ти „${group.name}“ на „${name}“. След седмица можеш да ѝ дадеш друго.`,
       basis,
       reason: why,
@@ -965,7 +997,12 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
   if (reason.length < MODERATION.reasonMin)
     return { ok: false, error: `Напиши защо го отменяш (поне ${MODERATION.reasonMin} знака).` };
   const userId = row.target_user_id;
-  const mine = notTheirs(adminId, userId);
+  // A question's decision names its author, but isn't about them: only the author is kept out of it (D10).
+  const mine = QUESTION_ACTIONS.has(row.action)
+    ? userId === adminId
+      ? OWN_QUESTION
+      : null
+    : notTheirs(adminId, userId);
   if (mine) return { ok: false, error: mine };
   switch (row.action) {
     case 'ban':
@@ -1009,6 +1046,7 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
       const taken = nameTaken(old, userId);
       if (taken) return { ok: false, error: `„${old}“ вече е заето.` };
       setName(userId, old);
+      run('UPDATE users SET must_rename = 0 WHERE id = ?', userId);
       afterRename(userId);
       tellReversal(userId, `Модератор върна името ти „${old}“.`, reason, '✏️');
       break;
@@ -1053,12 +1091,14 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
     }
     case 'hide_question':
     case 'auto_hide_question': {
-      const done = unhideQuestion(String(row.target));
+      const done = unhideQuestion(String(row.target), adminId, { undoing: true, reason });
       if (!done.ok) return done;
       break;
     }
     case 'unhide_question':
-      hideQuestion(adminId, String(row.target));
+      // The flags the put-back dismissed open again, with the hide.
+      reopenFlags((undo.flags as number[] | undefined) ?? []);
+      hideQuestion(adminId, String(row.target), { basis: row.basis, reason });
       break;
     case 'hide_set':
     case 'unhide_set': {
@@ -1077,17 +1117,13 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
       break;
     }
     case 'approve':
-      // An approval taken back: the question leaves play.
-      hideQuestion(adminId, String(row.target));
+      // An approval taken back: the question leaves play, and its author hears why.
+      hideQuestion(adminId, String(row.target), { basis: null, reason, withdrawn: true });
       break;
     case 'dismiss_flags': {
       // „Въпросът е наред“ taken back: the flags open again, and a question they had hidden is hidden again.
-      for (const id of (undo.flags as number[] | undefined) ?? [])
-        run(
-          "UPDATE question_reports SET status = 'open', resolved_at = NULL, resolved_by = NULL WHERE id = ? AND status = 'dismissed'",
-          id,
-        );
-      if (undo.hidden) hideQuestion(adminId, String(row.target));
+      reopenFlags((undo.flags as number[] | undefined) ?? []);
+      if (undo.hidden) hideQuestion(adminId, String(row.target), { basis: null, reason });
       break;
     }
     case 'stop_reports': {

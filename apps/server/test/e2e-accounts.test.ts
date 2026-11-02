@@ -482,42 +482,36 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
       reportIds: await open(),
       decision,
     });
-  assert.equal(
-    (await resolve({ action: 'rename', username: 'kurva_1', basis: 'name', reason: 'Името обижда другите играчи.' }))
-      .status,
-    400,
-    "moderators can't pick offensive names either",
-  );
-  assert.equal(
-    (
-      await resolve({
-        action: 'rename',
-        username: 'm\u0430ria_test',
-        basis: 'name',
-        reason: 'Името обижда другите играчи.',
-      })
-    ).status,
-    400,
-    'or a name that passes for another player',
-  );
   const grounds = { basis: 'name', reason: 'Името обижда другите играчи.' };
   assert.equal(
-    (await resolve({ action: 'rename', username: 'Мирен_играч' })).status,
+    (await resolve({ action: 'rename' })).status,
     400,
     'a decision names its basis and a reason the player reads',
   );
-  assert.equal(
-    (await resolve({ action: 'rename', username: 'Мирен_играч', basis: 'name', reason: 'лошо' })).status,
-    400,
-  );
-  assert.equal((await resolve({ action: 'rename', username: 'Мирен_играч', ...grounds })).status, 200);
+  assert.equal((await resolve({ action: 'rename', basis: 'name', reason: 'лошо' })).status, 400);
+  // A moderator doesn't name anyone (MOD-11): the name becomes „ИграчN“, and the player picks a new one once.
+  assert.equal((await resolve({ action: 'rename', ...grounds })).status, 200);
+  const neutral = `Играч${D.user.id}`;
   const renamed = (await api.get('/api/notifications', D.cookie)).body.notifications[0];
   assert.match(
     renamed.text,
-    /Мирен_играч.*Неподходящо име.*Името обижда.*след сигнал от играч.*човек, не автоматично.*до 6 месеца.*извънсъдебно/,
+    new RegExp(
+      `смени името ти „troll_test“.*„${neutral}“.*Неподходящо име.*Името обижда.*след сигнал от играч.*човек, не автоматично.*до 6 месеца.*извънсъдебно`,
+    ),
     'the player is told what, on what basis and why, that a person decided, and where to appeal',
   );
-  assert.equal((await api.get('/api/me', D.cookie)).body.user.username, 'Мирен_играч');
+  let me = (await api.get('/api/me', D.cookie)).body.user;
+  assert.deepEqual([me.username, me.mustRename], [neutral, true]);
+  const choose = (username: string) => api.send('POST', '/api/account/name', D.cookie, { username });
+  assert.equal((await choose('kurva_1')).status, 400, 'the name rules hold for the new one too');
+  assert.equal((await choose('m\u0430ria_test')).status, 400, 'nor one that passes for another player');
+  const chosen = await choose('Мирен_играч');
+  assert.equal(chosen.status, 200, chosen.body.error);
+  me = (await api.get('/api/me', D.cookie)).body.user;
+  assert.deepEqual([me.username, me.mustRename], ['Мирен_играч', false]);
+  assert.match((await choose('Друго_име')).body.error, /не може да се сменя/, 'once');
+  const picked = (await api.get(`/api/admin/players/${D.user.id}`, A.cookie)).body.card.log[0];
+  assert.deepEqual([picked.action, picked.reason], ['choose_name', `„${neutral}“ → „Мирен_играч“`]);
   assert.equal((await api.get('/api/admin/reports', A.cookie)).body.cases.length, 0, 'reports close when resolved');
   assert.match(
     (await api.get('/api/notifications', B.cookie)).body.notifications[0].text,
@@ -823,6 +817,16 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     'only its members report a group',
   );
   const code = (srv.db.prepare('SELECT code FROM player_groups WHERE id = ?').get(groupId) as { code: string }).code;
+  // …or anyone signed in who was sent its invite (MOD-15): the same case.
+  assert.equal(
+    (await api.send('POST', `/api/groups/join/${code}/report`, B.cookie, { reason: 'name' })).status,
+    200,
+    'from the invite page',
+  );
+  assert.equal(
+    (await api.send('POST', '/api/groups/join/no-such-code/report', B.cookie, { reason: 'name' })).status,
+    404,
+  );
   await api.send('POST', `/api/groups/join/${code}`, B.cookie);
   assert.equal(
     (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'content', details: 'обидно' }))
@@ -862,6 +866,21 @@ test('every moderation decision is logged with its grounds, and can be undone', 
   assert.equal(renameGroup.action, 'rename_group');
   assert.equal((await undo(renameGroup.id)).status, 200);
   assert.equal((await card()).groups[0].name, 'Измамници');
+
+  // Its owner's account gone (owner_id empty): the group is still reported, to whoever runs it since.
+  srv.db.prepare('UPDATE player_groups SET owner_id = NULL WHERE id = ?').run(groupId);
+  assert.equal(
+    (await api.send('POST', `/api/groups/${groupId}/report`, B.cookie, { reason: 'name', details: 'пак' })).status,
+    200,
+  );
+  const ownerless = (await api.get('/api/admin/reports', A.cookie)).body.cases.find(
+    (c: { kind: string; id: string }) => c.kind === 'group' && c.id === String(groupId),
+  );
+  assert.equal(ownerless.owner.username, 'izmamnik_test', 'its longest member runs it now');
+  await api.send('POST', `/api/admin/cases/group/${groupId}/resolve`, A.cookie, {
+    reportIds: ownerless.reports.map((r: { id: number }) => r.id),
+    decision: { action: 'dismiss' },
+  });
   await api.send('POST', `/api/groups/${groupId}/leave`, B.cookie);
 });
 
@@ -914,6 +933,89 @@ test('data export and account deletion', T, async () => {
   );
 });
 
+test(
+  'data rights that need no session: a banned player’s own, the owner’s on a request by mail, the command line’s (LEGAL-2)',
+  T,
+  async () => {
+    const login = (username: string, password = 'secret123') =>
+      api.send('POST', '/api/auth/login', '', { username, password });
+    const grounds = { basis: 'cheating', reason: 'Отговаря с програма.' };
+
+    // Banned: the right password brings the ban, and a token for exactly the data and the deletion.
+    const P = await register(srv.url, 'spryan_test');
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${P.user.id}/ban`, A.cookie, { days: null, ...grounds })).status,
+      200,
+    );
+    assert.equal((await login('spryan_test', 'wrong-password')).body.dataToken, undefined, 'not without the password');
+    const banned = await login('spryan_test');
+    assert.equal(banned.status, 403);
+    const token = banned.body.dataToken as string;
+    assert.match(token, /^\d+\.\d{13}\.[\w-]{43}$/);
+    const bannedExport = (t: string) =>
+      fetch(`${srv.url}/api/account/banned/export`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token: t }),
+      });
+    const exp = await bannedExport(token);
+    assert.equal(exp.status, 200);
+    assert.match(exp.headers.get('content-disposition') ?? '', /attachment/);
+    assert.equal(((await exp.json()) as { account: { username: string } }).account.username, 'spryan_test');
+    const forged = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+    assert.equal((await bannedExport(forged)).status, 403, 'signed');
+    const other = token.replace(/^\d+/, String(A.user.id));
+    assert.equal((await bannedExport(other)).status, 403, 'for this account only');
+    assert.equal((await api.get('/api/me', '')).body.user, null, 'and no session from it');
+    const del = (password: string) => api.send('POST', '/api/account/banned/delete', '', { token, password });
+    assert.equal((await del('wrong-password')).status, 400, 'the password again');
+    assert.equal((await del('secret123')).status, 200);
+    assert.equal(srv.db.prepare('SELECT 1 AS x FROM users WHERE id = ?').get(P.user.id), undefined);
+
+    // On a request by mail: the owner downloads a player's data, or erases the account; logged without the name.
+    const Q = await register(srv.url, 'pismo_test');
+    const why = 'Имейл до privacy@ от адреса на профила.';
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${Q.user.id}/export`, A.cookie, { reason: '' })).status,
+      400,
+    );
+    const owned = await fetch(`${srv.url}/api/admin/players/${Q.user.id}/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: A.cookie },
+      body: JSON.stringify({ reason: why }),
+    });
+    assert.equal(owned.status, 200);
+    assert.equal(((await owned.json()) as { account: { username: string } }).account.username, 'pismo_test');
+    const self = await api.send('POST', `/api/admin/players/${A.user.id}/erase`, A.cookie, { reason: why });
+    assert.match(self.body.error, /екипа/, 'not on staff');
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${Q.user.id}/erase`, A.cookie, { reason: why })).status,
+      200,
+    );
+    assert.equal(srv.db.prepare('SELECT 1 AS x FROM users WHERE id = ?').get(Q.user.id), undefined);
+    const logged = srv.db
+      .prepare(
+        "SELECT target_user_id AS user, reason FROM moderation_log WHERE action = 'erase_request' ORDER BY id DESC",
+      )
+      .get() as { user: number | null; reason: string };
+    assert.deepEqual({ ...logged }, { user: null, reason: why });
+    assert.ok(
+      !(srv.db.prepare("SELECT reason FROM moderation_log WHERE reason LIKE '%pismo_test%'").get() as unknown),
+      'the name nowhere in the log',
+    );
+
+    // From the server's command line, when the site can't: the same two.
+    await register(srv.url, 'red_test');
+    const out = cli(srv.dbPath, 'account', 'export', 'red_test');
+    assert.equal(out.status, 0, out.output);
+    assert.match(out.output, /"username": "red_test"/);
+    assert.notEqual(cli(srv.dbPath, 'account', 'erase', 'red_test').status, 0, 'only with --yes and how it came');
+    const erased = cli(srv.dbPath, 'account', 'erase', 'red_test', '--yes', 'Писмо от родител, проверено.');
+    assert.equal(erased.status, 0, erased.output);
+    assert.equal(srv.db.prepare("SELECT 1 AS x FROM users WHERE username = 'red_test'").get(), undefined);
+  },
+);
+
 test('players flag wrong questions; moderators hide them from new matches', T, async () => {
   const log = newLog();
   const play = autoPlay(sb, 'wrong', log);
@@ -964,7 +1066,7 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
 });
 
 test(
-  'flags hide a question only from players who were shown it and rate others; „Поправен“ starts it over; dismissed flags never count again; a few a day',
+  'flags hide a question only from players who were shown it and rate others; „Поправен“ starts it over; dismissed or put-back flags never count again; a few a day',
   T,
   async () => {
     const id = 'history-7';
@@ -1035,9 +1137,53 @@ test(
     assert.deepEqual(await hidden(), [], 'their flags were dismissed once: they wait for a moderator now');
     await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'dismiss' });
 
-    // Past MODERATION.autoHidesPerDay a day, flags alert the moderators but hide nothing more.
+    // Put back by any other way a moderator says „it's fine“ (MOD-2): the flags are dismissed with it, and the same
+    // players' next flags don't hide it again.
+    const putBack = 'history-9';
+    const openFlags = () =>
+      srv.db
+        .prepare("SELECT COUNT(*) AS n FROM question_reports WHERE question_id = ? AND status = 'open'")
+        .get(putBack) as { n: number };
+    const flagAll = async () => {
+      for (const u of [A, B, F]) {
+        show(u.user.id, putBack);
+        await flag(u.cookie, putBack);
+      }
+    };
+    const entry = async (action: string) =>
+      (await api.get('/api/admin/log', A.cookie)).body.entries.find(
+        (e: { action: string; target: string; undoneAt: number | null }) =>
+          e.action === action && e.target === putBack && e.undoneAt === null,
+      );
+    const undo = (id: number) =>
+      api.send('POST', `/api/admin/log/${id}/undo`, A.cookie, { reason: 'Проверено от модератор.' });
+    await flagAll();
+    assert.ok((await hidden()).includes(putBack));
+    // 1. The auto-hide undone from the log, as the alert mail says to.
+    assert.equal((await undo((await entry('auto_hide_question')).id)).status, 200);
+    assert.ok(!(await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 0, 'dismissed with the undo');
+    await flagAll();
+    assert.ok(!(await hidden()).includes(putBack), 'the same flags don’t hide it again');
+    // …and that dismissal is logged: taken back, the flags are open and the question hidden again.
+    assert.equal((await undo((await entry('dismiss_flags')).id)).status, 200);
+    assert.ok((await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 3);
+    // 2. „Върни в играта“ from the hidden list: the same, and its undo opens the flags again.
+    const unhid = await api.send('POST', `/api/admin/hidden-questions/${putBack}/unhide`, A.cookie, {});
+    assert.equal(unhid.status, 200, unhid.body.error);
+    assert.equal(openFlags().n, 0);
+    await flagAll();
+    assert.ok(!(await hidden()).includes(putBack));
+    assert.equal((await undo((await entry('unhide_question')).id)).status, 200);
+    assert.ok((await hidden()).includes(putBack));
+    assert.equal(openFlags().n, 3);
+    await api.send('POST', `/api/admin/question-reports/${putBack}/resolve`, A.cookie, { action: 'dismiss' });
+
+    // Past MODERATION.autoHidesPerDay a day, flags alert the moderators but hide nothing more — counted from the log,
+    // so a hide put back since still counts.
     const insert = srv.db.prepare(
-      'INSERT INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, NULL, ?)',
+      "INSERT INTO moderation_log (admin_id, action, target, created_at) VALUES (NULL, 'auto_hide_question', ?, ?)",
     );
     for (let i = 0; i < 5; i++) insert.run(`cap-${i}`, Date.now());
     const other = 'history-8';
@@ -1046,7 +1192,7 @@ test(
       await flag(u.cookie, other);
     }
     assert.ok(!(await hidden()).includes(other), 'five hidden by flags today already');
-    srv.db.prepare("DELETE FROM hidden_questions WHERE question_id LIKE 'cap-%'").run();
+    srv.db.prepare("DELETE FROM moderation_log WHERE target LIKE 'cap-%'").run();
     await api.send('POST', `/api/admin/question-reports/${other}/resolve`, A.cookie, { action: 'dismiss' });
   },
 );

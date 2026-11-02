@@ -248,7 +248,7 @@ function CaseCard({
             busy={busy}
             onCancel={() => setMode('idle')}
             onRename={(rename) =>
-              void decide({ action: 'rename', ...rename }, `Името е сменено на „${rename.username}“`)
+              void decide({ action: 'rename', ...rename }, 'Името е сменено: играчът си избира ново')
             }
           />
         )}

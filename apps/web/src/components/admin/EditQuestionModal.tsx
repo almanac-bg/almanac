@@ -1,10 +1,11 @@
 import { api, errorMessage, toast } from '@quiz/client';
 import type { QuestionDraft } from '@quiz/shared';
+import { MODERATION } from '@quiz/shared';
 import { Check } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { DraftEditor } from '../questions/DraftEditor';
 import { cleanDraft, hasErrors, toDraft, validateDraft } from '../questions/draft';
-import { Button, Modal } from '../ui';
+import { Button, Field, INPUT, Modal } from '../ui';
 
 /**
  * A player's question already in the game, corrected by a moderator (`questionId` null: closed). The change is in
@@ -42,16 +43,19 @@ function EditForm({
   onSaved: (draft: QuestionDraft) => void;
 }) {
   const [draft, setDraft] = useState(() => toDraft(original));
+  // What was corrected and why: its author reads it.
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const errors = useMemo(() => validateDraft(draft), [draft]);
+  const explained = reason.trim().length >= MODERATION.reasonMin;
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (hasErrors(errors)) return;
+    if (hasErrors(errors) || !explained) return;
     setBusy(true);
     try {
       const clean = cleanDraft(draft);
-      await api.editCommunityQuestion(questionId, clean);
+      await api.editCommunityQuestion(questionId, clean, reason.trim());
       toast({ kind: 'success', title: 'Въпросът е поправен и вече се играе така.' });
       onSaved(clean);
       onClose();
@@ -64,8 +68,18 @@ function EditForm({
   return (
     <form onSubmit={save} className="space-y-6">
       <DraftEditor draft={draft} onChange={setDraft} errors={errors} compact />
+      <Field label="Какво поправяш и защо — авторът ще го прочете" htmlFor={`${questionId}-why`}>
+        <input
+          id={`${questionId}-why`}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={MODERATION.reasonMax}
+          className={INPUT}
+          placeholder="Верният отговор е друг: виж източника"
+        />
+      </Field>
       <div className="flex justify-end">
-        <Button type="submit" loading={busy} disabled={hasErrors(errors)}>
+        <Button type="submit" loading={busy} disabled={hasErrors(errors) || !explained}>
           <Check className="size-4" /> Запази
         </Button>
       </div>

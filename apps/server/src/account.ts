@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import {
   ACHIEVEMENTS,
   dayKey,
@@ -123,6 +123,7 @@ export function getMe(userId: number): MeUser | null {
     push: pushPrefs(row),
     shareRuns: row.share_runs === 1,
     moreTime: isMoreTime(row.more_time) ? row.more_time : 'off',
+    mustRename: row.must_rename === 1,
     seasonRewards: unseenSeasonRewards(userId),
     friendRequests: incomingRequests(userId),
     unreadNotifications: unreadNotifications(userId),
@@ -278,10 +279,44 @@ export async function deleteAccount(
   // A guest has no password: being signed in on this device is the proof.
   if (!user.is_guest && !(await verifyPassword(password, user.password_hash)))
     return { ok: false, error: 'Грешна парола.' };
+  eraseOnRequest(userId);
+  return { ok: true };
+}
+
+/**
+ * An account erased as its player asked: from Settings, with a banned player's data token, by the owner on a request
+ * that came by mail (a parent, a banned player), or from the command line. Their approved questions stay, without
+ * their name.
+ */
+export function eraseOnRequest(userId: number) {
   const authored = one('SELECT 1 AS x FROM questions WHERE author_id = ? LIMIT 1', userId);
   eraseAccount(userId);
-  if (authored) reloadQuestionBank(); // their approved questions stop showing their name
-  return { ok: true };
+  if (authored) reloadQuestionBank();
+}
+
+/**
+ * What a banned player gets for signing in with the right password (the 31 October review, LEGAL-2): a token, good for
+ * DATA_TOKEN_MS, for exactly two things — downloading their data and deleting the account (the privacy policy promises
+ * both while a ban lasts). It opens nothing else: a ban has no session.
+ */
+const DATA_TOKEN_MS = 15 * 60_000;
+const dataSignature = (userId: number, expires: number) =>
+  createHmac('sha256', installationSecret('banned-data')).update(`${userId}.${expires}`).digest('base64url');
+
+export function bannedDataToken(userId: number, now = Date.now()): string {
+  const expires = now + DATA_TOKEN_MS;
+  return `${userId}.${expires}.${dataSignature(userId, expires)}`;
+}
+
+/** The account a banned player's data token is for, while it's good; null otherwise. */
+export function bannedDataUser(token: unknown, now = Date.now()): number | null {
+  if (typeof token !== 'string') return null;
+  const m = /^(\d{1,12})\.(\d{13})\.([\w-]{43})$/.exec(token);
+  if (!m) return null;
+  const [userId, expires] = [Number(m[1]), Number(m[2])];
+  if (expires < now) return null;
+  const want = Buffer.from(dataSignature(userId, expires));
+  return want.length === m[3].length && timingSafeEqual(want, Buffer.from(m[3])) ? userId : null;
 }
 
 /** Removes an account for good (see deleteAccount); also used for guest accounts nobody can sign in to any more. */

@@ -17,8 +17,14 @@
 //                                                            now would cut short (deploy/deploy.sh waits for that)
 //   node apps/server/dist/cli.mjs names                    — names already taken that today's name check would refuse
 //                                                            (players, groups, sets), to rename through /admin
+//   node apps/server/dist/cli.mjs account export <name|#id> — a player's data as JSON, on a request by mail, when
+//                                                            /admin can't (the owner's card does it otherwise)
+//   node apps/server/dist/cli.mjs account erase <name|#id> --yes "<how the request came>" — the account erased, as
+//                                                            „Изтрий профила“ does; for good
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
+import { MODERATION } from '@quiz/shared';
 import webpush from 'web-push';
+import { eraseOnRequest, exportAccount } from './account';
 import { config } from './config';
 import { all, run } from './db';
 import { nameProblem } from './moderation';
@@ -26,7 +32,7 @@ import { logAction } from './modlog';
 import { textProblem } from './names';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
 import { guestsPaused, pauseGuests } from './settings';
-import { getUserByName } from './users';
+import { getUser, getUserByName, isAdmin } from './users';
 
 const [area, command, username] = process.argv.slice(2);
 
@@ -36,7 +42,7 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live | names';
+  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live | names | account export <name|#id> | account erase <name|#id> --yes "<how the request came>"';
 
 if (area === 'check-bank') {
   try {
@@ -99,6 +105,28 @@ if (area === 'notice') {
     Date.now(),
   );
   console.log(`📣 Left for ${changes} players (they see it the next time they open the game).`);
+  process.exit(0);
+}
+
+// A player's data rights on a request by mail (docs/operations.md → „Лични данни и сигнали“), from the server itself:
+// logged as the command line's, without the name.
+if (area === 'account') {
+  if (!['export', 'erase'].includes(command ?? '') || !username) fail(USAGE);
+  const user = username.startsWith('#') ? getUser(Number(username.slice(1))) : getUserByName(username);
+  if (!user) fail(`No player "${username}".`);
+  if (isAdmin(user)) fail('Not for staff: take the role away first (cli admin remove).');
+  if (command === 'export') {
+    logAction({ adminId: null, action: 'export_data', userId: user.id, reason: 'Командният ред' });
+    process.stdout.write(`${JSON.stringify(exportAccount(user.id), null, 2)}\n`);
+    process.exit(0);
+  }
+  const [flag, ...why] = process.argv.slice(5);
+  const reason = why.join(' ').trim();
+  if (flag !== '--yes' || reason.length < MODERATION.reasonMin)
+    fail('Erasing is for good: add --yes "<how the request came and how you checked who it is, without the name>".');
+  eraseOnRequest(user.id);
+  logAction({ adminId: null, action: 'erase_request', reason });
+  console.log(`✅ ${user.username} is erased (their approved questions stay, without their name).`);
   process.exit(0);
 }
 

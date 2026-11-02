@@ -13,7 +13,7 @@ import {
 import { z } from 'zod';
 import { grantXp } from './account';
 import { all, one, run, tx } from './db';
-import { logAction } from './modlog';
+import { logAction, OWN_QUESTION, questionAuthor } from './modlog';
 import { notify } from './notifications';
 import { questionBank, reloadQuestionBank } from './questions';
 import { sentence } from './statements';
@@ -296,6 +296,7 @@ export function approveSubmission(
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };
+  if (row.user_id === adminId) return { ok: false, error: OWN_QUESTION };
   const final: QuestionDraft = edits ?? {
     category: row.category,
     difficulty: row.difficulty,
@@ -364,6 +365,7 @@ export function rejectSubmission(
   const row = one<Row>('SELECT * FROM question_submissions WHERE id = ?', id);
   if (!row) return { ok: false, error: 'Няма такова предложение.' };
   if (row.status !== 'pending') return { ok: false, error: 'Предложението вече е прегледано.' };
+  if (row.user_id === adminId) return { ok: false, error: OWN_QUESTION };
   // The author learns why: a „не“ alone teaches nothing about the next one.
   const why = reason.trim().slice(0, 300);
   if (why.length < MODERATION.reasonMin)
@@ -387,14 +389,37 @@ export function rejectSubmission(
   return { ok: true };
 }
 
-/** A moderator corrects a player's question already in the game (its id and stats stay). */
+/**
+ * A moderator corrects a player's question already in the game (its id stays). Its author hears what changed and why
+ * (the 31 October review, MOD-5); a right answer changed means its numbers start over, as „Поправен“ does.
+ */
 export function editCommunityQuestion(
   adminId: number,
   questionId: string,
   draft: QuestionDraft,
+  reason: string,
 ): { ok: true } | { ok: false; error: string } {
-  const before = one<{ q: string }>('SELECT q FROM questions WHERE id = ?', questionId);
+  const before = one<{ q: string; options: string; answer: number; fact: string | null; category: string }>(
+    'SELECT q, options, answer, fact, category FROM questions WHERE id = ?',
+    questionId,
+  );
   if (!before) return { ok: false, error: 'Няма такъв въпрос на играч.' };
+  const author = questionAuthor(questionId);
+  if (author === adminId) return { ok: false, error: OWN_QUESTION };
+  const why = reason.trim();
+  if (why.length < MODERATION.reasonMin)
+    return {
+      ok: false,
+      error: `Напиши какво поправяш и защо (поне ${MODERATION.reasonMin} знака): авторът ще го прочете.`,
+    };
+  const options: string[] = JSON.parse(before.options);
+  const answerChanged = options[before.answer] !== draft.options[draft.answer];
+  const changed = [
+    before.q !== draft.q && 'въпросът',
+    answerChanged ? 'верният отговор' : options.some((o, i) => o !== draft.options[i]) && 'отговорите',
+    (before.fact ?? undefined) !== draft.fact && '„Знаеше ли?“',
+    before.category !== draft.category && 'категорията',
+  ].filter((c): c is string => !!c);
   tx(() => {
     run(
       `UPDATE questions SET category = ?, difficulty = ?, q = ?, options = ?, answer = ?, answer_source = ?, fact = ?,
@@ -423,9 +448,26 @@ export function editCommunityQuestion(
       draft.fact ? (draft.factSource ?? null) : null,
       questionId,
     );
-    logAction({ adminId, action: 'edit_question', target: questionId, reason: `Беше: „${before.q}“` });
+    // Another right answer: what players did on the old one says nothing about this question.
+    if (answerChanged) {
+      run('DELETE FROM question_stats WHERE question_id = ?', questionId);
+      run('DELETE FROM question_skill WHERE question_id = ?', questionId);
+    }
+    logAction({
+      adminId,
+      action: 'edit_question',
+      userId: author,
+      target: questionId,
+      reason: `${sentence(why)} Беше: „${before.q}“`,
+    });
   });
   reloadQuestionBank();
+  if (author !== null)
+    notify(author, {
+      icon: '✏️',
+      text: `Модератор поправи въпроса ти „${truncate(draft.q)}“${changed.length ? ` (${changed.join(', ')})` : ''}. Причина: ${sentence(why)}`,
+      link: '/submit',
+    });
   return { ok: true };
 }
 

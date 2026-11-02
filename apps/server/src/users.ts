@@ -73,6 +73,7 @@ export interface UserRow {
   share_runs: number;
   /** „Повече време“ (MORE_TIME): 'off' for the usual clock. */
   more_time: string;
+  must_rename: number;
   /** Secret in the reminder email's unsubscribe link. */
   reminder_key: string | null;
   /** Opted in to the „X те изпревари на линка ти“ email; the day the last one went (one a day at most). */
@@ -172,3 +173,10 @@ export function isAdmin(row: Pick<UserRow, 'is_admin'>): boolean {
 export function isOwner(row: Pick<UserRow, 'is_admin' | 'staff_role'>): boolean {
   return row.is_admin === 1 && row.staff_role === 'owner';
 }
+
+/**
+ * Which open reports a staff member sees, as SQL on `reports r`: everything for the owner; for a moderator, none about
+ * staff (or what they made) — those are the owner's to see and decide. The queue and the morning digest both go by it.
+ */
+export const reportsVisibleTo = (viewer: Pick<UserRow, 'is_admin' | 'staff_role'> | undefined) =>
+  viewer && isOwner(viewer) ? '1' : 'NOT EXISTS (SELECT 1 FROM users s WHERE s.id = r.target_id AND s.is_admin = 1)';

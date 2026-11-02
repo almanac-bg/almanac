@@ -704,7 +704,12 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   assert.equal((await api.get(`/api/sets/${copy.body.id}`, B.cookie)).body.hidden, true);
   const toB = (await api.get('/api/notifications', B.cookie)).body.notifications.map((n: { text: string }) => n.text);
   assert.ok(toB.some((t: string) => /копие на набор, скрит заради съдържанието му.*Съдържа обиди/.test(t)));
-  assert.ok(toB.some((t: string) => /Разгледахме доклада ти за „Урок по история“: наборът е скрит/.test(t)));
+  // A notice of illegal content: the answer in the game says who decided and where to contest it (LEGAL-5).
+  assert.ok(
+    toB.some((t: string) =>
+      /Разгледахме доклада ти за „Урок по история“: наборът е скрит.*човек.*до 6 месеца.*извънсъдебно/.test(t),
+    ),
+  );
   assert.equal((await api.get(`/api/sets/shared/${mine.code}`, B.cookie)).status, 404, 'hidden');
   assert.equal(
     (await api.get(`/api/sets/shared/${mine.code}`, A.cookie)).body.mine,

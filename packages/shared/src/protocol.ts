@@ -59,6 +59,8 @@ export interface MeUser extends PublicUser {
   shareRuns: boolean;
   /** „Повече време“ (MORE_TIME): 'off' for the usual clock. */
   moreTime: MoreTime;
+  /** A moderator took their name (it's „ИграчN“ meanwhile): they pick a new one, once, in Settings. */
+  mustRename: boolean;
   /** Season-end rewards the player hasn't seen yet. */
   seasonRewards: SeasonReward[];
   friendRequests: number;
@@ -966,7 +968,7 @@ export const MODERATION = {
 
 export type ModerationAction =
   | { action: 'dismiss' }
-  | { action: 'rename'; username: string; basis: ModerationBasis; reason: string }
+  | { action: 'rename'; basis: ModerationBasis; reason: string; username?: string }
   | { action: 'ban'; days: number | null; basis: ModerationBasis; reason: string; annul?: boolean };
 
 /** A case's decision: about a player (as ModerationAction), a group's name, or a set. */
@@ -1001,7 +1003,12 @@ export type ModerationLogAction =
   | 'staff_sign_in'
   | 'second_factor_failed'
   | 'second_factor_locked'
-  | 'stop_reports';
+  | 'stop_reports'
+  /** The owner downloaded a player's data, or erased the account, on a request by mail (or from the command line). */
+  | 'export_data'
+  | 'erase_request'
+  /** The player picked a name of their own after a moderator's rename. */
+  | 'choose_name';
 
 export interface ModerationLogEntry {
   id: number;

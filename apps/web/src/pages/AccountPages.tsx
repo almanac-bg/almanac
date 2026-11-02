@@ -1,5 +1,15 @@
-import { api, disconnectRealtime, errorMessage, refreshMe, setState, signedOut, toast, useStore } from '@quiz/client';
-import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import {
+  ApiError,
+  api,
+  disconnectRealtime,
+  errorMessage,
+  refreshMe,
+  setState,
+  signedOut,
+  toast,
+  useStore,
+} from '@quiz/client';
+import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH, USERNAME } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   Check,
@@ -14,6 +24,7 @@ import {
   MailCheck,
   MailWarning,
   Moon,
+  PenLine,
   Save,
   ShieldAlert,
   Sun,
@@ -27,6 +38,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { BannedData } from '../components/BannedData';
 import { BlockedSettings } from '../components/BlockedSettings';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
@@ -56,6 +68,8 @@ export function ResetPasswordPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The account is banned: the new password is set, and the data is still the player's (BannedData).
+  const [dataToken, setDataToken] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -71,6 +85,7 @@ export function ResetPasswordPage() {
       navigate('/', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
+      if (err instanceof ApiError && typeof err.data.dataToken === 'string') setDataToken(err.data.dataToken);
     } finally {
       setBusy(false);
     }
@@ -96,6 +111,9 @@ export function ResetPasswordPage() {
             <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
               {error}
             </p>
+          )}
+          {dataToken && (
+            <BannedData token={dataToken} password={password} onDeleted={() => navigate('/', { replace: true })} />
           )}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Запази и влез
@@ -184,6 +202,7 @@ export function SettingsPage() {
           </p>
         </div>
       </div>
+      {me.mustRename && <ChooseNameSettings />}
       {/* A guest has no email or password yet: saving the account comes first, and brings both. */}
       {me.isGuest ? (
         <ClaimSettings />
@@ -944,6 +963,61 @@ function EmailSettings() {
         </div>
         <Button type="submit" variant="secondary" size="field" className="w-full sm:w-auto" loading={busy === 'save'}>
           {me.email ? 'Смени' : 'Добави'}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/** After a moderator took their name („ИграчN“ meanwhile): a name of their own, picked once. */
+function ChooseNameSettings() {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = useId();
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { user } = await api.chooseName(name.trim());
+      setState({ me: user });
+      toast({ kind: 'success', title: `Вече си „${user.username}“` });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="border-amber-400/30 p-6">
+      <div className="flex items-center gap-2">
+        <PenLine className="size-5 text-amber-300" />
+        <h2 className="t-card">Избери си ново име</h2>
+      </div>
+      <p className="mt-1 text-sm text-fg-2">
+        Модератор смени името ти (защо — в известията). Избери си ново: веднъж, по правилата на играта.
+      </p>
+      <form noValidate onSubmit={submit} className="mt-4 space-y-4">
+        <Field label="Ново име" htmlFor={`${id}-name`}>
+          <input
+            id={`${id}-name`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="username"
+            maxLength={USERNAME.max}
+            className={INPUT}
+          />
+        </Field>
+        {error && (
+          <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+            {error}
+          </p>
+        )}
+        <Button type="submit" loading={busy} disabled={name.trim().length < USERNAME.min}>
+          Запази името
         </Button>
       </form>
     </Card>

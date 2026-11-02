@@ -1,6 +1,6 @@
-import { api, errorMessage, longDate, timeAgo, toast } from '@quiz/client';
-import type { ModerationBasis, PlayerCard, PlayerSearchHit } from '@quiz/shared';
-import { Ban, Check, Eye, EyeOff, PenLine, Search, Trash2, Unlock } from 'lucide-react';
+import { api, errorMessage, longDate, saveFile, timeAgo, toast, useStore } from '@quiz/client';
+import { MODERATION, type ModerationBasis, type PlayerCard, type PlayerSearchHit } from '@quiz/shared';
+import { Ban, Check, Download, Eye, EyeOff, PenLine, Search, Trash2, Unlock, UserX } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useLoad } from '../../lib/load';
@@ -106,13 +106,45 @@ export function PlayersPanel() {
   );
 }
 
-type Mode = 'idle' | 'ban' | 'change' | 'rename' | 'annul';
+type Mode = 'idle' | 'ban' | 'change' | 'rename' | 'annul' | 'export' | 'erase';
 
 function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
   const { data, error, retry, setData } = useLoad(() => api.adminPlayer(id), String(id));
   const card = data?.card ?? null;
   const [mode, setMode] = useState<Mode>('idle');
   const [busy, setBusy] = useState(false);
+  // A player's data rights on a request by mail are the owner's to carry out (the privacy policy, §8 and §10).
+  const owner = useStore((s) => s.me?.staffRole === 'owner');
+
+  async function exportData(reason: string) {
+    setBusy(true);
+    try {
+      saveFile(await api.adminExportPlayer(id, reason), `almanac-data-${id}.json`);
+      toast({
+        kind: 'success',
+        title: 'Данните са изтеглени',
+        body: 'Изпрати ги само на адреса, от който дойде искането.',
+      });
+      setMode('idle');
+      retry();
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function erase(reason: string) {
+    setBusy(true);
+    try {
+      await api.adminErasePlayer(id, reason);
+      toast({ kind: 'success', title: 'Профилът е изтрит по искане' });
+      onBack();
+    } catch (e) {
+      toast({ kind: 'error', title: errorMessage(e) });
+      setBusy(false);
+    }
+  }
 
   async function act(run: () => Promise<{ card: PlayerCard }>, message: string) {
     setBusy(true);
@@ -222,7 +254,7 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
           <RenameForm
             busy={busy}
             onCancel={() => setMode('idle')}
-            onRename={(r) => void act(() => api.renamePlayer(id, r), `Името е сменено на „${r.username}“`)}
+            onRename={(r) => void act(() => api.renamePlayer(id, r), 'Името е сменено: играчът си избира ново')}
           />
         )}
         {mode === 'annul' && (
@@ -233,6 +265,29 @@ function PlayerCardView({ id, onBack }: { id: number; onBack: () => void }) {
             onCancel={() => setMode('idle')}
             onSubmit={(grounds) => void act(() => api.annulResults(id, grounds), 'Резултатите са анулирани')}
           />
+        )}
+        {(mode === 'export' || mode === 'erase') && (
+          <DataRequestForm
+            busy={busy}
+            erase={mode === 'erase'}
+            onCancel={() => setMode('idle')}
+            onSubmit={(reason) => void (mode === 'erase' ? erase(reason) : exportData(reason))}
+          />
+        )}
+        {mode === 'idle' && owner && !card.staff && !user.isGuest && (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+            <Button size="sm" variant="secondary" onClick={() => setMode('export')}>
+              <Download className="size-4" /> Изтегли данните
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-rose-300 hover:bg-rose-500/10"
+              onClick={() => setMode('erase')}
+            >
+              <UserX className="size-4" /> Изтрий по искане
+            </Button>
+          </div>
         )}
         {mode === 'idle' && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -357,6 +412,59 @@ function ChangeBanForm({
 }
 
 /** A decision with only its grounds to give (annulling results). */
+/**
+ * A data request by mail, carried out by the owner: how it came and how they checked whose it is (the log keeps that,
+ * never the name — an erasure takes every entry about the player).
+ */
+function DataRequestForm({
+  busy,
+  erase,
+  onSubmit,
+  onCancel,
+}: {
+  busy: boolean;
+  erase: boolean;
+  onSubmit: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const ready = reason.trim().length >= MODERATION.reasonMin;
+  return (
+    <form
+      className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) onSubmit(reason.trim());
+      }}
+    >
+      <p className="text-sm text-fg-2">
+        {erase
+          ? 'Профилът се изтрива завинаги, както с „Изтрий профила“ от Настройки. Само по искане на играча (или на родител) от адреса на профила или след друга проверка, че е той.'
+          : 'Файлът с данните е за изпращане само на адреса на профила (или на родителя, след проверка).'}
+      </p>
+      <label className="block text-sm">
+        <span className="font-semibold">Как дойде искането и как провери кой е (без името)</span>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          maxLength={MODERATION.reasonMax}
+          className="mt-1 w-full rounded-xl border border-line bg-sunk/30 px-3 py-2"
+          placeholder="Имейл до privacy@ на 2 ноември, от адреса на профила"
+        />
+      </label>
+      <div className="flex gap-2">
+        <Button size="sm" variant={erase ? 'danger' : 'primary'} type="submit" loading={busy} disabled={!ready}>
+          {erase ? 'Изтрий завинаги' : 'Изтегли данните'}
+        </Button>
+        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
+          Отказ
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function ReasonForm({
   busy,
   action,

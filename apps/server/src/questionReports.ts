@@ -1,5 +1,6 @@
 import {
   MODERATION,
+  type ModerationBasis,
   QUESTION_REPORT_REASONS,
   type QuestionInfo,
   type QuestionReportAction,
@@ -8,10 +9,9 @@ import {
   RATED_AFTER,
 } from '@quiz/shared';
 import { alertModerators } from './alerts';
-import { config } from './config';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';
-import { logAction } from './modlog';
+import { logAction, OWN_QUESTION, questionAuthor } from './modlog';
 import { notify } from './notifications';
 import {
   dropFromPlay,
@@ -23,45 +23,70 @@ import {
   reloadQuestionBank,
   rightOrderOf,
 } from './questions';
+import { sentence, tellPlayer, tellReversal } from './statements';
 
 type Result = { ok: true } | { ok: false; error: string };
 
 const REASONS = new Set<string>(QUESTION_REPORT_REASONS.map((r) => r.id));
 const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ?', id);
 
-/**
- * A player's question taken out of play, or back in it: its author hears so, and why (what the players flagged in
- * the last month). The bank's questions have no author to tell.
- */
-function tellAuthor(questionId: string, hidden: { byPlayers: boolean } | null) {
+/** A player's question as its author's messages name it; null for the bank's own (no author to tell). */
+function authored(questionId: string): { authorId: number; text: string } | null {
   const row = one<{ author_id: number | null; q: string }>(
     'SELECT author_id, q FROM questions WHERE id = ?',
     questionId,
   );
-  if (!row?.author_id) return;
-  const text = row.q.length > 70 ? `${row.q.slice(0, 70)}…` : row.q;
-  if (!hidden) {
-    notify(row.author_id, { icon: '✅', text: `Въпросът ти „${text}“ отново е в играта.`, link: '/submit' });
-    return;
-  }
+  if (!row?.author_id) return null;
+  return { authorId: row.author_id, text: row.q.length > 70 ? `${row.q.slice(0, 70)}…` : row.q };
+}
+
+/** What a moderator says when hiding a player's question (a set's hide asks the same): basis and reason. */
+export interface HideGrounds {
+  basis: ModerationBasis | null;
+  reason: string;
+  /** An approval taken back, rather than a hide. */
+  withdrawn?: boolean;
+}
+
+/**
+ * A player's question taken out of play: its author gets the statement of reasons every content decision gives
+ * (statements.ts, by note and mail; the 31 October review, MOD-5 = LEGAL-4). By its players' flags (`adminId` null),
+ * it says it was decided automatically until a person checks, with what they flagged.
+ */
+function tellHidden(questionId: string, adminId: number | null, grounds?: HideGrounds) {
+  const q = authored(questionId);
+  if (!q) return;
   const flagged = all<{ reason: string }>(
     'SELECT DISTINCT reason FROM question_reports WHERE question_id = ? AND created_at > ?',
     questionId,
     Date.now() - 30 * 24 * 60 * 60_000,
   ).map((r) => QUESTION_REPORT_REASONS.find((x) => x.id === r.reason)?.label ?? r.reason);
-  notify(row.author_id, {
+  const flags = flagged.length ? `Сигнали: ${flagged.join('; ')}` : '';
+  tellPlayer(q.authorId, {
+    what:
+      adminId === null
+        ? `Сигналите на играчите скриха въпроса ти „${q.text}“ от новите мачове, докато модератор го провери.`
+        : grounds?.withdrawn
+          ? `Модератор оттегли одобрението на въпроса ти „${q.text}“: вече не е в играта.`
+          : `Модератор скри въпроса ти „${q.text}“ от новите мачове.`,
+    basis: grounds?.basis ?? null,
+    // The moderator's words, and what the players flagged (the facts it rests on).
+    reason: [grounds?.reason && sentence(grounds.reason), flags].filter(Boolean).join(' ') || 'Проверка от модератор',
+    onReport: flagged.length > 0,
+    automated:
+      adminId === null
+        ? 'Решено е автоматично, от сигналите на играчите (без човек), докато модератор го провери.'
+        : undefined,
+    subject: 'Въпросът ти е скрит от новите мачове',
     icon: '🚩',
-    text: [
-      hidden.byPlayers
-        ? `Сигналите на играчите скриха въпроса ти „${text}“ от новите мачове, докато модератор го провери.`
-        : `Модератор скри въпроса ти „${text}“ от новите мачове.`,
-      flagged.length && `Сигнали: ${flagged.join('; ')}.`,
-      `Ако смяташ, че е грешка, пиши на ${config.operator.email}.`,
-    ]
-      .filter(Boolean)
-      .join(' '),
     link: '/submit',
   });
+}
+
+/** A player's question back in play: its author hears so, and why. */
+function tellShown(questionId: string, reason: string) {
+  const q = authored(questionId);
+  if (q) tellReversal(q.authorId, `Въпросът ти „${q.text}“ отново е в играта.`, reason, '✅', '/submit');
 }
 
 export function questionInfo(q: PlayableQuestion): QuestionInfo {
@@ -123,8 +148,10 @@ export function reportQuestion(userId: number, questionId: string, reason: strin
     if (counted >= MODERATION.alertAt) alertFlags();
     return { ok: true };
   }
+  // Counted from the log, where a hide stays when a moderator puts the question back: an unhide frees no slot (the 31
+  // October review, MOD-2).
   const hiddenToday = one<{ n: number }>(
-    'SELECT COUNT(*) AS n FROM hidden_questions WHERE hidden_by IS NULL AND hidden_at > ?',
+    "SELECT COUNT(*) AS n FROM moderation_log WHERE created_at > ? AND action = 'auto_hide_question'",
     now - 24 * 60 * 60_000,
   )!.n;
   if (hiddenToday >= MODERATION.autoHidesPerDay) {
@@ -180,8 +207,11 @@ export function openQuestionReports(): QuestionReportGroup[] {
   return [...groups.values()].sort((a, b) => b.reports.length - a.reports.length);
 }
 
-/** Takes a question out of new matches (`adminId` null: its players' flags did), logged so it can be undone. */
-export function hideQuestion(adminId: number | null, questionId: string) {
+/**
+ * Takes a question out of new matches (`adminId` null: its players' flags did), logged so it can be undone, with the
+ * moderator's grounds (asked for a player's question).
+ */
+export function hideQuestion(adminId: number | null, questionId: string, grounds?: HideGrounds) {
   run(
     'INSERT OR IGNORE INTO hidden_questions (question_id, hidden_by, hidden_at) VALUES (?, ?, ?)',
     questionId,
@@ -191,12 +221,15 @@ export function hideQuestion(adminId: number | null, questionId: string) {
   logAction({
     adminId,
     action: adminId === null ? 'auto_hide_question' : 'hide_question',
+    userId: questionAuthor(questionId),
     target: questionId,
+    basis: grounds?.basis ?? null,
+    reason: grounds?.reason || null,
     undo: {},
   });
   dropFromPlay(questionId);
   redrawDailyWithout(questionId);
-  tellAuthor(questionId, { byPlayers: adminId === null });
+  tellHidden(questionId, adminId, grounds);
 }
 
 /**
@@ -204,8 +237,21 @@ export function hideQuestion(adminId: number | null, questionId: string) {
  * corrected: what players did on the old wording no longer says anything about it, so its numbers start over, and
  * whoever flagged it is thanked).
  */
-export function resolveQuestionReports(adminId: number, questionId: string, action: QuestionReportAction): Result {
+export function resolveQuestionReports(
+  adminId: number,
+  questionId: string,
+  action: QuestionReportAction,
+  grounds?: HideGrounds,
+): Result {
   if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
+  const author = questionAuthor(questionId);
+  if (action !== 'hide' && author === adminId) return { ok: false, error: OWN_QUESTION };
+  // A player's question hidden: its author reads why, as for a set.
+  if (action === 'hide' && author !== null && (!grounds?.basis || grounds.reason.trim().length < MODERATION.reasonMin))
+    return {
+      ok: false,
+      error: `Избери основание и напиши причина (поне ${MODERATION.reasonMin} знака): авторът ще ги прочете.`,
+    };
   const open = all<{ id: number; user_id: number }>(
     "SELECT id, user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
     questionId,
@@ -227,19 +273,24 @@ export function resolveQuestionReports(adminId: number, questionId: string, acti
     if (action === 'fixed') {
       run('DELETE FROM question_stats WHERE question_id = ?', questionId);
       run('DELETE FROM question_skill WHERE question_id = ?', questionId);
-      logAction({ adminId, action: 'fix_question', target: questionId });
+      logAction({ adminId, action: 'fix_question', userId: author, target: questionId });
     } else if (action === 'dismiss')
       // Which flags, and whether it was hidden: an undo opens them again and hides it again.
       logAction({
         adminId,
         action: 'dismiss_flags',
+        userId: author,
         target: questionId,
         undo: { flags: open.map((r) => r.id), hidden: shown },
       });
   });
-  if (action === 'hide') hideQuestion(adminId, questionId);
+  if (action === 'hide') hideQuestion(adminId, questionId, grounds);
   else if (shown || action === 'fixed') reloadQuestionBank();
-  if (shown) tellAuthor(questionId, null);
+  if (shown)
+    tellShown(
+      questionId,
+      action === 'fixed' ? 'Модератор го поправи.' : 'Модератор провери сигналите: въпросът е наред.',
+    );
   if (action === 'fixed') {
     for (const userId of reporters)
       notify(userId, { icon: '🛠️', text: 'Благодарим! Въпросът, за който сигнализира, е поправен.' });
@@ -255,13 +306,65 @@ export function hiddenQuestions(): QuestionInfo[] {
     .map(questionInfo);
 }
 
-export function unhideQuestion(questionId: string, adminId: number | null = null): Result {
-  if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) {
-    return { ok: false, error: 'Въпросът не е скрит.' };
-  }
-  // From the hidden list (an undo from the log is logged as one already).
-  if (adminId !== null) logAction({ adminId, action: 'unhide_question', target: questionId, undo: {} });
+/**
+ * A moderator puts a hidden question back: from the hidden list („Върни в играта“), or by undoing its hide in the log
+ * (`undoing`). Either says the question is fine, so its open flags are dismissed as „Въпросът е наред“ dismisses them:
+ * the same players can't hide it again with the next flag (the 31 October review, MOD-2). Which flags is logged, so
+ * an undo opens them again: in the unhide's entry, or (undoing a hide) in a „Въпросът е наред“ entry of its own.
+ */
+export function unhideQuestion(
+  questionId: string,
+  adminId: number,
+  { undoing = false, reason = 'Модератор го провери: въпросът е наред.' } = {},
+): Result {
+  const author = questionAuthor(questionId);
+  if (author === adminId) return { ok: false, error: OWN_QUESTION };
+  const flags = tx(() => {
+    if (!Number(run('DELETE FROM hidden_questions WHERE question_id = ?', questionId).changes)) return null;
+    const open = all<{ id: number }>(
+      "SELECT id FROM question_reports WHERE question_id = ? AND status = 'open'",
+      questionId,
+    ).map((r) => r.id);
+    run(
+      "UPDATE question_reports SET status = 'dismissed', resolved_at = ?, resolved_by = ? WHERE question_id = ? AND status = 'open'",
+      Date.now(),
+      adminId,
+      questionId,
+    );
+    if (!undoing)
+      logAction({ adminId, action: 'unhide_question', userId: author, target: questionId, undo: { flags: open } });
+    else if (open.length)
+      logAction({
+        adminId,
+        action: 'dismiss_flags',
+        userId: author,
+        target: questionId,
+        undo: { flags: open, hidden: true },
+      });
+    return open;
+  });
+  if (!flags) return { ok: false, error: 'Въпросът не е скрит.' };
   reloadQuestionBank();
-  tellAuthor(questionId, null);
+  tellShown(questionId, reason);
   return { ok: true };
+}
+
+/**
+ * Flags dismissed with a put-back (or „Въпросът е наред“), open again: its undo. A player who has flagged it again since
+ * has an open flag already (one each): that one stands, and the dismissed one goes, so it counts again.
+ */
+export function reopenFlags(ids: number[]) {
+  tx(() => {
+    for (const id of ids) {
+      run(
+        `DELETE FROM question_reports AS d WHERE d.id = ? AND d.status = 'dismissed' AND EXISTS (
+           SELECT 1 FROM question_reports o WHERE o.question_id = d.question_id AND o.user_id = d.user_id AND o.status = 'open')`,
+        id,
+      );
+      run(
+        "UPDATE question_reports SET status = 'open', resolved_at = NULL, resolved_by = NULL WHERE id = ? AND status = 'dismissed'",
+        id,
+      );
+    }
+  });
 }

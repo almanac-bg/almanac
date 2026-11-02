@@ -7,6 +7,7 @@ import {
 } from '@quiz/shared';
 import { type Request, Router } from 'express';
 import { z } from 'zod';
+import { eraseOnRequest, exportAccount } from '../account';
 import { playCheck } from '../answers';
 import { requireAuth } from '../auth';
 import {
@@ -45,6 +46,7 @@ import {
   rejectSubmission,
   similarQuestions,
 } from '../submissions';
+import { getUser, isAdmin } from '../users';
 import {
   idParam,
   parse,
@@ -137,7 +139,9 @@ adminRouter.post('/admin/submissions/:id/reject', change, (req, res) => {
 adminRouter.put('/admin/questions/:id', change, (req, res) => {
   const draft = parse(DraftSchema, req, res);
   if (!draft) return;
-  reply(res, editCommunityQuestion(res.locals.userId, String(req.params.id), draft));
+  // Why, beside the draft: its author reads it.
+  const why = Reason.safeParse((req.body as { reason?: unknown } | undefined)?.reason);
+  reply(res, editCommunityQuestion(res.locals.userId, String(req.params.id), draft, why.success ? why.data : ''));
 });
 
 /** The bank read again from disk (after a pull of the private bank, without a restart). */
@@ -161,9 +165,21 @@ adminRouter.get('/admin/question-reports', (_req, res) => {
 });
 
 adminRouter.post('/admin/question-reports/:id/resolve', change, (req, res) => {
-  const body = parse(z.object({ action: z.enum(['dismiss', 'hide', 'fixed']) }), req, res);
+  // Hiding a player's question takes a basis and reason, as a set's hide does: its author reads them.
+  const body = parse(
+    z.object({ action: z.enum(['dismiss', 'hide', 'fixed']), basis: Basis.optional(), reason: Reason }),
+    req,
+    res,
+  );
   if (!body) return;
-  reply(res, resolveQuestionReports(res.locals.userId, String(req.params.id), body.action), flagsNow);
+  reply(
+    res,
+    resolveQuestionReports(res.locals.userId, String(req.params.id), body.action, {
+      basis: body.basis ?? null,
+      reason: body.reason.trim(),
+    }),
+    flagsNow,
+  );
 });
 
 adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {
@@ -178,7 +194,7 @@ adminRouter.get('/admin/reports', (_req, res) => {
 
 const Decision = z.discriminatedUnion('action', [
   z.object({ action: z.literal('dismiss') }),
-  z.object({ action: z.literal('rename'), username: z.string().max(40), basis: Basis, reason: Reason }),
+  z.object({ action: z.literal('rename'), username: z.string().max(40).optional(), basis: Basis, reason: Reason }),
   z.object({
     action: z.literal('ban'),
     days: z.number().int().min(1).max(3650).nullable(),
@@ -235,6 +251,51 @@ adminRouter.get('/admin/players/:id', (req, res) => {
   res.json({ card });
 });
 
+/**
+ * A player's data rights carried out for them, on a request that came by mail (the privacy policy, §8 and §10: a parent,
+ * someone who can't sign in): the owner downloads the data to send, or erases the account the way „Изтрий профила“
+ * does. Logged, without the name (`reason`: how the request came and how it was checked). Not for staff: their role goes
+ * first (`cli admin remove`).
+ */
+const DataRequest = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(MODERATION.reasonMin, 'Напиши как дойде искането и как провери кой е (без името).')
+    .max(MODERATION.reasonMax),
+});
+
+function requestable(req: Request, res: import('express').Response): number | null {
+  const id = idParam(req);
+  const user = getUser(id);
+  if (!user) res.status(404).json({ error: 'Няма такъв играч.' });
+  else if (id === res.locals.userId || isAdmin(user))
+    res.status(400).json({ error: 'Не и за профил от екипа: първо махни ролята (cli admin remove).' });
+  else return id;
+  return null;
+}
+
+adminRouter.post('/admin/players/:id/export', requireOwner, change, (req, res) => {
+  const body = parse(DataRequest, req, res);
+  if (!body) return;
+  const id = requestable(req, res);
+  if (id === null) return;
+  logAction({ adminId: res.locals.userId, action: 'export_data', userId: id, reason: body.reason });
+  res.setHeader('content-disposition', `attachment; filename="almanac-data-${id}.json"`);
+  res.type('application/json').send(JSON.stringify(exportAccount(id), null, 2));
+});
+
+adminRouter.post('/admin/players/:id/erase', requireOwner, change, (req, res) => {
+  const body = parse(DataRequest, req, res);
+  if (!body) return;
+  const id = requestable(req, res);
+  if (id === null) return;
+  eraseOnRequest(id);
+  // After the erasure, which takes every entry about them: this one names nobody.
+  logAction({ adminId: res.locals.userId, action: 'erase_request', reason: body.reason });
+  res.json({ ok: true });
+});
+
 adminRouter.post('/admin/players/:id/ban', change, (req, res) => {
   const body = parse(
     z.object({
@@ -258,7 +319,7 @@ adminRouter.post('/admin/players/:id/ban-change', change, (req, res) => {
 });
 
 adminRouter.post('/admin/players/:id/rename', change, (req, res) => {
-  const body = parse(z.object({ username: z.string().max(40), basis: Basis, reason: Reason }), req, res);
+  const body = parse(z.object({ username: z.string().max(40).optional(), basis: Basis, reason: Reason }), req, res);
   if (!body) return;
   reply(res, renamePlayer(res.locals.userId, idParam(req), body), cardOf(req));
 });

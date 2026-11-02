@@ -134,7 +134,7 @@ jobs:
       # …and Caddy must accept its config: a mistake there takes HTTPS down.
       # (The same Caddy version the compose file runs.)
       - run: >-
-          docker run --rm -e DOMAIN=example.test -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          docker run --rm -e DOMAIN=example.test -v "$PWD/deploy:/etc/caddy:ro"
           "$(sed -n 's/.*image: \(caddy:.*\)/\1/p' docker-compose.yml)"
           caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - run: docker build -t almanac .

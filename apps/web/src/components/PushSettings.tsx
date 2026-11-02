@@ -3,7 +3,7 @@ import { PUSH, PUSH_KINDS, type PushKind, type PushPrefs } from '@quiz/shared';
 import clsx from 'clsx';
 import { BellRing, Share } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import { Button, Card, SwitchTrack } from './ui';
+import { Button, Card, Modal, SwitchTrack } from './ui';
 
 /** The key as the browser wants it (the server gives it base64url). */
 function keyBytes(base64url: string) {
@@ -38,6 +38,9 @@ export function PushSettings() {
   const [here, setHere] = useState<PushSubscription | null>(null);
   const [permission, setPermission] = useState<NotificationPermission | null>(null);
   const [busy, setBusy] = useState(false);
+  // Push rests on consent, and under 14 that's a parent's: asked here, as the optional mails ask (the 31 October
+  // review, LEGAL-3). The browser's own prompt comes from the confirming tap (Safari wants one).
+  const [confirming, setConfirming] = useState(false);
   const timeId = useId();
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export function PushSettings() {
   if (!key) return null;
 
   async function enable() {
+    setConfirming(false);
     setBusy(true);
     try {
       const asked = await Notification.requestPermission();
@@ -139,10 +143,24 @@ export function PushSettings() {
           </Button>
         </div>
       ) : (
-        <Button className="mt-4" onClick={enable} loading={busy}>
+        <Button className="mt-4" onClick={() => setConfirming(true)} loading={busy}>
           <BellRing className="size-4" /> Включи на това устройство
         </Button>
       )}
+      <Modal open={confirming} onClose={() => setConfirming(false)} title="Известия на устройството">
+        <p className="text-sm text-fg-2">
+          Ще идват кратки известия на това устройство — най-много {PUSH.perDay} на ден. Спираш ги по всяко време оттук.
+        </p>
+        <p className="mt-3 text-sm text-fg">
+          Потвърждаваш, че имаш навършени 14 години или имаш съгласие на родител или настойник.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirming(false)}>
+            Отказ
+          </Button>
+          <Button onClick={enable}>Потвърждавам, включи</Button>
+        </div>
+      </Modal>
 
       {prefs && (
         <div className="mt-6 space-y-4 border-t border-line pt-5">

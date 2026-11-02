@@ -89,7 +89,9 @@ services:
       DOMAIN: ${DOMAIN:-almanac.bg}
       HSTS_PRELOAD: ${HSTS_PRELOAD:-}
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The folder, not the file: git writes a changed Caddyfile as a new file, which a mount of the file itself never
+      # shows (the container keeps the old one, and deploy.sh's reload read it again — 8g's mta-sts site waited so).
+      - ./deploy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
 
@@ -121,6 +123,7 @@ services:
       BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
     volumes:
       - data:/data
+      # A file mount sees a changed file only from a restart, which deploy.sh does when it changed.
       - ./deploy/litestream.yml:/etc/litestream.yml:ro
 
 volumes:
