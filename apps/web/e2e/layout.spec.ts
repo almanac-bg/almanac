@@ -274,3 +274,56 @@ for (const [where, size] of [
     expect(await hiddenWhenFocused(page, 30)).toEqual([]);
   });
 }
+
+test('the landing’s wordmark stays inside its column, on phones and a laptop (VD-9)', async ({ page }) => {
+  for (const width of [320, 390, 430, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/');
+    const over = await page.evaluate(() => {
+      const h1 = document.querySelector('main h1')!;
+      const column = h1.parentElement!;
+      const edge = column.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(column).paddingRight);
+      return Math.round((h1.firstElementChild as HTMLElement).getBoundingClientRect().right - edge);
+    });
+    expect(over, `${width} px: past its column by`).toBeLessThanOrEqual(0);
+  }
+});
+
+test('320 px with WCAG’s text spacing never scrolls sideways (1.4.12)', async ({ page }) => {
+  // Line height 1.5, letter spacing 0.12 em, word spacing 0.16 em, 2 em after paragraphs: what a reader may set.
+  const spacing =
+    '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }';
+  // Set as a reader's stylesheet is: before the page draws.
+  await page.addInitScript((css) => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.append(style);
+    });
+  }, spacing);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  await expectNoSideScroll(page, 'the landing');
+  await startAsGuest(page);
+  for (const path of ['/', '/achievements', '/leaderboard', '/locker', '/settings', '/almanac', '/profile']) {
+    await page.goto(path);
+    await expectNoSideScroll(page, path);
+  }
+});
+
+test('a long page title keeps its words whole on a phone (UX-13)', async ({ page }) => {
+  await page.goto('/privacy');
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 800 });
+    // The longest word of „Политика за поверителност“, on one line: its letters all on one row.
+    const rows = await page.locator('main h1').evaluate((h1) => {
+      const text = h1.firstChild!;
+      const at = text.textContent!.indexOf('поверителност');
+      const range = document.createRange();
+      range.setStart(text, at);
+      range.setEnd(text, at + 'поверителност'.length);
+      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+    });
+    expect(rows, `${width} px`).toBe(1);
+  }
+});

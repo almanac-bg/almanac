@@ -66,7 +66,7 @@ export function DraftEditor({
                   style={active ? { borderColor: `${c.color}99`, background: `${c.color}1f` } : undefined}
                 >
                   <Emoji e={c.icon} className="size-5" size="" />
-                  <span className="truncate">{c.name}</span>
+                  <span className="line-clamp-2 min-w-0 leading-tight">{c.name}</span>
                 </button>
               );
             })}

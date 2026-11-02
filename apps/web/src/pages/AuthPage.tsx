@@ -16,6 +16,7 @@ import { PasswordField } from '../components/PasswordField';
 import { Button, Card, Field, INPUT, Segmented } from '../components/ui';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { embeddedChallenge } from '../lib/embedded';
+import { useFitWidth } from '../lib/fitWidth';
 import { useLoad } from '../lib/load';
 import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
@@ -58,6 +59,9 @@ export function AuthPage() {
   // effect rather than autoFocus, so the server's markup and the first render stay the same.
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  // The wordmark on one line, inside its column whatever the letter spacing (VD-9, A11Y-9).
+  const wordmark = useRef<HTMLHeadingElement>(null);
+  useFitWidth(wordmark);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on arrival
   useEffect(() => {
     if (DESKTOP && returning) usernameRef.current?.focus();
@@ -206,7 +210,8 @@ export function AuthPage() {
           >
             <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Нови 10 въпроса всеки ден
           </span>
-          <h1 className="text-[min(12.5cqw,6.25rem)] leading-[0.9] whitespace-nowrap">
+          {/* Sized for the rosette and its gap (1.25 em) beside the word: at 12.5cqw it ran 7–13 px past its column. */}
+          <h1 ref={wordmark} className="text-[min(11.6cqw,5.8rem)] leading-[0.9] whitespace-nowrap">
             <Logo />
             {/* What the name is, for screen readers and search results: the logo alone says only "АЛМАНАХ". */}
             <span className="sr-only"> — онлайн викторина на български: 10 въпроса на деня</span>

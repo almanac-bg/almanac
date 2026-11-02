@@ -301,11 +301,12 @@ function Item({
         )}
       >
         <span className={clsx(!unlocked && 'opacity-30 grayscale')}>{children}</span>
-        {name && <span className="w-full truncate text-xs font-semibold">{name}</span>}
+        {/* Two lines rather than „Демон на ск…“ (A11Y-9, UX-13). */}
+        {name && <span className="line-clamp-2 w-full text-xs leading-tight font-semibold">{name}</span>}
         {!unlocked && (
           <span className="flex max-w-full items-center gap-1 text-xs leading-tight text-fg-3">
             {'level' in req && <Lock className="size-3 shrink-0" />}
-            <span className="truncate">{requirementLabel(req, true)}</span>
+            <span className="line-clamp-2 min-w-0">{requirementLabel(req, true)}</span>
           </span>
         )}
         {equipped && (

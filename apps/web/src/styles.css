@@ -299,8 +299,11 @@ body {
  */
 /* A long word („предизвикателство“ in the display face) breaks rather than pushing a narrow or zoomed page sideways. */
 @utility t-page {
-  /* A size down under 360 px: „Политика за поверителност“ split mid-word at the usual size. */
-  @apply font-display text-3xl font-bold tracking-tight wrap-anywhere hyphens-auto max-[22.5rem]:text-2xl sm:text-4xl;
+  /*
+   * Grows with a phone's width up to the usual size: „Политика за поверителност“ split „поверителнос/т“ at 390 px when
+   * only screens under 360 px stepped down (UX-13).
+   */
+  @apply font-display text-[clamp(1.375rem,6.8vw,1.875rem)] font-bold tracking-tight wrap-anywhere hyphens-auto sm:text-4xl;
 }
 @utility t-section {
   @apply font-display text-2xl font-bold tracking-tight wrap-anywhere hyphens-auto;

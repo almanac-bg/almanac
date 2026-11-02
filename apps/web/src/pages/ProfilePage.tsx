@@ -607,7 +607,7 @@ function CategoryBars({ categories }: { categories: ProfileStats['categories'] }
           >
             <span role="cell" className="flex min-w-0 items-center gap-2 text-sm text-fg-2">
               <Emoji e={r.icon} />
-              <span className="truncate">{r.name}</span>
+              <span className="line-clamp-2 min-w-0 leading-tight">{r.name}</span>
               {r.tier !== null && (
                 <span title={MASTERY_TIERS[r.tier].name} className="shrink-0">
                   <Emoji e={MASTERY_TIERS[r.tier].icon} />
