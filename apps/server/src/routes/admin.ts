@@ -32,6 +32,7 @@ import {
   openQuestionReportCount,
   openQuestionReports,
   resolveQuestionReports,
+  settleBankFixes,
   unhideQuestion,
 } from '../questionReports';
 import { bankProblem, questionById, reloadQuestionBank } from '../questions';
@@ -147,6 +148,8 @@ adminRouter.put('/admin/questions/:id', change, (req, res) => {
 /** The bank read again from disk (after a pull of the private bank, without a restart). */
 adminRouter.post('/admin/bank/reload', requireOwner, change, (_req, res) => {
   reloadQuestionBank();
+  // Fixes the bank brought: their flags close, the questions come back.
+  settleBankFixes();
   const problem = bankProblem();
   if (problem) {
     res.status(400).json({ error: 'Банката не се зареди — играта продължава с предишната. Виж грешките в Sentry.' });
@@ -167,7 +170,11 @@ adminRouter.get('/admin/question-reports', (_req, res) => {
 adminRouter.post('/admin/question-reports/:id/resolve', change, (req, res) => {
   // Hiding a player's question takes a basis and reason, as a set's hide does: its author reads them.
   const body = parse(
-    z.object({ action: z.enum(['dismiss', 'hide', 'fixed']), basis: Basis.optional(), reason: Reason }),
+    z.object({
+      action: z.enum(['dismiss', 'hide', 'fixed', 'awaiting_fix']),
+      basis: Basis.optional(),
+      reason: Reason,
+    }),
     req,
     res,
   );

@@ -28,7 +28,7 @@ const ACTION: Record<ModerationLogAction, string> = {
   unhide_set: 'показа отново набор',
   rename_group: 'преименува група на',
   reload_bank: 'презареди банката с въпроси',
-  staff_add: 'направи от екипа',
+  staff_add: 'включи в екипа',
   staff_remove: 'махна от екипа',
   staff_2fa_reset: 'нулира двуфакторното влизане на',
   staff_sign_in: 'влезе в модерацията',

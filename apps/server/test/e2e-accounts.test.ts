@@ -1134,6 +1134,8 @@ test(
     assert.ok(auto.about && auto.about.length > 5, 'with the question in its words');
 
     srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
+    // Fixed in the bank since the flags (a bank question's „Поправих го“ wants it changed).
+    srv.db.prepare("UPDATE question_reports SET question_hash = 'before-the-fix' WHERE question_id = ?").run(id);
     const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });
     assert.equal(fixed.status, 200, fixed.body.error);
     assert.equal(fixed.body.groups.length, 0);
@@ -1226,6 +1228,35 @@ test(
     assert.ok(!(await hidden()).includes(other), 'five hidden by flags today already');
     srv.db.prepare("DELETE FROM moderation_log WHERE target LIKE 'cap-%'").run();
     await api.send('POST', `/api/admin/question-reports/${other}/resolve`, A.cookie, { action: 'dismiss' });
+
+    // A real mistake in a bank question (MOD-7): „Чака поправка в банката“ keeps it hidden, its flags open; „Поправих
+    // го“ waits for the bank's copy to change, and once it has, the next reload closes the flags by itself.
+    const bank = 'history-10';
+    show(F.user.id, bank);
+    await flag(F.cookie, bank);
+    const resolve = (action: string) =>
+      api.send('POST', `/api/admin/question-reports/${bank}/resolve`, A.cookie, { action });
+    assert.equal((await resolve('awaiting_fix')).status, 200);
+    let card = (await api.get('/api/admin/question-reports', A.cookie)).body.groups.find(
+      (g: { question: { id: string } }) => g.question.id === bank,
+    );
+    assert.deepEqual([card.question.hidden, card.question.awaitingFix], [true, true], 'hidden, its flag still open');
+    assert.match((await resolve('fixed')).body.error, /същият като при сигнала/, 'not before it changed');
+    const listed = cli(srv.dbPath, 'flags');
+    assert.equal(listed.status, 0, listed.output);
+    assert.ok(
+      // (The helper joins stdout, the JSON, with stderr, what loading the bank says.)
+      JSON.parse(listed.output.slice(listed.output.indexOf('{'), listed.output.lastIndexOf('}') + 1)).open.some(
+        (f: { id: string; awaitingFix: boolean }) => f.id === bank && f.awaitingFix,
+      ),
+    );
+    // As if the bank's copy had been fixed since the flag: the reload brings it back and closes the flag.
+    srv.db.prepare("UPDATE question_reports SET question_hash = 'before-the-fix' WHERE question_id = ?").run(bank);
+    assert.equal((await api.send('POST', '/api/admin/bank/reload', A.cookie)).status, 200);
+    card = (await api.get('/api/admin/question-reports', A.cookie)).body;
+    assert.ok(!card.groups.some((g: { question: { id: string } }) => g.question.id === bank), 'its flag closed');
+    assert.ok(!card.hidden.some((q: { id: string }) => q.id === bank), 'back in play');
+    assert.match((await api.get('/api/notifications', F.cookie)).body.notifications[0].text, /поправен/);
   },
 );
 

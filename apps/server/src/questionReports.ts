@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   MODERATION,
   type ModerationBasis,
@@ -30,6 +31,20 @@ type Result = { ok: true } | { ok: false; error: string };
 
 const REASONS = new Set<string>(QUESTION_REPORT_REASONS.map((r) => r.id));
 const isHidden = (id: string) => !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ?', id);
+const awaitingFix = (id: string) =>
+  !!one('SELECT 1 AS x FROM hidden_questions WHERE question_id = ? AND awaiting_fix = 1', id);
+
+/** What a question says (its text, answers, the right one): a flag keeps it, so a fix shows as a change. */
+export function questionHash(q: PlayableQuestion): string {
+  const say = {
+    q: q.q,
+    options: isChoice(q) ? q.options : null,
+    answer: isChoice(q) ? q.answer : null,
+    number: q.kind === 'number' ? q.number : null,
+    order: q.kind === 'order' ? rightOrderOf(q) : null,
+  };
+  return createHash('sha256').update(JSON.stringify(say)).digest('base64url').slice(0, 22);
+}
 
 /** A player's question as its author's messages name it; null for the bank's own (no author to tell). */
 function authored(questionId: string): { authorId: number; text: string } | null {
@@ -106,6 +121,7 @@ export function questionInfo(q: PlayableQuestion): QuestionInfo {
     image: image && credit && { ...image, ...credit },
     author: (isChoice(q) && q.author) || null,
     hidden: isHidden(q.id),
+    awaitingFix: awaitingFix(q.id),
     fact: q.fact ?? null,
     factSource: q.factSource ?? null,
     answerSource: q.answerSource ?? null,
@@ -125,13 +141,14 @@ export function reportQuestion(userId: number, questionId: string, reason: strin
   if (!REASONS.has(reason)) return { ok: false, error: 'Избери причина.' };
   const now = Date.now();
   run(
-    `INSERT INTO question_reports (question_id, user_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO question_reports (question_id, user_id, reason, details, created_at, question_hash) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (question_id, user_id) WHERE status = 'open' DO UPDATE SET reason = excluded.reason, details = excluded.details`,
     questionId,
     userId,
     reason,
     details.trim().slice(0, 500),
     now,
+    questionHash(q),
   );
   const flags = one<{ all: number; counted: number }>(
     `SELECT COUNT(*) AS "all", SUM(u.is_guest = 0 AND u.created_at <= ? AND u.games_played >= ?
@@ -268,14 +285,36 @@ export function hideQuestion(adminId: number | null, questionId: string, grounds
  * whoever flagged it is thanked).
  */
 export function resolveQuestionReports(
-  adminId: number,
+  adminId: number | null,
   questionId: string,
   action: QuestionReportAction,
   grounds?: HideGrounds,
 ): Result {
-  if (!questionById(questionId)) return { ok: false, error: 'Няма такъв въпрос.' };
+  const question = questionById(questionId);
+  if (!question) return { ok: false, error: 'Няма такъв въпрос.' };
   const author = questionAuthor(questionId);
-  if (action !== 'hide' && author === adminId) return { ok: false, error: OWN_QUESTION };
+  if (action !== 'hide' && author !== null && author === adminId) return { ok: false, error: OWN_QUESTION };
+  // A bank question with a real mistake: hidden until the bank's copy is fixed, its flags open for the owner.
+  if (action === 'awaiting_fix') {
+    if (author !== null) return { ok: false, error: 'Въпрос на играч се поправя тук („Редактирай“).' };
+    if (!isHidden(questionId)) hideQuestion(adminId, questionId, { basis: null, reason: 'Чака поправка в банката.' });
+    run('UPDATE hidden_questions SET awaiting_fix = 1 WHERE question_id = ?', questionId);
+    return { ok: true };
+  }
+  // „Поправих го“ on a bank question: only once it says something else than what was flagged.
+  if (
+    action === 'fixed' &&
+    author === null &&
+    one(
+      "SELECT 1 AS x FROM question_reports WHERE question_id = ? AND status = 'open' AND question_hash = ?",
+      questionId,
+      questionHash(question),
+    )
+  )
+    return {
+      ok: false,
+      error: 'Въпросът е същият като при сигнала: първо го поправи в банката (questions.json) и я презареди.',
+    };
   // A player's question hidden: its author reads why, as for a set.
   if (action === 'hide' && author !== null && (!grounds?.basis || grounds.reason.trim().length < MODERATION.reasonMin))
     return {
@@ -326,6 +365,29 @@ export function resolveQuestionReports(
       notify(userId, { icon: '🛠️', text: 'Благодарим! Въпросът, за който сигнализира, е поправен.' });
   }
   return { ok: true };
+}
+
+/**
+ * Bank questions waiting for a fix whose copy in the bank now says something else (a deploy brought it, or „Презареди
+ * банката“): their flags close as fixed, the question is back in play with its numbers started over, and whoever
+ * flagged it is thanked. The upkeep runs it, and the reload. Returns how many.
+ */
+export function settleBankFixes(): number {
+  let fixed = 0;
+  for (const { question_id: id } of all<{ question_id: string }>(
+    'SELECT question_id FROM hidden_questions WHERE awaiting_fix = 1',
+  )) {
+    const q = questionById(id);
+    if (!q) continue;
+    const now = questionHash(q);
+    const flagged = all<{ hash: string | null }>(
+      "SELECT DISTINCT question_hash AS hash FROM question_reports WHERE question_id = ? AND status = 'open'",
+      id,
+    );
+    if (!flagged.length || flagged.some((f) => f.hash === null || f.hash === now)) continue;
+    if (resolveQuestionReports(null, id, 'fixed').ok) fixed++;
+  }
+  return fixed;
 }
 
 /** Hidden questions, newest first — so a hide can be undone. */

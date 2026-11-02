@@ -1099,6 +1099,8 @@ export interface QuestionInfo {
   author: string | null;
   /** Hidden from new matches by a moderator. */
   hidden: boolean;
+  /** Hidden until the bank's copy is fixed („Чака поправка в банката“). */
+  awaitingFix: boolean;
   /** Its "Знаеше ли?" and where that can be checked (moderators judge reports about it). */
   fact: string | null;
   factSource: string | null;
@@ -1122,7 +1124,8 @@ export interface QuestionReportGroup {
 }
 
 /** `fixed`: corrected (its numbers start over, and whoever flagged it is thanked). */
-export type QuestionReportAction = 'dismiss' | 'hide' | 'fixed';
+/** `awaiting_fix`: a bank question with a real mistake, hidden until the bank's copy is fixed (its flags stay open). */
+export type QuestionReportAction = 'dismiss' | 'hide' | 'fixed' | 'awaiting_fix';
 
 /** What the answer log says, for moderators: play no person could manage, and questions whose label is off. */
 export interface PlayCheck {

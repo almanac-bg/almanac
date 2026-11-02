@@ -42,6 +42,7 @@ test('the sets from before (v43) come in with their pictures: those in a set are
       -- And what the steps after v44 added, which come again after it (v45, v46).
       ALTER TABLE users DROP COLUMN must_rename;
       DROP TABLE hidden_set_texts; ALTER TABLE question_sets DROP COLUMN hidden_at;
+      ALTER TABLE question_reports DROP COLUMN question_hash; ALTER TABLE hidden_questions DROP COLUMN awaiting_fix;
       PRAGMA user_version = 43;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'host', 'host', 'x', 0);
     `);

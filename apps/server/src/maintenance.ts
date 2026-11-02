@@ -17,6 +17,7 @@ import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
 import { dailyReminderPushes, timedPushes } from './push';
+import { settleBankFixes } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { pruneRecordPlays, tellRecordOwners } from './records';
 import { pruneRuns } from './runs';
@@ -195,6 +196,13 @@ const STEPS: [string, () => unknown][] = [
     },
   ],
   ['guests', () => purgeGuests()],
+  [
+    'bank fixes',
+    () => {
+      const fixed = settleBankFixes();
+      if (fixed) console.log(`🛠️  Bank questions fixed: ${fixed} back in play, their flags closed`);
+    },
+  ],
   [
     'room guests',
     async () => {
