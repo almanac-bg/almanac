@@ -368,6 +368,8 @@ export class Game {
   /** A room's host paused the big screen on a reveal (numbered as `reading` is): the next question waits for them. */
   private paused = 0;
   private pauseSeq = 0;
+  /** A class's open question its host paused (game clock): its time stands still until it goes on. */
+  private questionPausedAt: number | null = null;
   /** The reveal ended while they were reading (or the host had paused): the next question comes when they go on. */
   private waitingForReader = false;
   /** The reveal's own wait for the next question, which the host's „Следващ“ cuts short. */
@@ -609,14 +611,32 @@ export class Game {
 
   /**
    * A class's pace, from the host's big screen: „Покажи отговора“ closes the open question now (one without a clock
-   * waits for it); „Пауза“ on a reveal holds the next question while the teacher talks the answer through
-   * (HOST_PAUSE_MS at most); „Следващ“ brings it on now, paused or not. Everyone sees the pause.
+   * waits for it); „Пауза“ stops an open question's clock while the class talks (answers still come), and on a reveal
+   * holds the next question while the teacher talks the answer through (HOST_PAUSE_MS at most, either); „Следващ“ /
+   * „Продължи“ goes on now. Everyone sees the pause.
    */
   steer(userId: number, index: number, action: 'pause' | 'next' | 'reveal'): boolean {
     if (userId !== this.setup.presenter || index !== this.index) return false;
     if (action === 'reveal') {
       if (this.phase !== 'question') return false;
       this.guard(() => this.reveal());
+      return true;
+    }
+    if (this.phase === 'question') {
+      if (action === 'next') {
+        if (this.questionPausedAt === null) return false;
+        this.guard(() => this.resumeQuestion());
+        return true;
+      }
+      // Not while the server drains, nor twice.
+      if (this.questionPausedAt !== null || this.hooks.draining()) return false;
+      this.questionPausedAt = gameClock.now();
+      if (this.questionTimer) clearTimeout(this.questionTimer);
+      this.questionTimer = null;
+      const seq = ++this.pauseSeq;
+      this.paused = seq;
+      this.later(HOST_PAUSE_MS, () => this.resumeQuestion(seq));
+      this.toGame('game:paused', { index, paused: true });
       return true;
     }
     if (this.phase !== 'reveal') return false;
@@ -637,6 +657,20 @@ export class Game {
       this.advance();
     });
     return true;
+  }
+
+  /**
+   * A paused question goes on (the host, its pause running out, the server draining): its clock from where it stopped —
+   * the pause counts for nobody's speed — and the phones told how long is left.
+   */
+  private resumeQuestion(seq = this.paused) {
+    if (this.questionPausedAt === null || seq !== this.paused || this.phase !== 'question') return;
+    this.questionStartedAt += gameClock.now() - this.questionPausedAt;
+    this.questionPausedAt = null;
+    this.paused = 0;
+    const left = Math.max(0, this.limitMs - this.elapsed());
+    this.questionTimer = this.later(left + GRACE_MS, () => this.reveal());
+    this.toGame('game:paused', { index: this.index, paused: false, remainingMs: left });
   }
 
   /** The host's pause runs out (or the server drains): on as if „Следващ“ had come when the reveal ended. */
@@ -798,6 +832,7 @@ export class Game {
    */
   drain() {
     if (this.held) return this.endForDrain();
+    if (this.questionPausedAt !== null) return this.guard(() => this.resumeQuestion());
     if (this.paused) return this.guard(() => this.unpause());
     if (!this.reading) return;
     this.reading = 0;
@@ -1002,6 +1037,12 @@ export class Game {
 
   private reveal() {
     if (this.phase !== 'question') return;
+    // Everyone answered while the class was paused (or the host showed the answer): the pause ends with the question.
+    if (this.questionPausedAt !== null) {
+      this.questionPausedAt = null;
+      this.paused = 0;
+      this.toGame('game:paused', { index: this.index, paused: false });
+    }
     this.phase = 'reveal';
     this.movedAt = Date.now();
     this.played++;
@@ -1724,9 +1765,9 @@ export class Game {
     return sides.size < 2;
   }
 
-  /** Milliseconds since the question opened, in game time. */
+  /** Milliseconds since the question opened, in game time (standing still while a class has it paused). */
   private elapsed() {
-    return (gameClock.now() - this.questionStartedAt) / config.gameTimeScale;
+    return ((this.questionPausedAt ?? gameClock.now()) - this.questionStartedAt) / config.gameTimeScale;
   }
 
   private consume(p: Participant, powerup: PowerupId) {

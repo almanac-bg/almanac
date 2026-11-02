@@ -364,7 +364,15 @@ function bind(s: GameSocket) {
     patchGame((g) => ({ myChoice: null, retryPrompt: true, removed: [...g.removed, wrong] }));
   });
 
-  s.on('game:paused', ({ index, paused }) => patchGame(() => ({ paused: paused ? index : null })));
+  // A question that goes on after its pause: its new deadline (the pause counted for nobody).
+  s.on('game:paused', ({ index, paused, remainingMs }) =>
+    patchGame((g) => ({
+      paused: paused ? index : null,
+      ...(!paused && remainingMs !== undefined && g.phase === 'question' && g.question?.index === index
+        ? { deadline: Date.now() + remainingMs }
+        : {}),
+    })),
+  );
 
   s.on('game:closing', ({ index, remainingMs }) =>
     patchGame((g) =>

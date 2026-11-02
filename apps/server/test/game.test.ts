@@ -874,6 +874,46 @@ test('a room without a clock: a question waits for everyone, or for the host’s
   assert.equal(timed.game.phase, 'reveal');
 });
 
+test('a class’s host pauses an open question: its clock stands still, answers still come, and it goes on from there (A11Y-5)', () => {
+  const g = setup({ humans: [1, 2], presenter: 9, room: true });
+  const at = g.game.index;
+  advance(TIME / 2);
+  assert.equal(g.game.steer(1, at, 'pause'), false, 'only the host');
+  assert.equal(g.game.steer(9, at, 'pause'), true);
+  assert.deepEqual(g.of('game:paused').at(-1), { index: at, paused: true });
+  assert.equal(g.game.steer(9, at, 'pause'), false, 'paused already');
+  advance(TIME * 3);
+  assert.equal(g.game.phase, 'question', 'three clocks later, still open');
+  g.right(1);
+  assert.equal(g.game.phase, 'question', 'an answer comes in a pause, the other is still awaited');
+  assert.equal(g.game.steer(9, at, 'next'), true);
+  const resumed = g.of<{ paused: boolean; remainingMs: number }>('game:paused').at(-1)!;
+  assert.equal(resumed.paused, false);
+  assert.ok(Math.abs(resumed.remainingMs - TIME / 2) < 50, `half the clock left: ${resumed.remainingMs}`);
+  advance(TIME / 2 - 300);
+  assert.equal(g.game.phase, 'question', 'not before its time');
+  advance(1_000);
+  assert.equal(g.game.phase, 'reveal', 'then on as ever');
+
+  // Everyone answers while it's paused: the pause ends with the question.
+  advance(5_000);
+  const next = g.game.index;
+  assert.equal(g.game.steer(9, next, 'pause'), true);
+  g.right(1);
+  g.right(2);
+  advance(700);
+  assert.equal(g.game.phase, 'reveal');
+  assert.deepEqual(g.of('game:paused').at(-1), { index: next, paused: false });
+
+  // A pause left alone runs out (ten minutes), and the server draining ends one.
+  advance(5_000);
+  const left = g.game.index;
+  assert.equal(g.game.steer(9, left, 'pause'), true);
+  g.drain();
+  assert.equal(g.of<{ paused: boolean }>('game:paused').at(-1)?.paused, false);
+  assert.equal(g.game.steer(9, left, 'pause'), false, 'no new pause while the server drains');
+});
+
 test('bots made up their minds when the question opened: once every person has answered, they answer at once', () => {
   // pace 0.3: the bot would answer three seconds in; the person answers after one.
   const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });

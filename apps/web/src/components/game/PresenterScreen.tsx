@@ -1,9 +1,9 @@
 import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
 import { BRAND, categoryById, type FinalStanding, type Standing } from '@quiz/shared';
 import clsx from 'clsx';
-import { ArrowRight, Check, Eye, Lightbulb, Pause, Users } from 'lucide-react';
+import { ArrowRight, Check, Eye, Lightbulb, Pause, Play, Users } from 'lucide-react';
 import { m } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { louder, sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
@@ -47,7 +47,14 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
   useEffect(() => {
     if (opening === 0) louder(() => sfx.go());
   }, [opening]);
-  const left = q && !reveal && !end && q.speedMs !== null ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  // While the class has the question paused its clock stands still: the time left as it was at the pause.
+  const pausedQuestion = !!q && !reveal && !end && game.paused === q.index;
+  const [frozen, setFrozen] = useState<number | null>(null);
+  useEffect(() => {
+    setFrozen(pausedQuestion ? Math.max(0, game.deadline - Date.now()) : null);
+  }, [pausedQuestion, game.deadline]);
+  const remainingMs = frozen ?? Math.max(0, game.deadline - now);
+  const left = q && !reveal && !end && q.speedMs !== null ? Math.ceil(remainingMs / 1000) : null;
   useEffect(() => {
     if (left !== null && left > 0 && left <= 5) louder(() => sfx.tick(left));
   }, [left]);
@@ -63,15 +70,15 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     louder(() => (knew * 2 >= playing ? sfx.correct() : sfx.timeUp()));
   }, [revealed]);
 
-  // The teacher sets the pace: on an open question „Покажи отговора“ (a room without a clock waits for it); on an
-  // answer „Пауза“ to talk it through, „Следващ“ to go on now — from the screen, or a presenter's clicker (→ or
-  // PageDown: the next step, whichever it is), Space pausing and going on.
-  const paused = revealed !== null && game.paused === revealed;
+  // The teacher sets the pace: on an open question „Пауза“ / „Продължи“ (its clock stops; answers still come) and
+  // „Покажи отговора“ (a room without a clock waits for it); on an answer „Пауза“ to talk it through, „Следващ“ to go on
+  // now — from the screen, or a presenter's clicker (→ or PageDown: the next step, whichever it is), Space pausing and
+  // going on.
   const open = q && !reveal && !end && game.phase === 'question' ? q.index : null;
+  const paused = (revealed !== null && game.paused === revealed) || (open !== null && game.paused === open);
   const steer = (action: 'pause' | 'next' | 'reveal') => {
-    if (action === 'reveal') {
-      if (open !== null) void actions.steer(open, 'reveal');
-    } else if (revealed !== null) void actions.steer(revealed, action);
+    const at = open ?? revealed;
+    if (at !== null && (action !== 'reveal' || open !== null)) void actions.steer(at, action);
   };
   const keys = useRef({ steer, paused, open: open !== null });
   keys.current = { steer, paused, open: open !== null };
@@ -111,6 +118,21 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
             Въпрос {q.index + 1} от {q.total}
           </p>
         )}
+        {open !== null &&
+          (paused ? (
+            <>
+              <span className="inline-flex items-center gap-2 font-semibold text-fg-2">
+                <Pause aria-hidden className="size-5" /> На пауза
+              </span>
+              <Button variant="secondary" onClick={() => steer('next')}>
+                <Play aria-hidden className="size-4" /> Продължи
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" onClick={() => steer('pause')}>
+              <Pause aria-hidden className="size-4" /> Пауза
+            </Button>
+          ))}
         {open !== null && (
           <Button variant="secondary" onClick={() => steer('reveal')}>
             <Eye aria-hidden className="size-4" /> Покажи отговора
@@ -213,7 +235,7 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
                 <div className="h-3 flex-1 overflow-hidden rounded-full bg-tint/10">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,#a855f7,#22d3ee)] transition-[width] duration-300 ease-linear"
-                    style={{ width: `${Math.max(0, (game.deadline - now) / q.durationMs) * 100}%` }}
+                    style={{ width: `${Math.max(0, remainingMs / q.durationMs) * 100}%` }}
                   />
                 </div>
                 <span

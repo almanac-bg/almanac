@@ -71,6 +71,8 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   });
   // The teacher stops on the answer to talk it through, then goes on from the keyboard (a presenter's clicker sends →).
   await pupil.getByRole('button', { name: /^[АБВГ]\) София/ }).click();
+  // On the answer (an open question has its own „Пауза“, which stops its clock).
+  await expect(teacher.getByText(/ познаха$/)).toBeVisible({ timeout: gameMs(3_000) });
   await teacher.getByRole('button', { name: 'Пауза', exact: true }).click({ timeout: gameMs(3_000) });
   await expect(teacher.getByText('На пауза', { exact: true })).toBeVisible();
   await expect(pupil.locator('p:not([aria-live])', { hasText: 'Пауза на големия екран' })).toBeVisible();

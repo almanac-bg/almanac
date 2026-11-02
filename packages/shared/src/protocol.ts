@@ -601,7 +601,8 @@ export interface ServerToClientEvents {
    */
   'game:closing': (p: { index: number; remainingMs: number }) => void;
   /** A room's host paused the big screen on this reveal (the next question waits), or the pause ran out. */
-  'game:paused': (p: { index: number; paused: boolean }) => void;
+  /** `remainingMs`: a question that goes on after its pause, how long it has left. */
+  'game:paused': (p: { index: number; paused: boolean; remainingMs?: number }) => void;
   /** A round's category is being picked (also re-sent to a client that reconnects meanwhile). */
   'game:pick': (p: PickPayload) => void;
   'game:round': (p: RoundPayload) => void;
