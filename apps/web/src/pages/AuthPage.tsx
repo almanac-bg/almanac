@@ -181,8 +181,10 @@ export function AuthPage() {
 
   const guest = (
     <GuestPlay
-      // On the sign-in tab, signing in is what's asked for: the guest button steps back.
-      primary={!returning && mode !== 'login'}
+      // The main action only where it leads the form: a room's or a group's invite to a newcomer. Under the form the
+      // person asked for („Създай профил“, „Вход“), the form's own button is the main one (UX-5): the big guest button
+      // under a filled-in form made „Гост_8095355“ and dropped what was typed.
+      primary={!returning && !!inviteCode}
       label={inviteCode ? 'Влез като гост' : challengeId && playable ? 'Приеми като гост' : 'Играй като гост'}
       busy={guestBusy}
       error={guestError}
@@ -423,7 +425,7 @@ export function AuthPage() {
                     <Button
                       type="submit"
                       size="lg"
-                      variant={returning || mode === 'login' ? 'primary' : 'secondary'}
+                      variant={!returning && inviteCode ? 'secondary' : 'primary'}
                       className="w-full"
                       loading={busy}
                     >
