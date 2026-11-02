@@ -168,7 +168,8 @@ export function dailyQuestions(day: string, userId: number): PreparedQuestion[] 
 export function joinBoardAfterSave(userId: number) {
   const user = getUser(userId);
   if (!user || !onDailyBoard(user)) return;
-  run('UPDATE daily_results SET own_set = 0 WHERE user_id = ? AND day = ?', userId, dayKey());
+  // Not a run with „Повече време“: that one is off the board for its clock, not for the account.
+  run('UPDATE daily_results SET own_set = 0 WHERE user_id = ? AND day = ? AND more_time = 0', userId, dayKey());
 }
 
 /**
@@ -179,6 +180,8 @@ export function joinBoardAfterSave(userId: number) {
 export function claimDailyAttempt(
   userId: number,
   viaCode: string | null = null,
+  /** Played with „Повече време“: off the board, with the place it would have had (D6). */
+  moreTime = false,
 ): { ok: true; day: string } | { ok: false; error: string } {
   const day = dayKey();
   const existing = one<{ started_at: number; finished_at: number | null; revealed: number }>(
@@ -202,18 +205,19 @@ export function claimDailyAttempt(
         : 'Днешният опит вече е започнат — имаш само един на ден.',
     };
   }
-  const offBoard = !onDailyBoard(getUser(userId)!, day);
+  const offBoard = moreTime || !onDailyBoard(getUser(userId)!, day);
   // Opened from someone's link for today: they hear how it went (tellSharer).
   const link = viaCode
     ? one<{ user_id: number }>('SELECT user_id FROM daily_links WHERE code = ? AND day = ?', viaCode, day)
     : undefined;
   run(
-    'INSERT INTO daily_results (user_id, day, started_at, own_set, via) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO daily_results (user_id, day, started_at, own_set, via, more_time) VALUES (?, ?, ?, ?, ?, ?)',
     userId,
     day,
     Date.now(),
     offBoard ? 1 : 0,
     link && link.user_id !== userId ? link.user_id : null,
+    moreTime ? 1 : 0,
   );
   count('daily_runs');
   if (link && link.user_id !== userId) count('link_uses:daily');
@@ -399,8 +403,8 @@ export function recordDailyResult(
   );
   if (played) count('daily_finished');
   const u = getUser(userId)!;
-  const entry = one<{ own_set: number | null; via: number | null }>(
-    'SELECT own_set, via FROM daily_results WHERE user_id = ? AND day = ?',
+  const entry = one<{ own_set: number | null; via: number | null; more_time: number }>(
+    'SELECT own_set, via, more_time FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
@@ -409,6 +413,7 @@ export function recordDailyResult(
   const rank = {
     ...rankOf(day, score, timeMs),
     offBoard,
+    ...(entry?.more_time === 1 && { moreTime: true }),
     sharer: entry?.via ? sharerResult(entry.via, day) : null,
     field: dayField(day, score, timeMs, !offBoard),
   };
@@ -481,8 +486,9 @@ export function dailyInfo(userId: number): DailyInfo {
     correct: number | null;
     time_ms: number | null;
     own_set: number | null;
+    more_time: number;
   }>(
-    'SELECT finished_at, score, correct, time_ms, own_set FROM daily_results WHERE user_id = ? AND day = ?',
+    'SELECT finished_at, score, correct, time_ms, own_set, more_time FROM daily_results WHERE user_id = ? AND day = ?',
     userId,
     day,
   );
@@ -510,6 +516,7 @@ export function dailyInfo(userId: number): DailyInfo {
     streak: liveDailyStreak(me),
     attempted: !!mine,
     offBoard,
+    ...(mine?.more_time === 1 && { moreTime: true }),
     played,
     total: boardSize(day),
     entries: rows.map((r, i) => ({ rank: i + 1, user: toPublicUser(r), value: r.score, correct: r.correct })),

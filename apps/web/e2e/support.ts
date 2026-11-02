@@ -85,6 +85,8 @@ export interface Me {
   isGuest: boolean;
   roomGuest: boolean;
   xp: number;
+  /** „Повече време“ (MORE_TIME). */
+  moreTime: string;
 }
 
 /** The signed-in account of this page's browser context, straight from the API (same cookies). */

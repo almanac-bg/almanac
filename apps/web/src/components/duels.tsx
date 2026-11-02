@@ -10,7 +10,7 @@ import {
   ROUNDS,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { RotateCcw, Swords } from 'lucide-react';
+import { RotateCcw, Swords, Timer } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../lib/load';
@@ -193,6 +193,11 @@ export function DuelCard({
       {run && (
         <span className="text-xs text-fg-3">
           {run.correct} от {MODES.challenge.questions} верни
+        </span>
+      )}
+      {run?.moreTime && (
+        <span className="inline-flex items-center gap-1 text-xs text-violet-300">
+          <Timer aria-hidden className="size-3.5" /> с повече време
         </span>
       )}
     </div>

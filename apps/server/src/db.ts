@@ -994,6 +994,16 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX player_skill_ranked ON player_skill(category, COALESCE(steady, rating)) WHERE answers >= 60;
     `,
   },
+  // v42, „Повече време“ (MORE_TIME; the 31 October review, A11Y-2, D6): the player's setting, and which daily and
+  // challenge-link runs were played with it — off their boards, as a newcomer's first day is, with the place they'd
+  // have had. Older code doesn't read the columns (it would put such a run back on the board: a rollback is short).
+  {
+    compatible: `
+    ALTER TABLE users ADD COLUMN more_time TEXT NOT NULL DEFAULT 'off';
+    ALTER TABLE daily_results ADD COLUMN more_time INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE challenge_results ADD COLUMN more_time INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

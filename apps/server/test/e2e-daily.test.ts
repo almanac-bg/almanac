@@ -393,6 +393,61 @@ test('daily challenge', T, async () => {
 });
 
 test(
+  '„Повече време“: the daily and a link at that clock, off their boards with the place they’d have had',
+  T,
+  async () => {
+    // The setting is anyone's, a guest's too, and only one of its four.
+    const g = await guest(srv.url);
+    assert.equal((await api.send('POST', '/api/account/more-time', g.cookie, { value: 'relaxed' })).status, 200);
+    assert.equal((await api.send('POST', '/api/account/more-time', g.cookie, { value: 'x9' })).status, 400);
+
+    const C = await register(srv.url, 'bavna_test');
+    srv.db.prepare('UPDATE users SET created_at = ? WHERE id = ?').run(Date.now() - RATED_AFTER.ms, C.user.id);
+    const set = await api.send('POST', '/api/account/more-time', C.cookie, { value: 'triple' });
+    assert.equal(set.body.user.moreTime, 'triple');
+    const sc = connect(srv.url, C.cookie);
+    await connected(sc);
+    try {
+      // The daily: at three times the clock, off the board — A and B are still the two on it.
+      const play = autoPlay(sc, 'right', newLog());
+      assert.ok((await emitAck(sc, 'daily:start')).ok);
+      const { start, end } = await play;
+      assert.equal(start!.pace, 'triple');
+      const daily = end.rewards!.daily!;
+      assert.deepEqual([daily.offBoard, daily.moreTime, daily.total], [true, true, 2]);
+      assert.ok(daily.rank >= 1 && daily.rank <= 3, 'with the place it would have had');
+      const info = (await api.get('/api/daily', C.cookie)).body;
+      assert.deepEqual([info.offBoard, info.moreTime, info.entries.length], [true, true, 2]);
+      assert.equal((await api.get('/api/daily', A.cookie)).body.entries.length, 2, 'the board as it was');
+
+      // A link: off its board too; its creator hears it was played, not that anyone's place changed.
+      const playA = autoPlay(sa, 'wrong', newLog());
+      const created = await emitAck(sa, 'challenge:start', {});
+      assert.ok(created.ok);
+      await playA;
+      const told = next(sa, 'notification');
+      const playC = autoPlay(sc, 'right', newLog());
+      assert.ok((await emitAck(sc, 'challenge:start', { id: created.id })).ok);
+      const { end: endC } = await playC;
+      assert.deepEqual(endC.rewards!.challenge, { id: created.id, rank: 1, total: 1, duel: null, moreTime: true });
+      assert.match((await told).item.text, /с „Повече време“: \d+ точки \(извън класирането\)/);
+      const link = (await api.get(`/api/challenges/${created.id}`, C.cookie)).body;
+      assert.equal(link.total, 1);
+      assert.deepEqual(
+        link.entries.map((e: { you: boolean; moreTime?: boolean; rank: number }) => [e.you, !!e.moreTime, e.rank]),
+        [
+          [false, false, 1],
+          [true, true, 1],
+        ],
+        'A first on the board; C beside it, where it would have been',
+      );
+    } finally {
+      sc.close();
+    }
+  },
+);
+
+test(
   'a guest, or an account made today, plays the same questions off the board, and sees where it would stand',
   T,
   async () => {

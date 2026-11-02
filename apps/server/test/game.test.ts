@@ -15,6 +15,7 @@ import {
   type PowerupId,
   type QuestionPayload,
   type RevealPayload,
+  ROUNDS,
   type RoundPayload,
   readingMs,
 } from '@quiz/shared';
@@ -85,7 +86,9 @@ function setup(opts: {
   /** A number final's weight (a set made before it counted double: 1). */
   finalTimes?: number;
   /** Соло at this pace (the match is then a Соло). */
-  pace?: 'normal' | 'relaxed' | 'untimed';
+  pace?: 'normal' | 'relaxed' | 'triple' | 'untimed';
+  /** People with „Повече време“ on, by user id (a longer round pick). */
+  longPick?: number[];
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -114,6 +117,7 @@ function setup(opts: {
         player: { ...player(`u${id}`, id), rating: opts.ratings?.[id] ?? 1000 },
         powerups: opts.powerups ?? [],
         emotes: [],
+        longPick: opts.longPick?.includes(id),
       })),
       bots: opts.bots ?? [],
       records: opts.records ?? [],
@@ -459,6 +463,35 @@ test('knocked out with people still in: unanswered, the hold ends with the clock
     // Too late now.
     g.right(1);
     assert.equal(g.events.at(-1)!.event, 'game:rejected');
+  }
+});
+
+test('„Повече време“ ×3: three times the clock; a right answer past the usual one counts, without the streak', () => {
+  const g = setup({ humans: [1], pace: 'triple' });
+  advance(2 * TIME + 1_000);
+  assert.equal(g.game.phase, 'question', 'still open past twice the clock');
+  g.right(1);
+  advance(1_000);
+  const u1 = g.game.participants.get('u1')!;
+  assert.deepEqual([u1.correct, u1.streak, u1.log[0].slow], [1, 0, true], 'right, no streak, left out of what it says');
+  const h = setup({ humans: [1], pace: 'triple' });
+  advance(3 * TIME + 1_000);
+  assert.equal(h.game.phase, 'reveal', 'closed at three times the clock');
+});
+
+test('„Повече време“ in a live match: twice the time to pick a round’s category, for who has it on', () => {
+  for (const [longPick, ms] of [
+    [[2], 2 * ROUNDS.pickMs],
+    [[], ROUNDS.pickMs],
+  ] as const) {
+    const g = setup({ humans: [1, 2], rounds: true, ratings: { 1: 1000, 2: 1100 }, longPick: [...longPick] });
+    for (let i = 0; i < 3; i++) playQuestion(g, { 1: true, 2: false });
+    const [pick] = g.of<PickPayload>('game:pick');
+    assert.equal(pick.pickerId, 'u2');
+    assert.equal(pick.durationMs, ms);
+    advance(ROUNDS.pickMs + 1_000);
+    // Decided (drawn) by the usual time without it; still open with it.
+    assert.equal(g.of('game:round').length === 0, longPick.length > 0, 'still picking past the usual time, with it on');
   }
 });
 

@@ -1,5 +1,5 @@
 import { api, disconnectRealtime, errorMessage, refreshMe, setState, signedOut, toast, useStore } from '@quiz/client';
-import { type MeUser, PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
   Check,
@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Sun,
   Swords,
+  Timer,
   Trash2,
   TriangleAlert,
   Volume2,
@@ -198,6 +199,7 @@ export function SettingsPage() {
       )}
       <ThemeSettings />
       <SoundSettings />
+      <MoreTimeSettings />
       <MatchKeySettings />
       {!me.isGuest && <PasswordSettings />}
       <DataSettings />
@@ -425,6 +427,49 @@ function ThemeSettings() {
           ]}
         />
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Достъпност: „Повече време“ (MORE_TIME), kept with the profile — the clock of the daily, links, friend duels and
+ * „Поправителен“, and a longer round pick in a live match (the review's A11Y-2, D6).
+ */
+function MoreTimeSettings() {
+  const me = useStore((s) => s.me)!;
+  const [busy, setBusy] = useState(false);
+  async function choose(value: MoreTime) {
+    if (value === me.moreTime) return;
+    setBusy(true);
+    try {
+      const { user } = await api.setMoreTime(value);
+      setState({ me: user });
+    } catch (err) {
+      toast({ kind: 'error', title: errorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="p-6">
+      <div className="flex items-center gap-2">
+        <Timer aria-hidden className={clsx('size-5', me.moreTime === 'off' ? 'text-fg-3' : 'text-violet-300')} />
+        <h2 className="t-card">Повече време</h2>
+      </div>
+      <p className="mt-1 text-sm text-fg-3 text-pretty">
+        Достъпност: за Въпросите на деня, линковете с предизвикателство, дуелите с приятел и „Поправителен“, а в мач на
+        живо — двойно време за избора на категория. Отговор след 15-ата секунда е верен, но без бонус за бързина и
+        серия. Така Въпросите на деня и линковете са извън класацията (виждаш къде щеше да си), а спечелен дуел не носи
+        бонус.
+      </p>
+      <fieldset className="mt-4 min-w-0 border-0 p-0" disabled={busy}>
+        <legend className="sr-only">Време за въпрос</legend>
+        <Segmented
+          value={me.moreTime}
+          onChange={(value) => void choose(value)}
+          options={MORE_TIME.map((m) => ({ value: m.id, label: m.label }))}
+        />
+      </fieldset>
     </Card>
   );
 }

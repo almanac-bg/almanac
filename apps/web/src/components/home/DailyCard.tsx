@@ -21,6 +21,7 @@ import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { GroupStandings } from '../groups';
 import { LoadError } from '../LoadError';
+import { MoreTimeNote } from '../MoreTimeNote';
 import { Button, Card, Spinner } from '../ui';
 import { countdown } from './time';
 
@@ -135,7 +136,13 @@ export function DailyCard({ className }: { className?: string }) {
                   </div>
                   {info.offBoard && (
                     <p className="mt-1 max-w-64 text-xs text-fg-3">
-                      {offBoardLine({ guest: me.isGuest, madeToday, rank: info.played.rank, total: info.total })}
+                      {offBoardLine({
+                        guest: me.isGuest,
+                        madeToday,
+                        moreTime: info.moreTime,
+                        rank: info.played.rank,
+                        total: info.total,
+                      })}
                     </p>
                   )}
                 </div>
@@ -153,9 +160,12 @@ export function DailyCard({ className }: { className?: string }) {
                 Днешният опит е използван. Нови въпроси след {countdown(info.endsAt - now)}.
               </p>
             ) : (
-              <Button variant="gold" size="lg" onClick={play} loading={busy}>
-                Играй днешните <ArrowRight className="size-5" />
-              </Button>
+              <>
+                <Button variant="gold" size="lg" onClick={play} loading={busy}>
+                  Играй днешните <ArrowRight className="size-5" />
+                </Button>
+                <MoreTimeNote className="mt-2" />
+              </>
             )}
             {info && !failed && <AmongFriends friends={info.friends} meId={me.id} />}
             <GroupStandings refresh={`${me.daily.day}:${me.daily.played}`} />

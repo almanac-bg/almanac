@@ -659,7 +659,8 @@ export const actions = {
     setState((st) => ({ evening: st.evening && { ...st.evening, joined: false } }));
   },
   /** „Поправителен“: the missed questions that have come back. */
-  startReview: () => ask(() => withTimeout().emitWithAck('review:start')),
+  /** „Поправителен“ at the clock „Повече време“ sets (the server reads it). */
+  startReview: () => ask(() => withTimeout().emitWithAck('review:start', {})),
   /** `via`: the code of the daily link it was opened from. */
   startDaily: (via?: string) => ask(() => withTimeout().emitWithAck('daily:start', { via })),
   /** Plays a challenge link, or (no id) makes a new one and plays it first. */

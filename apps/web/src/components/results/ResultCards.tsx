@@ -104,7 +104,9 @@ export function DailyCard({
         </>
       )}
       {daily.offBoard && (
-        <p className="relative mt-2 text-sm text-fg-2">{offBoardWhy({ guest: !!me?.isGuest, madeToday })}</p>
+        <p className="relative mt-2 text-sm text-fg-2">
+          {offBoardWhy({ guest: !!me?.isGuest, madeToday, moreTime: daily.moreTime })}
+        </p>
       )}
       {daily.field && (
         <DayField field={daily.field} correct={history.filter((h) => h.right).length} className="relative mt-4" />

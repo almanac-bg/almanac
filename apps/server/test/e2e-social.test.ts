@@ -190,12 +190,39 @@ test('friends, invites and challenges', T, async () => {
   assert.equal((await emitAck(sa, 'challenge:start', { rival: B.user.id, categories: picked })).ok, false);
   const rematchLog = newLog();
   const bRematch = autoPlay(sb, 'right', rematchLog);
-  assert.ok((await emitAck(sb, 'challenge:start', { rival: A.user.id, categories: picked })).ok);
+  const rematch = await emitAck(sb, 'challenge:start', { rival: A.user.id, categories: picked });
+  assert.ok(rematch.ok);
   await bRematch;
   assert.deepEqual(
     [0, 3, 6].map((i) => rematchLog.questions[i].category),
     picked,
   );
+
+  // „Повече време“ (D6): a duel won with it stands, marked, but pays no win bonus. A turns it on, loses the rematch,
+  // picks the next one, and wins it.
+  assert.equal((await api.send('POST', '/api/account/more-time', A.cookie, { value: 'relaxed' })).status, 200);
+  const aLoses = autoPlay(sa, 'wrong');
+  assert.ok((await emitAck(sa, 'challenge:start', { id: rematch.id })).ok);
+  await aLoses;
+  const aWins = autoPlay(sa, 'right');
+  const third = await emitAck(sa, 'challenge:start', { rival: B.user.id, categories: ['nature', 'science', 'movies'] });
+  assert.ok(third.ok, JSON.stringify(third));
+  const { start: aThird, end: aThirdEnd } = await aWins;
+  assert.equal(aThird!.pace, 'relaxed');
+  const bThird = autoPlay(sb, 'wrong');
+  assert.ok((await emitAck(sb, 'challenge:start', { id: third.id })).ok);
+  const { end: bThirdEnd } = await bThird;
+  const seen = bThirdEnd.rewards!.challenge!.duel!;
+  assert.deepEqual([seen.outcome, seen.theirs?.moreTime, seen.mine?.moreTime], ['lost', true, undefined]);
+  await eventually(async () => {
+    const [note] = (await api.get('/api/notifications', A.cookie)).body.notifications;
+    assert.equal(
+      note.text,
+      `${B.user.username} изигра дуела ви: ${aThirdEnd.standings[0].score} на ${bThirdEnd.standings[0].score} — печелиш.`,
+      'no „+65 XP“',
+    );
+  });
+  assert.equal((await api.send('POST', '/api/account/more-time', A.cookie, { value: 'off' })).status, 200);
 });
 
 test('a rematch asked for after the other had gone is waiting for them when they are back', T, async () => {

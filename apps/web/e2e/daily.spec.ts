@@ -88,3 +88,29 @@ test('one attempt a day: walking out after the first question uses it, and nothi
   await expect(page).toHaveURL(/\/daily$/);
   await expect(page.getByRole('button', { name: /^Играй днешните/ })).toHaveCount(0);
 });
+
+test('„Повече време“ from Settings: the day’s questions at three times the clock, off the board, said before and after', async ({
+  page,
+}) => {
+  await startAsGuest(page);
+  await page.goto('/settings');
+  const setting = page.getByRole('group', { name: 'Време за въпрос' });
+  await setting.getByRole('button', { name: '45 с', exact: true }).click();
+  await expect(setting.getByRole('button', { name: '45 с', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect((await me(page)).moreTime).toBe('triple');
+
+  // Said before the one attempt, and again as it starts.
+  await page.goto('/daily');
+  await expect(
+    page.getByText('С „Повече време“ (45 с за въпрос) — резултатът е извън класацията.', { exact: false }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /^Играй днешните/ }).click();
+  await expect(page).toHaveURL(/\/game$/);
+  await expect(page.getByText('Повече време: резултатът е извън класацията')).toBeVisible();
+  await expect(page.getByText(/45 секунди за всеки/)).toBeVisible();
+  await playMatch(page);
+  // Off the board for its clock, not for being a guest.
+  await expect(page.getByText('С „Повече време“ резултатът е извън класацията.').first()).toBeVisible({
+    timeout: gameMs(5_000),
+  });
+});

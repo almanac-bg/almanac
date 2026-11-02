@@ -11,7 +11,7 @@ import {
   type TeamId,
 } from '@quiz/shared';
 import clsx from 'clsx';
-import { Skull } from 'lucide-react';
+import { Skull, Timer } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
@@ -99,10 +99,25 @@ export function Intro({ game }: { game: LiveGame }) {
             </p>
           )}
           <p className="mt-2 text-fg-3">
-            {game.start.totalQuestions} въпроса · {game.start.timeMs / 1000} секунди за всеки
+            {game.start.totalQuestions} въпроса ·{' '}
+            {game.start.pace === 'untimed'
+              ? 'без часовник'
+              : `${(game.start.timeMs * (game.start.pace === 'triple' ? 3 : game.start.pace === 'relaxed' ? 2 : 1)) / 1000} секунди за всеки`}
             {(game.start.mode === 'daily' || game.start.mode === 'challenge' || game.start.mode === 'review') &&
               ' · без козове'}
           </p>
+          {/* „Повече време“ (Settings): every start of these comes through here — a duel from a friend's row too. */}
+          {game.start.pace !== 'normal' && game.start.mode !== 'solo' && (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-violet-200">
+              <Timer aria-hidden className="size-4" />
+              Повече време
+              {game.start.duelWith
+                ? ': победата важи, но без бонус'
+                : game.start.mode === 'review'
+                  ? ''
+                  : ': резултатът е извън класацията'}
+            </p>
+          )}
         </div>
       ) : game.start.teams ? (
         <TeamsVersus game={game} />

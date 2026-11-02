@@ -313,8 +313,9 @@ function rewardHuman(
   const challengeResult = challenge
     ? recordChallengeResult(setup.challengeId!, userId, s.score, p.correct, p.answerMs)
     : null;
-  // A friend duel decided by this run: a win pays as a 1-on-1 win (the friend who played first got theirs then).
-  const duelWon = challengeResult?.duel?.outcome === 'won';
+  // A friend duel decided by this run: a win pays as a 1-on-1 win (the friend who played first got theirs then) — one
+  // played with „Повече време“ stands, marked, without the bonus (D6).
+  const duelWon = challengeResult?.duel?.outcome === 'won' && !challengeResult.duel.mine?.moreTime;
   if (duelWon && counts && payDuelWin(userId, challengeResult!.duel!.friend.id))
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 

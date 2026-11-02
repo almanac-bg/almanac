@@ -23,6 +23,7 @@ import type {
   MeUser,
   ModerationBasis,
   ModerationLogEntry,
+  MoreTime,
   MyChallenge,
   PlayCheck,
   PlayerCard,
@@ -177,6 +178,8 @@ export const api = {
   unblock: (userId: number) => request<{ players: PublicUser[] }>('DELETE', `/blocks/${userId}`),
   /** Whether others may play against your recorded matches. */
   setShareRuns: (on: boolean) => request<{ user: MeUser }>('POST', '/account/share-runs', { on }),
+  /** „Повече време“ (MORE_TIME). */
+  setMoreTime: (value: MoreTime) => request<{ user: MeUser }>('POST', '/account/more-time', { value }),
   /** From the reminder email's unsubscribe link (works signed out). */
   remindersOff: (u: string, k: string) =>
     request<{ ok: true }>('POST', `/reminders/off?u=${encodeURIComponent(u)}&k=${encodeURIComponent(k)}`),
