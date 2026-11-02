@@ -104,7 +104,7 @@ export function sendStreakReminders(now = Date.now()): number {
   // A streak can still be alive a few days back if shields cover the gap; liveDailyStreak decides. Whoever already used
   // today's attempt (and left it at once, so the day didn't count) can't save the streak today: no email.
   const candidates = all<UserRow>(
-    `SELECT * FROM users WHERE streak_reminders = 1 AND email IS NOT NULL AND is_guest = 0
+    `SELECT * FROM users WHERE streak_reminders = 1 AND email IS NOT NULL AND email_bounced_at IS NULL AND is_guest = 0
      AND last_daily_day >= ? AND last_daily_day < ? AND (reminded_day IS NULL OR reminded_day < ?)
      AND (banned_until IS NULL OR banned_until < ?)
      AND NOT EXISTS (SELECT 1 FROM daily_results d WHERE d.user_id = users.id AND d.day = ?) LIMIT ?`,

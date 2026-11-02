@@ -146,6 +146,15 @@ test('the streak reminder goes out in the evening, once a day, with a working un
   });
   user({ email: 'quiet@example.com', streak_reminders: 0, daily_streak: 5, last_daily_day: shiftDay(today, -1) });
   user({ email: 'done@example.com', streak_reminders: 1, reminder_key: 'k', daily_streak: 5, last_daily_day: today });
+  // Our mail doesn't reach this one (a bounce): nothing more goes there, even switched on (OPS-8).
+  user({
+    email: 'bounced@example.com',
+    streak_reminders: 1,
+    reminder_key: 'b',
+    daily_streak: 5,
+    last_daily_day: shiftDay(today, -1),
+    email_bounced_at: 1,
+  });
   // Started today's daily and walked out of it at once: the day is gone, and an email can't save it.
   const quitter = user({
     email: 'quit@example.com',

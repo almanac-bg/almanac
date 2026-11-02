@@ -230,6 +230,31 @@ test('the mail provider reports a bounce: no more reminders, and Settings says w
   assert.equal((await report('events-secret-for-tests')).status, 204);
   const me = (await api.get('/api/me', P.cookie)).body.user;
   assert.deepEqual([me.emailBounced, me.streakReminders], [true, false]);
+
+  // Switched on again, they'd go on bouncing: refused, for both optional mails, with what to do (OPS-8).
+  for (const route of ['/api/account/reminders', '/api/account/beaten-mails']) {
+    const on = await api.send('POST', route, P.cookie, { on: true });
+    assert.equal(on.status, 400, route);
+    assert.match(on.body.error, /не стигат/);
+    assert.equal((await api.send('POST', route, P.cookie, { on: false })).status, 200, 'off always works');
+  }
+  // The same address confirmed again (a mailbox that was full): the bounce is cleared, and they can be switched on.
+  const again = await api.send('POST', '/api/account/email', P.cookie, {
+    email: 'gone@example.test',
+    password: 'secret123',
+  });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  const link = srv.mails().at(-1)!;
+  assert.equal(link.to, 'gone@example.test');
+  assert.equal((await api.send('POST', '/api/auth/verify-email', '', { token: tokenFrom(link) })).status, 200);
+  assert.equal((await api.get('/api/me', P.cookie)).body.user.emailBounced, false);
+  assert.equal((await api.send('POST', '/api/account/reminders', P.cookie, { on: true })).status, 200);
+  // Not bounced, the same address is still refused as the one already there.
+  const same = await api.send('POST', '/api/account/email', P.cookie, {
+    email: 'gone@example.test',
+    password: 'secret123',
+  });
+  assert.deepEqual([same.status, same.body.error], [400, 'Това вече е твоят имейл.']);
 });
 
 test(

@@ -205,12 +205,26 @@ accountRouter.post('/account/claim', requireAuth, async (req, res) => {
   res.json({ user: getMe(me.id) });
 });
 
+/**
+ * Why an optional email can't be switched on, or null: it needs a verified address, and one our mail reaches (a bounce
+ * switched them off; on again, they'd go on bouncing — the 31 October review, OPS-8). Confirming the address again, or
+ * another, clears the bounce.
+ */
+function mailOptInRefused(userId: number): string | null {
+  const user = getUser(userId)!;
+  if (!user.email) return 'Първо добави и потвърди имейл.';
+  if (user.email_bounced_at !== null)
+    return 'Писмата ни до този адрес не стигат. Провери го или добави друг, и после го включи.';
+  return null;
+}
+
 /** The evening "your streak is about to break" email (needs a verified address). */
 accountRouter.post('/account/reminders', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ on: z.boolean() }), req, res);
   if (!body) return;
-  if (body.on && !getUser(res.locals.userId)!.email) {
-    res.status(400).json({ error: 'Първо добави и потвърди имейл.' });
+  const refused = body.on && mailOptInRefused(res.locals.userId);
+  if (refused) {
+    res.status(400).json({ error: refused });
     return;
   }
   run(
@@ -230,8 +244,9 @@ accountRouter.post('/account/reminders', requireAuth, requireAccount, (req, res)
 accountRouter.post('/account/beaten-mails', requireAuth, requireAccount, (req, res) => {
   const body = parse(z.object({ on: z.boolean() }), req, res);
   if (!body) return;
-  if (body.on && !getUser(res.locals.userId)!.email) {
-    res.status(400).json({ error: 'Първо добави и потвърди имейл.' });
+  const refused = body.on && mailOptInRefused(res.locals.userId);
+  if (refused) {
+    res.status(400).json({ error: refused });
     return;
   }
   run(
