@@ -246,45 +246,48 @@ export function PowerupBar({ game, offline }: { game: LiveGame; offline: boolean
           const blocked = blockedBy(game, p);
           const used = game.usedPowerups.includes(p.id);
           return (
-            <button
-              key={p.id}
-              type="button"
-              data-powerup={p.id}
-              // Not `disabled` when it's only blocked: a tap then says why.
-              disabled={offline || used}
-              aria-disabled={!!blocked || undefined}
-              onClick={() => (blocked ? explain(p, blocked) : actions.powerup(p.id))}
-              title={blocked ? `${p.name} — ${blocked}` : `${p.name} (${POWERUP_KEYS[p.id]}): ${p.description}`}
-              // Named by its name, which the label on screen is (or a word of: „Шанс“), described apart (WCAG 2.5.3).
-              aria-label={p.name}
-              aria-describedby={`${describedBy}-${p.id}`}
-              aria-keyshortcuts={keys ? POWERUP_KEYS[p.id] : undefined}
-              className={clsx(
-                'focus-ring relative inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:h-12 max-sm:min-w-10 max-sm:max-w-16 max-sm:flex-1 max-sm:flex-col max-sm:justify-center max-sm:gap-0.5 max-sm:px-0 flat:w-12 flat:justify-center flat:px-0',
-                used
-                  ? 'border-line text-fg-3 line-through opacity-50'
-                  : blocked
-                    ? 'border-line text-fg-3 opacity-60'
-                    : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
-              )}
-            >
-              <span className="text-base leading-none max-sm:text-base flat:text-lg" aria-hidden>
-                <Emoji e={p.icon} />
-              </span>
-              <span className="max-sm:hidden flat:hidden">{p.name}</span>
-              <span aria-hidden className="text-xs leading-none font-semibold sm:hidden flat:hidden">
-                {p.short}
-              </span>
-              <span id={`${describedBy}-${p.id}`} className="sr-only">
-                {p.description}
-                {blocked ? ` (${blocked})` : ''}
-              </span>
+            // The key's hint sits on the button's corner but outside it: inside, „Q“ was part of what the button
+            // shows, and its name („50/50“) no longer what it shows (WCAG 2.5.3, axe on a laptop).
+            <div key={p.id} className="relative max-sm:min-w-10 max-sm:max-w-16 max-sm:flex-1 flat:w-12">
+              <button
+                type="button"
+                data-powerup={p.id}
+                // Not `disabled` when it's only blocked: a tap then says why.
+                disabled={offline || used}
+                aria-disabled={!!blocked || undefined}
+                onClick={() => (blocked ? explain(p, blocked) : actions.powerup(p.id))}
+                title={blocked ? `${p.name} — ${blocked}` : `${p.name} (${POWERUP_KEYS[p.id]}): ${p.description}`}
+                // Named by its name, which the label on screen is (or a word of: „Шанс“), described apart (WCAG 2.5.3).
+                aria-label={p.name}
+                aria-describedby={`${describedBy}-${p.id}`}
+                aria-keyshortcuts={keys ? POWERUP_KEYS[p.id] : undefined}
+                className={clsx(
+                  'focus-ring relative inline-flex h-11 w-full items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-all max-sm:h-12 max-sm:flex-col max-sm:justify-center max-sm:gap-0.5 max-sm:px-0 flat:justify-center flat:px-0',
+                  used
+                    ? 'border-line text-fg-3 line-through opacity-50'
+                    : blocked
+                      ? 'border-line text-fg-3 opacity-60'
+                      : 'border-amber-300/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 hover:shadow-[0_0_20px_-6px_rgb(251_191_36/0.8)]',
+                )}
+              >
+                <span className="text-base leading-none max-sm:text-base flat:text-lg" aria-hidden>
+                  <Emoji e={p.icon} />
+                </span>
+                <span className="max-sm:hidden flat:hidden">{p.name}</span>
+                <span aria-hidden className="text-xs leading-none font-semibold sm:hidden flat:hidden">
+                  {p.short}
+                </span>
+                <span id={`${describedBy}-${p.id}`} className="sr-only">
+                  {p.description}
+                  {blocked ? ` (${blocked})` : ''}
+                </span>
+              </button>
               {!used && (
-                <KeyHint className="absolute -top-2 -right-1.5 bg-ink-2 leading-4 max-sm:hidden! flat:hidden!">
+                <KeyHint className="pointer-events-none absolute -top-2 -right-1.5 bg-ink-2 leading-4 max-sm:hidden! flat:hidden!">
                   {POWERUP_KEYS[p.id]}
                 </KeyHint>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

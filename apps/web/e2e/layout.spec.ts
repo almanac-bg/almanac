@@ -3,6 +3,7 @@ import {
   expectLobby,
   expectNoSideScroll,
   gameMs,
+  hiddenWhenFocused,
   type Page,
   playMatch,
   signUp,
@@ -225,36 +226,6 @@ test('the bank’s letters are drawn in the game’s font, not the system’s (V
   }
   expect(Object.entries(drawnBy).filter(([, font]) => font !== 'Onest')).toEqual([]);
 });
-
-/**
- * Tabs through a page and lists every focused element the screen hides entirely (WCAG 2.4.11): each of nine points of
- * it off the screen or under a bar pinned over the page (the header, the tab bar, a page's own: `data-bottom-bar`).
- */
-async function hiddenWhenFocused(page: Page, steps: number): Promise<string[]> {
-  const hidden: string[] = [];
-  for (let i = 0; i < steps; i++) {
-    await page.keyboard.press('Tab');
-    const seen = await page.evaluate(() => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || el === document.body) return null;
-      const r = el.getBoundingClientRect();
-      const name = `${el.tagName} ${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 30) ?? ''}`;
-      const bars = 'header, nav, [data-bottom-bar]';
-      // Something in a bar is shown by it.
-      if (el.closest(bars)) return { name, shown: true };
-      for (const fx of [0.1, 0.5, 0.9])
-        for (const fy of [0.1, 0.5, 0.9]) {
-          const x = r.left + r.width * fx;
-          const y = r.top + r.height * fy;
-          if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
-          if (!document.elementFromPoint(x, y)?.closest(bars)) return { name, shown: true };
-        }
-      return { name, shown: false };
-    });
-    if (seen && !seen.shown) hidden.push(seen.name);
-  }
-  return hidden;
-}
 
 for (const [where, size] of [
   ['phone', { width: 390, height: 844 }],
