@@ -4,7 +4,7 @@ import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionInfo } from './questionReports';
 import { bankOption, isChoice, type PreparedQuestion, questionById } from './questions';
-import { accurateAnswerers, tallyAnswer } from './tallies';
+import { accurateAnswerers, markTallied, tallyAnswer } from './tallies';
 import { getUser, toPublicUser } from './users';
 
 /** How long each person's answers are kept: enough to see a pattern, not a history of everything they ever played. */
@@ -103,7 +103,9 @@ export async function pruneAnswers(now = Date.now()): Promise<number> {
         before,
         PRUNE_BATCH,
       );
-      return run(`DELETE FROM answers WHERE rowid IN (${batch})`, before, PRUNE_BATCH);
+      const deleted = run(`DELETE FROM answers WHERE rowid IN (${batch})`, before, PRUNE_BATCH);
+      markTallied();
+      return deleted;
     });
     pruned += Number(changes);
     if (Number(changes) < PRUNE_BATCH) break;

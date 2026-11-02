@@ -30,7 +30,7 @@ import { recordRun } from '../runs';
 import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
-import { tallyMatchPlayer } from '../tallies';
+import { markTallied, tallyMatchPlayer } from '../tallies';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
@@ -181,6 +181,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       }
       run('UPDATE match_players SET xp_gained = ? WHERE match_id = ? AND player_id = ?', r.xpGained, game.id, s.id);
     }
+    markTallied();
   });
 
   return rewards;
