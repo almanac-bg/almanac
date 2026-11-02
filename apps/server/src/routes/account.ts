@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { levelFromXp, MORE_TIME, type MoreTime } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
+import { bannedDataUser, deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
 import {
   createSession,
@@ -303,6 +303,48 @@ accountRouter.get('/account/export', requireAuth, (_req, res) => {
   }
   res.setHeader('content-disposition', 'attachment; filename="almanac-data.json"');
   res.type('application/json').send(JSON.stringify(exportAccount(res.locals.userId), null, 2));
+});
+
+/**
+ * A banned player's data (the token their sign-in brought, bannedDataToken): downloaded, or the account deleted with the
+ * password again — what the privacy policy promises while a ban lasts. Nothing else opens with it.
+ */
+const BannedData = z.object({ token: z.string().max(200), password: z.string().max(200).default('') });
+
+accountRouter.post('/account/banned/export', (req, res) => {
+  const body = parse(BannedData, req, res);
+  if (!body) return;
+  const userId = bannedDataUser(body.token);
+  if (userId === null || !getUser(userId)) {
+    res.status(403).json({ error: 'Влез отново с паролата си, за да изтеглиш данните.' });
+    return;
+  }
+  if (throttled(`export:${userId}`, 3, 10 * 60_000)) {
+    res.status(429).json({ error: 'Вече изтегли данните си. Опитай пак след няколко минути.' });
+    return;
+  }
+  res.setHeader('content-disposition', 'attachment; filename="almanac-data.json"');
+  res.type('application/json').send(JSON.stringify(exportAccount(userId), null, 2));
+});
+
+accountRouter.post('/account/banned/delete', async (req, res) => {
+  const body = parse(BannedData, req, res);
+  if (!body) return;
+  const userId = bannedDataUser(body.token);
+  if (userId === null || !getUser(userId)) {
+    res.status(403).json({ error: 'Влез отново с паролата си, за да изтриеш профила.' });
+    return;
+  }
+  if (passwordChecks(userId)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  const result = await deleteAccount(userId, body.password);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 accountRouter.post('/account/delete', requireAuth, async (req, res) => {

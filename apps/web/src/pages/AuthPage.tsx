@@ -1,10 +1,11 @@
-import { api, errorMessage, loadRealtime, plural, setState, toast } from '@quiz/client';
+import { ApiError, api, errorMessage, loadRealtime, plural, setState, toast } from '@quiz/client';
 import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, UsersRound } from 'lucide-react';
 import { m } from 'motion/react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { BannedData } from '../components/BannedData';
 import { Emoji } from '../components/Emoji';
 import { LegalLinks } from '../components/LegalLinks';
 import { AboutGame, ProofLine } from '../components/landing/About';
@@ -74,6 +75,8 @@ export function AuthPage() {
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // A banned account signed in with its password: its data is still the player's (BannedData).
+  const [dataToken, setDataToken] = useState<string | null>(null);
   // The field the error is about (when the check here found it): marked while the message shows.
   const [invalid, setInvalid] = useState<CredentialField[]>([]);
   const [busy, setBusy] = useState(false);
@@ -108,6 +111,7 @@ export function AuthPage() {
       return setError(problems.map((p) => p.message).join(' '));
     }
     setError(null);
+    setDataToken(null);
     setBusy(true);
     // The realtime library comes while the sign-in is on its way: the lobby connects the moment it opens.
     void loadRealtime().catch(() => {});
@@ -127,6 +131,7 @@ export function AuthPage() {
         });
     } catch (err) {
       setError(errorMessage(err));
+      if (err instanceof ApiError && typeof err.data.dataToken === 'string') setDataToken(err.data.dataToken);
     } finally {
       setBusy(false);
     }
@@ -403,6 +408,17 @@ export function AuthPage() {
                     >
                       {error}
                     </div>
+                    {dataToken && mode === 'login' && (
+                      <BannedData
+                        token={dataToken}
+                        password={password}
+                        onDeleted={() => {
+                          setDataToken(null);
+                          setError(null);
+                          setPassword('');
+                        }}
+                      />
+                    )}
 
                     <Button
                       type="submit"

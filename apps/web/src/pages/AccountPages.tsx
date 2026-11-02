@@ -1,4 +1,14 @@
-import { api, disconnectRealtime, errorMessage, refreshMe, setState, signedOut, toast, useStore } from '@quiz/client';
+import {
+  ApiError,
+  api,
+  disconnectRealtime,
+  errorMessage,
+  refreshMe,
+  setState,
+  signedOut,
+  toast,
+  useStore,
+} from '@quiz/client';
 import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH } from '@quiz/shared';
 import clsx from 'clsx';
 import {
@@ -27,6 +37,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { BannedData } from '../components/BannedData';
 import { BlockedSettings } from '../components/BlockedSettings';
 import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
@@ -56,6 +67,8 @@ export function ResetPasswordPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The account is banned: the new password is set, and the data is still the player's (BannedData).
+  const [dataToken, setDataToken] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -71,6 +84,7 @@ export function ResetPasswordPage() {
       navigate('/', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
+      if (err instanceof ApiError && typeof err.data.dataToken === 'string') setDataToken(err.data.dataToken);
     } finally {
       setBusy(false);
     }
@@ -96,6 +110,9 @@ export function ResetPasswordPage() {
             <p role="alert" className="rounded-xl bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
               {error}
             </p>
+          )}
+          {dataToken && (
+            <BannedData token={dataToken} password={password} onDeleted={() => navigate('/', { replace: true })} />
           )}
           <Button type="submit" size="lg" className="w-full" loading={busy}>
             Запази и влез

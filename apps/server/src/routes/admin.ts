@@ -7,6 +7,7 @@ import {
 } from '@quiz/shared';
 import { type Request, Router } from 'express';
 import { z } from 'zod';
+import { eraseOnRequest, exportAccount } from '../account';
 import { playCheck } from '../answers';
 import { requireAuth } from '../auth';
 import {
@@ -45,6 +46,7 @@ import {
   rejectSubmission,
   similarQuestions,
 } from '../submissions';
+import { getUser, isAdmin } from '../users';
 import {
   idParam,
   parse,
@@ -233,6 +235,51 @@ adminRouter.get('/admin/players/:id', (req, res) => {
     return;
   }
   res.json({ card });
+});
+
+/**
+ * A player's data rights carried out for them, on a request that came by mail (the privacy policy, §8 and §10: a parent,
+ * someone who can't sign in): the owner downloads the data to send, or erases the account the way „Изтрий профила“
+ * does. Logged, without the name (`reason`: how the request came and how it was checked). Not for staff: their role goes
+ * first (`cli admin remove`).
+ */
+const DataRequest = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(MODERATION.reasonMin, 'Напиши как дойде искането и как провери кой е (без името).')
+    .max(MODERATION.reasonMax),
+});
+
+function requestable(req: Request, res: import('express').Response): number | null {
+  const id = idParam(req);
+  const user = getUser(id);
+  if (!user) res.status(404).json({ error: 'Няма такъв играч.' });
+  else if (id === res.locals.userId || isAdmin(user))
+    res.status(400).json({ error: 'Не и за профил от екипа: първо махни ролята (cli admin remove).' });
+  else return id;
+  return null;
+}
+
+adminRouter.post('/admin/players/:id/export', requireOwner, change, (req, res) => {
+  const body = parse(DataRequest, req, res);
+  if (!body) return;
+  const id = requestable(req, res);
+  if (id === null) return;
+  logAction({ adminId: res.locals.userId, action: 'export_data', userId: id, reason: body.reason });
+  res.setHeader('content-disposition', `attachment; filename="almanac-data-${id}.json"`);
+  res.type('application/json').send(JSON.stringify(exportAccount(id), null, 2));
+});
+
+adminRouter.post('/admin/players/:id/erase', requireOwner, change, (req, res) => {
+  const body = parse(DataRequest, req, res);
+  if (!body) return;
+  const id = requestable(req, res);
+  if (id === null) return;
+  eraseOnRequest(id);
+  // After the erasure, which takes every entry about them: this one names nobody.
+  logAction({ adminId: res.locals.userId, action: 'erase_request', reason: body.reason });
+  res.json({ ok: true });
 });
 
 adminRouter.post('/admin/players/:id/ban', change, (req, res) => {

@@ -914,6 +914,89 @@ test('data export and account deletion', T, async () => {
   );
 });
 
+test(
+  'data rights that need no session: a banned player’s own, the owner’s on a request by mail, the command line’s (LEGAL-2)',
+  T,
+  async () => {
+    const login = (username: string, password = 'secret123') =>
+      api.send('POST', '/api/auth/login', '', { username, password });
+    const grounds = { basis: 'cheating', reason: 'Отговаря с програма.' };
+
+    // Banned: the right password brings the ban, and a token for exactly the data and the deletion.
+    const P = await register(srv.url, 'spryan_test');
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${P.user.id}/ban`, A.cookie, { days: null, ...grounds })).status,
+      200,
+    );
+    assert.equal((await login('spryan_test', 'wrong-password')).body.dataToken, undefined, 'not without the password');
+    const banned = await login('spryan_test');
+    assert.equal(banned.status, 403);
+    const token = banned.body.dataToken as string;
+    assert.match(token, /^\d+\.\d{13}\.[\w-]{43}$/);
+    const bannedExport = (t: string) =>
+      fetch(`${srv.url}/api/account/banned/export`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token: t }),
+      });
+    const exp = await bannedExport(token);
+    assert.equal(exp.status, 200);
+    assert.match(exp.headers.get('content-disposition') ?? '', /attachment/);
+    assert.equal(((await exp.json()) as { account: { username: string } }).account.username, 'spryan_test');
+    const forged = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`;
+    assert.equal((await bannedExport(forged)).status, 403, 'signed');
+    const other = token.replace(/^\d+/, String(A.user.id));
+    assert.equal((await bannedExport(other)).status, 403, 'for this account only');
+    assert.equal((await api.get('/api/me', '')).body.user, null, 'and no session from it');
+    const del = (password: string) => api.send('POST', '/api/account/banned/delete', '', { token, password });
+    assert.equal((await del('wrong-password')).status, 400, 'the password again');
+    assert.equal((await del('secret123')).status, 200);
+    assert.equal(srv.db.prepare('SELECT 1 AS x FROM users WHERE id = ?').get(P.user.id), undefined);
+
+    // On a request by mail: the owner downloads a player's data, or erases the account; logged without the name.
+    const Q = await register(srv.url, 'pismo_test');
+    const why = 'Имейл до privacy@ от адреса на профила.';
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${Q.user.id}/export`, A.cookie, { reason: '' })).status,
+      400,
+    );
+    const owned = await fetch(`${srv.url}/api/admin/players/${Q.user.id}/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: A.cookie },
+      body: JSON.stringify({ reason: why }),
+    });
+    assert.equal(owned.status, 200);
+    assert.equal(((await owned.json()) as { account: { username: string } }).account.username, 'pismo_test');
+    const self = await api.send('POST', `/api/admin/players/${A.user.id}/erase`, A.cookie, { reason: why });
+    assert.match(self.body.error, /екипа/, 'not on staff');
+    assert.equal(
+      (await api.send('POST', `/api/admin/players/${Q.user.id}/erase`, A.cookie, { reason: why })).status,
+      200,
+    );
+    assert.equal(srv.db.prepare('SELECT 1 AS x FROM users WHERE id = ?').get(Q.user.id), undefined);
+    const logged = srv.db
+      .prepare(
+        "SELECT target_user_id AS user, reason FROM moderation_log WHERE action = 'erase_request' ORDER BY id DESC",
+      )
+      .get() as { user: number | null; reason: string };
+    assert.deepEqual({ ...logged }, { user: null, reason: why });
+    assert.ok(
+      !(srv.db.prepare("SELECT reason FROM moderation_log WHERE reason LIKE '%pismo_test%'").get() as unknown),
+      'the name nowhere in the log',
+    );
+
+    // From the server's command line, when the site can't: the same two.
+    await register(srv.url, 'red_test');
+    const out = cli(srv.dbPath, 'account', 'export', 'red_test');
+    assert.equal(out.status, 0, out.output);
+    assert.match(out.output, /"username": "red_test"/);
+    assert.notEqual(cli(srv.dbPath, 'account', 'erase', 'red_test').status, 0, 'only with --yes and how it came');
+    const erased = cli(srv.dbPath, 'account', 'erase', 'red_test', '--yes', 'Писмо от родител, проверено.');
+    assert.equal(erased.status, 0, erased.output);
+    assert.equal(srv.db.prepare("SELECT 1 AS x FROM users WHERE username = 'red_test'").get(), undefined);
+  },
+);
+
 test('players flag wrong questions; moderators hide them from new matches', T, async () => {
   const log = newLog();
   const play = autoPlay(sb, 'wrong', log);

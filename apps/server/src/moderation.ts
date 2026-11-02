@@ -439,7 +439,7 @@ const banEnd = (until: number) => (until >= FOREVER ? 'за постоянно' 
 
 /** A banned player can't sign in to Settings: their data and the account's deletion are a mail away (GDPR Art. 15, 17). */
 const BANNED_DATA = () =>
-  `Докато профилът е спрян, можеш да поискаш данните си или да изтрием профила — пиши ни на ${config.operator.email}.`;
+  `Докато профилът е спрян, при вход с паролата си пак можеш да изтеглиш данните си или да изтриеш профила; или ни пиши на ${config.operator.email}.`;
 
 /** Lifts a ban now, or moves its end (`days` from now). */
 export function changeBan(adminId: number, targetId: number, days: number | null, reason: string): Result {

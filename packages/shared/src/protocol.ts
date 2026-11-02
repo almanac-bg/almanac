@@ -1001,7 +1001,10 @@ export type ModerationLogAction =
   | 'staff_sign_in'
   | 'second_factor_failed'
   | 'second_factor_locked'
-  | 'stop_reports';
+  | 'stop_reports'
+  /** The owner downloaded a player's data, or erased the account, on a request by mail (or from the command line). */
+  | 'export_data'
+  | 'erase_request';
 
 export interface ModerationLogEntry {
   id: number;

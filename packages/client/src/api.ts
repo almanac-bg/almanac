@@ -64,6 +64,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** The rest of what the server answered (a banned sign-in's `dataToken`). */
+    readonly data: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -108,10 +110,14 @@ export const REQUEST_TIMEOUT_MS = { default: 15_000, upload: 60_000 } as const;
 
 const timeout = (ms: number) => (typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined);
 
-/** `body`: JSON, or a file (a Blob goes as it is, with its own type). */
-async function request<T>(method: string, path: string, body?: unknown, again = true): Promise<T> {
+/**
+ * `body`: JSON, or a file (a Blob goes as it is, with its own type). `blob`: the answer is a file to save (a data
+ * export), handed back as it came; a failure is JSON as always.
+ */
+async function request<T>(method: string, path: string, body?: unknown, again = true, blob = false): Promise<T> {
   let res: Response;
   let data: Record<string, unknown>;
+  let saved: Blob | null = null;
   const file = typeof Blob !== 'undefined' && body instanceof Blob;
   try {
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
@@ -122,7 +128,8 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
       signal: timeout(file ? REQUEST_TIMEOUT_MS.upload : REQUEST_TIMEOUT_MS.default),
     });
     // The answer is read under the same clock: one that stops half way is no answer.
-    const text = await res.text();
+    if (blob && res.ok) saved = await res.blob();
+    const text = saved ? '' : await res.text();
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
@@ -137,16 +144,29 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
     asking ??= askForPassword().finally(() => {
       asking = null;
     });
-    if (await asking) return request<T>(method, path, body, false);
+    if (await asking) return request<T>(method, path, body, false, blob);
   }
   if (res.status === 403 && data.code && again && askForCode) {
     askingCode ??= askForCode().finally(() => {
       askingCode = null;
     });
-    if (await askingCode) return request<T>(method, path, body, false);
+    if (await askingCode) return request<T>(method, path, body, false, blob);
   }
-  if (!res.ok) throw new ApiError((data.error as string | undefined) ?? 'Нещо се обърка. Опитай пак.', res.status);
-  return data as T;
+  if (!res.ok)
+    throw new ApiError((data.error as string | undefined) ?? 'Нещо се обърка. Опитай пак.', res.status, data);
+  return (saved ?? data) as T;
+}
+
+/** A file the server answered with, saved by the browser under `name`. */
+export function saveFile(file: Blob, name: string) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export const api = {
@@ -196,6 +216,10 @@ export const api = {
   deleteAccount: (password: string) => request<{ ok: true }>('POST', '/account/delete', { password }),
   /** Where the browser downloads the data export (the session cookie authenticates it). */
   exportUrl: () => `${clientConfig().baseUrl}/api/account/export`,
+  /** A banned player's own data, with the token their sign-in brought (no session): the file, or the account gone. */
+  bannedExport: (token: string) => request<Blob>('POST', '/account/banned/export', { token }, true, true),
+  bannedDelete: (token: string, password: string) =>
+    request<{ ok: true }>('POST', '/account/banned/delete', { token, password }),
 
   report: (username: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', '/reports', { username, reason, details }),
@@ -227,6 +251,11 @@ export const api = {
   adminPlayers: (query: string) =>
     request<{ players: PlayerSearchHit[] }>('GET', `/admin/players?q=${encodeURIComponent(query)}`),
   adminPlayer: (id: number) => request<{ card: PlayerCard }>('GET', `/admin/players/${id}`),
+  /** The owner, on a request by mail: a player's data as a file, or the account erased (`reason`: how it came). */
+  adminExportPlayer: (id: number, reason: string) =>
+    request<Blob>('POST', `/admin/players/${id}/export`, { reason }, true, true),
+  adminErasePlayer: (id: number, reason: string) =>
+    request<{ ok: true }>('POST', `/admin/players/${id}/erase`, { reason }),
   banPlayer: (id: number, ban: { days: number | null; basis: ModerationBasis; reason: string; annul?: boolean }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban`, ban),
   /** Lifts a ban (`days` null) or moves its end. */

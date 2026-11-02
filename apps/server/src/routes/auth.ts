@@ -1,7 +1,7 @@
 import { BRAND, USERNAME } from '@quiz/shared';
 import { Router } from 'express';
 import { z } from 'zod';
-import { getMe } from '../account';
+import { bannedDataToken, getMe } from '../account';
 import {
   confirmSession,
   createSession,
@@ -163,7 +163,8 @@ authRouter.post('/auth/login', async (req, res) => {
   }
   const ban = activeBan(user);
   if (ban) {
-    res.status(403).json({ error: ban });
+    // The right password: still theirs to download their data or delete the account (bannedDataToken).
+    res.status(403).json({ error: ban, dataToken: bannedDataToken(user.id) });
     return;
   }
   // A hash from before the current cost: redone now, while the password is at hand.
@@ -206,10 +207,10 @@ authRouter.post('/auth/reset', async (req, res) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  // A new password doesn't lift a ban.
+  // A new password doesn't lift a ban (but the mailbox proved whose account it is: their data stays theirs).
   const ban = activeBan(getUser(result.userId)!);
   if (ban) {
-    res.status(403).json({ error: ban });
+    res.status(403).json({ error: ban, dataToken: bannedDataToken(result.userId) });
     return;
   }
   setSessionCookie(res, createSession(result.userId));
