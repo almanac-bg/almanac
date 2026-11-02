@@ -781,9 +781,11 @@ function AnswerButton({
               ? 'border-2 border-rose-400 bg-transparent'
               : // Not .glass: no backdrop blur on buttons that move with every question and reveal (a moving blurred
                 // backdrop is re-blurred each frame on a phone's GPU); the page behind is soft already.
+                // On paper, white cards lifted as .glass's are (a tint of ink made grey slabs that read as sunken or
+                // disabled under the white question: VD-11), the coloured edge kept.
                 state === 'selected'
-                ? 'border-(--pick) bg-tint/[0.045] shadow-[0_0_0_1px_var(--pick),0_0_36px_-8px_var(--pick)]'
-                : 'border-line bg-tint/[0.045] hover:bg-tint/[0.08]',
+                ? 'border-(--pick) bg-tint/[0.045] shadow-[0_0_0_1px_var(--pick),0_0_36px_-8px_var(--pick)] light:bg-white'
+                : 'border-line bg-tint/[0.045] hover:bg-tint/[0.08] light:bg-white light:shadow-[0_1px_2px_rgb(22_19_40/0.05),0_10px_28px_-14px_rgb(22_19_40/0.18)] light:hover:bg-[#fbfaff]',
           // Your own pick, once the answer is out: a ring in the result's colour (the pick's accent outline is gone).
           revealed && selected && (correct ? 'ring-2 ring-emerald-200/70' : 'ring-2 ring-rose-200/70'),
           removed && 'line-through',
