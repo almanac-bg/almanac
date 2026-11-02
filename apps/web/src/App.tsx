@@ -11,12 +11,12 @@ import {
 } from '@quiz/client';
 import { routeKind } from '@quiz/shared';
 import { LazyMotion, MotionConfig } from 'motion/react';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';
 import { Background } from './components/Background';
 import { ConnectionBanner } from './components/ConnectionBanner';
-import { PageBoundary } from './components/ErrorBoundary';
+import { FrameBoundary, PageBoundary } from './components/ErrorBoundary';
 import { Invites } from './components/Invites';
 import { LegalLinks } from './components/LegalLinks';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
@@ -320,14 +320,21 @@ function SignedIn() {
     lastGame.current = gameId;
   }, [gameId, inGame, navigate]);
 
+  // Each piece of the frame on its own: one that crashes goes quiet, the page and the connection stay (WEB-8).
+  const frame = (name: string, piece: ReactNode) => (
+    <FrameBoundary name={name} resetKey={location.pathname}>
+      {piece}
+    </FrameBoundary>
+  );
+
   return (
     <>
-      {!bare && <NavBar />}
+      {!bare && frame('nav', <NavBar />)}
       {/* Right after the header, not after the page: an invite lasts a minute, and a keyboard reached it after the
           whole lobby (22 Tabs and more). */}
-      <Invites />
-      {!bare && <MaintenanceBanner />}
-      {!bare && <ActiveMatchBar />}
+      {frame('invites', <Invites />)}
+      {!bare && frame('maintenance', <MaintenanceBanner />)}
+      {!bare && frame('active match', <ActiveMatchBar />)}
       <main
         id="content"
         tabIndex={-1}
@@ -374,11 +381,11 @@ function SignedIn() {
         </PageBoundary>
         {!bare && <LegalLinks className="mt-16 justify-center" />}
       </main>
-      {!bare && <QueueOverlay />}
-      <ConnectionBanner explained={!inGame && maintenance} />
-      <SeasonRecap />
-      <PasswordConfirm />
-      <SecondFactorPrompt />
+      {!bare && frame('queue', <QueueOverlay />)}
+      {frame('connection', <ConnectionBanner explained={!inGame && maintenance} />)}
+      {frame('season recap', <SeasonRecap />)}
+      {frame('password prompt', <PasswordConfirm />)}
+      {frame('second factor', <SecondFactorPrompt />)}
     </>
   );
 }
