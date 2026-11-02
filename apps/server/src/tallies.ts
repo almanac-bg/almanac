@@ -16,16 +16,24 @@ import { all, one, run, tx } from './db';
  * every crash before, 4 s and more on a big history, with the site down meanwhile (the 31 October review, SERVER-3).
  */
 
+/**
+ * A person's row (mp) of a match (room_code: the match's) as a team win the tallies count: won, two a side or more,
+ * and in a private room against at least one person. It reads the match's other rows — bots' among them — so it's
+ * decided as the match is settled and kept on the row (match_players.team_win: history.ts prunes bots' rows later).
+ */
+export const TEAM_WIN = (roomCode: string) => `(mp.won IS 1 AND mp.team IS NOT NULL
+  AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
+  AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
+  AND (${roomCode} IS NULL OR EXISTS (
+    SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team)))`;
+
 /** Each match a player played (mp, with its match m), as it adds to their tally in that mode. */
 const MODE_TALLY = `
   SELECT mp.user_id, m.mode, COUNT(*),
     SUM(mp.placement = 1 AND m.player_count > 1 AND mp.left_match = 0),
     SUM(mp.won IS 1),
-    SUM(mp.won IS 1 AND mp.team IS NOT NULL
-      AND (SELECT COUNT(*) FROM match_players t WHERE t.match_id = mp.match_id AND t.team = mp.team) >= 2
-      AND (SELECT COUNT(*) FROM match_players o WHERE o.match_id = mp.match_id AND o.team <> mp.team) >= 2
-      AND (m.room_code IS NULL OR EXISTS (
-        SELECT 1 FROM match_players o WHERE o.match_id = mp.match_id AND o.is_bot = 0 AND o.team <> mp.team))),
+    -- Kept on the row since v43; a row from before (still being filled in: history.ts) works it out.
+    SUM(COALESCE(mp.team_win, ${TEAM_WIN('m.room_code')})),
     SUM(m.player_count > 1),
     SUM(CASE WHEN m.player_count > 1 THEN mp.placement ELSE 0 END)
   FROM match_players mp JOIN matches m ON m.id = mp.match_id`;

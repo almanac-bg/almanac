@@ -1050,6 +1050,17 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE challenge_results ADD COLUMN more_time INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  // v43, match history kept within bounds (history.ts; the 31 October review, SERVER-4, D7): bots' rows go after 30
+  // days and whole matches after two years, so what the tallies need from the others is kept on each person's row —
+  // whether it was a team win as they count it. Rows from before are filled in by the upkeep, in batches (the index
+  // finds them, and empties as it goes). Older code doesn't read the column.
+  {
+    compatible: `
+    ALTER TABLE match_players ADD COLUMN team_win INTEGER;
+    CREATE INDEX match_players_team_unsettled ON match_players(match_id)
+      WHERE team IS NOT NULL AND user_id IS NOT NULL AND team_win IS NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

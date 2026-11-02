@@ -30,7 +30,7 @@ import { recordRun } from '../runs';
 import { getRating, ratedGames, recordRating } from '../seasons';
 import { recordSkill } from '../skill';
 import { count, countActive } from '../stats';
-import { markTallied, tallyMatchPlayer } from '../tallies';
+import { markTallied, TEAM_WIN, tallyMatchPlayer } from '../tallies';
 import { ratesPeople } from '../trust';
 import { DELETED_NAME, getUser } from '../users';
 import { BOT_MAX_RATING } from './bots';
@@ -243,6 +243,14 @@ function rewardHuman(
   const realWin = won && (!setup.roomCode || rivals.length > 0);
   // Before the achievements below: the per-mode wins they count include this one.
   run('UPDATE match_players SET won = ? WHERE match_id = ? AND player_id = ?', realWin ? 1 : 0, game.id, s.id);
+  // Whether it was a team win as the tallies count it, kept on the row: it reads the bots' rows, which go after a month.
+  if (setup.teams)
+    run(
+      `UPDATE match_players AS mp SET team_win = ${TEAM_WIN('(SELECT room_code FROM matches WHERE id = mp.match_id)')}
+       WHERE mp.match_id = ? AND mp.player_id = ?`,
+      game.id,
+      s.id,
+    );
   tallyMatchPlayer(game.id, s.id);
 
   // ── XP ──

@@ -12,6 +12,7 @@ import { all, db, optimize, prunePreMigrationCopies, run } from './db';
 import { eveningStartsAt, retireChampionTitles } from './evening';
 import { settleGroupWeeks } from './groups';
 import { purgeGuests, purgeRoomGuests } from './guests';
+import { pruneHistory } from './history';
 import { inactiveAccountMail, sendMail, streakReminderMail } from './mailer';
 import { reportError } from './monitoring';
 import { NOTIFICATION_MAX_AGE_MS } from './notifications';
@@ -173,6 +174,13 @@ const STEPS: [string, () => unknown][] = [
   ['expired', () => purgeExpired()],
   ['answers', () => pruneAnswers()],
   ['runs', () => pruneRuns()],
+  [
+    'match history',
+    async () => {
+      const { bots, matches } = await pruneHistory();
+      if (bots || matches) console.log(`🗂️  Match history: ${bots} bots' rows and ${matches} old matches gone`);
+    },
+  ],
   ['guests', () => purgeGuests()],
   [
     'room guests',
