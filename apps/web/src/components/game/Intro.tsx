@@ -82,15 +82,18 @@ export function Intro({ game }: { game: LiveGame }) {
               }
             />
           </m.span>
-          <h1 className="mt-4 font-display text-3xl font-bold">
-            {game.start.duelWith
-              ? `Дуел с ${game.start.duelWith.username}`
-              : game.start.mode === 'daily'
+          {/* A duel's title has a name in it: the text face (D2), whose Cyrillic doesn't read as Latin. */}
+          {game.start.duelWith ? (
+            <h1 className="mt-4 text-3xl font-extrabold">Дуел с {game.start.duelWith.username}</h1>
+          ) : (
+            <h1 className="mt-4 font-display text-3xl font-bold">
+              {game.start.mode === 'daily'
                 ? 'Въпросите на деня'
                 : game.start.mode === 'review'
                   ? 'Сгрешеното се връща'
                   : category?.name}
-          </h1>
+            </h1>
+          )}
           {game.start.duelWith && (
             <p className="mt-2 font-semibold text-amber-200">
               {game.start.duelWith.score !== null

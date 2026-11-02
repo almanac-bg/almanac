@@ -206,8 +206,11 @@ export function DailyLanding({
           <div className="mt-4 flex items-center gap-3">
             <Avatar avatar={sharer.user.avatar} frame={sharer.user.frame} size={52} />
             <div className="min-w-0">
-              {/* A long name wraps rather than losing "те кани" to an ellipsis. */}
-              <h2 className="t-section text-balance [overflow-wrap:anywhere]">{sharer.user.username} те кани</h2>
+              {/* A long name wraps rather than losing "те кани" to an ellipsis. A name in the text face (D2): the
+                  display face's Cyrillic reads as Latin. */}
+              <h2 className="text-2xl font-extrabold tracking-tight text-balance [overflow-wrap:anywhere]">
+                {sharer.user.username} те кани
+              </h2>
               <p className="text-sm text-fg-2 tabular-nums">
                 {sharer.correct}/{mode.questions} · {fmt(sharer.score)} т. — можеш ли повече?
               </p>
@@ -334,7 +337,7 @@ export function ChallengeLanding({
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3">
         {creator && <Avatar avatar={creator.avatar} frame={creator.frame} size={64} />}
         <div className="min-w-0 flex-1 basis-48">
-          <h2 className="font-display text-[1.375rem] leading-tight font-bold [overflow-wrap:anywhere] sm:text-2xl">
+          <h2 className="text-[1.375rem] leading-tight font-extrabold [overflow-wrap:anywhere] sm:text-2xl">
             {creator ? (
               <>
                 {creator.username} <span className="text-fg-2">те предизвиква</span>
@@ -392,7 +395,8 @@ export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-sunk/20 p-3.5">
       <dt className="text-xs font-semibold tracking-wide text-fg-3 uppercase">{label}</dt>
-      <dd className="mt-1 font-display text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
+      {/* Values come with units („250 т.“, „3 дни“): in the text face, whose „т“ doesn't read as Latin „m“ (D2). */}
+      <dd className="mt-1 text-xl font-extrabold whitespace-nowrap tabular-nums sm:text-2xl">{value}</dd>
     </div>
   );
 }

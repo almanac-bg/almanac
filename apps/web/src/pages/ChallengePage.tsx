@@ -105,7 +105,14 @@ function Challenge({ info }: { info: ChallengeInfo }) {
       <div className="mx-auto max-w-md space-y-6">
         <div className="text-center">
           <p className="t-eyebrow text-fg-3">Дуел с приятел</p>
-          <h1 className="mt-2 t-page">{info.duel ? `Ти срещу ${info.duel.friend.username}` : 'Дуел между приятели'}</h1>
+          {/* With a name in it, the title is in the text face (D2): the display face's Cyrillic reads as Latin. */}
+          {info.duel ? (
+            <h1 className="mt-2 text-[clamp(1.375rem,6.8vw,1.875rem)] font-extrabold tracking-tight wrap-anywhere sm:text-4xl">
+              Ти срещу {info.duel.friend.username}
+            </h1>
+          ) : (
+            <h1 className="mt-2 t-page">Дуел между приятели</h1>
+          )}
         </div>
         {info.duel ? (
           <DuelCard
@@ -192,7 +199,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
                   <p className="t-eyebrow text-fg-3">Резултат за биене</p>
                   {leader ? (
                     <>
-                      <p className="mt-1 font-display text-3xl font-bold tabular-nums">{fmt(leader.score)} т.</p>
+                      <p className="mt-1 text-3xl font-extrabold tabular-nums">{fmt(leader.score)} т.</p>
                       <p className="mt-0.5 truncate text-sm text-fg-3">
                         {leader.user?.username ?? 'Изтрит играч'} · {leader.correct}/{MODE.questions} верни
                       </p>
@@ -252,7 +259,7 @@ function YourResult({ entry, total, expired }: { entry: ChallengeEntry; total: n
       </span>
       <div className="min-w-0">
         <p className="t-eyebrow text-fg-3">{expired ? 'Краен резултат' : 'Твоят резултат'}</p>
-        <p className="mt-0.5 font-display text-3xl font-bold tabular-nums">{fmt(entry.score)} т.</p>
+        <p className="mt-0.5 text-3xl font-extrabold tabular-nums">{fmt(entry.score)} т.</p>
         <p className="mt-1 text-sm text-fg-2">
           <span className="font-semibold text-fg tabular-nums">
             {entry.correct}/{MODE.questions} верни
