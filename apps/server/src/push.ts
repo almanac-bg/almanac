@@ -16,6 +16,7 @@ import webpush from 'web-push';
 import { z } from 'zod';
 import { config } from './config';
 import { afterCommit, all, one, run } from './db';
+import { guarded } from './guard';
 import { reportError } from './monitoring';
 import type { UserRow } from './users';
 
@@ -164,15 +165,21 @@ export function push(
           TTL: 6 * 60 * 60,
           urgency: 'normal',
         })
-        .catch((err: { statusCode?: number }) => {
-          // Gone (the browser dropped it, the app was removed): forget this device.
-          if (err.statusCode === 404 || err.statusCode === 410)
-            run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
-          else void reportError(err, 'push', { extra: { status: err.statusCode ?? null } });
-        });
+        .catch((err: { statusCode?: number }) => pushFailed(s.endpoint, err));
   });
   return true;
 }
+
+/**
+ * A push that didn't go. A device that's gone (the browser dropped it, the app was removed) is forgotten; anything else
+ * is reported. It runs in a promise's handler, where a throw (a busy or full database) would be nobody's to catch: it
+ * never throws (the 31 October review, SERVER-7). Missed, the delete is made the next time that device is pushed.
+ */
+export const pushFailed = guarded('push failed', (endpoint: string, err: { statusCode?: number }) => {
+  if (err.statusCode === 404 || err.statusCode === 410)
+    run('DELETE FROM push_subscriptions WHERE endpoint = ?', endpoint);
+  else void reportError(err, 'push', { extra: { status: err.statusCode ?? null } });
+});
 
 const minuteOfDay = (now: number) => {
   const [h, m] = new Intl.DateTimeFormat('en-GB', {

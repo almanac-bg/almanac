@@ -13,6 +13,8 @@ process.env.DB_PATH = path.join(tmp, 'push.db');
 process.env.VAPID_PUBLIC_KEY = keys.publicKey;
 process.env.VAPID_PRIVATE_KEY = keys.privateKey;
 process.env.PUSH_OUTBOX = path.join(tmp, 'pushes');
+process.env.ERROR_OUTBOX = path.join(tmp, 'errors.jsonl');
+const { config } = await import('../src/config');
 const { one, run, tx } = await import('../src/db');
 const { dailyReminderPushes, push, subscribe, timedPushes } = await import('../src/push');
 const { defaultPushPrefs } = await import('@quiz/shared');
@@ -156,4 +158,53 @@ test('a device stops getting pushes when the session it subscribed with ends, ho
   assert.equal(devices(), 1, 'signed out there: that device hears no more');
   run('DELETE FROM sessions WHERE user_id = ?', id);
   assert.equal(devices(), 0, 'every session gone (a reset password, a ban): every device');
+});
+
+test('a push that fails never takes the server down: a gone device is forgotten, or reported if the database is held (SERVER-7)', async (t) => {
+  // Out to a push service this time, and it answers as one does for a device that's gone, or with an error.
+  let answer = 410;
+  t.mock.method(webpush, 'sendNotification', () =>
+    Promise.reject(Object.assign(new Error('push'), { statusCode: answer })),
+  );
+  t.mock.property(config, 'pushOutbox', null);
+  const unheard: unknown[] = [];
+  const listen = (err: unknown) => unheard.push(err);
+  process.on('unhandledRejection', listen);
+  t.after(() => {
+    process.off('unhandledRejection', listen);
+    run('PRAGMA query_only = OFF');
+  });
+  const errors = () =>
+    fs.existsSync(process.env.ERROR_OUTBOX!)
+      ? fs
+          .readFileSync(process.env.ERROR_OUTBOX!, 'utf8')
+          .trim()
+          .split('\n')
+          .map((l) => JSON.parse(l).where as string)
+      : [];
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const devices = (id: number) =>
+    one<{ n: number }>('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?', id)!.n;
+
+  // Gone, while nothing can be written (as a full disk or a held database leaves it): reported, and play goes on.
+  const id = player();
+  run('PRAGMA query_only = ON');
+  assert.equal(push(id, 'hello', message), true);
+  await settled();
+  assert.deepEqual(unheard, [], 'nothing left for the last resort');
+  assert.deepEqual(errors(), ['push failed']);
+  run('PRAGMA query_only = OFF');
+  assert.equal(devices(id), 1, 'kept for now: forgotten the next time it is pushed');
+
+  // Gone, with the database writable: forgotten. Another error: reported, the device kept.
+  push(id, 'hello', message);
+  await settled();
+  assert.equal(devices(id), 0);
+  answer = 500;
+  const other = player();
+  push(other, 'hello', message);
+  await settled();
+  assert.equal(devices(other), 1);
+  assert.deepEqual(errors(), ['push failed', 'push']);
+  assert.deepEqual(unheard, []);
 });

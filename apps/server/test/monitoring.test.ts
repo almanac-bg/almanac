@@ -28,7 +28,9 @@ process.env.DB_PATH = path.join(tmp, 'monitoring.db');
 process.env.SENTRY_DSN = DSN;
 process.env.SENTRY_BROWSER_DSN = BROWSER_DSN;
 process.env.APP_RELEASE = 'test-release';
-const { forwardEnvelope, reportError, scrubLog, shipLogs, watchEventLoop } = await import('../src/monitoring');
+const { forwardEnvelope, lastResort, reportError, scrubLog, shipLogs, watchEventLoop } = await import(
+  '../src/monitoring'
+);
 
 after(() => {
   fake.close();
@@ -64,6 +66,32 @@ test('a server error becomes a Sentry event with its stack, place and account nu
     exception.stacktrace.frames.some((f: { filename: string }) => f.filename.endsWith('monitoring.test.ts')),
     'with frames',
   );
+});
+
+// (Before the flood below: it uses up the minute's reports.)
+test('a failed promise nobody heard is reported and play goes on; an uncaught throw is reported, then the server restarts (SERVER-7)', async () => {
+  received.length = 0;
+  const original = console.error;
+  console.error = () => {};
+  const exits: number[] = [];
+  const until = async (done: () => boolean) => {
+    for (let i = 0; i < 200 && !done(); i++) await sleep(10);
+  };
+  try {
+    lastResort('unhandledRejection', new Error('a side job failed'), (code) => exits.push(code));
+    await until(() => received.length === 1);
+    await sleep(50);
+    assert.equal(lines(received[0].body)[2].exception.values[0].value, 'a side job failed');
+    assert.equal(exits.length, 0, 'still running');
+
+    lastResort('uncaughtException', new Error('state may be broken'), (code) => exits.push(code));
+    await until(() => exits.length > 0);
+    assert.equal(received.length, 2, 'the report went out first');
+    assert.equal(lines(received[1].body)[2].tags.where, 'uncaughtException');
+    assert.equal(exits[0], 1);
+  } finally {
+    console.error = original;
+  }
 });
 
 test('a stalled event loop is reported with how long it stalled; a short hold-up only goes to the log', async () => {
