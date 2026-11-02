@@ -306,6 +306,12 @@ function SignedIn() {
   const gameId = useStore((s) => s.game?.start.gameId);
   const maintenance = useStore((s) => !!s.maintenance);
   const inGame = location.pathname === '/game';
+  // A room's host with „Само водя“: the room page is the class's projector lobby — no app chrome round it, as in the
+  // match it leads to (it has its own header, with the way out).
+  const projecting = useStore(
+    (s) => location.pathname === '/room' && !!s.room && !s.room.settings.hostPlays && s.room.hostId === `u${s.me?.id}`,
+  );
+  const bare = inGame || projecting;
 
   // Jump into a match the moment one starts (queue pop, room start, reconnect).
   const lastGame = useRef<string | undefined>(undefined);
@@ -316,17 +322,21 @@ function SignedIn() {
 
   return (
     <>
-      {!inGame && <NavBar />}
+      {!bare && <NavBar />}
       {/* Right after the header, not after the page: an invite lasts a minute, and a keyboard reached it after the
           whole lobby (22 Tabs and more). */}
       <Invites />
-      {!inGame && <MaintenanceBanner />}
-      {!inGame && <ActiveMatchBar />}
+      {!bare && <MaintenanceBanner />}
+      {!bare && <ActiveMatchBar />}
       <main
         id="content"
         tabIndex={-1}
         className={
-          inGame ? 'outline-none' : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
+          inGame
+            ? 'outline-none'
+            : projecting
+              ? 'mx-auto max-w-7xl px-6 py-6 outline-none lg:px-12'
+              : 'mx-auto max-w-6xl px-4 pt-6 pb-28 outline-none cramped:pb-8 sm:px-6 md:pb-16'
         }
       >
         <PageBoundary>
@@ -362,9 +372,9 @@ function SignedIn() {
             </Routes>
           </Suspense>
         </PageBoundary>
-        {!inGame && <LegalLinks className="mt-16 justify-center" />}
+        {!bare && <LegalLinks className="mt-16 justify-center" />}
       </main>
-      {!inGame && <QueueOverlay />}
+      {!bare && <QueueOverlay />}
       <ConnectionBanner explained={!inGame && maintenance} />
       <SeasonRecap />
       <PasswordConfirm />

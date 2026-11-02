@@ -105,6 +105,15 @@ export async function expectLobby(page: Page) {
 }
 
 /**
+ * A room's code, from its „копирай линк за покана“ button: named by the code first (the room page's big code, the
+ * projector lobby's „Копирай линк“), whatever text it shows.
+ */
+export async function roomCode(page: Page): Promise<string> {
+  const button = page.getByRole('button', { name: /^\d{6} — копирай/ }).first();
+  return (await button.getAttribute('aria-label'))!.match(/\d{6}/)![0];
+}
+
+/**
  * The landing page's "Играй като гост" (the card's: the page repeats it under the game's description): a guest
  * account, straight into the lobby.
  */

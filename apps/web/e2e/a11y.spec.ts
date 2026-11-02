@@ -5,6 +5,7 @@ import {
   gameMs,
   hiddenWhenFocused,
   playMatch,
+  roomCode,
   signUp,
   startAsGuest,
   startSolo,
@@ -119,10 +120,7 @@ for (const device of ['phone', 'desktop'] as const)
           await expect(set).toHaveCount(1, { timeout: 15_000 });
           await sets.selectOption((await set.getAttribute('value'))!);
           await teacher.getByRole('switch', { name: 'Само водя' }).click();
-          const code = (await teacher
-            .getByRole('button', { name: /^\d{6} — копирай/ })
-            .first()
-            .textContent())!.match(/\d{6}/)![0];
+          const code = await roomCode(teacher);
           const pupil = await newPlayer();
           await pupil.goto(`/join/${code}`);
           await pupil.getByRole('button', { name: 'Влез като гост' }).first().click();

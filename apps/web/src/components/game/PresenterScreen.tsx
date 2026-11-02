@@ -11,6 +11,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';
+import { Logo } from '../NavBar';
 import { burst } from '../results/confetti';
 import { Button } from '../ui';
 import { accentText, LETTERS, OPTION_COLORS } from './answers';
@@ -74,9 +75,17 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-ink px-6 py-5 lg:px-12 lg:py-8">
+      {/* The mark and where this is, on every screen of the match (VD-8): the projector is the class's whole view of it.
+          No line to join: a match under way takes nobody new (rooms.ts). */}
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Logo className="text-2xl lg:text-3xl" />
         {game.start.roomCode && (
-          <p className="font-mono text-2xl font-bold tracking-[0.25em] text-fg-2 lg:text-3xl">{game.start.roomCode}</p>
+          <p className="text-lg text-fg-2 lg:text-xl">
+            {BRAND.domain} · код{' '}
+            <span className="font-mono font-bold tracking-[0.15em] text-fg">
+              {game.start.roomCode.slice(0, 3)} {game.start.roomCode.slice(3)}
+            </span>
+          </p>
         )}
         <p className="inline-flex items-center gap-2 text-fg-3">
           <Users aria-hidden className="size-5" /> {playing} {playing === 1 ? 'играч' : 'играчи'}

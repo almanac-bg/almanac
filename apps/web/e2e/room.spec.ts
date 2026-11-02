@@ -1,4 +1,4 @@
-import { expect, expectLobby, playMatch, signUp, test, uniqueName } from './support';
+import { expect, expectLobby, playMatch, roomCode, signUp, test, uniqueName } from './support';
 
 test('a private room: a friend joins by its code, the host starts, both play and come back to the room', async ({
   page: host,
@@ -14,10 +14,7 @@ test('a private room: a friend joins by its code, the host starts, both play and
   await host.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
   await expect(host).toHaveURL(/\/room$/);
   await expect(host.getByRole('heading', { name: 'Частна стая', exact: true })).toBeVisible();
-  const code = (await host
-    .getByRole('button', { name: /^\d{6} — копирай/ })
-    .first()
-    .textContent())!.match(/\d{6}/)![0];
+  const code = await roomCode(host);
 
   // The friend types the code on the lobby.
   await friend.getByPlaceholder('Код на стая').fill(code);
