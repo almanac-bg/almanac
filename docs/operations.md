@@ -36,7 +36,8 @@ CI е публикувал за този commit — той съществува 
 apt-get install --only-upgrade docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin
 ```
 
-Docker спира контейнерите плавно (`shutdown-timeout` в `/etc/docker/daemon.json`) и ги пуска отново; докато
+Docker спира контейнерите плавно (`stop_grace_period` на приложението и `TimeoutStopSec` от стъпка 1 на
+внедряването) и ги пуска отново; докато
 Docker се рестартира (обикновено под минута), сайтът не отговаря. После `curl -s https://almanac.bg/api/health`.
 
 ## Връщане към предишна версия
@@ -79,25 +80,57 @@ df -h /                                    # място на диска
 
 ## Сървърът е изгубен
 
-Около 45 минути, ако `.env` и SSH ключът са в password manager-а (веднъж в годината мини по списъка на
-тренировка):
-1. Нов сървър (стъпка 1: firewall, обновления, бекъпи) — или възстанови образ от Hetzner Backups и прескочи до 6.
-2. Deploy key за частната банка (стъпка 4) и двете хранилища (стъпка 5) — **същият `.env`** от password manager-а.
-3. Базата от Litestream (без `deploy/deploy.sh` преди това):
+Два пътя: **нов сървър от нулата** (базата от Litestream, губят се само последните секунди) или **образ от Hetzner
+Backups** (по-бързо, но базата в образа е до ден стара, затова и тя идва от Litestream). С упражнение първият отнема
+около 40 минути, а първия път — час и половина до два; вторият — 10–20 минути. Веднъж в годината мини по списъка на
+проба (по-долу). Последна проба: още няма.
+
+**Преди всичко:**
+1. Ако старият сървър още съществува, **изключи го** (Hetzner Console → Power off): два сървъра, които пишат в една
+   реплика, преплитат историята ѝ (Litestream не я заключва).
+2. От password manager-а: `.env`, SSH ключът и URL-ите на трите heartbeat-а (cron-ът с тях е на изгубения сървър).
+
+**Нов сървър от нулата:**
+1. Нов сървър (стъпка 1: firewall, обновления, бекъпи).
+2. В Cloudflare смени A и AAAA записите (`@` и `www`) с адресите на новия сървър — сайтът така или иначе не работи, а
+   Caddy взема сертификата си при първото си пускане само ако домейнът вече сочи към него.
+3. Docker (стъпка 3), deploy key за частната банка (стъпка 4) и двете хранилища (стъпка 5) — със **същия `.env`**.
+4. Образът и базата, преди първия деплой (образът — само с удостоверения произход, `deploy/pull-image.sh`):
 
    ```bash
-   docker pull ghcr.io/almanac-bg/almanac:$(git rev-parse HEAD)
-   docker tag ghcr.io/almanac-bg/almanac:$(git rev-parse HEAD) almanac:latest
+   image=$(deploy/pull-image.sh "$(git rev-parse HEAD)") && docker tag "$image" almanac:latest
    docker compose run --rm --no-deps --entrypoint true app      # създава празния volume за данните
    docker compose run --rm --no-deps litestream restore -o /data/quiz.db /data/quiz.db
-   deploy/deploy.sh
+   deploy/deploy.sh --now
    ```
-4. В Cloudflare смени A и AAAA записите (`@` и `www`) с адресите на новия сървър.
-5. Изчакай сертификата: на сървъра `curl -I --resolve almanac.bg:443:127.0.0.1 https://almanac.bg` (Caddy го
-   взема сам през Cloudflare за минута-две след DNS промяната; дотогава Cloudflare показва грешка 525/526).
-6. Cron-ът от стъпка 10 и проверка, че двата heartbeat-а в Better Stack светят зелено на следващия ден.
+5. Изчакай сертификата: `curl -I --resolve <домейнът ти>:443:127.0.0.1 https://<домейнът ти>` (Caddy го взема през
+   Cloudflare за минута-две; дотогава Cloudflare показва 525/526). Ако `deploy.sh` каже, че сайтът не отговаря след
+   90 s, а `rollback.sh` — че няма към какво да се върне, сертификатът още не е дошъл: изчакай го и пусни
+   `deploy/deploy.sh --now` отново.
+6. Cron-ът от стъпка 10 с URL-ите от password manager-а; на следващия ден — трите heartbeat-а в Better Stack зелени.
+
+**Образ от Hetzner Backups** (на същия сървър или на нов от образа; нов адрес — и стъпка 2 отгоре). Щом образът
+тръгне, Docker пуска контейнерите сам, а Litestream, намерил базата по-назад от репликата, за секунди прави старото
+състояние неин връх. Затова базата се връща от момента преди образа да тръгне:
+
+```bash
+docker compose stop app litestream
+boot=$(date -u -d "$(uptime -s)" +%FT%TZ)    # кога тръгна образът: всичко дотогава е в Litestream
+docker compose run --rm --no-deps --entrypoint sh app -c \
+  'mkdir -p /data/from-image && mv /data/quiz.db /data/quiz.db-wal /data/quiz.db-shm /data/from-image/ 2>/dev/null; true'
+docker compose run --rm --no-deps litestream restore -timestamp "$boot" -o /data/quiz.db /data/quiz.db
+docker compose run --rm --no-deps litestream reset /data/quiz.db
+APP_RELEASE=$(cat .release) docker compose up -d
+```
+
+Само когато Litestream не е достъпен (R2) или лошите данни са и в него: остави базата от образа (без `restore`), с
+`litestream reset` и `docker compose up -d`.
 
 (За момент преди грешка добави `-timestamp 2026-10-25T14:00:00Z` към `restore`.)
+
+**Пробата** (веднъж в годината): на временен сървър (CAX11) под тестово име (`dr-test.<домейнът ти>`, DNS only), с
+R2 токен само за четене и без репликация обратно (`COMPOSE_PROFILES=` след `restore`, или друг `BACKUP_BUCKET` и път) —
+никога в репликата на продукцията. Засечи всяка стъпка и запиши датата и времето тук и в CHANGELOG.
 
 Възстановяване на дневно копие (или на копието отпреди миграция):
 
@@ -108,10 +141,11 @@ docker compose run --rm --no-deps --entrypoint sh app -c \
   'cp /data/quiz.db /data/quiz-before-restore.db && cp /data/backups/quiz-2026-10-25.db /data/quiz.db &&
    rm -f /data/quiz.db-wal /data/quiz.db-shm'
 docker compose run --rm --no-deps litestream reset /data/quiz.db
-docker compose up -d
+APP_RELEASE=$(cat .release) docker compose up -d
 ```
 
-`litestream reset` забравя докъде е стигнал с предишната база и Litestream продължава от възстановената (CI го
+(`APP_RELEASE`: версията, която приложението казва на Sentry и под „Изходен код“; без него до следващия деплой е
+празна.) `litestream reset` забравя докъде е стигнал с предишната база и Litestream продължава от възстановената (CI го
 упражнява при всеки commit: стъпката „Backup and restore with Litestream“). Момент отпреди възстановяването може вече да
 не се възстанови от Litestream: за него е `quiz-before-restore.db`.
 
