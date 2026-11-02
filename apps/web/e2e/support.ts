@@ -265,6 +265,8 @@ export async function passRewardMoment(page: Page): Promise<boolean> {
   if (!shown) return false;
   await page.keyboard.press('Escape');
   await expect(moment).toBeHidden();
+  // Focus goes to the outcome once the dialog is gone, not before (behind it: A11Y-6).
+  await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   return true;
 }
 
@@ -272,7 +274,6 @@ export async function passRewardMoment(page: Page): Promise<boolean> {
  * A number question's answer, locked in: on a slider one step up; else its range's low end, its first digit tapped on
  * the keypad and the rest typed (the clock is short at the tests' speed), Enter to lock it.
  */
-/** Gives a number question an answer: its range's low end (or „Повече“ once, on one with steps). */
 export async function giveNumber(page: Page) {
   const more = page.getByRole('button', { name: 'Повече', exact: true });
   if (await more.isVisible()) {

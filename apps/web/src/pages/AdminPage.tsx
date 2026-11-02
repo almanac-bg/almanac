@@ -8,7 +8,7 @@ import {
 } from '@quiz/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { EditQuestionModal } from '../components/admin/EditQuestionModal';
@@ -47,12 +47,24 @@ export function AdminPage() {
   const summary = useLoad(() => (me.isAdmin ? api.adminSummary() : Promise.resolve(null)), String(me.isAdmin));
   const counts = summary.data;
   const setCounts = (patch: (c: AdminSummary) => AdminSummary) => counts && summary.setData(patch(counts));
+  // Past the second factor's gate, focus goes to the page's heading: the form that had it is gone (A11Y-6).
+  const gated = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const passed = counts?.secondFactor === 'ok';
+  useEffect(() => {
+    if (!passed || !gated.current) return;
+    gated.current = false;
+    heading.current?.focus({ preventScroll: true });
+  }, [passed]);
 
   if (!me.isAdmin) return <Navigate to="/" replace />;
   if (summary.error && !counts)
     return <LoadError title="Модерацията не се зареди" error={summary.error} onRetry={summary.retry} />;
   if (!counts) return <PageSpinner />;
-  if (counts.secondFactor !== 'ok') return <SecondFactorGate state={counts.secondFactor} onDone={summary.retry} />;
+  if (counts.secondFactor !== 'ok') {
+    gated.current = true;
+    return <SecondFactorGate state={counts.secondFactor} onDone={summary.retry} />;
+  }
   const owner = me.staffRole === 'owner';
 
   const badge = (n: number | undefined) => (n ? <span className="ml-1.5 text-amber-300">{n}</span> : null);
@@ -63,7 +75,9 @@ export function AdminPage() {
           <p className="flex items-center gap-1.5 t-eyebrow text-emerald-300">
             <ShieldCheck className="size-4" /> Модератор
           </p>
-          <h1 className="mt-1 t-page">Модерация</h1>
+          <h1 ref={heading} tabIndex={-1} className="mt-1 t-page outline-none">
+            Модерация
+          </h1>
           {!me.email && (
             <p className="mt-1 text-sm text-amber-300">
               Нямаш потвърден имейл: няма да получаваш сутрешното резюме и сигналите за спешното (Настройки → Имейл).

@@ -93,11 +93,14 @@ export function Results({ game }: { game: LiveGame }) {
   const rematch = useRematch(game);
   const headlineRef = useRef<HTMLHeadingElement>(null);
 
-  // The match just ended: start from the top, with focus (and screen readers) on the outcome.
+  // The match just ended: start from the top, with focus (and screen readers) on the outcome — once the reward dialog,
+  // if there is one, has closed: while it's open, focus is its, and the page behind is no place to read (A11Y-6).
   useEffect(() => {
     window.scrollTo(0, 0);
-    headlineRef.current?.focus({ preventScroll: true });
   }, []);
+  useEffect(() => {
+    if (!moment) headlineRef.current?.focus({ preventScroll: true });
+  }, [moment]);
 
   // Off to another page (a board, the back button): the finished match is dropped once this screen is gone. Dropping
   // it before the route changes would make /game send the player home first. Checked a tick later, so a new match

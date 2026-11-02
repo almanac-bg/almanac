@@ -58,10 +58,13 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   // /admin opens with an authenticator app: its key on the page, then the code it shows.
   await page.goto('/admin');
   await page.getByRole('button', { name: 'Включи' }).click();
+  // Focus goes where the next step is, never back to the page (A11Y-6): the code field, then the page's heading.
+  await expect(page.getByLabel('Код от приложението')).toBeFocused();
   const key = (await page.locator('code').first().textContent())!.replace(/\s/g, '');
   await page.getByLabel('Код от приложението').fill(codeAt(key, stepAt(Date.now())));
   await page.getByRole('button', { name: 'Потвърди' }).click();
   await expect(page.getByRole('heading', { name: 'Модерация' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Модерация' })).toBeFocused();
 
   await openPlayer(page, player);
   await page.getByRole('button', { name: 'Спри профила', exact: true }).click();

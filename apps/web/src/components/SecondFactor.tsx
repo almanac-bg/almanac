@@ -1,6 +1,6 @@
 import { api, errorMessage, onSecondFactorNeeded } from '@quiz/client';
 import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from 'lucide-react';
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Button, Card, Field, INPUT, Modal } from './ui';
 
 /**
@@ -15,17 +15,26 @@ function CodeField({
   onChange,
   error,
   label = 'Код от приложението',
+  focus = false,
 }: {
   code: string;
   onChange: (code: string) => void;
   error: string | null;
   label?: string;
+  /** Take focus when it appears (it replaces the button that had it: focus would drop to the page). */
+  focus?: boolean;
 }) {
   const id = useId();
+  const field = useRef<HTMLInputElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on mount only
+  useEffect(() => {
+    if (focus) field.current?.focus();
+  }, []);
   return (
     <div>
       <Field label={label} htmlFor={id}>
         <input
+          ref={field}
           id={id}
           value={code}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -178,7 +187,7 @@ function SecondFactorSetup({ onDone }: { onDone: () => void }) {
             </li>
             <li>Напиши шестте цифри, които то показва сега.</li>
           </ol>
-          <CodeField code={code} onChange={setCode} error={error} />
+          <CodeField code={code} onChange={setCode} error={error} focus />
           <Button type="submit" size="lg" className="w-full" loading={busy} disabled={code.length !== 6}>
             <ShieldCheck className="size-4.5" /> Потвърди
           </Button>
