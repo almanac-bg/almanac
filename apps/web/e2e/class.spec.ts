@@ -86,6 +86,10 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   expect(run).toEqual({ answered: 1, total: 2 });
   await expect(teacher.getByRole('heading', { name: 'Край!' })).toBeVisible();
   await expect(teacher.getByText('Мария 7Б')).toBeVisible();
+  // The pupil's results: what happens to a room's guest, the questions — and nothing celebrated as theirs (UX-2).
+  await expect(pupil.getByText('Влезе като гост за стаята', { exact: false })).toBeVisible();
+  await expect(pupil.getByRole('heading', { name: 'Награди', exact: true })).toHaveCount(0);
+  await expect(pupil.getByRole('dialog')).toHaveCount(0);
 });
 
 test('a teacher from /teachers: one way in to a room for the class, through sign-up; a set goes into a room from its card (UX-4)', async ({

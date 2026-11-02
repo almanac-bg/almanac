@@ -56,8 +56,12 @@ export function Results({ game }: { game: LiveGame }) {
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
   const rewards = end.rewards;
+  // A pupil in a class, as a guest only for the room: the account and all it earned go within the hour of leaving, so
+  // nothing is celebrated as theirs — no level, no new avatar, no achievements (the 31 October review, UX-2). The
+  // podium, their place, the review of the questions and a line on what happens to it stay.
+  const classPupil = roomGuest && !!end.roomCode;
   // A new level or a new avatar or frame: one beat at a time before the page (RewardMoment).
-  const [steps] = useState(() => rewardSteps(end.noContest ? null : rewards));
+  const [steps] = useState(() => rewardSteps(end.noContest || classPupil ? null : rewards));
   const [moment, setMoment] = useState(steps.length > 0);
   // A challenge link is played alone, but it has a board: first place over others is a win too. A friend duel is won
   // once the friend has played it too.
@@ -82,8 +86,9 @@ export function Results({ game }: { game: LiveGame }) {
   // A no contest says so in the headline; the other reasons a rating stayed put get a card.
   const unrated = rewards?.unrated && rewards.unrated !== 'no_contest' ? rewards.unrated : null;
   // A no contest has no podium to show, and nothing to award unless a question or two were answered.
-  const rewardsCard = !end.noContest || (!!rewards && rewards.xpGained > 0);
+  const rewardsCard = !classPupil && (!end.noContest || (!!rewards && rewards.xpGained > 0));
   const sideCards =
+    !classPupil &&
     !!rewards &&
     (!!rewards.daily ||
       rewards.achievements.length > 0 ||
@@ -417,7 +422,7 @@ export function Results({ game }: { game: LiveGame }) {
 
       {/* A guest's results: what keeps them, once they've seen what there is to keep (it stood before the podium). A
           pupil in a class is told what happens to it instead: no offer to make a profile in the middle of a lesson. */}
-      {roomGuest && end.roomCode ? (
+      {classPupil ? (
         <p className="mx-auto mt-6 max-w-2xl rounded-2xl border border-line bg-tint/[0.04] p-4 text-sm text-fg-2">
           Влезе като гост за стаята: до час, след като излезеш, профилът и всичко изиграно се изтриват.
         </p>

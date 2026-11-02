@@ -201,7 +201,10 @@ export async function playMatch(
   const open = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false });
   const lock = page.getByRole('button', { name: 'Заключи', exact: true });
   const pick = page.getByRole('heading', { name: 'Избери категория', exact: true });
-  const results = page.getByRole('heading', { name: 'Награди', exact: true });
+  // The results: their rewards — or, for a pupil in a class (a guest only for the room), what happens to that guest.
+  const results = page
+    .getByRole('heading', { name: 'Награди', exact: true })
+    .or(page.getByText(/^Влезе като гост за стаята/));
   // Соло without a clock: each answer waits for „Продължи“.
   const goOn = page.getByRole('button', { name: 'Продължи', exact: true });
   const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });
