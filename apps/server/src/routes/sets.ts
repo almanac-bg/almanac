@@ -79,14 +79,15 @@ setsRouter.delete('/sets/:id', requireAuth, requireAccount, (req, res) => {
 
 /**
  * A picture for a question: made small enough in the browser (a WebP or a JPEG, without a photo's metadata), checked
- * and kept here. Saved with a set, it's that set's; one no set uses goes after a day (sweepPictures).
+ * and made anew here from its pixels (pictures.ts). Saved with a set, it's that set's; one no set uses goes after a day
+ * (sweepPictures).
  */
 setsRouter.post(
   '/sets/images',
   requireAuth,
   requireAccount,
   express.raw({ type: ['image/webp', 'image/jpeg'], limit: SETS.imageBytes }),
-  (req, res) => {
+  async (req, res) => {
     if (throttled(`set-image:${res.locals.userId}`, 120, 60 * 60_000)) {
       res.status(429).json({ error: 'Твърде много снимки наведнъж. Изчакай малко.' });
       return;
@@ -95,7 +96,7 @@ setsRouter.post(
       res.status(400).json({ error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' });
       return;
     }
-    const up = uploadPicture(res.locals.userId, req.body);
+    const up = await uploadPicture(res.locals.userId, req.body);
     if (!up.ok) {
       res.status(400).json({ error: up.error });
       return;

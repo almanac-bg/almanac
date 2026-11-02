@@ -29,6 +29,15 @@ for (const [where, entry] of Object.entries(lock.packages)) {
     .sort();
   const licence = typeof pkg.license === 'string' ? pkg.license : (pkg.license?.type ?? entry.license ?? 'see below');
   const texts = files.map((f) => fs.readFileSync(path.join(dir, f), 'utf8').trim());
+  // A package that keeps its licences in its README instead: sharp's libvips build, a table of the libraries in it.
+  const readme = fs.readdirSync(dir).find((f) => /^readme\.md$/i.test(f));
+  if (!texts.length && readme) {
+    const section = fs
+      .readFileSync(path.join(dir, readme), 'utf8')
+      .split(/^## /m)
+      .find((part) => part.startsWith('Licensing'));
+    if (section) texts.push(`## ${section.trim()}`);
+  }
   packages.set(id, { id, licence, texts });
 }
 

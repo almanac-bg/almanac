@@ -135,7 +135,9 @@ Issues и pull request-и са добре дошли: виж [CONTRIBUTING.md](C
 
 Чуждото в хранилището е под собствените си лицензи: шрифтовете Onest и Unbounded — SIL Open Font License
 (`apps/web/src/fonts`), а картинките на играта (аватари, категории, козове, постижения) — Fluent Emoji на Microsoft, MIT
-(`apps/web/src/emoji/LICENSE`).
+(`apps/web/src/emoji/LICENSE`). Образът на сървъра носи и libvips (през sharp, за снимките в наборите): отделни
+споделени библиотеки, повечето под LGPL-3.0, изброени в `/licenses.txt`; изходният им код и как са построени —
+[lovell/sharp-libvips](https://github.com/lovell/sharp-libvips).
 
 ## In English
 

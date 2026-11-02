@@ -21,7 +21,7 @@ import { settleBankFixes } from './questionReports';
 import { reloadQuestionBank } from './questions';
 import { pruneRecordPlays, tellRecordOwners } from './records';
 import { pruneRuns } from './runs';
-import { sweepPictures } from './sets';
+import { remakeOldPictures, sweepPictures } from './sets';
 import { count } from './stats';
 import type { UserRow } from './users';
 
@@ -244,9 +244,13 @@ const STEPS: [string, () => unknown][] = [
   ],
   [
     'pictures',
-    () => {
+    async () => {
       const pictures = sweepPictures();
       if (pictures) console.log(`🖼️  Pictures no set uses: ${pictures} deleted`);
+      const { remade, failed } = await remakeOldPictures();
+      if (remade) console.log(`🖼️  Pictures kept from before, made anew: ${remade}`);
+      if (failed.length)
+        console.warn(`⚠️  Pictures that couldn't be made anew (left as they were): ${failed.join(', ')}`);
     },
   ],
   [

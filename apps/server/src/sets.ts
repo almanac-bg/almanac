@@ -15,6 +15,7 @@ import { alertModerators } from './alerts';
 import { all, one, run, tx } from './db';
 import { longDateTime } from './mailer';
 import { textProblem } from './names';
+import { remakePicture, samePicture } from './pictures';
 import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
 import { installationSecret } from './settings';
@@ -140,11 +141,12 @@ const owned = (id: number, userId: number) => {
 // ─── Pictures ───────────────────────────────────────────────────────────────
 
 /**
- * A picture as uploaded, made clean: what it is, its size, and its bytes as kept — a WebP or a JPEG as a browser's
- * canvas makes them (nothing animated), with everything besides the picture taken out (a JPEG's EXIF, XMP or comments —
- * Safari's canvas writes some, and a phone's photo could say where it was taken). Null for anything else, a file cut
- * short, or one with no picture in it. The editor makes them small enough itself (SETS.imageSide, SETS.imageBytes):
- * the server only checks.
+ * A picture as uploaded, checked by its structure before any decoder sees it: what it is, its size, and its bytes with
+ * everything besides the picture taken out — a WebP or a JPEG as a browser's canvas makes them (nothing animated),
+ * without a JPEG's EXIF, XMP or comments (Safari's canvas writes some, and a phone's photo could say where it was
+ * taken). Null for anything else, a file cut short, one with no picture in it, or one too big or too small. The editor
+ * makes them small enough itself (SETS.imageSide, SETS.imageBytes); what is kept is made anew from these bytes'
+ * pixels (remakePicture in pictures.ts).
  */
 export function readPicture(
   b: Buffer,
@@ -254,7 +256,7 @@ function cleanJpeg(b: Buffer): { w: number; h: number; bytes: Buffer } | null {
   return null;
 }
 
-/** A picture's id: a hash of its content (the same picture twice is one). */
+/** A picture's id: a hash of its content as kept (the same picture twice is one). */
 const pictureId = (b: Buffer) => createHash('sha256').update(b).digest('hex').slice(0, 16);
 
 /**
@@ -278,14 +280,32 @@ export function pictureAllowed(id: string, expires: unknown, signature: unknown,
   return timingSafeEqual(Buffer.from(pictureSignature(id, Number(expires))), Buffer.from(signature));
 }
 
-/** A picture a moderator blocked (with a set it was in): never served or taken again, whoever uploads it. */
-const isBlocked = (id: string) => !!one('SELECT 1 AS x FROM blocked_pictures WHERE id = ?', id);
+/**
+ * A picture a moderator blocked (with a set it was in): never served or taken again, whoever uploads it — the same
+ * bytes, or the same picture by its print (re-encoded, resized, a shade lighter).
+ */
+const isBlocked = (id: string, print: string) =>
+  !!one('SELECT 1 AS x FROM blocked_pictures WHERE id = ?', id) ||
+  all<{ print: string }>("SELECT print FROM blocked_pictures WHERE print > ''").some((b) =>
+    samePicture(b.print, print),
+  );
 
-/** Keeps a picture a host uploads for a question of theirs, up to SETS.images of them. */
-export function uploadPicture(
+/** Blocks a picture by its id and, while its bytes are kept, by its print. */
+const blockPicture = (id: string) =>
+  run(
+    `INSERT INTO blocked_pictures (id, blocked_at, print)
+     VALUES (?, ?, (SELECT print FROM set_images WHERE id = ? AND print > '' LIMIT 1))
+     ON CONFLICT (id) DO UPDATE SET print = COALESCE(blocked_pictures.print, excluded.print)`,
+    id,
+    Date.now(),
+    id,
+  );
+
+/** Keeps a picture a host uploads for a question of theirs, up to SETS.images of them, made anew (remakePicture). */
+export async function uploadPicture(
   userId: number,
   upload: Buffer,
-): Result<{ id: string; w: number; h: number; url: string }> {
+): Promise<Result<{ id: string; w: number; h: number; url: string }>> {
   // The bytes of a file, whatever the request parser made of the body.
   if (!Buffer.isBuffer(upload) || Array.isArray(upload) || typeof upload === 'string')
     return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
@@ -308,27 +328,61 @@ export function uploadPicture(
       );
     return { ok: false, error: 'Днес са качени много снимки. Опитай утре.' };
   }
-  const pic = readPicture(upload);
+  const checked = readPicture(upload);
+  const pic = checked && (await remakePicture(checked.bytes));
   if (!pic) return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
-  const bytes = pic.bytes;
-  const id = pictureId(bytes);
-  if (isBlocked(id)) return { ok: false, error: 'Тази снимка е спряна от модератор.' };
+  const id = pictureId(pic.bytes);
+  if (isBlocked(id, pic.print)) return { ok: false, error: 'Тази снимка е спряна от модератор.' };
   const done = { ok: true as const, id, w: pic.w, h: pic.h, url: pictureUrl(id) };
   if (one('SELECT 1 AS x FROM set_images WHERE owner_id = ? AND id = ?', userId, id)) return done;
   const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM set_images WHERE owner_id = ?', userId)!.n;
   if (count >= SETS.images)
     return { ok: false, error: `Можеш да пазиш до ${SETS.images} снимки — махни някоя от наборите си.` };
   run(
-    'INSERT INTO set_images (owner_id, id, type, bytes, w, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO set_images (owner_id, id, type, bytes, w, h, print, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     userId,
     id,
     pic.type,
-    bytes,
+    pic.bytes,
     pic.w,
     pic.h,
+    pic.print,
     Date.now(),
   );
   return done;
+}
+
+/**
+ * Pictures kept from before the server made them anew (v48): a few at a time, each made anew from its pixels under the
+ * same id (the sets point at it), with its print — and given to a block on it. One that can't be decoded is left as
+ * it was (an empty print, so it isn't tried again) and named in the log. Returns how many of each.
+ */
+export async function remakeOldPictures(limit = 20): Promise<{ remade: number; failed: string[] }> {
+  const out = { remade: 0, failed: [] as string[] };
+  for (const { id } of all<{ id: string }>('SELECT DISTINCT id FROM set_images WHERE print IS NULL LIMIT ?', limit)) {
+    const row = one<{ bytes: Uint8Array }>('SELECT bytes FROM set_images WHERE id = ? AND print IS NULL LIMIT 1', id);
+    if (!row) continue;
+    const pic = await remakePicture(row.bytes);
+    if (!pic) {
+      run("UPDATE set_images SET print = '' WHERE id = ? AND print IS NULL", id);
+      out.failed.push(id);
+      continue;
+    }
+    tx(() => {
+      run(
+        'UPDATE set_images SET type = ?, bytes = ?, w = ?, h = ?, print = ? WHERE id = ? AND print IS NULL',
+        pic.type,
+        pic.bytes,
+        pic.w,
+        pic.h,
+        pic.print,
+        id,
+      );
+      run('UPDATE blocked_pictures SET print = ? WHERE id = ? AND print IS NULL', pic.print, id);
+    });
+    out.remade++;
+  }
+  return out;
 }
 
 /** A picture to serve: none once a moderator has blocked it (or no set has kept it). */
@@ -549,7 +603,7 @@ export function hideSet(code: string, hidden: boolean): { ownerId: number; name:
     for (const id of imageIds(questionsOf(row))) {
       run('UPDATE set_images SET blocked = ? WHERE id = ?', hidden ? 1 : 0, id);
       // Blocked by what it is, not by whose copy: an upload of the same picture is refused, and served nowhere.
-      if (hidden) run('INSERT OR IGNORE INTO blocked_pictures (id, blocked_at) VALUES (?, ?)', id, Date.now());
+      if (hidden) blockPicture(id);
       else if (!stillHidden(id)) run('DELETE FROM blocked_pictures WHERE id = ?', id);
     }
   });
@@ -641,7 +695,7 @@ export function deletePicture(id: string): { ownerId: number; name: string }[] {
     id,
   );
   tx(() => {
-    run('INSERT OR IGNORE INTO blocked_pictures (id, blocked_at) VALUES (?, ?)', id, Date.now());
+    blockPicture(id);
     for (const s of sets) {
       const questions = questionsOf(s).map((q) => {
         if (!('image' in q) || q.image?.id !== id) return q;

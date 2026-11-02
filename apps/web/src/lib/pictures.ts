@@ -3,7 +3,8 @@ import { SETS } from '@quiz/shared';
 /**
  * A picture picked for a question, made fit to keep: at most SETS.imageSide on its longer side, drawn anew (which also
  * leaves behind a photo's metadata, such as where it was taken) and saved as WebP — or JPEG, where the browser can't
- * write WebP — within SETS.imageBytes. Null if it can't be read as a picture.
+ * write WebP — within SETS.imageBytes. Null if it can't be read as a picture. The server makes what it keeps anew from
+ * the pixels (apps/server/src/pictures.ts): this is about size and the upload, not about trust.
  */
 export async function shrinkPicture(file: File): Promise<Blob | null> {
   const img = await load(file);

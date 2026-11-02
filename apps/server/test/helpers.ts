@@ -454,5 +454,29 @@ export function jpeg(w: number, h: number, extra: number[][] = []): Buffer {
     0xd9,
   ]);
 }
+/**
+ * A real picture to upload, as the editor sends one: soft waves of colour drawn from `seed` (another seed, another
+ * picture to its print), as a JPEG — with `extra` segments after its start, as Safari's canvas writes EXIF — or a WebP.
+ */
+export async function photo(
+  w: number,
+  h: number,
+  { seed = 1, type = 'jpeg', extra = [] }: { seed?: number; type?: 'jpeg' | 'webp'; extra?: number[][] } = {},
+): Promise<Buffer> {
+  const { default: sharp } = await import('sharp');
+  const px = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const [u, v, i] = [x / w, y / h, (y * w + x) * 3];
+      px[i] = 128 + 127 * Math.sin(2 * Math.PI * (u * (1 + (seed % 3)) + v * seed * 0.7));
+      px[i + 1] = 128 + 127 * Math.sin(2 * Math.PI * (v * (2 + (seed % 4)) - u * 1.3 + seed));
+      px[i + 2] = 128 + 127 * Math.cos(2 * Math.PI * Math.hypot(u - 0.3 - 0.05 * seed, v - 0.6) * (3 + (seed % 5)));
+    }
+  const image = sharp(px, { raw: { width: w, height: h, channels: 3 } });
+  if (type === 'webp') return image.webp({ quality: 85 }).toBuffer();
+  const b = await image.jpeg({ quality: 85 }).toBuffer();
+  return Buffer.concat([b.subarray(0, 2), Buffer.from(extra.flat()), b.subarray(2)]);
+}
+
 /** An APPn (or comment) segment carrying `text`. */
 export const app = (marker: number, text: string) => [0xff, marker, 0, text.length + 2, ...Buffer.from(text, 'latin1')];

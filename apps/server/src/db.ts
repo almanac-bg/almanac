@@ -1148,6 +1148,17 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE hidden_questions ADD COLUMN awaiting_fix INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  // v48, set pictures made anew on the server (pictures.ts; the 31 October review, SEC-9): each picture's print, so a
+  // blocked one is refused re-encoded or resized too. NULL on one kept from before, until the upkeep makes it anew
+  // (remakeOldPictures, by the index of those); empty on one that couldn't be. Older code doesn't read it (a rollback
+  // stores none, and the upkeep makes those anew on the way forward again).
+  {
+    compatible: `
+    ALTER TABLE set_images ADD COLUMN print TEXT;
+    ALTER TABLE blocked_pictures ADD COLUMN print TEXT;
+    CREATE INDEX set_images_unmade ON set_images(id) WHERE print IS NULL;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

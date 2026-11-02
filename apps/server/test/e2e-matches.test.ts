@@ -16,10 +16,10 @@ import {
   eventually,
   guest,
   http,
-  jpeg,
   newLog,
   next,
   nextWhere,
+  photo,
   register,
   sleep,
   startServer,
@@ -584,8 +584,8 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   });
   assert.equal(bad.status, 400);
   assert.match(bad.body.error, /^Въпрос 1: .*еднакви/);
-  // A picture as Safari's canvas writes it (EXIF and APP13 in the JPEG): kept without them, and served only by the
-  // signed address the server gives, never to another site.
+  // A picture as Safari's canvas writes it (EXIF and APP13 in the JPEG): kept as a WebP made anew from its pixels, so
+  // without them, and served only by the signed address the server gives, never to another site.
   // An account with a confirmed address may add pictures (MOD-6).
   srv.db
     .prepare("UPDATE users SET email = 'ivan@example.test', email_key = 'ivan@example.test' WHERE id = ?")
@@ -593,14 +593,17 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   const uploaded = await fetch(`${srv.url}/api/sets/images`, {
     method: 'POST',
     headers: { cookie: A.cookie, 'content-type': 'image/jpeg' },
-    body: jpeg(320, 240, [app(0xe1, 'Exif GPS'), app(0xed, 'Photoshop')]),
+    body: await photo(320, 240, { extra: [app(0xe1, 'Exif GPS'), app(0xed, 'Photoshop')] }),
   });
   assert.equal(uploaded.status, 200);
   const picture = (await uploaded.json()) as { id: string; url: string };
   const shown = await fetch(`${srv.url}${picture.url}`);
   assert.equal(shown.status, 200);
   assert.equal(shown.headers.get('cross-origin-resource-policy'), 'same-origin');
-  assert.deepEqual(Buffer.from(await shown.arrayBuffer()), jpeg(320, 240));
+  const served = Buffer.from(await shown.arrayBuffer());
+  assert.equal(shown.headers.get('content-type'), 'image/webp');
+  assert.equal(served.toString('latin1', 8, 12), 'WEBP');
+  assert.ok(!served.includes('Exif GPS') && !served.includes('Photoshop'));
   assert.equal(
     (await fetch(`${srv.url}/api/sets/images/${picture.id}`)).status,
     404,
@@ -771,7 +774,7 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
   const again2 = await fetch(`${srv.url}/api/sets/images`, {
     method: 'POST',
     headers: { cookie: A.cookie, 'content-type': 'image/jpeg' },
-    body: jpeg(320, 240),
+    body: await photo(320, 240),
   });
   assert.match(((await again2.json()) as { error: string }).error, /спряна от модератор/, "and can't come back");
   assert.match(

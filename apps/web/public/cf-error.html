@@ -8,7 +8,8 @@
     <!-- Cloudflare's page for a server it can't reach (520–530), as the game says it, for every visitor — the installed
          app's service worker does the same for its players (sw.js → outage). Cloudflare keeps a copy of this file and
          puts its error details in place of the token it requires (in the .cf box below). Tries again every
-         15 seconds. Set in Cloudflare → Custom Pages → 500 class errors (docs/operations.md). -->
+         15 seconds. Set in Cloudflare → Custom Pages → 500 class errors (docs/self-hosting.md), which takes the Pro
+         plan or above: on the free plan the page waits here unused. -->
     <meta http-equiv="refresh" content="15" />
     <title>Сървърът не отговаря — АЛМАНАХ</title>
     <style>
