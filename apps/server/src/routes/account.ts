@@ -190,12 +190,14 @@ accountRouter.post('/account/claim', requireAuth, async (req, res) => {
   try {
     tx(() => {
       run(
+        // Saving the account accepts the terms (the form says so), for a room's guest too, who hadn't.
         `UPDATE users SET username = ?, username_key = ?, username_shape = ?, password_hash = ?, is_guest = 0,
-         room_guest_seen_at = NULL WHERE id = ? AND is_guest = 1`,
+         room_guest_seen_at = NULL, terms_at = COALESCE(terms_at, ?) WHERE id = ? AND is_guest = 1`,
         creds.username,
         usernameKey(creds.username),
         nameShape(creds.username),
         hash,
+        Date.now(),
         me.id,
       );
       // Matches already played show the new name too.

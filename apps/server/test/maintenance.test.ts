@@ -284,3 +284,11 @@ test('the morning digest counts cases, illegal ones too, as each recipient’s q
   assert.match(digest('mod@example.test'), /Доклади \(играчи, групи, набори\): 1/, 'not the case about staff');
   run('DELETE FROM reports');
 });
+
+test('a guest accepts the terms by playing; one only for a teacher’s room doesn’t (the lesson is the basis) (LEGAL-13)', async () => {
+  const { createGuest } = await import('../src/guests');
+  const player = createGuest();
+  const pupil = createGuest({ room: true });
+  assert.ok(getUser(player)!.terms_at, 'a guest who plays');
+  assert.equal(getUser(pupil)!.terms_at, null, 'a pupil in a class');
+});

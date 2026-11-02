@@ -20,7 +20,9 @@ export function createGuest({ room = false } = {}): number {
     if (getUserByName(username)) continue;
     const now = Date.now();
     const { lastInsertRowid } = run(
-      // Playing as a guest accepts the terms (each way in says so): terms_at keeps when.
+      // Playing as a guest accepts the terms (each way in says so): terms_at keeps when. Not a guest only for a teacher's
+      // room: a pupil (under 14, often) doesn't contract; their basis is the lesson the teacher runs, our legitimate
+      // interest (the policy's §3; the 31 October review, LEGAL-13). Saving the account later accepts them.
       `INSERT INTO users (username, username_key, username_shape, password_hash, created_at, is_guest, room_guest_seen_at,
          terms_at)
        VALUES (?, ?, ?, '', ?, 1, ?, ?)`,
@@ -29,7 +31,7 @@ export function createGuest({ room = false } = {}): number {
       nameShape(username),
       now,
       room ? now : null,
-      now,
+      room ? null : now,
     );
     return Number(lastInsertRowid);
   }
