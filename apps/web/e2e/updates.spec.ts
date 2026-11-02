@@ -85,8 +85,8 @@ test('a page whose code won’t download: one reload to fetch it again, then a w
   await expect(page.getByRole('heading', { name: 'Страницата не се зареди', exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  // A moment more: no second reload comes.
-  await page.waitForTimeout(1_500);
+  // A moment more (longer than a reload waits, lib/reload.ts): no second reload comes.
+  await page.waitForTimeout(2_500);
   expect(loads, 'reloaded once to try again').toBe(1);
 
   // The deploy is through: „Опитай пак“ asks for the page anew, in every engine. (WebKit once kept the failed file for

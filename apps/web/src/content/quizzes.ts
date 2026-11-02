@@ -1,5 +1,5 @@
 import { use } from 'react';
-import { reloadForNewVersion } from '../lib/reload';
+import { holdForReload, reloadForNewVersion } from '../lib/reload';
 import { choiceQuestions, type QuizQuestion } from './choice';
 
 export type { QuizQuestion } from './choice';
@@ -37,7 +37,7 @@ export function loadQuiz(id: string): Promise<QuizQuestion[]> {
       },
       (err: unknown) => {
         loading.delete(id); // to be asked for again
-        reloadForNewVersion();
+        if (reloadForNewVersion()) return holdForReload();
         throw err;
       },
     );

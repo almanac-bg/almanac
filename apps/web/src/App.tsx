@@ -11,7 +11,7 @@ import { Toasts } from './components/Toasts';
 import { Button, PageSpinner, Spinner } from './components/ui';
 import { identify } from './lib/monitoring';
 import { onServer, paintedSignedOut, paintingDone } from './lib/painted';
-import { reloadForNewVersion } from './lib/reload';
+import { holdForReload, reloadForNewVersion } from './lib/reload';
 import { markReturning } from './lib/returning';
 import { useRouteFocus } from './lib/routeFocus';
 import {
@@ -68,7 +68,7 @@ const loadMotion = () =>
   import('./lib/motionFeatures').then(
     (r) => r.default,
     (err: unknown) => {
-      reloadForNewVersion();
+      if (reloadForNewVersion()) return holdForReload();
       throw err;
     },
   );

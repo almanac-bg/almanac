@@ -71,7 +71,14 @@ test('every public page fetches the code it runs as it starts, and runs the code
     const ran = scripts.filter((s) => s.by !== 'fetch').map((s) => s.path);
     // (Not in WebKit, which would download it twice: public/early.js.)
     expect(new Set(fetched), `${path}: fetched as it started`).toEqual(new Set(browserName === 'webkit' ? [] : named));
-    expect(new Set(ran), `${path}: the code it ran`).toEqual(new Set([...entry, ...named]));
+    // (WebKit leaves out of the timings some files its memory cache served, from the page before: there, nothing it ran
+    // came unnamed.)
+    if (browserName === 'webkit')
+      expect(
+        ran.filter((f) => !entry.includes(f) && !named.includes(f)),
+        `${path}: unnamed code it ran`,
+      ).toEqual([]);
+    else expect(new Set(ran), `${path}: the code it ran`).toEqual(new Set([...entry, ...named]));
   }
 });
 

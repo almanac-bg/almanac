@@ -1,23 +1,39 @@
+/** Long enough for a navigation away to take the page with it, short enough that a reload still feels prompt. */
+const LEAVING_MS = 1500;
+
+/** Reloaded for this already, in the last 10 s (the stamp outlives the reload: it's this tab's). */
+function reloadedRecently(): boolean {
+  try {
+    return Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000;
+  } catch {
+    return false; // storage unavailable: reload anyway
+  }
+}
+
 /**
  * Code that was about to be shown didn't arrive. A tab opened before a deploy asks for files that are gone: one reload
  * gets the new version. Not while offline (that would only swap the app for the offline page), and not twice in a
  * row. Only for code being shown: a background fetch that fails (prefetchPages) mustn't reload the app under the
  * player, taking whatever they were typing with it.
+ *
+ * Says whether it will reload — after a moment: a download cut short because the page is being left (a link out, a
+ * typed address) fails the same way, and a reload at once took that navigation over. A page being left is gone before
+ * the moment is up, and nothing is noted. Meanwhile what waited for the code goes on waiting (holdForReload): a spinner,
+ * not „Страницата не се зареди“ for the second before the reload.
  */
-/** Long enough for a navigation away to take the page with it, short enough that a reload still feels prompt. */
-const LEAVING_MS = 1500;
-
-export function reloadForNewVersion() {
-  if (!navigator.onLine) return;
-  // A moment first. A download cut short because the page is being left (a link out, a typed address) fails the same
-  // way, and a reload then took that navigation over; a page being left is gone before this runs.
+export function reloadForNewVersion(): boolean {
+  if (!navigator.onLine || reloadedRecently()) return false;
   setTimeout(() => {
+    if (reloadedRecently()) return;
     try {
-      if (Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000) return; // already tried
       sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
     } catch {
       /* storage unavailable: reload anyway */
     }
     window.location.reload();
   }, LEAVING_MS);
+  return true;
 }
+
+/** What a load that's about to be redone by a reload resolves to: nothing, ever (its page shows "loading" until then). */
+export const holdForReload = () => new Promise<never>(() => {});

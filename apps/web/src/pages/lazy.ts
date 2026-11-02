@@ -2,7 +2,7 @@ import { publicPageCode, routeKind } from '@quiz/shared';
 import { type ComponentType, createElement, lazy, useState } from 'react';
 import { matchPath } from 'react-router';
 import { loadQuiz } from '../content/quizzes';
-import { reloadForNewVersion } from '../lib/reload';
+import { holdForReload, reloadForNewVersion } from '../lib/reload';
 
 /**
  * Pages beyond the first screen load on demand, so visitors download the sign-in page or the lobby first.
@@ -81,7 +81,7 @@ function page<L extends Loader, N extends keyof Exports<L> & string>(
           failed.add(() => {
             Lazy = null;
           });
-          reloadForNewVersion();
+          if (reloadForNewVersion()) return holdForReload();
           throw err;
         },
       ),
