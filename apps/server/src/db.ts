@@ -10,11 +10,53 @@ import { nameShape } from './names';
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
 export const db = new DatabaseSync(config.dbPath);
+/**
+ * How long a write waits for another connection's lock. Litestream's ordinary checkpoint holds it for milliseconds;
+ * past this, the breaker below takes over. Not seconds: node:sqlite waits synchronously, the whole server with it.
+ */
+const BUSY_WAIT_MS = 1000;
 // WAL + a busy timeout is also what Litestream (continuous backups) needs. synchronous = NORMAL is safe in WAL mode
 // (a power cut can lose the last commits, never corrupt the file) and saves an fsync per write.
 db.exec(
-  'PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;',
+  `PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = ${BUSY_WAIT_MS};`,
 );
+
+/**
+ * The breaker. Another writer held the lock past BUSY_WAIT_MS (Litestream's emergency checkpoint writes a whole
+ * snapshot under it; an ad-hoc session; `cli notice` over every account): until it lets go, writes fail at once instead
+ * of each sleeping the server — N queued writes were N × 5 s of a frozen event loop, every match with it (the 31
+ * October review, SERVER-1). A probe from a timer finds when the lock is free.
+ */
+const PROBE_MS = 250;
+/** How long after the last busy write /api/health still says so. */
+const LOCKED_FOR_MS = 60_000;
+let breaker: NodeJS.Timeout | null = null;
+let lockedAt = 0;
+
+function tripBreaker() {
+  lockedAt = Date.now();
+  if (breaker) return;
+  db.exec('PRAGMA busy_timeout = 0');
+  breaker = setInterval(() => {
+    // Between two turns of the event loop: no transaction of ours is open (they're synchronous).
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      db.exec('ROLLBACK');
+    } catch {
+      return;
+    }
+    if (breaker) clearInterval(breaker);
+    breaker = null;
+    db.exec(`PRAGMA busy_timeout = ${BUSY_WAIT_MS}`);
+  }, PROBE_MS);
+  breaker.unref();
+}
+
+/** The database was locked by another writer in the last minute (the health check says so). */
+export const lockedRecently = (now = Date.now()) => lockedAt > 0 && now - lockedAt < LOCKED_FOR_MS;
+
+/** Writes fail at once just now: another writer holds the lock (the breaker is open). */
+export const writesHeld = () => breaker !== null;
 
 type Step = string | (() => void);
 
@@ -27,6 +69,10 @@ type Step = string | (() => void);
  * simply doesn't use) lets the release before it run on the database as it is (see schemaFloor), so a rollback is
  * the image alone. Make steps compatible whenever possible; what an older release leaves out meanwhile is filled in
  * by repair() on the next start.
+ *
+ * A step that rewrites a big table (an UPDATE or a copy of matches, answers, runs…) goes in batches from repair() or a
+ * one-off command, not here in one transaction: past Litestream's truncate-page-n (≈ 500 MB of WAL) it takes the write
+ * lock for a whole snapshot, and every write waits (the breaker above keeps the server going, but nothing saves).
  */
 const MIGRATIONS: (Step | { compatible: Step })[] = [
   `
@@ -1153,7 +1199,12 @@ export function all<T>(sql: string, ...params: SQLInputValue[]): T[] {
 }
 
 export function run(sql: string, ...params: SQLInputValue[]) {
-  return stmt(sql).run(...params);
+  try {
+    return stmt(sql).run(...params);
+  } catch (err) {
+    if (isBusy(err)) tripBreaker();
+    throw err;
+  }
 }
 
 /** Another connection held the write lock for longer than busy_timeout (SQLITE_BUSY and its extended codes). */
@@ -1190,7 +1241,12 @@ export function tx<T>(fn: () => T): T {
   // IMMEDIATE: the write lock is taken up front, waiting out busy_timeout if Litestream (or the admin command line)
   // holds it. A plain BEGIN that reads first and writes later fails at once instead, with no wait, whenever another
   // connection wrote in between.
-  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+  } catch (err) {
+    if (isBusy(err)) tripBreaker();
+    throw err;
+  }
   txDepth++;
   let committed = false;
   try {

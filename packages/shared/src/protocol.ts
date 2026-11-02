@@ -508,6 +508,11 @@ export interface GameEndPayload {
   rewards: MatchRewards | null;
   /** The other side walked out before the match got going: it counts for nobody who stayed. */
   noContest: boolean;
+  /**
+   * The results are still being saved (the database was busy): `rewards` is null for now, and they come in
+   * game:rewards (the 31 October review, SERVER-1).
+   */
+  saving?: boolean;
 }
 
 export interface QueueStatus {
@@ -602,6 +607,8 @@ export interface ServerToClientEvents {
   'game:reaction': (p: { playerId: string; emote: string }) => void;
   'game:presence': (p: { playerId: string; connected: boolean; left: boolean }) => void;
   'game:end': (p: GameEndPayload) => void;
+  /** The rewards of a match that ended while its results were still being saved (GameEndPayload.saving). */
+  'game:rewards': (p: { gameId: string; rewards: MatchRewards | null }) => void;
   /** A one-attempt run we cut short: no result, and the attempt can be played again. */
   'game:aborted': (p: { gameId: string; message: string }) => void;
   /** Something about your friends changed (refetch the list); `requests` is your pending friend-request count. */

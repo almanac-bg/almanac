@@ -31,7 +31,8 @@ export function GamePage() {
   if (!game) return settled ? <Navigate to="/" replace /> : <Restoring what="в мача" />;
   // A room's host running it on a big screen: the whole match there, to its end.
   if (game.start.presenter) return <PresenterScreen game={game} />;
-  if (game.phase === 'ended' && game.end) return <Results game={game} />;
+  // Keyed by whether the rewards are in: ones saved late (game:rewards) bring their moment, as on time.
+  if (game.phase === 'ended' && game.end) return <Results key={game.end.rewards ? 'saved' : 'saving'} game={game} />;
   return <Arena game={game} />;
 }
 

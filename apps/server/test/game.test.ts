@@ -8,8 +8,10 @@ import {
   answerPoints,
   type CategoryId,
   type FinalStanding,
+  type GameEndPayload,
   type GamePlayer,
   HOLD,
+  type MatchRewards,
   NUMBER,
   type PickPayload,
   type PowerupId,
@@ -39,6 +41,8 @@ const advance = (ms: number) => {
   for (let t = 0; t < ms; t += 50) mock.timers.tick(Math.min(50, ms - t));
 };
 const TIME = 10_000;
+/** Game.ts's SAVE_RETRY_MS. */
+const SAVE_RETRY = 60_000;
 
 const player = (id: string, userId: number | null): GamePlayer => ({
   id,
@@ -89,6 +93,8 @@ function setup(opts: {
   pace?: 'normal' | 'relaxed' | 'triple' | 'untimed';
   /** People with „Повече време“ on, by user id (a longer round pick). */
   longPick?: number[];
+  /** The save finds the database locked this many times (SQLITE_BUSY) before it gets through. */
+  busySaves?: number;
 }) {
   const plan = opts.rounds === true ? pickRounds(new Map())! : (opts.rounds ?? null);
   const shown: string[][] = [];
@@ -98,6 +104,8 @@ function setup(opts: {
   const missed: number[] = [];
   let released = 0;
   let draining = false;
+  let busySaves = opts.busySaves ?? 0;
+  let settled = 0;
   const game = new Game(
     {
       mode: opts.daily ? 'daily' : opts.pace ? 'solo' : 'custom',
@@ -132,8 +140,16 @@ function setup(opts: {
     } satisfies GameEmitter,
     {
       finalize: (_game, final) => {
+        if (busySaves > 0) {
+          busySaves--;
+          throw Object.assign(new Error('database is locked'), { errcode: 5 });
+        }
         standings = final;
-        return new Map();
+        return new Map([[1, { xpGained: 50 } as MatchRewards]]);
+      },
+      busy: (err) => (err as { errcode?: number }).errcode === 5,
+      onSettled: () => {
+        settled++;
       },
       undelivered: (userId) => missed.push(userId),
       release: () => {
@@ -162,6 +178,7 @@ function setup(opts: {
     events,
     missed,
     released: () => released,
+    settled: () => settled,
     finalized: () => standings !== null,
     /** The registry's startDraining(). */
     drain: () => {
@@ -514,6 +531,26 @@ test('„Без часовник“: an open question closes after HOLD.untimedM
   // A timed Соло has nothing to extend.
   const t = setup({ humans: [1], pace: 'normal' });
   assert.equal(t.game.hold('u1', 0), false);
+});
+
+test('a save that finds the database locked: the result goes out at once, its rewards when a retry gets through', () => {
+  const g = setup({ humans: [1], daily: true, busySaves: 2 });
+  until(() => g.of('game:end').length > 0, 10 * (TIME + 5_000));
+  const [end] = g.of<GameEndPayload>('game:end');
+  assert.deepEqual([end.saving, end.rewards], [true, null], 'how it ended, „записваме…“');
+  assert.equal(g.of('game:rewards').length, 0);
+  advance(3_100); // retried after 1 s (still locked), then 2 s more
+  assert.deepEqual(g.of<{ rewards: MatchRewards | null }>('game:rewards'), [
+    { gameId: g.game.id, rewards: { xpGained: 50 } },
+  ]);
+  assert.deepEqual([g.released(), g.settled()], [0, 1], 'the attempt was kept; the stopping server waits no more');
+  // Locked for good: after a minute of trying, the run's one attempt is given back and the player told.
+  const h = setup({ humans: [1], daily: true, busySaves: 100 });
+  until(() => h.of('game:end').length > 0, 10 * (TIME + 5_000));
+  assert.equal(h.released(), 0, 'not while it retries');
+  advance(SAVE_RETRY + 70_000);
+  assert.equal(h.released(), 1);
+  assert.deepEqual(h.of<{ rewards: MatchRewards | null }>('game:rewards'), [{ gameId: h.game.id, rewards: null }]);
 });
 
 test("an answer the server didn't take is answered with the reason", () => {

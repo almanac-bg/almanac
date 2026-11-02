@@ -18,7 +18,7 @@ import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCook
 import { challengePreview } from './challenges';
 import { config } from './config';
 import { dailyPreview } from './daily';
-import { db, isBusy, one } from './db';
+import { db, isBusy, lockedRecently, one } from './db';
 import { groupPreview } from './groups';
 import { startMaintenance } from './maintenance';
 import { flushLogs, forwardEnvelope, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
@@ -92,6 +92,12 @@ app.get('/api/health', (_req, res) => {
     db.prepare('SELECT 1').get();
   } catch {
     res.status(503).json({ ok: false, problem: 'database' });
+    return;
+  }
+  // Another writer held the database past the wait in the last minute: reads go on (WAL), so a read alone stayed
+  // green through a 16-second lock while every match froze and results failed to save (SERVER-1).
+  if (lockedRecently()) {
+    res.status(503).json({ ok: false, problem: 'locked' });
     return;
   }
   // The bank on disk can't be loaded: matches go on with the one loaded before, but a restart would fail.
