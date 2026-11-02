@@ -373,7 +373,9 @@ function rewardHuman(
     fastest,
     k.correctMs * known,
     p.usedPowerups.size,
-    solo && counts ? s.score : 0,
+    // The Соло record (and „Рекорден мач“, which reads it) is the usual pace's: with 30 s or no clock an answer can be
+    // looked up (GAMEPLAY-5).
+    solo && counts && (game.pace ?? 'normal') === 'normal' ? s.score : 0,
     setup.roomCode && setup.hostUserId === userId && counts ? 1 : 0,
     claimDaily ? today : null,
     lines.reduce((sum, l) => sum + l.amount, 0),

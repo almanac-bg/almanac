@@ -939,7 +939,9 @@ export class Game {
       p.answerMs += Math.min(p.answer?.timeMs ?? this.scoreLimitMs, this.scoreLimitMs);
       if (correct && p.answer) {
         const timeMs = Math.min(p.answer.timeMs, this.scoreLimitMs);
-        p.streak++;
+        // In the 30-second pace a right answer past the usual clock still counts, but it breaks the streak, as the rules
+        // say: a look-up mustn't build a streak's bonus (the review's GAMEPLAY-5).
+        p.streak = this.pace === 'relaxed' && p.answer.timeMs > this.scoreLimitMs ? 0 : p.streak + 1;
         p.correct++;
         p.correctByDifficulty[q.difficulty]++;
         cat.correct++;
