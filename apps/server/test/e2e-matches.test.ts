@@ -621,6 +621,9 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
       assert.deepEqual(states.at(-1)!.settings.set, { id: made.body.id, name: 'Урок по история', questions: 3 }),
     );
     sb.emit('room:settings', { set: null }); // not the host
+    // The room's final off: the set's last number question is a question like the others, not a final (GAMEPLAY-9).
+    sa.emit('room:settings', { final: false });
+    await eventually(() => assert.equal(states.at(-1)!.settings.final, false));
     const log = newLog();
     const pa = autoPlay(sa, 'right', log);
     const pb = autoPlay(sb, 'right');
@@ -637,6 +640,7 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
       ],
     );
     assert.deepEqual(log.questions[1].options, ['Вярно', 'Невярно']);
+    assert.equal(log.questions[2].times, 1, 'its number question counts once');
     assert.ok(!end.rewards!.breakdown.some((l) => l.label.startsWith('Верни отговори')), 'no XP for answers');
     const after = (await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, A.cookie)).body.overview;
     assert.equal(after.questionsAnswered, before.questionsAnswered, 'nothing measured');

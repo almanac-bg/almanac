@@ -501,3 +501,13 @@ test('every themed day links to a quiz page that exists', async () => {
   for (const [day, theme] of Object.entries(CALENDAR_DAYS))
     assert.ok(theme.page in PUBLIC_PAGES, `${day}: ${theme.page} is a public page`);
 });
+
+test('the evening Роял says what its cuts are, from the cuts themselves', async () => {
+  const { EVENING, MODES } = await import('@quiz/shared');
+  const said = MODES.evening.description;
+  assert.match(said, new RegExp(`До ${EVENING.maxPlayers} души`));
+  for (const cut of EVENING.cuts) {
+    assert.match(said, new RegExp(`${cut.after}-ия`), `after question ${cut.after}`);
+    assert.match(said, new RegExp(`${Math.round(cut.share * 100)}%`));
+  }
+});

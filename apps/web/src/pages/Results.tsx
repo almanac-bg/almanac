@@ -363,24 +363,29 @@ export function Results({ game }: { game: LiveGame }) {
           !rewardsCard && !sideCards && 'hidden',
         )}
       >
+        {/* The day's standing first on a phone — it's what the daily was for, and under the rewards it was a scroll
+            away (the review's UX-3); beside them, on top of the side column, on a wider screen. */}
+        {sideCards && rewards.daily && (
+          <div className="md:col-start-2 md:row-start-1">
+            <DailyCard
+              daily={rewards.daily}
+              history={game.history}
+              total={game.start.totalQuestions}
+              score={mine.score}
+            />
+          </div>
+        )}
         {!rewardsCard ? null : rewards ? (
-          <div className="space-y-4">
-            <UnlockReveal rewards={rewards} celebrated={steps.length > 0} />
+          <div className="space-y-4 md:col-start-1 md:row-span-2 md:row-start-1">
+            {/* The reward moment offered the new avatar or frame already („Сложи го“): not a second time here. */}
+            {steps.length === 0 && <UnlockReveal rewards={rewards} />}
             <RewardsCard rewards={rewards} quiet={quiet} celebrated={steps.length > 0} />
           </div>
         ) : (
           <Card className="p-6 text-sm text-fg-3">Наградите от този мач не можаха да се запишат.</Card>
         )}
         {sideCards && (
-          <div className="space-y-4">
-            {rewards.daily && (
-              <DailyCard
-                daily={rewards.daily}
-                history={game.history}
-                total={game.start.totalQuestions}
-                score={mine.score}
-              />
-            )}
+          <div className="space-y-4 md:col-start-2">
             {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
             {!!rewards.mastery?.length && <MasteryCard mastery={rewards.mastery} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}

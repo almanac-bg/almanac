@@ -2,7 +2,7 @@ import { fmt, type LiveGame, useNow } from '@quiz/client';
 import {
   type CategoryMastery,
   categoryById,
-  EVENING,
+  eveningCutsLine,
   type GamePlayer,
   MASTERY_TIERS,
   MODES,
@@ -24,13 +24,7 @@ import { PlayerMark } from './Scoreboard';
 import { SCORING_LINE, takeScoringHint } from './scoring';
 import { myTeamOf, teamColor } from './teams';
 
-/** The evening's cuts, from EVENING: „Последните 20% отпадат след 4-ия въпрос, 30% — след 7-ия, 10-ия и 12-ия…“. */
-const EVENING_CUTS_LINE = (() => {
-  const [first, ...rest] = EVENING.cuts;
-  const pct = (share: number) => `${Math.round(share * 100)}%`;
-  const after = rest.map((c) => `${c.after}-ия`);
-  return `Последните ${pct(first.share)} отпадат след ${first.after}-ия въпрос, ${pct(rest[0].share)} — след ${after.slice(0, -1).join(', ')} и ${after.at(-1)}; финалът е за двама`;
-})();
+const EVENING_CUTS_LINE = eveningCutsLine();
 
 /** Before the first question: the countdown, and who plays whom. */
 export function Intro({ game }: { game: LiveGame }) {

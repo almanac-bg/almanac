@@ -12,6 +12,7 @@ import {
 } from '@quiz/shared';
 import { reviewQueue } from './almanac';
 import { config } from './config';
+import { eveningStartsAt } from './evening';
 import { all, one, run } from './db';
 import { friendIds } from './friends';
 import { seededRng } from './questions';
@@ -269,7 +270,8 @@ const SLOTS: {
       },
     },
     {
-      when: () => config.eveningAt !== null,
+      // Only before tonight's evening starts: dealt after it, the quest can't be done today (the review's GAMEPLAY-11).
+      when: () => (eveningStartsAt(dayKey()) ?? 0) > Date.now(),
       def: {
         id: 'evening',
         icon: '🌙',

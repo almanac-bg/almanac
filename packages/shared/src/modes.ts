@@ -202,8 +202,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     rounds: false,
     formats: { images: 2, order: false },
     tagline: 'Всяка вечер в 21:00. Всички срещу всички.',
-    description:
-      'До 50 души наведнъж. След 3-ти, 6-и, 9-и и 12-и въпрос отпадат последните 30%, накрая двама играят финала с число.',
+    // From EVENING itself (read when asked, as it's defined below): written by hand, it had gone out of step with the
+    // cuts (the review's UX-15).
+    get description() {
+      return `До ${EVENING.maxPlayers} души наведнъж. ${eveningCutsLine()}.`;
+    },
     accent: ['#818cf8', '#f472b6'],
   },
   custom: {
@@ -251,6 +254,14 @@ export const QUEUE_MODES: QueueModeId[] = ['duel', 'teams', 'squad', 'royale'];
  * questions. The winner of a match of `titleFrom` people or more wears „Шампион на вечерта“ for `titleHours`;
  * `winsForFrame` such wins earn a frame; the night's `top` stay on the home page until the next one.
  */
+/** The evening's cuts, from EVENING: „Последните 20% отпадат след 4-ия въпрос, 30% — след 7-ия, 10-ия и 12-ия…“. */
+export function eveningCutsLine(): string {
+  const [first, ...rest] = EVENING.cuts;
+  const pct = (share: number) => `${Math.round(share * 100)}%`;
+  const after = rest.map((c) => `${c.after}-ия`);
+  return `Последните ${pct(first.share)} отпадат след ${first.after}-ия въпрос, ${pct(rest[0].share)} — след ${after.slice(0, -1).join(', ')} и ${after.at(-1)}; финалът е за двама`;
+}
+
 export const EVENING = {
   hour: 21,
   lobbyMinutes: 5,
