@@ -30,7 +30,7 @@ import {
 import clsx from 'clsx';
 import { ArrowUp, Check, Share2 } from 'lucide-react';
 import { animate, m } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { dailyLinkUrl, offBoardWhy, placeShown } from '../../lib/daily';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
@@ -315,11 +315,23 @@ export function RatingChip({ rating }: { rating: { before: number; after: number
   );
 }
 
-export function AchievementsCard({ ids }: { ids: string[] }) {
+/**
+ * `held`: the reward dialog is open over the page — its sound waits until the dialog is gone (it played on top of the
+ * dialog's own, behind it, before: the review's VD-6).
+ */
+export function AchievementsCard({ ids, held = false }: { ids: string[]; held?: boolean }) {
+  const played = useRef(false);
+  const shownAt = useRef(Date.now());
   useEffect(() => {
-    const t = setTimeout(sfx.achievement, 1200);
+    if (held || played.current) return;
+    // After the page's own sting (1.2 s in), or a moment after the dialog closes.
+    const wait = Math.max(600, 1200 - (Date.now() - shownAt.current));
+    const t = setTimeout(() => {
+      played.current = true;
+      sfx.achievement();
+    }, wait);
     return () => clearTimeout(t);
-  }, []);
+  }, [held]);
   return (
     <Card className="p-6">
       <h2 className="t-card">Нови постижения</h2>

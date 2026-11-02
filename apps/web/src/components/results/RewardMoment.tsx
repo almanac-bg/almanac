@@ -41,28 +41,39 @@ export function rewardSteps(rewards: MatchRewards | null | undefined): Step[] {
  * The rewards of a match, one beat at a time before its page: the new level, then each new avatar or frame, large, with
  * „Сложи го“. „Нататък“ goes on; Escape or a tap outside skips the rest. An ordinary match has none and goes straight
  * to its page. (All at once on one long page, a level-up landed as a line among a dozen.) `quiet`: a match lost, or
- * mostly missed — the level is said, without confetti.
+ * mostly missed — the level is said, without confetti. `after`: the page's own sting (a win, a loss) plays first, so the
+ * first step's cue waits this long rather than sounding over it (the review's VD-6); `burst`: false when the page has
+ * thrown its confetti already — one burst, not two.
  */
 export function RewardMoment({
   steps,
   open,
   quiet = false,
+  after = 0,
+  burst: confetti = true,
   onDone,
 }: {
   steps: Step[];
   open: boolean;
   quiet?: boolean;
+  after?: number;
+  burst?: boolean;
   onDone: () => void;
 }) {
   const [at, setAt] = useState(0);
   const step = steps[at];
   useEffect(() => {
     if (!open || !step) return;
-    if (step.kind === 'level') {
-      sfx.levelUp();
-      if (!quiet) burst(0.9);
-    } else if (step.kind === 'unlock') sfx.achievement();
-  }, [open, step, quiet]);
+    const cue = () => {
+      if (step.kind === 'level') {
+        sfx.levelUp();
+        if (!quiet && confetti) burst(0.9);
+      } else if (step.kind === 'unlock') sfx.achievement();
+    };
+    if (at > 0 || !after) return cue();
+    const t = setTimeout(cue, after);
+    return () => clearTimeout(t);
+  }, [open, step, at, quiet, after, confetti]);
   if (!step) return null;
   const last = at + 1 >= steps.length;
   return (

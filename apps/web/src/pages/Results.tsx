@@ -32,6 +32,9 @@ import { Button, Card } from '../components/ui';
 import { matchShareText, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 
+/** How long the win or loss sting has to itself before the reward dialog's first cue (the level-up's run). */
+const STING_MS = 900;
+
 export function Results({ game }: { game: LiveGame }) {
   const end = game.end!;
   const navigate = useNavigate();
@@ -109,12 +112,16 @@ export function Results({ game }: { game: LiveGame }) {
     [gameId],
   );
 
+  // The end of a match has one order to its sounds: this sting first, then the reward dialog's (RewardMoment, `after`),
+  // then the achievements card's once the dialog is gone — and one burst of confetti.
+  const fanfare = won || (single && perfect && !lostLink) || newBest;
+  const sting = fanfare || !single;
   useEffect(() => {
-    if (won || (single && perfect && !lostLink) || newBest) {
+    if (fanfare) {
       sfx.win();
       burst(1.2);
     } else if (!single) sfx.lose();
-  }, [won, single, perfect, newBest, lostLink]);
+  }, [fanfare, single]);
 
   async function again() {
     const mode = end.mode;
@@ -232,7 +239,14 @@ export function Results({ game }: { game: LiveGame }) {
   return (
     // No bottom padding on phones: the sticky action bar ends the page.
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6 sm:pb-20">
-      <RewardMoment steps={steps} open={moment} quiet={quiet} onDone={() => setMoment(false)} />
+      <RewardMoment
+        steps={steps}
+        open={moment}
+        quiet={quiet}
+        after={sting ? STING_MS : 0}
+        burst={!fanfare}
+        onDone={() => setMoment(false)}
+      />
       <m.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <p className="t-eyebrow text-fg-3">
           {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
@@ -386,7 +400,7 @@ export function Results({ game }: { game: LiveGame }) {
         )}
         {sideCards && (
           <div className="space-y-4 md:col-start-2">
-            {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
+            {rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} held={moment} />}
             {!!rewards.mastery?.length && <MasteryCard mastery={rewards.mastery} />}
             {rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
             {rewards.rating && <RatingCard rating={rewards.rating} />}
