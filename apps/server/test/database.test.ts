@@ -13,7 +13,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-database-'));
 process.env.DB_PATH = path.join(tmp, 'database.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
-const { afterCommit, all, run, tx } = await import('../src/db');
+const { afterCommit, all, db, run, tx } = await import('../src/db');
 const { bankProblem, markSeen, questionBank, RECENT_LIMIT, recentFor, reloadQuestionBank } = await import(
   '../src/questions'
 );
@@ -140,6 +140,34 @@ test('a nested step that fails is undone on its own; the work around it still co
   const keys = all<{ key: string }>("SELECT key FROM settings WHERE key IN ('around', 'inner')").map((r) => r.key);
   assert.deepEqual(keys, ['around']);
   assert.deepEqual(heard, ['the work around it']);
+});
+
+test('a full disk is reported as one, not as the rollback after it, in a step or a nested one', () => {
+  // SQLite undoes the transaction itself when the disk is full: the ROLLBACK after it failed („no transaction is
+  // active“, code 1), and that was what got reported (the 31 October review, SERVER-6).
+  run('CREATE TABLE IF NOT EXISTS filler (data BLOB)');
+  const pages = (db.prepare('PRAGMA page_count').get() as { page_count: number }).page_count;
+  db.exec(`PRAGMA max_page_count = ${pages + 2}`);
+  const big = () => run('INSERT INTO filler (data) VALUES (zeroblob(1000000))');
+  try {
+    assert.throws(
+      () => tx(big),
+      (err: { errcode?: number; message: string }) => {
+        assert.equal(err.errcode, 13, err.message);
+        assert.match(err.message, /full/);
+        return true;
+      },
+    );
+    assert.throws(
+      () => tx(() => tx(big)),
+      (err: { errcode?: number }) => err.errcode === 13,
+      'from a nested step too',
+    );
+    assert.equal(db.isTransaction, false, 'nothing left open');
+  } finally {
+    db.exec('PRAGMA max_page_count = 4294967294');
+  }
+  tx(() => run('DELETE FROM filler'));
 });
 
 test('a transaction that reads, then writes holds up against another writer (Litestream) in between', () => {

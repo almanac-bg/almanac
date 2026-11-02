@@ -1266,7 +1266,13 @@ export function tx<T>(fn: () => T): T {
     committed = true;
     return result;
   } catch (err) {
-    db.exec('ROLLBACK');
+    // SQLite rolls back by itself on a full disk, an I/O error or no memory: a ROLLBACK then fails ("no transaction is
+    // active") and was what got reported, not why (the 31 October review, SERVER-6). The error that matters goes on.
+    try {
+      if (db.isTransaction) db.exec('ROLLBACK');
+    } catch {
+      // Already undone.
+    }
     throw err;
   } finally {
     txDepth--;
@@ -1287,8 +1293,15 @@ function savepoint<T>(fn: () => T): T {
     db.exec(`RELEASE ${name}`);
     return result;
   } catch (err) {
-    db.exec(`ROLLBACK TO ${name}`);
-    db.exec(`RELEASE ${name}`);
+    // As in tx(): SQLite may have rolled the whole transaction back already (and the savepoint with it).
+    try {
+      if (db.isTransaction) {
+        db.exec(`ROLLBACK TO ${name}`);
+        db.exec(`RELEASE ${name}`);
+      }
+    } catch {
+      // Already undone.
+    }
     onCommit.length = waiting;
     throw err;
   } finally {
