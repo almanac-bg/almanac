@@ -31,6 +31,8 @@
 @custom-variant cramped (@media (max-height: 480px));
 /* A big screen, wide and tall: the match grows into it instead of leaving its lower half empty. */
 @custom-variant large (@media (min-width: 1024px) and (min-height: 820px));
+/* The light theme (data-theme="light" on <html>), for a utility that must beat another one there (`light:bg-ink-2`). */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
 
 @theme {
   --font-sans: 'Onest Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

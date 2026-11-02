@@ -1,7 +1,7 @@
 import { CATEGORIES, MODES, RANK_TIERS, RARITIES, TEAMS } from '@quiz/shared';
 import { accentText, OPTION_COLORS } from '../src/components/game/answers';
 import { PRESENCE } from '../src/components/presence';
-import { expect, test } from './support';
+import { expect, startAsGuest, test } from './support';
 
 /**
  * Every accent colour the game writes text in (a category's, a mode's, a rank's, a rarity's, a team's, an answer's, a
@@ -146,5 +146,56 @@ for (const theme of ['dark', 'light'] as const)
       },
       { theme, surfaces: surfaces(theme), onTints, card: surfaces(theme).card },
     );
+    expect(failures).toEqual([]);
+  });
+
+for (const theme of ['dark', 'light'] as const)
+  test(`an open dialog's text reads on it, ${theme} theme (VD-4)`, async ({ page }) => {
+    await startAsGuest(page);
+    await page.evaluate((theme) => {
+      if (theme === 'light') document.documentElement.dataset.theme = 'light';
+      else delete document.documentElement.dataset.theme;
+    }, theme);
+    await page.getByRole('button', { name: 'Играй Соло', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Избери категория' });
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(500); // in, at rest
+    const failures = await dialog.evaluate((box, theme) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d', { willReadFrequently: true })!;
+      // The page, the scrim and the dialog as the browser stacks them.
+      const scrim = box.parentElement!;
+      context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim();
+      context.fillRect(0, 0, 1, 1);
+      for (const layer of [scrim, box]) {
+        context.fillStyle = getComputedStyle(layer).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+      }
+      const under = [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      const out: string[] = [];
+      // Paper on the light theme: at 80% over a dark scrim it came out grey, and looked dirty and disabled.
+      if (theme === 'light' && under.join() !== '255,255,255')
+        out.push(`the dialog is rgb(${under.join(' ')}), not white`);
+      const rgb = (css: string) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = css;
+        context.fillRect(0, 0, 1, 1);
+        return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+      };
+      const luminance = (c: number[]) =>
+        c
+          .map((v) => v / 255)
+          .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+          .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+      // Every bit of text right on the dialog (not on a tile or a button of its own).
+      for (const el of box.querySelectorAll<HTMLElement>('p, legend, span'))
+        if (el.closest('button') === null && el.textContent?.trim() && el.offsetParent !== null) {
+          const [hi, lo] = [luminance(rgb(getComputedStyle(el).color)), luminance(under)].sort((x, y) => y - x);
+          const ratio = (hi + 0.05) / (lo + 0.05);
+          if (ratio < 4.5) out.push(`„${el.textContent.trim().slice(0, 30)}“: ${ratio.toFixed(2)}`);
+        }
+      return out;
+    }, theme);
     expect(failures).toEqual([]);
   });

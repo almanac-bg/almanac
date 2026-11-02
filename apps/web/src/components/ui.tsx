@@ -305,7 +305,8 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <m.div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md"
+          // On paper a lighter scrim: a dark one turned the white card grey (the review's VD-4).
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md light:bg-[rgb(22_19_40/0.35)]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -319,7 +320,8 @@ export function Modal({
             aria-label={title || labelledBy ? undefined : label}
             tabIndex={-1}
             className={clsx(
-              'glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none sm:p-8',
+              // Solid paper on the light theme: at 80% over the scrim it was grey, and its muted text fell below 4.5:1.
+              'glass relative w-full max-w-lg rounded-3xl bg-ink-2/80 p-6 outline-none light:bg-ink-2 sm:p-8',
               className,
             )}
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
