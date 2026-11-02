@@ -488,8 +488,21 @@ test('community questions', T, async () => {
     'only moderators correct',
   );
   assert.equal((await api.send('PUT', '/api/admin/questions/no-such-id', A.cookie, corrected)).status, 400);
-  const fixed = await api.send('PUT', `/api/admin/questions/${qid}`, A.cookie, corrected);
+  assert.match(
+    (await api.send('PUT', `/api/admin/questions/${qid}`, A.cookie, corrected)).body.error,
+    /авторът ще го прочете/,
+    'what was corrected and why, for its author',
+  );
+  const editNote = next(sb, 'notification');
+  const fixed = await api.send('PUT', `/api/admin/questions/${qid}`, A.cookie, {
+    ...corrected,
+    reason: 'Третият грешен отговор беше двусмислен',
+  });
   assert.equal(fixed.status, 200, fixed.body.error);
+  assert.match(
+    (await editNote).item.text,
+    /Модератор поправи въпроса ти .*\(отговорите\)\. Причина: Третият грешен отговор беше двусмислен\./,
+  );
   const row = srv.db.prepare('SELECT options FROM questions WHERE id = ?').get(qid) as { options: string };
   assert.deepEqual(JSON.parse(row.options), corrected.options);
   assert.deepEqual(
@@ -505,7 +518,10 @@ test('community questions', T, async () => {
   const logged = srv.db
     .prepare("SELECT reason FROM moderation_log WHERE action = 'edit_question' AND target = ?")
     .get(qid) as { reason: string };
-  assert.match(logged.reason, /^Беше: „Тестов общностен въпрос за реките \(редактиран\)\?“/);
+  assert.match(
+    logged.reason,
+    /^Третият грешен отговор беше двусмислен\. Беше: „Тестов общностен въпрос за реките \(редактиран\)\?“/,
+  );
 
   // The author edits or takes back one still waiting; the moderator says why one is rejected.
   const second = await api.send('POST', '/api/submissions', B.cookie, {
@@ -561,11 +577,15 @@ test('community questions', T, async () => {
   const questionId = mine.questionId;
   assert.match(questionId, /^usr-\d+$/);
   await api.send('POST', `/api/questions/${questionId}/report`, A.cookie, { reason: 'wrong' });
+  const hide = (grounds: object) =>
+    api.send('POST', `/api/admin/question-reports/${questionId}/resolve`, A.cookie, { action: 'hide', ...grounds });
+  assert.match((await hide({})).body.error, /основание/, 'a player’s question hidden says why');
   const hiddenNote = next(sb, 'notification');
-  await api.send('POST', `/api/admin/question-reports/${questionId}/resolve`, A.cookie, { action: 'hide' });
+  assert.equal((await hide({ basis: 'other', reason: 'Отговорът е спорен' })).status, 200);
+  // The statement of reasons: basis, reason with what was flagged, that a person decided, and where to contest it.
   assert.match(
     (await hiddenNote).item.text,
-    /Модератор скри въпроса ти .*Сигнали: Отговорът, отбелязан като верен, е грешен/,
+    /Модератор скри въпроса ти .*Основание: .*Причина: Отговорът е спорен\. Сигнали: Отговорът, отбелязан като верен, е грешен\..*човек.*6 месеца/,
   );
   const backNote = next(sb, 'notification');
   await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
@@ -576,13 +596,32 @@ test('community questions', T, async () => {
     (e: { action: string; target: string }) => e.action === 'approve' && e.target === questionId,
   );
   assert.ok(approval.canUndo);
+  const withdrawnNote = next(sb, 'notification');
   const undone = await api.send('POST', `/api/admin/log/${approval.id}/undo`, A.cookie, {
     reason: 'Одобрен по погрешка.',
   });
   assert.equal(undone.status, 200, undone.body.error);
+  assert.match((await withdrawnNote).item.text, /оттегли одобрението на въпроса ти .*Причина: Одобрен по погрешка\./);
   const stillHidden = (await api.get('/api/admin/question-reports', A.cookie)).body.hidden;
   assert.ok(stillHidden.some((q: { id: string }) => q.id === questionId));
   await api.send('POST', `/api/admin/hidden-questions/${questionId}/unhide`, A.cookie);
+
+  // Another right answer: what players did on the old one no longer says anything, so its numbers start over.
+  srv.db
+    .prepare(
+      'INSERT OR REPLACE INTO question_stats (question_id, answered, correct, correct_ms) VALUES (?, 40, 30, 90000)',
+    )
+    .run(questionId);
+  const live = (await api.get('/api/submissions/mine', B.cookie)).body.submissions[0];
+  const otherAnswer = await api.send('PUT', `/api/admin/questions/${questionId}`, A.cookie, {
+    ...draft,
+    q: live.q,
+    options: live.options,
+    answer: 1,
+    reason: 'Верният отговор е вторият',
+  });
+  assert.equal(otherAnswer.status, 200, otherAnswer.body.error);
+  assert.equal(srv.db.prepare('SELECT 1 AS x FROM question_stats WHERE question_id = ?').get(questionId), undefined);
 });
 
 test(
@@ -636,7 +675,13 @@ test(
     }
     // Hiding their own is no conflict; putting it back is another's to decide.
     assert.equal(
-      (await api.send('POST', `/api/admin/question-reports/${qid}/resolve`, M.cookie, { action: 'hide' })).status,
+      (
+        await api.send('POST', `/api/admin/question-reports/${qid}/resolve`, M.cookie, {
+          action: 'hide',
+          basis: 'other',
+          reason: 'Сам го скривам за проверка.',
+        })
+      ).status,
       200,
     );
     assert.match((await api.send('POST', `/api/admin/hidden-questions/${qid}/unhide`, M.cookie)).body.error, own);
@@ -652,6 +697,7 @@ test(
     const fixed = await api.send('PUT', `/api/admin/questions/${qid}`, A.cookie, {
       ...draft,
       q: `${draft.q} (поправен)`,
+      reason: 'По-ясен въпрос.',
     });
     assert.equal(fixed.status, 200, fixed.body.error);
     assert.deepEqual(await card(), ['approve', 'hide_question', 'unhide_question', 'edit_question']);

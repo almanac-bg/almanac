@@ -18,6 +18,7 @@ import { RightOrderList } from '../game/OrderQuestion';
 import { QuestionPicture } from '../game/QuestionPicture';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';
+import { type Grounds, GroundsFields, groundsReady } from './Decisions';
 import { EditQuestionModal } from './EditQuestionModal';
 
 const reasonLabel = (id: string) => QUESTION_REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
@@ -201,11 +202,21 @@ function QuestionReportCard({
   const [busy, setBusy] = useState<QuestionReportAction | null>(null);
   const [editing, setEditing] = useState(false);
   const [question, setQuestion] = useState(group.question);
+  // A player's question hidden says why, as a set's hide does: its author reads it (by note and mail).
+  const [hiding, setHiding] = useState(false);
+  const [grounds, setGrounds] = useState<Grounds>({ basis: 'other', reason: '' });
 
   async function decide(action: QuestionReportAction) {
+    if (action === 'hide' && isCommunity(question) && !groundsReady(grounds)) return setHiding(true);
     setBusy(action);
     try {
-      const r = await api.resolveQuestionReports(group.question.id, action);
+      const r = await api.resolveQuestionReports(
+        group.question.id,
+        action,
+        action === 'hide' && isCommunity(question) && grounds.basis
+          ? { basis: grounds.basis, reason: grounds.reason.trim() }
+          : undefined,
+      );
       toast({
         kind: 'success',
         title:
@@ -293,6 +304,28 @@ function QuestionReportCard({
             </Button>
           )}
         </div>
+        {hiding && !question.hidden && (
+          <form
+            className="mt-4 space-y-3 rounded-2xl border border-line bg-sunk/20 p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (groundsReady(grounds)) void decide('hide');
+            }}
+          >
+            <p className="text-sm text-fg-2">
+              Въпросът е на играч: той ще прочете основанието и причината (в играта и по имейл) и къде да възрази.
+            </p>
+            <GroundsFields grounds={grounds} onChange={setGrounds} reasonLabel="Причина — авторът ще я прочете" />
+            <div className="flex gap-2">
+              <Button size="sm" type="submit" loading={busy === 'hide'} disabled={!groundsReady(grounds)}>
+                <EyeOff className="size-4" /> Скрий
+              </Button>
+              <Button size="sm" variant="ghost" type="button" onClick={() => setHiding(false)}>
+                Отказ
+              </Button>
+            </div>
+          </form>
+        )}
       </Card>
       <EditQuestionModal
         questionId={editing ? question.id : null}

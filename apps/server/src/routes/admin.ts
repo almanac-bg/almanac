@@ -139,7 +139,9 @@ adminRouter.post('/admin/submissions/:id/reject', change, (req, res) => {
 adminRouter.put('/admin/questions/:id', change, (req, res) => {
   const draft = parse(DraftSchema, req, res);
   if (!draft) return;
-  reply(res, editCommunityQuestion(res.locals.userId, String(req.params.id), draft));
+  // Why, beside the draft: its author reads it.
+  const why = Reason.safeParse((req.body as { reason?: unknown } | undefined)?.reason);
+  reply(res, editCommunityQuestion(res.locals.userId, String(req.params.id), draft, why.success ? why.data : ''));
 });
 
 /** The bank read again from disk (after a pull of the private bank, without a restart). */
@@ -163,9 +165,21 @@ adminRouter.get('/admin/question-reports', (_req, res) => {
 });
 
 adminRouter.post('/admin/question-reports/:id/resolve', change, (req, res) => {
-  const body = parse(z.object({ action: z.enum(['dismiss', 'hide', 'fixed']) }), req, res);
+  // Hiding a player's question takes a basis and reason, as a set's hide does: its author reads them.
+  const body = parse(
+    z.object({ action: z.enum(['dismiss', 'hide', 'fixed']), basis: Basis.optional(), reason: Reason }),
+    req,
+    res,
+  );
   if (!body) return;
-  reply(res, resolveQuestionReports(res.locals.userId, String(req.params.id), body.action), flagsNow);
+  reply(
+    res,
+    resolveQuestionReports(res.locals.userId, String(req.params.id), body.action, {
+      basis: body.basis ?? null,
+      reason: body.reason.trim(),
+    }),
+    flagsNow,
+  );
 });
 
 adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {

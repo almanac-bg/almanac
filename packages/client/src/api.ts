@@ -234,8 +234,16 @@ export const api = {
   adminQuestionReports: () => request<QuestionReports>('GET', '/admin/question-reports'),
   adminStats: () => request<LaunchStats>('GET', '/admin/stats'),
   adminPlayCheck: () => request<PlayCheck>('GET', '/admin/play-check'),
-  resolveQuestionReports: (questionId: string, action: QuestionReportAction) =>
-    request<QuestionReports>('POST', `/admin/question-reports/${encodeURIComponent(questionId)}/resolve`, { action }),
+  /** `grounds`: a player's question hidden says why (its author reads it). */
+  resolveQuestionReports: (
+    questionId: string,
+    action: QuestionReportAction,
+    grounds?: { basis: ModerationBasis; reason: string },
+  ) =>
+    request<QuestionReports>('POST', `/admin/question-reports/${encodeURIComponent(questionId)}/resolve`, {
+      action,
+      ...grounds,
+    }),
   unhideQuestion: (questionId: string) =>
     request<QuestionReports>('POST', `/admin/hidden-questions/${encodeURIComponent(questionId)}/unhide`),
   adminReports: () => request<ReportCases>('GET', '/admin/reports'),
@@ -324,8 +332,9 @@ export const api = {
   withdrawSubmission: (id: number) => request<{ ok: true }>('DELETE', `/submissions/${id}`),
   similarQuestions: (id: number) => request<{ similar: SimilarQuestion[] }>('GET', `/admin/submissions/${id}/similar`),
   /** A player's question already in the game, corrected by a moderator. */
-  editCommunityQuestion: (questionId: string, draft: QuestionDraft) =>
-    request<{ ok: true }>('PUT', `/admin/questions/${encodeURIComponent(questionId)}`, draft),
+  /** `reason`: what was corrected and why (its author reads it). */
+  editCommunityQuestion: (questionId: string, draft: QuestionDraft, reason: string) =>
+    request<{ ok: true }>('PUT', `/admin/questions/${encodeURIComponent(questionId)}`, { ...draft, reason }),
 
   almanac: () => request<AlmanacOverview>('GET', '/almanac'),
   almanacCategory: (category: CategoryId) => request<AlmanacCategoryPage>('GET', `/almanac/${category}`),

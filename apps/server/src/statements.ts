@@ -37,6 +37,8 @@ export interface Statement {
   link?: string | null;
   /** Said after the rest (a banned player: how to get their data or have the account deleted). */
   after?: string;
+  /** Decided by automated means, not a person (DSA Art. 17(3)(c)): said instead of who looked and HUMAN. */
+  automated?: string;
 }
 
 export function statementLines(s: Statement): string[] {
@@ -44,7 +46,8 @@ export function statementLines(s: Statement): string[] {
   return [
     sentence(s.what),
     `${basis ? `Основание: ${basis}. ` : ''}Причина: ${sentence(s.reason)}`,
-    `${s.onReport ? 'Разгледахме го след сигнал от играч.' : 'Забелязахме го при наша проверка.'} ${HUMAN}`,
+    s.automated ??
+      `${s.onReport ? 'Разгледахме го след сигнал от играч.' : 'Забелязахме го при наша проверка.'} ${HUMAN}`,
     appealLine(),
     ...(s.after ? [s.after] : []),
   ];

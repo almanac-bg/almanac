@@ -1067,14 +1067,14 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
     }
     case 'hide_question':
     case 'auto_hide_question': {
-      const done = unhideQuestion(String(row.target), adminId, { undoing: true });
+      const done = unhideQuestion(String(row.target), adminId, { undoing: true, reason });
       if (!done.ok) return done;
       break;
     }
     case 'unhide_question':
       // The flags the put-back dismissed open again, with the hide.
       reopenFlags((undo.flags as number[] | undefined) ?? []);
-      hideQuestion(adminId, String(row.target));
+      hideQuestion(adminId, String(row.target), { basis: row.basis, reason });
       break;
     case 'hide_set':
     case 'unhide_set': {
@@ -1093,13 +1093,13 @@ export function undoAction(adminId: number, logId: number, why: string): Result 
       break;
     }
     case 'approve':
-      // An approval taken back: the question leaves play.
-      hideQuestion(adminId, String(row.target));
+      // An approval taken back: the question leaves play, and its author hears why.
+      hideQuestion(adminId, String(row.target), { basis: null, reason, withdrawn: true });
       break;
     case 'dismiss_flags': {
       // „Въпросът е наред“ taken back: the flags open again, and a question they had hidden is hidden again.
       reopenFlags((undo.flags as number[] | undefined) ?? []);
-      if (undo.hidden) hideQuestion(adminId, String(row.target));
+      if (undo.hidden) hideQuestion(adminId, String(row.target), { basis: null, reason });
       break;
     }
     case 'stop_reports': {
