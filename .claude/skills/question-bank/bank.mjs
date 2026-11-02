@@ -224,6 +224,8 @@ function append(bank, added) {
     if (!q.id.startsWith(`${PREFIX[q.category]}-`)) fail(`${q.id}: the id doesn't match the category ${q.category}`);
     if (taken.has(q.id)) fail(`${q.id} is taken (leave the id out to get the next free one)`);
     if (q.fact) q.fact = tidyFact(q.fact);
+    // When it came in (the 31 October review, BANK-7: Phase 7d's 300 came without): the day it's added, unless given.
+    q.added ??= new Date().toISOString().slice(0, 10);
     taken.add(q.id);
     bank.questions.push(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
   }
