@@ -15,7 +15,7 @@ const WHY: { icon: string; title: string; text: string }[] = [
   {
     icon: '✅',
     title: 'Проверени въпроси',
-    text: 'Всеки въпрос е проверен по източник. Видиш ли грешка, сигнализираш от прегледа след мача — и я поправяме.',
+    text: 'Въпросите се проверяват по източник. Видиш ли грешка, сигнализираш от прегледа след мача — и я поправяме.',
   },
   {
     icon: '💡',
@@ -61,7 +61,7 @@ export function WhyAlmanac() {
 export function ProofLine({ className }: { className?: string }) {
   const questions = useSite()?.questions;
   // One string: the drawn page holds the sentence whole (no markers between its parts).
-  const line = `${questions ? `Над ${fmt(questions)} въпроса, проверени по източници` : 'Въпроси, проверени по източници'} · ${CATEGORIES.length} категории · безплатно · без реклами`;
+  const line = `${questions ? `Над ${fmt(questions)} въпроса` : 'Въпроси от всички области'} · ${CATEGORIES.length} категории · безплатно · без реклами`;
   return <p className={clsx('text-sm text-fg-3', className)}>{keepTogether(line)}</p>;
 }
 

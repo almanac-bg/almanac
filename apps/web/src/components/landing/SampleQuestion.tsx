@@ -113,8 +113,8 @@ export function SampleQuestion({ cta }: { cta: ReactNode }) {
               <p className="mt-1.5 text-fg-2">{keepTogether(SAMPLE.fact)}</p>
             </div>
             <p className="mt-4 text-sm text-fg-2">
-              Такъв е всеки въпрос: отговаряш срещу часовника, после научаваш нещо за отговора. Днешните десет са едни и
-              същи за цяла България.
+              Така изглежда въпросът: отговаряш срещу часовника, а след много от тях научаваш нещо за отговора. Днешните
+              десет са едни и същи за цяла България.
             </p>
             {cta && <div className="mt-4 max-w-sm">{cta}</div>}
           </div>

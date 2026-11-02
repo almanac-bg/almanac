@@ -252,7 +252,7 @@ export function decisionMail(
 ): Mail {
   const appeal = {
     label: 'Обжалвай решението',
-    link: `mailto:${config.operator.email}?subject=${encodeURIComponent(`Обжалване – ${username}`)}`,
+    link: `mailto:${config.operator.email}?subject=${encodeURIComponent(`Обжалване — ${username}`)}`,
   };
   const { label, link } = button ?? appeal;
   return {

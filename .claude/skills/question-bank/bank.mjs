@@ -129,7 +129,7 @@ const number = (id) => Number(id.split('-')[1]);
 /** A non-breaking space between a number and its unit or "г." (2925 м, 1885 г.): a narrow screen never splits them. */
 const tidyFact = (fact) =>
   fact.replace(
-    /(\d) (?=(?:м|км|см|мм|м²|км²|кг|г\.|т|тона|милион|милиона|милиард|милиарда|млн\.|млрд\.|хиляди|души|години|дни|часа|минути|пъти|държави|вида|метра|километра|%|°C|°F|°|MW|kW|Hz|kHz)(?![\p{L}]))/gu,
+    /(\d) (?=(?:м|км|см|мм|м²|км²|кг|г\.|т|тона|милион|милиона|милиард|милиарда|млн\.|млрд\.|хиляди|души|жители|години|дни|часа|минути|пъти|държави|вида|метра|километра|%|°C|°F|°|MW|kW|Hz|kHz)(?![\p{L}]))/gu,
     '$1\u00a0',
   );
 
@@ -224,6 +224,8 @@ function append(bank, added) {
     if (!q.id.startsWith(`${PREFIX[q.category]}-`)) fail(`${q.id}: the id doesn't match the category ${q.category}`);
     if (taken.has(q.id)) fail(`${q.id} is taken (leave the id out to get the next free one)`);
     if (q.fact) q.fact = tidyFact(q.fact);
+    // When it came in (the 31 October review, BANK-7: Phase 7d's 300 came without): the day it's added, unless given.
+    q.added ??= new Date().toISOString().slice(0, 10);
     taken.add(q.id);
     bank.questions.push(Object.fromEntries(KEYS.filter((k) => q[k] !== undefined).map((k) => [k, q[k]])));
   }
@@ -532,7 +534,30 @@ switch (command) {
         console.log(`  ${a.id}: ${a.q}\n  ${b.q.id}: ${b.q.q}${inText ? '' : ` [${around(b.q).trim()}]`}`);
       }
     }
+    // A question that gives itself away: a word of its own that only the right option shares („…скали“ → only
+    // „Белоградчишките скали“; „рога“ → „Бръмбарът рогач“). Stems of four letters, as Bulgarian endings vary.
+    const short = (text) =>
+      new Set(
+        text
+          .toLowerCase()
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter((w) => w.length >= 4)
+          .map((w) => w.slice(0, 4))
+          .filter((w) => !COMMON.has(w)),
+      );
+    let self = 0;
+    for (const q of all) {
+      if (!mine.has(q) || kindOf(q) !== 'choice') continue;
+      const own = short(q.q);
+      const sharing = [...own].filter((w) => q.options.filter((o) => short(o).has(w)).length === 1);
+      const pointing = sharing.filter((w) => short(q.options[q.answer]).has(w));
+      if (!pointing.length) continue;
+      self++;
+      console.log(`${q.id} names its own answer («${q.options[q.answer]}»): „${pointing.join('“, „')}“ only there`);
+      console.log(`  ${q.q}`);
+    }
     console.log(found ? `${found} pairs to judge` : 'no giveaways');
+    console.log(self ? `${self} questions pointing at their own answer` : 'none points at its own answer');
     break;
   }
   case 'collect': {

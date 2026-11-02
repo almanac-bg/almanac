@@ -73,7 +73,7 @@ const manifest = JSON.stringify({
       sizes: '1080x1920',
       type: 'image/webp',
       form_factor: 'narrow',
-      label: 'Научи нещо ново след всеки отговор',
+      label: 'Научи нещо ново след отговора',
     },
     {
       src: '/screenshots/lobby-phone.webp',
