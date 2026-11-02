@@ -5,7 +5,7 @@ import { ArrowRight, Check, Eye, Lightbulb, Pause, Users } from 'lucide-react';
 import { m } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { sfx } from '../../lib/sound';
+import { louder, sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
@@ -36,19 +36,31 @@ export function PresenterScreen({ game }: { game: LiveGame }) {
     actions.closeGame();
     navigate('/room');
   };
-  // The room's speakers carry the match as the phones do for each player: the last seconds ticking, everyone in, the
-  // answer.
-  const left = q && !reveal && !end ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  // The room's speakers carry the match as the phones do for each player — louder, for a room (VD-17): the countdown
+  // and the start, the last seconds ticking, everyone in, and the answer as the room did: right when at least half
+  // knew it, a softer step down when most didn't.
+  const counting = game.phase === 'countdown' ? Math.max(0, Math.ceil((game.countdownEndsAt - now) / 1000)) : null;
   useEffect(() => {
-    if (left !== null && left > 0 && left <= 5) sfx.tick(left);
+    if (counting !== null && counting > 0) louder(() => sfx.countdown());
+  }, [counting]);
+  const opening = q?.index === 0 && !reveal ? 0 : null;
+  useEffect(() => {
+    if (opening === 0) louder(() => sfx.go());
+  }, [opening]);
+  const left = q && !reveal && !end && q.speedMs !== null ? Math.max(0, Math.ceil((game.deadline - now) / 1000)) : null;
+  useEffect(() => {
+    if (left !== null && left > 0 && left <= 5) louder(() => sfx.tick(left));
   }, [left]);
   const allIn = !!q && !reveal && playing > 0 && game.answered.length >= playing;
   useEffect(() => {
-    if (allIn) sfx.lock();
+    if (allIn) louder(() => sfx.lock());
   }, [allIn]);
   const revealed = reveal?.index ?? null;
+  const knew = reveal ? Object.values(reveal.results).filter((r) => r.correct).length : 0;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per answer shown, with how the room did then
   useEffect(() => {
-    if (revealed !== null) sfx.correct();
+    if (revealed === null) return;
+    louder(() => (knew * 2 >= playing ? sfx.correct() : sfx.timeUp()));
   }, [revealed]);
 
   // The teacher sets the pace: on an open question „Покажи отговора“ (a room without a clock waits for it); on an

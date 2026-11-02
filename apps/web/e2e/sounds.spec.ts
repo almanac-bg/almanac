@@ -159,3 +159,27 @@ test('the audio engine sleeps in the background and stays asleep when the tab co
   await page.evaluate(() => (window as unknown as { almanacSound: Sound }).almanacSound.sfx.pop());
   await expect.poll(state).toBe('running');
 });
+
+test('a room’s big screen plays the quiet cues about 8 LU louder than a phone, and none clips (VD-17) @desktop', async ({
+  page,
+}) => {
+  await soundsPage(page);
+  const measure = async (name: 'tick' | 'lock' | 'countdown', loud: boolean) => {
+    const samples = Float64Array.from(
+      await page.evaluate(
+        async ([cue, big]) => {
+          const { renderOffline, louder } = (window as unknown as { almanacSound: Sound }).almanacSound;
+          const play = (sfx: Sound['sfx']) => (sfx[cue as 'tick'] as () => void)();
+          return Array.from(await renderOffline((sfx) => (big ? louder(() => play(sfx)) : play(sfx))));
+        },
+        [name, loud] as const,
+      ),
+    );
+    return { lufs: loudness(samples), peak: 20 * Math.log10(samples.reduce((m, v) => Math.max(m, Math.abs(v)), 0)) };
+  };
+  for (const cue of ['tick', 'lock', 'countdown'] as const) {
+    const [phone, room] = [await measure(cue, false), await measure(cue, true)];
+    expect(room.lufs - phone.lufs, `${cue}: louder in a room`).toBeGreaterThan(6);
+    expect(room.peak, `${cue}: no clipping`).toBeLessThan(-1);
+  }
+});

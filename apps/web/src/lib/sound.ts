@@ -179,11 +179,28 @@ export async function renderOffline(play: (sounds: typeof sfx) => void, seconds 
   return (await ac.startRendering()).getChannelData(0);
 }
 
+/** How much louder than on a phone the sounds played now are (louder: a room's speakers). */
+let boost = 1;
+
+/**
+ * Sounds for a room's speakers, a class's big screen (the 31 October review, VD-17): about 8 dB over a phone's, which
+ * is held in a hand — a tick or „everyone's in“ at a phone's level is lost across a classroom. The master bus's
+ * compressor keeps the big ones from clipping.
+ */
+export function louder<T>(play: () => T): T {
+  boost = 2.5;
+  try {
+    return play();
+  } finally {
+    boost = 1;
+  }
+}
+
 /** An envelope on a gain: a quick rise to `peak`, then an exponential fall over `decay`. */
 function envelope(ac: BaseAudioContext, t0: number, peak: number, attack: number, decay: number): GainNode {
   const amp = ac.createGain();
   amp.gain.setValueAtTime(0.0001, t0);
-  amp.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+  amp.gain.exponentialRampToValueAtTime(peak * boost, t0 + attack);
   amp.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
   amp.connect(master!);
   return amp;
