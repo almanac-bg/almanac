@@ -600,7 +600,7 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
   },
 
   // v22, progress:
-  // - `learned`: „Моят алманах“ — each question a player got right, or stopped on to read its fact (almanac.ts).
+  // - `learned`: „Моите знания“ — each question a player got right, or stopped on to read its fact (knowledge.ts).
   // - `review_queue`: „Поправителен“ — each missed question and when it comes back (REVIEW).
   // - `question_stats.pick0`…`pick3`, `unanswered`: how many picked each option (as the bank orders them), or none in
   //   time: „X% знаят“ and the review's shares. Filled from the recorded runs so far (runs keep each pick; a number
@@ -961,7 +961,7 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE users ADD COLUMN duel_wins_paid INTEGER NOT NULL DEFAULT 0;
     `,
   },
-  // v35, „Поправителен“ (almanac.ts → makeRoom): at most REVIEW.keep (30) coming back at a time. A queue that grew past
+  // v35, „Поправителен“ (knowledge.ts → makeRoom): at most REVIEW.keep (30) coming back at a time. A queue that grew past
   // that keeps the 30 due last: a player behind on it never got to the oldest.
   {
     compatible: `
@@ -1159,6 +1159,14 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX set_images_unmade ON set_images(id) WHERE print IS NULL;
     `,
   },
+  // v49, „Моят алманах“ is „Моите знания“ (2 November 2026): the ids its three achievements and its daily quest are kept
+  // under follow the name, as the address (/knowledge) and the code do. Breaking: older code knows them by the old ids,
+  // and would hand the achievements out a second time.
+  `
+  UPDATE user_achievements SET achievement_id = 'knowledge_' || substr(achievement_id, 9)
+    WHERE achievement_id IN ('almanac_100', 'almanac_500', 'almanac_1000');
+  UPDATE quest_progress SET quest = 'knowledge5' WHERE quest = 'almanac5';
+  `,
 ];
 
 /** The schema version this code brings a database to. */

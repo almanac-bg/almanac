@@ -17,12 +17,12 @@ import {
 } from '@quiz/shared';
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
-import { factCount, factsSince, noteMatch } from '../almanac';
 import { recordAnswers } from '../answers';
 import { DUEL, payDuelWin, recordChallengeResult } from '../challenges';
 import { recordDailyResult } from '../daily';
 import { all, one, run, tx } from '../db';
 import { recordEvening } from '../evening';
+import { factCount, factsSince, noteMatch } from '../knowledge';
 import { settleMastery } from '../mastery';
 import { advanceQuests } from '../quests';
 import { noteRecordPlay } from '../records';
@@ -329,7 +329,7 @@ function rewardHuman(
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
   // „Моят алманах“ and „Поправителен“ (before the quests: one counts the facts added). A host's own questions aren't the
-  // bank's: nothing of them goes into the almanac or comes back to review.
+  // bank's: nothing of them goes into „Моите знания“ or comes back to review.
   const factsAdded = ownSet ? 0 : noteMatch(userId, p.log, review);
 
   // ── Daily quests ──
@@ -467,7 +467,7 @@ function rewardHuman(
     challenge: challengeResult,
     soloBest: solo && counts ? before.best_solo_score : null,
     // Read during the match (stopped on, in a run alone) or got right in it.
-    almanac: { added: factsSince(userId, game.startedAt), total: factCount(userId) },
+    knowledge: { added: factsSince(userId, game.startedAt), total: factCount(userId) },
     mastery,
   };
 }

@@ -75,7 +75,7 @@ export interface MeUser extends PublicUser {
   /** Category mastery earned (MASTERY_TIERS), for the titles it unlocks. */
   mastery: CategoryMastery[];
   /** „Моите знания“: facts collected, and how many missed questions „Поправителен“ has ready (`due`). */
-  almanac: { facts: number; due: number };
+  knowledge: { facts: number; due: number };
   /** Groups the player is in. */
   groups: number;
   /** Won the evening Роял in the last day: its title is theirs to wear. */
@@ -468,7 +468,7 @@ export interface MatchRewards {
   /** A solo run: the best solo score before this one (0 before the first), the record "Гони рекорда си" is about. */
   soloBest: number | null;
   /** „Моите знания“: facts this match added, and how many there are now. */
-  almanac: { added: number; total: number };
+  knowledge: { added: number; total: number };
   /** Category mastery tiers this match earned. */
   mastery: CategoryMastery[];
 }
@@ -725,7 +725,7 @@ export interface ProfileStats {
   /** `tier`: the category mastery earned there (null: none yet). */
   categories: { category: CategoryId; answered: number; correct: number; tier: number | null }[];
   /** „Моите знания“: facts collected, of how many there are. */
-  almanac: { facts: number; total: number };
+  knowledge: { facts: number; total: number };
   recent: {
     matchId: string;
     mode: ModeId;
@@ -1287,8 +1287,8 @@ export interface SiteInfo {
 
 // ─── „Моите знания“ ──────────────────────────────────────────────────────────
 
-/** One fact in a player's almanac: the question it's behind, its answer, and when it became theirs. */
-export interface AlmanacFact {
+/** One fact in a player's „Моите знания“: the question it's behind, its answer, and when it became theirs. */
+export interface KnowledgeFact {
   id: string;
   category: CategoryId;
   q: string;
@@ -1297,13 +1297,13 @@ export interface AlmanacFact {
   number: (Pick<NumberInput, 'unit' | 'step' | 'scale'> & { answer: number }) | null;
   /** An order question's items in their right order, with what each is ordered by. */
   order: RightOrder | null;
-  /** The question's picture (a small one: the almanac is a list). */
+  /** The question's picture (a small one: „Моите знания“ is a list). */
   image: QuestionImage | null;
   fact: string;
   learnedAt: number;
 }
 
-/** An order question's answer, as reviews and the almanac show it: the items first to last, with their numbers. */
+/** An order question's answer, as reviews and „Моите знания“ show it: the items first to last, with their numbers. */
 export interface RightOrder {
   items: { text: string; value: number }[];
   unit: string;
@@ -1321,19 +1321,19 @@ export interface ReviewQueue {
   ready: boolean;
 }
 
-export interface AlmanacOverview {
+export interface KnowledgeOverview {
   facts: number;
   /** Facts there are to collect. */
   total: number;
   categories: { category: CategoryId; facts: number; total: number; tier: number | null }[];
   review: ReviewQueue;
   /** The newest few, newest first. */
-  recent: AlmanacFact[];
+  recent: KnowledgeFact[];
 }
 
-export interface AlmanacCategoryPage {
+export interface KnowledgeCategoryPage {
   category: CategoryId;
-  facts: AlmanacFact[];
+  facts: KnowledgeFact[];
   total: number;
   tier: number | null;
 }
@@ -1343,7 +1343,7 @@ export interface AlmanacCategoryPage {
  * `afterDays[2]`; right then too, it's learned for good. Wrong at any step, it starts over; nearly right (a number
  * `nearCloseness` close, an order with `nearPlaced` items in place) is that step again. A run plays up to `size` of
  * those due, once at least `min` are. At most `keep` are coming back at a time — a pile of hundreds is a debt, not
- * practice (almanac.ts → makeRoom) — and a near miss outside a run never enters.
+ * practice (knowledge.ts → makeRoom) — and a near miss outside a run never enters.
  */
 export const REVIEW = {
   afterDays: [3, 7, 21],

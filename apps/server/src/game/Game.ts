@@ -1245,7 +1245,7 @@ export class Game {
   }
 
   /**
-   * An answer from someone knocked out („Играй до края“): judged and logged like any (what they know, XP, the almanac),
+   * An answer from someone knocked out („Играй до края“): judged and logged like any (what they know, XP, „Моите знания“),
    * for no points, and outside the match's tallies and streaks.
    */
   private answeredOn(p: Participant, q: PreparedQuestion): PlayerResult {
@@ -1662,7 +1662,7 @@ export class Game {
   }
 
   /**
-   * Knocked out and still here („Играй до края“): a person answers on, outside the race — for XP, the almanac and what
+   * Knocked out and still here („Играй до края“): a person answers on, outside the race — for XP, „Моите знания“ and what
    * they know, not for points or a place.
    */
   playsOn(p: Participant) {

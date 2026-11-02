@@ -50,8 +50,8 @@ export function Results({ game }: { game: LiveGame }) {
   const daily = end.mode === 'daily';
   const challenge = end.mode === 'challenge';
   const review = end.mode === 'review';
-  // More missed questions back already: another „Поправителен“; else the almanac they went into.
-  const moreReview = review && (me?.almanac.due ?? 0) >= REVIEW.min;
+  // More missed questions back already: another „Поправителен“; else „Моите знания“, where they went.
+  const moreReview = review && (me?.knowledge.due ?? 0) >= REVIEW.min;
   const single = game.start.players.length === 1;
   const teamScores = end.teamScores;
   const winningTeam = teamScores?.[0].team ?? null;
@@ -155,7 +155,7 @@ export function Results({ game }: { game: LiveGame }) {
     }
     if (mode === 'review') {
       if (!moreReview) {
-        navigate('/almanac');
+        navigate('/knowledge');
         return;
       }
       setBusy(true);
@@ -434,7 +434,7 @@ export function Results({ game }: { game: LiveGame }) {
         </GuestNudge>
       )}
 
-      <LearnedToday items={game.history} added={rewards?.almanac?.added ?? 0} />
+      <LearnedToday items={game.history} added={rewards?.knowledge?.added ?? 0} />
       {game.history.length > 0 && <QuestionReview items={game.history} />}
 
       {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a

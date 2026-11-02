@@ -195,7 +195,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 50,
   },
   {
-    id: 'almanac_100',
+    id: 'knowledge_100',
     name: 'Първа глава',
     description: 'Събери 100 факта в „Моите знания“.',
     icon: '📖',
@@ -204,7 +204,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 100,
   },
   {
-    id: 'almanac_500',
+    id: 'knowledge_500',
     name: 'Дебел том',
     description: 'Събери 500 факта в „Моите знания“.',
     icon: '📚',
@@ -213,7 +213,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 500,
   },
   {
-    id: 'almanac_1000',
+    id: 'knowledge_1000',
     name: 'Хиляда факта',
     description: 'Събери 1000 факта в „Моите знания“.',
     icon: '🏛️',

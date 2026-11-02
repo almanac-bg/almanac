@@ -282,7 +282,7 @@ test('320 px with WCAG’s text spacing never scrolls sideways (1.4.12)', async 
   await expectLobby(page);
   // The lobby as it opened (Firefox aborts a load of the page it's already on), then the others.
   await expectNoSideScroll(page, 'the lobby');
-  for (const path of ['/achievements', '/leaderboard', '/locker', '/settings', '/almanac', '/profile']) {
+  for (const path of ['/achievements', '/leaderboard', '/locker', '/settings', '/knowledge', '/profile']) {
     // Settled before the next: Firefox aborts a load while the last page still fetches its parts.
     await page.waitForLoadState('networkidle');
     await page.goto(path);

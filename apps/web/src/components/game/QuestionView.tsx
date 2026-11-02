@@ -31,7 +31,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
   const untimedRun = game.start.pace === 'untimed' && !game.start.roomCode;
   const cat = categoryById(q.category)!;
   const youId = game.start.youId;
-  // Knocked out: the questions go on, and can still be answered — for XP and the almanac, outside the race.
+  // Knocked out: the questions go on, and can still be answered — for XP and „Моите знания“, outside the race.
   const out = game.eliminated.includes(youId);
   const active = !reveal && !game.resyncing;
   const mine = reveal?.results[youId];

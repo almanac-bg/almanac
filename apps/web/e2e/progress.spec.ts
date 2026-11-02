@@ -11,7 +11,7 @@ test('„Моите знания“ keep the facts a run taught, and the missed 
   const right = Number(line!.match(/(\d+) от 10 верни/)![1]);
   if (right > 0) await expect(page.getByRole('link', { name: `+${right} в „Моите знания“` })).toBeVisible();
 
-  await page.goto('/almanac');
+  await page.goto('/knowledge');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Моите знания');
   await expect(page.getByText(new RegExp(`^${right} от \\d+ факта$`))).toBeVisible();
   // Every miss waits, except a final's number guessed half-way close or nearer (nearly known).
@@ -24,7 +24,7 @@ test('„Моите знания“ keep the facts a run taught, and the missed 
   expect(queued).toBeLessThanOrEqual(missed);
   expect(queued).toBeGreaterThanOrEqual(missed - 1);
   await page.getByRole('link', { name: /^География/ }).click();
-  await expect(page).toHaveURL(/\/almanac\/geography$/);
+  await expect(page).toHaveURL(/\/knowledge\/geography$/);
   await expect(page.getByText(new RegExp(`^${right} от \\d+ факта`))).toBeVisible();
   await expect(page.getByRole('main').getByRole('listitem')).toHaveCount(right);
 });

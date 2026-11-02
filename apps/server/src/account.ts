@@ -13,7 +13,6 @@ import {
   type UnlockContext,
 } from '@quiz/shared';
 import { settleAchievements } from './achievements';
-import { factCount, reviewQueue } from './almanac';
 import { verifyPassword } from './auth';
 import { pendingChoices, picksOf } from './choices';
 import { config } from './config';
@@ -22,6 +21,7 @@ import { all, one, run, tx } from './db';
 import { isChampion } from './evening';
 import { incomingRequests } from './friends';
 import { dropEmptyGroups, groupIdsOf } from './groups';
+import { factCount, reviewQueue } from './knowledge';
 import { earnedMastery } from './mastery';
 import { unreadNotifications } from './notifications';
 import { disconnectUser, notifyUser, removeFromPlay } from './notify';
@@ -131,7 +131,7 @@ export function getMe(userId: number): MeUser | null {
     emailBounced: row.email_bounced_at !== null,
     pendingEmail: row.pending_email,
     mastery: earnedMastery(userId).map((m) => ({ ...m })),
-    almanac: { facts: factCount(userId), due: reviewQueue(userId).due },
+    knowledge: { facts: factCount(userId), due: reviewQueue(userId).due },
     groups: groupIdsOf(userId).length,
     eveningChampion: isChampion(userId),
     chosen: [...picks.values()],

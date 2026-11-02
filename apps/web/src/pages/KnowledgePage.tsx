@@ -1,18 +1,18 @@
 import { api, fmt, plural, useStore } from '@quiz/client';
-import { type AlmanacFact, type CATEGORIES, categoryById, isCategoryId } from '@quiz/shared';
+import { type CATEGORIES, categoryById, isCategoryId, type KnowledgeFact } from '@quiz/shared';
 import { ArrowLeft, ChevronRight, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { FactItem, ReviewCard, TierBadge } from '../components/almanac';
 import { Emoji } from '../components/Emoji';
+import { FactItem, ReviewCard, TierBadge } from '../components/knowledge';
 import { LoadError } from '../components/LoadError';
 import { Card, EmptyState, INPUT, PageSpinner, ProgressBar } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 import { NotFoundPage } from './NotFoundPage';
 
-/** „Моите знания“ (/almanac; „Моят алманах“ until 2 November 2026), or one of its categories (/almanac/<category>). */
-export function AlmanacPage() {
+/** „Моите знания“ (/knowledge; „Моят алманах“ at /almanac until 2 November 2026), or one of its categories (/knowledge/<category>). */
+export function KnowledgePage() {
   const { category } = useParams();
   if (category === undefined) return <Overview />;
   return isCategoryId(category) ? <CategoryFacts category={category} /> : <NotFoundPage />;
@@ -22,8 +22,8 @@ export function AlmanacPage() {
 function Overview() {
   usePageTitle('Моите знания');
   // A match just played may have added some: loaded afresh each time the facts or the queue change.
-  const version = useStore((s) => `${s.me?.almanac.facts}:${s.me?.almanac.due}`);
-  const { data, error, retry } = useLoad(() => api.almanac(), version);
+  const version = useStore((s) => `${s.me?.knowledge.facts}:${s.me?.knowledge.due}`);
+  const { data, error, retry } = useLoad(() => api.knowledge(), version);
   if (!data && error) return <LoadError title="Знанията не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
 
@@ -43,8 +43,8 @@ function Overview() {
 
       <ReviewCard queue={data.review} />
 
-      <section aria-labelledby="almanac-categories">
-        <h2 id="almanac-categories" className="sr-only">
+      <section aria-labelledby="knowledge-categories">
+        <h2 id="knowledge-categories" className="sr-only">
           По категории
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -53,7 +53,7 @@ function Overview() {
             return (
               <li key={c.category}>
                 <Link
-                  to={`/almanac/${c.category}`}
+                  to={`/knowledge/${c.category}`}
                   className="focus-ring glass flex items-center gap-4 rounded-3xl p-4 transition-colors hover:bg-tint/[0.06]"
                 >
                   <span aria-hidden className="text-3xl leading-none">
@@ -97,7 +97,7 @@ function Overview() {
   );
 }
 
-const matches = (f: AlmanacFact, words: string[]) => {
+const matches = (f: KnowledgeFact, words: string[]) => {
   const text = `${f.q} ${f.answer ?? ''} ${f.fact}`.toLocaleLowerCase('bg');
   return words.every((w) => text.includes(w));
 };
@@ -106,7 +106,7 @@ const matches = (f: AlmanacFact, words: string[]) => {
 function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id'] }) {
   const cat = categoryById(category)!;
   usePageTitle(`${cat.name} · Моите знания`);
-  const { data, error, retry } = useLoad(() => api.almanacCategory(category), category);
+  const { data, error, retry } = useLoad(() => api.knowledgeCategory(category), category);
   const [query, setQuery] = useState('');
   const words = useDeferredValue(query).toLocaleLowerCase('bg').split(/\s+/u).filter(Boolean);
   if (!data && error) return <LoadError title="Знанията не се заредиха" error={error} onRetry={retry} />;
@@ -116,7 +116,7 @@ function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id
   return (
     <div className="space-y-6">
       <Link
-        to="/almanac"
+        to="/knowledge"
         className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-fg-3 hover:text-fg-2"
       >
         <ArrowLeft aria-hidden className="size-4" /> Моите знания

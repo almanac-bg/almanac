@@ -1,7 +1,6 @@
 import { isCategoryId } from '@quiz/shared';
 import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
-import { almanacCategory, almanacOverview } from '../almanac';
 import { requireAuth, userIdFromRequest } from '../auth';
 import { one } from '../db';
 import {
@@ -15,6 +14,7 @@ import {
   manageGroup,
   myGroups,
 } from '../groups';
+import { knowledgeCategory, knowledgeOverview } from '../knowledge';
 import { fileReport } from '../moderation';
 import { count } from '../stats';
 import { network, throttled } from '../throttle';
@@ -25,17 +25,17 @@ export const progress = Router();
 
 // ─── „Моят алманах“ ──────────────────────────────────────────────────────────
 
-progress.get('/almanac', requireAuth, (_req, res) => {
-  res.json(almanacOverview(res.locals.userId));
+progress.get('/knowledge', requireAuth, (_req, res) => {
+  res.json(knowledgeOverview(res.locals.userId));
 });
 
-progress.get('/almanac/:category', requireAuth, (req, res) => {
+progress.get('/knowledge/:category', requireAuth, (req, res) => {
   const { category } = req.params;
   if (!isCategoryId(category)) {
     res.status(404).json({ error: 'Няма такава категория.' });
     return;
   }
-  res.json(almanacCategory(res.locals.userId, category));
+  res.json(knowledgeCategory(res.locals.userId, category));
 });
 
 // ─── Groups ──────────────────────────────────────────────────────────────────

@@ -162,7 +162,7 @@ export const orderOf = (q: OrderQuestion) =>
     q.direction,
   );
 
-/** An order question's answer as reviews and the almanac show it: the items in their right order, with their numbers. */
+/** An order question's answer as reviews and „Моите знания“ show it: the items in their right order, with their numbers. */
 export const rightOrderOf = (q: OrderQuestion): RightOrder => ({
   items: orderOf(q).map((i) => q.items[i]),
   unit: q.unit ?? '',

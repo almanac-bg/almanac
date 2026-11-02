@@ -81,8 +81,9 @@ test('the database as it was is kept beside the backups before migrating', () =>
 });
 
 test('the database knows the oldest code that can run on it: the one its last breaking step needs', () => {
-  // Every step up to v14 counts as breaking (they're from before steps were marked); v15 is compatible.
-  assert.equal(schemaFloor(), 14);
+  // Every step up to v14 counts as breaking (they're from before steps were marked); v15–v48 are compatible; v49 (the
+  // ids of „Моите знания“'s achievements and quest, renamed) is breaking.
+  assert.equal(schemaFloor(), 49);
 });
 
 test('a rollback runs on a database whose newer steps were all compatible, and not past a breaking one', () => {
@@ -138,4 +139,44 @@ test('a database from newer code is refused, not opened', () => {
   });
   assert.notEqual(child.status, 0);
   assert.match(child.stderr, new RegExp(`schema v${SCHEMA_VERSION + 1}, but this code only knows v${SCHEMA_VERSION}`));
+});
+
+test('„Моят алманах“ became „Моите знания“: its achievements and quest move to their new ids, kept as they were', () => {
+  const file = path.join(tmp, 'knowledge.db');
+  const boot = () =>
+    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
+      encoding: 'utf8',
+    });
+  assert.equal(boot().status, 0, 'a new database');
+  const db = new DatabaseSync(file);
+  try {
+    db.exec(`
+      PRAGMA user_version = 48;
+      INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'ana', 'ana', 'x', 0);
+      INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES
+        (1, 'almanac_100', 10), (1, 'almanac_500', 20), (1, 'first_game', 5);
+      INSERT INTO quest_progress (user_id, day, quest, progress) VALUES (1, '2026-11-02', 'almanac5', 3);
+    `);
+    const migrated = boot();
+    assert.equal(migrated.status, 0, migrated.stderr);
+    assert.deepEqual(
+      db
+        .prepare('SELECT achievement_id AS id, unlocked_at AS at FROM user_achievements ORDER BY at')
+        .all()
+        .map((r) => ({ ...r })),
+      [
+        { id: 'first_game', at: 5 },
+        { id: 'knowledge_100', at: 10 },
+        { id: 'knowledge_500', at: 20 },
+      ],
+    );
+    assert.deepEqual(
+      { ...db.prepare('SELECT quest, progress FROM quest_progress').get() },
+      { quest: 'knowledge5', progress: 3 },
+    );
+  } finally {
+    db.close();
+  }
 });

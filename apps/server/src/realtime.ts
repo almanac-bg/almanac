@@ -24,7 +24,6 @@ import {
 } from '@quiz/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
-import { learn, reviewQuestions } from './almanac';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
 import {
   challengeMadeAt,
@@ -48,6 +47,7 @@ import { Rematches } from './game/rematch';
 import { type KeptRoom, RoomManager } from './game/rooms';
 import { guarded } from './guard';
 import { ACCOUNT_ONLY } from './guests';
+import { learn, reviewQuestions } from './knowledge';
 import { reportError } from './monitoring';
 import { friendsChanged, notifyUser, setRealtime } from './notify';
 import { handOver, takeHandover } from './settings';

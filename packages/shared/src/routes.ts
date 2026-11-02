@@ -111,7 +111,7 @@ const APP_PATHS = [
   /^\/locker$/,
   /^\/leaderboard$/,
   /^\/friends$/,
-  /^\/almanac(\/[^/]+)?$/,
+  /^\/knowledge(\/[^/]+)?$/,
   /^\/groups(\/[^/]+)?$/,
   /^\/groups\/join\/[^/]+$/,
   /^\/sets(\/[^/]+)?$/,

@@ -1,5 +1,5 @@
 import { actions, plural, timeAgo, toast } from '@quiz/client';
-import { type AlmanacFact, MASTERY_TIERS, REVIEW, type ReviewQueue } from '@quiz/shared';
+import { type KnowledgeFact, MASTERY_TIERS, REVIEW, type ReviewQueue } from '@quiz/shared';
 import clsx from 'clsx';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
@@ -25,8 +25,8 @@ export function TierBadge({ tier, className }: { tier: number; className?: strin
   );
 }
 
-/** One fact of the almanac: its question and answer, small, then the fact itself. */
-export function FactItem({ fact }: { fact: AlmanacFact }) {
+/** One fact of „Моите знания“: its question and answer, small, then the fact itself. */
+export function FactItem({ fact }: { fact: KnowledgeFact }) {
   return (
     <div className="flex gap-3">
       {fact.image && <Thumbnail image={fact.image} />}

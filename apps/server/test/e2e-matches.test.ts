@@ -98,9 +98,9 @@ test(
       const missed = newLog();
       const solo = autoPlay(s, 'wrong', missed);
       await emitAck(s, 'solo:start', { category: 'music' });
-      assert.deepEqual((await solo).end.rewards!.almanac, { added: 0, total: 0 });
+      assert.deepEqual((await solo).end.rewards!.knowledge, { added: 0, total: 0 });
       srv.db.prepare('UPDATE review_queue SET due_at = 0 WHERE user_id = ?').run(P.user.id);
-      assert.deepEqual((await api.get('/api/me', P.cookie)).body.user.almanac, { facts: 0, due: 10 });
+      assert.deepEqual((await api.get('/api/me', P.cookie)).body.user.knowledge, { facts: 0, due: 10 });
 
       const log = newLog();
       const review = autoPlay(s, 'right', log);
@@ -115,14 +115,14 @@ test(
       );
       // In the fixture bank every other question with options has a fact.
       const facts = log.questions.filter((q) => q.kind === 'choice' && Number(q.id.split('-')[1]) % 2 === 0).length;
-      assert.deepEqual(end.rewards!.almanac, { added: facts, total: facts });
+      assert.deepEqual(end.rewards!.knowledge, { added: facts, total: facts });
       assert.ok(!end.rewards!.achievements.includes('perfect'), 'no feats on known answers');
       assert.ok(!end.rewards!.breakdown.some((l) => l.label === 'Перфектен мач'));
       assert.ok(end.rewards!.breakdown.some((l) => l.label.startsWith('Верни отговори')));
       // Its answers count for nobody's accuracy, and the queue moved each question on a step.
       const profile = (await api.get('/api/profile/povtorach', P.cookie)).body;
       assert.equal(profile.overview.correctAnswers, 0);
-      assert.equal(profile.almanac.facts, facts);
+      assert.equal(profile.knowledge.facts, facts);
       assert.equal(
         (
           srv.db.prepare('SELECT COUNT(*) AS n FROM review_queue WHERE user_id = ? AND step = 1').get(P.user.id) as {
@@ -131,9 +131,9 @@ test(
         ).n,
         10,
       );
-      const almanac = (await api.get('/api/almanac', P.cookie)).body;
-      assert.equal(almanac.categories.find((c: { category: string }) => c.category === 'music').facts, facts);
-      assert.deepEqual(almanac.review, { due: 0, waiting: 10, nextDueAt: almanac.review.nextDueAt, ready: false });
+      const knowledge = (await api.get('/api/knowledge', P.cookie)).body;
+      assert.equal(knowledge.categories.find((c: { category: string }) => c.category === 'music').facts, facts);
+      assert.deepEqual(knowledge.review, { due: 0, waiting: 10, nextDueAt: knowledge.review.nextDueAt, ready: false });
     } finally {
       s.close();
     }
@@ -157,8 +157,8 @@ test('stopping to read a fact in a run alone makes it the player’s, right answ
     await emitAck(s, 'solo:start', { category: 'nature' });
     const { end } = await play;
     assert.ok(held);
-    assert.deepEqual(end.rewards!.almanac, { added: 1, total: 1 });
-    const page = (await api.get('/api/almanac/nature', R.cookie)).body;
+    assert.deepEqual(end.rewards!.knowledge, { added: 1, total: 1 });
+    const page = (await api.get('/api/knowledge/nature', R.cookie)).body;
     assert.deepEqual(
       page.facts.map((f: { id: string }) => f.id),
       [held],

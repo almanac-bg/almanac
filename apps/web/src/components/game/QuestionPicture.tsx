@@ -90,7 +90,7 @@ function Linked({ href, children }: { href?: string | null; children: string }) 
   );
 }
 
-/** A question's picture small, beside its text in a list (the almanac, „Научи днес“). */
+/** A question's picture small, beside its text in a list („Моите знания“, „Научи днес“). */
 export function Thumbnail({ image }: { image: QuestionImage }) {
   return (
     <img

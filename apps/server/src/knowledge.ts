@@ -1,9 +1,9 @@
 import {
-  type AlmanacCategoryPage,
-  type AlmanacFact,
-  type AlmanacOverview,
   CATEGORIES,
   type CategoryId,
+  type KnowledgeCategoryPage,
+  type KnowledgeFact,
+  type KnowledgeOverview,
   REVIEW,
   type ReviewQueue,
 } from '@quiz/shared';
@@ -88,7 +88,7 @@ export const factsSince = (userId: number, since: number) =>
 /** Facts there are to collect in all. */
 export const factsInAll = () => [...factTotals().values()].reduce((sum, n) => sum + n, 0);
 
-function toFact(q: PlayableQuestion, at: number): AlmanacFact {
+function toFact(q: PlayableQuestion, at: number): KnowledgeFact {
   return {
     id: q.id,
     category: q.category,
@@ -234,7 +234,7 @@ export function reviewQuestions(userId: number, now = Date.now()): PreparedQuest
   return reorderOptions(ordered, `review:${userId}:${now}`);
 }
 
-export function almanacOverview(userId: number, now = Date.now()): AlmanacOverview {
+export function knowledgeOverview(userId: number, now = Date.now()): KnowledgeOverview {
   const facts = learnedFacts(userId);
   const byCategory = factTotals();
   const tiers = new Map(earnedMastery(userId).map((m) => [m.category, m.tier]));
@@ -252,7 +252,7 @@ export function almanacOverview(userId: number, now = Date.now()): AlmanacOvervi
   };
 }
 
-export function almanacCategory(userId: number, category: CategoryId): AlmanacCategoryPage {
+export function knowledgeCategory(userId: number, category: CategoryId): KnowledgeCategoryPage {
   return {
     category,
     facts: learnedFacts(userId)

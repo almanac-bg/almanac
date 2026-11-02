@@ -10,11 +10,11 @@ import {
   REVIEW,
   type XpLine,
 } from '@quiz/shared';
-import { reviewQueue } from './almanac';
 import { config } from './config';
 import { all, one, run } from './db';
 import { eveningStartsAt } from './evening';
 import { friendIds } from './friends';
+import { reviewQueue } from './knowledge';
 import { seededRng } from './questions';
 import { getUser } from './users';
 
@@ -28,7 +28,7 @@ export interface QuestEvent {
   bestStreak: number;
   jokers: number;
   correctByCategory: Map<CategoryId, number>;
-  /** Facts the match added to the player's almanac. */
+  /** Facts the match added to the player's „Моите знания“. */
   facts: number;
   /** „Подреди“ questions with everything in its place. */
   ordersRight: number;
@@ -216,7 +216,7 @@ const SLOTS: {
     },
     {
       def: {
-        id: 'almanac5',
+        id: 'knowledge5',
         icon: '📖',
         text: 'Добави 5 факта в „Моите знания“',
         goal: 5,

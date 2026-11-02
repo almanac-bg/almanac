@@ -38,7 +38,6 @@ import { useRouteFocus } from './lib/routeFocus';
 import {
   AchievementsPage,
   AdminPage,
-  AlmanacPage,
   AuthPage,
   ChallengePage,
   ClassPage,
@@ -49,6 +48,7 @@ import {
   GroupsPage,
   HomePage,
   HowToPlayPage,
+  KnowledgePage,
   LeaderboardPage,
   LockerPage,
   NotificationsPage,
@@ -357,8 +357,8 @@ function SignedIn() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/friends" element={<FriendsPage />} />
-              <Route path="/almanac" element={<AlmanacPage />} />
-              <Route path="/almanac/:category" element={<AlmanacPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />} />
+              <Route path="/knowledge/:category" element={<KnowledgePage />} />
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/groups/:id" element={<GroupsPage />} />
               <Route path="/groups/join/:code" element={<GroupsPage />} />
