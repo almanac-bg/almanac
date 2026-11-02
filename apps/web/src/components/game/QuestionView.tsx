@@ -3,8 +3,9 @@ import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type Que
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, m, useReducedMotion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
+import { useMediaQuery } from '../../lib/media';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
@@ -62,6 +63,32 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
     }
     return map;
   }, [reveal, game.players, youId, eliminated]);
+
+  // Phones float what comes after the answer above the answers (see there); wider screens put it under them.
+  const wide = useMediaQuery('(min-width: 40rem)');
+  // The row under the answers, measured while the question is open (see there).
+  const row = useRef<HTMLDivElement>(null);
+  const rowHeight = useRef(0);
+  useLayoutEffect(() => {
+    if (!reveal && row.current) rowHeight.current = row.current.offsetHeight;
+  });
+  const afterAnswer = reveal && (
+    <>
+      {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). Without
+          a clock, every answer waits for „Продължи“ (the server holds it). */}
+      {reveal.fact && game.start.players.length === 1 && (
+        <FactNote index={q.index} fact={reveal.fact} waiting={untimedRun} />
+      )}
+      {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
+      {!reveal.fact && game.start.mode === 'solo' && <PauseAfterAnswer index={q.index} waiting={untimedRun} />}
+      {/* A class whose teacher stopped on this answer to talk it through. */}
+      {game.paused === reveal.index && (
+        <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
+          <Pause aria-hidden className="size-4 shrink-0" /> Пауза на големия екран — следващият въпрос идва след нея.
+        </p>
+      )}
+    </>
+  );
 
   return (
     // The clock is already running: the last question gets out of the way at once (the next one waits for it to
@@ -199,7 +226,11 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
         </div>
       </div>
 
-      <div className="max-sm:mt-auto">
+      <div className="relative max-sm:mt-auto">
+        {/* Phones: the fact and the stop float just above the answers — in the room the question leaves, or over the
+            foot of its card — so the tile just tapped stays under the finger (the answers sit at the bottom, and
+            anything added below them pushed them up by up to 200 px: the review's UX-10). */}
+        {!wide && afterAnswer && <div className="absolute inset-x-0 bottom-full z-10 pb-1">{afterAnswer}</div>}
         <AnimatePresence>
           {game.retryPrompt && !reveal && (
             <m.div
@@ -261,7 +292,21 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           )}
         </div>
 
-        <div className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5">
+        {/* On a reveal the row keeps the height it had (the козове are taller than the result, a result with the crowd's
+            note can be taller than the козове): on a phone the answers sit on it, and any change would move them. */}
+        <div
+          ref={row}
+          // Phones: exactly that height (a taller result hangs below, where nothing follows now that the fact floats
+          // above the answers). Wider: at least that, with the fact under it.
+          style={
+            reveal && rowHeight.current
+              ? wide
+                ? { minHeight: rowHeight.current }
+                : { height: rowHeight.current }
+              : undefined
+          }
+          className="mt-5 flex min-h-12 flex-wrap items-center gap-3 short:mt-3 tiny:mt-2 flat:mt-1.5"
+        >
           <AnimatePresence mode="wait">
             {reveal && mine ? (
               number && reveal.answerNumber !== undefined ? (
@@ -287,21 +332,7 @@ export function QuestionView({ game, offline }: { game: LiveGame; offline: boole
           </AnimatePresence>
           {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
         </div>
-        {/* Only in a run played alone: with others, the rhythm is everyone's (their facts wait for the results). Without
-            a clock, every answer waits for „Продължи“ (the server holds it). */}
-        {reveal?.fact && game.start.players.length === 1 && (
-          <FactNote index={q.index} fact={reveal.fact} waiting={untimedRun} />
-        )}
-        {/* Соло is the player's own time: any answer can wait (a fact has its own stop, above). */}
-        {reveal && !reveal.fact && game.start.mode === 'solo' && (
-          <PauseAfterAnswer index={q.index} waiting={untimedRun} />
-        )}
-        {/* A class whose teacher stopped on this answer to talk it through. */}
-        {reveal && game.paused === reveal.index && (
-          <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-fg-2">
-            <Pause aria-hidden className="size-4 shrink-0" /> Пауза на големия екран — следващият въпрос идва след нея.
-          </p>
-        )}
+        {wide && afterAnswer}
       </div>
     </m.section>
   );
@@ -344,7 +375,8 @@ function FactNote({ index, fact, waiting }: { index: number; fact: string; waiti
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
+      // On the page's own colour (before:), so on a phone, floating over the foot of the question's card, it reads.
+      className="relative isolate mt-3 rounded-2xl border border-amber-300/25 bg-amber-400/[0.07] p-3.5 before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:bg-ink short:max-sm:mt-2 short:max-sm:p-3 sm:p-4"
     >
       <p className="text-sm text-fg-2 text-pretty sm:text-[15px]">
         <span className="font-bold text-amber-200">

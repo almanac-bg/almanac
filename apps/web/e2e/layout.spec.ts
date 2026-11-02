@@ -170,3 +170,27 @@ test('the question, its four answers and the clock fit a small phone and a phone
     }
   }
 });
+
+test('on a phone the answer just tapped stays under the finger when the answer comes (UX-10)', async ({ page }) => {
+  // No motion: what comes with the answer is in place at once, and the reveal lasts 0.6 s at the test speed.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startAsGuest(page);
+  await startSolo(page, 'Микс');
+  const counter = page.getByText(/^Въпрос \d+ от \d+$/);
+  const moved: number[] = [];
+  for (let n = 1; n <= 8 && moved.length < 3; n++) {
+    await expect(counter).toHaveText(new RegExp(`^Въпрос ${n} от`), { timeout: gameMs(15_000) });
+    // Г, the lowest: anything added under the answers pushed it up the most. A number or an order is let go by.
+    const tile = page.getByRole('button', { name: /^Г\) /, disabled: false });
+    if (!(await tile.isVisible())) continue;
+    const before = (await tile.boundingBox())!;
+    await tile.click();
+    // The answer is in once the result and the stop („Спри, за да прочета“ or „Пауза“) are there.
+    await expect(page.locator('[data-hold]')).toBeVisible({ timeout: gameMs(3_000) });
+    const after = (await page.getByRole('button', { name: /^Г\) / }).boundingBox())!;
+    moved.push(Math.round(after.y - before.y));
+  }
+  expect(moved.length, 'questions with options measured').toBeGreaterThan(0);
+  for (const dy of moved) expect(Math.abs(dy), `moved ${moved.join(', ')} px`).toBeLessThanOrEqual(2);
+});
