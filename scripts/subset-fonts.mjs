@@ -98,4 +98,8 @@ for (const font of FONTS) {
   fs.writeFileSync(path.join(out, `OFL-${family}.txt`), await download(font.license));
   console.log(`${font.file}: ${(full.length / 1024).toFixed(0)} KB → ${(woff2.length / 1024).toFixed(1)} KB`);
 }
-fs.writeFileSync(path.join(out, 'coverage.json'), `${JSON.stringify(coverage)}\n`);
+// Laid out as the formatter lays it out (a range a line), so running this again leaves the lint clean.
+const families = Object.entries(coverage).map(
+  ([family, ranges]) => `  "${family}": [\n${ranges.map(([from, to]) => `    [${from}, ${to}]`).join(',\n')}\n  ]`,
+);
+fs.writeFileSync(path.join(out, 'coverage.json'), `{\n${families.join(',\n')}\n}\n`);
