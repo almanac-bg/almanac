@@ -272,7 +272,8 @@ export async function passRewardMoment(page: Page): Promise<boolean> {
  * A number question's answer, locked in: on a slider one step up; else its range's low end, its first digit tapped on
  * the keypad and the rest typed (the clock is short at the tests' speed), Enter to lock it.
  */
-async function giveNumber(page: Page) {
+/** Gives a number question an answer: its range's low end (or „Повече“ once, on one with steps). */
+export async function giveNumber(page: Page) {
   const more = page.getByRole('button', { name: 'Повече', exact: true });
   if (await more.isVisible()) {
     await more.click();
