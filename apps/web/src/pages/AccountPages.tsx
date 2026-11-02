@@ -569,8 +569,9 @@ function MailOptIn({
   // Optional emails rest on consent, and under 14 that's a parent's: asked where it's given.
   const [confirming, setConfirming] = useState(false);
   const on = me[field];
-  // Switching off always works; switching on needs somewhere to send the email.
-  const blocked = !on && !me.email;
+  // Switching off always works; switching on needs somewhere to send the email, which our mail reaches.
+  const bounced = !!me.email && me.emailBounced;
+  const blocked = !on && (!me.email || bounced);
 
   async function toggle() {
     setConfirming(false);
@@ -597,7 +598,11 @@ function MailOptIn({
       hint={
         <>
           {hint} Спираш го оттук или от линка във всяко писмо. Под 14 години — със съгласие на родител или настойник.
-          {blocked && <span className="sr-only"> Нужен е потвърден имейл.</span>}
+          {blocked && (
+            <span className="sr-only">
+              {bounced ? ' Писмата ни до имейла ти не стигат.' : ' Нужен е потвърден имейл.'}
+            </span>
+          )}
         </>
       }
       on={on}
@@ -626,13 +631,15 @@ function MailOptIn({
                 Отвори линка, който изпратихме до <b className="text-fg [overflow-wrap:anywhere]">{me.pendingEmail}</b>,
                 и после го включи.
               </>
+            ) : bounced ? (
+              'Писмата ни до този адрес не стигат — провери го или добави друг по-горе, и после го включи.'
             ) : (
               'Нужен е потвърден имейл — добави го по-горе.'
             )}
           </span>
           {!me.pendingEmail && (
             <Button size="sm" variant="secondary" onClick={() => focusEmailField()}>
-              <Mail className="size-4" /> Добави имейл
+              <Mail className="size-4" /> {bounced ? 'Смени имейла' : 'Добави имейл'}
             </Button>
           )}
         </div>
@@ -855,7 +862,7 @@ function EmailSettings() {
           <MailWarning aria-hidden className="mt-0.5 size-4 shrink-0 text-amber-300" />
           <span>
             Писмата ни до този адрес не стигат (връщат се или са отбелязани като спам), затова спряхме напомнянията.
-            Провери адреса или добави друг.
+            Провери пощата и потвърди адреса отново (въведи го по-долу) или добави друг.
           </span>
         </p>
       )}

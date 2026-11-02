@@ -42,6 +42,7 @@
 | `COMPOSE_PROFILES`                                  |                              | `backup` пуска и Litestream                                                                                                    |
 | `BACKUP_BUCKET`, `BACKUP_ENDPOINT`, `BACKUP_REGION` |                              | Къде Litestream пази бекъпите (S3-съвместимо object storage)                                                                   |
 | `BACKUP_ACCESS_KEY_ID`, `BACKUP_SECRET_ACCESS_KEY`  |                              | Ключовете за него                                                                                                              |
+| `BACKUP_HEARTBEAT_URL`                              |                              | Heartbeat, който Litestream пингва на 5 минути, докато базата се реплицира (Better Stack: период 5 мин.)                       |
 
 ## Зададени от образа и `docker-compose.yml`
 

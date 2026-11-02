@@ -51,6 +51,7 @@ main() {
     exit 1
   fi
   caddy_before=$(git rev-parse -q --verify HEAD:deploy/Caddyfile || echo none)
+  litestream_before=$(git rev-parse -q --verify HEAD:deploy/litestream.yml || echo none)
   git merge --quiet --ff-only origin/main
 
   # What runs now becomes the way back — unless it's this very image again (a retry, or new questions only): then the
@@ -78,6 +79,12 @@ main() {
       echo "$(date -u +%FT%TZ) Caddy refused the new deploy/Caddyfile and kept the old one: fix it and deploy again"
       exit 1
     }
+  fi
+  # Litestream reads its config once as well (deploy/litestream.yml, mounted): a changed one takes effect on a restart,
+  # which carries on replicating from where it was. Where it runs (COMPOSE_PROFILES=backup).
+  if [ "$(git rev-parse -q --verify HEAD:deploy/litestream.yml || echo none)" != "$litestream_before" ] &&
+    [ -n "$(docker compose ps -q litestream 2>/dev/null)" ]; then
+    docker compose restart litestream
   fi
 
   if ! healthy; then

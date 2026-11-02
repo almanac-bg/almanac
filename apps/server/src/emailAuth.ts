@@ -81,7 +81,10 @@ export function requestEmailChange(userId: number, email: string, net: string): 
   const parsed = EmailSchema.safeParse(email.trim());
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const user = getUser(userId)!;
-  if (user.email_key === emailKey(parsed.data)) return { ok: false, error: 'Това вече е твоят имейл.' };
+  // The same address again only while our mail doesn't reach it: confirmed once more (a mailbox that was full), the
+  // bounce is cleared.
+  if (user.email_key === emailKey(parsed.data) && user.email_bounced_at === null)
+    return { ok: false, error: 'Това вече е твоят имейл.' };
   // Whoever types an address, it's the mailbox's owner who gets the mail: a few a day per address and sender (sign-up,
   // a saved guest and Settings all come through here) — so a stranger can't spend the owner's own allowance — a few
   // more per address from everyone, and a ceiling for all of them near what the site really sends, so nobody can mail

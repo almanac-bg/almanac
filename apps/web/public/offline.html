@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#07060d" />
     <meta name="robots" content="noindex" />
-    <!-- Tries again by itself every 15 seconds; the service worker shows this page again while there's no connection. -->
+    <!-- Tries again by itself every 15 seconds; the service worker shows this page again while there's no connection.
+         `data-down`: what it says instead when the connection is there but the server is down (sw.js → outage). -->
     <meta http-equiv="refresh" content="15" />
-    <title>Няма връзка — АЛМАНАХ</title>
+    <title data-down="Сървърът не отговаря — АЛМАНАХ">Няма връзка — АЛМАНАХ</title>
     <style>
       html { background: #07060d; }
       body {
@@ -41,8 +42,8 @@
   <body>
     <main>
       <div class="logo"><svg aria-hidden="true" viewBox="8.5 8.5 47 47" width="27" height="27"><path class="gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</div>
-      <h1>Няма връзка</h1>
-      <p>Играта иска интернет. Щом връзката се върне, страницата ще се отвори сама.</p>
+      <h1 data-down="Сървърът не отговаря">Няма връзка</h1>
+      <p data-down="Връщаме се след малко: страницата ще опита отново сама.">Играта иска интернет. Щом връзката се върне, страницата ще се отвори сама.</p>
       <a href="">Опитай отново</a>
     </main>
   </body>
