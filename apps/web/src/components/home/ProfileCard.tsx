@@ -19,6 +19,7 @@ import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { GuestNudge } from '../ClaimAccount';
 import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';
+import { UnlockIcon } from '../UnlockIcon';
 import { Card, ProgressBar } from '../ui';
 
 export function ProfileCard({ className }: { className?: string }) {
@@ -102,7 +103,7 @@ export function ProfileCard({ className }: { className?: string }) {
 }
 
 function UpNext({ unlock, className }: { unlock: UnlockRef & { level: number }; className?: string }) {
-  const { icon, name } = unlockPreview(unlock);
+  const { name } = unlockPreview(unlock);
   return (
     <span
       className={clsx(
@@ -111,9 +112,7 @@ function UpNext({ unlock, className }: { unlock: UnlockRef & { level: number }; 
       )}
     >
       <span className="shrink-0">Ниво {unlock.level}:</span>
-      <span aria-hidden className="text-base leading-none">
-        {icon}
-      </span>
+      <UnlockIcon unlock={unlock} size={16} />
       <span className="truncate">{name}</span>
     </span>
   );

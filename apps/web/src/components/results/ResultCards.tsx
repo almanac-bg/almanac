@@ -39,6 +39,7 @@ import { Avatar, LevelBadge, RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { PlayerName } from '../FitName';
 import { accentText } from '../game/answers';
+import { UnlockIcon } from '../UnlockIcon';
 import { Button, Card } from '../ui';
 import { burst } from './confetti';
 import { DayField } from './DayField';
@@ -481,7 +482,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {rewards.unlocks.map((u, i) => {
-          const { icon, name } = unlockPreview(u);
+          const { name } = unlockPreview(u);
           return (
             <m.span
               key={`${u.kind}:${u.id}`}
@@ -490,7 +491,7 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
               transition={{ delay: 1.2 + i * 0.06 }}
               className="inline-flex items-center gap-2 rounded-xl border border-line bg-tint/5 px-3 py-2 text-sm"
             >
-              <Emoji e={icon} size="1.25rem" />
+              <UnlockIcon unlock={u} size={20} />
               {name}
             </m.span>
           );
