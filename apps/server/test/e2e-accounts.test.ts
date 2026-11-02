@@ -470,6 +470,7 @@ test('moderation: name filter, reports, rename, ban', T, async () => {
   assert.equal(queue[0].reports.length, 1);
   assert.equal(queue[0].reports[0].reason, 'name');
   assert.equal(queue[0].reports[0].reporter.name, 'maria_test', 'with who sent it');
+  assert.equal((await api.get('/api/admin/reports?limit=1000', A.cookie)).status, 200, 'a page at most 200');
   assert.deepEqual((await api.get('/api/admin/summary', A.cookie)).body.openReports, 1);
 
   // A decision answers the reports the moderator saw.
@@ -796,6 +797,21 @@ test('every moderation decision is logged with its grounds, and can be undone', 
     .get(E.user.id) as { text: string };
   assert.match(told.text, /върна резултатите ти.*Причина: Обжалване: беше грешка\./, 'the player hears each undo');
 
+  // A ban that came with an annulment, lifted on appeal: the results come back with it, in one statement (MOD-10).
+  const again = await act('ban', { days: 30, basis: 'cheating', reason: 'Отговаря с програма.', annul: true });
+  assert.equal(again.body.card.ban.annulled, true, 'the card says the results went with it');
+  assert.deepEqual(results(), { rating: 0, daily: 1, evening: 1 });
+  const lifted = await act('ban-change', { days: null, reason: 'Обжалването е уважено.', restore: true });
+  assert.equal(lifted.body.card.ban, null);
+  assert.deepEqual(results(), before, 'the results back with the lift');
+  const [liftEntry, annulEntry] = await log();
+  assert.equal(liftEntry.action, 'unban');
+  assert.deepEqual([annulEntry.action, annulEntry.undoReason], ['annul', 'Обжалването е уважено.']);
+  const both = srv.db
+    .prepare('SELECT text FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 1')
+    .get(E.user.id) as { text: string };
+  assert.match(both.text, /свали спирането на профила ти и върна резултатите ти от този сезон/);
+
   // A rename, undone while the old name is free.
   assert.equal(
     (await act('rename', { username: 'chesten_test', basis: 'name', reason: 'Името подвежда играчите.' })).status,
@@ -1036,9 +1052,24 @@ test('players flag wrong questions; moderators hide them from new matches', T, a
   assert.equal(open.body.groups.length, 1);
   assert.equal(open.body.groups[0].question.id, id);
   assert.deepEqual(
-    open.body.groups[0].reports.map((r: { reason: string; reporter: string }) => [r.reason, r.reporter]),
+    open.body.groups[0].reports.map((r: { reason: string; reporter: { name: string } }) => [r.reason, r.reporter.name]),
     [['ambiguous', B.user.username]],
   );
+  // The card says who flagged it (how long they've played, how their flags went) and how the question is played.
+  const flagged = open.body.groups[0];
+  assert.deepEqual(Object.keys(flagged.reports[0].reporter).sort(), [
+    'days',
+    'dismissed',
+    'id',
+    'matches',
+    'name',
+    'upheld',
+  ]);
+  srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 20, 5)').run(id);
+  assert.deepEqual((await api.get('/api/admin/question-reports', A.cookie)).body.groups[0].stats, {
+    answered: 20,
+    correct: 5,
+  });
   assert.equal((await api.get('/api/admin/summary', A.cookie)).body.questionReports, 1);
 
   const hidden = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'hide' });
@@ -1100,8 +1131,11 @@ test(
     assert.equal(auto.action, 'auto_hide_question');
     assert.equal(auto.admin, null, 'the game did it');
     assert.equal(auto.target, id);
+    assert.ok(auto.about && auto.about.length > 5, 'with the question in its words');
 
     srv.db.prepare('INSERT OR REPLACE INTO question_stats (question_id, answered, correct) VALUES (?, 40, 2)').run(id);
+    // Fixed in the bank since the flags (a bank question's „Поправих го“ wants it changed).
+    srv.db.prepare("UPDATE question_reports SET question_hash = 'before-the-fix' WHERE question_id = ?").run(id);
     const fixed = await api.send('POST', `/api/admin/question-reports/${id}/resolve`, A.cookie, { action: 'fixed' });
     assert.equal(fixed.status, 200, fixed.body.error);
     assert.equal(fixed.body.groups.length, 0);
@@ -1194,6 +1228,35 @@ test(
     assert.ok(!(await hidden()).includes(other), 'five hidden by flags today already');
     srv.db.prepare("DELETE FROM moderation_log WHERE target LIKE 'cap-%'").run();
     await api.send('POST', `/api/admin/question-reports/${other}/resolve`, A.cookie, { action: 'dismiss' });
+
+    // A real mistake in a bank question (MOD-7): „Чака поправка в банката“ keeps it hidden, its flags open; „Поправих
+    // го“ waits for the bank's copy to change, and once it has, the next reload closes the flags by itself.
+    const bank = 'history-10';
+    show(F.user.id, bank);
+    await flag(F.cookie, bank);
+    const resolve = (action: string) =>
+      api.send('POST', `/api/admin/question-reports/${bank}/resolve`, A.cookie, { action });
+    assert.equal((await resolve('awaiting_fix')).status, 200);
+    let card = (await api.get('/api/admin/question-reports', A.cookie)).body.groups.find(
+      (g: { question: { id: string } }) => g.question.id === bank,
+    );
+    assert.deepEqual([card.question.hidden, card.question.awaitingFix], [true, true], 'hidden, its flag still open');
+    assert.match((await resolve('fixed')).body.error, /същият като при сигнала/, 'not before it changed');
+    const listed = cli(srv.dbPath, 'flags');
+    assert.equal(listed.status, 0, listed.output);
+    assert.ok(
+      // (The helper joins stdout, the JSON, with stderr, what loading the bank says.)
+      JSON.parse(listed.output.slice(listed.output.indexOf('{'), listed.output.lastIndexOf('}') + 1)).open.some(
+        (f: { id: string; awaitingFix: boolean }) => f.id === bank && f.awaitingFix,
+      ),
+    );
+    // As if the bank's copy had been fixed since the flag: the reload brings it back and closes the flag.
+    srv.db.prepare("UPDATE question_reports SET question_hash = 'before-the-fix' WHERE question_id = ?").run(bank);
+    assert.equal((await api.send('POST', '/api/admin/bank/reload', A.cookie)).status, 200);
+    card = (await api.get('/api/admin/question-reports', A.cookie)).body;
+    assert.ok(!card.groups.some((g: { question: { id: string } }) => g.question.id === bank), 'its flag closed');
+    assert.ok(!card.hidden.some((q: { id: string }) => q.id === bank), 'back in play');
+    assert.match((await api.get('/api/notifications', F.cookie)).body.notifications[0].text, /поправен/);
   },
 );
 

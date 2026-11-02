@@ -262,8 +262,10 @@ export function cli(dbPath: string, ...args: string[]): { status: number | null;
     process.env.TEST_TARGET === 'dist'
       ? [path.join(serverDir, 'dist/cli.mjs')]
       : [require.resolve('tsx/cli'), path.join(serverDir, 'src/cli.ts')];
+  // The question bank of the server it runs next to (startServer writes it beside the database), as on the server.
+  const questions = path.join(path.dirname(dbPath), 'questions.json');
   const r = spawnSync(process.execPath, [...entry, ...args], {
-    env: { ...shellBasics(), DB_PATH: dbPath },
+    env: { ...shellBasics(), DB_PATH: dbPath, ...(fs.existsSync(questions) && { QUESTIONS_PATH: questions }) },
     encoding: 'utf8',
   });
   return { status: r.status, output: `${r.stdout}${r.stderr}` };

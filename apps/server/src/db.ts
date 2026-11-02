@@ -1126,6 +1126,28 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     ALTER TABLE users ADD COLUMN must_rename INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  // v46, a hidden set stays hidden (sets.ts; the 31 October review, MOD-9): what its questions say, as a hash
+  // (`hidden_set_texts`), so the same set made again is refused; and since when it's hidden (`hidden_at`), so its owner
+  // can't delete it within the appeal window. Sets hidden before are counted from now. Older code doesn't read either.
+  {
+    compatible: `
+    CREATE TABLE hidden_set_texts (
+      hash TEXT PRIMARY KEY,
+      hidden_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    ALTER TABLE question_sets ADD COLUMN hidden_at INTEGER;
+    UPDATE question_sets SET hidden_at = CAST(unixepoch('subsec') * 1000 AS INTEGER) WHERE hidden = 1;
+    `,
+  },
+  // v47, flags on the bank's questions (questionReports.ts; the 31 October review, MOD-7): what the question said when
+  // it was flagged (`question_hash`), so „Поправих го“ needs a changed question and a fixed one closes its flags by
+  // itself; and „Чака поправка в банката“ (`awaiting_fix`). Older code doesn't read either.
+  {
+    compatible: `
+    ALTER TABLE question_reports ADD COLUMN question_hash TEXT;
+    ALTER TABLE hidden_questions ADD COLUMN awaiting_fix INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

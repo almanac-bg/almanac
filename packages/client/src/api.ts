@@ -246,7 +246,8 @@ export const api = {
     }),
   unhideQuestion: (questionId: string) =>
     request<QuestionReports>('POST', `/admin/hidden-questions/${encodeURIComponent(questionId)}/unhide`),
-  adminReports: () => request<ReportCases>('GET', '/admin/reports'),
+  /** The queue's first `limit` cases (25 a page). */
+  adminReports: (limit = 25) => request<ReportCases>('GET', `/admin/reports?limit=${limit}`),
   /** A case decided: the reports seen in it (`reportIds`; a 409 when another moderator decided some meanwhile). */
   decideCase: (c: Pick<ReportCase, 'kind' | 'id'>, reportIds: number[], decision: CaseDecision) =>
     request<ReportCases & { ok: true }>('POST', `/admin/cases/${c.kind}/${encodeURIComponent(c.id)}/resolve`, {
@@ -259,6 +260,9 @@ export const api = {
   adminPlayers: (query: string) =>
     request<{ players: PlayerSearchHit[] }>('GET', `/admin/players?q=${encodeURIComponent(query)}`),
   adminPlayer: (id: number) => request<{ card: PlayerCard }>('GET', `/admin/players/${id}`),
+  /** A picture with illegal content deleted everywhere (the owner's, under the written procedure). */
+  deletePicture: (id: string, reason: string) =>
+    request<{ ok: true; sets: number }>('POST', `/admin/pictures/${id}/delete`, { reason }),
   /** The owner, on a request by mail: a player's data as a file, or the account erased (`reason`: how it came). */
   adminExportPlayer: (id: number, reason: string) =>
     request<Blob>('POST', `/admin/players/${id}/export`, { reason }, true, true),
@@ -267,8 +271,9 @@ export const api = {
   banPlayer: (id: number, ban: { days: number | null; basis: ModerationBasis; reason: string; annul?: boolean }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban`, ban),
   /** Lifts a ban (`days` null) or moves its end. */
-  changeBan: (id: number, days: number | null, reason: string) =>
-    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason }),
+  /** `restore`: lifting a ban that came with an annulment gives the results back too. */
+  changeBan: (id: number, days: number | null, reason: string, restore = false) =>
+    request<{ card: PlayerCard }>('POST', `/admin/players/${id}/ban-change`, { days, reason, restore }),
   renamePlayer: (id: number, rename: { basis: ModerationBasis; reason: string }) =>
     request<{ card: PlayerCard }>('POST', `/admin/players/${id}/rename`, rename),
   /** After a moderator's rename: the player's own new name (once). */

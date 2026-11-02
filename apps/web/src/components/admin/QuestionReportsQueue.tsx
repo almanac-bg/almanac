@@ -1,4 +1,13 @@
-import { api, DIFFICULTY_LABEL, errorMessage, type QuestionReports, timeAgo, toast, useStore } from '@quiz/client';
+import {
+  api,
+  DIFFICULTY_LABEL,
+  errorMessage,
+  plural,
+  type QuestionReports,
+  timeAgo,
+  toast,
+  useStore,
+} from '@quiz/client';
 import {
   categoryById,
   QUESTION_REPORT_REASONS,
@@ -49,6 +58,8 @@ export const draftOf = (q: QuestionInfo): QuestionDraft => ({
 /** Questions players flagged as wrong, the most reported first; hiding one takes it out of new matches at once. */
 export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }) {
   const { data, error, retry, setData } = useLoad(() => api.adminQuestionReports());
+  // The bank is the owner's: moderators mark a bank question's mistake for them.
+  const owner = useStore((s) => s.me?.staffRole === 'owner');
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `onOpen` is recreated on every parent render
   useEffect(() => {
@@ -78,8 +89,11 @@ export function QuestionReportsQueue({ onOpen }: { onOpen: (n: number) => void }
         <>
           <p className="text-fg-2">
             Сигнали от играчите за грешни или неясни въпроси. „Скрий“ спира въпроса за нови мачове веднага. Въпросите на
-            играчите се поправят тук („Редактирай“); тези от банката — в <code>questions.json</code> по номера им, после
-            „Презареди банката“. „Поправих го“ връща въпроса в играта, нулира числата му и благодари на сигнализиралите.
+            играчите се поправят тук („Редактирай“).{' '}
+            {owner
+              ? 'Тези от банката — в questions.json по номера им, после „Презареди банката“: тогава чакащите поправка се връщат сами, а сигнализиралите получават благодарност.'
+              : 'Грешка във въпрос от банката: „Чака поправка в банката“ го държи скрит, а собственикът го поправя.'}{' '}
+            „Поправих го“ връща въпроса в играта, нулира числата му и благодари на сигнализиралите.
           </p>
           <AnimatePresence initial={false}>
             {data.groups.map((g) => (
@@ -207,6 +221,7 @@ function QuestionReportCard({
   const [grounds, setGrounds] = useState<Grounds>({ basis: 'other', reason: '' });
 
   async function decide(action: QuestionReportAction) {
+    // (awaiting_fix: a bank question kept hidden, its flags open for the owner.)
     if (action === 'hide' && isCommunity(question) && !groundsReady(grounds)) return setHiding(true);
     setBusy(action);
     try {
@@ -220,11 +235,13 @@ function QuestionReportCard({
       toast({
         kind: 'success',
         title:
-          action === 'hide'
-            ? 'Въпросът е скрит от нови мачове'
-            : action === 'fixed'
-              ? 'Поправен: числата му започват отначало, а сигнализиралите получават благодарност'
-              : 'Сигналите са затворени',
+          action === 'awaiting_fix'
+            ? 'Скрит, докато го поправят в банката'
+            : action === 'hide'
+              ? 'Въпросът е скрит от нови мачове'
+              : action === 'fixed'
+                ? 'Поправен: числата му започват отначало, а сигнализиралите получават благодарност'
+                : 'Сигналите са затворени',
       });
       onResolved(r);
     } catch (e) {
@@ -245,16 +262,32 @@ function QuestionReportCard({
             <Flag className="size-3.5" /> {group.reports.length}
           </span>
         </div>
+        {group.stats && group.stats.answered > 0 && (
+          <p className="mt-3 text-xs text-fg-3">
+            Отговорен {plural(group.stats.answered, 'път', 'пъти')} ·{' '}
+            {Math.round((group.stats.correct / group.stats.answered) * 100)}% верни
+          </p>
+        )}
         <ul className="mt-4 space-y-2">
           {group.reports.map((r) => (
             <li key={r.id} className="rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{reasonLabel(r.reason)}</span>
-                <span className="text-xs text-fg-3">
-                  {r.reporter ?? 'изтрит профил'} · {timeAgo(r.createdAt)}
-                </span>
+                <span className="text-xs text-fg-3">{timeAgo(r.createdAt)}</span>
               </div>
               {r.details && <p className="mt-1 text-fg-2">„{r.details}“</p>}
+              <p className="mt-1 text-xs text-fg-3">
+                {r.reporter ? (
+                  <>
+                    {r.reporter.name} · профил{' '}
+                    {r.reporter.days ? `от ${plural(r.reporter.days, 'ден', 'дни')}` : 'от днес'},{' '}
+                    {plural(r.reporter.matches, 'мач', 'мача')} · предишни сигнали: {r.reporter.upheld} прави,{' '}
+                    {r.reporter.dismissed} отхвърлени
+                  </>
+                ) : (
+                  'изтрит профил'
+                )}
+              </p>
             </li>
           ))}
         </ul>
@@ -287,7 +320,23 @@ function QuestionReportCard({
           >
             <Wrench className="size-4" /> Поправих го
           </Button>
-          {question.hidden ? (
+          {!isCommunity(question) && !question.awaitingFix && (
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy === 'awaiting_fix'}
+              disabled={!!busy}
+              onClick={() => decide('awaiting_fix')}
+              title="Грешката е истинска: скрит, докато собственикът го поправи в банката"
+            >
+              <Wrench className="size-4" /> Чака поправка в банката
+            </Button>
+          )}
+          {question.awaitingFix ? (
+            <span className="inline-flex items-center gap-1.5 self-center text-xs font-semibold text-amber-300">
+              <Wrench className="size-4" /> Чака поправка в банката
+            </span>
+          ) : question.hidden ? (
             <span className="inline-flex items-center gap-1.5 self-center text-xs font-semibold text-amber-300">
               <EyeOff className="size-4" /> Скрит от новите мачове, докато решиш
             </span>

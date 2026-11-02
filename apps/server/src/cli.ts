@@ -17,6 +17,8 @@
 //                                                            now would cut short (deploy/deploy.sh waits for that)
 //   node apps/server/dist/cli.mjs names                    — names already taken that today's name check would refuse
 //                                                            (players, groups, sets), to rename through /admin
+//   node apps/server/dist/cli.mjs flags                    — the players' open flags, the bank questions waiting for a
+//                                                            fix, and the play check, as JSON: the bank's work list
 //   node apps/server/dist/cli.mjs account export <name|#id> — a player's data as JSON, on a request by mail, when
 //                                                            /admin can't (the owner's card does it otherwise)
 //   node apps/server/dist/cli.mjs account erase <name|#id> --yes "<how the request came>" — the account erased, as
@@ -25,11 +27,13 @@
 import { MODERATION } from '@quiz/shared';
 import webpush from 'web-push';
 import { eraseOnRequest, exportAccount } from './account';
+import { playCheck } from './answers';
 import { config } from './config';
 import { all, run } from './db';
 import { nameProblem } from './moderation';
 import { logAction } from './modlog';
 import { textProblem } from './names';
+import { openQuestionReports } from './questionReports';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
 import { guestsPaused, pauseGuests } from './settings';
 import { getUser, getUserByName, isAdmin } from './users';
@@ -42,7 +46,7 @@ function fail(message: string): never {
 }
 
 const USAGE =
-  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live | names | account export <name|#id> | account erase <name|#id> --yes "<how the request came>"';
+  'Usage: cli admin add <username> | admin owner <username> | admin remove <username> | admin 2fa-reset <username> | admin list | guests off | guests on | guests status | notice "<text>" [/link] | vapid-keys | check-bank | live | names | flags | account export <name|#id> | account erase <name|#id> --yes "<how the request came>"';
 
 if (area === 'check-bank') {
   try {
@@ -105,6 +109,23 @@ if (area === 'notice') {
     Date.now(),
   );
   console.log(`📣 Left for ${changes} players (they see it the next time they open the game).`);
+  process.exit(0);
+}
+
+// What the players flagged and the answer log says, for the bank's re-check (bank.mjs reads it as a work list).
+if (area === 'flags') {
+  // Only the JSON on stdout (a script reads it): what loading the bank says goes to stderr.
+  console.log = (...args: unknown[]) => console.error(...args);
+  const open = openQuestionReports().map((g) => ({
+    id: g.question.id,
+    q: g.question.q,
+    reasons: g.reports.map((r) => r.reason),
+    details: g.reports.map((r) => r.details).filter(Boolean),
+    hidden: g.question.hidden,
+    awaitingFix: g.question.awaitingFix,
+    stats: g.stats,
+  }));
+  process.stdout.write(`${JSON.stringify({ open, playCheck: playCheck().questions }, null, 2)}\n`);
   process.exit(0);
 }
 

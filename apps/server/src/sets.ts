@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import {
   type QuestionSetInfo,
   type QuestionSetSummary,
+  RATED_AFTER,
   type RoomSettings,
   SETS,
   type SetImage,
@@ -10,12 +11,17 @@ import {
   setPictureUrl,
 } from '@quiz/shared';
 import { z } from 'zod';
+import { alertModerators } from './alerts';
 import { all, one, run, tx } from './db';
+import { longDateTime } from './mailer';
 import { textProblem } from './names';
 import type { HostImage, PreparedQuestion } from './questions';
 import { shuffle } from './questions';
 import { installationSecret } from './settings';
 import { count } from './stats';
+import { throttled } from './throttle';
+import { ratesPeople } from './trust';
+import { getUser } from './users';
 
 /**
  * „Моите въпроси“: a host's own question sets (SETS), for their private rooms — a teacher's quiz on the lesson, an
@@ -284,6 +290,24 @@ export function uploadPicture(
   if (!Buffer.isBuffer(upload) || Array.isArray(upload) || typeof upload === 'string')
     return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
   if (upload.length > SETS.imageBytes) return { ok: false, error: 'Снимката е твърде голяма.' };
+  // Pictures are stored and served: only from an account that has played a while or confirmed an e-mail address,
+  // within a day's budget for everyone (the 31 October review, MOD-6).
+  const user = getUser(userId);
+  if (!user || !(ratesPeople(user) || user.email))
+    return {
+      ok: false,
+      error: `Снимки могат да добавят профили с потвърден имейл или с поне ${RATED_AFTER.games} мача отпреди ден.`,
+    };
+  if (throttled('set-images:all', SETS.imagesPerDay, 24 * 60 * 60_000)) {
+    if (!throttled('set-images:all:alerted', 1, 24 * 60 * 60_000))
+      alertModerators(
+        'pictures-budget',
+        'Дневният лимит за снимки е стигнат',
+        [`Днес са качени ${SETS.imagesPerDay} снимки в набори: нови се отказват до утре.`],
+        { ownerOnly: true },
+      );
+    return { ok: false, error: 'Днес са качени много снимки. Опитай утре.' };
+  }
   const pic = readPicture(upload);
   if (!pic) return { ok: false, error: 'Това не е снимка, която можем да ползваме (WebP или JPEG).' };
   const bytes = pic.bytes;
@@ -409,6 +433,7 @@ export function createSet(userId: number, body: unknown, copiedFrom: number | nu
   if (!parsed.ok) return parsed;
   const pictured = withPictures(parsed.set.questions);
   if (!pictured.ok) return pictured;
+  if (hiddenText(pictured.questions)) return { ok: false, error: HIDDEN_TEXT };
   const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM question_sets WHERE owner_id = ?', userId)!.n;
   if (count >= SETS.perOwner) return { ok: false, error: `Можеш да имаш най-много ${SETS.perOwner} набора.` };
   const now = Date.now();
@@ -437,6 +462,7 @@ export function saveSet(id: number, userId: number, body: unknown): Result<{ set
   if (!parsed.ok) return parsed;
   const pictured = withPictures(parsed.set.questions);
   if (!pictured.ok) return pictured;
+  if (hiddenText(pictured.questions)) return { ok: false, error: HIDDEN_TEXT };
   run(
     'UPDATE question_sets SET name = ?, questions = ?, updated_at = ? WHERE id = ?',
     parsed.set.name,
@@ -447,9 +473,21 @@ export function saveSet(id: number, userId: number, body: unknown): Result<{ set
   return { ok: true, set: info(getRow(id)!) };
 }
 
-export function deleteSet(id: number, userId: number): boolean {
-  return Number(run('DELETE FROM question_sets WHERE id = ? AND owner_id = ?', id, userId).changes) > 0;
+export function deleteSet(id: number, userId: number): Result {
+  const row = owned(id, userId);
+  if (!row) return { ok: false, error: 'Няма такъв набор.' };
+  // Kept while it can be appealed: the decision's ground, for the owner's appeal and for the moderators.
+  const since = one<{ at: number | null }>('SELECT hidden_at AS at FROM question_sets WHERE id = ?', id)!.at;
+  if (row.hidden && since !== null && Date.now() - since < HIDDEN_KEPT_MS)
+    return {
+      ok: false,
+      error: `Скрит от модератор набор се пази 6 месеца — срокът за обжалване. Ще можеш да го изтриеш след ${longDateTime(since + HIDDEN_KEPT_MS)}.`,
+    };
+  run('DELETE FROM question_sets WHERE id = ? AND owner_id = ?', id, userId);
+  return { ok: true };
 }
+
+const HIDDEN_TEXT = 'Тези въпроси са от набор, скрит от модератор: не могат да се ползват отново.';
 
 /** A set's share link as anyone signed in sees it (a hidden one is gone, but for moderators). */
 export function sharedPreview(code: string, viewerId: number, admin = false): SharedSetPreview | null {
@@ -493,7 +531,21 @@ export function hideSet(code: string, hidden: boolean): { ownerId: number; name:
   const row = one<SetRow>('SELECT * FROM question_sets WHERE code = ?', code);
   if (!row) return null;
   tx(() => {
-    run('UPDATE question_sets SET hidden = ? WHERE id = ?', hidden ? 1 : 0, row.id);
+    run(
+      'UPDATE question_sets SET hidden = ?, hidden_at = ? WHERE id = ?',
+      hidden ? 1 : 0,
+      hidden ? Date.now() : null,
+      row.id,
+    );
+    // What it says, so the same set made again under a new link is refused (and allowed again once it's shown).
+    const text = setText(questionsOf(row));
+    if (hidden) run('INSERT OR IGNORE INTO hidden_set_texts (hash, hidden_at) VALUES (?, ?)', text, Date.now());
+    else if (
+      !all<SetRow>('SELECT * FROM question_sets WHERE hidden = 1 AND id != ?', row.id).some(
+        (s) => setText(questionsOf(s)) === text,
+      )
+    )
+      run('DELETE FROM hidden_set_texts WHERE hash = ?', text);
     for (const id of imageIds(questionsOf(row))) {
       run('UPDATE set_images SET blocked = ? WHERE id = ?', hidden ? 1 : 0, id);
       // Blocked by what it is, not by whose copy: an upload of the same picture is refused, and served nowhere.
@@ -503,6 +555,38 @@ export function hideSet(code: string, hidden: boolean): { ownerId: number; name:
   });
   return { ownerId: row.owner_id, name: row.name };
 }
+
+/**
+ * A set's questions as a hash, whatever their order, case or punctuation: the same set made again (the 31 October
+ * review, MOD-9). An edited one is a new set, for a moderator to look at if it's reported.
+ */
+function setText(questions: SetQuestion[]): string {
+  const norm = (t: string) =>
+    t
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
+  const each = questions
+    .map((q) =>
+      norm(
+        [
+          q.q,
+          ...('options' in q ? q.options : []),
+          ...('items' in q ? q.items.map((i) => i.text) : []),
+          'answer' in q ? String(q.answer) : '',
+        ].join(' '),
+      ),
+    )
+    .sort();
+  return createHash('sha256').update(each.join('\n')).digest('base64url');
+}
+
+/** The same questions as a set a moderator hid: refused, as a blocked picture is. */
+const hiddenText = (questions: SetQuestion[]) =>
+  questions.length > 0 && !!one('SELECT 1 AS x FROM hidden_set_texts WHERE hash = ?', setText(questions));
+
+/** How long a hidden set is kept against its owner's deletion: the appeal window (statements.ts → appealLine). */
+const HIDDEN_KEPT_MS = 183 * 24 * 60 * 60_000;
 
 /** Another hidden set has this picture too: it stays blocked when one of them is shown again. */
 const stillHidden = (id: string) =>
@@ -528,7 +612,47 @@ export function setForModerator(code: string): (QuestionSetInfo & { author: stri
     'SELECT s.*, u.username FROM question_sets s LEFT JOIN users u ON u.id = s.owner_id WHERE s.code = ?',
     code,
   );
-  return row ? { ...info(row), author: row.username } : null;
+  if (!row) return null;
+  // Its pictures from the moderators' own address, which serves a blocked one too: an appeal, an undo, is decided
+  // seeing what the decision was about (the 31 October review, MOD-6).
+  const set = info(row);
+  return {
+    ...set,
+    questions: set.questions.map((q) =>
+      'image' in q && q.image ? { ...q, image: { ...q.image, url: `/api/admin/pictures/${q.image.id}` } } : q,
+    ),
+    author: row.username,
+  };
+}
+
+/** A picture for a moderator's eyes: blocked or not, while its bytes are kept (deletePicture takes them). */
+export const pictureForModerator = (id: string) =>
+  one<{ type: string; bytes: Uint8Array }>('SELECT type, bytes FROM set_images WHERE id = ? LIMIT 1', id);
+
+/**
+ * „Изтрий снимката“: a picture with illegal content goes everywhere at once — its bytes from every uploader's copy, its
+ * place in every set (the questions stay, without it) — and stays blocked by its hash, so it can't come back. For good:
+ * the written procedure (docs/operations.md → „Незаконна снимка“) says when, and what is reported first. Returns the
+ * sets it was in, their owners and names, to tell them.
+ */
+export function deletePicture(id: string): { ownerId: number; name: string }[] {
+  const sets = all<SetRow>(
+    'SELECT s.* FROM question_sets s JOIN set_image_uses u ON u.set_id = s.id WHERE u.image_id = ?',
+    id,
+  );
+  tx(() => {
+    run('INSERT OR IGNORE INTO blocked_pictures (id, blocked_at) VALUES (?, ?)', id, Date.now());
+    for (const s of sets) {
+      const questions = questionsOf(s).map((q) => {
+        if (!('image' in q) || q.image?.id !== id) return q;
+        const { image: _, ...rest } = q;
+        return rest as SetQuestion;
+      });
+      run('UPDATE question_sets SET questions = ? WHERE id = ?', JSON.stringify(questions), s.id);
+    }
+    run('DELETE FROM set_images WHERE id = ?', id);
+  });
+  return sets.map((s) => ({ ownerId: s.owner_id, name: s.name }));
 }
 
 /** A set its owner can play in a room: theirs, not hidden, with questions in it. */

@@ -1008,7 +1008,9 @@ export type ModerationLogAction =
   | 'export_data'
   | 'erase_request'
   /** The player picked a name of their own after a moderator's rename. */
-  | 'choose_name';
+  | 'choose_name'
+  /** A picture with illegal content deleted everywhere (its bytes; its hash stays blocked). */
+  | 'delete_picture';
 
 export interface ModerationLogEntry {
   id: number;
@@ -1018,6 +1020,8 @@ export interface ModerationLogEntry {
   /** The player it was about, and/or what (a question's id, a set's or group's name), with where to see it. */
   user: PublicUser | null;
   target: string | null;
+  /** What `target` is, to read: a question's text (its id says nothing). */
+  about?: string | null;
   link: string | null;
   basis: ModerationBasis | null;
   reason: string | null;
@@ -1048,13 +1052,16 @@ export interface PlayerCard {
   staff: 'owner' | 'moderator' | null;
   /** A deleted account with this verified e-mail was banned (in the last 12 months): the same person starting over. */
   bannedBefore: { basis: ModerationBasis | null; until: number | null; erasedAt: number } | null;
-  ban: { until: number; basis: ModerationBasis | null; reason: string | null } | null;
+  /** `annulled`: this season's results were annulled with it (lifting it can give them back). */
+  ban: { until: number; basis: ModerationBasis | null; reason: string | null; annulled: boolean } | null;
   gamesPlayed: number;
   reports: { open: number; resolved: number; filed: number };
   submissions: { pending: number; approved: number; rejected: number };
   /** Groups they made and sets they share: what a report about them is often about. */
   groups: { id: number; name: string; members: number }[];
   sets: { code: string; name: string; hidden: boolean }[];
+  /** How many of their sets moderators have hidden so far (deleted since or not): a repeat weighs more. */
+  setsHidden: number;
   log: ModerationLogEntry[];
 }
 
@@ -1094,6 +1101,8 @@ export interface QuestionInfo {
   author: string | null;
   /** Hidden from new matches by a moderator. */
   hidden: boolean;
+  /** Hidden until the bank's copy is fixed („Чака поправка в банката“). */
+  awaitingFix: boolean;
   /** Its "Знаеше ли?" and where that can be checked (moderators judge reports about it). */
   fact: string | null;
   factSource: string | null;
@@ -1104,11 +1113,21 @@ export interface QuestionInfo {
 /** Open reports about one question, for the moderation queue. */
 export interface QuestionReportGroup {
   question: QuestionInfo;
-  reports: { id: number; reason: QuestionReportReason; details: string; createdAt: number; reporter: string | null }[];
+  /** How it's played: answers counted and how many right (null: not yet). */
+  stats: { answered: number; correct: number } | null;
+  /** `reporter`: their account's age and matches, and their earlier flags fixed or hidden (`upheld`) or dismissed. */
+  reports: {
+    id: number;
+    reason: QuestionReportReason;
+    details: string;
+    createdAt: number;
+    reporter: Reporter | null;
+  }[];
 }
 
 /** `fixed`: corrected (its numbers start over, and whoever flagged it is thanked). */
-export type QuestionReportAction = 'dismiss' | 'hide' | 'fixed';
+/** `awaiting_fix`: a bank question with a real mistake, hidden until the bank's copy is fixed (its flags stay open). */
+export type QuestionReportAction = 'dismiss' | 'hide' | 'fixed' | 'awaiting_fix';
 
 /** What the answer log says, for moderators: play no person could manage, and questions whose label is off. */
 export interface PlayCheck {
@@ -1442,6 +1461,8 @@ export const SETS = {
   imageSide: 1200,
   imageBytes: 150_000,
   imageAlt: 150,
+  /** New pictures a day, from everyone together (past it, uploads wait for tomorrow and the owner hears). */
+  imagesPerDay: 500,
 } as const;
 
 /** A set as its owner keeps and edits it. */

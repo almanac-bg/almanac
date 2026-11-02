@@ -26,16 +26,18 @@ import {
   stopReports,
   undoAction,
 } from '../moderation';
-import { logAction, moderationLog } from '../modlog';
+import { logAction, moderationLog, QUESTION_ACTIONS } from '../modlog';
 import {
   hiddenQuestions,
   openQuestionReportCount,
   openQuestionReports,
   resolveQuestionReports,
+  settleBankFixes,
   unhideQuestion,
 } from '../questionReports';
-import { bankProblem, reloadQuestionBank } from '../questions';
-import { setForModerator } from '../sets';
+import { bankProblem, questionById, reloadQuestionBank } from '../questions';
+import { deletePicture, pictureForModerator, setForModerator } from '../sets';
+import { tellPlayer } from '../statements';
 import { launchStats } from '../stats';
 import {
   approveSubmission,
@@ -147,6 +149,8 @@ adminRouter.put('/admin/questions/:id', change, (req, res) => {
 /** The bank read again from disk (after a pull of the private bank, without a restart). */
 adminRouter.post('/admin/bank/reload', requireOwner, change, (_req, res) => {
   reloadQuestionBank();
+  // Fixes the bank brought: their flags close, the questions come back.
+  settleBankFixes();
   const problem = bankProblem();
   if (problem) {
     res.status(400).json({ error: 'Банката не се зареди — играта продължава с предишната. Виж грешките в Sentry.' });
@@ -167,7 +171,11 @@ adminRouter.get('/admin/question-reports', (_req, res) => {
 adminRouter.post('/admin/question-reports/:id/resolve', change, (req, res) => {
   // Hiding a player's question takes a basis and reason, as a set's hide does: its author reads them.
   const body = parse(
-    z.object({ action: z.enum(['dismiss', 'hide', 'fixed']), basis: Basis.optional(), reason: Reason }),
+    z.object({
+      action: z.enum(['dismiss', 'hide', 'fixed', 'awaiting_fix']),
+      basis: Basis.optional(),
+      reason: Reason,
+    }),
     req,
     res,
   );
@@ -188,8 +196,10 @@ adminRouter.post('/admin/hidden-questions/:id/unhide', change, (req, res) => {
 
 // ─── Reports about players, and the players ──────────────────────────────────
 
-adminRouter.get('/admin/reports', (_req, res) => {
-  res.json(openCases(res.locals.userId));
+/** The queue, a page at a time: `limit` grows by 25 with „Покажи още“ (up to 200). */
+adminRouter.get('/admin/reports', (req, res) => {
+  const limit = Math.min(200, Math.max(25, Number(req.query.limit) || 25));
+  res.json(openCases(res.locals.userId, limit));
 });
 
 const Decision = z.discriminatedUnion('action', [
@@ -227,6 +237,56 @@ adminRouter.post('/admin/cases/:kind/:id/resolve', change, (req, res) => {
 });
 
 /** A reported set, all of it, for the moderator to read (hidden or not). */
+/** A set's picture for a moderator's eyes, blocked or not (setForModerator points here): never cached, never framed. */
+adminRouter.get('/admin/pictures/:id', (req, res) => {
+  const id = String(req.params.id);
+  const file = /^[0-9a-f]{16}$/.test(id) ? pictureForModerator(id) : undefined;
+  if (!file) {
+    res.status(404).json({ error: 'Няма такава снимка.' });
+    return;
+  }
+  res.set({
+    'Content-Type': file.type,
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex',
+    'Content-Security-Policy': "default-src 'none'",
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  });
+  res.send(Buffer.from(file.bytes));
+});
+
+/**
+ * „Изтрий снимката“ (the owner's, under the written procedure for illegal pictures — docs/operations.md): its bytes go
+ * from every copy and every set, its hash stays blocked. Logged; whoever had it in a set hears why. For good.
+ */
+adminRouter.post('/admin/pictures/:id/delete', requireOwner, change, (req, res) => {
+  const body = parse(z.object({ reason: Reason }), req, res);
+  if (!body) return;
+  const id = String(req.params.id);
+  const reason = body.reason.trim();
+  if (!/^[0-9a-f]{16}$/.test(id) || !pictureForModerator(id)) {
+    res.status(404).json({ error: 'Няма такава снимка.' });
+    return;
+  }
+  if (reason.length < MODERATION.reasonMin) {
+    res.status(400).json({ error: `Напиши защо (поне ${MODERATION.reasonMin} знака).` });
+    return;
+  }
+  const sets = deletePicture(id);
+  logAction({ adminId: res.locals.userId, action: 'delete_picture', target: id, basis: 'content', reason });
+  for (const s of sets)
+    tellPlayer(s.ownerId, {
+      what: `Модератор изтри снимка от набора ти „${s.name}“: въпросът остава без нея.`,
+      basis: 'content',
+      reason,
+      onReport: true,
+      subject: 'Снимка от набора ти е изтрита',
+      icon: '🖼️',
+      link: '/sets',
+    });
+  res.json({ ok: true, sets: sets.length });
+});
+
 adminRouter.get('/admin/sets/:code', (req, res) => {
   const set = setForModerator(String(req.params.code).slice(0, 32));
   if (!set) {
@@ -313,9 +373,21 @@ adminRouter.post('/admin/players/:id/ban', change, (req, res) => {
 
 /** Lifts a ban (`days` null) or moves its end. */
 adminRouter.post('/admin/players/:id/ban-change', change, (req, res) => {
-  const body = parse(z.object({ days: z.number().int().min(1).max(3650).nullable(), reason: Reason }), req, res);
+  const body = parse(
+    z.object({
+      days: z.number().int().min(1).max(3650).nullable(),
+      reason: Reason,
+      restore: z.boolean().default(false),
+    }),
+    req,
+    res,
+  );
   if (!body) return;
-  reply(res, changeBan(res.locals.userId, idParam(req), body.days, body.reason), cardOf(req));
+  reply(
+    res,
+    changeBan(res.locals.userId, idParam(req), body.days, body.reason, { restore: body.restore }),
+    cardOf(req),
+  );
 });
 
 adminRouter.post('/admin/players/:id/rename', change, (req, res) => {
@@ -356,7 +428,12 @@ adminRouter.post('/admin/groups/:id/rename', change, (req, res) => {
 
 adminRouter.get('/admin/log', (req, res) => {
   const before = Number(req.query.before);
-  res.json({ entries: moderationLog(50, Number.isInteger(before) && before > 0 ? before : null) });
+  // A question's entry says which question, in its words.
+  const entries = moderationLog(50, Number.isInteger(before) && before > 0 ? before : null).map((e) => {
+    const q = e.target && QUESTION_ACTIONS.has(e.action) ? questionById(e.target) : undefined;
+    return q ? { ...e, about: q.q.length > 80 ? `${q.q.slice(0, 80)}…` : q.q } : e;
+  });
+  res.json({ entries });
 });
 
 adminRouter.post('/admin/log/:id/undo', change, (req, res) => {

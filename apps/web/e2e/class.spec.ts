@@ -1,4 +1,9 @@
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { expect, gameMs, me, playMatch, png, signUp, test, uniqueName } from './support';
+
+/** The test server's database (playwright.config.ts): what the tests can't do through the app. */
+const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
 
 test('a class: the teacher writes a set, runs it on a big screen, and a pupil joins by link under a name of their own', async ({
   page: teacher,
@@ -132,7 +137,17 @@ test('a locked room: a pupil with the code from the landing knocks, the teacher 
 test('a picture for a set’s question: picked on the device, made small, uploaded (Safari’s too) and shown only by its signed address', async ({
   page,
 }) => {
-  await signUp(page, uniqueName('Учител'), 'parola-123');
+  const name = uniqueName('Учител');
+  await signUp(page, name, 'parola-123');
+  // Pictures come from an account with a confirmed address (or one that has played a while): as if confirmed.
+  const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA busy_timeout = 5000');
+  db.prepare('UPDATE users SET email = ?, email_key = ? WHERE username = ?').run(
+    `${name}@example.test`.toLowerCase(),
+    `${name}@example.test`.toLowerCase(),
+    name,
+  );
+  db.close();
   await page.goto('/sets');
   await page.getByRole('button', { name: 'Нов набор' }).click();
   await expect(page).toHaveURL(/\/sets\/\d+$/);
