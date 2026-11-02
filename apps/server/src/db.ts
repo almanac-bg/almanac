@@ -1061,6 +1061,64 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
       WHERE team IS NOT NULL AND user_id IS NOT NULL AND team_win IS NULL;
     `,
   },
+  // v44, set pictures by index (sets.ts; the 31 October review, SERVER-10): which set uses which picture, as rows
+  // (`set_image_uses`), and since when each picture no set uses has been unused (`unused_pictures`, beside the
+  // pictures: a flag on their rows would write the picture again each time it flipped) — the sweep deletes those a day
+  // on by index, where it read every set's questions. Triggers keep both, so whatever writes a set (older code too,
+  // after a rollback) or deletes it (an account erased: the cascade) keeps them right.
+  {
+    compatible: `
+    CREATE TABLE set_image_uses (
+      image_id TEXT NOT NULL,
+      set_id INTEGER NOT NULL REFERENCES question_sets(id) ON DELETE CASCADE,
+      PRIMARY KEY (image_id, set_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX set_image_uses_set ON set_image_uses(set_id);
+    INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+      SELECT json_extract(q.value, '$.image.id'), s.id FROM question_sets s, json_each(s.questions) q
+      WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+
+    CREATE TABLE unused_pictures (
+      owner_id INTEGER NOT NULL,
+      id TEXT NOT NULL,
+      since INTEGER NOT NULL,
+      PRIMARY KEY (id, owner_id),
+      FOREIGN KEY (owner_id, id) REFERENCES set_images(owner_id, id) ON DELETE CASCADE
+    ) WITHOUT ROWID;
+    CREATE INDEX unused_pictures_since ON unused_pictures(since);
+    INSERT INTO unused_pictures (owner_id, id, since)
+      SELECT owner_id, id, created_at FROM set_images i
+      WHERE NOT EXISTS (SELECT 1 FROM set_image_uses u WHERE u.image_id = i.id);
+
+    CREATE TRIGGER set_pictures_added AFTER INSERT ON question_sets BEGIN
+      INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+        SELECT json_extract(q.value, '$.image.id'), NEW.id FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+    END;
+    CREATE TRIGGER set_pictures_changed AFTER UPDATE OF questions ON question_sets BEGIN
+      DELETE FROM set_image_uses WHERE set_id = NEW.id AND image_id NOT IN (
+        SELECT json_extract(q.value, '$.image.id') FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL);
+      INSERT OR IGNORE INTO set_image_uses (image_id, set_id)
+        SELECT json_extract(q.value, '$.image.id'), NEW.id FROM json_each(NEW.questions) q
+        WHERE json_extract(q.value, '$.image.id') IS NOT NULL;
+    END;
+    CREATE TRIGGER picture_used AFTER INSERT ON set_image_uses BEGIN
+      DELETE FROM unused_pictures WHERE id = NEW.image_id;
+    END;
+    CREATE TRIGGER picture_unused AFTER DELETE ON set_image_uses
+      WHEN NOT EXISTS (SELECT 1 FROM set_image_uses WHERE image_id = OLD.image_id)
+    BEGIN
+      INSERT OR IGNORE INTO unused_pictures (owner_id, id, since)
+        SELECT owner_id, id, CAST(unixepoch('subsec') * 1000 AS INTEGER) FROM set_images WHERE id = OLD.image_id;
+    END;
+    CREATE TRIGGER picture_uploaded AFTER INSERT ON set_images
+      WHEN NOT EXISTS (SELECT 1 FROM set_image_uses WHERE image_id = NEW.id)
+    BEGIN
+      INSERT OR IGNORE INTO unused_pictures (owner_id, id, since) VALUES (NEW.owner_id, NEW.id, NEW.created_at);
+    END;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

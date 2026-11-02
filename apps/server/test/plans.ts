@@ -43,10 +43,6 @@ const ALLOWED: { sql: RegExp; why: string }[] = [
     why: 'loading the bank: every approved question from players is part of it',
   },
   {
-    sql: /^SELECT DISTINCT json_extract\(q\.value, '\$\.image\.id'\) AS id FROM question_sets s, json_each/,
-    why: 'once a day (sweepPictures): the pictures sets use, so the ones no set uses can go',
-  },
-  {
     sql: /^SELECT id FROM player_groups g WHERE created_at < \? AND NOT EXISTS/,
     why: 'once a week (settleGroupWeeks): every group gets its week settled',
   },
