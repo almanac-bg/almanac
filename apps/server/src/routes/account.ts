@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { levelFromXp, MORE_TIME, type MoreTime } from '@almanac/shared';
+import { CLIENT_HEADER, levelFromXp, MORE_TIME, type MoreTime, parseClient } from '@almanac/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { bannedDataUser, deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
@@ -23,7 +23,19 @@ import { chooseOwnName, nameProblem } from '../moderation';
 import { nameShape } from '../names';
 import { listNotifications, markNotificationsRead } from '../notifications';
 import { disconnectSession } from '../notify';
-import { PrefsSchema, push, pushEnabled, SubscriptionSchema, setPushPrefs, subscribe, unsubscribe } from '../push';
+import {
+  DEVICE_TOKEN,
+  forgetDevice,
+  nativePushFor,
+  PrefsSchema,
+  push,
+  pushEnabled,
+  registerDevice,
+  SubscriptionSchema,
+  setPushPrefs,
+  subscribe,
+  unsubscribe,
+} from '../push';
 import { count } from '../stats';
 import { network, throttled, wideNetwork } from '../throttle';
 import { emailKey, getUser, nameTaken, usernameKey } from '../users';
@@ -418,6 +430,46 @@ accountRouter.post('/push/subscribe', requireAuth, requireAccount, (req, res) =>
       url: '/settings',
     });
   res.json({ user: getMe(res.locals.userId) });
+});
+
+/**
+ * An app's device gets pushes: the token Apple's or Google's service knows it by (`sandbox`: an iOS app built for
+ * development). Which service is the app's own (CLIENT_HEADER); the first device confirms it works, as in a browser.
+ */
+accountRouter.post('/push/devices', requireAuth, requireAccount, (req, res) => {
+  const platform = parseClient(req.headers[CLIENT_HEADER])?.client;
+  if (platform !== 'ios' && platform !== 'android') {
+    res.status(400).json({ error: 'Това е за приложението.' });
+    return;
+  }
+  if (!nativePushFor(platform)) {
+    res.status(503).json({ error: 'Известията не са включени за това приложение.' });
+    return;
+  }
+  const body = parse(z.object({ token: z.string().max(4096), sandbox: z.boolean().default(false) }), req, res);
+  if (!body) return;
+  if (!DEVICE_TOKEN[platform].test(body.token)) {
+    res.status(400).json({ error: 'Устройството не даде адрес за известия, който познаваме.' });
+    return;
+  }
+  if (throttled(`push-subscribe:${res.locals.userId}`, 20, 24 * 60 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Опитай утре.' });
+    return;
+  }
+  const session = sessionTokenOf(req);
+  const device = { platform, token: body.token, sandbox: platform === 'ios' && body.sandbox };
+  if (registerDevice(res.locals.userId, device, session ? hashToken(session) : null))
+    push(res.locals.userId, 'hello', {
+      title: 'Известията работят ✓',
+      body: 'Ще идват само избраните в Настройки — най-много две на ден, нищо нощем.',
+      url: '/settings',
+    });
+  res.json({ user: getMe(res.locals.userId) });
+});
+
+accountRouter.delete('/push/devices/:token', requireAuth, (req, res) => {
+  forgetDevice(res.locals.userId, String(req.params.token));
+  res.json({ ok: true });
 });
 
 accountRouter.post('/push/unsubscribe', requireAuth, (req, res) => {

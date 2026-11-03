@@ -1,3 +1,4 @@
+import { createPrivateKey } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -101,6 +102,70 @@ function minProtocol(): Record<ClientPlatform, number> {
 }
 
 /**
+ * A PEM key as it can be written in .env: whole, with its line breaks as `\n`, or as the base64 between its first and
+ * last line. Checked here, so a broken one stops the start instead of the first push.
+ */
+function pemKey(name: string, raw: string, label: string): string {
+  const text = raw.includes('-----BEGIN')
+    ? raw.replace(/\\n/g, '\n')
+    : `-----BEGIN ${label}-----\n${raw.trim()}\n-----END ${label}-----\n`;
+  try {
+    createPrivateKey(text);
+  } catch {
+    throw new Error(`Invalid setting: ${name} is not a ${label}.`);
+  }
+  return text;
+}
+
+/**
+ * Pushes to the iOS app, straight to Apple's service (APNs) with a token key (.p8): APNS_KEY_ID, APNS_TEAM_ID,
+ * APNS_KEY (the .p8's text) and APNS_TOPIC (the app's bundle id), all four or none. APNS_URL: a stand-in for Apple's
+ * service, for tests.
+ */
+function apns() {
+  const names = ['APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_KEY', 'APNS_TOPIC'] as const;
+  const given = names.filter((n) => process.env[n]?.trim());
+  if (!given.length) return null;
+  if (given.length < names.length)
+    throw new Error(
+      `Invalid setting: APNs needs all of ${names.join(', ')}; missing ${names.filter((n) => !given.includes(n)).join(', ')}.`,
+    );
+  return {
+    keyId: process.env.APNS_KEY_ID!.trim(),
+    teamId: process.env.APNS_TEAM_ID!.trim(),
+    key: pemKey('APNS_KEY', process.env.APNS_KEY!, 'PRIVATE KEY'),
+    topic: process.env.APNS_TOPIC!.trim(),
+    url: process.env.APNS_URL || null,
+  };
+}
+
+/**
+ * Pushes to the Android app, straight to Firebase Cloud Messaging (HTTP v1) as a service account:
+ * FCM_SERVICE_ACCOUNT, its JSON key file's text (or that text in base64). FCM_URL: a stand-in for Google's service,
+ * for tests.
+ */
+function fcm() {
+  const raw = process.env.FCM_SERVICE_ACCOUNT?.trim();
+  if (!raw) return null;
+  let account: { project_id?: unknown; client_email?: unknown; private_key?: unknown; token_uri?: unknown };
+  try {
+    account = JSON.parse(raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'));
+  } catch {
+    throw new Error('Invalid setting: FCM_SERVICE_ACCOUNT is not a service account key (JSON, or JSON in base64).');
+  }
+  const { project_id, client_email, private_key, token_uri } = account;
+  if (typeof project_id !== 'string' || typeof client_email !== 'string' || typeof private_key !== 'string')
+    throw new Error('Invalid setting: FCM_SERVICE_ACCOUNT lacks project_id, client_email or private_key.');
+  return {
+    projectId: project_id,
+    clientEmail: client_email,
+    privateKey: pemKey('FCM_SERVICE_ACCOUNT', private_key, 'PRIVATE KEY'),
+    tokenUri: typeof token_uri === 'string' ? token_uri : 'https://oauth2.googleapis.com/token',
+    url: process.env.FCM_URL || 'https://fcm.googleapis.com',
+  };
+}
+
+/**
  * When the evening Роял starts, Sofia time: EVENING_AT=21:00 (the default), or with seconds for tests ("13:05:30");
  * "off" turns it off. A typo stops the server.
  */
@@ -196,6 +261,9 @@ export const config = {
     process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY
       ? { publicKey: process.env.VAPID_PUBLIC_KEY.trim(), privateKey: process.env.VAPID_PRIVATE_KEY.trim() }
       : null,
+  /** The apps' pushes (nativePush.ts): Apple's service for iOS, Google's for Android; unset, that app gets none. */
+  apns: apns(),
+  fcm: fcm(),
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
   /**

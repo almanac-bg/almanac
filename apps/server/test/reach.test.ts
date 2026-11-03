@@ -1,7 +1,7 @@
 // Reaching players (6c): a note when a friend request is accepted, blocking (guests too, and in matchmaking), the opt-in „X те изпревари на линка ти“
 // email (once a day), and web push (a known push service only, a hello, a duel's turn, one of each kind a day).
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +30,14 @@ before(async () => {
   srv = await startServer({
     VAPID_PUBLIC_KEY: keys.publicKey,
     VAPID_PRIVATE_KEY: keys.privateKey,
+    // And the iOS app's (nothing goes to Apple: the outbox takes every push).
+    APNS_KEY_ID: 'KEY1234567',
+    APNS_TEAM_ID: 'TEAM123456',
+    APNS_KEY: generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }) as string,
+    APNS_TOPIC: 'bg.almanac.app',
     PUSH_OUTBOX: pushDir,
     PUSH_QUIET: 'off',
   });
@@ -52,6 +60,9 @@ const pushes = () =>
           kind: string;
           title: string;
           url: string;
+          /** What an app's device got, when the player has one: its lines, and which apps. */
+          native?: { title: string; body: string };
+          apps?: string[];
         },
     );
 
@@ -285,6 +296,24 @@ test(
     const prefs = await api.send('POST', '/api/push/prefs', F.cookie, { ...on.body.user.push, daily: 19 * 60 });
     assert.equal(prefs.body.user.push.daily, 19 * 60);
 
+    // F's iPhone too, signed in from the app.
+    const signedIn = await fetch(`${srv.url}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'x-almanac-client': 'ios 1 1.0.0+1', 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'telefonat', password: 'secret123' }),
+    });
+    const { session } = (await signedIn.json()) as { session: { token: string } };
+    const iphone = await fetch(`${srv.url}/api/push/devices`, {
+      method: 'POST',
+      headers: {
+        'x-almanac-client': 'ios 1 1.0.0+1',
+        'content-type': 'application/json',
+        authorization: `Bearer ${session.token}`,
+      },
+      body: JSON.stringify({ token: 'e'.repeat(64) }),
+    });
+    assert.equal(iphone.status, 200);
+
     await befriend(G, F);
     const sg = connect(srv.url, G.cookie);
     await connected(sg);
@@ -299,6 +328,10 @@ test(
       assert.equal(turns.length, 1, 'two duels, one push: the in-app notes have the rest');
       assert.match(turns[0].title, /Твой ред: predizvikva те предизвика/);
       assert.match(turns[0].url, /^\/c\//);
+      // To the iPhone without the name: Apple's service reads what it carries (the app has the rest).
+      assert.deepEqual(turns[0].apps, ['ios']);
+      assert.equal(turns[0].native?.title, '⚔️ Твой ред: приятел те предизвика');
+      assert.ok(!JSON.stringify(turns[0].native).includes('predizvikva'));
     });
 
     // The device is let go (switched off in Settings, or signed out of): nothing more goes to it.

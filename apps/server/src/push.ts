@@ -18,18 +18,30 @@ import { config } from './config';
 import { afterCommit, all, one, run } from './db';
 import { guarded } from './guard';
 import { reportError } from './monitoring';
+import { type NativeMessage, type Sent, sendApns, sendFcm } from './nativePush';
 import type { UserRow } from './users';
 
 /**
- * Web push: notifications on a player's devices, by their choice (PUSH_KINDS, a daily reminder at their time). At most
- * PUSH.perDay a day, one of each kind, and none at night; what they say also waits in the app's notifications, so a push
- * that isn't sent (quiet hours, the cap) loses nothing. The push services see only an encrypted payload.
+ * Pushes: notifications on a player's devices, by their choice (PUSH_KINDS, a daily reminder at their time) — a
+ * browser's (web push) and the apps' (nativePush.ts). At most PUSH.perDay a day, one of each kind, and none at night;
+ * what they say also waits in the app's notifications, so a push that isn't sent (quiet hours, the cap) loses nothing.
+ * A browser's push service sees only an encrypted payload; Apple's and Google's read theirs, which names nobody.
  */
 
 if (config.vapid)
   webpush.setVapidDetails(`mailto:${config.operator.email}`, config.vapid.publicKey, config.vapid.privateKey);
 
+/** Web push is set up (the VAPID keys): Settings offers it in the browser. */
 export const pushEnabled = () => !!config.vapid;
+
+export type DevicePlatform = 'ios' | 'android';
+/** An app's pushes are set up: Apple's service for iOS, Google's for Android. */
+export const nativePushFor = (platform: DevicePlatform) => (platform === 'ios' ? !!config.apns : !!config.fcm);
+const anyPush = () => !!(config.vapid || config.apns || config.fcm);
+
+/** The player has a device pushes can reach: a browser's subscription or an app's (in SQL, for `u`, a user row). */
+const HAS_DEVICE = `(EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = u.id)
+  OR EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id))`;
 
 /**
  * Where a subscription may point: the browsers' own push services (Chrome/Edge/Android, Firefox, Safari/iOS). The
@@ -117,6 +129,43 @@ export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema
 export const unsubscribe = (userId: number, endpoint: string) =>
   run('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', userId, pushEndpoint(endpoint) ?? endpoint);
 
+/**
+ * What an app's device token may be: Apple's, hexadecimal; Google's, letters, digits and `-_:`. The server only ever
+ * puts it in a request to that service (APNs: in the path), so nothing else gets in.
+ */
+export const DEVICE_TOKEN: Record<DevicePlatform, RegExp> = {
+  ios: /^[0-9a-f]{64,200}$/i,
+  android: /^[\w:-]{100,4096}$/,
+};
+
+/**
+ * Keeps an app's device for the player, with the session it came with (the trigger drops it with that session).
+ * True when it's new to them, as for a browser's (subscribe). `sandbox`: an iOS app built for development.
+ */
+export function registerDevice(
+  userId: number,
+  device: { platform: DevicePlatform; token: string; sandbox: boolean },
+  session: string | null,
+): boolean {
+  const had = one('SELECT 1 AS x FROM push_devices WHERE token = ? AND user_id = ?', device.token, userId);
+  run(
+    `INSERT INTO push_devices (token, platform, sandbox, user_id, session_token, created_at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (token) DO UPDATE SET platform = excluded.platform, sandbox = excluded.sandbox,
+       user_id = excluded.user_id, session_token = excluded.session_token`,
+    device.token,
+    device.platform,
+    device.sandbox ? 1 : 0,
+    userId,
+    session,
+    Date.now(),
+  );
+  run('UPDATE users SET push_prefs = COALESCE(push_prefs, ?) WHERE id = ?', JSON.stringify(defaultPushPrefs()), userId);
+  return !had;
+}
+
+export const forgetDevice = (userId: number, token: string) =>
+  run('DELETE FROM push_devices WHERE user_id = ? AND token = ?', userId, token);
+
 export const setPushPrefs = (userId: number, prefs: PushPrefs) =>
   run('UPDATE users SET push_prefs = ? WHERE id = ?', JSON.stringify(prefs), userId);
 
@@ -127,6 +176,11 @@ export interface PushMessage {
   url: string;
   /** Pushes with the same tag replace each other on the device. */
   tag?: string;
+  /**
+   * The lines for an app's device, when these name someone: Apple's and Google's services read what they carry, so
+   * there it says „приятел“ and the name waits in the app (a browser's push is encrypted end to end).
+   */
+  native?: { title: string; body: string };
 }
 
 const quietNow = (now: number) => {
@@ -146,17 +200,23 @@ export function push(
   message: PushMessage,
   now = Date.now(),
 ): boolean {
-  if (!config.vapid) return false;
-  const subs = all<{ endpoint: string; p256dh: string; auth: string }>(
-    'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
+  if (!anyPush()) return false;
+  const subs = !config.vapid
+    ? []
+    : all<{ endpoint: string; p256dh: string; auth: string }>(
+        'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
+        userId,
+      ).filter((s) => {
+        if (pushEndpoint(s.endpoint) === s.endpoint) return true;
+        // Kept before the check above was strict: never pushed to, and forgotten.
+        run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
+        return false;
+      });
+  const devices = all<{ token: string; platform: DevicePlatform; sandbox: number }>(
+    'SELECT token, platform, sandbox FROM push_devices WHERE user_id = ?',
     userId,
-  ).filter((s) => {
-    if (pushEndpoint(s.endpoint) === s.endpoint) return true;
-    // Kept before the check above was strict: never pushed to, and forgotten.
-    run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
-    return false;
-  });
-  if (!subs.length) return false;
+  ).filter((d) => nativePushFor(d.platform));
+  if (!subs.length && !devices.length) return false;
   if (kind !== 'hello') {
     const row = one<Pick<UserRow, 'push_prefs'>>('SELECT push_prefs FROM users WHERE id = ?', userId);
     const prefs = row && pushPrefs(row);
@@ -174,7 +234,10 @@ export function push(
       today,
     );
   }
-  const payload = JSON.stringify({ ...message, tag: message.tag ?? kind });
+  const { native, ...web } = message;
+  const tag = message.tag ?? kind;
+  const payload = JSON.stringify({ ...web, tag });
+  const forApps: NativeMessage = { ...(native ?? { title: message.title, body: message.body }), url: message.url, tag };
   // Called within a match's result (or another write) it goes out once that's in: a result rolled back buzzes nobody,
   // and the day's count (push_sent) is rolled back with it.
   afterCommit(() => {
@@ -183,7 +246,13 @@ export function push(
       const name = `${Date.now()}-${randomBytes(3).toString('hex')}.json`;
       fs.writeFileSync(
         path.join(config.pushOutbox, name),
-        JSON.stringify({ userId, kind, devices: subs.length, ...JSON.parse(payload) }),
+        JSON.stringify({
+          userId,
+          kind,
+          devices: subs.length + devices.length,
+          ...JSON.parse(payload),
+          ...(devices.length && { native: forApps, apps: devices.map((d) => d.platform) }),
+        }),
       );
       return;
     }
@@ -194,9 +263,23 @@ export function push(
           urgency: 'normal',
         })
         .catch((err: { statusCode?: number }) => pushFailed(s.endpoint, err));
+    for (const d of devices)
+      void (d.platform === 'ios' ? sendApns(d.token, d.sandbox === 1, forApps) : sendFcm(d.token, forApps)).then(
+        (sent) => devicePushed(d.token, d.platform, sent),
+      );
   });
   return true;
 }
+
+/** How an app's push went: a device that's gone is forgotten, any other failure reported. Never throws (pushFailed). */
+const devicePushed = guarded('device push', (token: string, platform: DevicePlatform, sent: Sent) => {
+  if (sent.ok) return;
+  if (sent.gone) run('DELETE FROM push_devices WHERE token = ?', token);
+  else
+    void reportError(new Error(`${platform} push failed: ${sent.status} ${sent.reason}`.trim()), 'push', {
+      extra: { platform, status: sent.status, reason: sent.reason },
+    });
+});
 
 /**
  * A push that didn't go. A device that's gone (the browser dropped it, the app was removed) is forgotten; anything else
@@ -224,12 +307,12 @@ const minuteOfDay = (now: number) => {
 
 /** The daily reminders whose time has come: whoever hasn't played today's questions yet (maintenance, every 15 min). */
 export function dailyReminderPushes(now = Date.now()): number {
-  if (!config.vapid) return 0;
+  if (!anyPush()) return 0;
   const today = dayKey(now);
   const minute = minuteOfDay(now);
   const due = all<{ id: number; push_prefs: string }>(
     `SELECT u.id, u.push_prefs FROM users u
-     WHERE u.push_prefs IS NOT NULL AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = u.id)
+     WHERE u.push_prefs IS NOT NULL AND ${HAS_DEVICE}
      AND NOT EXISTS (SELECT 1 FROM daily_results d WHERE d.user_id = u.id AND d.day = ?)
      AND NOT EXISTS (SELECT 1 FROM push_sent p WHERE p.user_id = u.id AND p.kind = 'daily' AND p.day = ?)
      AND json_extract(u.push_prefs, '$.daily') <= ?`,
@@ -261,8 +344,7 @@ export function dailyReminderPushes(now = Date.now()): number {
 /** Users who set up push on some device and want `kind`. */
 function wanting(kind: PushKind, extra = '', ...args: (string | number)[]) {
   return all<UserRow>(
-    `SELECT u.* FROM users u WHERE u.push_prefs IS NOT NULL
-     AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = u.id)
+    `SELECT u.* FROM users u WHERE u.push_prefs IS NOT NULL AND ${HAS_DEVICE}
      AND NOT EXISTS (SELECT 1 FROM push_sent p WHERE p.user_id = u.id AND p.kind = '${kind}' AND p.day = ?) ${extra}`,
     dayKey(),
     ...args,
@@ -281,7 +363,7 @@ const EVENING_LEAD_MS = 15 * 60_000;
  * about to start, the group week's last day. `streakOf` and `eveningStart` come from their own modules.
  */
 export function timedPushes(streakOf: (u: UserRow) => number, eveningStart: number | null, now = Date.now()): number {
-  if (!config.vapid || quietNow(now)) return 0;
+  if (!anyPush() || quietNow(now)) return 0;
   const today = dayKey(now);
   const hour = sofiaHour(now);
   const notPlayed = 'AND NOT EXISTS (SELECT 1 FROM daily_results d WHERE d.user_id = u.id AND d.day = ?)';

@@ -1,6 +1,7 @@
 // The settings read from the environment: a number that isn't one stops the start (naming it) instead of becoming NaN.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -83,6 +84,8 @@ test('every setting the server reads is passed to it by docker-compose.yml, or i
     'PUSH_QUIET',
     'SQL_LOG',
     'MIGRATE_TO',
+    'APNS_URL',
+    'FCM_URL',
     'NODE_ENV',
     'PORT',
     'UV_THREADPOOL_SIZE',
@@ -109,4 +112,32 @@ test('every setting the code and .env.example name is described in docs/configur
   for (const name of ['CI', 'TEST_WORKER_INDEX']) names.delete(name);
   const doc = fs.readFileSync(path.join(root, 'docs/configuration.md'), 'utf8');
   assert.deepEqual([...names].filter((name) => !doc.includes(`\`${name}\``)).sort(), []);
+});
+
+// The apps' pushes: half the APNs settings, or a key that isn't one, stops the start — not the first push hours later.
+test('APNs takes all four settings or none, and a real key; FCM a real service account key', () => {
+  const ec = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({
+    type: 'pkcs8',
+    format: 'pem',
+  });
+  const all = {
+    APNS_KEY_ID: 'K',
+    APNS_TEAM_ID: 'T',
+    APNS_KEY: String(ec).replace(/\n/g, '\\n'),
+    APNS_TOPIC: 'bg.almanac.app',
+  };
+  assert.equal(load(all).status, 0, 'all four, the key on one line');
+  const body = String(ec).split('\n').slice(1, -2).join('');
+  assert.equal(load({ ...all, APNS_KEY: body }).status, 0, 'the key as its base64 alone');
+  const half = load({ APNS_KEY_ID: 'K', APNS_KEY: all.APNS_KEY });
+  assert.notEqual(half.status, 0);
+  assert.match(half.err, /Invalid setting: APNs needs all of .*missing APNS_TEAM_ID, APNS_TOPIC/);
+  const broken = load({ ...all, APNS_KEY: 'not-a-key' });
+  assert.notEqual(broken.status, 0);
+  assert.match(broken.err, /Invalid setting: APNS_KEY is not a PRIVATE KEY/);
+  for (const value of ['{"project_id":"p"}', 'not json', '{"project_id":"p","client_email":"e","private_key":"x"}']) {
+    const { status, err } = load({ FCM_SERVICE_ACCOUNT: value });
+    assert.notEqual(status, 0, value);
+    assert.match(err, /Invalid setting: FCM_SERVICE_ACCOUNT/, value);
+  }
 });

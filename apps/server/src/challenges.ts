@@ -485,6 +485,8 @@ function duelPlayed(c: ChallengeRow, userId: number, score: number): DuelStandin
     push(friendId, 'duels', {
       title: `⚔️ Твой ред: ${me.username} те предизвика`,
       body: `${score} точки за биене. Имаш ${DUEL.hours} часа.`,
+      // On an app, without the name: Apple's and Google's services read it (push.ts → PushMessage.native).
+      native: { title: '⚔️ Твой ред: приятел те предизвика', body: `${score} точки за биене. Имаш ${DUEL.hours} часа.` },
       url: link,
       tag: `duel-${c.id}`,
     });

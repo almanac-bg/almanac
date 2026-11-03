@@ -1237,6 +1237,30 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
   // pupils, guests most of them — can report that set from the match's review, with no link to it. A plain number, no
   // foreign key: a set deleted since is simply not found. Older code doesn't write it; a match it saves has none.
   { compatible: 'ALTER TABLE matches ADD COLUMN set_id INTEGER;' },
+
+  // v54, the apps' devices for pushes (push.ts; the 31 October review, 8n.5): the token Apple's or Google's service
+  // knows the device by, for the account and the session it came with. As a browser's subscription (v40), it goes when
+  // that session ends — signing out, a new password, a ban, its expiry — and with the account. Older code doesn't read
+  // it; the trigger works for it too.
+  {
+    compatible: `
+    CREATE TABLE push_devices (
+      token TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      sandbox INTEGER NOT NULL DEFAULT 0,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      session_token TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX push_devices_user ON push_devices(user_id);
+    CREATE INDEX push_devices_session ON push_devices(session_token) WHERE session_token IS NOT NULL;
+    DROP TRIGGER sessions_take_push;
+    CREATE TRIGGER sessions_take_push AFTER DELETE ON sessions BEGIN
+      DELETE FROM push_subscriptions WHERE session_token = OLD.token;
+      DELETE FROM push_devices WHERE session_token = OLD.token;
+    END;
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
