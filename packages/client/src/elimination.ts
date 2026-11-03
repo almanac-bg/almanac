@@ -1,5 +1,5 @@
-import type { LiveGame } from '@almanac/client';
 import { knockoutsAfter } from '@almanac/shared';
+import type { LiveGame } from './store';
 
 /**
  * The next question after which someone is knocked out (1-based), or null when none is left. Once a question is
@@ -21,4 +21,14 @@ export function inDropZone(game: LiveGame): Set<string> {
   if (still.length <= 2 || still.every((s) => s.score === 0)) return new Set();
   const out = knockoutsAfter(game.start.mode, game.start.eliminationSchedule, next, still.length);
   return new Set(still.slice(still.length - out).map((s) => s.id));
+}
+
+/**
+ * People other than you still playing (bots don't count, nor the knocked out or gone). With none, the server doesn't
+ * keep anyone waiting for the bots' final: it decides it at once and the results come, so there's nothing to watch.
+ */
+export function othersStillIn(game: LiveGame) {
+  return game.standings.filter(
+    (s) => s.id !== game.start.youId && !game.players[s.id]?.isBot && s.eliminatedAt === null && !s.left,
+  ).length;
 }

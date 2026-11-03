@@ -17,6 +17,7 @@ jest.mock('expo-secure-store', () => ({
 const answer = jest.spyOn(actions, 'answer').mockImplementation(() => {});
 const guess = jest.spyOn(actions, 'guess').mockImplementation(() => {});
 const arrange = jest.spyOn(actions, 'arrange').mockImplementation(() => {});
+const powerup = jest.spyOn(actions, 'powerup').mockImplementation(() => {});
 beforeEach(() => jest.clearAllMocks());
 
 const base: QuestionPayload = {
@@ -42,7 +43,7 @@ const base: QuestionPayload = {
 } as QuestionPayload;
 
 /** A run alone, on this question, nothing picked yet. */
-function game(question: Partial<QuestionPayload> = {}, more: Partial<LiveGame> = {}): LiveGame {
+function game(question: Partial<QuestionPayload> = {}, { start, ...more }: Partial<LiveGame> = {}): LiveGame {
   return {
     start: {
       gameId: 'g1',
@@ -54,6 +55,11 @@ function game(question: Partial<QuestionPayload> = {}, more: Partial<LiveGame> =
       questionSet: null,
       totalQuestions: 10,
       timeMs: 15_000,
+      eliminationSchedule: [],
+      powerups: [],
+      emotes: [],
+      teams: false,
+      ...start,
     },
     players: {},
     standings: [{ id: 'u1', score: 0, streak: 0 }],
@@ -172,4 +178,19 @@ test('a fact after an answer in a run alone, with the way to stop and read it', 
   expect(screen.getByText('+1200')).toBeTruthy();
   expect(screen.getByText(/Освобождението е на 3 март/)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Спри, за да прочета' })).toBeTruthy();
+});
+
+test("a коз is played with a tap; one that can't be played now says why instead", async () => {
+  const g = game(
+    { difficulty: 'medium' },
+    { start: { powerups: ['fifty', 'double'] } as never, usedPowerups: ['double'] },
+  );
+  await show(g);
+  await fireEvent.press(screen.getByRole('button', { name: '50/50' }));
+  expect(powerup).toHaveBeenCalledWith('fifty');
+  powerup.mockClear();
+  await show({ ...g, powerupThisQuestion: true } as LiveGame);
+  await fireEvent.press(screen.getAllByRole('button', { name: '50/50' }).at(-1)!);
+  expect(powerup).not.toHaveBeenCalled();
+  expect(screen.getByText('50/50: само един коз на въпрос')).toBeTruthy();
 });

@@ -1,4 +1,4 @@
-import { fmt, type LiveGame } from '@almanac/client';
+import { fmt, inDropZone, type LiveGame } from '@almanac/client';
 import { emoteById, type Standing, TEAMS, type TeamId } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Skull } from 'lucide-react';
@@ -11,7 +11,6 @@ import { Avatar, machineTag, PlayerTag } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { accentText } from './answers';
 import { BIG_MATCH, topAndYou } from './bigMatch';
-import { inDropZone } from './elimination';
 import { myTeamOf, TeamScoreBar, TeamTotal, teamColor, teamTotals } from './teams';
 
 /* Who stands where during a match: the board beside it on wide screens, the strip of players on phones. */

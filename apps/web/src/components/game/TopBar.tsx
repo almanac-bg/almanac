@@ -1,4 +1,4 @@
-import { fmt, type LiveGame } from '@almanac/client';
+import { fmt, type LiveGame, nextElimination } from '@almanac/client';
 import { MODES } from '@almanac/shared';
 import clsx from 'clsx';
 import { Flame, Skull, Volume2, VolumeX, X } from 'lucide-react';
@@ -6,7 +6,6 @@ import { accentFill } from '../../lib/accent';
 import { useCountUp } from '../../lib/hooks';
 import { m } from '../../lib/motion';
 import { useMuted } from '../../lib/sound';
-import { nextElimination } from './elimination';
 import { myTeamOf, TeamScoreBar, teamTotals } from './teams';
 
 /** The match screen's top bar: the mode, how far along it is, your score, the sound and the way out. */

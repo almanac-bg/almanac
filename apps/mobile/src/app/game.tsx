@@ -1,12 +1,15 @@
-import { actions, useStore } from '@almanac/client';
+import { actions, type LiveGame, useStore } from '@almanac/client';
 import { Redirect, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Emotes } from '@/game/Emotes';
 import { Intro } from '@/game/Intro';
+import { OutNotice } from '@/game/OutNotice';
 import { QuestionScreen } from '@/game/QuestionScreen';
 import { Results } from '@/game/Results';
 import { RoundPick } from '@/game/RoundPick';
+import { Strip } from '@/game/Strip';
 import { TopBar } from '@/game/TopBar';
 import { gutter, useColors } from '@/theme';
 import { T } from '@/ui';
@@ -70,9 +73,13 @@ export default function GameScreen() {
       </View>
     );
   if (game.phase === 'ended' && game.end) return <Results key={game.end.rewards ? 'saved' : 'saving'} game={game} />;
+  const single = game.start.players.length === 1;
+  const out = game.eliminated.includes(game.start.youId);
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
       <TopBar game={game} onLeave={leave} />
+      {!single && <Strip game={game} />}
+      <Feed game={game} />
       {offline && (
         <T variant="small" tone="bad" align="center" style={{ paddingTop: 8 }} accessibilityLiveRegion="polite">
           Няма връзка — връщаме те веднага щом се появи
@@ -90,7 +97,27 @@ export default function GameScreen() {
             <T tone="fg3">Следващият въпрос идва…</T>
           </View>
         )}
+        {out && game.phase !== 'countdown' && <OutNotice game={game} />}
+        {!single && <Emotes emotes={game.start.emotes} offline={offline} />}
       </View>
     </View>
+  );
+}
+
+/** What just happened in the match („Ана отпадна“, a коз played), for a few seconds — and to a screen reader. */
+function Feed({ game }: { game: LiveGame }) {
+  const last = game.feed.at(-1);
+  const [shown, setShown] = useState<number | null>(null);
+  useEffect(() => {
+    if (!last) return;
+    setShown(last.key);
+    const t = setTimeout(() => setShown(null), 4000);
+    return () => clearTimeout(t);
+  }, [last]);
+  if (!last || shown !== last.key) return null;
+  return (
+    <T variant="small" tone="fg2" align="center" accessibilityLiveRegion="polite" style={{ paddingTop: 8 }}>
+      {last.icon} {last.text}
+    </T>
   );
 }
