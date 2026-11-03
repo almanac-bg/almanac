@@ -3,6 +3,7 @@ import { expect, gameMs, me, playMatch, signUp, test, uniqueName } from './suppo
 test('Отбори: one asks a friend from the mode card, the friend says yes, and the two play together', async ({
   page: anna,
   newPlayer,
+  queue,
 }) => {
   const annaName = uniqueName('Анна');
   const boris = await newPlayer();
@@ -12,6 +13,7 @@ test('Отбори: one asks a friend from the mode card, the friend says yes, a
   expect((await anna.request.post(`/api/friends/${(await me(boris)).id}/accept`)).ok()).toBe(true);
 
   // The Отбори card asks who with: Boris is online.
+  await queue('teams');
   await anna.getByRole('button', { name: 'Играй Отбори', exact: true }).click();
   const picker = anna.getByRole('dialog', { name: 'Отбори: с кого играеш?' });
   await picker.getByRole('listitem').filter({ hasText: borisName }).getByRole('button', { name: 'Покани' }).click();
