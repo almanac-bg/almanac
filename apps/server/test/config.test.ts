@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
+import { PROTOCOL } from '@almanac/shared';
 
 /** Loads the configuration in a fresh process with these settings; its exit status and what it printed. */
 function load(env: Record<string, string>) {
@@ -13,7 +14,7 @@ function load(env: Record<string, string>) {
       '--import',
       'tsx',
       '-e',
-      "const { config } = await import('./src/config.ts'); console.log(JSON.stringify({ port: config.port, botFillMs: config.botFillMs, gameTimeScale: config.gameTimeScale }))",
+      "const { config } = await import('./src/config.ts'); console.log(JSON.stringify({ port: config.port, botFillMs: config.botFillMs, gameTimeScale: config.gameTimeScale, minProtocol: config.minProtocol }))",
     ],
     { cwd: path.resolve(import.meta.dirname, '..'), env: { ...process.env, ...env }, encoding: 'utf8' },
   );
@@ -36,7 +37,25 @@ test('a number setting that is not a number stops the start, naming it', () => {
 test('blank settings count as unset; "off" and decimals are understood', () => {
   const { status, out } = load({ PORT: '', BOT_FILL_SECONDS: 'off', GAME_TIME_SCALE: '0.15' });
   assert.equal(status, 0);
-  assert.deepEqual(JSON.parse(out), { port: 3001, botFillMs: null, gameTimeScale: 0.15 });
+  assert.deepEqual(JSON.parse(out), {
+    port: 3001,
+    botFillMs: null,
+    gameTimeScale: 0.15,
+    minProtocol: { web: PROTOCOL, ios: 1, android: 1 },
+  });
+});
+
+// MIN_PROTOCOL turns the apps' oldest protocol up once a newer app is out: a typo would refuse every player of an app,
+// or none, so it stops the start instead.
+test('MIN_PROTOCOL: ios:N,android:N up to the current protocol; anything else stops the start', () => {
+  const ok = load({ MIN_PROTOCOL: ` ios:${PROTOCOL} , android:1 ` });
+  assert.equal(ok.status, 0, ok.err);
+  assert.deepEqual(JSON.parse(ok.out).minProtocol, { web: PROTOCOL, ios: PROTOCOL, android: 1 });
+  for (const value of [`ios:${PROTOCOL + 1}`, 'ios:0', 'web:1', 'ios', 'ios:1.5', 'ios:one', 'iphone:1', 'ios=1']) {
+    const { status, err } = load({ MIN_PROTOCOL: value });
+    assert.notEqual(status, 0, value);
+    assert.match(err, /Invalid setting: MIN_PROTOCOL /, value);
+  }
 });
 
 // Compose names each setting it hands the app: one added to the code but not to docker-compose.yml never reaches

@@ -2,6 +2,7 @@ export * from './accounts';
 export * from './achievements';
 export * from './brand';
 export * from './categories';
+export * from './client';
 export * from './cosmetics';
 export * from './formats';
 export * from './mastery';

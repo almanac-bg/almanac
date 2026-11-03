@@ -1,6 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, DEFAULT_OPEN_QUEUES, EVENING, isQueueMode, QUEUE_MODES, type QueueModeId } from '@almanac/shared';
+import {
+  BRAND,
+  type ClientPlatform,
+  DEFAULT_OPEN_QUEUES,
+  EVENING,
+  isQueueMode,
+  PROTOCOL,
+  QUEUE_MODES,
+  type QueueModeId,
+} from '@almanac/shared';
 import { z } from 'zod';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
@@ -73,6 +82,25 @@ function openQueues(): QueueModeId[] {
 }
 
 /**
+ * MIN_PROTOCOL=ios:2,android:2: the oldest protocol (packages/shared → PROTOCOL) each app may still speak; unset, an
+ * app's is 1. The web's is always this server's own: a tab from before it reloads onto the new build. Raised once an
+ * app that speaks the new one is out (docs/maintainers.md → Протокол). A typo stops the server.
+ */
+function minProtocol(): Record<ClientPlatform, number> {
+  const min: Record<ClientPlatform, number> = { web: PROTOCOL, ios: 1, android: 1 };
+  const raw = process.env.MIN_PROTOCOL?.trim();
+  if (!raw) return min;
+  for (const part of raw.split(',')) {
+    const [platform, value] = part.split(':').map((s) => s.trim());
+    const n = Number(value);
+    if ((platform !== 'ios' && platform !== 'android') || !Number.isInteger(n) || n < 1 || n > PROTOCOL)
+      throw new Error(`Invalid setting: MIN_PROTOCOL has "${part}"; use ios:N,android:N with N from 1 to ${PROTOCOL}.`);
+    min[platform] = n;
+  }
+  return min;
+}
+
+/**
  * When the evening Роял starts, Sofia time: EVENING_AT=21:00 (the default), or with seconds for tests ("13:05:30");
  * "off" turns it off. A typo stops the server.
  */
@@ -103,6 +131,7 @@ export const config = {
   botFillBusyMs: Math.max(botFillMs ?? 0, (env.BOT_FILL_BUSY_SECONDS ?? 20) * 1000),
   /** Ranked queues players can join; the others stay closed until there are enough people for them. */
   openQueues: openQueues(),
+  minProtocol: minProtocol(),
   /** When the evening Роял starts each day (null: never). */
   eveningAt: eveningAt(),
   // Secure cookies whenever the site is served over HTTPS, unless COOKIE_SECURE says otherwise.
