@@ -1,4 +1,4 @@
-import { actions, api, toast, useStore } from '@almanac/client';
+import { actions, api, PRESENCE, toast, useStore } from '@almanac/client';
 import type { FriendEntry } from '@almanac/shared';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
@@ -7,7 +7,6 @@ import { useLoad } from '../../lib/load';
 import { Avatar } from '../Avatar';
 import { GuestNudge } from '../ClaimAccount';
 import { PlayerName } from '../FitName';
-import { PRESENCE } from '../presence';
 import { Button, Modal, Spinner } from '../ui';
 
 /** A friend who could say yes now: online, in a room or in a queue (not mid-match or away). */

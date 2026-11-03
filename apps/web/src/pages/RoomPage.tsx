@@ -1,4 +1,4 @@
-import { actions, api, plural, toast, useStore } from '@almanac/client';
+import { actions, api, PRESENCE, plural, toast, useStore } from '@almanac/client';
 import {
   BRAND,
   CATEGORIES,
@@ -46,7 +46,6 @@ import { FreshPowerupNotes } from '../components/game/Powerups';
 import { teamColor } from '../components/game/teams';
 import { LoadError } from '../components/LoadError';
 import { Logo, Rosette } from '../components/Logo';
-import { PRESENCE } from '../components/presence';
 import { QrCode } from '../components/QrCode';
 import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
