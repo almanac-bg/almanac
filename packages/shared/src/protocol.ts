@@ -1001,6 +1001,9 @@ export type ModerationLogAction =
   | 'staff_add'
   | 'staff_remove'
   | 'staff_2fa_reset'
+  /** A staff member added or removed a passkey for their second factor. */
+  | 'staff_passkey_added'
+  | 'staff_passkey_removed'
   | 'staff_sign_in'
   | 'second_factor_failed'
   | 'second_factor_locked'
@@ -1035,8 +1038,24 @@ export interface ModerationLogEntry {
   canUndo: boolean;
 }
 
-/** A staff member's second factor this session: an authenticator app to set up, a code to give, or given. */
+/** A staff member's second factor this session: one to set up (an app or a passkey), one to give, or given. */
 export type SecondFactorState = 'setup' | 'needed' | 'ok';
+
+/** A passkey a staff member signs in to /admin with (WebAuthn), as their settings list it. */
+export interface StaffPasskey {
+  /** The credential's id, as the browser names it (base64url). */
+  id: string;
+  /** The device it was made on („iPhone“, „Mac“…). */
+  name: string;
+  createdAt: number;
+  usedAt: number | null;
+}
+
+/** The second factors a staff member has: the authenticator app's code, and passkeys. */
+export interface StaffSecondFactors {
+  code: boolean;
+  passkeys: StaffPasskey[];
+}
 
 /** What waits for the moderators (the home card, the tabs' counts), and their second factor this session. */
 export interface AdminSummary {

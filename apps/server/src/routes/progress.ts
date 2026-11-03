@@ -23,7 +23,7 @@ import { idParam, parse, requireAccount } from './common';
 /** „Моите знания“ and groups: what a player builds up over time. */
 export const progress = Router();
 
-// ─── „Моят алманах“ ──────────────────────────────────────────────────────────
+// ─── „Моите знания“ ──────────────────────────────────────────────────────────
 
 progress.get('/knowledge', requireAuth, (_req, res) => {
   res.json(knowledgeOverview(res.locals.userId));

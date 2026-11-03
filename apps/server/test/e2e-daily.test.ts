@@ -488,7 +488,7 @@ test(
         password: 'secret123',
       });
     const saved = await claim(G.cookie);
-    assert.equal(saved.status, 200);
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
     sg.close();
     assert.equal((await api.get('/api/daily', saved.cookie)).body.offBoard, true, 'saved today: off until tomorrow');
 
@@ -501,7 +501,8 @@ test(
     assert.ok((await emitAck(sh, 'daily:start', {})).ok);
     assert.equal((await own).end.rewards!.daily!.offBoard, true, 'as a guest, off the board');
     const savedH = await claim(H.cookie);
-    assert.equal(savedH.status, 200);
+    // Why, if not (once on CI, a 400 with nothing to tell which of the route's reasons it was).
+    assert.equal(savedH.status, 200, JSON.stringify(savedH.body));
     sh.close();
     const after = (await api.get('/api/daily', savedH.cookie)).body;
     assert.equal(after.offBoard, false);

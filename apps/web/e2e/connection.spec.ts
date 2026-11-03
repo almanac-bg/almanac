@@ -1,5 +1,5 @@
 import type { WebSocketRoute } from '@playwright/test';
-import { expect, playMatch, signUp, startAsGuest, startSolo, test, uniqueName } from './support';
+import { expect, gameMs, notePicked, playMatch, signUp, startAsGuest, startSolo, test, uniqueName } from './support';
 
 test('a connection that drops mid-match comes back to the same match, which plays to the end', async ({ page }) => {
   // Every realtime connection goes through here, so the test can cut one the way a tunnel or a lift would.
@@ -11,11 +11,10 @@ test('a connection that drops mid-match comes back to the same match, which play
   await startSolo(page, 'Микс');
 
   // The first question answered, then the line goes.
-  await page
-    .getByRole('button', { name: /^[АБВГ]\) /, disabled: false })
-    .first()
-    .click();
-  await expect(page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ })).toBeVisible();
+  const first = page.getByRole('button', { name: /^[АБВГ]\) /, disabled: false }).first();
+  const taken = await notePicked(first);
+  await first.click();
+  await taken('the first answer not taken', gameMs(2_000));
   const cut = links.at(-1)!;
   await Promise.all([cut.page.close(), cut.server.close()]);
   await expect(page.locator('[data-connection="down"]')).toHaveCount(1);

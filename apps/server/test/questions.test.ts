@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { CALENDAR_DAYS, CATEGORY_IDS } from '@quiz/shared';
+import { plainWords, stems as wordStems } from '../src/giveaways';
 
 interface Q {
   id: string;
@@ -113,40 +114,13 @@ function asNumber(option: string): { value: number; unit: string } | null {
   return Number.isFinite(value) ? { value, unit: m[2].trim() } : null;
 }
 
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
+const normalize = plainWords;
 
 /** The mix every match draws (pickQuestions): a bank with the same split wears its difficulties out evenly. */
 const SHARE = { easy: 0.4, medium: 0.4, hard: 0.2 } as const;
 
-/** Words every other question has: two questions sharing them aren't on the same subject (as in the bank tool). */
-const COMMON = new Set([
-  'колко',
-  'която',
-  'което',
-  'които',
-  'какво',
-  'какъв',
-  'каква',
-  'какви',
-  'годин',
-  'чийто',
-  'чиято',
-  'бълга',
-]);
-
-/** Rough word stems (the first five letters of each word of five or more), as the bank tool compares questions. */
-const stems = (s: string) =>
-  new Set(
-    normalize(s)
-      .split(' ')
-      .filter((w) => w.length >= 5 && !/^\d+$/.test(w))
-      .map((w) => w.slice(0, 5))
-      .filter((w) => !COMMON.has(w)),
-  );
+/** Rough word stems, as the bank tool compares questions (src/giveaways.ts): words only, numbers apart. */
+const stems = (s: string) => wordStems(s);
 
 for (const { name, file, perCategory, perDifficulty, numbersPerCategory, balanced } of BANKS) {
   const everything = JSON.parse(fs.readFileSync(file, 'utf8')) as Q[];

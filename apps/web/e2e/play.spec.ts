@@ -1,4 +1,14 @@
-import { expect, expectPressable, gameMs, noteWhenShown, playMatch, startAsGuest, startSolo, test } from './support';
+import {
+  expect,
+  expectPressable,
+  gameMs,
+  notePicked,
+  noteWhenShown,
+  playMatch,
+  startAsGuest,
+  startSolo,
+  test,
+} from './support';
 
 test.describe('with motion on', () => {
   // Everything else runs with reduced motion (playwright.config.ts): here the animations play, from the lazily loaded
@@ -74,11 +84,10 @@ test('a whole match from the keyboard: Tab to the category, Enter, then 1–4 to
       await page.keyboard.press('Enter');
       await expect(lock, `number ${index}: the keys didn't lock it`).toBeHidden({ timeout: gameMs(2_000) });
     } else {
+      // 1 is А, the first answer.
+      const taken = await notePicked(open.first());
       await page.keyboard.press('1');
-      await expect(
-        page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ }),
-        `question ${index}: the key didn't answer it`,
-      ).toBeVisible({ timeout: gameMs(2_000) });
+      await taken(`question ${index}: the key didn't answer it`, gameMs(2_000));
     }
     answered.add(index);
   }

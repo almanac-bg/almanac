@@ -1,6 +1,6 @@
 // A database with a long history, for the load test (`npm run load -w @quiz/server -- --seed 20000`): that many
 // accounts, each with months of what play leaves behind — matches, the answer log, dailies, seasons, notifications,
-// friends, the almanac, groups — as a server has after a year or two. A query that's instant on ten players can crawl
+// friends, what they've learned („Моите знания“), groups — as a server has after a year or two. A query that's instant on ten players can crawl
 // through a million rows; the load test then plays on top of this. Written straight in with SQL (seconds, not hours);
 // the running tallies are left for the server's first start to count (catchUpTallies), which the load test times.
 //
@@ -182,7 +182,7 @@ step(
   now,
 );
 step(
-  'almanac',
+  'knowledge',
   `INSERT INTO learned (user_id, question_id, learned_at)
    SELECT u.id, q.id, ? - q.n * 600000 FROM users u JOIN q ON (u.id * 7 + q.n) % 4 = 0 WHERE u.is_guest = 0`,
   now,

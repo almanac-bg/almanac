@@ -1,6 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
+import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
+import { serverDb } from '../playwright.config';
 
 export type { Page };
 export { expect };
@@ -100,23 +103,25 @@ export async function me(page: Page): Promise<Me> {
 
 /**
  * A line that's on screen only for a moment (at the tests' speed the next screen replaces it within a few dozen ms):
- * noted the moment it appears, then waited for — a look every so often can miss it. Set up before what makes it
- * appear.
+ * noted the moment it appears — on the page, or in one element of it — then waited for: a look every so often can
+ * miss it. Set up before what makes it appear.
  */
-export async function noteWhenShown(page: Page, text: RegExp) {
+export async function noteWhenShown(where: Page | Locator, text: RegExp) {
+  const page = 'goto' in where ? where : where.page();
+  const root = 'goto' in where ? where.locator('body') : where;
   const key = `shown_${Math.random().toString(36).slice(2)}`;
-  await page.evaluate(
-    ({ key, source, flags }) => {
+  await root.evaluate(
+    (element, { key, source, flags }) => {
       const pattern = new RegExp(source, flags);
       const notes = window as unknown as Record<string, boolean>;
       notes[key] = false;
       const look = () => {
-        if (!pattern.test(document.body.textContent ?? '')) return;
+        if (!pattern.test(element.textContent ?? '')) return;
         notes[key] = true;
         observer.disconnect();
       };
       const observer = new MutationObserver(look);
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      observer.observe(element, { childList: true, subtree: true, characterData: true });
     },
     { key, source: text.source, flags: text.flags },
   );
@@ -124,6 +129,25 @@ export async function noteWhenShown(page: Page, text: RegExp) {
     expect
       .poll(() => page.evaluate((k) => (window as unknown as Record<string, boolean>)[k], key), { message, timeout })
       .toBe(true);
+}
+
+/**
+ * Notes when this answer shows as the player's pick („— твоят избор“, and on the reveal „— верен отговор, твоят избор“
+ * or „— твоят избор, грешен“). Set up on the answer before it's pressed: alone, the reveal follows a pick at once and
+ * the next question soon after, and a busy engine can take longer than that over a test's next step (a pointer moved
+ * aside took WebKit 2.8 s in CI) — a look after it would find the next question. On the answer itself, not the page:
+ * the last question's reveal, fading out, still says „твоят избор“ beside the next one.
+ */
+export const notePicked = (answer: Locator) => noteWhenShown(answer, /— (верен отговор, )?твоят избор/);
+
+/** A moderator, made by the admin command line next to the tests' server (its database: playwright.config.ts). */
+export function makeModerator(username: string) {
+  const cli = spawnSync(
+    process.execPath,
+    [path.resolve(import.meta.dirname, '../../server/dist/cli.mjs'), 'admin', 'add', username],
+    { env: { ...process.env, DB_PATH: serverDb }, encoding: 'utf8' },
+  );
+  expect(cli.status, cli.stderr).toBe(0);
 }
 
 /** The lobby, ready to play: rendered, and the realtime connection is up (matches start over it). */
@@ -291,12 +315,12 @@ export async function playMatch(
       // Locked in: the number stays on show, with nothing left to press.
       await expect(lock, `number for question ${index} not taken`).toBeHidden({ timeout: gameMs(2_000) });
     } else {
+      const answer = open.first();
+      const taken = await notePicked(answer);
       // No longer than the question lasts: a click that waited on would land on the next question.
-      await open.first().click({ timeout: gameMs(2_500) });
+      await answer.click({ timeout: gameMs(2_500) });
       await parkPointer();
-      // The pick shows as "твоят избор" at once and stays until the next question comes up.
-      const picked = page.getByRole('button', { name: /— (верен отговор, )?твоят избор/ });
-      await expect(picked, `answer to question ${index} not taken`).toBeVisible({ timeout: gameMs(2_000) });
+      await taken(`answer to question ${index} not taken`, gameMs(2_000));
     }
     answered.add(index);
   }

@@ -153,6 +153,8 @@ test('„Моят алманах“ became „Моите знания“: its ac
   const db = new DatabaseSync(file);
   try {
     db.exec(`
+      -- And what the steps after v49 added, which come again after it (v50).
+      DROP TABLE staff_passkeys;
       PRAGMA user_version = 48;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'ana', 'ana', 'x', 0);
       INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES

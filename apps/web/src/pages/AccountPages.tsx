@@ -44,6 +44,7 @@ import { ClaimAccountModal } from '../components/ClaimAccount';
 import { EmailLinkPage } from '../components/EmailLinkPage';
 import { PasswordField } from '../components/PasswordField';
 import { PushSettings } from '../components/PushSettings';
+import { StaffPasskeys } from '../components/SecondFactor';
 import { Button, buttonClass, Card, Field, INPUT, Modal, Segmented, SwitchTrack } from '../components/ui';
 import { forgetThisDevice } from '../lib/device';
 import { setMatchKeys, useMatchKeysOn } from '../lib/matchKeys';
@@ -224,6 +225,8 @@ export function SettingsPage() {
         <MoreTimeSettings />
         <MatchKeySettings />
         {!me.isGuest && <PasswordSettings />}
+        {/* Staff: the passkeys their second factor for /admin can be (components/SecondFactor.tsx). */}
+        {me.isAdmin && <StaffPasskeys />}
         <DataSettings />
       </div>
       {/* Last: leaving is the rarest thing done here, and the least to be hit by mistake. */}

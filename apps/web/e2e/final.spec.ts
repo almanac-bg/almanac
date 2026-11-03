@@ -1,4 +1,4 @@
-import { expect, gameMs, passRewardMoment, startAsGuest, startSolo, test } from './support';
+import { expect, gameMs, notePicked, passRewardMoment, startAsGuest, startSolo, test } from './support';
 
 test('a solo match ends on a number, typed on the keyboard, shown on a line against the answer @desktop', async ({
   page,
@@ -11,8 +11,9 @@ test('a solo match ends on a number, typed on the keyboard, shown on a line agai
   // Nine questions with options, then the final.
   for (let i = 0; i < 9; i++) {
     await expect(option.first()).toBeVisible({ timeout: gameMs(15_000) });
+    const taken = await notePicked(option.first());
     await option.first().click();
-    await expect(page.getByRole('button', { name: /твоят избор/ })).toBeVisible();
+    await taken(`answer to question ${i + 1} not taken`, gameMs(2_000));
   }
   await expect(lock).toBeVisible({ timeout: gameMs(15_000) });
   await expect(page.getByText('Финал', { exact: false }).first()).toBeVisible();
