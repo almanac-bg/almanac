@@ -17,6 +17,8 @@ const SCREENS: readonly RegExp[] = [
   /^\/room$/,
   /^\/join\/[^/]+$/,
   /^\/settings$/,
+  /^\/locker$/,
+  /^\/achievements$/,
 ];
 
 /** Whether the app has a screen for a site's path ("/profile/Мария", "/knowledge/history"). */
