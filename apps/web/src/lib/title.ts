@@ -1,4 +1,4 @@
-import { PUBLIC_PAGES, pageTitle } from '@quiz/shared';
+import { PUBLIC_PAGES, pageTitle } from '@almanac/shared';
 import { useEffect } from 'react';
 
 /**

@@ -2,7 +2,7 @@
 // choice never sees the dark theme flash first. A file of its own: the page's security policy runs no inline script.
 (() => {
   try {
-    const choice = localStorage.getItem('quiz:theme');
+    const choice = localStorage.getItem('almanac:theme');
     const light = choice === 'light' || (choice === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
     if (!light) return;
     document.documentElement.dataset.theme = 'light';

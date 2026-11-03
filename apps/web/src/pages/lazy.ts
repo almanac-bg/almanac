@@ -1,4 +1,4 @@
-import { publicPageCode, routeKind } from '@quiz/shared';
+import { publicPageCode, routeKind } from '@almanac/shared';
 import { type ComponentType, createElement, lazy, useState } from 'react';
 import { matchPath } from 'react-router';
 import { loadQuiz } from '../content/quizzes';

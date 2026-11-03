@@ -1,4 +1,4 @@
-import { MODES, ROOM_CODE_DIGITS } from '@quiz/shared';
+import { MODES, ROOM_CODE_DIGITS } from '@almanac/shared';
 import { ArrowRight, CalendarDays, DoorOpen, LogIn, Play } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';

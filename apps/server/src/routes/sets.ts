@@ -1,4 +1,4 @@
-import { MODERATION, MODERATION_BASES, type ModerationBasis, SETS } from '@quiz/shared';
+import { MODERATION, MODERATION_BASES, type ModerationBasis, SETS } from '@almanac/shared';
 import express, { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth';

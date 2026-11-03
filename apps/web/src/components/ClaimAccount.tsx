@@ -1,5 +1,5 @@
-import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
-import { PASSWORD_MIN_LENGTH, USERNAME } from '@quiz/shared';
+import { api, errorMessage, setState, toast, useStore } from '@almanac/client';
+import { PASSWORD_MIN_LENGTH, USERNAME } from '@almanac/shared';
 import { Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';

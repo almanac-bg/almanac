@@ -1,5 +1,5 @@
-import { api, errorMessage, longDate, timeAgo, toast } from '@quiz/client';
-import type { ModerationLogAction, ModerationLogEntry } from '@quiz/shared';
+import { api, errorMessage, longDate, timeAgo, toast } from '@almanac/client';
+import type { ModerationLogAction, ModerationLogEntry } from '@almanac/shared';
 import clsx from 'clsx';
 import { Undo2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';

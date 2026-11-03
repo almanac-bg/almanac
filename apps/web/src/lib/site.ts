@@ -1,5 +1,5 @@
-import { api } from '@quiz/client';
-import type { SiteInfo } from '@quiz/shared';
+import { api } from '@almanac/client';
+import type { SiteInfo } from '@almanac/shared';
 import { useEffect, useState } from 'react';
 
 let loaded: SiteInfo | null = inPage();

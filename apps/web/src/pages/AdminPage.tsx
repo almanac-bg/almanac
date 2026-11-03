@@ -1,11 +1,11 @@
-import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@quiz/client';
+import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@almanac/client';
 import {
   type AdminSummary,
   MODERATION,
   type QuestionDraft,
   type Submission,
   type SubmissionStatus,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';

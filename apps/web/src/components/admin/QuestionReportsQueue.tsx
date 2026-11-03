@@ -7,7 +7,7 @@ import {
   timeAgo,
   toast,
   useStore,
-} from '@quiz/client';
+} from '@almanac/client';
 import {
   categoryById,
   QUESTION_REPORT_REASONS,
@@ -15,7 +15,7 @@ import {
   type QuestionInfo,
   type QuestionReportAction,
   type QuestionReportGroup,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, EyeOff, Flag, Lightbulb, Pencil, RefreshCw, RotateCcw, Wrench } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

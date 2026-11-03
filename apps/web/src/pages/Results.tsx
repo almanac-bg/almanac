@@ -1,5 +1,5 @@
-import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@quiz/client';
-import { categoryById, EVENING, isQueueMode, MODES, REVIEW, TEAMS } from '@quiz/shared';
+import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@almanac/client';
+import { categoryById, EVENING, isQueueMode, MODES, REVIEW, TEAMS } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { m } from 'motion/react';

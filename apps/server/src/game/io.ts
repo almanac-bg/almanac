@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, ServerToClientEvents } from '@quiz/shared';
+import type { ClientToServerEvents, ServerToClientEvents } from '@almanac/shared';
 import type { Server, Socket } from 'socket.io';
 
 export interface SocketData {

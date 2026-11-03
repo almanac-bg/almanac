@@ -1,5 +1,5 @@
-import { api, errorMessage, timeAgo, toast } from '@quiz/client';
-import type { PlayCheck } from '@quiz/shared';
+import { api, errorMessage, timeAgo, toast } from '@almanac/client';
+import type { PlayCheck } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, EyeOff, Pencil, Wrench } from 'lucide-react';
 import { useState } from 'react';

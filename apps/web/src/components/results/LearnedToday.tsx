@@ -1,4 +1,4 @@
-import type { ReviewItem } from '@quiz/client';
+import type { ReviewItem } from '@almanac/client';
 import { BookOpen, Lightbulb } from 'lucide-react';
 import { Link } from 'react-router';
 import { keepTogether } from '../../lib/typography';

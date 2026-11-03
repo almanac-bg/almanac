@@ -1,4 +1,4 @@
-import { type CategoryId, type CategoryMastery, MASTERY, MASTERY_TIERS } from '@quiz/shared';
+import { type CategoryId, type CategoryMastery, MASTERY, MASTERY_TIERS } from '@almanac/shared';
 import { all, one, run } from './db';
 
 /**

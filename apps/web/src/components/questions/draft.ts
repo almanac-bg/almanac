@@ -1,4 +1,4 @@
-import { type QuestionDraft, SUBMISSION_RULES, type SubmissionStatus } from '@quiz/shared';
+import { type QuestionDraft, SUBMISSION_RULES, type SubmissionStatus } from '@almanac/shared';
 
 export const SUBMISSION_STATUS: Record<SubmissionStatus, { label: string; className: string }> = {
   pending: { label: 'Чака одобрение', className: 'bg-amber-400/15 text-amber-300' },

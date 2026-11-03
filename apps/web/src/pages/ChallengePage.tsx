@@ -1,5 +1,5 @@
-import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } from '@quiz/client';
-import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, ordinal, titleName } from '@quiz/shared';
+import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } from '@almanac/client';
+import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, ordinal, titleName } from '@almanac/shared';
 import clsx from 'clsx';
 import { Clock, Gamepad2, Plus, RotateCcw, Save, Share2, Swords } from 'lucide-react';
 import { m } from 'motion/react';

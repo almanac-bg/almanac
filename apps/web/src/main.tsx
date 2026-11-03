@@ -1,5 +1,5 @@
-import { ApiError, configureClient, type Effect, setState } from '@quiz/client';
-import { dayKey } from '@quiz/shared';
+import { ApiError, configureClient, type Effect, setState } from '@almanac/client';
+import { dayKey } from '@almanac/shared';
 import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
@@ -9,7 +9,6 @@ import { PICTURE_SIZES } from './components/game/pictureSizes';
 import { dropOldShares } from './lib/device';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
-import { upgradeReturning } from './lib/returning';
 import { buzz, sfx, unlockAudioOnFirstTap } from './lib/sound';
 import { watchSystemTheme } from './lib/theme';
 import { prefetchStart, preloadPage } from './pages/lazy';
@@ -94,7 +93,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 // the challenge's preview in it too): the same, so the sign-in, or the challenge, shows at once.
 const signedOut = paintedSignedOut || document.getElementById('root')?.dataset.signedOut === '1';
 if (signedOut) setState({ authChecked: true, me: null });
-upgradeReturning();
 dropOldShares(dayKey());
 
 const container = document.getElementById('root')!;

@@ -7,7 +7,7 @@ import {
   type Requirement,
   START_RATING,
   TITLES,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { shuffle } from '../questions';
 
 export interface BotBrain {

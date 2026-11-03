@@ -1,5 +1,5 @@
-import { fmt, type LiveGame } from '@quiz/client';
-import { type GamePlayer, type Standing, TEAMS, type TeamId, teamPoints } from '@quiz/shared';
+import { fmt, type LiveGame } from '@almanac/client';
+import { type GamePlayer, type Standing, TEAMS, type TeamId, teamPoints } from '@almanac/shared';
 import clsx from 'clsx';
 import { useCountUp } from '../../lib/hooks';
 import { accentText } from './answers';

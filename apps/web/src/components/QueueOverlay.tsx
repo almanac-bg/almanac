@@ -1,5 +1,5 @@
-import { actions, plural, useNow, useStore } from '@quiz/client';
-import { avatarEmoji, MODES, POWERUPS, type QueueStatus } from '@quiz/shared';
+import { actions, plural, useNow, useStore } from '@almanac/client';
+import { avatarEmoji, MODES, POWERUPS, type QueueStatus } from '@almanac/shared';
 import clsx from 'clsx';
 import { Bot, User, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

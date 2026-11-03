@@ -15,7 +15,7 @@ import {
   type ReportSubjectKind,
   seasonKey,
   USERNAME,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { bannedBefore } from './account';
 import { alertModerators } from './alerts';
 import { config } from './config';

@@ -17,7 +17,7 @@ process.env.ERROR_OUTBOX = path.join(tmp, 'errors.jsonl');
 const { config } = await import('../src/config');
 const { one, run, tx } = await import('../src/db');
 const { dailyReminderPushes, push, pushEndpoint, subscribe, timedPushes } = await import('../src/push');
-const { defaultPushPrefs } = await import('@quiz/shared');
+const { defaultPushPrefs } = await import('@almanac/shared');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 

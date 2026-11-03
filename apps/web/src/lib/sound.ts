@@ -20,7 +20,7 @@ const listeners = new Set<() => void>();
 function readMuted() {
   try {
     // window's, not the bare global: in the server's render (Node) that one exists only to print a warning.
-    return window.localStorage.getItem('quiz:muted') === '1';
+    return window.localStorage.getItem('almanac:muted') === '1';
   } catch {
     return false;
   }
@@ -33,7 +33,7 @@ export function isMuted() {
 export function setMuted(value: boolean) {
   muted = value;
   try {
-    localStorage.setItem('quiz:muted', value ? '1' : '0');
+    localStorage.setItem('almanac:muted', value ? '1' : '0');
   } catch {
     /* storage unavailable */
   }

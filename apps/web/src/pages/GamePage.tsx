@@ -1,5 +1,5 @@
-import { actions, type LiveGame, useStore } from '@quiz/client';
-import { MODES, type PowerupId } from '@quiz/shared';
+import { actions, type LiveGame, useStore } from '@almanac/client';
+import { MODES, type PowerupId } from '@almanac/shared';
 import clsx from 'clsx';
 import { DoorOpen } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

@@ -1,4 +1,4 @@
-import { useStore } from '@quiz/client';
+import { useStore } from '@almanac/client';
 import { AnimatePresence, m } from 'motion/react';
 import { Emoji } from './Emoji';
 

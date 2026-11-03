@@ -1,4 +1,4 @@
-import { getState, useStore } from '@quiz/client';
+import { getState, useStore } from '@almanac/client';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
@@ -23,8 +23,8 @@ function holdsTypedText() {
 function reload(latest: string) {
   try {
     // Once per build: should the page somehow still be the old one, keep running rather than reload for ever.
-    if (sessionStorage.getItem('quiz:reloadedFor') === latest) return;
-    sessionStorage.setItem('quiz:reloadedFor', latest);
+    if (sessionStorage.getItem('almanac:reloadedFor') === latest) return;
+    sessionStorage.setItem('almanac:reloadedFor', latest);
   } catch {
     return;
   }

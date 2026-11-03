@@ -20,7 +20,7 @@ import {
   ROUNDS,
   type RoundPayload,
   readingMs,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import type { GameEmitter, RecordScript } from '../src/game/Game';
 import type { PreparedQuestion } from '../src/questions';
 import { writeFixtureQuestions } from './helpers';
@@ -650,8 +650,8 @@ function playOut(g: ReturnType<typeof setup>) {
   assert.equal(g.game.phase, 'ended');
 }
 
-/** Each joker a bot played, with the question it was played on. */
-function botJokers(g: ReturnType<typeof setup>, botId: string) {
+/** Each коз a bot played, with the question it was played on. */
+function botPowerups(g: ReturnType<typeof setup>, botId: string) {
   const played: { powerup: PowerupId; question: QuestionPayload; payload: object; to: string }[] = [];
   let question: QuestionPayload | null = null;
   for (const e of g.events) {
@@ -668,7 +668,7 @@ test('bots play 50/50 when they are unsure, never on an easy question, once, and
   mock.method(Math, 'random', () => 0.3);
   const g = setup({ humans: [1], bots: [bot('b1', 'weak')] });
   playOut(g);
-  const [fifty, ...more] = botJokers(g, 'b1');
+  const [fifty, ...more] = botPowerups(g, 'b1');
   assert.equal(more.length, 0, 'once a match');
   assert.equal(fifty.powerup, 'fifty');
   assert.notEqual(fifty.question.difficulty, 'easy');
@@ -695,7 +695,7 @@ test('bots bet "Двойно или нищо" when they know, never on an easy q
   mock.method(Math, 'random', () => 0.1);
   const g = setup({ humans: [1], bots: [bot('b1', 'strong')] });
   playOut(g);
-  const played = botJokers(g, 'b1');
+  const played = botPowerups(g, 'b1');
   assert.deepEqual(
     played.map((j) => j.powerup),
     ['double'],

@@ -1,5 +1,5 @@
 import { setImmediate as yieldToMatches } from 'node:timers/promises';
-import { CROWD, type Crowd, type Difficulty, type PlayCheck } from '@quiz/shared';
+import { CROWD, type Crowd, type Difficulty, type PlayCheck } from '@almanac/shared';
 import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionInfo } from './questionReports';

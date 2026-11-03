@@ -47,9 +47,9 @@ test('signing out on a shared device leaves nothing of the player in the browser
 }) => {
   await signUp(page, uniqueName('Споделен'), 'parola-123');
   await page.evaluate(() => {
-    localStorage.setItem('quiz:daily-share:2026-10-30', '🏵️ АЛМАНАХ №1 · 8/10');
-    localStorage.setItem('quiz:room-nickname', 'Мария 7Б');
-    sessionStorage.setItem('quiz:room-nickname', 'Мария 7Б');
+    localStorage.setItem('almanac:daily-share:2026-10-30', '🏵️ АЛМАНАХ №1 · 8/10');
+    localStorage.setItem('almanac:room-nickname', 'Мария 7Б');
+    sessionStorage.setItem('almanac:room-nickname', 'Мария 7Б');
   });
   await page.goto('/settings');
   await page.getByRole('button', { name: 'Изход', exact: true }).click();
@@ -58,7 +58,7 @@ test('signing out on a shared device leaves nothing of the player in the browser
   expect(
     await page.evaluate(() =>
       [...Object.keys(localStorage), ...Object.keys(sessionStorage)].filter(
-        (k) => k.startsWith('quiz:daily-share:') || k === 'quiz:room-nickname',
+        (k) => k.startsWith('almanac:daily-share:') || k === 'almanac:room-nickname',
       ),
     ),
   ).toEqual([]);

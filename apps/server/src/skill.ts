@@ -1,4 +1,4 @@
-import { type CategoryId, type Difficulty, ORDER, type PowerupId, START_RATING } from '@quiz/shared';
+import { type CategoryId, type Difficulty, ORDER, type PowerupId, START_RATING } from '@almanac/shared';
 import { all, one, run, tx } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { questionById } from './questions';

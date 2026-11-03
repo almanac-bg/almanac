@@ -1,4 +1,4 @@
-import { dismissToast, type Toast, useStore } from '@quiz/client';
+import { dismissToast, type Toast, useStore } from '@almanac/client';
 import clsx from 'clsx';
 import { AlertTriangle, Info, Sparkles, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

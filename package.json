@@ -1,5 +1,5 @@
 {
-  "name": "quiz",
+  "name": "almanac",
   "version": "1.0.0",
   "license": "AGPL-3.0-or-later",
   "private": true,
@@ -9,12 +9,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @quiz/server\" \"npm run dev -w @quiz/web\"",
-    "build": "npm run build -w @quiz/web && npm run build -w @quiz/server",
-    "start": "npm run start -w @quiz/server",
+    "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @almanac/server\" \"npm run dev -w @almanac/web\"",
+    "build": "npm run build -w @almanac/web && npm run build -w @almanac/server",
+    "start": "npm run start -w @almanac/server",
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/client && tsc --noEmit -p packages/client/test && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/e2e && tsc --noEmit -p .claude/skills/question-bank",
-    "test": "npm test -w @quiz/server && npm test -w @quiz/client",
-    "test:browser": "npm run build && npm run test:browser -w @quiz/web && npm run plans -w @quiz/server",
+    "test": "npm test -w @almanac/server && npm test -w @almanac/client",
+    "test:browser": "npm run build && npm run test:browser -w @almanac/web && npm run plans -w @almanac/server",
     "lint": "biome ci .",
     "format": "biome check --write ."
   },

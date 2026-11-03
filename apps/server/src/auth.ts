@@ -44,11 +44,9 @@ function parseHash(stored: string): { params: ScryptParams; salt: string; hash: 
 
 /**
  * The session cookie. Over HTTPS it carries the __Host- prefix: browsers then take it only from this very host, so a
- * page on some other subdomain could never plant a session of its choosing. Sessions issued under the old name still
- * work until they lapse (30 days after the prefix shipped), and are moved to the new name as they're renewed.
+ * page on some other subdomain could never plant a session of its choosing.
  */
-export const SESSION_COOKIE = config.cookieSecure ? '__Host-quiz_session' : 'quiz_session';
-const OLD_SESSION_COOKIE = 'quiz_session';
+export const SESSION_COOKIE = config.cookieSecure ? '__Host-almanac_session' : 'almanac_session';
 const SESSION_MS = config.sessionDays * 24 * 60 * 60 * 1000;
 
 /** Thrown when too many password checks are already queued; the API answers 503. */
@@ -178,9 +176,7 @@ export function destroySession(token: string) {
 }
 
 export function sessionTokenFromCookieHeader(header: string | undefined): string | null {
-  if (!header) return null;
-  const cookies = parseCookie(header);
-  return cookies[SESSION_COOKIE] ?? cookies[OLD_SESSION_COOKIE] ?? null;
+  return header ? (parseCookie(header)[SESSION_COOKIE] ?? null) : null;
 }
 
 /**
@@ -256,10 +252,9 @@ export function setSessionCookie(res: Response, token: string | null) {
       maxAge,
     });
   res.append('Set-Cookie', cookie(SESSION_COOKIE, token ?? '', token ? SESSION_MS / 1000 : 0));
-  if (SESSION_COOKIE !== OLD_SESSION_COOKIE) res.append('Set-Cookie', cookie(OLD_SESSION_COOKIE, '', 0));
 }
 
-export const DEVICE_COOKIE = 'quiz_device';
+export const DEVICE_COOKIE = 'almanac_device';
 const DEVICE_MS = 365 * 24 * 60 * 60 * 1000;
 
 const deviceSignature = (userId: number, device: string) =>

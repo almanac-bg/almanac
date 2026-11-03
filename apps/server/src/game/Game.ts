@@ -42,7 +42,7 @@ import {
   snapNumber,
   type TeamId,
   teamPoints,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { config } from '../config';
 import { reportError } from '../monitoring';
 import {
@@ -302,7 +302,7 @@ export interface AnswerLogEntry {
 interface BotMove {
   knows: boolean;
   afterMs: number;
-  joker: PowerupId | null;
+  powerup: PowerupId | null;
   /** Its number, on a number question. */
   guess: number | null;
   /** Its order, on an order question. */
@@ -314,7 +314,7 @@ type Phase = 'countdown' | 'question' | 'reveal' | 'pick' | 'ended';
 
 const BOT_EMOTES = { good: ['fire', 'cool', 'thumbs'], bad: ['lol', 'wow', 'dead'] };
 /** The козове bots play: the two about their own answer, a person's typical pair. */
-const BOT_JOKERS: readonly PowerupId[] = ['fifty', 'double'];
+const BOT_POWERUPS: readonly PowerupId[] = ['fifty', 'double'];
 
 export class Game {
   readonly id = randomUUID();
@@ -424,7 +424,7 @@ export class Game {
       this.participants.set(h.player.id, this.newParticipant(h.player, null, h.powerups, h.emotes));
     for (const h of setup.humans) if (h.longPick) this.longPick.add(h.player.id);
     for (const b of setup.bots)
-      this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_JOKERS], []));
+      this.participants.set(b.player.id, this.newParticipant(b.player, b.brain, [...BOT_POWERUPS], []));
     for (const r of setup.records ?? []) {
       const p = this.newParticipant(
         r.player,
@@ -1519,7 +1519,7 @@ export class Game {
   }
 
   /**
-   * How a bot plays the current question: whether it knows the answer, how long it takes (game ms), and a joker it
+   * How a bot plays the current question: whether it knows the answer, how long it takes (game ms), and a коз it
    * plays on the way, as a person would — 50/50 when it doesn't know, "Двойно или нищо" mostly when it does (now and
    * then on a hunch, which costs it). On a number question, its number: the more it knows, the closer. Null when it
    * zones out.
@@ -1536,20 +1536,21 @@ export class Game {
     const fraction = clamp(brain.pace + (Math.random() - 0.5) * 0.35 + (knows ? -0.05 : 0.1), 0.08, 0.92);
     // On the question's own clock: one without a clock waits minutes, a bot doesn't.
     const afterMs = Math.max(900, fraction * (this.pace === 'untimed' ? this.scoreLimitMs : this.limitMs));
-    if (q.kind === 'number') return { knows, afterMs, joker: null, guess: this.botGuess(q, chance), order: null };
-    if (q.kind === 'order') return { knows, afterMs, joker: null, guess: null, order: this.botOrder(q, knows, chance) };
+    if (q.kind === 'number') return { knows, afterMs, powerup: null, guess: this.botGuess(q, chance), order: null };
+    if (q.kind === 'order')
+      return { knows, afterMs, powerup: null, guess: null, order: this.botOrder(q, knows, chance) };
     const playable = (id: PowerupId) =>
       p.powerups.includes(id) &&
       !p.usedPowerups.has(id) &&
       !(q.difficulty === 'easy' && POWERUPS.find((d) => d.id === id)?.notOnEasy);
     // 50/50 kept for a question past the easy ones, as a person would.
-    const joker =
+    const powerup =
       !knows && playable('fifty') && q.difficulty !== 'easy' && q.options.length === 4 && Math.random() < 0.35
         ? 'fifty'
         : playable('double') && Math.random() < (knows ? 0.25 : 0.06)
           ? 'double'
           : null;
-    return { knows, afterMs, joker, guess: null, order: null };
+    return { knows, afterMs, powerup, guess: null, order: null };
   }
 
   /**
@@ -1607,8 +1608,8 @@ export class Game {
       const move = this.botMove(p);
       p.move = move;
       if (!move) continue;
-      const { joker, guess, order } = move;
-      if (joker) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, joker));
+      const { powerup, guess, order } = move;
+      if (powerup) this.later(move.afterMs * 0.4, () => this.usePowerup(p.player.id, index, powerup));
       this.later(move.afterMs, () =>
         order !== null
           ? this.arrange(p.player.id, index, order)
@@ -1650,7 +1651,7 @@ export class Game {
     }
     const move = p.move;
     if (!move || p.answer) return;
-    if (move.joker) this.usePowerup(p.player.id, this.index, move.joker);
+    if (move.powerup) this.usePowerup(p.player.id, this.index, move.powerup);
     p.answer = this.botAnswer(p, move);
     this.toGame('game:answered', { playerId: p.player.id });
   }

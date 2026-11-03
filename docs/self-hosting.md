@@ -234,7 +234,7 @@ S3-съвместимо object storage. Нищо не го обвързва с �
    отчети я смени на `enforce` и смени и `id`. DMARC: `sp=reject` от самото начало — поддомейните не пращат писма.
 6. **Знакът до името на подателя (BIMI)** — щом DMARC отказва или слага в спам каквото не мине (`p=quarantine` или
    `p=reject`, не `none`): TXT `default._bimi` `v=BIMI1; l=https://<домейнът ти>/bimi.svg;` (`bimi.svg` е в
-   `apps/web/public`, нарисуван от `npm run lockup -w @quiz/web`). Yahoo, Fastmail, Apple Mail и др. го показват; Gmail
+   `apps/web/public`, нарисуван от `npm run lockup -w @almanac/web`). Yahoo, Fastmail, Apple Mail и др. го показват; Gmail
    иска и платен сертификат за марката (VMC), без който просто не го показва.
 
 Използвай порт **587** с `?requireTLS=true`: много доставчици (сред тях и Hetzner) блокират изходящите портове 25 и

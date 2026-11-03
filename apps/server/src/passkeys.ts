@@ -1,4 +1,4 @@
-import { BRAND, type StaffPasskey } from '@quiz/shared';
+import { BRAND, type StaffPasskey } from '@almanac/shared';
 import {
   type AuthenticationResponseJSON,
   generateAuthenticationOptions,

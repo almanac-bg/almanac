@@ -1,4 +1,4 @@
-import { isCategoryId } from '@quiz/shared';
+import { isCategoryId } from '@almanac/shared';
 import { type Request, type Response, Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, userIdFromRequest } from '../auth';

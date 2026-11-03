@@ -1,5 +1,5 @@
-import { api, useStore } from '@quiz/client';
-import { levelProgress, SUBMISSION_RULES } from '@quiz/shared';
+import { api, useStore } from '@almanac/client';
+import { levelProgress, SUBMISSION_RULES } from '@almanac/shared';
 import clsx from 'clsx';
 import { PenLine, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';

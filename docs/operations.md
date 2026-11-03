@@ -50,7 +50,7 @@ git остава, където е: поправи напред или `git check
 `apps/server/src/db.ts`), старата работи с нея, както е, а каквото не е попълнила, новата попълва при следващото си
 пускане (важи от версията от 28 октомври 2026 нататък). След несъвместима стъпка старата отказва да тръгне
 („Database is at schema vN…“): преди миграции приложението записва копие на базата в
-`/data/backups/quiz-vN-before-vM.db` — върни него, както дневно копие ([„Бекъпи“](#бекъпи)), или възстанови от
+`/data/backups/almanac-vN-before-vM.db` — върни него, както дневно копие ([„Бекъпи“](#бекъпи)), или възстанови от
 Litestream до
 записания час (`restore -timestamp <часа>`).
 
@@ -69,7 +69,7 @@ df -h /                                    # място на диска
 1. **Litestream (непрекъснато, извън сървъра):** всяка промяна стига до object storage за секунди; може да се
    възстанови всеки момент от последните 14 дни. Всеки ден `deploy/backup-check.sh` проверява, че копието е актуално.
 2. **Дневни копия (автоматично, на сървъра):** след 04:00 софийско време приложението записва консистентно копие на
-   базата в `/data/backups/quiz-YYYY-MM-DD.db` и пази последните 3 (`BACKUP_KEEP_DAYS`). Удобни са за бързо
+   базата в `/data/backups/almanac-YYYY-MM-DD.db` и пази последните 3 (`BACKUP_KEEP_DAYS`). Удобни са за бързо
    поправяне на грешка; намират се на същия диск (всяко е пълно копие, затова са малко: по-старите моменти са в
    Litestream).
 3. **Бекъпите на сървъра от доставчика** (Hetzner Backups): дневни образи на целия сървър, пазени извън машината и
@@ -100,7 +100,7 @@ Backups** (по-бързо, но базата в образа е до ден с�
    ```bash
    image=$(deploy/pull-image.sh "$(git rev-parse HEAD)") && docker tag "$image" almanac:latest
    docker compose run --rm --no-deps --entrypoint true app      # създава празния volume за данните
-   docker compose run --rm --no-deps litestream restore -o /data/quiz.db /data/quiz.db
+   docker compose run --rm --no-deps litestream restore -o /data/almanac.db /data/almanac.db
    deploy/deploy.sh --now
    ```
 5. Изчакай сертификата: `curl -I --resolve <домейнът ти>:443:127.0.0.1 https://<домейнът ти>` (Caddy го взема през
@@ -117,9 +117,9 @@ Backups** (по-бързо, но базата в образа е до ден с�
 docker compose stop app litestream
 boot=$(date -u -d "$(uptime -s)" +%FT%TZ)    # кога тръгна образът: всичко дотогава е в Litestream
 docker compose run --rm --no-deps --entrypoint sh app -c \
-  'mkdir -p /data/from-image && mv /data/quiz.db /data/quiz.db-wal /data/quiz.db-shm /data/from-image/ 2>/dev/null; true'
-docker compose run --rm --no-deps litestream restore -timestamp "$boot" -o /data/quiz.db /data/quiz.db
-docker compose run --rm --no-deps litestream reset /data/quiz.db
+  'mkdir -p /data/from-image && mv /data/almanac.db /data/almanac.db-wal /data/almanac.db-shm /data/from-image/ 2>/dev/null; true'
+docker compose run --rm --no-deps litestream restore -timestamp "$boot" -o /data/almanac.db /data/almanac.db
+docker compose run --rm --no-deps litestream reset /data/almanac.db
 APP_RELEASE=$(cat .release) docker compose up -d
 ```
 
@@ -138,16 +138,16 @@ R2 токен само за четене и без репликация обра
 docker compose stop app litestream
 docker compose run --rm --no-deps --entrypoint sh app -c 'ls /data/backups'   # избери файл
 docker compose run --rm --no-deps --entrypoint sh app -c \
-  'cp /data/quiz.db /data/quiz-before-restore.db && cp /data/backups/quiz-2026-10-25.db /data/quiz.db &&
-   rm -f /data/quiz.db-wal /data/quiz.db-shm'
-docker compose run --rm --no-deps litestream reset /data/quiz.db
+  'cp /data/almanac.db /data/almanac-before-restore.db && cp /data/backups/almanac-2026-10-25.db /data/almanac.db &&
+   rm -f /data/almanac.db-wal /data/almanac.db-shm'
+docker compose run --rm --no-deps litestream reset /data/almanac.db
 APP_RELEASE=$(cat .release) docker compose up -d
 ```
 
 (`APP_RELEASE`: версията, която приложението казва на Sentry и под „Изходен код“; без него до следващия деплой е
 празна.) `litestream reset` забравя докъде е стигнал с предишната база и Litestream продължава от възстановената (CI го
 упражнява при всеки commit: стъпката „Backup and restore with Litestream“). Момент отпреди възстановяването може вече да
-не се възстанови от Litestream: за него е `quiz-before-restore.db`.
+не се възстанови от Litestream: за него е `almanac-before-restore.db`.
 
 ## Диск
 

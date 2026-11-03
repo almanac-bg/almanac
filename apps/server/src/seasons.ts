@@ -14,7 +14,7 @@ import {
   seasonName,
   tierIndex,
   type UnlockRef,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { all, one, run, tx } from './db';
 
 /** Current-season rating; a player's first game of a season starts from a soft reset of their last one. */

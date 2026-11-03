@@ -1,5 +1,5 @@
-import { api, ordinal } from '@quiz/client';
-import { DAILY_FIELD } from '@quiz/shared';
+import { api, ordinal } from '@almanac/client';
+import { DAILY_FIELD } from '@almanac/shared';
 
 /**
  * Where a run off the day's board would stand on it, and when the player joins the board (DailyInfo.offBoard): a guest

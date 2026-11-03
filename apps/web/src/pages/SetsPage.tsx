@@ -1,4 +1,4 @@
-import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@quiz/client';
+import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@almanac/client';
 import {
   type ModerationBasis,
   type ReportReason,
@@ -6,7 +6,7 @@ import {
   type SetImage,
   type SetQuestion,
   setPictureUrl,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import {
   ArrowDown,

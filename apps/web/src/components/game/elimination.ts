@@ -1,5 +1,5 @@
-import type { LiveGame } from '@quiz/client';
-import { knockoutsAfter } from '@quiz/shared';
+import type { LiveGame } from '@almanac/client';
+import { knockoutsAfter } from '@almanac/shared';
 
 /**
  * The next question after which someone is knocked out (1-based), or null when none is left. Once a question is

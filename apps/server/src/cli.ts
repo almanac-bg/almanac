@@ -24,7 +24,7 @@
 //   node apps/server/dist/cli.mjs account erase <name|#id> --yes "<how the request came>" — the account erased, as
 //                                                            „Изтрий профила“ does; for good
 // In Docker: docker compose exec app node apps/server/dist/cli.mjs admin add <username>
-import { MODERATION } from '@quiz/shared';
+import { MODERATION } from '@almanac/shared';
 import webpush from 'web-push';
 import { eraseOnRequest, exportAccount } from './account';
 import { playCheck } from './answers';

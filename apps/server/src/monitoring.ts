@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { format } from 'node:util';
-import { scrubPaths } from '@quiz/shared';
+import { scrubPaths } from '@almanac/shared';
 import { config } from './config';
 import { throttled } from './throttle';
 

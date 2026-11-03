@@ -1,5 +1,5 @@
-import { actions, api, toast, useStore } from '@quiz/client';
-import type { FriendEntry } from '@quiz/shared';
+import { actions, api, toast, useStore } from '@almanac/client';
+import type { FriendEntry } from '@almanac/shared';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';

@@ -1,4 +1,4 @@
-import { fmt, unlockPreview, useNow, useStore } from '@quiz/client';
+import { fmt, unlockPreview, useNow, useStore } from '@almanac/client';
 import {
   levelProgress,
   type MeUser,
@@ -10,7 +10,7 @@ import {
   TITLES,
   type UnlockRef,
   upcomingUnlocks,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Gift, Trophy } from 'lucide-react';
 import { Link } from 'react-router';

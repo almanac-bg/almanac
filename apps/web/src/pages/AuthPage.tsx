@@ -1,5 +1,11 @@
-import { ApiError, api, errorMessage, loadRealtime, plural, setState, toast } from '@quiz/client';
-import { BRAND, type ChallengePreview, type DailyPreview, type GroupPreview, PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { ApiError, api, errorMessage, loadRealtime, plural, setState, toast } from '@almanac/client';
+import {
+  BRAND,
+  type ChallengePreview,
+  type DailyPreview,
+  type GroupPreview,
+  PASSWORD_MIN_LENGTH,
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, Presentation, UsersRound } from 'lucide-react';
 import { m } from 'motion/react';

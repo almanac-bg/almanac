@@ -15,7 +15,7 @@ import {
   RATED_GAMES_PER_PAIR,
   shiftDay,
   xpToReach,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import type { GameEmitter } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 
@@ -336,13 +336,13 @@ test('a newcomer draws quests a first day can finish; the harder ones come from 
   const newcomer = drawn(account());
   for (const id of ['correct25', 'hard4', 'streak6', 'win2']) assert.ok(!newcomer.has(id), id);
   assert.ok(![...newcomer].some((id) => id.startsWith('cat:')), 'no category quests yet');
-  assert.ok(newcomer.has('correct15') && newcomer.has('joker1'), 'the starter ones instead');
+  assert.ok(newcomer.has('correct15') && newcomer.has('powerup1'), 'the starter ones instead');
 
   const seasonedId = account();
   run('UPDATE users SET xp = ? WHERE id = ?', xpToReach(3), seasonedId);
   const seasoned = drawn(seasonedId);
   for (const id of ['correct25', 'hard4', 'streak6', 'win2']) assert.ok(seasoned.has(id), id);
-  assert.ok(!seasoned.has('correct15') && !seasoned.has('joker1'), 'and the starter ones are behind them');
+  assert.ok(!seasoned.has('correct15') && !seasoned.has('powerup1'), 'and the starter ones are behind them');
 });
 
 test('a rating finds its level sooner: the first ten rated games in a mode move it twice as far', () => {

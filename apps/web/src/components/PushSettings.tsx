@@ -1,5 +1,5 @@
-import { api, errorMessage, setState, toast, useStore } from '@quiz/client';
-import { PUSH, PUSH_KINDS, type PushKind, type PushPrefs } from '@quiz/shared';
+import { api, errorMessage, setState, toast, useStore } from '@almanac/client';
+import { PUSH, PUSH_KINDS, type PushKind, type PushPrefs } from '@almanac/shared';
 import clsx from 'clsx';
 import { BellRing, Share } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';

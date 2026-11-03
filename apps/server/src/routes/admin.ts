@@ -4,7 +4,7 @@ import {
   MODERATION_BASES,
   type ModerationBasis,
   type SubmissionStatus,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { type Request, Router } from 'express';
 import { z } from 'zod';
 import { eraseOnRequest, exportAccount } from '../account';

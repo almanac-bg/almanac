@@ -1,5 +1,5 @@
-import { api, setState, timeAgo } from '@quiz/client';
-import type { AppNotification } from '@quiz/shared';
+import { api, setState, timeAgo } from '@almanac/client';
+import type { AppNotification } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { useEffect } from 'react';

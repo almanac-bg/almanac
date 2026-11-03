@@ -1,6 +1,6 @@
 // The pictures a shared link shows: public/og.jpg (the site's preview on social networks and chats) and
 // .github/social-preview.png (the repository's, uploaded by hand: docs/maintainers.md). `npm run share-images -w
-// @quiz/web` after a change to the mark or the words. Drawn as a page in a browser; the fonts come from Google Fonts
+// @almanac/web` after a change to the mark or the words. Drawn as a page in a browser; the fonts come from Google Fonts
 // here only (the site serves its own subsets).
 import fs from 'node:fs';
 import path from 'node:path';

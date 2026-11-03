@@ -1,5 +1,5 @@
-import { actions, getState, type LiveGame, useNow, useStore } from '@quiz/client';
-import { type GamePlayer, isQueueMode } from '@quiz/shared';
+import { actions, getState, type LiveGame, useNow, useStore } from '@almanac/client';
+import { type GamePlayer, isQueueMode } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, RotateCcw, Swords } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';

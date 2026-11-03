@@ -1,5 +1,5 @@
-import { fmt, type LiveGame, ordinal, plural } from '@quiz/client';
-import { type FinalStanding, type GameEndPayload, type MatchRewards, TEAMS, type TeamId } from '@quiz/shared';
+import { fmt, type LiveGame, ordinal, plural } from '@almanac/client';
+import { type FinalStanding, type GameEndPayload, type MatchRewards, TEAMS, type TeamId } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChartColumn, Share2 } from 'lucide-react';
 import { m } from 'motion/react';

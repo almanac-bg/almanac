@@ -1,4 +1,4 @@
-import type { Presence, ServerToClientEvents } from '@quiz/shared';
+import type { Presence, ServerToClientEvents } from '@almanac/shared';
 import { afterCommit } from './db';
 import type { IO } from './game/io';
 import { guarded } from './guard';

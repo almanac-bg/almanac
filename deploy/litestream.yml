@@ -16,7 +16,7 @@ snapshot:
   retention: 336h
 
 dbs:
-  - path: /data/quiz.db
+  - path: /data/almanac.db
     replica:
       type: s3
       bucket: ${BACKUP_BUCKET}

@@ -1,4 +1,4 @@
-import type { ModeId } from '@quiz/shared';
+import type { ModeId } from '@almanac/shared';
 import { all, one, run, tx } from './db';
 
 /**

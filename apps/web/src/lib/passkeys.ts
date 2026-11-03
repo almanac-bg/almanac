@@ -1,4 +1,4 @@
-import { ApiError, api, errorMessage } from '@quiz/client';
+import { ApiError, api, errorMessage } from '@almanac/client';
 
 /**
  * Passkeys for staff (apps/server/src/passkeys.ts): the browser's part of WebAuthn, through @simplewebauthn/browser,

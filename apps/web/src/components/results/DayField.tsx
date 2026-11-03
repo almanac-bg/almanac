@@ -1,5 +1,5 @@
-import { fmt, percent } from '@quiz/client';
-import type { DailyField } from '@quiz/shared';
+import { fmt, percent } from '@almanac/client';
+import type { DailyField } from '@almanac/shared';
 import clsx from 'clsx';
 import { useState } from 'react';
 

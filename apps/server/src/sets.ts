@@ -9,7 +9,7 @@ import {
   type SetQuestion,
   type SharedSetPreview,
   setPictureUrl,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { z } from 'zod';
 import { alertModerators } from './alerts';
 import { all, one, run, tx } from './db';

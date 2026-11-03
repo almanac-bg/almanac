@@ -76,7 +76,7 @@ jobs:
       - run: npm run build
       # Sources, then the production bundle that ships in the Docker image (the tests that start a server on it).
       - run: npm test
-      - run: npm run test:dist -w @quiz/server
+      - run: npm run test:dist -w @almanac/server
 
   # The built app in a real browser, on production's Node and the production build (apps/web/playwright.config.ts):
   # Chrome (the runner's own), and Playwright's builds of Safari's engine and Firefox's at 0.5 speed (a question lasts
@@ -135,7 +135,7 @@ jobs:
           E2E_TIME_SCALE: ${{ matrix.engine == 'chromium' && '0.15' || '0.5' }}
       # How SQLite runs every statement the server ran in these tests: a read of a whole table that grows with players
       # fails (apps/server/test/plans.ts; `npm test` checks the server tests' own).
-      - run: npm run plans -w @quiz/server
+      - run: npm run plans -w @almanac/server
       # A test that passed only on its retry, written down (and both attempts' traces uploaded below): green, but worth
       # a look — and on main, the same test flaky three runs in a row fails the job.
       - id: flaky
@@ -227,7 +227,7 @@ jobs:
           }
           users() {
             docker exec "$1" node -e \
-              "const db = new (require('node:sqlite').DatabaseSync)('/data/quiz.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)"
+              "const db = new (require('node:sqlite').DatabaseSync)('/data/almanac.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)"
           }
 
           docker network create backup
@@ -246,7 +246,7 @@ jobs:
           # A new server: the data volume created by the app's image (so it's the app user's), restored into, and the
           # app started on it.
           docker run --rm -v restored:/data --entrypoint true almanac
-          docker run --rm --network backup $as_app -v restored:/data $config $env_args "$LITESTREAM" restore -o /data/quiz.db /data/quiz.db
+          docker run --rm --network backup $as_app -v restored:/data $config $env_args "$LITESTREAM" restore -o /data/almanac.db /data/almanac.db
           docker run -d --name restored --network backup -v restored:/data $app_env almanac
           healthy restored
           register restored after_restore
@@ -256,22 +256,22 @@ jobs:
           # A daily copy put back over the live database, as docs/operations.md does it (`litestream reset` after the
           # copy): Litestream must carry on from the copy, so a restore after that brings back the copy and what was
           # written since — not the old database, and not nothing. Litestream 0.5 doesn't document this case.
-          docker exec app node -e "require('node:fs').mkdirSync('/data/backups', { recursive: true }); new (require('node:sqlite').DatabaseSync)('/data/quiz.db').exec(\"VACUUM INTO '/data/backups/quiz-2026-01-01.db'\")"
+          docker exec app node -e "require('node:fs').mkdirSync('/data/backups', { recursive: true }); new (require('node:sqlite').DatabaseSync)('/data/almanac.db').exec(\"VACUUM INTO '/data/backups/almanac-2026-01-01.db'\")"
           register app after_copy
           sleep 5
           docker stop app litestream
           docker run --rm -v data:/data --entrypoint sh almanac -c \
-            'cp /data/backups/quiz-2026-01-01.db /data/quiz.db && rm -f /data/quiz.db-wal /data/quiz.db-shm'
-          docker run --rm $as_app -v data:/data $config $env_args "$LITESTREAM" reset /data/quiz.db
+            'cp /data/backups/almanac-2026-01-01.db /data/almanac.db && rm -f /data/almanac.db-wal /data/almanac.db-shm'
+          docker run --rm $as_app -v data:/data $config $env_args "$LITESTREAM" reset /data/almanac.db
           docker start litestream app
           healthy app
           register app after_copy_restore
           sleep 5
           docker logs litestream
           docker run --rm -v again:/data --entrypoint true almanac
-          docker run --rm --network backup $as_app -v again:/data $config $env_args "$LITESTREAM" restore -o /data/quiz.db /data/quiz.db
+          docker run --rm --network backup $as_app -v again:/data $config $env_args "$LITESTREAM" restore -o /data/almanac.db /data/almanac.db
           again=$(docker run --rm -v again:/data --entrypoint node almanac -e \
-            "const db = new (require('node:sqlite').DatabaseSync)('/data/quiz.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)")
+            "const db = new (require('node:sqlite').DatabaseSync)('/data/almanac.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)")
           echo "restored after the copy: $again"
           test "$again" = "before_backup,after_backup,after_copy_restore"
 

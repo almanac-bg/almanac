@@ -11,7 +11,7 @@ export interface AchievementDef {
   xp: number;
   /** Achievements with a goal show a progress bar. */
   goal?: number;
-  /** Only earnable in this ranked queue (hidden while it's closed, or for good once it's gone, like Трио). */
+  /** Only earnable in this ranked queue (hidden while it's closed). */
   queue?: ModeId;
 }
 
@@ -67,16 +67,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     rarity: 'rare',
     xp: 300,
     goal: 10,
-  },
-  {
-    id: 'trio_win',
-    name: 'Начело на триото',
-    description: 'Спечели класиран мач „Трио“.',
-    icon: '🥇',
-    rarity: 'common',
-    xp: 120,
-    goal: 1,
-    queue: 'trio',
   },
   {
     id: 'squad_win',

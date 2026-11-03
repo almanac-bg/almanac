@@ -2,7 +2,7 @@
 // time with bots making up eight, its places kept for the night's top, and the champion's title.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import type { EveningInfo, MeUser } from '@quiz/shared';
+import type { EveningInfo, MeUser } from '@almanac/shared';
 import {
   autoPlay,
   type Client,

@@ -1,4 +1,4 @@
-import type { SecondFactorState } from '@quiz/shared';
+import type { SecondFactorState } from '@almanac/shared';
 import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
 import { verifyPassword } from '../auth';

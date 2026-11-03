@@ -48,6 +48,6 @@ export function timeAgo(ts: number): string {
 /** Bulgarian has one form for 1 and another for everything else. */
 export const plural = (n: number, one: string, many: string) => `${fmt(n)} ${n === 1 ? one : many}`;
 
-export { ordinal } from '@quiz/shared';
+export { ordinal } from '@almanac/shared';
 
 export const DIFFICULTY_LABEL = { easy: 'Лесен', medium: 'Среден', hard: 'Труден' } as const;

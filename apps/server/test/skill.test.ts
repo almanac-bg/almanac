@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import type { PowerupId } from '@quiz/shared';
+import type { PowerupId } from '@almanac/shared';
 import { writeFixtureQuestions } from './helpers';
 
 // Server modules open the database on import — point them at a throwaway one first.

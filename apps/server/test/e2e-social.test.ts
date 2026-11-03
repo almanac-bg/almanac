@@ -12,7 +12,7 @@ import {
   type RevealPayload,
   type RoomState,
   SEASON_REWARD_XP,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import {
   type Account,
   answer,

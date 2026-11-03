@@ -14,7 +14,7 @@ import {
   type RoomSettingsPatch,
   type ServerToClientEvents,
   type SoloPace,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import type { io as connect, Socket } from 'socket.io-client';
 import { api } from './api';
 import { clientConfig, effect, preloadImage } from './config';

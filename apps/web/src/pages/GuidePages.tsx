@@ -1,5 +1,5 @@
 import { QUIZ_COUNTS } from 'virtual:quiz-counts';
-import { fmt } from '@quiz/client';
+import { fmt } from '@almanac/client';
 import {
   BRAND,
   CATEGORIES,
@@ -22,7 +22,7 @@ import {
   SEASON_MIN_GAMES,
   SETS,
   STREAK_SHIELDS,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';

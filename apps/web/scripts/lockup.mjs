@@ -7,7 +7,7 @@
 // twice the size it's shown, on the mails' dark card) and the logo for BIMI (public/bimi.svg, SVG Tiny PS: the
 // rosette on its tile, square), which mail apps show beside the sender once DMARC refuses what fails.
 //
-//   npm run lockup -w @quiz/web      (after a change to the name, the mark or the font)
+//   npm run lockup -w @almanac/web      (after a change to the name, the mark or the font)
 import fs from 'node:fs';
 import path from 'node:path';
 import fontverter from 'fontverter';

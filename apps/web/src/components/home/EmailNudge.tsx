@@ -1,4 +1,4 @@
-import { useStore } from '@quiz/client';
+import { useStore } from '@almanac/client';
 import { MailWarning, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -13,7 +13,7 @@ export function EmailNudge() {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
     try {
-      return localStorage.getItem('quiz:email-nudge') === '1';
+      return localStorage.getItem('almanac:email-nudge') === '1';
     } catch {
       return false;
     }
@@ -40,7 +40,7 @@ export function EmailNudge() {
         onClick={() => {
           setDismissed(true);
           try {
-            localStorage.setItem('quiz:email-nudge', '1');
+            localStorage.setItem('almanac:email-nudge', '1');
           } catch {
             /* storage unavailable */
           }

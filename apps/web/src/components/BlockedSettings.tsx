@@ -1,5 +1,5 @@
-import { api, errorMessage, toast } from '@quiz/client';
-import type { PublicUser } from '@quiz/shared';
+import { api, errorMessage, toast } from '@almanac/client';
+import type { PublicUser } from '@almanac/shared';
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import { useLoad } from '../lib/load';

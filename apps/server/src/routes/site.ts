@@ -1,4 +1,4 @@
-import { scrubPaths } from '@quiz/shared';
+import { scrubPaths } from '@almanac/shared';
 import express, { Router } from 'express';
 import { z } from 'zod';
 import { emailEventsSecretMatches, handleEmailEvent } from '../emailEvents';

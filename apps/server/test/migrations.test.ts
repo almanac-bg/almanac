@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { after, test } from 'node:test';
-import { seasonKey } from '@quiz/shared';
+import { seasonKey } from '@almanac/shared';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-migrations-'));
 const file = path.join(tmp, 'old.db');
@@ -66,7 +66,7 @@ test('the steps that move data did it on the rows that were there', () => {
 });
 
 test('the database as it was is kept beside the backups before migrating', () => {
-  const copy = path.join(tmp, 'backups', `quiz-v1-before-v${SCHEMA_VERSION}.db`);
+  const copy = path.join(tmp, 'backups', `almanac-v1-before-v${SCHEMA_VERSION}.db`);
   assert.ok(fs.existsSync(copy), copy);
   const saved = new DatabaseSync(copy, { readOnly: true });
   try {
@@ -82,8 +82,9 @@ test('the database as it was is kept beside the backups before migrating', () =>
 
 test('the database knows the oldest code that can run on it: the one its last breaking step needs', () => {
   // Every step up to v14 counts as breaking (they're from before steps were marked); v15–v48 are compatible; v49 (the
-  // ids of „Моите знания“'s achievements and quest, renamed) is breaking.
-  assert.equal(schemaFloor(), 49);
+  // ids of „Моите знания“'s achievements and quest, renamed) is breaking, v50 compatible, and v51 (the last of the old
+  // names: the quests for козове, Трио's matches) breaking.
+  assert.equal(schemaFloor(), 51);
 });
 
 test('a rollback runs on a database whose newer steps were all compatible, and not past a breaking one', () => {
@@ -178,6 +179,54 @@ test('„Моят алманах“ became „Моите знания“: its ac
       { ...db.prepare('SELECT quest, progress FROM quest_progress').get() },
       { quest: 'knowledge5', progress: 3 },
     );
+  } finally {
+    db.close();
+  }
+});
+
+test('the last of the old names go: the quests for козове are powerup ones, and Трио’s matches are Арена’s', () => {
+  const file = path.join(tmp, 'old-names.db');
+  const boot = () =>
+    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
+      encoding: 'utf8',
+    });
+  assert.equal(boot().status, 0, 'a new database');
+  const db = new DatabaseSync(file);
+  try {
+    db.exec(`
+      PRAGMA user_version = 50;
+      INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'ana', 'ana', 'x', 0);
+      INSERT INTO quest_progress (user_id, day, quest, progress) VALUES
+        (1, '2026-11-03', 'joker1', 1), (1, '2026-11-03', 'jokers3', 2), (1, '2026-11-03', 'correct15', 4);
+      INSERT INTO matches (id, mode, ranked, player_count, question_count, started_at, ended_at) VALUES
+        ('m1', 'trio', 1, 3, 10, 1, 2), ('m2', 'duel', 1, 2, 10, 3, 4);
+      INSERT INTO season_ratings (user_id, season, mode, rating, peak) VALUES
+        (1, '2026-10', 'trio', 1100, 1120), (1, '2026-10', 'squad', 1050, 1060);
+      INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES (1, 'trio_win', 10), (1, 'first_game', 5);
+      INSERT INTO settings (key, value) VALUES ('tallies_kept', 'x'), ('tallied_to', 'y');
+    `);
+    const migrated = boot();
+    assert.equal(migrated.status, 0, migrated.stderr);
+    const all = (sql: string) =>
+      db
+        .prepare(sql)
+        .all()
+        .map((r) => ({ ...r }));
+    assert.deepEqual(all('SELECT quest, progress FROM quest_progress ORDER BY quest'), [
+      { quest: 'correct15', progress: 4 },
+      { quest: 'powerup1', progress: 1 },
+      { quest: 'powerups3', progress: 2 },
+    ]);
+    assert.deepEqual(all('SELECT id, mode FROM matches ORDER BY id'), [
+      { id: 'm1', mode: 'squad' },
+      { id: 'm2', mode: 'duel' },
+    ]);
+    assert.deepEqual(all('SELECT mode FROM season_ratings'), [{ mode: 'squad' }]);
+    assert.deepEqual(all('SELECT achievement_id AS id FROM user_achievements'), [{ id: 'first_game' }]);
+    // Counted again from the rows at the next start (tallies.ts).
+    assert.deepEqual(all("SELECT key FROM settings WHERE key IN ('tallies_kept', 'tallied_to')"), []);
   } finally {
     db.close();
   }

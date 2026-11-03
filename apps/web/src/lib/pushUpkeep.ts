@@ -1,6 +1,6 @@
-import { api } from '@quiz/client';
+import { api } from '@almanac/client';
 
-const KEPT = 'quiz:pushKept';
+const KEPT = 'almanac:pushKept';
 
 /**
  * Once a day per device, for an account with notifications allowed: this device's subscription posted to the server

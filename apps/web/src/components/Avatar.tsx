@@ -1,4 +1,4 @@
-import { avatarEmoji, frameById, type GamePlayer, rankFor, titleName } from '@quiz/shared';
+import { avatarEmoji, frameById, type GamePlayer, rankFor, titleName } from '@almanac/shared';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { Emoji } from './Emoji';

@@ -1,4 +1,4 @@
-import { type AckResult, dayKey, EVENING, type EveningStatus, MODES, shiftDay } from '@quiz/shared';
+import { type AckResult, dayKey, EVENING, type EveningStatus, MODES, shiftDay } from '@almanac/shared';
 import { eveningStartsAt } from '../evening';
 import { guarded } from '../guard';
 import { reportError } from '../monitoring';

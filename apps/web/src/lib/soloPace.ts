@@ -1,7 +1,7 @@
-import { isSoloPace, type SoloPace } from '@quiz/shared';
+import { isSoloPace, type SoloPace } from '@almanac/shared';
 
 /** Соло's clock, as the player last chose it on this device (a convenience: lost storage means the usual 15 s). */
-const KEY = 'quiz_solo_pace';
+const KEY = 'almanac:solo-pace';
 
 export function savedSoloPace(): SoloPace {
   try {

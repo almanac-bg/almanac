@@ -3,7 +3,7 @@
 // the tests run in order and share state.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { type MeUser, RATED_AFTER, seasonKey } from '@quiz/shared';
+import { type MeUser, RATED_AFTER, seasonKey } from '@almanac/shared';
 import {
   type Account,
   autoPlay,

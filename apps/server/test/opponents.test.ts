@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { dayEndsAt, dayKey, shiftDay } from '@quiz/shared';
+import { dayEndsAt, dayKey, shiftDay } from '@almanac/shared';
 import { writeFixtureQuestions } from './helpers';
 
 // Server modules open the database on import — point them at a throwaway one first.

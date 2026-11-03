@@ -4,7 +4,7 @@ const LEAVING_MS = 1500;
 /** Reloaded for this already, in the last 10 s (the stamp outlives the reload: it's this tab's). */
 function reloadedRecently(): boolean {
   try {
-    return Date.now() - Number(sessionStorage.getItem('quiz:reloadedAt') ?? 0) < 10_000;
+    return Date.now() - Number(sessionStorage.getItem('almanac:reloadedAt') ?? 0) < 10_000;
   } catch {
     return false; // storage unavailable: reload anyway
   }
@@ -26,7 +26,7 @@ export function reloadForNewVersion(): boolean {
   setTimeout(() => {
     if (reloadedRecently()) return;
     try {
-      sessionStorage.setItem('quiz:reloadedAt', String(Date.now()));
+      sessionStorage.setItem('almanac:reloadedAt', String(Date.now()));
     } catch {
       /* storage unavailable: reload anyway */
     }

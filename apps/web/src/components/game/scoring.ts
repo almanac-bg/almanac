@@ -1,9 +1,9 @@
-import { SCORING } from '@quiz/shared';
+import { SCORING } from '@almanac/shared';
 
 /** How points are counted, in one line: speed is half of every answer's worth, and nothing in the game said so. */
 export const SCORING_LINE = `${SCORING.base} точки за верен отговор, до +${SCORING.speed} за бързина (след време за четене) и +${SCORING.streakStep} за всеки пореден верен (до +${SCORING.streakMax}).`;
 
-const SHOWN_KEY = 'quiz:scoring-shown';
+const SHOWN_KEY = 'almanac:scoring-shown';
 /** How many matches open with the line, before the player has the hang of it. */
 const FIRST_MATCHES = 3;
 

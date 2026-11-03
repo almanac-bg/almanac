@@ -9,7 +9,7 @@ import {
   SUBMISSION_RULES,
   type Submission,
   type SubmissionStatus,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { z } from 'zod';
 import { grantXp } from './account';
 import { all, one, run, tx } from './db';

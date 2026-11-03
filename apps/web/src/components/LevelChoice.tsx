@@ -1,5 +1,5 @@
-import { api, errorMessage, setState as setStore, toast, useStore } from '@quiz/client';
-import { AVATARS, EMOTES, FRAMES, type PendingChoice, TITLES, type UnlockRef } from '@quiz/shared';
+import { api, errorMessage, setState as setStore, toast, useStore } from '@almanac/client';
+import { AVATARS, EMOTES, FRAMES, type PendingChoice, TITLES, type UnlockRef } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import { useState } from 'react';

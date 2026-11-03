@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, DEFAULT_OPEN_QUEUES, EVENING, isQueueMode, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
+import { BRAND, DEFAULT_OPEN_QUEUES, EVENING, isQueueMode, QUEUE_MODES, type QueueModeId } from '@almanac/shared';
 import { z } from 'zod';
 
 const serverRoot = path.resolve(import.meta.dirname, '..');
@@ -34,7 +34,7 @@ const env = numbers();
 
 const botFillMs = env.BOT_FILL_SECONDS === 'off' ? null : (env.BOT_FILL_SECONDS ?? 8) * 1000;
 
-const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'quiz.db');
+const dbPath = process.env.DB_PATH ?? path.join(serverRoot, 'data', 'almanac.db');
 const webDist = path.resolve(serverRoot, '../web/dist');
 /** The web app's renderer for the pages the server sends already drawn (apps/web/src/paint.tsx). */
 const webPaint = path.resolve(serverRoot, '../web/dist-ssr/paint.mjs');
@@ -57,13 +57,13 @@ function httpsUrl(raw: string | undefined): string | null {
 
 /**
  * PUBLIC_QUEUES=duel,royale,squad… ("all", or unset: every ranked queue). A typo stops the server: it would close a
- * queue. "trio" (merged into Арена) still reads as Арена, so an old setting doesn't keep the server down.
+ * queue.
  */
 function openQueues(): QueueModeId[] {
   const raw = process.env.PUBLIC_QUEUES?.trim();
   if (!raw) return DEFAULT_OPEN_QUEUES;
   if (raw === 'all') return QUEUE_MODES;
-  const names = [...new Set(raw.split(',').map((m) => (m.trim() === 'trio' ? 'squad' : m.trim())))];
+  const names = [...new Set(raw.split(',').map((m) => m.trim()))];
   const unknown = names.filter((m) => !isQueueMode(m));
   if (unknown.length)
     throw new Error(

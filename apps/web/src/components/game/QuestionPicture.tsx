@@ -1,4 +1,4 @@
-import type { ImageCredit, QuestionImage } from '@quiz/shared';
+import type { ImageCredit, QuestionImage } from '@almanac/shared';
 import clsx from 'clsx';
 import { m } from 'motion/react';
 import { useState } from 'react';

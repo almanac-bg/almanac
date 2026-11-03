@@ -1,4 +1,4 @@
-import { useStore } from '@quiz/client';
+import { useStore } from '@almanac/client';
 import clsx from 'clsx';
 import { RotateCcw, TriangleAlert, WifiOff } from 'lucide-react';
 import type { LoadFailure } from '../lib/load';

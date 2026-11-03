@@ -1,4 +1,4 @@
-import type { SiteInfo } from '@quiz/shared';
+import type { SiteInfo } from '@almanac/shared';
 import { config } from './config';
 import { imageBank, numberBank, orderBank, questionBank } from './questions';
 

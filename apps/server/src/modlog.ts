@@ -1,4 +1,4 @@
-import type { ModerationBasis, ModerationLogAction, ModerationLogEntry } from '@quiz/shared';
+import type { ModerationBasis, ModerationLogAction, ModerationLogEntry } from '@almanac/shared';
 import { all, one, run } from './db';
 import { getUser, toPublicUser, type UserRow } from './users';
 

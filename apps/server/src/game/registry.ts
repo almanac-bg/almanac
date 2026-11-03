@@ -11,7 +11,7 @@ import {
   START_RATING,
   type TeamId,
   unlockedIds,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { unlockContext } from '../account';
 import { crowdFor } from '../answers';
 import { releaseChallengeAttempt, saveChallengeProgress } from '../challenges';

@@ -1,4 +1,4 @@
-import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client';
+import { actions, api, fmt, plural, toast, useNow, useStore } from '@almanac/client';
 import {
   BRAND,
   type DailyInfo,
@@ -9,7 +9,7 @@ import {
   MODES,
   STREAK_SHIELDS,
   TIME_ZONE,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, CalendarDays, ChevronDown, Flame, Share2, Users } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';

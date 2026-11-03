@@ -1,5 +1,5 @@
-import { actions, type LiveGame } from '@quiz/client';
-import { POWERUPS, type PowerupDef, type PowerupId } from '@quiz/shared';
+import { actions, type LiveGame } from '@almanac/client';
+import { POWERUPS, type PowerupDef, type PowerupId } from '@almanac/shared';
 import clsx from 'clsx';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -33,8 +33,8 @@ export function KeyHint({ children, className }: { children: string; className?:
 
 // ─── Explaining them ───────────────────────────────────────────────────────
 
-// The name is from when they were "жокери": whoever has read about one shouldn't get it again.
-const EXPLAINED_KEY = 'quiz:jokers-explained';
+// Whoever has read about one shouldn't get it again.
+const EXPLAINED_KEY = 'almanac:powerups-explained';
 
 function readExplained(): string[] {
   try {

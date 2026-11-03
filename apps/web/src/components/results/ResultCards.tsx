@@ -8,7 +8,7 @@ import {
   toast,
   unlockPreview,
   useStore,
-} from '@quiz/client';
+} from '@almanac/client';
 import {
   achievementById,
   type CategoryMastery,
@@ -26,7 +26,7 @@ import {
   RATED_GAMES_PER_PAIR,
   rankFor,
   type UnratedReason,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowUp, Check, Share2 } from 'lucide-react';
 import { animate, m } from 'motion/react';

@@ -1,4 +1,4 @@
-import { useStore } from '@quiz/client';
+import { useStore } from '@almanac/client';
 import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { Link } from 'react-router';

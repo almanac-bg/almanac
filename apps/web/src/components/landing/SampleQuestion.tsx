@@ -1,4 +1,4 @@
-import { categoryById } from '@quiz/shared';
+import { categoryById } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb, X } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';

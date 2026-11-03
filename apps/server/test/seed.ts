@@ -1,4 +1,4 @@
-// A database with a long history, for the load test (`npm run load -w @quiz/server -- --seed 20000`): that many
+// A database with a long history, for the load test (`npm run load -w @almanac/server -- --seed 20000`): that many
 // accounts, each with months of what play leaves behind — matches, the answer log, dailies, seasons, notifications,
 // friends, what they've learned („Моите знания“), groups — as a server has after a year or two. A query that's instant on ten players can crawl
 // through a million rows; the load test then plays on top of this. Written straight in with SQL (seconds, not hours);
@@ -7,7 +7,7 @@
 // `node --import tsx test/seed.ts <database file> <players>` — also writes `<database file>.sessions.json`: signed-in
 // cookies for a sample of the accounts, for requests as them.
 import fs from 'node:fs';
-import { CATEGORY_IDS, dayKey, shiftDay } from '@quiz/shared';
+import { CATEGORY_IDS, dayKey, shiftDay } from '@almanac/shared';
 
 const [file, count] = process.argv.slice(2);
 const players = Number(count);

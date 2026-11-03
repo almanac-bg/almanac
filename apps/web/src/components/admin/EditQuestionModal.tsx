@@ -1,6 +1,6 @@
-import { api, errorMessage, toast } from '@quiz/client';
-import type { QuestionDraft } from '@quiz/shared';
-import { MODERATION } from '@quiz/shared';
+import { api, errorMessage, toast } from '@almanac/client';
+import type { QuestionDraft } from '@almanac/shared';
+import { MODERATION } from '@almanac/shared';
 import { Check } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { DraftEditor } from '../questions/DraftEditor';

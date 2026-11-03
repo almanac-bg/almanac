@@ -1,5 +1,5 @@
-import { api, fmt } from '@quiz/client';
-import { type LaunchStats, MODES, type ModeId } from '@quiz/shared';
+import { api, fmt } from '@almanac/client';
+import { type LaunchStats, MODES, type ModeId } from '@almanac/shared';
 import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useLoad } from '../../lib/load';

@@ -103,10 +103,13 @@ test('a report about a set is a case: the moderator reads the set and hides it, 
   await secondFactor(page);
   const owner = await newPlayer();
   await signUp(owner, uniqueName('Автор'), 'parola-123');
+  // A question of its own: questions from a set a moderator hid can't be used again (sets.ts), and another run of this
+  // test against the same server (another engine's) hid this one's twin.
+  const question = `Това е въпрос с обида към някого (${uniqueName('набор')})?`;
   const made = await owner.request.post('/api/sets', {
     data: {
       name: 'Обиден набор',
-      questions: [{ kind: 'truefalse', q: 'Това е въпрос с обида към някого?', answer: true }],
+      questions: [{ kind: 'truefalse', q: question, answer: true }],
     },
   });
   expect(made.ok()).toBe(true);
@@ -127,7 +130,7 @@ test('a report about a set is a case: the moderator reads the set and hides it, 
   const card = page.getByRole('article', { name: 'Набор „Обиден набор“' });
   await expect(card.getByText('Незаконно', { exact: true }), 'first, and marked').toBeVisible();
   await card.getByRole('button', { name: 'Прочети набора' }).click();
-  await expect(card.getByText('Това е въпрос с обида към някого?')).toBeVisible();
+  await expect(card.getByText(question)).toBeVisible();
   await card.getByRole('button', { name: 'Скрий набора' }).click();
   await choose(card, 'Основание (от условията)', 'Неподходящо или незаконно съдържание');
   await card.getByLabel('Причина — играчът ще я прочете').fill('Въпросът обижда човек.');

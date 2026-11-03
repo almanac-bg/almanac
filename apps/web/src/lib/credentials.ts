@@ -3,7 +3,7 @@
  * `noValidate`: the browser's own bubbles speak the device's language (often English), so the message goes in the
  * form's error box instead.
  */
-import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { PASSWORD_MIN_LENGTH } from '@almanac/shared';
 
 export type CredentialField = 'username' | 'password';
 

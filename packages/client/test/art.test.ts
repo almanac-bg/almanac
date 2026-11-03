@@ -4,7 +4,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { ACHIEVEMENTS, AVATARS, CATEGORIES, EMOTES, FRAMES, MASTERY_TIERS, TITLES, type UnlockRef } from '@quiz/shared';
+import {
+  ACHIEVEMENTS,
+  AVATARS,
+  CATEGORIES,
+  EMOTES,
+  FRAMES,
+  MASTERY_TIERS,
+  TITLES,
+  type UnlockRef,
+} from '@almanac/shared';
 import { unlockPreview } from '../src/unlocks';
 
 const ART = path.join(import.meta.dirname, '../../../apps/web/src/emoji');

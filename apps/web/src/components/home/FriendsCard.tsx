@@ -1,5 +1,5 @@
-import { actions, toast, useStore } from '@quiz/client';
-import { ROOM_CODE_DIGITS } from '@quiz/shared';
+import { actions, toast, useStore } from '@almanac/client';
+import { ROOM_CODE_DIGITS } from '@almanac/shared';
 import clsx from 'clsx';
 import { Lock, Plus, Users } from 'lucide-react';
 import { type FormEvent, useState } from 'react';

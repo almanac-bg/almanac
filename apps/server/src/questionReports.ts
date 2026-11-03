@@ -9,7 +9,7 @@ import {
   type QuestionReportReason,
   RATED_AFTER,
   type Reporter,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { alertModerators } from './alerts';
 import { redrawDailyWithout } from './daily';
 import { all, one, run, tx } from './db';

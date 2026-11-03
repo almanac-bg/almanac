@@ -1,4 +1,4 @@
-import { actions, getState, setState, toast, useStore } from '@quiz/client';
+import { actions, getState, setState, toast, useStore } from '@almanac/client';
 import { type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import { ActiveMatchBar } from './components/ActiveMatchBar';

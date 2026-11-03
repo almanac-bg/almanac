@@ -13,7 +13,7 @@ import {
   routeKind,
   type SiteInfo,
   scrubPaths,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
@@ -366,7 +366,7 @@ if (fs.existsSync(config.webDist)) {
       // The landing page is drawn for a visitor without a session (in the version for a device that has signed in
       // before, if it says so); with a session, the app opens the lobby instead.
       if (req.path === '/') res.vary('Cookie');
-      const returning = !!pub.returning && /(?:^|;\s*)quiz_returning=1(?:;|$)/.test(cookie ?? '');
+      const returning = !!pub.returning && /(?:^|;\s*)almanac_returning=1(?:;|$)/.test(cookie ?? '');
       sendCompressible(req, res, req.path === '/' && session ? pub.html : returning ? pub.returning! : pub.painted);
       return;
     }

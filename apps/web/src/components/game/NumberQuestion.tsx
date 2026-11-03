@@ -1,4 +1,4 @@
-import { actions, fmt, type LiveGame } from '@quiz/client';
+import { actions, fmt, type LiveGame } from '@almanac/client';
 import {
   decimalsOf,
   type GamePlayer,
@@ -8,7 +8,7 @@ import {
   type QuestionPayload,
   type RevealPayload,
   snapNumber,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Delete, Flame, Lock, Minus, Plus } from 'lucide-react';
 import { m } from 'motion/react';

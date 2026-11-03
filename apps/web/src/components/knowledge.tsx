@@ -1,5 +1,5 @@
-import { actions, plural, timeAgo, toast } from '@quiz/client';
-import { type KnowledgeFact, MASTERY_TIERS, REVIEW, type ReviewQueue } from '@quiz/shared';
+import { actions, plural, timeAgo, toast } from '@almanac/client';
+import { type KnowledgeFact, MASTERY_TIERS, REVIEW, type ReviewQueue } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';

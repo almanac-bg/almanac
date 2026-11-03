@@ -1,5 +1,5 @@
-import { fmt } from '@quiz/client';
-import { BRAND, MODES } from '@quiz/shared';
+import { fmt } from '@almanac/client';
+import { BRAND, MODES } from '@almanac/shared';
 
 export const challengeUrl = (id: string) => `${window.location.origin}/c/${id}`;
 

@@ -16,7 +16,7 @@ import {
   type QuestionPayload,
   type RevealPayload,
   type ServerToClientEvents,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { io, type Socket } from 'socket.io-client';
 import { codeAt, stepAt } from '../src/totp';
 
@@ -305,7 +305,7 @@ export function http(url: string) {
     // A new session (signing in, saving a guest) comes as a cookie: the one to go on with.
     const session = r.headers
       .getSetCookie()
-      .find((c) => /quiz_session=./.test(c))
+      .find((c) => /almanac_session=[^;]/.test(c))
       ?.split(';')[0];
     // biome-ignore lint/suspicious/noExplicitAny: tests read whichever fields of a route's JSON they assert on
     return { status: r.status, body: (await r.json()) as any, cookie: session };

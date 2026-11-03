@@ -12,7 +12,7 @@ import {
   type RoomState,
   type TeamId,
   tidyNickname,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { areFriends, blockedBetween } from '../friends';
 import { guarded } from '../guard';
 import { textProblem } from '../names';

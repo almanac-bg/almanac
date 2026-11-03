@@ -1,5 +1,5 @@
-import { actions, fmt, type LiveGame, ordinal, useNow } from '@quiz/client';
-import { BRAND, categoryById, type FinalStanding, type Standing } from '@quiz/shared';
+import { actions, fmt, type LiveGame, ordinal, useNow } from '@almanac/client';
+import { BRAND, categoryById, type FinalStanding, type Standing } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Eye, Lightbulb, Pause, Play, Users } from 'lucide-react';
 import { m } from 'motion/react';

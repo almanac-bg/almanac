@@ -1,4 +1,4 @@
-import { actions, api, fmt, toast, useNow, useStore } from '@quiz/client';
+import { actions, api, fmt, toast, useNow, useStore } from '@almanac/client';
 import {
   CATEGORIES,
   type CategoryId,
@@ -8,7 +8,7 @@ import {
   MODES,
   type PublicUser,
   ROUNDS,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { RotateCcw, Swords, Timer } from 'lucide-react';
 import { type ReactNode, useState } from 'react';

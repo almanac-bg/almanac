@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
-import { seasonKey } from '@quiz/shared';
+import { seasonKey } from '@almanac/shared';
 import { config } from './config';
 import { guarded } from './guard';
 import { nameShape } from './names';
@@ -1184,6 +1184,20 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX staff_passkeys_user ON staff_passkeys(user_id, created_at);
     `,
   },
+  // v51, the last of the old names (3 November 2026). The quests for козове kept the name they had as „жокери“:
+  // `powerup1` and `powerups3` now, as everywhere else. And Трио, the queue of three merged into Арена on 29 October,
+  // goes: its matches are Арена's (three is an Арена of three), its ratings go with the queue, and so does its
+  // achievement; the players' tallies are counted again at the next start (tallies.ts → catchUpTallies). Breaking:
+  // older code knows the quests by their old ids, and would set them anew for the day.
+  `
+  UPDATE quest_progress SET quest = 'powerup1' WHERE quest = 'joker1';
+  UPDATE quest_progress SET quest = 'powerups3' WHERE quest = 'jokers3';
+  UPDATE matches SET mode = 'squad' WHERE mode = 'trio';
+  UPDATE runs SET mode = 'squad' WHERE mode = 'trio';
+  DELETE FROM season_ratings WHERE mode = 'trio';
+  DELETE FROM user_achievements WHERE achievement_id = 'trio_win';
+  DELETE FROM settings WHERE key IN ('tallies_kept', 'tallied_to');
+  `,
 ];
 
 /** The schema version this code brings a database to. */
@@ -1207,7 +1221,7 @@ function setSchemaFloor(floor: number) {
   ).run(String(floor));
 }
 
-const PRE_MIGRATION_NAME = /^quiz-v\d+-before-v\d+\.db$/;
+const PRE_MIGRATION_NAME = /^almanac-v\d+-before-v\d+\.db$/;
 /**
  * The copies taken before migrations stop being an option after a month (the privacy policy promises backups forget
  * within 30 days), and only the newest few are kept: each is a whole database, and one week brought eleven in two days
@@ -1235,7 +1249,7 @@ export function prunePreMigrationCopies(now = Date.now(), dir = config.backupDir
  */
 function copyBeforeMigrating(from: number) {
   if (!config.backupDir) return;
-  const file = path.join(config.backupDir, `quiz-v${from}-before-v${MIGRATIONS.length}.db`);
+  const file = path.join(config.backupDir, `almanac-v${from}-before-v${MIGRATIONS.length}.db`);
   if (fs.existsSync(file)) return;
   fs.mkdirSync(config.backupDir, { recursive: true });
   // Under a temporary name, then renamed: a copy cut short (a rollback's kill, out of memory) never passes for the way

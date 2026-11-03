@@ -94,9 +94,9 @@ fi
 # The daily copy (the fast way back, docs/operations.md): the newest under 26 hours old, or the upkeep stopped making
 # them. Asked in the app's container, where the app looks (BACKUP_DIR, else beside the database); not when it's off.
 age=$(docker compose exec -T app sh -c '
-  dir=${BACKUP_DIR:-$(dirname "${DB_PATH:-/data/quiz.db}")/backups}
+  dir=${BACKUP_DIR:-$(dirname "${DB_PATH:-/data/almanac.db}")/backups}
   [ "$dir" = off ] && echo off && exit
-  newest=$(ls -t "$dir"/quiz-????-??-??.db 2>/dev/null | head -1)
+  newest=$(ls -t "$dir"/almanac-????-??-??.db 2>/dev/null | head -1)
   [ -n "$newest" ] && echo $(( ($(date +%s) - $(stat -c %Y "$newest")) / 3600 ))') || true
 case "$age" in
   off) ;;

@@ -10,7 +10,7 @@ import {
   START_RATING,
   shiftDay,
   sofiaHour,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { grantXp } from './account';
 import { all, one, run, tx } from './db';
 import type { RecordScript } from './game/Game';

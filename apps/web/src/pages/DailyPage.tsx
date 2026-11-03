@@ -1,5 +1,5 @@
-import { actions, api, fmt, plural, toast, useNow, useStore } from '@quiz/client';
-import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@quiz/shared';
+import { actions, api, fmt, plural, toast, useNow, useStore } from '@almanac/client';
+import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@almanac/shared';
 import { ArrowRight, CalendarDays, ChartColumn, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';

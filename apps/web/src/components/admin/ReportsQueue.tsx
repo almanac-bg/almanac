@@ -1,4 +1,4 @@
-import { ApiError, api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/client';
+import { ApiError, api, errorMessage, plural, timeAgo, toast, useStore } from '@almanac/client';
 import {
   type CaseDecision,
   type ModerationBasis,
@@ -8,7 +8,7 @@ import {
   type Reporter,
   type SetQuestion,
   setPictureUrl,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, BookOpen, Check, EyeOff, Flag, IdCard, PenLine, ShieldAlert } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

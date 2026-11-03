@@ -1,5 +1,5 @@
-import { actions } from '@quiz/client';
-import { emoteById } from '@quiz/shared';
+import { actions } from '@almanac/client';
+import { emoteById } from '@almanac/shared';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { m } from 'motion/react';
@@ -40,7 +40,7 @@ export function EmoteBar({ emotes, offline }: { emotes: string[]; offline: boole
       <Emoji e={emoteById(id)?.emoji ?? ''} />
     </m.button>
   ));
-  // Phones (and phones held sideways, where a bar along the bottom would sit on the jokers): a button that opens the
+  // Phones (and phones held sideways, where a bar along the bottom would sit on the козове): a button that opens the
   // tray in the page. Wider screens: a bar along the bottom.
   return (
     <>

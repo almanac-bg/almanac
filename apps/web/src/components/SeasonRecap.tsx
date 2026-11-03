@@ -1,5 +1,5 @@
-import { api, fmt, refreshMe, unlockPreview, useStore } from '@quiz/client';
-import { RANK_TIERS, seasonTitle } from '@quiz/shared';
+import { api, fmt, refreshMe, unlockPreview, useStore } from '@almanac/client';
+import { RANK_TIERS, seasonTitle } from '@almanac/shared';
 import { m } from 'motion/react';
 import { useEffect, useId, useState } from 'react';
 import { sfx } from '../lib/sound';
