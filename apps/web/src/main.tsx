@@ -9,6 +9,7 @@ import { PICTURE_SIZES } from './components/game/pictureSizes';
 import { dropOldShares } from './lib/device';
 import { reportCrash, startMonitoring } from './lib/monitoring';
 import { isPainted, paintedSignedOut } from './lib/painted';
+import { reloadForNewVersion } from './lib/reload';
 import { buzz, sfx, unlockAudioOnFirstTap } from './lib/sound';
 import { watchSystemTheme } from './lib/theme';
 import { prefetchStart, preloadPage } from './pages/lazy';
@@ -49,6 +50,11 @@ const preloading = new Set<HTMLImageElement>();
 // Same-origin API, httpOnly session cookie.
 configureClient({
   baseUrl: '',
+  // Which client and build: a server that no longer takes this build's protocol says `update-required`, and the tab
+  // reloads onto the new one, as for a new build (lib/reload.ts, never twice in a row).
+  client: 'web',
+  build: document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content ?? '',
+  onUpdateRequired: () => void reloadForNewVersion(),
   effect: (name) => {
     SOUNDS[name]?.();
     buzz(HAPTICS[name]);

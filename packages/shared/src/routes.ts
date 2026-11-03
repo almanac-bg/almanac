@@ -98,37 +98,42 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
   },
 };
 
-/** The game's own screens and the pages email links open: served to anyone, never indexed. */
-const APP_PATHS = [
-  /^\/game$/,
-  /^\/room$/,
-  /^\/class$/,
-  /^\/join\/[^/]+$/,
-  /^\/c\/[^/]+$/,
-  /^\/daily(\/[^/]+)?$/,
-  /^\/profile(\/[^/]+)?$/,
-  /^\/achievements$/,
-  /^\/locker$/,
-  /^\/leaderboard$/,
-  /^\/friends$/,
-  /^\/knowledge(\/[^/]+)?$/,
-  /^\/groups(\/[^/]+)?$/,
-  /^\/groups\/join\/[^/]+$/,
-  /^\/sets(\/[^/]+)?$/,
-  /^\/sets\/shared\/[^/]+$/,
-  /^\/notifications$/,
-  /^\/submit$/,
-  /^\/admin$/,
-  /^\/settings$/,
-  /^\/reset-password$/,
-  /^\/verify-email$/,
-  /^\/unsubscribe$/,
+/**
+ * The game's own screens and the pages email links open: served to anyone, never indexed. Each says where it is:
+ * `app: true` — a screen the native app has too, and its links open the app (8o: apple-app-site-association and
+ * assetlinks are made from these); `app: false` — the web's alone. A new path says which, consciously: the field is
+ * required, so the type checker asks (the 31 October review, MOBILE-2).
+ */
+export const APP_PATHS: readonly { path: RegExp; app: boolean }[] = [
+  { path: /^\/game$/, app: true },
+  { path: /^\/room$/, app: true },
+  { path: /^\/class$/, app: false },
+  { path: /^\/join\/[^/]+$/, app: true },
+  { path: /^\/c\/[^/]+$/, app: true },
+  { path: /^\/daily(\/[^/]+)?$/, app: true },
+  { path: /^\/profile(\/[^/]+)?$/, app: true },
+  { path: /^\/achievements$/, app: true },
+  { path: /^\/locker$/, app: true },
+  { path: /^\/leaderboard$/, app: true },
+  { path: /^\/friends$/, app: true },
+  { path: /^\/knowledge(\/[^/]+)?$/, app: true },
+  { path: /^\/groups(\/[^/]+)?$/, app: true },
+  { path: /^\/groups\/join\/[^/]+$/, app: true },
+  { path: /^\/sets(\/[^/]+)?$/, app: true },
+  { path: /^\/sets\/shared\/[^/]+$/, app: true },
+  { path: /^\/notifications$/, app: true },
+  { path: /^\/submit$/, app: true },
+  { path: /^\/admin$/, app: false },
+  { path: /^\/settings$/, app: true },
+  { path: /^\/reset-password$/, app: false },
+  { path: /^\/verify-email$/, app: false },
+  { path: /^\/unsubscribe$/, app: false },
 ];
 
 /** What an address is: a public page, a screen of the game, or nothing at all (a 404). */
 export function routeKind(path: string): 'public' | 'app' | 'unknown' {
   if (Object.hasOwn(PUBLIC_PAGES, path)) return 'public';
-  return APP_PATHS.some((re) => re.test(path)) ? 'app' : 'unknown';
+  return APP_PATHS.some(({ path: re }) => re.test(path)) ? 'app' : 'unknown';
 }
 
 /**

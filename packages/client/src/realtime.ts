@@ -14,10 +14,11 @@ import {
   type RoomSettingsPatch,
   type ServerToClientEvents,
   type SoloPace,
+  UPDATE_REQUIRED,
 } from '@almanac/shared';
 import type { io as connect, Socket } from 'socket.io-client';
 import { api } from './api';
-import { clientConfig, effect, preloadImage } from './config';
+import { clientConfig, clientInfo, effect, preloadImage, updateRequired } from './config';
 import { loadRealtime } from './library';
 import { getState, type LiveGame, patchGame, setState, signedOut, toast } from './store';
 
@@ -43,6 +44,8 @@ export function getSocket(): GameSocket {
     // second on a phone). Polling stays the fallback where a WebSocket is blocked.
     socket = io(clientConfig().baseUrl || undefined, {
       autoConnect: false,
+      // Which client and protocol this is (packages/shared → client.ts): one the server no longer takes is refused.
+      auth: { ...clientInfo() },
       transports: ['websocket', 'polling'],
       tryAllTransports: true,
     });
@@ -178,6 +181,7 @@ function bind(s: GameSocket) {
   });
   s.on('connect_error', (err) => {
     if (err.message === 'unauthorized') signedOut();
+    if (err.message === UPDATE_REQUIRED) return updateRequired();
     // The server's cap on open tabs. Socket.IO doesn't retry a refusal like this on its own: say why, and try again in a
     // while (a tab may have been closed by then).
     if (err.message === 'too-many-connections') {

@@ -17,6 +17,7 @@ import {
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCookieHeader } from './auth';
 import { challengePreview } from './challenges';
+import { requireProtocol } from './clients';
 import { config } from './config';
 import { dailyPreview } from './daily';
 import { db, isBusy, lockedRecently, one } from './db';
@@ -62,6 +63,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(securityHeaders);
 app.use('/api', sameSiteWrites);
+app.use('/api', requireProtocol);
 // No /api answer is kept anywhere on the way: what it says depends on who asks (a profile's friendship, block and Дуел
 // record), and Cloudflare keeps any address that ends like a file (`/api/profile/ivan.exe`) for everyone after, unless
 // it's told not to (the 31 October review, CF-2). A route whose answer may be kept says so itself (a set's picture).

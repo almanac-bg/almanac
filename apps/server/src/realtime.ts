@@ -16,11 +16,13 @@ import {
   type PowerupId,
   type Presence,
   paceFor,
+  parseClient,
   type QueueModeId,
   REVIEW,
   ROUNDS,
   sofiaTimeOn,
   TIME_ZONE,
+  UPDATE_REQUIRED,
 } from '@almanac/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
@@ -34,6 +36,7 @@ import {
   duelOpponent,
   releaseChallengeAttempt,
 } from './challenges';
+import { tooOld } from './clients';
 import { config } from './config';
 import { claimDailyAttempt, dailyQuestions, releaseDailyAttempt } from './daily';
 import { setEveningLobby } from './evening';
@@ -205,6 +208,8 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   ).unref();
 
   io.use((socket, next) => {
+    // A client too old for this server's protocol (clients.ts): told so before anything else, so it updates.
+    if (tooOld(parseClient(socket.handshake.auth))) return next(new Error(UPDATE_REQUIRED));
     const token = sessionTokenFromCookieHeader(socket.request.headers.cookie);
     const userId = resolveSession(token)?.userId;
     if (!token || !userId || !getUser(userId)) return next(new Error('unauthorized'));

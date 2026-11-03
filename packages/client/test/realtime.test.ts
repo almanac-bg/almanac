@@ -12,6 +12,7 @@ import type {
   QuestionPayload,
   Standing,
 } from '@almanac/shared';
+import { UPDATE_REQUIRED } from '@almanac/shared';
 
 class FakeManager extends EventEmitter {
   delayMs = 1000;
@@ -80,7 +81,7 @@ class FakeSocket extends EventEmitter {
 
 const socket = new FakeSocket();
 mock.module('socket.io-client', { namedExports: { io: () => socket } });
-const { actions, connectRealtime, getState, setState } = await import('../src/index.ts');
+const { actions, configureClient, connectRealtime, getState, setState } = await import('../src/index.ts');
 
 const player = (id: string, name: string): GamePlayer => ({
   id,
@@ -313,6 +314,20 @@ test('one tab too many: the player is told once why, and it keeps trying', () =>
     assert.deepEqual(told, [once, once, once]);
   } finally {
     socket.connect = FakeSocket.prototype.connect;
+  }
+});
+
+test('a server that no longer takes this client: heard once, the app updates (protocol.test.ts has /api)', () => {
+  let updates = 0;
+  configureClient({ baseUrl: '', onUpdateRequired: () => updates++ });
+  try {
+    socket.drop();
+    socket.deliver('connect_error', new Error(UPDATE_REQUIRED));
+    socket.deliver('connect_error', new Error(UPDATE_REQUIRED));
+    assert.equal(updates, 1);
+    assert.deepEqual(toasts(), [], 'no word of its own: the update says it');
+  } finally {
+    configureClient({ baseUrl: '' });
   }
 });
 

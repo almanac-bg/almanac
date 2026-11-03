@@ -51,7 +51,8 @@ import type {
   SubmissionStatus,
   UnlockRef,
 } from '@almanac/shared';
-import { clientConfig } from './config';
+import { CLIENT_HEADER, clientHeader, UPDATE_REQUIRED } from '@almanac/shared';
+import { clientConfig, clientInfo, updateRequired } from './config';
 
 /** A set as its editor sends it: a name and its questions. */
 export type SetBody = { name: string; questions: SetQuestion[] };
@@ -123,7 +124,10 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
   try {
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
       method,
-      headers: body === undefined ? {} : { 'content-type': file ? body.type : 'application/json' },
+      headers: {
+        [CLIENT_HEADER]: clientHeader(clientInfo()),
+        ...(body === undefined ? {} : { 'content-type': file ? body.type : 'application/json' }),
+      },
       body: body === undefined ? undefined : file ? body : JSON.stringify(body),
       credentials: 'same-origin',
       signal: timeout(file ? REQUEST_TIMEOUT_MS.upload : REQUEST_TIMEOUT_MS.default),
@@ -153,6 +157,8 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
     });
     if (await askingCode) return request<T>(method, path, body, false, blob);
   }
+  // Too old a client for the server: nothing will work until it's updated (the web reloads onto the new build).
+  if (res.status === 426 && data.code === UPDATE_REQUIRED) updateRequired();
   if (!res.ok)
     throw new ApiError((data.error as string | undefined) ?? 'Нещо се обърка. Опитай пак.', res.status, data);
   return (saved ?? data) as T;
