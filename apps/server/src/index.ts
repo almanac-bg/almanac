@@ -25,6 +25,7 @@ import { startMaintenance } from './maintenance';
 import { forwardEnvelope, lastResort, publicDsn, reportError, shipLogs, watchEventLoop } from './monitoring';
 import { bankProblem, IMAGE_PATH, imageDir, questionBank } from './questions';
 import { createRealtime } from './realtime';
+import { logRequests } from './requestLog';
 import { api } from './routes/api';
 import { sameSiteWrites, securityHeaders } from './security';
 import { siteInfo } from './site';
@@ -674,6 +675,7 @@ if (config.production && config.gameTimeScale !== 1) {
 }
 
 const server = http.createServer(app);
+if (config.requestLog) logRequests(server, config.requestLog);
 // Caddy keeps idle connections to us open for a minute or two and reuses them. Node's default (5 s) closes them first,
 // and a request Caddy sends on a connection that's just closing fails — Caddy retries a GET, but a POST (sign-up, login)
 // becomes a 502. So idle connections stay open longer than the proxy's.

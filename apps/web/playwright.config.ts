@@ -32,6 +32,11 @@ const outputDir = path.join(elsewhere ?? import.meta.dirname, 'test-results');
 export const serverDb = path.join(outputDir, 'server', 'almanac.db');
 /** What the server reports as errors during the run (ERROR_OUTBOX): e2e/teardown.ts fails the run on any. */
 export const serverErrors = path.join(outputDir, 'server', 'errors.jsonl');
+/**
+ * Every connection and request the server saw (REQUEST_LOG), uploaded with the report: when a page.goto times out,
+ * whether its request ever reached the server.
+ */
+const requestLog = path.join(outputDir, 'server', 'requests.jsonl');
 /** Every statement the server runs, for `npm run plans -w @almanac/server` (beside the server tests' own by default). */
 const sqlLog = elsewhere ? path.join(elsewhere, 'sql-log') : path.join(root, 'apps/server/.sql-log');
 const reportDir = path.join(elsewhere ?? import.meta.dirname, 'playwright-report');
@@ -158,6 +163,7 @@ export default defineConfig({
       // Inside the output folder, which Playwright empties before each run (and before starting the server).
       DB_PATH: serverDb,
       ERROR_OUTBOX: serverErrors,
+      REQUEST_LOG: requestLog,
       APP_URL: baseURL,
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
       // engines more (CI runs WebKit and Firefox at 0.5, as their clicks take longer than Chrome's).
