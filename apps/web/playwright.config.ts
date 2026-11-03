@@ -90,8 +90,10 @@ export default defineConfig({
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
     // Every attempt that fails keeps its trace, the first included, and so does its retry: a flake's trace is the
-    // failing run's, not only the one that passed (the 31 October review, REPO-4).
-    trace: 'retain-on-failure-and-retries',
+    // failing run's, not only the one that passed (the 31 October review, REPO-4). The page as it was at each step,
+    // without the film of the screen: recording that on every first attempt slowed the tests enough for them to fall
+    // behind a match at the tests' speed (a screenshot of a failure is kept all the same).
+    trace: { mode: 'retain-on-failure-and-retries', screenshots: false, snapshots: true, sources: true },
     screenshot: 'only-on-failure',
   },
 

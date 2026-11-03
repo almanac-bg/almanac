@@ -98,6 +98,34 @@ export async function me(page: Page): Promise<Me> {
   return user!;
 }
 
+/**
+ * A line that's on screen only for a moment (at the tests' speed the next screen replaces it within a few dozen ms):
+ * noted the moment it appears, then waited for — a look every so often can miss it. Set up before what makes it
+ * appear.
+ */
+export async function noteWhenShown(page: Page, text: RegExp) {
+  const key = `shown_${Math.random().toString(36).slice(2)}`;
+  await page.evaluate(
+    ({ key, source, flags }) => {
+      const pattern = new RegExp(source, flags);
+      const notes = window as unknown as Record<string, boolean>;
+      notes[key] = false;
+      const look = () => {
+        if (!pattern.test(document.body.textContent ?? '')) return;
+        notes[key] = true;
+        observer.disconnect();
+      };
+      const observer = new MutationObserver(look);
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    },
+    { key, source: text.source, flags: text.flags },
+  );
+  return (message: string, timeout: number) =>
+    expect
+      .poll(() => page.evaluate((k) => (window as unknown as Record<string, boolean>)[k], key), { message, timeout })
+      .toBe(true);
+}
+
 /** The lobby, ready to play: rendered, and the realtime connection is up (matches start over it). */
 export async function expectLobby(page: Page) {
   await expect(page.getByRole('heading', { name: 'Избери битка', exact: true })).toBeVisible();
@@ -252,12 +280,12 @@ export async function playMatch(
       // „Подреди“: А, Б, В, Г in that order (1–4, as for options), Enter locks it — once its items can be pressed (a
       // key on a question still on its way in does nothing, as a tap wouldn't).
       await expectPressable(ordering);
-      for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
-      await page.keyboard.press('Enter');
       // Locked in — or already revealed as given: alone, the reveal follows the lock at once, so the line that says
       // it's locked can come and go between two looks (or never be drawn at all).
-      const taken = page.getByText('Редът е заключен.').or(page.getByText(/(Всичко на място!|\d от \d на място)$/));
-      await expect(taken.first(), `order for question ${index} not taken`).toBeAttached({ timeout: gameMs(2_000) });
+      const taken = await noteWhenShown(page, /Редът е заключен\.|Всичко на място!|\d от \d на място/);
+      for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
+      await page.keyboard.press('Enter');
+      await taken(`order for question ${index} not taken`, gameMs(2_000));
     } else if (await lock.isVisible()) {
       await giveNumber(page);
       // Locked in: the number stays on show, with nothing left to press.
