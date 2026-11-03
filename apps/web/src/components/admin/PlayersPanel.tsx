@@ -1,9 +1,10 @@
-import { api, errorMessage, longDate, saveFile, timeAgo, toast, useStore } from '@almanac/client';
+import { api, errorMessage, longDate, timeAgo, toast, useStore } from '@almanac/client';
 import { MODERATION, type ModerationBasis, type PlayerCard, type PlayerSearchHit } from '@almanac/shared';
 import { Ban, Check, Download, Eye, EyeOff, PenLine, Search, Trash2, Unlock, UserX } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useLoad } from '../../lib/load';
+import { saveFile } from '../../lib/saveFile';
 import { Avatar, LevelBadge } from '../Avatar';
 import { Checkbox } from '../controls';
 import { LoadError } from '../LoadError';

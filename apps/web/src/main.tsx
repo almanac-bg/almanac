@@ -55,6 +55,12 @@ configureClient({
   client: 'web',
   build: document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content ?? '',
   onUpdateRequired: () => void reloadForNewVersion(),
+  // A tab shown again (a phone unlocked), and the network back: the socket tries again at once.
+  onResume: (listener) =>
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') listener();
+    }),
+  onOnline: (listener) => window.addEventListener('online', listener),
   effect: (name) => {
     SOUNDS[name]?.();
     buzz(HAPTICS[name]);

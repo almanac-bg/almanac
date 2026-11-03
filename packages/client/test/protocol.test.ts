@@ -53,7 +53,9 @@ test('every /api request says which client, protocol and build it is', async () 
 
 test('the socket says the same in its auth', async () => {
   await connectRealtime();
-  assert.deepEqual(parseClient(sockets[0]?.options.auth), { client: 'ios', protocol: PROTOCOL, build: '1.4.0+27' });
+  const auth = sockets[0]?.options.auth as (send: (value: unknown) => void) => void;
+  const said = await new Promise((resolve) => auth(resolve));
+  assert.deepEqual(parseClient(said), { client: 'ios', protocol: PROTOCOL, build: '1.4.0+27' });
 });
 
 // The socket's refusal alone: realtime.test.ts.

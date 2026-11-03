@@ -365,6 +365,9 @@ export async function playMatch(
       await expect(pick).toBeHidden({ timeout: gameMs(5_000) });
       continue;
     }
+    // Nothing to answer after all: what the wait saw went by itself before this look (a round's pick the other player
+    // made, a reveal's button). Read on, the counter would still say the question just answered: look again.
+    if (!answerable) continue;
     const [index, of] = (await counter.textContent())!.match(/\d+/g)!.map(Number);
     total = of;
     expect(answered.has(index), `question ${index} offered twice`).toBe(false);

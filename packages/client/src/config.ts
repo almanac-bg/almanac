@@ -37,6 +37,16 @@ export interface ClientConfig {
   effect?: (name: Effect) => void;
   /** Fetches a question's picture ahead of it (the next question's, told during the reveal before it). */
   preload?: (image: { src: string; srcSet: string }) => void;
+  // What only the platform knows. This package runs in the browser and in React Native, so it touches neither
+  // `window` nor `document` itself (test/native.test.ts runs it with React Native's globals).
+  /** Calls `listener` whenever the client comes back to the foreground: a tab shown again, an app back from the background. */
+  onResume?: (listener: () => void) => void;
+  /** Calls `listener` whenever the device is back online. */
+  onOnline?: (listener: () => void) => void;
+  /** Headers every /api request carries besides the client's own: an app's session (a web page's is its cookie). */
+  authHeaders?: () => Record<string, string>;
+  /** What the socket sends when it connects (and reconnects) besides the client's own: an app's session. */
+  socketAuth?: () => Record<string, unknown>;
 }
 
 let config: ClientConfig = { baseUrl: '' };
