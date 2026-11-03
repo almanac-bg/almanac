@@ -13,7 +13,7 @@ import {
   ROUNDS,
   rightOrder,
   TEXT_ONLY,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';

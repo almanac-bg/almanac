@@ -1,4 +1,4 @@
-// The app's PNG icons, drawn from public/favicon.svg: `npm run icons -w @quiz/web` after a change to the mark.
+// The app's PNG icons, drawn from public/favicon.svg: `npm run icons -w @almanac/web` after a change to the mark.
 // Each is drawn on a canvas in a browser and exported from it — not a screenshot, which a window smaller than asked
 // for cuts off and pads with a second copy (what broke icon-192 and icon-512 in October 2026):
 // - icon-192.png, icon-512.png: favicon.svg as it is (the rounded tile, its corners transparent);

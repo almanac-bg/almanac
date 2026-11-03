@@ -1,4 +1,4 @@
-import { type LiveGame, plural } from '@quiz/client';
+import { type LiveGame, plural } from '@almanac/client';
 import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { sfx } from '../../lib/sound';

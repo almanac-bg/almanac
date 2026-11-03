@@ -21,7 +21,7 @@ import {
   ROUNDS,
   sofiaTimeOn,
   TIME_ZONE,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import proxyaddr from 'proxy-addr';
 import { Server } from 'socket.io';
 import { hashToken, resolveSession, sessionTokenFromCookieHeader } from './auth';
@@ -123,7 +123,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     // Every client message is tiny; the 1 MB default only invites abuse.
     maxHttpBufferSize: 16 * 1024,
     // A link that dies without closing (a tunnel, a phone switching networks) is noticed within 18 s, not the default
-    // 45: a match goes on meanwhile. The client flags silence sooner on its own (watchLink in @quiz/client).
+    // 45: a match goes on meanwhile. The client flags silence sooner on its own (watchLink in @almanac/client).
     pingInterval: 10_000,
     pingTimeout: 8_000,
     // Only same-origin pages may open a socket (blocks cross-site socket hijacking with the session cookie).
@@ -222,7 +222,7 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
     const { userId, session } = socket.data;
     socketsByNetwork.set(socket.data.network, (socketsByNetwork.get(socket.data.network) ?? 0) + 1);
     socket.join([`user:${userId}`, `session:${session}`]);
-    // Bursts are fine (answer + joker + emote); a stream of events is dropped — with an answer for any that wait for
+    // Bursts are fine (answer + коз + emote); a stream of events is dropped — with an answer for any that wait for
     // one, so the page says "too fast" rather than "no connection".
     const allowed = eventBucket();
     socket.use((packet, next) => {

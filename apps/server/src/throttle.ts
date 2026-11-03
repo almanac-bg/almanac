@@ -132,7 +132,7 @@ export function wideNetwork(ip: string | undefined): string {
 }
 
 /**
- * Token bucket for socket events: short bursts are fine (answer + joker + emote), a stream isn't.
+ * Token bucket for socket events: short bursts are fine (answer + коз + emote), a stream isn't.
  * Returns a function that says whether the next event is allowed.
  */
 export function eventBucket(capacity = 30, perSecond = 10): () => boolean {

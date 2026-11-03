@@ -1,4 +1,4 @@
-import { BRAND } from '@quiz/shared';
+import { BRAND } from '@almanac/shared';
 import clsx from 'clsx';
 
 /**

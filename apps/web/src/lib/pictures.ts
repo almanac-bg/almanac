@@ -1,4 +1,4 @@
-import { SETS } from '@quiz/shared';
+import { SETS } from '@almanac/shared';
 
 /**
  * A picture picked for a question, made fit to keep: at most SETS.imageSide on its longer side, drawn anew (which also

@@ -1,5 +1,5 @@
-import { actions, fmt, type LiveGame } from '@quiz/client';
-import { type GamePlayer, ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@quiz/shared';
+import { actions, fmt, type LiveGame } from '@almanac/client';
+import { type GamePlayer, ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Flame, Lock } from 'lucide-react';
 import { m } from 'motion/react';

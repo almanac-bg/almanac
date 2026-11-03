@@ -1,5 +1,5 @@
 {
-  "name": "@quiz/web",
+  "name": "@almanac/web",
   "version": "1.0.0",
   "license": "AGPL-3.0-or-later",
   "private": true,
@@ -15,8 +15,8 @@
     "store-shots": "node scripts/store-shots.mjs"
   },
   "dependencies": {
-    "@quiz/client": "*",
-    "@quiz/shared": "*",
+    "@almanac/client": "*",
+    "@almanac/shared": "*",
     "@sentry/browser": "^11.10.0",
     "@simplewebauthn/browser": "^14.0.0",
     "canvas-confetti": "^1.9.4",

@@ -1,6 +1,6 @@
-import { api } from '@quiz/client';
+import { api } from '@almanac/client';
 
-const SHARE_PREFIX = 'quiz:daily-share:';
+const SHARE_PREFIX = 'almanac:daily-share:';
 
 /**
  * Signing out (or deleting the account) on a shared device — a school's tablet, a family's phone — leaves nothing of
@@ -21,8 +21,8 @@ export async function forgetThisDevice({ server }: { server: boolean }) {
   }
   try {
     for (const key of Object.keys(localStorage)) if (key.startsWith(SHARE_PREFIX)) localStorage.removeItem(key);
-    localStorage.removeItem('quiz:room-nickname');
-    sessionStorage.removeItem('quiz:room-nickname');
+    localStorage.removeItem('almanac:room-nickname');
+    sessionStorage.removeItem('almanac:room-nickname');
   } catch {
     /* storage unavailable: nothing kept either */
   }

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BRAND, ordinal, TIME_ZONE } from '@quiz/shared';
+import { BRAND, ordinal, TIME_ZONE } from '@almanac/shared';
 import nodemailer from 'nodemailer';
 import { config } from './config';
 import { reportError } from './monitoring';

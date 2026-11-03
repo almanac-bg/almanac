@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test';
  * Browser tests (e2e/): the production build (the server bundle, serving the built web app) in a real browser.
  *
  *   npm run test:browser                 from the repo root: builds, then runs them
- *   npm run test:browser -w @quiz/web    runs them against the build there is
+ *   npm run test:browser -w @almanac/web    runs them against the build there is
  *   npx playwright show-report           (in apps/web) the last run's report
  *
  * The browser: BROWSER_PATH points at any installed Chromium-based browser (Brave, Chromium, Edge…), e.g.
@@ -29,10 +29,10 @@ const webIndex = path.join(root, 'apps/web/dist/index.html');
 const elsewhere = process.env.E2E_OUTPUT ? path.resolve(process.env.E2E_OUTPUT) : null;
 const outputDir = path.join(elsewhere ?? import.meta.dirname, 'test-results');
 /** The test server's database (the tests that check what the app can't show read it). */
-export const serverDb = path.join(outputDir, 'server', 'quiz.db');
+export const serverDb = path.join(outputDir, 'server', 'almanac.db');
 /** What the server reports as errors during the run (ERROR_OUTBOX): e2e/teardown.ts fails the run on any. */
 export const serverErrors = path.join(outputDir, 'server', 'errors.jsonl');
-/** Every statement the server runs, for `npm run plans -w @quiz/server` (beside the server tests' own by default). */
+/** Every statement the server runs, for `npm run plans -w @almanac/server` (beside the server tests' own by default). */
 const sqlLog = elsewhere ? path.join(elsewhere, 'sql-log') : path.join(root, 'apps/server/.sql-log');
 const reportDir = path.join(elsewhere ?? import.meta.dirname, 'playwright-report');
 
@@ -182,7 +182,7 @@ export default defineConfig({
       VAPID_PRIVATE_KEY: '',
       // No evening Роял at whatever hour the tests run (CI often runs at 21:00 Sofia).
       EVENING_AT: 'off',
-      // Every statement it runs, beside the server tests' (`npm run plans -w @quiz/server` checks them all).
+      // Every statement it runs, beside the server tests' (`npm run plans -w @almanac/server` checks them all).
       SQL_LOG: sqlLog,
     },
   },

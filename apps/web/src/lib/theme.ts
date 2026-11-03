@@ -3,7 +3,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 /** The colour theme a device asked for: the dark one (the game's own), the light one, or as the device is set. */
 export type ThemeChoice = 'dark' | 'light' | 'system';
 
-const KEY = 'quiz:theme';
+const KEY = 'almanac:theme';
 const COLORS = { dark: '#07060d', light: '#f4f3f9' } as const;
 const lightQuery = () => window.matchMedia('(prefers-color-scheme: light)');
 const listeners = new Set<() => void>();

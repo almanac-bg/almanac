@@ -12,7 +12,7 @@ import {
   seasonEndsAt,
   seasonKey,
   seasonName,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { duelRecord } from '../challenges';

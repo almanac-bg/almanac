@@ -1,5 +1,5 @@
-import { api, fmt, ordinal, plural, useStore } from '@quiz/client';
-import type { GroupSummary } from '@quiz/shared';
+import { api, fmt, ordinal, plural, useStore } from '@almanac/client';
+import type { GroupSummary } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router';

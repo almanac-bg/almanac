@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react';
  * or speaks to their device sends words as keys, and a stray „e“ was a bet of 500 points (WCAG 2.1.4). Enter, ⌫ and
  * the arrows aren't single characters and stay on.
  */
-const KEY = 'quiz:matchKeys';
+const KEY = 'almanac:matchKeys';
 const listeners = new Set<() => void>();
 
 export function matchKeysOn(): boolean {

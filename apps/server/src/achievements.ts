@@ -6,7 +6,7 @@ import {
   START_RATING,
   tierIndex,
   type XpLine,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { all, one, run } from './db';
 import { eveningWins } from './evening';
 import { factCount } from './knowledge';
@@ -82,7 +82,6 @@ const RULES: Record<string, Rule> = {
   games_100: { progress: (a) => a.gamesPlayed },
   first_win: { progress: (a) => a.wins },
   duelist: { progress: (a) => a.modeWins.duel ?? 0 },
-  trio_win: { progress: (a) => a.modeWins.trio ?? 0 },
   squad_win: { progress: (a) => a.modeWins.squad ?? 0 },
   royale_win: { progress: (a) => a.modeWins.royale ?? 0 },
   party_animal: { progress: (a) => a.mpGames },

@@ -4,7 +4,7 @@
 // runs) fails, unless it's listed below with the reason it's fine. At ten players a full scan is free; at a hundred
 // thousand it's what makes every match on the server wait.
 //
-// `node --import tsx test/plans.ts [folder]` (default .sql-log); `npm test -w @quiz/server` runs it after the suite.
+// `node --import tsx test/plans.ts [folder]` (default .sql-log); `npm test -w @almanac/server` runs it after the suite.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

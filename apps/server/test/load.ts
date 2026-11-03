@@ -1,5 +1,5 @@
 // Load test: how many people one server carries before matches start to stutter. Not part of `npm test` (it runs for
-// minutes): `npm run build && npm run load -w @quiz/server`, optionally with the steps as arguments (`… load 500 1000`),
+// minutes): `npm run build && npm run load -w @almanac/server`, optionally with the steps as arguments (`… load 500 1000`),
 // and `--seed <accounts>` to play on a database with a long history (test/seed.ts: months of matches, the answer log,
 // dailies… for that many accounts) instead of an empty one. Keep the computer awake meanwhile (on a Mac,
 // `caffeinate -i npm run load …`), and raise the open-files limit for big steps (`ulimit -n 20000`).
@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
-import type { QuestionPayload } from '@quiz/shared';
+import type { QuestionPayload } from '@almanac/shared';
 import { type Client, connect, rightOption, sleep, startServer, type TestServer } from './helpers';
 
 const args = process.argv.slice(2);
@@ -42,7 +42,7 @@ const env: Record<string, string> = {
 let sessions: { id: number; username: string; token: string }[] = [];
 const seedDir = seeded ? fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-seeded-')) : null;
 if (seedDir) {
-  const file = path.join(seedDir, 'quiz.db');
+  const file = path.join(seedDir, 'almanac.db');
   console.log(`Seeding a database with ${seeded.toLocaleString('en')} accounts' history…`);
   execFileSync(process.execPath, ['--import', 'tsx', path.join(import.meta.dirname, 'seed.ts'), file, String(seeded)], {
     stdio: 'inherit',
@@ -174,7 +174,7 @@ function probe(requests: { path: string; cookie?: string }[], everyMs: number): 
 const HEALTH = [{ path: '/api/health' }];
 /** As the seeded accounts: their own page, someone else's profile, the level board. */
 const PAGES = sessions.flatMap(({ token }, i) => {
-  const cookie = `quiz_session=${token}`;
+  const cookie = `almanac_session=${token}`;
   const other = sessions[(i + 1) % sessions.length].username;
   return [
     { path: '/api/me', cookie },

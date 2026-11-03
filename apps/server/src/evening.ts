@@ -8,7 +8,7 @@ import {
   shiftDay,
   sofiaTimeOn,
   TITLES,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { getUser, NOT_BANNED, toPublicUser, type UserRow } from './users';

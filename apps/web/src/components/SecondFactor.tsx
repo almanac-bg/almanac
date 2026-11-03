@@ -1,5 +1,5 @@
-import { api, errorMessage, longDate, onSecondFactorNeeded } from '@quiz/client';
-import type { StaffSecondFactors } from '@quiz/shared';
+import { api, errorMessage, longDate, onSecondFactorNeeded } from '@almanac/client';
+import type { StaffSecondFactors } from '@almanac/shared';
 import { Check, Copy, Fingerprint, KeyRound, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { addPasskey, passkeyProblem, passkeysWork, signInWithPasskey } from '../lib/passkeys';

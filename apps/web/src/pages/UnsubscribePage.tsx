@@ -1,4 +1,4 @@
-import { api, errorMessage, refreshMe, useStore } from '@quiz/client';
+import { api, errorMessage, refreshMe, useStore } from '@almanac/client';
 import { BellOff, CheckCircle2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';

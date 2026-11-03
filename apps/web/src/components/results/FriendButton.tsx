@@ -1,5 +1,5 @@
-import { api, errorMessage, type LiveGame, toast, useStore } from '@quiz/client';
-import type { Friendship, FriendsResponse, GamePlayer } from '@quiz/shared';
+import { api, errorMessage, type LiveGame, toast, useStore } from '@almanac/client';
+import type { Friendship, FriendsResponse, GamePlayer } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, UserCheck, UserPlus } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useState } from 'react';

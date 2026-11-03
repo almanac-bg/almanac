@@ -3,7 +3,7 @@
  * up doesn't take it. `base` is what it was written against (the saved set, say): a draft over something that has
  * changed since is no longer this one's, and is dropped.
  */
-const PREFIX = 'quiz:draft:';
+const PREFIX = 'almanac:draft:';
 
 export function loadDraft<T>(key: string, base: string): T | null {
   try {

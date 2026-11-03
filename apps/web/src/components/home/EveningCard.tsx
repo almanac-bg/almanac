@@ -1,5 +1,5 @@
-import { actions, api, fmt, toast, useNow, useStore } from '@quiz/client';
-import { EVENING, type EveningStatus, MODES } from '@quiz/shared';
+import { actions, api, fmt, toast, useNow, useStore } from '@almanac/client';
+import { EVENING, type EveningStatus, MODES } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChevronDown, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';

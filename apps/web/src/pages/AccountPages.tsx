@@ -8,8 +8,8 @@ import {
   signedOut,
   toast,
   useStore,
-} from '@quiz/client';
-import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH, USERNAME } from '@quiz/shared';
+} from '@almanac/client';
+import { type MeUser, MORE_TIME, type MoreTime, PASSWORD_MIN_LENGTH, USERNAME } from '@almanac/shared';
 import clsx from 'clsx';
 import {
   Check,

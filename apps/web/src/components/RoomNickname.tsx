@@ -1,9 +1,9 @@
-import { nicknameProblem, ROOM_CODE_DIGITS, ROOM_NICKNAME, tidyNickname } from '@quiz/shared';
+import { nicknameProblem, ROOM_CODE_DIGITS, ROOM_NICKNAME, tidyNickname } from '@almanac/shared';
 import { DoorClosed } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { Button, INPUT, Spinner } from './ui';
 
-const KEY = 'quiz:room-nickname';
+const KEY = 'almanac:room-nickname';
 
 /**
  * The name a guest went by in a room in this tab, to offer again (a reload, the next room). Only for the tab: a school's

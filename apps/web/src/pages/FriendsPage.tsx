@@ -1,5 +1,5 @@
-import { actions, api, errorMessage, timeAgo, toast, useStore } from '@quiz/client';
-import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@quiz/shared';
+import { actions, api, errorMessage, timeAgo, toast, useStore } from '@almanac/client';
+import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

@@ -1,5 +1,5 @@
-import { fmt, type LiveGame } from '@quiz/client';
-import { emoteById, type Standing, TEAMS, type TeamId } from '@quiz/shared';
+import { fmt, type LiveGame } from '@almanac/client';
+import { emoteById, type Standing, TEAMS, type TeamId } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Skull } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

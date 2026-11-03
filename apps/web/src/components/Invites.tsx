@@ -1,5 +1,5 @@
-import { actions, dropInvite, toast, useNow, useStore } from '@quiz/client';
-import type { Invite } from '@quiz/shared';
+import { actions, dropInvite, toast, useNow, useStore } from '@almanac/client';
+import type { Invite } from '@almanac/shared';
 import { Users } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';

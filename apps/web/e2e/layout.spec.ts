@@ -327,7 +327,7 @@ test('an iPhone’s status bar follows the theme: black on ink, white with dark 
   // Chosen once: set before the first paint from then on (public/theme.js), as iOS reads it as the app opens. (The
   // page settled first: WebKit fails a module still loading when the page reloads under it.)
   await page.waitForLoadState('networkidle');
-  await page.evaluate(() => localStorage.setItem('quiz:theme', 'light'));
+  await page.evaluate(() => localStorage.setItem('almanac:theme', 'light'));
   await page.reload();
   expect(await style()).toBe('default');
 });

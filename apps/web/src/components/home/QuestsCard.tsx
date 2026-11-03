@@ -1,5 +1,5 @@
-import { refreshMe, useNow, useStore } from '@quiz/client';
-import type { QuestInfo } from '@quiz/shared';
+import { refreshMe, useNow, useStore } from '@almanac/client';
+import type { QuestInfo } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ListChecks } from 'lucide-react';
 import { useEffect } from 'react';

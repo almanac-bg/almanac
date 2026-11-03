@@ -16,7 +16,7 @@ import {
   shiftDay,
   sofiaTimeOn,
   weekStart,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import type { AnswerLogEntry } from '../src/game/Game';
 import { writeFixtureQuestions } from './helpers';
 

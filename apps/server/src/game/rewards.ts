@@ -14,7 +14,7 @@ import {
   START_RATING,
   type UnratedReason,
   type XpLine,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { unlockContext } from '../account';
 import { type MatchContext, settleAchievements } from '../achievements';
 import { recordAnswers } from '../answers';
@@ -346,7 +346,7 @@ function rewardHuman(
         correct: measured ? k.correct : 0,
         hardCorrect: measured ? k.correctByDifficulty.hard : 0,
         bestStreak: measured ? race.bestStreak : 0,
-        jokers: p.usedPowerups.size,
+        powerups: p.usedPowerups.size,
         correctByCategory: measured
           ? new Map([...k.categories].map(([category, c]) => [category, c.correct]))
           : new Map(),

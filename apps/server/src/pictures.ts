@@ -2,7 +2,7 @@
 // kept and served is a WebP encoded here from the decoded pixels, never the bytes that came in, so nothing rides along
 // in a file that a decoder would skip (bytes after the scan, a wrapper round other data). And a print of what it shows,
 // so a picture a moderator blocked can't come back re-encoded, resized or a shade lighter.
-import { SETS } from '@quiz/shared';
+import { SETS } from '@almanac/shared';
 import sharp from 'sharp';
 
 // libvips decodes in native code: only the two formats the editor sends are ever handed to a decoder. Every other

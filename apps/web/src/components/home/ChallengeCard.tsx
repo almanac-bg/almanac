@@ -1,5 +1,5 @@
-import { actions, api, fmt, plural, timeAgo, toast, useNow, useStore } from '@quiz/client';
-import { MODES, type MyChallenge } from '@quiz/shared';
+import { actions, api, fmt, plural, timeAgo, toast, useNow, useStore } from '@almanac/client';
+import { MODES, type MyChallenge } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChevronRight, Link2, Lock, Share2, Swords } from 'lucide-react';
 import { useState } from 'react';

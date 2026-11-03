@@ -1,4 +1,4 @@
-import { useStore } from '@quiz/client';
+import { useStore } from '@almanac/client';
 import clsx from 'clsx';
 import { Check, WifiOff } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

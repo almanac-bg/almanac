@@ -1,4 +1,4 @@
-import { dayKey, daysBetween, shiftDay } from '@quiz/shared';
+import { dayKey, daysBetween, shiftDay } from '@almanac/shared';
 import { all, one, run } from './db';
 
 /**

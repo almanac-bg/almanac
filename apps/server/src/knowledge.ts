@@ -6,7 +6,7 @@ import {
   type KnowledgeOverview,
   REVIEW,
   type ReviewQueue,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { all, one, run } from './db';
 import type { AnswerLogEntry } from './game/Game';
 import { earnedMastery } from './mastery';

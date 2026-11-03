@@ -1,5 +1,5 @@
-import { fmt, type LiveGame } from '@quiz/client';
-import { MODES } from '@quiz/shared';
+import { fmt, type LiveGame } from '@almanac/client';
+import { MODES } from '@almanac/shared';
 import clsx from 'clsx';
 import { Flame, Skull, Volume2, VolumeX, X } from 'lucide-react';
 import { m } from 'motion/react';

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { CATEGORY_IDS, dayKey, shiftDay, sofiaMidnight } from '@quiz/shared';
+import { CATEGORY_IDS, dayKey, shiftDay, sofiaMidnight } from '@almanac/shared';
 
 // Server modules open the database on import — point them at a throwaway one first.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-progress-'));
@@ -56,7 +56,7 @@ test('daily quests: three a day that stay put, paid once each, plus a bonus for 
     correct: 40,
     hardCorrect: 10,
     bestStreak: 10,
-    jokers: 5,
+    powerups: 5,
     facts: 10,
     ordersRight: 1,
     finalCloseness: 1,

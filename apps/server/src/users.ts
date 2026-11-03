@@ -1,4 +1,4 @@
-import { levelFromXp, type PublicUser } from '@quiz/shared';
+import { levelFromXp, type PublicUser } from '@almanac/shared';
 import { all, one, run } from './db';
 import { nameShape } from './names';
 

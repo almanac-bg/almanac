@@ -1,4 +1,4 @@
-import { fmt, type LiveGame, useNow } from '@quiz/client';
+import { fmt, type LiveGame, useNow } from '@almanac/client';
 import {
   type CategoryMastery,
   categoryById,
@@ -9,7 +9,7 @@ import {
   masteryName,
   TEAMS,
   type TeamId,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Skull, Timer } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

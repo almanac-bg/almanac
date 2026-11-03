@@ -1,4 +1,4 @@
-import type { SiteInfo } from '@quiz/shared';
+import type { SiteInfo } from '@almanac/shared';
 import { prerender } from 'react-dom/static';
 import { StaticRouter } from 'react-router';
 import { App } from './App';

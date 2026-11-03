@@ -1,5 +1,13 @@
-import { api, fmt, pct, useStore } from '@quiz/client';
-import { BRAND, dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, TIME_ZONE, titleName } from '@quiz/shared';
+import { api, fmt, pct, useStore } from '@almanac/client';
+import {
+  BRAND,
+  dayKey,
+  type LeaderboardBoard,
+  type LeaderboardEntry,
+  MODES,
+  TIME_ZONE,
+  titleName,
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
 import { m } from 'motion/react';

@@ -12,7 +12,7 @@ import {
   MODES,
   type MyChallenge,
   ordinal,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { grantXp } from './account';
 import { config } from './config';
 import { cutShortError } from './daily';

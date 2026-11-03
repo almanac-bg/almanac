@@ -11,7 +11,7 @@ import {
   type PushPrefs,
   sofiaHour,
   TIME_ZONE,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import webpush from 'web-push';
 import { z } from 'zod';
 import { config } from './config';

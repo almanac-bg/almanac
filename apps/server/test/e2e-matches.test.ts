@@ -3,7 +3,7 @@
 // state, like a play session; the other e2e-*.test.ts files run beside this one, each on a server of its own.
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { RATED_AFTER, type RoomState, SCORING } from '@quiz/shared';
+import { RATED_AFTER, type RoomState, SCORING } from '@almanac/shared';
 import {
   type Account,
   app,

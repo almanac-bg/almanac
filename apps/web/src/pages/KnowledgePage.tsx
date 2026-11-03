@@ -1,5 +1,5 @@
-import { api, fmt, plural, useStore } from '@quiz/client';
-import { type CATEGORIES, categoryById, isCategoryId, type KnowledgeFact } from '@quiz/shared';
+import { api, fmt, plural, useStore } from '@almanac/client';
+import { type CATEGORIES, categoryById, isCategoryId, type KnowledgeFact } from '@almanac/shared';
 import { ArrowLeft, ChevronRight, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Link, useParams } from 'react-router';

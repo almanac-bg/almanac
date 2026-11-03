@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { after, before, test } from 'node:test';
-import { BRAND, LEGAL, PUBLIC_PAGES, routeKind, type SiteInfo } from '@quiz/shared';
+import { BRAND, LEGAL, PUBLIC_PAGES, routeKind, type SiteInfo } from '@almanac/shared';
 import { cli, connect, connected, emitAck, http, next, register, startServer, type TestServer } from './helpers';
 
 let srv: TestServer;
@@ -272,7 +272,7 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
     const html = await res.text();
     return { html, vary: res.headers.get('vary'), root: /<div id="root"[^>]*>/.exec(html)?.[0] };
   };
-  const session = 'quiz_session=anything';
+  const session = 'almanac_session=anything';
 
   const landing = await get('/');
   assert.equal(landing.root, '<div id="root" data-painted="signed-out">');
@@ -293,7 +293,7 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
   assert.match(lobby.html, /rel="stylesheet"/);
   assert.doesNotMatch(lobby.html, /Онлайн викторина/);
   // A device that has signed in before gets that version drawn (the form on "Вход"), so nothing flips as it hydrates.
-  const back = await get('/', 'quiz_returning=1');
+  const back = await get('/', 'almanac_returning=1');
   assert.equal(back.root, '<div id="root" data-painted="signed-out" data-returning="1">');
   assert.match(back.html, /Здравей отново!/);
   assert.match(landing.html, /Създай профил/);
@@ -427,30 +427,29 @@ test('`cli guests off` turns new guests away until `cli guests on`; accounts are
   assert.equal((await fetch(`${srv.url}/api/auth/guest`, { method: 'POST' })).status, 201);
 });
 
-test('over HTTPS the session cookie is Secure and host-only by default; sessions under the old name still work', async () => {
+test('over HTTPS the session cookie is Secure and host-only by default', async () => {
   const secure = await startServer({ NODE_ENV: 'production', COOKIE_SECURE: '', OPERATOR_NAME: 'Тест Тестов' });
   try {
     const res = await fetch(`${secure.url}/api/auth/guest`, { method: 'POST' });
     const cookies = res.headers.getSetCookie();
-    const session = cookies.find((c) => c.startsWith('__Host-quiz_session='));
+    const session = cookies.find((c) => c.startsWith('__Host-almanac_session='));
     assert.ok(session, cookies.join(' | '));
     assert.match(session, /; Secure/i);
     assert.match(session, /; Path=\//i);
     assert.doesNotMatch(session, /Domain=/i);
     const token = session.split(';')[0].split('=')[1];
-    const before = await http(secure.url).get('/api/me', `quiz_session=${token}`);
-    assert.ok(before.body.user, 'a cookie issued before the prefix is still read');
+    assert.ok((await http(secure.url).get('/api/me', `__Host-almanac_session=${token}`)).body.user, 'it signs in');
   } finally {
     await secure.stop();
   }
   const typo = await startServer({ PUBLIC_QUEUES: 'duel,royal' }).catch((err: Error) => err);
   assert.ok(typo instanceof Error, 'a typo in PUBLIC_QUEUES stops the server');
   assert.match(typo.message, /PUBLIC_QUEUES has royal/);
-  // A setting from before Трио joined Арена still starts the server, with Арена open in its place.
-  const old = await startServer({ PUBLIC_QUEUES: 'duel,trio' });
+  // A shorter list opens only the queues it names: the others refuse a join, saying which are open.
+  const narrow = await startServer({ PUBLIC_QUEUES: 'duel,squad' });
   try {
-    const player = await register(old.url, 'staro_test');
-    const socket = connect(old.url, player.cookie);
+    const player = await register(narrow.url, 'tesen_spisak');
+    const socket = connect(narrow.url, player.cookie);
     const stats = next(socket, 'lobby:stats');
     await connected(socket);
     assert.deepEqual((await stats).modes, ['duel', 'squad']);
@@ -458,7 +457,7 @@ test('over HTTPS the session cookie is Secure and host-only by default; sessions
     assert.match((closed as { error: string }).error, /„Дуел“ или „Арена“/);
     socket.close();
   } finally {
-    await old.stop();
+    await narrow.stop();
   }
 });
 
@@ -477,14 +476,14 @@ test('browser crash reports are accepted (and never echo anything back)', async 
   assert.equal(res.status, 204);
 });
 
-test('as it ships every ranked queue is open, and the lobby says so; Трио is no more', async () => {
+test('as it ships every ranked queue is open, and the lobby says so; a mode it doesn’t have is refused', async () => {
   const player = await register(srv.url, 'opashka_test');
   const socket = connect(srv.url, player.cookie);
   const stats = next(socket, 'lobby:stats');
   await connected(socket);
   assert.deepEqual((await stats).modes, ['duel', 'teams', 'squad', 'royale']);
-  const gone = await emitAck(socket, 'queue:join', 'trio');
-  assert.deepEqual(gone, { ok: false, error: 'Непознат режим.' });
+  const unknown = await emitAck(socket, 'queue:join', 'chess');
+  assert.deepEqual(unknown, { ok: false, error: 'Непознат режим.' });
   assert.ok((await emitAck(socket, 'queue:join', 'squad')).ok);
   socket.emit('queue:leave');
   socket.close();

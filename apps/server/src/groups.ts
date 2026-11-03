@@ -12,7 +12,7 @@ import {
   TIME_ZONE,
   weekEndsAt,
   weekStart,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { config } from './config';
 import { all, one, run, tx } from './db';
 import { textProblem } from './names';

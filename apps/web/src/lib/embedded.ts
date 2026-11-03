@@ -1,4 +1,4 @@
-import type { ChallengePreview } from '@quiz/shared';
+import type { ChallengePreview } from '@almanac/shared';
 
 /**
  * A challenge link's preview, as the server put it in the page (index.ts → challengePage): there at once, no request

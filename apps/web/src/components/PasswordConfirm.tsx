@@ -1,4 +1,4 @@
-import { api, errorMessage, onPasswordNeeded, useStore } from '@quiz/client';
+import { api, errorMessage, onPasswordNeeded, useStore } from '@almanac/client';
 import { ShieldCheck } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { Button, Field, INPUT, Modal } from './ui';

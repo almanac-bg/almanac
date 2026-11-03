@@ -76,7 +76,7 @@ test('daily snapshots: one per day, a working copy, only the newest kept', async
   const dir = path.join(tmp, 'backups');
   const day = (d: number) => Date.UTC(2026, 9, d, 12);
   const first = await snapshot(day(1), dir);
-  assert.ok(first?.endsWith('quiz-2026-10-01.db'));
+  assert.ok(first?.endsWith('almanac-2026-10-01.db'));
   assert.equal(await snapshot(day(1), dir), null, 'one snapshot per day');
 
   const copy = new DatabaseSync(first!, { readOnly: true });
@@ -84,7 +84,11 @@ test('daily snapshots: one per day, a working copy, only the newest kept', async
   copy.close();
 
   for (const d of [2, 3, 4, 5]) await snapshot(day(d), dir);
-  assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-03.db', 'quiz-2026-10-04.db', 'quiz-2026-10-05.db']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), [
+    'almanac-2026-10-03.db',
+    'almanac-2026-10-04.db',
+    'almanac-2026-10-05.db',
+  ]);
 });
 
 test('the daily copy finishes while another connection keeps writing, and a second run leaves one being made be', async () => {
@@ -100,13 +104,13 @@ test('the daily copy finishes while another connection keeps writing, and a seco
   }, 2);
   try {
     const [made, overlapping] = await Promise.all([snapshot(day, dir), snapshot(day, dir)]);
-    assert.ok(made?.endsWith('quiz-2026-10-10.db'));
+    assert.ok(made?.endsWith('almanac-2026-10-10.db'));
     assert.equal(overlapping, null, 'the run that came over it left it be');
   } finally {
     clearInterval(writer);
     other.close();
   }
-  const copy = new DatabaseSync(path.join(dir, 'quiz-2026-10-10.db'), { readOnly: true });
+  const copy = new DatabaseSync(path.join(dir, 'almanac-2026-10-10.db'), { readOnly: true });
   assert.equal((copy.prepare('SELECT username FROM users WHERE id = 1').get() as { username: string }).username, 'a');
   copy.close();
 });
@@ -119,20 +123,20 @@ test('copies from before migrations: the newest two are kept, none past a month'
     fs.writeFileSync(path.join(dir, name), '');
     fs.utimesSync(path.join(dir, name), new Date(now - daysAgo * DAY), new Date(now - daysAgo * DAY));
   };
-  made('quiz-v40-before-v41.db', 3);
-  made('quiz-v41-before-v42.db', 2);
-  made('quiz-v42-before-v43.db', 1);
-  made('quiz-2026-10-29.db', 1);
+  made('almanac-v40-before-v41.db', 3);
+  made('almanac-v41-before-v42.db', 2);
+  made('almanac-v42-before-v43.db', 1);
+  made('almanac-2026-10-29.db', 1);
   prunePreMigrationCopies(now, dir);
   assert.deepEqual(fs.readdirSync(dir).sort(), [
-    'quiz-2026-10-29.db',
-    'quiz-v41-before-v42.db',
-    'quiz-v42-before-v43.db',
+    'almanac-2026-10-29.db',
+    'almanac-v41-before-v42.db',
+    'almanac-v42-before-v43.db',
   ]);
   prunePreMigrationCopies(now + 28.5 * DAY, dir);
-  assert.deepEqual(fs.readdirSync(dir).sort(), ['quiz-2026-10-29.db', 'quiz-v42-before-v43.db'], 'a month on');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['almanac-2026-10-29.db', 'almanac-v42-before-v43.db'], 'a month on');
   prunePreMigrationCopies(now + 29.5 * DAY, dir);
-  assert.deepEqual(fs.readdirSync(dir), ['quiz-2026-10-29.db'], 'the daily copies are not theirs to prune');
+  assert.deepEqual(fs.readdirSync(dir), ['almanac-2026-10-29.db'], 'the daily copies are not theirs to prune');
 });
 
 test('an account unused for three years gets an email a month before it is deleted; signing in keeps it', () => {

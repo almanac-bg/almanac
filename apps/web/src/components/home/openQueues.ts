@@ -1,5 +1,5 @@
-import { useStore } from '@quiz/client';
-import { ACHIEVEMENTS, DEFAULT_OPEN_QUEUES, QUEUE_MODES, type QueueModeId } from '@quiz/shared';
+import { useStore } from '@almanac/client';
+import { ACHIEVEMENTS, DEFAULT_OPEN_QUEUES, QUEUE_MODES, type QueueModeId } from '@almanac/shared';
 import { useMemo } from 'react';
 
 /**

@@ -1,5 +1,5 @@
-import { api, fmt, longDate } from '@quiz/client';
-import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@quiz/shared';
+import { api, fmt, longDate } from '@almanac/client';
+import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@almanac/shared';
 import { Lock } from 'lucide-react';
 import { m } from 'motion/react';
 import { useState } from 'react';

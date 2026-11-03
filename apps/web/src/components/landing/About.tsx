@@ -1,5 +1,5 @@
-import { fmt } from '@quiz/client';
-import { BRAND, CATEGORIES, isQueueMode, MODES, type ModeId, RANK_TIERS } from '@quiz/shared';
+import { fmt } from '@almanac/client';
+import { BRAND, CATEGORIES, isQueueMode, MODES, type ModeId, RANK_TIERS } from '@almanac/shared';
 import clsx from 'clsx';
 import { type ReactNode, useId } from 'react';
 import { Link } from 'react-router';

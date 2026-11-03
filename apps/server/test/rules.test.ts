@@ -32,7 +32,7 @@ import {
   sofiaTimeOn,
   teamPoints,
   xpToReach,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { writeFixtureQuestions } from './helpers';
 
 // Server modules open the database on import — point them at a throwaway one first.
@@ -41,7 +41,7 @@ process.env.DB_PATH = path.join(tmp, 'rules.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
-const { ordinal } = await import('@quiz/shared');
+const { ordinal } = await import('@almanac/shared');
 const { nameProblem } = await import('../src/moderation');
 const { BLOCKED_EDGES, BLOCKED_STARTS, BLOCKED_STEMS, BRAND, STAFF, mixesScripts, nameShape, textProblem } =
   await import('../src/names');
@@ -497,13 +497,13 @@ test('a mail-events subscription link is followed only on Scaleway’s Topics an
 });
 
 test('every themed day links to a quiz page that exists', async () => {
-  const { CALENDAR_DAYS, PUBLIC_PAGES } = await import('@quiz/shared');
+  const { CALENDAR_DAYS, PUBLIC_PAGES } = await import('@almanac/shared');
   for (const [day, theme] of Object.entries(CALENDAR_DAYS))
     assert.ok(theme.page in PUBLIC_PAGES, `${day}: ${theme.page} is a public page`);
 });
 
 test('the evening Роял says what its cuts are, from the cuts themselves', async () => {
-  const { EVENING, MODES } = await import('@quiz/shared');
+  const { EVENING, MODES } = await import('@almanac/shared');
   const said = MODES.evening.description;
   assert.match(said, new RegExp(`До ${EVENING.maxPlayers}\\sдуши`));
   for (const cut of EVENING.cuts) {

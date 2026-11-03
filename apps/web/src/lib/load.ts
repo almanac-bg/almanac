@@ -1,4 +1,4 @@
-import { ApiError, useStore } from '@quiz/client';
+import { ApiError, useStore } from '@almanac/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface LoadFailure {

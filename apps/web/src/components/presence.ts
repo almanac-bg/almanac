@@ -1,4 +1,4 @@
-import type { Presence } from '@quiz/shared';
+import type { Presence } from '@almanac/shared';
 
 /** Where a friend is right now, in words and as a dot's colour: the same on the friends page and in a room's invites. */
 export const PRESENCE: Record<Presence, { label: string; color: string }> = {

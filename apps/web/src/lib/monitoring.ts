@@ -3,7 +3,7 @@
  * then, after the page is up, and sends through our own server (/api/monitoring): the browser never contacts Sentry,
  * and no IP address or personal data goes with a report — only the account number.
  */
-import { scrubPaths } from '@quiz/shared';
+import { scrubPaths } from '@almanac/shared';
 
 type Sentry = typeof import('./sentry');
 

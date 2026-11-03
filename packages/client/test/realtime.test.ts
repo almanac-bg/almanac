@@ -11,7 +11,7 @@ import type {
   MatchRewards,
   QuestionPayload,
   Standing,
-} from '@quiz/shared';
+} from '@almanac/shared';
 
 class FakeManager extends EventEmitter {
   delayMs = 1000;

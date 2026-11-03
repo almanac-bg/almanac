@@ -1,4 +1,4 @@
-import type { FriendEntry, Friendship, FriendsResponse, PublicUser } from '@quiz/shared';
+import type { FriendEntry, Friendship, FriendsResponse, PublicUser } from '@almanac/shared';
 import { all, one, run, tx } from './db';
 import { notify } from './notifications';
 import { presence } from './notify';

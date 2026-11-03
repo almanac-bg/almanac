@@ -11,7 +11,7 @@ import {
   newlyUnlocked,
   seasonKey,
   type UnlockContext,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { settleAchievements } from './achievements';
 import { verifyPassword } from './auth';
 import { pendingChoices, picksOf } from './choices';

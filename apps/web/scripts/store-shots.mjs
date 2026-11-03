@@ -4,7 +4,7 @@
 // is checked out (private/), so it says what the site says. Chrome shows them when the app is installed, beside the icon, so they go stale with the
 // mark or the screens: run again after `npm run lockup` / `icons`, or a change to the landing, the lobby or a question.
 //
-//   npm run build && npm run store-shots -w @quiz/web
+//   npm run build && npm run store-shots -w @almanac/web
 //
 // Its own port (SHOTS_PORT, default 3251) and a throwaway database; BROWSER_PATH for a browser other than Playwright's.
 import { spawn } from 'node:child_process';
@@ -38,7 +38,7 @@ async function serve(bank) {
       NODE_ENV: 'production',
       PORT: String(port),
       APP_URL: base,
-      DB_PATH: path.join(data, 'quiz.db'),
+      DB_PATH: path.join(data, 'almanac.db'),
       QUESTIONS_PATH: bank,
       BACKUP_DIR: 'off',
       EVENING_AT: 'off',

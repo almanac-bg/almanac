@@ -1,5 +1,5 @@
-import { fmt } from '@quiz/client';
-import { type ChallengePreview, type DailyPreview, MODES } from '@quiz/shared';
+import { fmt } from '@almanac/client';
+import { type ChallengePreview, type DailyPreview, MODES } from '@almanac/shared';
 import { ArrowRight, CalendarDays, LogIn, Play, RotateCcw, Swords, TriangleAlert } from 'lucide-react';
 import type { LoadFailure } from '../../lib/load';
 import { Avatar } from '../Avatar';

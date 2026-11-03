@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { BRAND } from '@quiz/shared';
+import { BRAND } from '@almanac/shared';
 
 const root = path.resolve(import.meta.dirname, '../../..');
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -34,6 +34,6 @@ test('the brand lockup is drawn once, with the name, and inlined the same everyw
     assert.equal(
       /<!--lockup-->([\s\S]*?)<!--\/lockup-->/.exec(read(file))?.[1],
       lockup,
-      `${file}: run npm run lockup -w @quiz/web`,
+      `${file}: run npm run lockup -w @almanac/web`,
     );
 });

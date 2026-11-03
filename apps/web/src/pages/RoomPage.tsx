@@ -1,4 +1,4 @@
-import { actions, api, plural, toast, useStore } from '@quiz/client';
+import { actions, api, plural, toast, useStore } from '@almanac/client';
 import {
   BRAND,
   CATEGORIES,
@@ -9,7 +9,7 @@ import {
   type RoomState,
   TEAMS,
   type TeamId,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import {
   ArrowLeftRight,

@@ -1,4 +1,4 @@
-import { dayKey, RATED_AFTER } from '@quiz/shared';
+import { dayKey, RATED_AFTER } from '@almanac/shared';
 import type { UserRow } from './users';
 
 // What a second account may not do on its first day. One costs about ten seconds (a guest, then saving it), so wherever

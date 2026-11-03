@@ -17,7 +17,7 @@ import {
   type RevealPayload,
   rightOrder,
   SETS,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import type { GameEmitter } from '../src/game/Game';
 import type { OrderQuestion, PreparedQuestion } from '../src/questions';
 import { app, jpeg, photo, writeFixtureQuestions } from './helpers';

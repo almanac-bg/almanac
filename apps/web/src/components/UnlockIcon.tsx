@@ -1,5 +1,5 @@
-import { unlockPreview, useStore } from '@quiz/client';
-import { AVATARS, type UnlockRef } from '@quiz/shared';
+import { unlockPreview, useStore } from '@almanac/client';
+import { AVATARS, type UnlockRef } from '@almanac/shared';
 import { Avatar } from './Avatar';
 import { Emoji } from './Emoji';
 

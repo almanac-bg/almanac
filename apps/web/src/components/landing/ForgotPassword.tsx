@@ -1,4 +1,4 @@
-import { api, errorMessage } from '@quiz/client';
+import { api, errorMessage } from '@almanac/client';
 import { ArrowLeft, MailCheck } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { Button, Field, INPUT } from '../ui';

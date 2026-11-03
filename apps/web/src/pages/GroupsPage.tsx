@@ -1,5 +1,5 @@
-import { api, errorMessage, fmt, plural, toast, useStore } from '@quiz/client';
-import { BRAND, GROUPS, type GroupEntry, type GroupInfo, type ReportReason, shiftDay } from '@quiz/shared';
+import { api, errorMessage, fmt, plural, toast, useStore } from '@almanac/client';
+import { BRAND, GROUPS, type GroupEntry, type GroupInfo, type ReportReason, shiftDay } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, Flag, Link2, LogOut, Pencil, Share2, Trash2, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';

@@ -1,5 +1,5 @@
-import { ApiError, api, getState, setState, useStore } from '@quiz/client';
-import { routeKind } from '@quiz/shared';
+import { ApiError, api, getState, setState, useStore } from '@almanac/client';
+import { routeKind } from '@almanac/shared';
 import { LazyMotion, MotionConfig } from 'motion/react';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
@@ -35,9 +35,9 @@ import { NotFoundPage } from './pages/NotFoundPage';
  * The connection's own code (packages/client/src/realtime.ts), fetched once someone is signed in: the landing never
  * needs it. One promise for every caller, so a connect and the disconnect after it run in the order they were asked.
  */
-let realtimeCode: Promise<typeof import('@quiz/client/realtime')> | null = null;
+let realtimeCode: Promise<typeof import('@almanac/client/realtime')> | null = null;
 const realtime = () =>
-  (realtimeCode ??= import('@quiz/client/realtime').catch((err: unknown) => {
+  (realtimeCode ??= import('@almanac/client/realtime').catch((err: unknown) => {
     realtimeCode = null; // to be asked for again
     throw err;
   }));

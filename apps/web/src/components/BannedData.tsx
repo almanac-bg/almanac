@@ -1,4 +1,4 @@
-import { api, errorMessage, saveFile, toast } from '@quiz/client';
+import { api, errorMessage, saveFile, toast } from '@almanac/client';
 import { Download, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from './ui';

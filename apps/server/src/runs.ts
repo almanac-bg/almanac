@@ -1,5 +1,5 @@
 import { setImmediate as yieldToMatches } from 'node:timers/promises';
-import type { CategoryChoice, ModeId, PowerupId } from '@quiz/shared';
+import type { CategoryChoice, ModeId, PowerupId } from '@almanac/shared';
 import { run } from './db';
 import type { AnswerLogEntry } from './game/Game';
 

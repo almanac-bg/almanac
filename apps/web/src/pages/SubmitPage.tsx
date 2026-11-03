@@ -1,5 +1,5 @@
-import { api, errorMessage, plural, timeAgo, toast, useStore } from '@quiz/client';
-import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@quiz/shared';
+import { api, errorMessage, plural, timeAgo, toast, useStore } from '@almanac/client';
+import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

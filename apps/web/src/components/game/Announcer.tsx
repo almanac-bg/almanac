@@ -1,5 +1,5 @@
-import { fmt, type LiveGame, plural } from '@quiz/client';
-import { categoryById, MODES, ordinal } from '@quiz/shared';
+import { fmt, type LiveGame, plural } from '@almanac/client';
+import { categoryById, MODES, ordinal } from '@almanac/shared';
 import { useEffect, useState } from 'react';
 import { LETTERS } from './answers';
 import { numberText } from './numbers';

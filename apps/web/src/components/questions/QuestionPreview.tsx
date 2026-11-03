@@ -1,5 +1,5 @@
-import { DIFFICULTY_LABEL } from '@quiz/client';
-import { categoryById, type QuestionDraft } from '@quiz/shared';
+import { DIFFICULTY_LABEL } from '@almanac/client';
+import { categoryById, type QuestionDraft } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb } from 'lucide-react';
 import { Emoji } from '../Emoji';

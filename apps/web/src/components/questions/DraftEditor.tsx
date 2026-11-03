@@ -1,4 +1,4 @@
-import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMISSION_RULES } from '@quiz/shared';
+import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMISSION_RULES } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import { useId } from 'react';

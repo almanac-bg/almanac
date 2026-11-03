@@ -1,4 +1,4 @@
-import { dayKey, MODERATION, sofiaHour } from '@quiz/shared';
+import { dayKey, MODERATION, sofiaHour } from '@almanac/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { moderatorMail, sendMail } from './mailer';

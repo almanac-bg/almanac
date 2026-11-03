@@ -1,4 +1,11 @@
-import { CHOICE_EVERY, choiceKey, choiceOffers, LEVEL_CHOICES, type PendingChoice, type UnlockRef } from '@quiz/shared';
+import {
+  CHOICE_EVERY,
+  choiceKey,
+  choiceOffers,
+  LEVEL_CHOICES,
+  type PendingChoice,
+  type UnlockRef,
+} from '@almanac/shared';
 import { all, run } from './db';
 
 /**

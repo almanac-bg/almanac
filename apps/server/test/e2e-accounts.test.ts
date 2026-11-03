@@ -6,7 +6,7 @@ import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { dayKey, PUBLIC_PAGES, RATED_AFTER, seasonKey, shiftDay } from '@quiz/shared';
+import { dayKey, PUBLIC_PAGES, RATED_AFTER, seasonKey, shiftDay } from '@almanac/shared';
 import { codeAt, stepAt } from '../src/totp';
 import {
   type Account,
@@ -171,7 +171,7 @@ test("wrong passwords from everywhere can't lock a player out from a device they
   assert.equal(signUp.status, 201);
   const device = signUp.headers
     .getSetCookie()
-    .find((c) => c.startsWith('quiz_device='))!
+    .find((c) => c.startsWith('almanac_device='))!
     .split(';')[0];
   const login = (password: string, from: string, cookie = '') =>
     fetch(`${srv.url}/api/auth/login`, {

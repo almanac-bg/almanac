@@ -1,4 +1,4 @@
-import { api, errorMessage, fmt, requirementLabel, setState, toast, unlockContextOf, useStore } from '@quiz/client';
+import { api, errorMessage, fmt, requirementLabel, setState, toast, unlockContextOf, useStore } from '@almanac/client';
 import {
   ACHIEVEMENTS,
   AVATARS,
@@ -19,7 +19,7 @@ import {
   titleName,
   type UnlockKind,
   xpToReach,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lock } from 'lucide-react';
 import { m } from 'motion/react';

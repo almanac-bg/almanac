@@ -3,11 +3,8 @@ import type { Formats } from './formats';
 import type { Difficulty } from './protocol';
 
 export type QueueModeId = 'duel' | 'teams' | 'squad' | 'royale';
-/**
- * `trio`: a queue of three, merged into Арена (3–5) on 2026-10-29; its matches stay in the players' history. `evening`:
- * the evening Роял (EVENING), one big match a day at a set time.
- */
-export type ModeId = 'solo' | 'daily' | 'challenge' | 'review' | QueueModeId | 'trio' | 'evening' | 'custom';
+/** `evening`: the evening Роял (EVENING), one big match a day at a set time. */
+export type ModeId = 'solo' | 'daily' | 'challenge' | 'review' | QueueModeId | 'evening' | 'custom';
 
 export interface ModeDef {
   id: ModeId;
@@ -137,22 +134,6 @@ export const MODES: Record<ModeId, ModeDef> = {
     tagline: 'Ти и приятел срещу друга двойка.',
     description: 'Покани приятел и играйте заедно срещу друга двойка (хора или ботове). Точките на двамата се събират.',
     accent: ['#38bdf8', '#fb7185'],
-  },
-  trio: {
-    id: 'trio',
-    name: 'Трио',
-    short: '3 играчи',
-    players: 3,
-    questions: 10,
-    timeMs: 15_000,
-    elimination: false,
-    teams: false,
-    final: true,
-    rounds: false,
-    formats: { images: 2, order: true },
-    tagline: 'Трима влизат. Един взима короната.',
-    description: 'Класирана битка на трима — всеки срещу всеки. Вече е част от „Арена“.',
-    accent: ['#c084fc', '#7c3aed'],
   },
   squad: {
     id: 'squad',

@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { levelFromXp, MORE_TIME, type MoreTime } from '@quiz/shared';
+import { levelFromXp, MORE_TIME, type MoreTime } from '@almanac/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { bannedDataUser, deleteAccount, exportAccount, getMe, updateLoadout } from '../account';

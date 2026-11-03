@@ -1,4 +1,4 @@
-import { MODERATION_BASES, type ModerationBasis } from '@quiz/shared';
+import { MODERATION_BASES, type ModerationBasis } from '@almanac/shared';
 import { config } from './config';
 import { decisionMail, sendMail } from './mailer';
 import { notify } from './notifications';

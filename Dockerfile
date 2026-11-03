@@ -16,7 +16,7 @@ FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64
 # default 4 leaves them room while hashes run (see hashingLimits in apps/server/src/auth.ts).
 ENV NODE_ENV=production \
     PORT=3001 \
-    DB_PATH=/data/quiz.db \
+    DB_PATH=/data/almanac.db \
     UV_THREADPOOL_SIZE=8
 WORKDIR /app
 COPY --from=build /app/apps/server/dist apps/server/dist

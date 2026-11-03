@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import type { Difficulty } from '@quiz/shared';
+import type { Difficulty } from '@almanac/shared';
 
 // Server modules open the database on import — point them at a throwaway one first.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'almanac-tallies-'));

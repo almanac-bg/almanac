@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
-import { dayKey, shiftDay, sofiaHour } from '@quiz/shared';
+import { dayKey, shiftDay, sofiaHour } from '@almanac/shared';
 import { ERASED_BAN_MS, eraseAccount } from './account';
 import { moderatorDigest } from './alerts';
 import { pruneAnswers } from './answers';
@@ -31,7 +31,7 @@ const SNAPSHOT_HOUR = 4;
 const REMINDER_HOURS = [19, 22] as const;
 /** Per maintenance run, so a big list doesn't flood the mail provider (and its daily quota) in one go. */
 const REMINDERS_PER_RUN = 200;
-const SNAPSHOT_NAME = /^quiz-\d{4}-\d{2}-\d{2}\.db$/;
+const SNAPSHOT_NAME = /^almanac-\d{4}-\d{2}-\d{2}\.db$/;
 
 /**
  * Expired login sessions (otherwise only deleted when someone uses them), spent or expired email links, addresses
@@ -135,7 +135,7 @@ export function sendStreakReminders(now = Date.now()): number {
 }
 
 /**
- * Today's consistent copy of the database (`quiz-2026-10-25.db`), at most one per day; older ones beyond
+ * Today's consistent copy of the database (`almanac-2026-10-25.db`), at most one per day; older ones beyond
  * BACKUP_KEEP_DAYS are deleted, and so are pre-migration copies older than a month. Resolves to the new file, or null if there was nothing to do.
  *
  * The copy is made off the main thread, so live matches don't stall while it runs, from a read-only connection of its
@@ -149,7 +149,7 @@ let copying = false;
 export async function snapshot(now = Date.now(), dir = config.backupDir): Promise<string | null> {
   if (!dir || copying) return null;
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `quiz-${dayKey(now)}.db`);
+  const file = path.join(dir, `almanac-${dayKey(now)}.db`);
   if (fs.existsSync(file)) return null;
   copying = true;
   // Write under a temporary name, then rename: a half-written copy never looks like a backup.

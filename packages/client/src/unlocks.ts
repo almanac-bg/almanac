@@ -12,7 +12,7 @@ import {
   TITLES,
   type UnlockContext,
   type UnlockRef,
-} from '@quiz/shared';
+} from '@almanac/shared';
 
 export function unlockPreview(u: UnlockRef): { icon: string; name: string } {
   switch (u.kind) {

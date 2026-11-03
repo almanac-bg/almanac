@@ -50,7 +50,7 @@ import type {
   Submission,
   SubmissionStatus,
   UnlockRef,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { clientConfig } from './config';
 
 /** A set as its editor sends it: a name and its questions. */

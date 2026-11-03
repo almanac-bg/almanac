@@ -1,4 +1,4 @@
-import { MODERATION, MODERATION_BASES, type ModerationBasis } from '@quiz/shared';
+import { MODERATION, MODERATION_BASES, type ModerationBasis } from '@almanac/shared';
 import { Ban, Eye, EyeOff, PenLine } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Checkbox, Select } from '../controls';

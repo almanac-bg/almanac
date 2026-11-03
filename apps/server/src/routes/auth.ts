@@ -1,4 +1,4 @@
-import { BRAND, USERNAME } from '@quiz/shared';
+import { BRAND, USERNAME } from '@almanac/shared';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { Router } from 'express';
 import { z } from 'zod';

@@ -1,4 +1,4 @@
-import { actions, fmt, toast, useStore } from '@quiz/client';
+import { actions, fmt, toast, useStore } from '@almanac/client';
 import {
   CATEGORIES,
   type CategoryChoice,
@@ -15,7 +15,7 @@ import {
   SOLO_PACES,
   type SoloPace,
   START_RATING,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, CircleHelp, Trophy } from 'lucide-react';
 import { m } from 'motion/react';

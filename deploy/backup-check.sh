@@ -16,12 +16,12 @@ fail() {
 clean() { docker compose run --rm --no-deps --entrypoint sh app -c 'rm -f /data/restore-test.db*'; }
 
 clean
-docker compose run --rm --no-deps litestream restore -o /data/restore-test.db /data/quiz.db ||
+docker compose run --rm --no-deps litestream restore -o /data/restore-test.db /data/almanac.db ||
   fail "litestream could not restore the backup"
 result=$(docker compose run --rm --no-deps --entrypoint node app -e "
   const { DatabaseSync } = require('node:sqlite');
   const copy = new DatabaseSync('/data/restore-test.db', { readOnly: true });
-  const live = new DatabaseSync('/data/quiz.db', { readOnly: true });
+  const live = new DatabaseSync('/data/almanac.db', { readOnly: true });
   const stamp = (db) => Number(db.prepare(\"SELECT value FROM settings WHERE key = 'alive_at'\").get()?.value ?? 0);
   const behind = Math.round((stamp(live) - stamp(copy)) / 60000);
   const idle = Math.round((Date.now() - stamp(live)) / 60000);

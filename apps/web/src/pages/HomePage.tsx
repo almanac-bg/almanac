@@ -1,4 +1,4 @@
-import { actions, fmt, plural, toast, useNow, useStore } from '@quiz/client';
+import { actions, fmt, plural, toast, useNow, useStore } from '@almanac/client';
 import {
   EVENING,
   levelProgress,
@@ -8,7 +8,7 @@ import {
   START_RATING,
   SUBMISSION_RULES,
   sofiaHour,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
 import { m } from 'motion/react';

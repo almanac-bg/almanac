@@ -21,7 +21,7 @@ import type {
   RoomState,
   RoundInfo,
   Standing,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { create } from 'zustand';
 
 export interface Toast {
@@ -104,7 +104,7 @@ export interface LiveGame {
   removed: number[];
   doubled: boolean;
   usedPowerups: PowerupId[];
-  /** A joker was already played on this question (one per question). */
+  /** A коз was already played on this question (one per question). */
   powerupThisQuestion: boolean;
   /** "Втори шанс" is armed for this question. */
   retryArmed: boolean;

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { PASSWORD_MIN_LENGTH } from '@quiz/shared';
+import { PASSWORD_MIN_LENGTH } from '@almanac/shared';
 import { z } from 'zod';
 import { hashPassword, hashToken as hashSessionToken, verifyPassword } from './auth';
 import { isCommonPassword } from './commonPasswords';

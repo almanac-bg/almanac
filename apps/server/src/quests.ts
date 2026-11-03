@@ -9,7 +9,7 @@ import {
   type QueueModeId,
   REVIEW,
   type XpLine,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { eveningStartsAt } from './evening';
@@ -26,7 +26,7 @@ export interface QuestEvent {
   correct: number;
   hardCorrect: number;
   bestStreak: number;
-  jokers: number;
+  powerups: number;
   correctByCategory: Map<CategoryId, number>;
   /** Facts the match added to the player's „Моите знания“. */
   facts: number;
@@ -174,7 +174,7 @@ const SLOTS: {
     ...CATEGORIES.map((c) => ({ level: SEASONED, def: categoryQuest(c) })),
     {
       below: SEASONED,
-      def: { id: 'joker1', icon: '🃏', text: 'Изиграй коз в мач', goal: 1, xp: 50, count: (e) => e.jokers },
+      def: { id: 'powerup1', icon: '🃏', text: 'Изиграй коз в мач', goal: 1, xp: 50, count: (e) => e.powerups },
     },
     {
       queue: 'royale',
@@ -189,7 +189,7 @@ const SLOTS: {
     },
     {
       level: 2,
-      def: { id: 'jokers3', icon: '🃏', text: 'Изиграй 3 коза', goal: 3, xp: 60, count: (e) => e.jokers },
+      def: { id: 'powerups3', icon: '🃏', text: 'Изиграй 3 коза', goal: 3, xp: 60, count: (e) => e.powerups },
     },
     {
       account: true,

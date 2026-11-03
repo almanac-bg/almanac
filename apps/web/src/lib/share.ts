@@ -1,8 +1,8 @@
-import { fmt, ordinal, type ReviewItem, toast } from '@quiz/client';
-import { BRAND, dayKey, dayNumber, isExact, type NumberInput } from '@quiz/shared';
+import { fmt, ordinal, type ReviewItem, toast } from '@almanac/client';
+import { BRAND, dayKey, dayNumber, isExact, type NumberInput } from '@almanac/shared';
 import { numberText } from '../components/game/numbers';
 
-const storageKey = (day: string) => `quiz:daily-share:${day}`;
+const storageKey = (day: string) => `almanac:daily-share:${day}`;
 
 /**
  * The day's result, Wordle-style: spoiler-free squares (⬛ a question left unanswered, ⬜ one never reached, 🟨 an order

@@ -1,4 +1,4 @@
-import type { AppNotification } from '@quiz/shared';
+import type { AppNotification } from '@almanac/shared';
 import { all, one, run } from './db';
 import { notifyUser } from './notify';
 

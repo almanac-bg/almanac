@@ -14,7 +14,7 @@ import {
   STREAK_SHIELDS,
   shiftDay,
   weekStart,
-} from '@quiz/shared';
+} from '@almanac/shared';
 import { config } from './config';
 import { all, one, run } from './db';
 import { friendIds } from './friends';

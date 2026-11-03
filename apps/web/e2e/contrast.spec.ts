@@ -1,4 +1,4 @@
-import { CATEGORIES, MODES, RANK_TIERS, RARITIES, TEAMS } from '@quiz/shared';
+import { CATEGORIES, MODES, RANK_TIERS, RARITIES, TEAMS } from '@almanac/shared';
 import { accentText, OPTION_COLORS } from '../src/components/game/answers';
 import { PRESENCE } from '../src/components/presence';
 import { expect, startAsGuest, test } from './support';

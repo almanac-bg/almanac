@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { CALENDAR_DAYS, CATEGORY_IDS } from '@quiz/shared';
+import { CALENDAR_DAYS, CATEGORY_IDS } from '@almanac/shared';
 import { plainWords, stems as wordStems } from '../src/giveaways';
 
 interface Q {

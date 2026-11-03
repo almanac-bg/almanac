@@ -1,4 +1,4 @@
-import { REPORT_REASONS, REPORT_REASONS_FOR, type ReportReason, type ReportSubjectKind } from '@quiz/shared';
+import { REPORT_REASONS, REPORT_REASONS_FOR, type ReportReason, type ReportSubjectKind } from '@almanac/shared';
 import clsx from 'clsx';
 import { Radio } from './controls';
 

@@ -1,5 +1,5 @@
-import { useStore } from '@quiz/client';
-import { levelProgress } from '@quiz/shared';
+import { useStore } from '@almanac/client';
+import { levelProgress } from '@almanac/shared';
 import clsx from 'clsx';
 import {
   Bell,

@@ -21,20 +21,20 @@ routing.
 ## Знакът и картините
 
 Знакът е розетката в `apps/web/public/favicon.svg`: четири листа, единият златен — четирите отговора, единият верен.
-След промяна в него `npm run icons -w @quiz/web` рисува иконите на приложението (`icon-192/512`, `apple-touch-icon`,
-`icon-maskable-512`, `favicon.ico`) и значката на известията, а `npm run share-images -w @quiz/web` — картините при
+След промяна в него `npm run icons -w @almanac/web` рисува иконите на приложението (`icon-192/512`, `apple-touch-icon`,
+`icon-maskable-512`, `favicon.ico`) и значката на известията, а `npm run share-images -w @almanac/web` — картините при
 споделяне: `og.jpg` на сайта и `.github/social-preview.png` (качи я отново в GitHub). В интерфейса знакът е `Rosette` в
 `components/Logo.tsx`, с цветовете `--logo-petal` и `--logo-gold` за двете теми.
 
 Там, където шрифт още не е зареден или не може да се зареди — първият кадър на приложението (`index.html`), страницата
 без връзка (`offline.html`) и тази на Caddy, докато приложението се рестартира (`deploy/Caddyfile`), — знакът и името
-са един рисуван файл: `npm run lockup -w @quiz/web` чертае `public/brand-lockup.svg` (розетката и името от `brand.ts`
+са един рисуван файл: `npm run lockup -w @almanac/web` чертае `public/brand-lockup.svg` (розетката и името от `brand.ts`
 като контури от Unbounded) и го слага между маркерите `<!--lockup-->` в трите; рисува от него и заглавието на писмата
 (`public/mail/lockup.png`) и знака за BIMI (`public/bimi.svg`). `test/brand.test.ts` в сървъра следи да са еднакви и
 никъде да няма старата мълния.
 
 Снимките в листа за инсталиране (`screenshots` в манифеста, `vite.config.ts`) прави `npm run store-shots -w
-@quiz/web` след `npm run build`: играе изграденото приложение като гост върху примерната банка (началната страница —
+@almanac/web` след `npm run build`: играе изграденото приложение като гост върху примерната банка (началната страница —
 върху истинската, ако е тук, за да казва колко въпроса има сайтът) и слага надписите от манифеста. Пусни го след
 `lockup` или `icons` и след промяна на началната страница, лобито или въпроса.
 

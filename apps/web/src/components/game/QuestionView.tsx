@@ -1,5 +1,5 @@
-import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@quiz/client';
-import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type QuestionPayload } from '@quiz/shared';
+import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@almanac/client';
+import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type QuestionPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
 import { AnimatePresence, m, useReducedMotion } from 'motion/react';

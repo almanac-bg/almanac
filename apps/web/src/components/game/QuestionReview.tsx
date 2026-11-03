@@ -1,5 +1,5 @@
-import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } from '@quiz/client';
-import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@quiz/shared';
+import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } from '@almanac/client';
+import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';

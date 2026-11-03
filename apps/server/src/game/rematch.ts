@@ -1,4 +1,4 @@
-import { isQueueMode, type QueueModeId, type RematchState } from '@quiz/shared';
+import { isQueueMode, type QueueModeId, type RematchState } from '@almanac/shared';
 import { guarded } from '../guard';
 import { notify } from '../notifications';
 import { getUser } from '../users';

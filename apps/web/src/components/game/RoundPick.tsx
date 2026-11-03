@@ -1,5 +1,5 @@
-import { actions, type LiveGame, useNow } from '@quiz/client';
-import { type CategoryId, categoryById, ROUNDS } from '@quiz/shared';
+import { actions, type LiveGame, useNow } from '@almanac/client';
+import { type CategoryId, categoryById, ROUNDS } from '@almanac/shared';
 import clsx from 'clsx';
 import { m } from 'motion/react';
 import { useEffect, useRef } from 'react';

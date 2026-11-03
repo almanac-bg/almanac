@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type AckResult, MODES, QUEUE_MODES, type QueueModeId, type TeamId } from '@quiz/shared';
+import { type AckResult, MODES, QUEUE_MODES, type QueueModeId, type TeamId } from '@almanac/shared';
 import { config } from '../config';
 import { areFriends } from '../friends';
 import { guarded } from '../guard';

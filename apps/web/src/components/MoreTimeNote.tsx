@@ -1,5 +1,5 @@
-import { useStore } from '@quiz/client';
-import { MORE_TIME } from '@quiz/shared';
+import { useStore } from '@almanac/client';
+import { MORE_TIME } from '@almanac/shared';
 import clsx from 'clsx';
 import { Timer } from 'lucide-react';
 

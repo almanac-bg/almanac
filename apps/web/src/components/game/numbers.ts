@@ -1,4 +1,4 @@
-import { decimalsOf, isExact, type NumberInput } from '@quiz/shared';
+import { decimalsOf, isExact, type NumberInput } from '@almanac/shared';
 
 /** A unit written in the plural, as its one: „1 ден“, not „1 дни“ (a host's own question can count in words). */
 const ONE: Record<string, string> = {
