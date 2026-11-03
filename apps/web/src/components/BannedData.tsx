@@ -1,6 +1,7 @@
-import { api, errorMessage, saveFile, toast } from '@almanac/client';
+import { api, errorMessage, toast } from '@almanac/client';
 import { Download, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { saveFile } from '../lib/saveFile';
 import { Button } from './ui';
 
 /**

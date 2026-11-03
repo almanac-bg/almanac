@@ -125,6 +125,7 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
     res = await fetch(`${clientConfig().baseUrl}/api${path}`, {
       method,
       headers: {
+        ...clientConfig().authHeaders?.(),
         [CLIENT_HEADER]: clientHeader(clientInfo()),
         ...(body === undefined ? {} : { 'content-type': file ? body.type : 'application/json' }),
       },
@@ -141,7 +142,9 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
       data = {};
     }
   } catch (err) {
-    if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError'))
+    // By name: not every platform has DOMException to check against.
+    const name = (err as { name?: unknown } | null)?.name;
+    if (name === 'TimeoutError' || name === 'AbortError')
       throw new ApiError('Сървърът не отговаря. Опитай пак след малко.', 0);
     throw new ApiError('Няма връзка със сървъра. Провери интернета си.', 0);
   }
@@ -162,18 +165,6 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
   if (!res.ok)
     throw new ApiError((data.error as string | undefined) ?? 'Нещо се обърка. Опитай пак.', res.status, data);
   return (saved ?? data) as T;
-}
-
-/** A file the server answered with, saved by the browser under `name`. */
-export function saveFile(file: Blob, name: string) {
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export const api = {
