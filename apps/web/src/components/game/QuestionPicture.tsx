@@ -1,14 +1,9 @@
+import { fromCommons, licenseName } from '@almanac/client';
 import type { ImageCredit, QuestionImage } from '@almanac/shared';
 import clsx from 'clsx';
 import { useState } from 'react';
 import { m } from '../../lib/motion';
 import { PICTURE_SIZES } from './pictureSizes';
-
-const LICENSES: Record<string, string> = { PD: 'обществено достояние' };
-
-// Said once: some credits are Commons itself.
-const fromCommons = (c: ImageCredit) =>
-  !!c.sourceUrl?.startsWith('https://commons.wikimedia.org/') && !/wikimedia/i.test(c.credit);
 
 /**
  * A question's picture: as large as it fits, at most `maxHeight` of the screen (40% in a match, so the question and its
@@ -66,7 +61,7 @@ export function QuestionPicture({
           // Over the picture, on a scrim: white on dark whatever the theme, as the picture's own frame is.
           className="absolute inset-x-px bottom-px line-clamp-2 rounded-b-2xl bg-linear-to-t from-black/80 via-black/60 to-transparent px-3 pt-5 pb-1.5 text-right text-[11px] leading-snug text-white/85 [overflow-wrap:anywhere] sm:text-xs"
         >
-          <Linked href={credit.licenseUrl}>{LICENSES[credit.license] ?? credit.license}</Linked>
+          <Linked href={credit.licenseUrl}>{licenseName(credit.license)}</Linked>
           {' · '}
           <Linked href={credit.sourceUrl}>{credit.credit}</Linked>
           {fromCommons(credit) && ' · чрез Wikimedia Commons'}

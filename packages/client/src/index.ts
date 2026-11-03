@@ -11,6 +11,7 @@ export * from './numbers';
 export * from './openQueues';
 export * from './presence';
 export * from './realtime';
+export * from './rematch';
 export * from './results';
 export * from './share';
 export * from './store';
