@@ -286,9 +286,16 @@ export async function playMatch(
     // Only with no question open: a held reveal fading out keeps its button for a moment beside the next question.
     const answerable = (await open.first().isVisible()) || (await lock.isVisible()) || (await ordering.isVisible());
     if (!answerable && (await goOn.isVisible())) {
-      // It may go by itself meanwhile (a hold's own end): that's no failure.
-      await goOn.click({ timeout: gameMs(2_000) }).catch(() => {});
-      await expect(goOn).toBeHidden({ timeout: gameMs(5_000) });
+      // Briefly, then a look again: it may be going by itself (a hold's own end, or one pressed before playMatch
+      // fading out), and the next question's clock runs meanwhile. Two seconds spent on a fading one took a
+      // question's whole time (2.25 s at the tests' speed): the click then waited on and answered the question after.
+      if (
+        await goOn.click({ timeout: gameMs(500) }).then(
+          () => true,
+          () => false,
+        )
+      )
+        await expect(goOn).toBeHidden({ timeout: gameMs(5_000) });
       continue;
     }
     if (await pick.isVisible()) {
