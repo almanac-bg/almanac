@@ -128,6 +128,10 @@ Issues и pull request-и са добре дошли: виж [CONTRIBUTING.md](C
 потребителите ѝ трябва да могат да получат изходния ти код: линкът „Изходен код“ във футъра (`SOURCE_URL`) е точно за
 това.
 
+**Допълнително разрешение за магазините за приложения** (чл. 7 от AGPL): програмата може да се разпространява в App
+Store, Google Play и подобни, въпреки че условията им не се съвместяват с AGPL, стига изходният код да остава
+достъпен извън тях, под AGPL и без ограниченията им ([APP-STORE-EXCEPTION.md](APP-STORE-EXCEPTION.md)).
+
 Лицензът не обхваща:
 - **Името АЛМАНАХ, логото му и домейна almanac.bg.** Копие, което пускаш публично, трябва да има собствено име и
   собствена визуална идентичност (`packages/shared/src/brand.ts`, иконите в `apps/web/public`).
@@ -154,5 +158,6 @@ the server. Production is a single Docker host behind Caddy, with continuous Lit
 
 Run it with Node 24+: `npm ci && npm run dev`, then open http://localhost:5173. The real question bank is private
 (answers shouldn't be searchable mid-match); a public sample of 120 questions ships with the code. The code is free
-software under the [AGPL-3.0](LICENSE); the name, logo and domain are not part of the licence. The documentation is in
-Bulgarian; issues and pull requests in English are welcome.
+software under the [AGPL-3.0](LICENSE), with an [additional permission for app stores](APP-STORE-EXCEPTION.md) (section
+7); the name, logo and domain are not part of the licence. The documentation is in Bulgarian; issues and pull requests
+in English are welcome.
