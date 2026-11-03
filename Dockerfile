@@ -1,5 +1,5 @@
 # ── Build: install everything, build the web app and bundle the server ──
-FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS build
+FROM node:26.13.0-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/server/package.json apps/server/
@@ -11,7 +11,7 @@ COPY . .
 RUN npm run build
 
 # ── Runtime: plain Node and the server bundle, with one package beside it (sharp) ──
-FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
+FROM node:26.13.0-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
 # UV_THREADPOOL_SIZE: password hashing shares libuv's threads with file reads and DNS lookups; 8 instead of the
 # default 4 leaves them room while hashes run (see hashingLimits in apps/server/src/auth.ts).
 ENV NODE_ENV=production \
