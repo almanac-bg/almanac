@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import ChartColumn from 'lucide-react-native/icons/chart-column';
 import Gamepad2 from 'lucide-react-native/icons/gamepad-2';
 import User from 'lucide-react-native/icons/user';
+import Users from 'lucide-react-native/icons/users';
 import { fonts, useColors } from '@/theme';
 
 /**
@@ -29,6 +30,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="leaderboard"
         options={{ title: 'Класации', tabBarIcon: ({ color, size }) => <ChartColumn color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="friends"
+        options={{ title: 'Приятели', tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="profile"

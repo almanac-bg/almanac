@@ -7,6 +7,7 @@ export * from './hooks';
 export * from './library';
 export * from './numbers';
 export * from './openQueues';
+export * from './presence';
 export * from './realtime';
 export * from './store';
 export * from './unlocks';

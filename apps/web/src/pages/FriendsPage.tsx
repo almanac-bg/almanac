@@ -1,4 +1,4 @@
-import { actions, api, errorMessage, timeAgo, toast, useStore } from '@almanac/client';
+import { actions, api, errorMessage, PRESENCE, timeAgo, toast, useStore } from '@almanac/client';
 import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
@@ -13,7 +13,6 @@ import { PlayerName } from '../components/FitName';
 import { accentText } from '../components/game/answers';
 import { GroupsSection } from '../components/groups';
 import { LoadError } from '../components/LoadError';
-import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { m } from '../lib/motion';
