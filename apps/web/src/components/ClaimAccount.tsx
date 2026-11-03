@@ -1,10 +1,9 @@
 import { api, errorMessage, setState, toast, useStore } from '@almanac/client';
-import { PASSWORD_MIN_LENGTH, USERNAME } from '@almanac/shared';
+import { MINORS_NOTICE, PASSWORD_MIN_LENGTH, USERNAME } from '@almanac/shared';
 import { Save } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { markReturning } from '../lib/returning';
-import { MINORS_NOTICE } from './LegalLinks';
 import { PasswordField } from './PasswordField';
 import { Button, Field, INPUT, Modal } from './ui';
 

@@ -98,6 +98,8 @@ packages/client   Ядрото на клиента: API заявки, състо
 apps/web          React 19 + Vite + Tailwind 4 + Motion
   src/content/            Осемте празнични викторини (/quiz/…): свои въпроси, никога от банката
   e2e/                    Браузърните тестове (Playwright)
+apps/mobile       Приложението за iOS и Android: Expo (React Native) със същото ядро (packages/client), на своя
+                  инсталация (CONTRIBUTING.md → Приложението)
 deploy/           Caddyfile (HTTPS и страницата при обновяване), litestream.yml (бекъпите) и скриптовете на сървъра:
                   deploy.sh, rollback.sh, pull-image.sh, check.sh, backup-check.sh и audit.sh (docs/operations.md)
 scripts/          github-setup.sh (настройките на хранилището в GitHub), subset-fonts.mjs (шрифтовете),

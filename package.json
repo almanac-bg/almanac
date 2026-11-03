@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*",
+    "apps/server",
+    "apps/web",
     "packages/*"
   ],
   "scripts": {
@@ -16,7 +17,8 @@
     "test": "npm test -w @almanac/server && npm test -w @almanac/client",
     "test:browser": "npm run build && npm run test:browser -w @almanac/web && npm run plans -w @almanac/server",
     "lint": "biome ci .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "app-links": "node --import tsx apps/mobile/scripts/app-links.ts"
   },
   "engines": {
     "node": ">=24"

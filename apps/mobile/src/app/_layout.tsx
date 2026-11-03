@@ -1,0 +1,57 @@
+import { useStore } from '@almanac/client';
+import { Onest_400Regular } from '@expo-google-fonts/onest/400Regular';
+import { Onest_500Medium } from '@expo-google-fonts/onest/500Medium';
+import { Onest_600SemiBold } from '@expo-google-fonts/onest/600SemiBold';
+import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
+import { Unbounded_700Bold } from '@expo-google-fonts/unbounded/700Bold';
+import { Unbounded_800ExtraBold } from '@expo-google-fonts/unbounded/800ExtraBold';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { UpdateScreen } from '@/components/UpdateScreen';
+import { restore, useApp } from '@/lib/client';
+import { useColors } from '@/theme';
+
+// The splash stays until the fonts are in and the app knows whether someone is signed in: no flash of the way in for a
+// player who is.
+void SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const colors = useColors();
+  const [fontsIn, fontError] = useFonts({
+    Onest_400Regular,
+    Onest_500Medium,
+    Onest_600SemiBold,
+    Onest_700Bold,
+    Unbounded_700Bold,
+    Unbounded_800ExtraBold,
+  });
+  const authChecked = useStore((s) => s.authChecked);
+  const updateRequired = useApp((s) => s.updateRequired);
+  const ready = (fontsIn || !!fontError) && authChecked;
+
+  useEffect(() => {
+    void restore();
+  }, []);
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        {updateRequired ? (
+          <UpdateScreen />
+        ) : (
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }} />
+        )}
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}

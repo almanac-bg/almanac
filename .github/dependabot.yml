@@ -17,6 +17,14 @@ updates:
       npm-minor:
         update-types: [minor, patch]
 
+  # The app (apps/mobile, its own install): only security updates. Its versions are the Expo SDK's, moved together with
+  # `npx expo install --fix` when the app goes to a new SDK, not one package at a time.
+  - package-ecosystem: npm
+    directory: /apps/mobile
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "fix(deps)", prefix-development: "build(deps)" }
+    open-pull-requests-limit: 0
+
   # The Node base image (security fixes in Node itself, e.g. its built-in SQLite).
   - package-ecosystem: docker
     directory: /

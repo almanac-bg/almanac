@@ -10,7 +10,21 @@ export default {
     'scope-enum': [
       2,
       'always',
-      ['web', 'server', 'client', 'shared', 'bank', 'deploy', 'ci', 'docs', 'deps', 'e2e', 'security', 'release'],
+      [
+        'web',
+        'mobile',
+        'server',
+        'client',
+        'shared',
+        'bank',
+        'deploy',
+        'ci',
+        'docs',
+        'deps',
+        'e2e',
+        'security',
+        'release',
+      ],
     ],
     // commitlint's own limit: Dependabot's group titles run past 72 ("… in the npm-minor group"), and nobody can
     // shorten those. A person's title aims for 72, a line a log shows whole (CONTRIBUTING.md).

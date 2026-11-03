@@ -1,0 +1,27 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // The shared packages import each other's files by their .ts names (as the server and the web build them).
+    "allowImportingTsExtensions": true,
+    // TypeScript 6 loads no @types package unless named, and the app needs none (the tests do: __tests__/tsconfig.json).
+    "types": [],
+    "noUncheckedIndexedAccess": false,
+    // For the type checker only (Metro resolves on its own: metro.config.js). The shared code from its sources, and
+    // what it imports from the app's own install — one React's types, as one React in the bundle.
+    "paths": {
+      "@/*": ["./src/*"],
+      "@almanac/shared": ["../../packages/shared/src/index.ts"],
+      "@almanac/client": ["../../packages/client/src/index.ts"],
+      "@almanac/client/realtime": ["../../packages/client/src/realtime.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "zustand": ["./node_modules/zustand"],
+      "zustand/*": ["./node_modules/zustand/*"],
+      "socket.io-client": ["./node_modules/socket.io-client"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  // The tests and scripts/ run on Node, with its types and Jest's: __tests__/tsconfig.json.
+  "exclude": ["node_modules", "dist", "scripts", "__tests__"]
+}
