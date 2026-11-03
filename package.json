@@ -32,5 +32,10 @@
   "allowScripts": {
     "esbuild": false,
     "fsevents": false
+  },
+  "overrides": {
+    "@google-automations/git-file-utils": {
+      "minimatch": "11.0.1"
+    }
   }
 }
