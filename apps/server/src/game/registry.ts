@@ -116,8 +116,9 @@ export interface NewGame {
   pictures?: boolean;
   /** A room's host who runs it on a big screen instead of playing. */
   presenter?: number | null;
-  /** A room playing its host's own set (its name; `questions` are the set's). */
+  /** A room playing its host's own set (its name; `questions` are the set's), and which set (saved with the match). */
   questionSet?: string | null;
+  questionSetId?: number | null;
   /** The evening Роял of this day. */
   eveningDay?: string | null;
   /** Соло's clock. */
@@ -313,6 +314,7 @@ export class GameRegistry {
         duelWith: opts.duelWith ?? null,
         presenter: opts.presenter ?? null,
         questionSet: opts.questionSet ?? null,
+        questionSetId: opts.questionSetId ?? null,
         eveningDay: opts.eveningDay ?? null,
         pace: opts.pace ?? 'normal',
         // Once, not twice: a final someone in a big match saw lately, and an own set's last number question unless the

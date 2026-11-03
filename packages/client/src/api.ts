@@ -384,6 +384,9 @@ export const api = {
   copySet: (code: string) => request<{ id: number }>('POST', `/sets/shared/${encodeURIComponent(code)}/copy`),
   reportSet: (code: string, reason: ReportReason, details: string) =>
     request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/report`, { reason, details }),
+  /** The host's set a room's match played, reported by one of its players (no link to it needed). */
+  reportPlayedSet: (gameId: string, reason: ReportReason, details: string) =>
+    request<{ ok: true }>('POST', `/matches/${encodeURIComponent(gameId)}/set/report`, { reason, details }),
   /** A moderator hides a set (a basis and a reason its owner reads) or shows it again (a reason). */
   hideSet: (code: string, hidden: boolean, grounds: { basis?: ModerationBasis; reason: string; copies?: boolean }) =>
     request<{ ok: true }>('POST', `/sets/shared/${encodeURIComponent(code)}/hide`, { hidden, ...grounds }),

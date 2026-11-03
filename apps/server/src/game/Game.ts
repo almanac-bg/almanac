@@ -173,6 +173,8 @@ export interface GameSetup {
   presenter?: number | null;
   /** A room playing its host's own set (its name): none of the bank's questions. */
   questionSet?: string | null;
+  /** …and which set it is, saved with the match: its players can report it from the review (routes/sets.ts). */
+  questionSetId?: number | null;
   /** The evening Роял of this day (its places are kept for the night's top and the champion). */
   eveningDay?: string | null;
   /** A run alone's clock: Соло's pace (SOLO_PACES), or „Повече време“ (MORE_TIME); 'normal' otherwise. */

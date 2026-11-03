@@ -87,6 +87,13 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await expect(pupil.getByText('Влезе като гост за стаята', { exact: false })).toBeVisible();
   await expect(pupil.getByRole('heading', { name: 'Награди', exact: true })).toHaveCount(0);
   await expect(pupil.getByRole('dialog')).toHaveCount(0);
+  // The set's questions are the teacher's, not the bank's: no flag for a mistake, but the set can be reported — by a
+  // pupil too, with no link to it (8n.4b).
+  await expect(pupil.getByText('Въпросите са от набора на домакина „Урок 5“.', { exact: false })).toBeVisible();
+  await pupil.getByRole('button', { name: 'Сигнал за набора' }).click();
+  await pupil.getByLabel('Обидно или неподходящо съдържание').check();
+  await pupil.getByRole('button', { name: 'Изпрати', exact: true }).click();
+  await expect(pupil.getByText('Модератор ще го прегледа, а ти ще научиш какво решихме.')).toBeVisible();
 });
 
 // A field focused the moment its page opens keeps the focus: the move's focus on the page heading (lib/routeFocus.ts)

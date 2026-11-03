@@ -96,8 +96,8 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
 
   tx(() => {
     run(
-      `INSERT INTO matches (id, mode, ranked, room_code, player_count, question_count, started_at, ended_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO matches (id, mode, ranked, room_code, player_count, question_count, started_at, ended_at, set_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       game.id,
       setup.mode,
       setup.ranked ? 1 : 0,
@@ -106,6 +106,7 @@ export function finalizeMatch(game: Game, standings: FinalStanding[]): Map<numbe
       game.questions.length,
       game.startedAt,
       Date.now(),
+      setup.questionSetId ?? null,
     );
     count(`matches:${setup.mode}`);
 

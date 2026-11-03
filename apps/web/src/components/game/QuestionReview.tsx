@@ -8,6 +8,7 @@ import { m } from '../../lib/motion';
 import { keepTogether } from '../../lib/typography';
 import { Radio } from '../controls';
 import { Emoji } from '../Emoji';
+import { ReportSet } from '../ReportSet';
 import { Button, Card, Modal } from '../ui';
 import { LETTERS } from './answers';
 import { numberText, offText } from './numbers';
@@ -17,9 +18,20 @@ import { QuestionPicture } from './QuestionPicture';
 /** A question from a room host's own set („Моите въпроси“), not the bank. */
 const ownQuestion = (item: ReviewItem) => item.id.startsWith('set-');
 
-/** The match's questions with the right answers, and a way to flag a mistake in any of them. */
-export function QuestionReview({ items }: { items: ReviewItem[] }) {
+/**
+ * The match's questions with the right answers, and a way to flag a mistake in any of them — or, for a room that played
+ * its host's own set (`set`), to report the set: a mistake in it is the host's to fix, what mustn't be in it a
+ * moderator's.
+ */
+export function QuestionReview({
+  items,
+  set = null,
+}: {
+  items: ReviewItem[];
+  set?: { gameId: string; name: string } | null;
+}) {
   const [open, setOpen] = useState(false);
+  const [reportingSet, setReportingSet] = useState(false);
   const listId = useId();
   const [reporting, setReporting] = useState<ReviewItem | null>(null);
   const [reported, setReported] = useState<Set<string>>(new Set());
@@ -42,8 +54,13 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
             </button>
           </h2>
           <p className="text-sm text-fg-3">
-            {right} от {items.length} верни · видя ли грешка във въпрос? Сигнализирай с{' '}
-            <Flag aria-label="знамето" className="inline size-3.5" />
+            {right} от {items.length} верни
+            {!set && (
+              <>
+                {' '}
+                · видя ли грешка във въпрос? Сигнализирай с <Flag aria-label="знамето" className="inline size-3.5" />
+              </>
+            )}
           </p>
         </div>
         <ChevronDown
@@ -51,6 +68,18 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
           className={clsx('size-5 shrink-0 text-fg-3 transition-transform', open && 'rotate-180')}
         />
       </div>
+      {set && (
+        <p className="-mt-3 px-5 pb-4 text-sm text-fg-3 sm:px-6">
+          Въпросите са от набора на домакина „{set.name}“. Нещо обидно или незаконно в тях?{' '}
+          <button
+            type="button"
+            onClick={() => setReportingSet(true)}
+            className="focus-ring inline-flex items-center gap-1 rounded font-semibold text-amber-300 underline underline-offset-2"
+          >
+            <Flag aria-hidden className="size-3.5" /> Сигнал за набора
+          </button>
+        </p>
+      )}
       <AnimatePresence initial={false}>
         {open && (
           <m.ol
@@ -72,6 +101,13 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
           </m.ol>
         )}
       </AnimatePresence>
+      {set && (
+        <ReportSet
+          open={reportingSet}
+          onClose={() => setReportingSet(false)}
+          send={(reason, details) => api.reportPlayedSet(set.gameId, reason, details)}
+        />
+      )}
       <ReportQuestion
         item={reporting}
         onClose={() => setReporting(null)}

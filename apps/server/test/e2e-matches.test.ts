@@ -649,6 +649,24 @@ test('„Моите въпроси“: a host plays their own set in a room; sha
     assert.deepEqual(log.questions[1].options, ['Вярно', 'Невярно']);
     assert.equal(log.questions[2].times, 1, 'its number question counts once');
     assert.ok(!end.rewards!.breakdown.some((l) => l.label.startsWith('Верни отговори')), 'no XP for answers');
+    // Its players can report the set from the match's review, with no link to it (a class's pupils): the match keeps
+    // which set it played (8n.4b). Only they can, and not its owner.
+    assert.equal(
+      (srv.db.prepare('SELECT set_id FROM matches WHERE id = ?').get(end.gameId) as { set_id: number }).set_id,
+      made.body.id,
+    );
+    const playedReport = (cookie: string) =>
+      api.send('POST', `/api/matches/${end.gameId}/set/report`, cookie, { reason: 'content', details: 'Обидно.' });
+    assert.equal((await playedReport(B.cookie)).status, 200);
+    assert.ok(
+      srv.db
+        .prepare("SELECT 1 FROM reports WHERE reporter_id = ? AND subject_kind = 'set' AND subject_id = ?")
+        .get(B.user.id, mine.code),
+      'a report about the set, as from its link',
+    );
+    assert.equal((await playedReport(A.cookie)).body.error, 'Това е твое.');
+    const outsider = await guest(srv.url);
+    assert.equal((await playedReport(outsider.cookie)).status, 404, 'not one who never played it');
     const after = (await api.get(`/api/profile/${encodeURIComponent(A.user.username)}`, A.cookie)).body.overview;
     assert.equal(after.questionsAnswered, before.questionsAnswered, 'nothing measured');
     sa.emit('room:leave');

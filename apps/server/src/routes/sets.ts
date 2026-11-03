@@ -151,6 +151,35 @@ setsRouter.post('/sets/shared/:code/copy', requireAuth, requireAccount, (req, re
   res.json({ id: copied.id });
 });
 
+/**
+ * The set a room's match played, reported by one who played it (a pupil in a class, often a guest): the match says
+ * which set it was, so no link to it is needed, and only its players can send one.
+ */
+setsRouter.post('/matches/:id/set/report', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
+  const body = parse(z.object({ reason: z.string(), details: z.string().max(400).default('') }), req, res);
+  if (!body) return;
+  const set = one<{ owner_id: number; name: string; code: string }>(
+    `SELECT s.owner_id, s.name, s.code FROM matches m
+     JOIN match_players p ON p.match_id = m.id AND p.user_id = ?
+     JOIN question_sets s ON s.id = m.set_id AND s.hidden = 0
+     WHERE m.id = ?`,
+    res.locals.userId,
+    String(req.params.id),
+  );
+  if (!set) {
+    res.status(404).json({ error: 'Този набор вече не е достъпен.' });
+    return;
+  }
+  const subject = { kind: 'set', id: set.code, owner: set.owner_id, label: set.name } as const;
+  const filed = fileReport(res.locals.userId, subject, body.reason, body.details);
+  if (!filed.ok) {
+    res.status(400).json({ error: filed.error });
+    return;
+  }
+  res.json({ ok: true });
+});
+
 /** Something wrong with a shared set (offensive, illegal, not what it says): a report about the set. */
 setsRouter.post('/sets/shared/:code/report', requireAuth, (req, res) => {
   if (guestCapped(req, res, 'reports')) return;

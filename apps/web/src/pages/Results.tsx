@@ -435,7 +435,12 @@ export function Results({ game }: { game: LiveGame }) {
       )}
 
       <LearnedToday items={game.history} added={rewards?.knowledge?.added ?? 0} />
-      {game.history.length > 0 && <QuestionReview items={game.history} />}
+      {game.history.length > 0 && (
+        <QuestionReview
+          items={game.history}
+          set={game.start.questionSet ? { gameId: game.start.gameId, name: game.start.questionSet } : null}
+        />
+      )}
 
       {/* The next step stays in reach at the bottom while the rewards and the review scroll by — and on phones so does a
           rematch offer, which can arrive at any moment. Wider screens: a floating bar in the middle. */}

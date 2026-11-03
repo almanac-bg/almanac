@@ -1,12 +1,5 @@
 import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@almanac/client';
-import {
-  type ModerationBasis,
-  type ReportReason,
-  SETS,
-  type SetImage,
-  type SetQuestion,
-  setPictureUrl,
-} from '@almanac/shared';
+import { type ModerationBasis, SETS, type SetImage, type SetQuestion, setPictureUrl } from '@almanac/shared';
 import clsx from 'clsx';
 import {
   ArrowDown,
@@ -31,7 +24,7 @@ import { Emoji } from '../components/Emoji';
 import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
-import { ReportReasons } from '../components/ReportReasons';
+import { ReportSet } from '../components/ReportSet';
 import { Button, buttonClass, Card, EmptyState, INPUT, Modal, PageSpinner, Segmented } from '../components/ui';
 import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
@@ -793,8 +786,6 @@ function SharedSet({ code }: { code: string }) {
   const { data, error, retry, setData } = useLoad(() => api.sharedSet(code), code);
   const [busy, setBusy] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [reason, setReason] = useState<ReportReason | null>(null);
-  const [details, setDetails] = useState('');
   const [moderating, setModerating] = useState(false);
 
   async function copy() {
@@ -806,18 +797,6 @@ function SharedSet({ code }: { code: string }) {
     } catch (err) {
       toast({ kind: 'error', title: errorMessage(err) });
       setBusy(false);
-    }
-  }
-
-  async function report() {
-    if (!reason) return;
-    try {
-      await api.reportSet(code, reason, details);
-      setReporting(false);
-      setReason(null);
-      toast({ kind: 'success', title: 'Благодарим!', body: 'Модератор ще го прегледа, а ти ще научиш какво решихме.' });
-    } catch (err) {
-      toast({ kind: 'error', title: errorMessage(err) });
     }
   }
 
@@ -898,26 +877,11 @@ function SharedSet({ code }: { code: string }) {
           onCancel={() => setModerating(false)}
         />
       )}
-      <Modal open={reporting} onClose={() => setReporting(false)} title="Сигнал за набор">
-        <ReportReasons kind="set" value={reason} onChange={setReason} />
-        <textarea
-          value={details}
-          maxLength={400}
-          rows={3}
-          aria-label="Подробности"
-          placeholder="Подробности (по желание): кой въпрос, коя снимка"
-          onChange={(e) => setDetails(e.target.value)}
-          className="field mt-4 w-full rounded-2xl p-3 text-sm"
-        />
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setReporting(false)}>
-            Отказ
-          </Button>
-          <Button onClick={() => void report()} disabled={!reason}>
-            Изпрати
-          </Button>
-        </div>
-      </Modal>
+      <ReportSet
+        open={reporting}
+        onClose={() => setReporting(false)}
+        send={(reason, details) => api.reportSet(code, reason, details)}
+      />
     </div>
   );
 }

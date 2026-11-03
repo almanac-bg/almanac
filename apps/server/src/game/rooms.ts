@@ -387,7 +387,7 @@ export class RoomManager {
         inRounds: !own && room.settings.rounds,
         final: room.settings.final,
         pictures: !own && room.settings.pictures,
-        ...(own && questions && { questions, questionSet: own.name }),
+        ...(own && questions && { questions, questionSet: own.name, questionSetId: own.id }),
         presenter: hosting ? room.hostUserId : null,
         elimination: room.settings.elimination && !teams,
         teams,
