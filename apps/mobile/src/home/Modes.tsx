@@ -3,8 +3,7 @@ import { MODES, type QueueModeId, START_RATING } from '@almanac/shared';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { radius, useColors } from '@/theme';
-import { T } from '@/ui';
-import { Card } from './Card';
+import { Card, T } from '@/ui';
 import { SoloSheet } from './SoloSheet';
 
 /**

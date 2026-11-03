@@ -1,11 +1,21 @@
-import { api, errorMessage, fmt, LETTERS, numberText, offText, percent, type ReviewItem, toast } from '@almanac/client';
+import {
+  api,
+  errorMessage,
+  fmt,
+  keepTogether,
+  LETTERS,
+  numberText,
+  offText,
+  percent,
+  type ReviewItem,
+  toast,
+} from '@almanac/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useId, useState } from 'react';
 import { m } from '../../lib/motion';
-import { keepTogether } from '../../lib/typography';
 import { Radio } from '../controls';
 import { Emoji } from '../Emoji';
 import { ReportSet } from '../ReportSet';

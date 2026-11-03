@@ -1,11 +1,33 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
+import { HeaderShownContext } from 'expo-router/react-navigation';
+import { BottomTabBarHeightContext } from 'expo-router/tabs';
+import { type ReactNode, useContext } from 'react';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { gutter, useColors } from '@/theme';
 
+/** A page's column: as wide as a phone's, centred on a tablet. */
+export const COLUMN: ViewStyle = { width: '100%', maxWidth: 520, alignSelf: 'center' };
+
 /**
- * A page: the theme's background to the edges, its content inside the phone's safe area, scrolling when it doesn't fit
- * (a large text size, a small phone, the keyboard up) — never cut off.
+ * A page's padding: inside the phone's safe area, with a margin. Under a header (a page pushed in a tab) or above the
+ * tab bar, those already keep it clear of the phone's edge, so that side has no inset of its own.
+ */
+export function usePagePadding(): ViewStyle {
+  const insets = useSafeAreaInsets();
+  const underHeader = useContext(HeaderShownContext);
+  const aboveTabs = useContext(BottomTabBarHeightContext) !== undefined;
+  return {
+    paddingTop: underHeader ? 16 : insets.top + 24,
+    paddingBottom: aboveTabs ? 24 : insets.bottom + 24,
+    paddingLeft: insets.left + gutter,
+    paddingRight: insets.right + gutter,
+  };
+}
+
+/**
+ * A page: the theme's background to the edges, its content in the page's padding, scrolling when it doesn't fit (a
+ * large text size, a small phone, the keyboard up) — never cut off. A long list is a FlatList with the same padding
+ * (usePagePadding) instead.
  */
 export function Screen({
   children,
@@ -20,7 +42,7 @@ export function Screen({
   onRefresh?: () => void;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const padding = usePagePadding();
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -31,16 +53,9 @@ export function Screen({
               <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.fg3} />
             ) : undefined
           }
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: centered ? 'center' : 'flex-start',
-            paddingTop: insets.top + 24,
-            paddingBottom: insets.bottom + 24,
-            paddingLeft: insets.left + gutter,
-            paddingRight: insets.right + gutter,
-          }}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: centered ? 'center' : 'flex-start', ...padding }}
         >
-          <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center', gap: 16 }}>{children}</View>
+          <View style={[COLUMN, { gap: 16 }]}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

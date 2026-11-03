@@ -1,4 +1,4 @@
-import { actions, fmt, LETTERS, type LiveGame, orderValueText } from '@almanac/client';
+import { actions, fmt, keepTogether, LETTERS, type LiveGame, orderValueText } from '@almanac/client';
 import { ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@almanac/shared';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -72,7 +72,7 @@ export function OrderAnswer({ game, q, disabled }: { game: LiveGame; q: Question
               </T>
             </View>
             <T variant="bodyStrong" style={{ flex: 1 }}>
-              {items[item]}
+              {keepTogether(items[item])}
             </T>
           </Pressable>
         );
@@ -125,7 +125,7 @@ export function OrderReveal({
               {place + 1}
             </T>
             <T variant="bodyStrong" style={{ flex: 1 }}>
-              {q.order!.items[item]}
+              {keepTogether(q.order!.items[item])}
               {answer.values ? (
                 <T variant="small" tone="fg3">
                   {' '}

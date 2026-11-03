@@ -1,4 +1,4 @@
-import { actions, fmt, LETTERS, type LiveGame, numberText } from '@almanac/client';
+import { actions, fmt, keepTogether, LETTERS, type LiveGame, numberText } from '@almanac/client';
 import { MODES } from '@almanac/shared';
 import { router } from 'expo-router';
 import { View } from 'react-native';
@@ -104,18 +104,18 @@ export function Results({ game }: { game: LiveGame }) {
               <T variant="caption" tone={item.right ? 'good' : 'bad'}>
                 {item.index + 1}. {item.right ? 'Верен' : 'Грешен'}
               </T>
-              <T variant="bodyStrong">{item.q}</T>
+              <T variant="bodyStrong">{keepTogether(item.q)}</T>
               <T variant="small" tone="good">
                 ✓{' '}
                 {item.number
                   ? numberText(item.number.answer, item.number)
                   : item.order
-                    ? item.order.right.map((i) => item.order!.items[i]).join(' → ')
-                    : `${LETTERS[item.correct]}) ${item.options[item.correct]}`}
+                    ? item.order.right.map((i) => keepTogether(item.order!.items[i])).join(' → ')
+                    : `${LETTERS[item.correct]}) ${keepTogether(item.options[item.correct])}`}
               </T>
               {item.fact && (
                 <T variant="small" tone="fg2">
-                  💡 {item.fact}
+                  💡 {keepTogether(item.fact)}
                 </T>
               )}
             </View>

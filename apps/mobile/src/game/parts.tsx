@@ -1,4 +1,4 @@
-import { actions, fmt, LETTERS, type LiveGame, OPTION_COLORS, percent, useNow } from '@almanac/client';
+import { actions, fmt, keepTogether, LETTERS, type LiveGame, OPTION_COLORS, percent, useNow } from '@almanac/client';
 import type { Crowd, PlayerResult, QuestionPayload } from '@almanac/shared';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -201,7 +201,7 @@ export function AnswerTile({
           (removed || state === 'wrong') && { textDecorationLine: 'line-through' },
         ]}
       >
-        {text}
+        {keepTogether(text)}
       </T>
     </Pressable>
   );

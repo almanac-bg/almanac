@@ -1,5 +1,5 @@
-import { api, fmt, plural, useStore } from '@almanac/client';
-import { type CATEGORIES, categoryById, isCategoryId, type KnowledgeFact } from '@almanac/shared';
+import { api, factMatches, fmt, plural, searchWords, useStore } from '@almanac/client';
+import { type CATEGORIES, categoryById, isCategoryId } from '@almanac/shared';
 import { ArrowLeft, ChevronRight, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -97,21 +97,16 @@ function Overview() {
   );
 }
 
-const matches = (f: KnowledgeFact, words: string[]) => {
-  const text = `${f.q} ${f.answer ?? ''} ${f.fact}`.toLocaleLowerCase('bg');
-  return words.every((w) => text.includes(w));
-};
-
 /** One category's facts, newest first, with a search once there are enough to need one. */
 function CategoryFacts({ category }: { category: (typeof CATEGORIES)[number]['id'] }) {
   const cat = categoryById(category)!;
   usePageTitle(`${cat.name} · Моите знания`);
   const { data, error, retry } = useLoad(() => api.knowledgeCategory(category), category);
   const [query, setQuery] = useState('');
-  const words = useDeferredValue(query).toLocaleLowerCase('bg').split(/\s+/u).filter(Boolean);
+  const words = searchWords(useDeferredValue(query));
   if (!data && error) return <LoadError title="Знанията не се заредиха" error={error} onRetry={retry} />;
   if (!data) return <PageSpinner />;
-  const shown = words.length ? data.facts.filter((f) => matches(f, words)) : data.facts;
+  const shown = words.length ? data.facts.filter((f) => factMatches(f, words)) : data.facts;
 
   return (
     <div className="space-y-6">

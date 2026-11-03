@@ -1,5 +1,5 @@
 import { QUIZ_COUNTS } from 'virtual:quiz-counts';
-import { fmt, LETTERS } from '@almanac/client';
+import { fmt, keepTogether, LETTERS } from '@almanac/client';
 import {
   BRAND,
   CATEGORIES,
@@ -34,7 +34,6 @@ import { buttonClass, Card } from '../components/ui';
 import { type QuizQuestion, useQuiz } from '../content/quizzes';
 import { useSite } from '../lib/site';
 import { usePublicPageTitle } from '../lib/title';
-import { keepTogether } from '../lib/typography';
 import { NotFoundPage } from './NotFoundPage';
 
 /**

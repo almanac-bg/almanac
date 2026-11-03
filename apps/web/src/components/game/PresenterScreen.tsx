@@ -1,6 +1,7 @@
 import {
   actions,
   fmt,
+  keepTogether,
   LETTERS,
   type LiveGame,
   numberText,
@@ -17,7 +18,6 @@ import { useNavigate } from 'react-router';
 import { m } from '../../lib/motion';
 import { louder, sfx } from '../../lib/sound';
 import { useForcedTheme } from '../../lib/theme';
-import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { FitName } from '../FitName';

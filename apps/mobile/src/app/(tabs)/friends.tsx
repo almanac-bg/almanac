@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { Section } from '@/settings/parts';
 import { radius, useColors } from '@/theme';
-import { Button, Field, Screen, T } from '@/ui';
+import { Button, Field, LoadError, Screen, T } from '@/ui';
 
 /** Приятели: add by name, the requests, the list with where each friend is, and a Дуел with any of them. */
 export default function Friends() {
@@ -52,10 +52,7 @@ export default function Friends() {
       </T>
       <AddFriend onAdded={(next) => setShown(next)} />
       {error && !list ? (
-        <View style={{ gap: 10 }}>
-          <T tone="bad">Приятелите не се заредиха: {error}</T>
-          <Button title="Опитай пак" variant="secondary" onPress={reload} />
-        </View>
+        <LoadError title="Приятелите не се заредиха" error={error} onRetry={reload} />
       ) : !list ? (
         <ActivityIndicator style={{ marginTop: 40 }} />
       ) : (
