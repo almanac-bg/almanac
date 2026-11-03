@@ -29,10 +29,15 @@ export interface DraftErrors {
 }
 
 /**
- * A link a source can be: https, a host with a dot in it. A pattern rather than `new URL()`, which React Native doesn't
- * fully have; the server checks it again.
+ * A link a source can be: https, no spaces, a host of names joined by dots. Read in two steps rather than by `new URL()`,
+ * which React Native doesn't fully have, or by one pattern, which backtracks on a long host of dots (CodeQL's polynomial
+ * ReDoS); each step's pattern can match only one way. The server checks it again.
  */
-const isHttps = (text: string) => /^https:\/\/[^\s/?#]+\.[^\s/?#]+(?:[/?#]\S*)?$/i.test(text);
+export function isHttpsLink(text: string) {
+  if (!/^https:\/\/\S+$/i.test(text)) return false;
+  const host = text.slice('https://'.length).split(/[/?#]/, 1)[0] ?? '';
+  return /^[^.]+(?:\.[^.]+)+$/.test(host);
+}
 
 /** Mirrors the server's rules so mistakes show up before submitting. */
 export function validateDraft(d: QuestionDraft): DraftErrors {
@@ -53,7 +58,7 @@ export function validateDraft(d: QuestionDraft): DraftErrors {
 
   const source = d.answerSource?.trim() ?? '';
   if (!source) errors.answerSource = 'Посочи къде се проверява верният отговор.';
-  else if (!isHttps(source)) errors.answerSource = 'Източникът трябва да е линк (https://…).';
+  else if (!isHttpsLink(source)) errors.answerSource = 'Източникът трябва да е линк (https://…).';
 
   const [fMin, fMax] = SUBMISSION_RULES.fact;
   const fact = d.fact?.trim() ?? '';
@@ -61,7 +66,7 @@ export function validateDraft(d: QuestionDraft): DraftErrors {
   if (fact) {
     if (fact.length < fMin) errors.fact = `„Знаеше ли?“ е поне ${fMin} знака.`;
     else if (fact.length > fMax) errors.fact = `„Знаеше ли?“ е до ${fMax} знака.`;
-    if (!isHttps(factSource)) errors.factSource = 'Фактът иска линк към източник (https://…).';
+    if (!isHttpsLink(factSource)) errors.factSource = 'Фактът иска линк към източник (https://…).';
   }
   return errors;
 }
