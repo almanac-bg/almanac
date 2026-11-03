@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import zlib from 'node:zlib';
 import {
+  appLinkPatterns,
   BRAND,
   MODES,
   PUBLIC_PAGES,
@@ -198,6 +199,34 @@ app.get('/.well-known/security.txt', (_req, res) => {
     ...(config.sourceUrl ? [`Policy: ${config.sourceUrl}/security/policy`] : []),
   ];
   res.type('text/plain').send(`${lines.join('\n')}\n`);
+});
+
+// The apps' claim to this site's links (8o; the 31 October review, MOBILE-8): where the app is installed, a link to one
+// of its screens (routes.ts → appLinkPatterns) opens it there — iOS universal links, Android App Links — and a password
+// saved for the site is offered in the app. Only once configured; Apple's and Google's checks read them.
+app.get('/.well-known/apple-app-site-association', (_req, res, next) => {
+  const id = config.appLinks.ios;
+  if (!id) return next();
+  res.set('cache-control', 'public, max-age=3600');
+  res.json({
+    applinks: { details: [{ appIDs: [id], components: appLinkPatterns().map((path) => ({ '/': path })) }] },
+    webcredentials: { apps: [id] },
+  });
+});
+app.get('/.well-known/assetlinks.json', (_req, res, next) => {
+  const android = config.appLinks.android;
+  if (!android) return next();
+  res.set('cache-control', 'public, max-age=3600');
+  res.json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls', 'delegate_permission/common.get_login_creds'],
+      target: {
+        namespace: 'android_app',
+        package_name: android.package,
+        sha256_cert_fingerprints: android.fingerprints,
+      },
+    },
+  ]);
 });
 
 // The banks' pictures (questions.ts): a file's name changes with its content, so it's cached for good. Not for search

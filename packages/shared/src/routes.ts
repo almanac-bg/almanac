@@ -131,6 +131,26 @@ export const APP_PATHS: readonly { path: RegExp; app: boolean }[] = [
 ];
 
 /** What an address is: a public page, a screen of the game, or nothing at all (a 404). */
+/**
+ * The app's links: every `app: true` path of APP_PATHS as the patterns Apple's apple-app-site-association and Android's
+ * intent filters take (`*`, any characters). Read from the path's own expression — `\/` a slash, `[^/]+` a `*`, an
+ * optional `(…)?` both with and without it — so the list can't drift from the app's screens; an expression written any
+ * other way throws instead of going missing from the links.
+ */
+export function appLinkPatterns(): string[] {
+  return APP_PATHS.filter((p) => p.app).flatMap(({ path }) => {
+    const body = /^\^(.*)\$$/.exec(path.source)?.[1];
+    if (body === undefined) throw new Error(`An app path needs ^…$: ${path}`);
+    const optional = /\((.*)\)\?$/.exec(body);
+    const variants = optional ? [body.slice(0, optional.index), body.slice(0, optional.index) + optional[1]] : [body];
+    return variants.map((variant) => {
+      const pattern = variant.replaceAll('\\/', '/').replaceAll('[^/]+', '*');
+      if (!/^(\/[a-z-]+|\/\*)+$/.test(pattern)) throw new Error(`An app path the links can't read: ${path}`);
+      return pattern;
+    });
+  });
+}
+
 export function routeKind(path: string): 'public' | 'app' | 'unknown' {
   if (Object.hasOwn(PUBLIC_PAGES, path)) return 'public';
   return APP_PATHS.some(({ path: re }) => re.test(path)) ? 'app' : 'unknown';
