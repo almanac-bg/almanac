@@ -25,6 +25,26 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     associatedDomains: [`applinks:${DOMAIN}`, `webcredentials:${DOMAIN}`],
     config: { usesNonExemptEncryption: false },
     infoPlist: { CFBundleDevelopmentRegion: 'bg', CFBundleLocalizations: ['bg'] },
+    // Apple's required-reason APIs, said in the app's own privacy manifest (React Native and Expo use them): the
+    // preferences the app keeps (CA92.1), files' dates for its own files (C617.1), the time since the phone started
+    // for its clocks (35F9.1). No tracking, of any kind.
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyAccessedAPITypes: [
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
+          NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
+        },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp',
+          NSPrivacyAccessedAPITypeReasons: ['C617.1'],
+        },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategorySystemBootTime',
+          NSPrivacyAccessedAPITypeReasons: ['35F9.1'],
+        },
+      ],
+    },
   },
   android: {
     package: 'bg.almanac.app',
