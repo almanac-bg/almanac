@@ -70,6 +70,9 @@ export default function RootLayout() {
                 <Stack.Screen name="c/[id]" options={{ ...header, title: 'Предизвикателство' }} />
                 <Stack.Screen name="room" options={{ ...header, title: 'Частна стая' }} />
                 <Stack.Screen name="locker" options={{ ...header, title: 'Колекция' }} />
+                <Stack.Screen name="groups/index" options={{ ...header, title: 'Групи' }} />
+                <Stack.Screen name="groups/[id]" options={{ ...header, title: 'Група' }} />
+                <Stack.Screen name="groups/join/[code]" options={{ ...header, title: 'Покана за група' }} />
                 <Stack.Screen name="daily/index" options={{ ...header, title: 'Въпросите на деня' }} />
                 <Stack.Screen name="daily/[code]" options={{ ...header, title: 'Въпросите на деня' }} />
                 <Stack.Screen name="achievements" options={{ ...header, title: 'Постижения' }} />
