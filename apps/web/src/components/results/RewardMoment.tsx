@@ -1,5 +1,14 @@
-import { api, errorMessage, setState as setStore, toast, unlockPreview, useStore } from '@almanac/client';
-import { LEVEL_CHOICES, type MatchRewards, type UnlockRef } from '@almanac/shared';
+import {
+  api,
+  errorMessage,
+  type RewardStep,
+  rewardSteps,
+  setState as setStore,
+  toast,
+  unlockPreview,
+  useStore,
+} from '@almanac/client';
+import { LEVEL_CHOICES, type UnlockRef } from '@almanac/shared';
 import { Check } from 'lucide-react';
 import { AnimatePresence, useIsPresent } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
@@ -10,33 +19,9 @@ import { LevelChoice } from '../LevelChoice';
 import { Button, Modal } from '../ui';
 import { burst } from './confetti';
 
-type Step =
-  | { kind: 'level'; level: number }
-  | { kind: 'choice'; level: number }
-  | { kind: 'unlock'; unlock: UnlockRef; more: number };
+type Step = RewardStep;
 
-/** Unlocks shown one by one at most; the rest are counted on the last one (a first match can bring half a dozen). */
-const SHOWN_UNLOCKS = 3;
-
-/**
- * What a match brought that deserves a moment of its own: a new level, a milestone's reward to pick (LEVEL_CHOICES),
- * then the avatars and frames it unlocked.
- */
-export function rewardSteps(rewards: MatchRewards | null | undefined): Step[] {
-  if (!rewards) return [];
-  const unlocks = rewards.unlocks.filter((u) => u.kind === 'avatar' || u.kind === 'frame');
-  const shown = unlocks.slice(0, SHOWN_UNLOCKS);
-  const milestones = LEVEL_CHOICES.filter((c) => c.level > rewards.levelBefore && c.level <= rewards.levelAfter);
-  return [
-    ...(rewards.levelAfter > rewards.levelBefore ? [{ kind: 'level' as const, level: rewards.levelAfter }] : []),
-    ...milestones.map((c) => ({ kind: 'choice' as const, level: c.level })),
-    ...shown.map((unlock, i) => ({
-      kind: 'unlock' as const,
-      unlock,
-      more: i === shown.length - 1 ? unlocks.length - shown.length : 0,
-    })),
-  ];
-}
+export { rewardSteps };
 
 /**
  * The rewards of a match, one beat at a time before its page: the new level, then each new avatar or frame, large, with

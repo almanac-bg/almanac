@@ -106,12 +106,15 @@ export function DuelCard({
   canPlay,
   onPlay,
   playing,
+  actions: withActions = true,
 }: {
   standing: DuelStanding;
   /** Not played yet by you, and still open. */
   canPlay: boolean;
   onPlay: () => void;
   playing: boolean;
+  /** Its play or rematch button (the results keep theirs in the bar at the bottom). */
+  actions?: boolean;
 }) {
   const colors = useColors();
   const me = useStore((s) => s.me);
@@ -153,7 +156,7 @@ export function DuelCard({
           {recordLine(record)}
         </T>
       </T>
-      {canPlay && !expired ? (
+      {!withActions ? null : canPlay && !expired ? (
         <Button title="⚔️ Играй дуела" loading={playing} onPress={onPlay} />
       ) : outcome || expired ? (
         <RematchButton standing={standing} />

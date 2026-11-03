@@ -1,152 +1,381 @@
-import { actions, fmt, keepTogether, LETTERS, type LiveGame, numberText, useStore } from '@almanac/client';
-import { MODES } from '@almanac/shared';
+import {
+  actions,
+  challengeShareText,
+  fmt,
+  keepTogether,
+  LETTERS,
+  type LiveGame,
+  matchOutcome,
+  matchShareText,
+  numberText,
+  toast,
+  useStore,
+} from '@almanac/client';
+import { categoryById, EVENING, isQueueMode, MODES, TEAMS } from '@almanac/shared';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { View } from 'react-native';
-import { radius, useColors } from '@/theme';
-import { Button, Screen, T } from '@/ui';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, findNodeHandle, ScrollView, Share, type Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DuelCard, RematchButton } from '@/duels/parts';
+import { API_URL } from '@/lib/client';
+import {
+  AchievementsCard,
+  Chip,
+  DailyResult,
+  GuestNudge,
+  LearnedToday,
+  MasteryCard,
+  RatingCard,
+  RatingChip,
+  RewardsCard,
+  UnlockReveal,
+  UnlocksCard,
+  UnratedCard,
+} from '@/results/Cards';
+import { ChallengeStanding, FriendsProvider, Podium, TeamResult } from '@/results/Standings';
+import { fonts, gutter, radius, useColors } from '@/theme';
+import { Button, Card, COLUMN, T, usePagePadding } from '@/ui';
 
-/** After the match: how it went, what it brought, and the questions with their answers. */
+/**
+ * After the match (the web's Results): how it went — the headline, the rating, the record, the XP — who placed where,
+ * the duel or the link it was, what it brought, what was learned, and the questions with their answers. The next step
+ * stays at the bottom, in reach, as the rest scrolls by.
+ */
 export function Results({ game }: { game: LiveGame }) {
   const colors = useColors();
-  const end = game.end!;
-  const rewards = end.rewards;
-  const me = end.standings.find((s) => s.id === game.start.youId);
-  const alone = game.start.players.length === 1;
-  const right = game.history.filter((i) => i.right).length;
-  const daily = rewards?.daily;
-  // A room's match: back to the room (still in it), for the next one.
-  const inRoom = useStore((s) => !!s.room) && end.mode === 'custom';
+  const insets = useSafeAreaInsets();
+  const padding = usePagePadding();
+  const room = useStore((s) => s.room);
+  const guest = useStore((s) => !!s.me?.isGuest);
+  const roomGuest = useStore((s) => !!s.me?.roomGuest);
+  const reviewDue = useStore((s) => s.me?.knowledge.due ?? 0);
+  const [busy, setBusy] = useState(false);
+  const o = matchOutcome(game, { roomGuest, reviewDue });
+  const { end, mine, rewards, link, duel, single, teamScores } = o;
+  const category = categoryById(game.start.category);
+  const headline = useRef<ComponentRef<typeof Text>>(null);
+
+  // The outcome is felt (a win, a perfect run, a record) and said first: a screen reader starts on the headline.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the results come in
+  useEffect(() => {
+    if (o.fanfare) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const node = headline.current && findNodeHandle(headline.current);
+    if (node) AccessibilityInfo.setAccessibilityFocus(node);
+  }, []);
+
   const home = () => {
     actions.closeGame();
     router.replace('/');
   };
-  const toRoom = () => {
-    actions.closeGame();
-    router.replace('/room');
+  const run = async (start: () => Promise<{ ok: true } | { ok: false; error: string }>) => {
+    setBusy(true);
+    const res = await start();
+    setBusy(false);
+    if (!res.ok) toast({ kind: 'error', title: res.error });
   };
   const again = async () => {
-    actions.closeGame();
-    await actions.startSolo(game.start.category, game.start.pace === 'untimed' ? 'untimed' : 'normal');
+    const mode = end.mode;
+    if (mode === 'challenge') return run(() => actions.startChallenge());
+    if (mode === 'custom') {
+      actions.closeGame();
+      return router.replace(room ? '/room' : '/');
+    }
+    if (mode === 'solo') {
+      actions.closeGame();
+      return run(() => actions.startSolo(game.start.category, game.start.pace === 'untimed' ? 'untimed' : 'normal'));
+    }
+    if (mode === 'review') {
+      if (!o.moreReview) {
+        actions.closeGame();
+        return router.replace('/knowledge');
+      }
+      return run(() => actions.startReview());
+    }
+    if (o.againIsHome) return home();
+    if (isQueueMode(mode)) {
+      home();
+      return run(() => actions.joinQueue(mode));
+    }
   };
+  const toBoard = () => {
+    actions.closeGame();
+    router.replace('/leaderboard');
+  };
+  const playDuel = () => {
+    home();
+    void run(() => actions.joinQueue('duel'));
+  };
+  const share = () =>
+    void Share.share({
+      message: matchShareText({
+        modeName: MODES[end.mode].name,
+        category: o.solo ? (category?.name ?? null) : null,
+        place: mine.placement,
+        players: end.standings.length,
+        won: o.won,
+        teams: !!teamScores,
+        royale: end.mode === 'royale',
+        score: mine.score,
+        history: game.history,
+        total: game.start.totalQuestions,
+        levelUp: rewards && rewards.levelAfter > rewards.levelBefore ? rewards.levelAfter : null,
+      }),
+    });
+
+  // A no contest has nothing to award unless a question or two were answered; a class's pupil, nothing as theirs.
+  const rewardsCard = !o.classPupil && (!end.noContest || (!!rewards && rewards.xpGained > 0));
+  const sideCards = !o.classPupil && !!rewards;
+  const eveningChampion = game.start.players.filter((p) => !p.isBot && !p.record).length >= EVENING.titleFrom;
+  const shareable = !o.daily && !o.challenge && !o.review && !end.noContest;
+  // The main button: what comes next, by the mode.
+  const main = o.daily
+    ? rewards?.daily?.offBoard
+      ? { title: '⚔️ Играй Дуел', onPress: playDuel }
+      : { title: '📊 Класация за деня', onPress: toBoard }
+    : duel
+      ? null
+      : o.challenge && guest
+        ? { title: 'Към началото', onPress: home }
+        : {
+            title: o.challenge
+              ? '⚔️ Ново предизвикателство'
+              : end.mode === 'custom'
+                ? 'Обратно в стаята'
+                : o.review && !o.moreReview
+                  ? '📖 Моите знания'
+                  : o.againIsHome
+                    ? 'Към началото'
+                    : '↻ Играй пак',
+            onPress: () => void again(),
+          };
+  const mainGoesHome = main?.title === 'Към началото' || (!!duel && !duel.outcome && !duel.expired);
+
   return (
-    <Screen>
-      <T variant="label" tone="fg3" align="center">
-        {MODES[end.mode].name}
-      </T>
-      <T variant="hero" align="center" role="heading">
-        {alone ? `${right} от ${game.history.length}` : me ? `${me.placement}. място` : 'Край'}
-      </T>
-      <T tone="fg2" align="center">
-        {fmt(me?.score ?? 0)} точки
-        {!alone ? ` · ${right} от ${game.history.length} верни` : ''}
-      </T>
-
-      {end.saving && !rewards && (
-        <T variant="small" tone="fg3" align="center">
-          Записваме резултата…
-        </T>
-      )}
-      {daily && (
-        <Card>
-          <T variant="title">
-            {daily.offBoard
-              ? `Щеше да си ${daily.rank}. от ${daily.total} в днешната класация`
-              : `${daily.rank}. място от ${daily.total} днес`}
-          </T>
-          <T variant="small" tone="fg2">
-            🔥 Серия {daily.streak} {daily.streak === 1 ? 'ден' : 'дни'}
-          </T>
-        </Card>
-      )}
-      {rewards && (
-        <Card>
-          <T variant="title">+{fmt(rewards.xpGained)} XP</T>
-          {rewards.breakdown.map((line) => (
-            <View key={line.label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <T variant="small" tone="fg2">
-                {line.label}
-              </T>
-              <T variant="small" tone="fg2">
-                +{fmt(line.amount)}
-              </T>
-            </View>
-          ))}
-          {rewards.levelAfter > rewards.levelBefore && (
-            <T variant="bodyStrong" tone="gold">
-              ⬆️ Ниво {rewards.levelAfter}!
+    <View style={{ flex: 1, backgroundColor: colors.ink }}>
+      <ScrollView contentContainerStyle={[padding, { paddingBottom: 24 }]}>
+        <View style={[COLUMN, { gap: 16 }]}>
+          <View style={{ alignItems: 'center', gap: 8 }}>
+            <T variant="label" tone="fg3" align="center">
+              {duel ? `Дуел с ${duel.friend.username}` : MODES[end.mode].name}
+              {o.solo && category ? ` · ${category.name}` : ''}
             </T>
-          )}
-          {rewards.knowledge.added > 0 && (
-            <T variant="small" tone="fg2">
-              📖 +{rewards.knowledge.added} в „Моите знания“
-            </T>
-          )}
-        </Card>
-      )}
-
-      <View style={{ gap: 10 }}>
-        {end.mode === 'solo' && <Button title="Още едно Соло" size="lg" onPress={() => void again()} />}
-        {inRoom && <Button title="Обратно в стаята" size="lg" onPress={toRoom} />}
-        <Button title="Към началото" variant={end.mode === 'solo' || inRoom ? 'secondary' : 'primary'} onPress={home} />
-      </View>
-
-      {game.history.length > 0 && (
-        <View style={{ gap: 10 }}>
-          <T variant="h2" role="heading">
-            Въпросите
-          </T>
-          {game.history.map((item) => (
-            <View
-              key={item.index}
-              accessible
+            <T
+              ref={headline}
+              variant="hero"
+              role="heading"
+              align="center"
               style={{
-                gap: 4,
-                padding: 12,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: colors.ink2,
+                fontSize: end.noContest ? 26 : 36,
+                lineHeight: end.noContest ? 32 : 44,
+                color: o.won ? colors.gold : colors.fg,
               }}
             >
-              <T variant="caption" tone={item.right ? 'good' : 'bad'}>
-                {item.index + 1}. {item.right ? 'Верен' : 'Грешен'}
+              {o.headline}
+            </T>
+            {o.winningTeam !== null && (
+              <T variant="h2" align="center" style={{ color: TEAMS[o.winningTeam].color }}>
+                {TEAMS[o.winningTeam].name} печелят!
               </T>
-              <T variant="bodyStrong">{keepTogether(item.q)}</T>
-              <T variant="small" tone="good">
-                ✓{' '}
-                {item.number
-                  ? numberText(item.number.answer, item.number)
-                  : item.order
-                    ? item.order.right.map((i) => keepTogether(item.order!.items[i])).join(' → ')
-                    : `${LETTERS[item.correct]}) ${keepTogether(item.options[item.correct])}`}
+            )}
+            {!end.noContest && (
+              <T tone="fg2" align="center">
+                {mine.eliminatedAt !== null ? (
+                  `💀 Отпадна след въпрос ${mine.eliminatedAt}`
+                ) : (
+                  <>
+                    <T style={{ fontFamily: fonts.bold }}>{fmt(mine.score)}</T> точки · {mine.correct} от{' '}
+                    {game.start.totalQuestions} верни
+                  </>
+                )}
               </T>
-              {item.fact && (
+            )}
+            {rewards && !end.noContest && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
+                {rewards.rating && <RatingChip rating={rewards.rating} />}
+                {o.best !== null && (
+                  <Chip
+                    tone={o.newBest ? 'gold' : 'fg2'}
+                    text={
+                      o.newBest
+                        ? `🏆 Нов личен рекорд! (беше ${fmt(o.best)})`
+                        : o.best === 0
+                          ? `Рекорд за побиване: ${fmt(mine.score)}`
+                          : `Личен рекорд: ${fmt(o.best)}`
+                    }
+                  />
+                )}
+                {end.mode === 'evening' && mine.placement === 1 && (
+                  <Chip
+                    tone="link"
+                    text={
+                      eveningChampion
+                        ? '🌙 Шампион на вечерта — титлата е твоя за денонощие'
+                        : `🌙 Първо място. Титлата „Шампион на вечерта“ се печели срещу поне ${EVENING.titleFrom - 1} души`
+                    }
+                  />
+                )}
+                {/* A guest has it in the card that offers to keep it, below. */}
+                {rewards.xpGained > 0 && !guest && <Chip tone="link" text={`+${fmt(rewards.xpGained)} XP`} />}
+              </View>
+            )}
+            {(end.noContest || o.byWalkout) && (
+              <T variant="small" tone="fg3" align="center">
+                {end.noContest
+                  ? 'Още в началото, затова мачът не се зачита: без победа и без промяна в рейтинга.'
+                  : `${o.rivals} по време на мача — победата е твоя.`}
+              </T>
+            )}
+          </View>
+
+          <FriendsProvider game={game}>
+            {teamScores ? (
+              <TeamResult game={game} end={end} />
+            ) : (
+              !single && !end.noContest && <Podium game={game} standings={end.standings} />
+            )}
+          </FriendsProvider>
+          {duel && <DuelCard standing={duel} canPlay={false} onPlay={() => {}} playing={false} actions={false} />}
+          {link && !duel && (
+            <ChallengeStanding
+              challenge={link}
+              onShare={() =>
+                void Share.share({
+                  message: challengeShareText(API_URL, link.id, mine.score, game.start.totalQuestions),
+                })
+              }
+            />
+          )}
+
+          {sideCards && rewards.daily && (
+            <DailyResult
+              daily={rewards.daily}
+              history={game.history}
+              total={game.start.totalQuestions}
+              score={mine.score}
+            />
+          )}
+          {rewardsCard &&
+            (rewards ? (
+              <>
+                <UnlockReveal rewards={rewards} />
+                <RewardsCard rewards={rewards} />
+              </>
+            ) : end.saving ? (
+              <Card>
                 <T variant="small" tone="fg2">
-                  💡 {keepTogether(item.fact)}
+                  Записваме наградите от мача… идват след миг.
                 </T>
-              )}
-            </View>
-          ))}
+              </Card>
+            ) : (
+              <Card>
+                <T variant="small" tone="fg3">
+                  Наградите от този мач не можаха да се запишат.
+                </T>
+              </Card>
+            ))}
+          {sideCards && rewards.achievements.length > 0 && <AchievementsCard ids={rewards.achievements} />}
+          {sideCards && !!rewards.mastery?.length && <MasteryCard mastery={rewards.mastery} />}
+          {sideCards && rewards.unlocks.length > 0 && <UnlocksCard rewards={rewards} />}
+          {sideCards && rewards.rating && <RatingCard rating={rewards.rating} />}
+          {sideCards && o.unrated && <UnratedCard reason={o.unrated} guest={guest} />}
+
+          {o.classPupil ? (
+            <Card>
+              <T variant="small" tone="fg2">
+                Влезе като гост за стаята: до час, след като излезеш, профилът и всичко изиграно се изтриват.
+              </T>
+            </Card>
+          ) : (
+            guest && <GuestNudge xp={rewards?.xpGained ?? null} />
+          )}
+
+          <LearnedToday items={game.history} added={rewards?.knowledge?.added ?? 0} />
+          <Questions game={game} />
         </View>
-      )}
-    </Screen>
+      </ScrollView>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: 8,
+          paddingTop: 12,
+          paddingBottom: insets.bottom + 12,
+          paddingLeft: insets.left + gutter,
+          paddingRight: insets.right + gutter,
+          borderTopWidth: 1,
+          borderTopColor: colors.line,
+          backgroundColor: colors.ink2,
+        }}
+      >
+        {duel ? (
+          duel.outcome || duel.expired ? (
+            <View style={{ flex: 1 }}>
+              <RematchButton standing={duel} />
+            </View>
+          ) : (
+            <Button title="Към началото" size="lg" onPress={home} style={{ flex: 1 }} />
+          )
+        ) : (
+          main && (
+            <Button
+              title={main.title}
+              size="lg"
+              variant={o.challenge ? 'secondary' : 'primary'}
+              loading={busy}
+              onPress={main.onPress}
+              style={{ flex: 1 }}
+            />
+          )
+        )}
+        {shareable && <Button title="↗" label="Сподели резултата" size="lg" variant="secondary" onPress={share} />}
+        {!mainGoesHome && <Button title="⌂" label="Към началото" size="lg" variant="secondary" onPress={home} />}
+      </View>
+    </View>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+/** The questions with their answers: yours right or not, the right one, and the fact behind it. */
+function Questions({ game }: { game: LiveGame }) {
   const colors = useColors();
+  if (!game.history.length) return null;
   return (
-    <View
-      style={{
-        gap: 6,
-        padding: 16,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.line,
-        backgroundColor: colors.glass,
-      }}
-    >
-      {children}
+    <View style={{ gap: 10 }}>
+      <T variant="h2" role="heading">
+        Въпросите
+      </T>
+      {game.history.map((item) => (
+        <View
+          key={item.index}
+          accessible
+          style={{
+            gap: 4,
+            padding: 12,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.ink2,
+          }}
+        >
+          <T variant="caption" tone={item.right ? 'good' : 'bad'}>
+            {item.index + 1}. {item.right ? 'Верен' : 'Грешен'}
+          </T>
+          <T variant="bodyStrong">{keepTogether(item.q)}</T>
+          <T variant="small" tone="good">
+            ✓{' '}
+            {item.number
+              ? numberText(item.number.answer, item.number)
+              : item.order
+                ? item.order.right.map((i) => keepTogether(item.order!.items[i] ?? '')).join(' → ')
+                : `${LETTERS[item.correct]}) ${keepTogether(item.options[item.correct] ?? '')}`}
+          </T>
+          {item.fact && (
+            <T variant="small" tone="fg2">
+              💡 {keepTogether(item.fact)}
+            </T>
+          )}
+        </View>
+      ))}
     </View>
   );
 }
