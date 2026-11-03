@@ -12,6 +12,7 @@ const SCREENS: readonly RegExp[] = [
   /^\/leaderboard$/,
   /^\/friends$/,
   /^\/profile(\/[^/]+)?$/,
+  /^\/c\/[^/]+$/,
   /^\/notifications$/,
   /^\/settings$/,
 ];

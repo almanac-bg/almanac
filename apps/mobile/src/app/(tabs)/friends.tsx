@@ -1,12 +1,14 @@
-import { api, errorMessage, PRESENCE, timeAgo, useStore } from '@almanac/client';
-import { avatarEmoji, type FriendEntry, type FriendsResponse } from '@almanac/shared';
+import { api, errorMessage, PRESENCE, sortDuels, timeAgo, useStore } from '@almanac/client';
+import { avatarEmoji, BRAND, type FriendEntry, type FriendsResponse } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, View } from 'react-native';
 import { DuelButton } from '@/components/DuelButton';
+import { DuelList, useDuels } from '@/duels/parts';
+import { API_URL } from '@/lib/client';
 import { useLoad } from '@/lib/load';
 import { Section } from '@/settings/parts';
-import { radius, useColors } from '@/theme';
+import { fonts, radius, useColors } from '@/theme';
 import { Button, Field, LoadError, Screen, T } from '@/ui';
 
 /** Приятели: add by name, the requests, the list with where each friend is, and a Дуел with any of them. */
@@ -52,6 +54,7 @@ export default function Friends() {
         Приятели
       </T>
       <AddFriend onAdded={(next) => setShown(next)} />
+      <Duels />
       {error && !list ? (
         <LoadError title="Приятелите не се заредиха" error={error} onRetry={reload} />
       ) : !list ? (
@@ -77,10 +80,13 @@ export default function Friends() {
           )}
           <Section title="Списък">
             {list.friends.length === 0 ? (
-              <T tone="fg2">
-                Още нямаш приятели тук. Добави някого по потребителско име горе: щом се приемете, ще виждате кой е
-                онлайн и ще се предизвиквате на дуел.
-              </T>
+              <>
+                <T tone="fg2">
+                  Още нямаш приятели тук. Добави някого по потребителско име горе — или прати своето: щом се приемете,
+                  ще виждате кой е онлайн и ще се предизвиквате на дуел.
+                </T>
+                <InviteFriend />
+              </>
             ) : (
               list.friends.map((f) => (
                 <FriendRow
@@ -241,6 +247,40 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
         <DuelButton friendId={entry.user.id} style={{ flex: 1 }} />
         <Button title="Премахни" variant="ghost" onPress={onRemove} style={{ flex: 1 }} />
       </View>
+    </View>
+  );
+}
+
+/** Your friend duels, when there are any: the ones waiting for you first. */
+function Duels() {
+  const { data } = useDuels();
+  const duels = sortDuels(data?.duels ?? []);
+  if (!duels.length) return null;
+  return (
+    <Section title="Дуели">
+      <DuelList duels={duels} />
+    </Section>
+  );
+}
+
+/** Your own name, for a friend to add: sent with the site's address. */
+function InviteFriend() {
+  const name = useStore((s) => s.me?.username ?? '');
+  return (
+    <View style={{ gap: 8 }}>
+      <T variant="small" tone="fg2">
+        Твоето име:{' '}
+        <T variant="small" style={{ fontFamily: fonts.bold }}>
+          {name}
+        </T>
+      </T>
+      <Button
+        title="Прати името си"
+        variant="secondary"
+        onPress={() =>
+          void Share.share({ message: `Добави ме в ${BRAND.name} — името ми е „${name}“. Да се мерим: ${API_URL}` })
+        }
+      />
     </View>
   );
 }
