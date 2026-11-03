@@ -1,4 +1,5 @@
 import { BRAND, USERNAME } from '@quiz/shared';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { Router } from 'express';
 import { z } from 'zod';
 import { bannedDataToken, getMe } from '../account';
@@ -35,7 +36,18 @@ import { activeBan, nameProblem } from '../moderation';
 import { reportError } from '../monitoring';
 import { nameShape } from '../names';
 import { disconnectSession } from '../notify';
-import { secondFactorFailed, secondFactorHold, secondFactorPassed } from '../secondFactor';
+import {
+  deviceName,
+  hasPasskey,
+  MAX_PASSKEYS,
+  passkeysOf,
+  register as registerPasskey,
+  registrationOptions,
+  removePasskey,
+  signInOptions,
+  signIn as signInWithPasskey,
+} from '../passkeys';
+import { passkeyChanged, secondFactorFailed, secondFactorHold, secondFactorPassed } from '../secondFactor';
 import { guestsPaused } from '../settings';
 import { count } from '../stats';
 import { network, throttled, throttledNetwork, wideNetwork } from '../throttle';
@@ -358,8 +370,99 @@ authRouter.post('/auth/2fa', requireAuth, requireStaff, (req, res) => {
     return;
   }
   run('UPDATE users SET totp_step = ? WHERE id = ?', step, user.id);
-  secondFactorPassed(user);
+  secondFactorPassed(user, 'code');
   secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  res.json({ ok: true });
+});
+
+// ─── Passkeys: the second factor without a code (passkeys.ts) ────────────────
+
+/** The session's own key for a ceremony (its token hashed: nothing raw is kept in memory). */
+const ceremonyKey = (cookie: string | undefined) => hashToken(sessionTokenFromCookieHeader(cookie)!);
+
+/** The second factors this staff member has: the app's code (on or not) and their passkeys. */
+authRouter.get('/auth/2fa/methods', requireAuth, requireStaff, (_req, res) => {
+  const user = getUser(res.locals.userId)!;
+  res.json({ code: !!user.totp_on_at, passkeys: passkeysOf(user.id) });
+});
+
+/** A new passkey, step one (with the password given within the hour): what the browser needs to make it. */
+authRouter.post('/auth/2fa/passkeys/options', requireAuth, requireStaff, requireRecentPassword, async (req, res) => {
+  const user = getUser(res.locals.userId)!;
+  if (throttled(`passkey-add:${user.id}`, 10, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  if (passkeysOf(user.id).length >= MAX_PASSKEYS) {
+    res.status(400).json({ error: `Имаш ${MAX_PASSKEYS} ключа за достъп: премахни някой, преди да добавиш нов.` });
+    return;
+  }
+  res.json(await registrationOptions(user, ceremonyKey(req.headers.cookie)));
+});
+
+const Ceremony = z.object({ response: z.looseObject({ id: z.string().max(1024), type: z.literal('public-key') }) });
+
+/**
+ * A new passkey, step two: the browser's answer, checked and kept. Two-factor sign-in is on with it, and this session
+ * has given its second factor (as with the app's first code).
+ */
+authRouter.post('/auth/2fa/passkeys', requireAuth, requireStaff, requireRecentPassword, async (req, res) => {
+  const body = parse(Ceremony, req, res);
+  if (!body) return;
+  const user = getUser(res.locals.userId)!;
+  const name = deviceName(req.headers['user-agent']);
+  // The rest of the answer's shape is the library's to check (verifyRegistrationResponse).
+  const response = body.response as unknown as RegistrationResponseJSON;
+  if (!(await registerPasskey(user, ceremonyKey(req.headers.cookie), response, name))) {
+    res.status(400).json({ error: 'Ключът не беше приет. Започни отначало.' });
+    return;
+  }
+  passkeyChanged(user, 'passkey-added');
+  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  res.json({ ok: true });
+});
+
+/** Signing in with a passkey, step one: what the browser needs to ask for one of this staff member's. */
+authRouter.post('/auth/2fa/passkey/options', requireAuth, requireStaff, async (req, res) => {
+  const user = getUser(res.locals.userId)!;
+  if (!hasPasskey(user.id)) {
+    res.status(400).json({ error: 'Нямаш ключ за достъп.' });
+    return;
+  }
+  if (throttled(`passkey:${user.id}`, 20, 15 * 60_000)) {
+    res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
+    return;
+  }
+  res.json(await signInOptions(user, ceremonyKey(req.headers.cookie)));
+});
+
+/**
+ * Signing in with a passkey, step two: the browser's answer, checked. Nothing to guess, so the wrong codes' hold
+ * (secondFactor.ts) doesn't stop it: someone trying the password can't lock its owner out of /admin.
+ */
+authRouter.post('/auth/2fa/passkey', requireAuth, requireStaff, async (req, res) => {
+  const body = parse(Ceremony, req, res);
+  if (!body) return;
+  const user = getUser(res.locals.userId)!;
+  // The rest of the answer's shape is the library's to check (verifyAuthenticationResponse).
+  const response = body.response as unknown as AuthenticationResponseJSON;
+  if (!(await signInWithPasskey(user, ceremonyKey(req.headers.cookie), response))) {
+    res.status(400).json({ error: 'Ключът не беше приет. Опитай пак.' });
+    return;
+  }
+  secondFactorPassed(user, 'passkey');
+  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  res.json({ ok: true });
+});
+
+/** A passkey removed (with the password given within the hour). The last factor can go too: then /admin asks for one. */
+authRouter.delete('/auth/2fa/passkeys/:id', requireAuth, requireStaff, requireRecentPassword, (req, res) => {
+  const user = getUser(res.locals.userId)!;
+  if (!removePasskey(user.id, String(req.params.id))) {
+    res.status(404).json({ error: 'Няма такъв ключ.' });
+    return;
+  }
+  passkeyChanged(user, 'passkey-removed');
   res.json({ ok: true });
 });
 

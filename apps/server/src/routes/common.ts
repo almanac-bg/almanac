@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
 import { verifyPassword } from '../auth';
 import { ACCOUNT_ONLY } from '../guests';
+import { hasPasskey } from '../passkeys';
 import { throttled, wideNetwork } from '../throttle';
 import { getUser, isAdmin, isOwner } from '../users';
 
@@ -44,19 +45,20 @@ export function requireStaff(_req: Request, res: Response, next: NextFunction) {
 const SECOND_FACTOR_MS = 12 * 60 * 60_000;
 
 /**
- * Where a staff member's second factor stands for this session: an authenticator app still to set up, a code to give
- * (none yet, or it's been SECOND_FACTOR_MS), or given.
+ * Where a staff member's second factor stands for this session: one still to set up (an authenticator app or a
+ * passkey), one to give (none yet, or it's been SECOND_FACTOR_MS), or given.
  */
 export function secondFactor(res: Response): SecondFactorState {
   const user = getUser(res.locals.userId);
-  if (!user?.totp_on_at) return 'setup';
+  if (!user || (!user.totp_on_at && !hasPasskey(user.id))) return 'setup';
   const at = res.locals.secondFactorAt as number | null;
   return at && Date.now() - at <= SECOND_FACTOR_MS ? 'ok' : 'needed';
 }
 
 /**
- * Staff, with a second factor: a stolen password alone moderates nothing. Without an authenticator app set up the
- * page leads to setting one up (`setup2fa`); without a recent code the app asks for one and tries again (`code`).
+ * Staff, with a second factor: a stolen password alone moderates nothing. Without one set up (an authenticator app or a
+ * passkey) the page leads to setting one up (`setup2fa`); without one given recently the app asks for it and tries
+ * again (`code`).
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   requireStaff(req, res, () => {
@@ -66,7 +68,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
       return;
     }
     if (state === 'needed') {
-      res.status(403).json({ error: 'Въведи кода от приложението си за удостоверяване.', code: true });
+      res.status(403).json({ error: 'Влез с ключа си за достъп или с кода от приложението.', code: true });
       return;
     }
     next();

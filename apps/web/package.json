@@ -18,6 +18,7 @@
     "@quiz/client": "*",
     "@quiz/shared": "*",
     "@sentry/browser": "^11.9.0",
+    "@simplewebauthn/browser": "^14.0.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "lucide-react": "^1.61.0",

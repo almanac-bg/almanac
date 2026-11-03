@@ -31,6 +31,8 @@ const ACTION: Record<ModerationLogAction, string> = {
   staff_add: 'включи в екипа',
   staff_remove: 'махна от екипа',
   staff_2fa_reset: 'нулира двуфакторното влизане на',
+  staff_passkey_added: 'добави ключ за достъп за двуфакторното влизане',
+  staff_passkey_removed: 'премахна ключ за достъп за двуфакторното влизане',
   staff_sign_in: 'влезе в модерацията',
   second_factor_failed: 'отбеляза грешен код за двуфакторното влизане на',
   second_factor_locked: 'спря двуфакторното влизане след твърде много грешни кодове на',

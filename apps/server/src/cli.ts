@@ -161,14 +161,20 @@ if (area === 'guests') {
 if (area !== 'admin' || !['add', 'owner', 'remove', '2fa-reset', 'list'].includes(command ?? '')) fail(USAGE);
 
 if (command === 'list') {
-  const staff = all<{ username: string; staff_role: string | null; totp_on_at: number | null }>(
-    'SELECT username, staff_role, totp_on_at FROM users WHERE is_admin = 1 ORDER BY username',
+  const staff = all<{ username: string; staff_role: string | null; totp_on_at: number | null; passkeys: number }>(
+    `SELECT username, staff_role, totp_on_at,
+       (SELECT count(*) FROM staff_passkeys p WHERE p.user_id = users.id) AS passkeys
+     FROM users WHERE is_admin = 1 ORDER BY username`,
   );
+  // Which second factors each has: the authenticator app, passkeys, both, or none yet.
+  const factors = (s: (typeof staff)[number]) => {
+    const has = [s.totp_on_at && 'app', s.passkeys && `${s.passkeys} passkey${s.passkeys === 1 ? '' : 's'}`];
+    const on = has.filter(Boolean).join(' + ');
+    return on ? `2FA on (${on})` : '2FA not set up';
+  };
   console.log(
     staff.length
-      ? staff
-          .map((s) => `${s.username}\t${s.staff_role ?? 'moderator'}\t${s.totp_on_at ? '2FA on' : '2FA not set up'}`)
-          .join('\n')
+      ? staff.map((s) => `${s.username}\t${s.staff_role ?? 'moderator'}\t${factors(s)}`).join('\n')
       : '(no admins)',
   );
 } else {
@@ -193,6 +199,7 @@ if (command === 'list') {
       'UPDATE users SET is_admin = 0, staff_role = NULL, totp_secret = NULL, totp_on_at = NULL, totp_step = NULL, totp_failures = 0, totp_failed_at = NULL WHERE id = ?',
       user.id,
     );
+    run('DELETE FROM staff_passkeys WHERE user_id = ?', user.id);
     run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
     logAction({ adminId: null, action: 'staff_remove', userId: user.id });
     console.log(`✅ ${user.username} is no longer staff.`);
@@ -201,6 +208,8 @@ if (command === 'list') {
       'UPDATE users SET totp_secret = NULL, totp_on_at = NULL, totp_step = NULL, totp_failures = 0, totp_failed_at = NULL WHERE id = ?',
       user.id,
     );
+    // The passkeys too: a lost phone may have been one of them.
+    run('DELETE FROM staff_passkeys WHERE user_id = ?', user.id);
     run('UPDATE sessions SET second_factor_at = NULL WHERE user_id = ?', user.id);
     logAction({ adminId: null, action: 'staff_2fa_reset', userId: user.id });
     console.log(`✅ ${user.username} sets up two-factor sign-in anew on their next visit to /admin.`);

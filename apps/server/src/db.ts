@@ -1167,6 +1167,23 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     WHERE achievement_id IN ('almanac_100', 'almanac_500', 'almanac_1000');
   UPDATE quest_progress SET quest = 'knowledge5' WHERE quest = 'almanac5';
   `,
+  // v50, passkeys as a staff second factor (passkeys.ts; the 31 October review, A11Y-11). Older code doesn't read them:
+  // on a rollback a staff member with only a passkey is asked to set up the app.
+  {
+    compatible: `
+    CREATE TABLE staff_passkeys (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      public_key BLOB NOT NULL,
+      counter INTEGER NOT NULL DEFAULT 0,
+      transports TEXT,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX staff_passkeys_user ON staff_passkeys(user_id, created_at);
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */

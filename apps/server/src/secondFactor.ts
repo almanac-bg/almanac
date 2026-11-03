@@ -44,9 +44,18 @@ export function secondFactorFailed(user: UserRow, now = Date.now()) {
   if (user.email) sendMail(staffSignInMail(user.email, user.username, stopped ? 'locked' : 'wrong-code', now));
 }
 
-/** A right code: the run of wrong ones is over, and the sign-in is told to its owner and kept in the log. */
-export function secondFactorPassed(user: UserRow, now = Date.now()) {
+/**
+ * A right code, or a passkey: the run of wrong codes is over, and the sign-in is told to its owner (with what it was
+ * made with) and kept in the log.
+ */
+export function secondFactorPassed(user: UserRow, how: 'code' | 'passkey', now = Date.now()) {
   run('UPDATE users SET totp_failures = 0, totp_failed_at = NULL WHERE id = ?', user.id);
   logAction({ adminId: user.id, action: 'staff_sign_in' });
-  if (user.email) sendMail(staffSignInMail(user.email, user.username, 'sign-in', now));
+  if (user.email) sendMail(staffSignInMail(user.email, user.username, how === 'code' ? 'sign-in' : 'passkey', now));
+}
+
+/** A passkey added or removed: told to its owner (someone with the session and the password could do either). */
+export function passkeyChanged(user: UserRow, what: 'passkey-added' | 'passkey-removed', now = Date.now()) {
+  logAction({ adminId: user.id, action: what === 'passkey-added' ? 'staff_passkey_added' : 'staff_passkey_removed' });
+  if (user.email) sendMail(staffSignInMail(user.email, user.username, what, now));
 }

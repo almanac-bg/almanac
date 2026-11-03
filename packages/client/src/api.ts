@@ -46,6 +46,7 @@ import type {
   SharedSetPreview,
   SimilarQuestion,
   SiteInfo,
+  StaffSecondFactors,
   Submission,
   SubmissionStatus,
   UnlockRef,
@@ -229,6 +230,18 @@ export const api = {
   enableSecondFactor: (code: string) => request<{ ok: true }>('POST', '/auth/2fa/enable', { code }),
   /** This session's code (/admin asks every 12 hours). */
   giveSecondFactor: (code: string) => request<{ ok: true }>('POST', '/auth/2fa', { code }),
+  /** The second factors a staff member has: the app's code, and their passkeys. */
+  secondFactors: () => request<StaffSecondFactors>('GET', '/auth/2fa/methods'),
+  /**
+   * A new passkey: what the browser needs to make one (WebAuthn's options, as JSON), then the browser's answer. The
+   * shapes are WebAuthn's own; the web app hands them to its browser library as they are.
+   */
+  passkeyCreationOptions: () => request<Record<string, unknown>>('POST', '/auth/2fa/passkeys/options'),
+  addPasskey: (response: unknown) => request<{ ok: true }>('POST', '/auth/2fa/passkeys', { response }),
+  /** Signing in with a passkey: the options for the browser, then its answer (as for a code: this session's). */
+  passkeyRequestOptions: () => request<Record<string, unknown>>('POST', '/auth/2fa/passkey/options'),
+  givePasskey: (response: unknown) => request<{ ok: true }>('POST', '/auth/2fa/passkey', { response }),
+  removePasskey: (id: string) => request<{ ok: true }>('DELETE', `/auth/2fa/passkeys/${encodeURIComponent(id)}`),
   reportQuestion: (questionId: string, reason: QuestionReportReason, details: string) =>
     request<{ ok: true }>('POST', `/questions/${encodeURIComponent(questionId)}/report`, { reason, details }),
   adminQuestionReports: () => request<QuestionReports>('GET', '/admin/question-reports'),

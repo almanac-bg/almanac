@@ -194,10 +194,12 @@ export function exportAccount(userId: number) {
       'SELECT match_id, mode, category, rating, score, correct, answers, played_at FROM runs WHERE user_id = ?',
     ).map((r) => ({ ...r, answers: JSON.parse(String(r.answers)) })),
     skill: rows('SELECT category, rating, answers FROM player_skill WHERE user_id = ?'),
-    // „Моят алманах“ (questions got right, or stopped on to read), „Поправителен“, category mastery.
+    // „Моите знания“ (questions got right, or stopped on to read), „Поправителен“, category mastery.
     learned: rows('SELECT question_id, learned_at FROM learned WHERE user_id = ? ORDER BY learned_at'),
     reviewQueue: rows('SELECT question_id, step, due_at FROM review_queue WHERE user_id = ? ORDER BY due_at'),
     mastery: rows('SELECT category, tier, earned_at FROM mastery WHERE user_id = ?'),
+    // A staff member's passkeys for /admin: which devices, and when (the keys themselves are the devices').
+    passkeys: rows('SELECT name, transports, created_at, used_at FROM staff_passkeys WHERE user_id = ?'),
     eveningResults: rows(
       'SELECT day, placement, score, players, people FROM evening_results WHERE user_id = ? ORDER BY day',
     ),

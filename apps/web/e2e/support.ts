@@ -1,6 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
+import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
+import { serverDb } from '../playwright.config';
 
 export type { Page };
 export { expect };
@@ -124,6 +127,16 @@ export async function noteWhenShown(page: Page, text: RegExp) {
     expect
       .poll(() => page.evaluate((k) => (window as unknown as Record<string, boolean>)[k], key), { message, timeout })
       .toBe(true);
+}
+
+/** A moderator, made by the admin command line next to the tests' server (its database: playwright.config.ts). */
+export function makeModerator(username: string) {
+  const cli = spawnSync(
+    process.execPath,
+    [path.resolve(import.meta.dirname, '../../server/dist/cli.mjs'), 'admin', 'add', username],
+    { env: { ...process.env, DB_PATH: serverDb }, encoding: 'utf8' },
+  );
+  expect(cli.status, cli.stderr).toBe(0);
 }
 
 /** The lobby, ready to play: rendered, and the realtime connection is up (matches start over it). */

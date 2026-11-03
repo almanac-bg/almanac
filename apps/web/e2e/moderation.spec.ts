@@ -1,20 +1,7 @@
-import { spawnSync } from 'node:child_process';
-import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { codeAt, stepAt } from '../../server/src/totp';
 import { serverDb } from '../playwright.config';
-import { choose, expect, type Page, signIn, signUp, test, uniqueName } from './support';
-
-// The server the tests run against (playwright.config.ts): its database, and the admin command line next to it.
-const root = path.resolve(import.meta.dirname, '../../..');
-
-function makeModerator(username: string) {
-  const cli = spawnSync(process.execPath, [path.join(root, 'apps/server/dist/cli.mjs'), 'admin', 'add', username], {
-    env: { ...process.env, DB_PATH: serverDb },
-    encoding: 'utf8',
-  });
-  expect(cli.status, cli.stderr).toBe(0);
-}
+import { choose, expect, makeModerator, type Page, signIn, signUp, test, uniqueName } from './support';
 
 /** A moderator's authenticator app, set up from this page's session (as the admin page does it). */
 async function secondFactor(page: Page) {
@@ -55,9 +42,10 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   const other = await newPlayer();
   await signUp(other, player, 'parola-123');
 
-  // /admin opens with an authenticator app: its key on the page, then the code it shows.
+  // /admin opens with a second factor to set up; here an authenticator app (passkeys: passkeys.spec.ts): its key on the
+  // page, then the code it shows.
   await page.goto('/admin');
-  await page.getByRole('button', { name: 'Включи' }).click();
+  await page.getByRole('button', { name: 'С приложение за удостоверяване', exact: true }).click();
   // Focus goes where the next step is, never back to the page (A11Y-6): the code field, then the page's heading.
   await expect(page.getByLabel('Код от приложението')).toBeFocused();
   const key = (await page.locator('code').first().textContent())!.replace(/\s/g, '');

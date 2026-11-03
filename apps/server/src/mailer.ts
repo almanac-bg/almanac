@@ -278,7 +278,12 @@ export function decisionMail(
  * To a staff member, about their own /admin sign-in: a wrong code after the right password (someone may have the
  * password), the second factor stopped after too many, or a new sign-in. Each says what to do if it wasn't them.
  */
-export function staffSignInMail(to: string, username: string, what: 'wrong-code' | 'locked' | 'sign-in', at: number) {
+export function staffSignInMail(
+  to: string,
+  username: string,
+  what: 'wrong-code' | 'locked' | 'sign-in' | 'passkey' | 'passkey-added' | 'passkey-removed',
+  at: number,
+) {
   const when = longDateTime(at);
   const said = {
     'wrong-code': {
@@ -293,11 +298,23 @@ export function staffSignInMail(to: string, username: string, what: 'wrong-code'
       subject: `Влизане в модерацията на ${BRAND.name}`,
       intro: `На ${when} профилът ти „${username}“ влезе в /admin с паролата и кода от приложението.`,
     },
+    passkey: {
+      subject: `Влизане в модерацията на ${BRAND.name}`,
+      intro: `На ${when} профилът ти „${username}“ влезе в /admin с паролата и ключ за достъп.`,
+    },
+    'passkey-added': {
+      subject: `Нов ключ за достъп до модерацията на ${BRAND.name}`,
+      intro: `На ${when} към профила ти „${username}“ беше добавен ключ за достъп за влизане в /admin.`,
+    },
+    'passkey-removed': {
+      subject: `Премахнат ключ за достъп до модерацията на ${BRAND.name}`,
+      intro: `На ${when} от профила ти „${username}“ беше премахнат ключ за достъп за влизане в /admin.`,
+    },
   }[what];
   const advice =
-    what === 'sign-in'
-      ? 'Ако не си ти, смени паролата веднага и кажи на собственика да нулира двуфакторното влизане.'
-      : 'Ако не си ти, смени паролата веднага: някой я знае.';
+    what === 'wrong-code' || what === 'locked'
+      ? 'Ако не си ти, смени паролата веднага: някой я знае.'
+      : 'Ако не си ти, смени паролата веднага и кажи на собственика да нулира двуфакторното влизане.';
   return {
     kind: 'staff-sign-in',
     to,
