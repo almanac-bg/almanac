@@ -494,7 +494,14 @@ export function UnlocksCard({ rewards }: { rewards: MatchRewards }) {
   const colors = useColors();
   return (
     <Card>
-      <Heading title="Отключено" />
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <Heading title="Отключено" />
+        <Pressable accessibilityRole="link" onPress={() => router.push('/locker')} hitSlop={8}>
+          <T variant="small" tone="link" style={{ fontFamily: fonts.semibold }}>
+            Към колекцията →
+          </T>
+        </Pressable>
+      </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {rewards.unlocks.map((u) => {
           const { icon, name } = unlockPreview(u);

@@ -14,7 +14,7 @@ import {
   seasonTitle,
 } from '@almanac/shared';
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { fonts, radius, useColors } from '@/theme';
 import { Button, Card, Progress, T } from '@/ui';
 
@@ -221,10 +221,30 @@ export function CategoryBars({ categories }: { categories: ProfileStats['categor
 }
 
 /** The twelve latest achievements, in their rarity's colour. */
-export function LatestAchievements({ achievements }: { achievements: ProfileStats['achievements'] }) {
+export function LatestAchievements({
+  achievements,
+  isMe,
+}: {
+  achievements: ProfileStats['achievements'];
+  isMe: boolean;
+}) {
   return (
     <>
-      <Heading title="Последни постижения" />
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <Heading title="Последни постижения" />
+        {isMe && (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Всички постижения"
+            onPress={() => router.push('/achievements')}
+            hitSlop={8}
+          >
+            <T variant="small" tone="link" style={{ fontFamily: fonts.semibold }}>
+              Всички →
+            </T>
+          </Pressable>
+        )}
+      </View>
       {achievements.length === 0 ? (
         <Card style={{ alignItems: 'center' }}>
           <T style={{ fontSize: 34, lineHeight: 42 }}>🏆</T>

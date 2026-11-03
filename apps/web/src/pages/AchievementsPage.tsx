@@ -1,5 +1,13 @@
-import { api, availableAchievements, fmt, longDate, useOpenQueues } from '@almanac/client';
-import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@almanac/shared';
+import {
+  achievementHint,
+  achievementRewards,
+  api,
+  availableAchievements,
+  fmt,
+  longDate,
+  useOpenQueues,
+} from '@almanac/client';
+import { type AchievementProgress, RARITIES } from '@almanac/shared';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
@@ -12,16 +20,6 @@ import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 type Filter = 'all' | 'unlocked' | 'locked';
-
-/** Cosmetics an achievement unlocks, for the "награда" line. */
-function rewardsFor(id: string): string[] {
-  const out: string[] = [];
-  for (const a of AVATARS) if ('achievement' in a.req && a.req.achievement === id) out.push(`${a.emoji} аватар`);
-  for (const f of FRAMES) if ('achievement' in f.req && f.req.achievement === id) out.push(`рамка „${f.name}“`);
-  for (const t of TITLES) if ('achievement' in t.req && t.req.achievement === id) out.push(`титла „${t.name}“`);
-  for (const e of EMOTES) if ('achievement' in e.req && e.req.achievement === id) out.push(`${e.emoji} емоция`);
-  return out;
-}
 
 export function AchievementsPage() {
   usePageTitle('Постижения');
@@ -75,7 +73,7 @@ export function AchievementsPage() {
           const p = byId.get(a.id);
           const done = !!p?.unlockedAt;
           const rarity = RARITIES[a.rarity];
-          const extras = rewardsFor(a.id);
+          const extras = achievementRewards(a.id);
           return (
             <m.div
               key={a.id}
@@ -143,7 +141,7 @@ export function AchievementsPage() {
                       />
                     </>
                   ) : (
-                    <p className="text-xs text-fg-3">{hint(a.id)}</p>
+                    <p className="text-xs text-fg-3">{achievementHint(a.id)}</p>
                   )}
                 </div>
               </Card>
@@ -160,11 +158,4 @@ export function AchievementsPage() {
       </p>
     </div>
   );
-}
-
-/** Where an achievement without a count gets earned: most in a single match, a few over a season or a ladder. */
-function hint(id: string) {
-  if (id.startsWith('season_')) return 'Отключва се в края на сезона';
-  if (id.startsWith('rank_')) return 'Отключва се с рейтинга в класиран режим';
-  return 'Изпълни го в мач';
 }

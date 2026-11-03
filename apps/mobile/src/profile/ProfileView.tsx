@@ -118,7 +118,20 @@ function Profile({
                 Играеш като гост: запази профила в Настройки, за да не го загубиш.
               </T>
             )}
-            <Button title="Настройки" variant="secondary" onPress={() => router.push('/settings')} />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button
+                title="Промени визията"
+                variant="secondary"
+                onPress={() => router.push('/locker')}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Настройки"
+                variant="secondary"
+                onPress={() => router.push('/settings')}
+                style={{ flex: 1 }}
+              />
+            </View>
           </>
         ) : (
           <PlayerActions profile={data} guest={guest} onChange={onChange} />
@@ -162,7 +175,7 @@ function Profile({
       <Seasons seasons={data.seasons} />
       <Modes modes={data.modes} openQueues={openQueues} />
       <CategoryBars categories={data.categories} />
-      <LatestAchievements achievements={data.achievements} />
+      <LatestAchievements achievements={data.achievements} isMe={isMe} />
       <RecentMatches recent={data.recent} isMe={isMe} />
     </>
   );

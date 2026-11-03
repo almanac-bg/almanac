@@ -14,6 +14,23 @@ import {
   type UnlockRef,
 } from '@almanac/shared';
 
+/** What an achievement unlocks besides its XP, for its „награда“ line: „🦊 аватар“, „рамка „Неон““. */
+export function achievementRewards(id: string): string[] {
+  const out: string[] = [];
+  for (const a of AVATARS) if ('achievement' in a.req && a.req.achievement === id) out.push(`${a.emoji} аватар`);
+  for (const f of FRAMES) if ('achievement' in f.req && f.req.achievement === id) out.push(`рамка „${f.name}“`);
+  for (const t of TITLES) if ('achievement' in t.req && t.req.achievement === id) out.push(`титла „${t.name}“`);
+  for (const e of EMOTES) if ('achievement' in e.req && e.req.achievement === id) out.push(`${e.emoji} емоция`);
+  return out;
+}
+
+/** Where an achievement without a count gets earned: most in a single match, a few over a season or a ladder. */
+export function achievementHint(id: string) {
+  if (id.startsWith('season_')) return 'Отключва се в края на сезона';
+  if (id.startsWith('rank_')) return 'Отключва се с рейтинга в класиран режим';
+  return 'Изпълни го в мач';
+}
+
 /** An item's own name („Видра“), without its kind. */
 export function itemName(u: UnlockRef): string {
   const list = { avatar: AVATARS, frame: FRAMES, title: TITLES, emote: EMOTES }[u.kind] as {
