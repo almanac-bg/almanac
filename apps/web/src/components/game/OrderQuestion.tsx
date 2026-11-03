@@ -1,11 +1,10 @@
-import { actions, fmt, LETTERS, type LiveGame, orderValueText } from '@almanac/client';
+import { actions, fmt, keepTogether, LETTERS, type LiveGame, orderValueText } from '@almanac/client';
 import { type GamePlayer, ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Flame, Lock } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
 import { m } from '../../lib/motion';
-import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';

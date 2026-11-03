@@ -1,9 +1,9 @@
-import { DIFFICULTY_LABEL, inDropZone, LETTERS, type LiveGame, nextElimination } from '@almanac/client';
+import { DIFFICULTY_LABEL, inDropZone, keepTogether, LETTERS, type LiveGame, nextElimination } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
 import { Image } from 'expo-image';
 import { type ComponentRef, useEffect, useRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, type Text, View } from 'react-native';
-import { API_URL } from '@/lib/client';
+import { pictureUri } from '@/lib/images';
 import { radius, useColors } from '@/theme';
 import { T } from '@/ui';
 import { FactNote, PauseAfterAnswer, UntimedEnding } from './Hold';
@@ -11,16 +11,6 @@ import { NumberAnswer, NumberReveal, NumberSummary } from './NumberAnswer';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderAnswer';
 import { ActivePowerups, PowerupBar } from './Powerups';
 import { AnswerTile, Chip, CrowdNote, LockStatus, RevealSummary, TimerRing } from './parts';
-
-/** The largest picture in a srcSet ("/qimg/a-512.webp 512w, /qimg/a-1024.webp 1024w"): a phone's screen is dense. */
-function largest(srcSet: string, src: string): string {
-  const best = srcSet
-    .split(',')
-    .map((part) => part.trim().split(/\s+/))
-    .sort((a, b) => Number.parseInt(b[1] ?? '0', 10) - Number.parseInt(a[1] ?? '0', 10))[0]?.[0];
-  const path = best || src;
-  return path.startsWith('http') ? path : `${API_URL}${path}`;
-}
 
 /** A question on screen: the clock, the answers, your pick and how it went (the web's QuestionView). */
 export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boolean }) {
@@ -98,7 +88,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
       >
         {q.image && (
           <Image
-            source={{ uri: largest(q.image.srcSet, q.image.src) }}
+            source={{ uri: pictureUri(q.image) }}
             accessibilityLabel={q.image.alt}
             contentFit="contain"
             style={{ width: '100%', aspectRatio: q.image.w / q.image.h, maxHeight: 260, borderRadius: radius.md }}
@@ -112,7 +102,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
             accessibilityLabel={`Въпрос ${q.index + 1} от ${q.total}: ${q.image ? `Картина: ${q.image.alt}. ` : ''}${q.q} ${options}`}
             style={{ flex: 1, fontSize: 20, lineHeight: 28 }}
           >
-            {q.q}
+            {keepTogether(q.q)}
           </T>
           <TimerRing
             deadline={game.closesAt ?? game.deadline}

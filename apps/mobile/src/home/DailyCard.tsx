@@ -1,8 +1,7 @@
 import { actions, useStore } from '@almanac/client';
 import { MODES } from '@almanac/shared';
 import { useState } from 'react';
-import { Button, T } from '@/ui';
-import { Card } from './Card';
+import { Button, Card, T } from '@/ui';
 
 /** The day's ten: to play, or played (with the streak either way). One attempt until midnight. */
 export function DailyCard() {

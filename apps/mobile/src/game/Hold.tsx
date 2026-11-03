@@ -1,4 +1,4 @@
-import { actions, useNow } from '@almanac/client';
+import { actions, keepTogether, useNow } from '@almanac/client';
 import { HOLD } from '@almanac/shared';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
@@ -41,7 +41,7 @@ export function FactNote({ index, fact, waiting }: { index: number; fact: string
         <T variant="small" tone="gold" style={{ fontWeight: '700' }}>
           💡 Знаеше ли?{' '}
         </T>
-        {fact}
+        {keepTogether(fact)}
       </T>
       <HoldButton state={state} onHold={() => void hold()} holdLabel="Спри, за да прочета" />
       {state === 'holding' && <HoldEnding holdMs={waiting ? HOLD.untimedMs : HOLD.pauseMs} />}

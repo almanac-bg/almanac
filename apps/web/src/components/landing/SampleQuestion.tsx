@@ -1,9 +1,8 @@
-import { LETTERS, OPTION_COLORS } from '@almanac/client';
+import { keepTogether, LETTERS, OPTION_COLORS } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb, X } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
-import { keepTogether } from '../../lib/typography';
 import { Emoji } from '../Emoji';
 import { accentText } from '../game/answers';
 

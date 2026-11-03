@@ -13,7 +13,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { Choices } from '@/settings/parts';
 import { radius, useColors } from '@/theme';
-import { Button, Screen, T } from '@/ui';
+import { LoadError, Screen, T } from '@/ui';
 
 const GUEST_LINE = 'Класациите са за играчи с профил: запази прогреса си, за да влезеш в тях.';
 
@@ -75,10 +75,7 @@ export default function Leaderboard() {
         </T>
       )}
       {error && !data ? (
-        <View style={{ gap: 10 }}>
-          <T tone="bad">Класацията не се зареди: {error}</T>
-          <Button title="Опитай пак" variant="secondary" onPress={reload} />
-        </View>
+        <LoadError title="Класацията не се зареди" error={error} onRetry={reload} />
       ) : !data ? (
         <ActivityIndicator style={{ marginTop: 40 }} />
       ) : entries.length === 0 ? (

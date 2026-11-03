@@ -54,6 +54,7 @@
     "preset": "jest-expo",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1",
+      "^lucide-react-native/icons/(.*)$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/icons/$1.js",
       "^@almanac/client/realtime$": "<rootDir>/../../packages/client/src/realtime.ts",
       "^@almanac/(shared|client)$": "<rootDir>/../../packages/$1/src/index.ts",
       "^(react|zustand|socket\\.io-client)(/.*)?$": "<rootDir>/node_modules/$1$2"

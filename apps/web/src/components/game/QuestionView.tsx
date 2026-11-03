@@ -3,6 +3,7 @@ import {
   DIFFICULTY_LABEL,
   fmt,
   inDropZone,
+  keepTogether,
   LETTERS,
   type LiveGame,
   nextElimination,
@@ -20,7 +21,6 @@ import { useMatchKeysOn } from '../../lib/matchKeys';
 import { useMediaQuery } from '../../lib/media';
 import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
-import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
