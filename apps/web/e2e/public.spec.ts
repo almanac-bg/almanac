@@ -122,29 +122,41 @@ test.describe('with motion on', () => {
   // and a tap aimed at it — the browser tests' too — hit the line below it.
   test('the drawn landing doesn’t move as the app takes it over: a tap lands where it was aimed', async ({ page }) => {
     await page.addInitScript(() => {
-      const notes = window as unknown as { tops: number[]; takenOver: number };
-      notes.tops = [];
+      const notes = window as unknown as { seen: { top: number; at: number }[]; takenOver: number };
+      notes.seen = [];
       notes.takenOver = 0;
       const look = () => {
         const guest = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Играй като гост');
-        if (guest && document.fonts.status === 'loaded') notes.tops.push(guest.getBoundingClientRect().top);
-        if (!document.getElementById('root')?.hasAttribute('data-painted') && !notes.takenOver)
-          notes.takenOver = performance.now();
-        // On for 1.5 s after the takeover: the entrance it replayed took half a second.
-        if (!notes.takenOver || performance.now() - notes.takenOver < 1500) requestAnimationFrame(look);
+        const at = performance.now();
+        if (guest && document.fonts.status === 'loaded')
+          notes.seen.push({ top: guest.getBoundingClientRect().top, at });
+        if (!document.getElementById('root')?.hasAttribute('data-painted') && !notes.takenOver) notes.takenOver = at;
       };
-      requestAnimationFrame(look);
+      // Every frame, and on a timer beside it: a slow runner draws few frames (CI's WebKit: 4 in 1.5 s).
+      const frames = () => {
+        look();
+        if (!notes.takenOver || performance.now() - notes.takenOver < 1500) requestAnimationFrame(frames);
+      };
+      requestAnimationFrame(frames);
+      const timer = setInterval(() => {
+        look();
+        if (notes.takenOver && performance.now() - notes.takenOver >= 1500) clearInterval(timer);
+      }, 20);
     });
     await page.goto('/');
     const notes = () =>
       page.evaluate(() => {
-        const { tops, takenOver } = window as unknown as { tops: number[]; takenOver: number };
-        return { tops, takenOver };
+        const { seen, takenOver } = window as unknown as { seen: { top: number; at: number }[]; takenOver: number };
+        return { seen, takenOver };
       });
     await expect.poll(async () => (await notes()).takenOver, { timeout: 15_000 }).toBeGreaterThan(0);
     await page.waitForTimeout(1700);
-    const { tops } = await notes();
-    expect(tops.length, 'frames seen').toBeGreaterThan(10);
+    const { seen, takenOver } = await notes();
+    // Looked at through the takeover and a second past it (the entrance it replayed took half a second).
+    const after = seen.filter((s) => s.at >= takenOver);
+    expect(after.length, 'looks after the takeover').toBeGreaterThanOrEqual(3);
+    expect(after.at(-1)!.at - takenOver, 'how long it was watched after the takeover').toBeGreaterThanOrEqual(1000);
+    const tops = seen.map((s) => s.top);
     expect(
       Math.max(...tops) - Math.min(...tops),
       `the guest button moved: ${[...new Set(tops.map(Math.round))].join(', ')}`,
