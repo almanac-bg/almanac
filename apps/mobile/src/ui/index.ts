@@ -1,6 +1,7 @@
 export { Button } from './Button';
 export { Card } from './Card';
 export { Field } from './Field';
+export { useHeader } from './header';
 export { LoadError } from './LoadError';
 export { Progress } from './Progress';
 export { COLUMN, Screen, usePagePadding } from './Screen';

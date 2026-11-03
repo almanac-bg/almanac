@@ -8,8 +8,9 @@ import {
   rankFor,
   TIME_ZONE,
 } from '@almanac/shared';
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { Choices } from '@/settings/parts';
 import { radius, useColors } from '@/theme';
@@ -126,10 +127,16 @@ function Row({ entry: e, board, mine }: { entry: LeaderboardEntry; board: Leader
         ? `${fmt(e.value)} т.${e.correct !== undefined ? ` · ${e.correct}/10` : ''}`
         : `${rankFor(e.value).name} · ${e.value}`;
   return (
-    <View
-      accessible
+    <Pressable
+      accessibilityRole="button"
       accessibilityLabel={`${e.rank}. ${mine ? 'Ти' : e.user.username}: ${value}`}
-      style={{
+      accessibilityHint="Отваря профила"
+      onPress={() =>
+        mine
+          ? router.navigate('/profile')
+          : router.push({ pathname: '/profile/[username]', params: { username: e.user.username } })
+      }
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
@@ -137,8 +144,8 @@ function Row({ entry: e, board, mine }: { entry: LeaderboardEntry; board: Leader
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: mine ? colors.violet : colors.line,
-        backgroundColor: mine ? `${colors.violet}18` : colors.ink2,
-      }}
+        backgroundColor: pressed ? colors.lineStrong : mine ? `${colors.violet}18` : colors.ink2,
+      })}
     >
       <T variant="title" style={{ minWidth: 32, textAlign: 'center' }}>
         {MEDALS[e.rank - 1] ?? e.rank}
@@ -150,6 +157,6 @@ function Row({ entry: e, board, mine }: { entry: LeaderboardEntry; board: Leader
       <T variant="small" tone="fg2" style={{ fontVariant: ['tabular-nums'] }}>
         {value}
       </T>
-    </View>
+    </Pressable>
   );
 }

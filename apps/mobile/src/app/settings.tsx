@@ -39,10 +39,8 @@ export default function Settings() {
   // Signed out (or deleted) a moment before the router takes this screen away.
   if (!me) return null;
   return (
+    // The title is in the header (app/_layout), with the way back.
     <Screen>
-      <T variant="h1" role="heading">
-        Настройки
-      </T>
       {me.isGuest && (
         <Section title="Запази профила">
           <SaveAccount />
