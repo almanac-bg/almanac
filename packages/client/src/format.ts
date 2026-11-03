@@ -48,6 +48,10 @@ export function timeAgo(ts: number): string {
 /** Bulgarian has one form for 1 and another for everything else. */
 export const plural = (n: number, one: string, many: string) => `${fmt(n)} ${n === 1 ? one : many}`;
 
+/** Two players' duels so far, you first: "3 : 2" (and the draws, if any). */
+export const recordLine = (r: { wins: number; losses: number; draws: number }) =>
+  `${r.wins} : ${r.losses}${r.draws ? ` · ${r.draws} равни` : ''}`;
+
 export { ordinal } from '@almanac/shared';
 
 export const DIFFICULTY_LABEL = { easy: 'Лесен', medium: 'Среден', hard: 'Труден' } as const;

@@ -17,6 +17,7 @@ import { QueueOverlay } from '@/home/QueueOverlay';
 import { restore, useApp } from '@/lib/client';
 import { useRealtime } from '@/lib/realtime';
 import { useColors } from '@/theme';
+import { useHeader } from '@/ui';
 
 // The splash stays until the fonts are in and the app knows whether someone is signed in: no flash of the way in for a
 // player who is.
@@ -24,6 +25,7 @@ void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colors = useColors();
+  const header = useHeader();
   const [fontsIn, fontError] = useFonts({
     Onest_400Regular,
     Onest_500Medium,
@@ -61,7 +63,8 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
                 <Stack.Screen name="game" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="settings" />
+                <Stack.Screen name="settings" options={{ ...header, title: 'Настройки' }} />
+                <Stack.Screen name="profile/[username]" options={header} />
               </Stack.Protected>
               <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="welcome" />

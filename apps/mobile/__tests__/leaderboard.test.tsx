@@ -1,6 +1,7 @@
 // Класации: the boards load as they're picked, the top three get their medals, and you're there even off the list.
 import { api, setState } from '@almanac/client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Leaderboard from '@/app/(tabs)/leaderboard';
 
@@ -10,6 +11,7 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(async () => {}),
   deleteItemAsync: jest.fn(async () => {}),
 }));
+jest.mock('expo-router', () => ({ router: { push: jest.fn(), navigate: jest.fn() } }));
 
 const user = (id: number, username: string) => ({ id, username, avatar: 'fox', frame: 'classic' });
 const me = { ...user(7, 'Ана'), isGuest: false, createdAt: 0, daily: { day: '2026-11-03', played: true, streak: 2 } };
@@ -42,6 +44,9 @@ test('the level board: the leaders with their medals, and you below them with yo
   await waitFor(() => expect(screen.getByLabelText('1. Иван: 90 000 XP')).toBeTruthy());
   expect(screen.getByText('🥇')).toBeTruthy();
   expect(screen.getByLabelText('41. Ти: 12 000 XP')).toBeTruthy();
+  // A row opens the player's profile.
+  await fireEvent.press(screen.getByLabelText('1. Иван: 90 000 XP'));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/profile/[username]', params: { username: 'Иван' } });
 });
 
 test('picking the day’s board loads it, with how many were right', async () => {

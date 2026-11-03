@@ -1,8 +1,9 @@
-import { actions, api, errorMessage, PRESENCE, timeAgo, useStore } from '@almanac/client';
+import { api, errorMessage, PRESENCE, timeAgo, useStore } from '@almanac/client';
 import { avatarEmoji, type FriendEntry, type FriendsResponse } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { DuelButton } from '@/components/DuelButton';
 import { useLoad } from '@/lib/load';
 import { Section } from '@/settings/parts';
 import { radius, useColors } from '@/theme';
@@ -185,7 +186,19 @@ function Person({ entry, hint }: { entry: FriendEntry; hint: string }) {
   const colors = useColors();
   const p = PRESENCE[entry.presence];
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${entry.user.username}, ${hint}`}
+      accessibilityHint="Отваря профила"
+      onPress={() => router.push({ pathname: '/profile/[username]', params: { username: entry.user.username } })}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        borderRadius: radius.sm,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
       <View>
         <T style={{ fontSize: 30, lineHeight: 36, opacity: entry.presence === 'offline' ? 0.5 : 1 }}>
           {avatarEmoji(entry.user.avatar)}
@@ -212,20 +225,12 @@ function Person({ entry, hint }: { entry: FriendEntry; hint: string }) {
           {hint}
         </T>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => void }) {
   const colors = useColors();
-  const inGame = useStore((s) => !!s.game && s.game.phase !== 'ended');
-  const [busy, setBusy] = useState(false);
-  const duel = async () => {
-    setBusy(true);
-    const res = await actions.startDuel(entry.user.id);
-    setBusy(false);
-    if (!res.ok) Alert.alert('Дуелът не започна', res.error);
-  };
   return (
     <View
       accessible={false}
@@ -233,14 +238,7 @@ function FriendRow({ entry, onRemove }: { entry: FriendEntry; onRemove: () => vo
     >
       <Person entry={entry} hint={PRESENCE[entry.presence].label} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button
-          title="⚔️ Дуел"
-          hint="Изиграваш въпросите сега, а приятелят ти — до един ден"
-          loading={busy}
-          disabled={inGame}
-          onPress={() => void duel()}
-          style={{ flex: 1 }}
-        />
+        <DuelButton friendId={entry.user.id} style={{ flex: 1 }} />
         <Button title="Премахни" variant="ghost" onPress={onRemove} style={{ flex: 1 }} />
       </View>
     </View>

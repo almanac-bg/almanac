@@ -7,6 +7,7 @@ import {
   ordinal,
   pct,
   plural,
+  recordLine,
   seconds,
   timeAgo,
   toast,
@@ -33,7 +34,7 @@ import { ArrowRight, Ban, Check, Flag, UserPlus } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
-import { DuelButton, recordLine } from '../components/duels';
+import { DuelButton } from '../components/duels';
 import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
 import { accentText } from '../components/game/answers';

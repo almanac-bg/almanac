@@ -1,9 +1,8 @@
-import { actions, api, fmt, toast, useNow, useStore } from '@almanac/client';
+import { actions, api, fmt, recordLine, toast, useNow, useStore } from '@almanac/client';
 import {
   CATEGORIES,
   type CategoryId,
   type DuelEntry,
-  type DuelRecord,
   type DuelStanding,
   MODES,
   type PublicUser,
@@ -26,11 +25,6 @@ export function timeLeft(expiresAt: number, now: number): string {
   const hours = Math.floor(ms / 3_600_000);
   const [n, unit] = hours >= 1 ? [hours, 'ч.'] : [Math.max(1, Math.ceil(ms / 60_000)), 'мин.'];
   return `${n === 1 ? 'остава' : 'остават'} ${n} ${unit}`;
-}
-
-/** The two of them so far, you first: "3 : 2" (and the draws, if any). */
-export function recordLine(record: DuelRecord): string {
-  return `${record.wins} : ${record.losses}${record.draws ? ` · ${record.draws} равни` : ''}`;
 }
 
 /** Your friend duels, reloaded when news comes in (a friend played, a note arrived). */
