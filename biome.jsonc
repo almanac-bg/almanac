@@ -7,6 +7,9 @@
     "includes": [
       "**",
       "!**/package-lock.json",
+      // Written by release-please as it is (.github/workflows/release.yml): its release pull request runs no CI, so a
+      // formatter's opinion on it would fail main's run after the release (v1.2.0).
+      "!CHANGELOG.md",
       // The question banks keep one question per line (easy to review and to diff).
       "!apps/server/src/data/*.json",
       "!apps/web/public",
