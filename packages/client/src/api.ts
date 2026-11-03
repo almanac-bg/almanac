@@ -196,6 +196,13 @@ export const api = {
   pushSubscribe: (subscription: PushSubscriptionJSON) =>
     request<{ user: MeUser }>('POST', '/push/subscribe', subscription),
   pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/push/unsubscribe', { endpoint }),
+  /**
+   * An app's device gets pushes: the token Apple's or Google's service gave it (`sandbox`: an iOS build for
+   * development). Which service is the app's own, from ClientConfig.client.
+   */
+  registerPushDevice: (token: string, sandbox = false) =>
+    request<{ user: MeUser }>('POST', '/push/devices', { token, sandbox }),
+  forgetPushDevice: (token: string) => request<{ ok: true }>('DELETE', `/push/devices/${encodeURIComponent(token)}`),
   setPushPrefs: (prefs: PushPrefs) => request<{ user: MeUser }>('POST', '/push/prefs', prefs),
   blocked: () => request<{ players: PublicUser[] }>('GET', '/blocks'),
   block: (userId: number) => request<{ players: PublicUser[] }>('POST', `/blocks/${userId}`),

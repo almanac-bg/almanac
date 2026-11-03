@@ -252,6 +252,8 @@ export function exportAccount(userId: number) {
     reportsFiled: rows('SELECT * FROM reports WHERE reporter_id = ?'),
     reportsAboutYou: rows('SELECT reason, status, action, created_at, resolved_at FROM reports WHERE target_id = ?'),
     pushDevices: rows('SELECT created_at FROM push_subscriptions WHERE user_id = ?'),
+    // An app's device: which app, and its token (the address Apple's or Google's service knows it by).
+    appDevices: rows('SELECT platform, token, created_at FROM push_devices WHERE user_id = ?'),
     blocked: rows(
       'SELECT u.username, b.created_at FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ?',
     ),
