@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { UpdateScreen } from '@/components/UpdateScreen';
+import { QueueOverlay } from '@/home/QueueOverlay';
 import { restore, useApp } from '@/lib/client';
 import { useRealtime } from '@/lib/realtime';
 import { useColors } from '@/theme';
@@ -32,6 +33,7 @@ export default function RootLayout() {
     Unbounded_800ExtraBold,
   });
   const authChecked = useStore((s) => s.authChecked);
+  const signedIn = useStore((s) => !!s.me);
   const updateRequired = useApp((s) => s.updateRequired);
   const ready = (fontsIn || !!fontError) && authChecked;
   useRealtime();
@@ -51,10 +53,23 @@ export default function RootLayout() {
         {updateRequired ? (
           <UpdateScreen />
         ) : (
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }}>
-            {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
-            <Stack.Screen name="game" options={{ gestureEnabled: false }} />
-          </Stack>
+          <>
+            {/* Signed in, the tabs and the match; signed out, the way in. The router moves between them as the session
+                comes and goes (a sign-in, a sign-out, a session the server ended). */}
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }}>
+              <Stack.Protected guard={signedIn}>
+                <Stack.Screen name="(tabs)" />
+                {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
+                <Stack.Screen name="game" options={{ gestureEnabled: false }} />
+              </Stack.Protected>
+              <Stack.Protected guard={!signedIn}>
+                <Stack.Screen name="welcome" />
+                <Stack.Screen name="sign-in" />
+                <Stack.Screen name="sign-up" />
+              </Stack.Protected>
+            </Stack>
+            {signedIn && <QueueOverlay />}
+          </>
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

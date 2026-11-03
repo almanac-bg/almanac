@@ -1,5 +1,6 @@
 import {
   api,
+  availableAchievements,
   errorMessage,
   fmt,
   longDate,
@@ -9,6 +10,7 @@ import {
   seconds,
   timeAgo,
   toast,
+  useOpenQueues,
   useStore,
 } from '@almanac/client';
 import {
@@ -35,7 +37,6 @@ import { DuelButton, recordLine } from '../components/duels';
 import { Emoji } from '../components/Emoji';
 import { FitName } from '../components/FitName';
 import { accentText } from '../components/game/answers';
-import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { ReportReasons } from '../components/ReportReasons';
 import { Button, buttonClass, Card, EmptyState, Modal, PageSpinner, ProgressBar, SectionTitle } from '../components/ui';

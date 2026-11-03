@@ -1,11 +1,10 @@
-import { api, fmt, longDate } from '@almanac/client';
+import { api, availableAchievements, fmt, longDate, useOpenQueues } from '@almanac/client';
 import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@almanac/shared';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Emoji } from '../components/Emoji';
 import { accentText } from '../components/game/answers';
-import { availableAchievements, useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Card, PageSpinner, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';

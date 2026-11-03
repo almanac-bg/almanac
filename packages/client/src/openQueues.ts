@@ -1,6 +1,6 @@
-import { useStore } from '@almanac/client';
 import { ACHIEVEMENTS, DEFAULT_OPEN_QUEUES, QUEUE_MODES, type QueueModeId } from '@almanac/shared';
 import { useMemo } from 'react';
+import { useStore } from './store';
 
 /**
  * The ranked queues the server has open, in the usual order — the defaults until the first lobby stats arrive.

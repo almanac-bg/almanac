@@ -1,6 +1,6 @@
 // The shared client as the app runs it (src/lib/client.ts): the session from the keychain goes out as a Bearer token on
 // /api and in the socket's auth, a sign-in's session is kept, and signing out takes the token (not the device mark).
-import { clientConfig, setState } from '@almanac/client';
+import { clientConfig, getState, setState } from '@almanac/client';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -28,7 +28,7 @@ globalThis.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) 
 
 // After the mocks: the module configures the client when it loads.
 const { restore, signedIn } = require('@/lib/client') as typeof import('@/lib/client');
-const Index = (require('@/app/index') as typeof import('@/app/index')).default;
+const Welcome = (require('@/app/welcome') as typeof import('@/app/welcome')).default;
 
 beforeEach(() => setState({ me: null, authChecked: true }));
 
@@ -52,9 +52,10 @@ test('the app says what it is on every request: its platform, protocol and build
 });
 
 test('a guest’s way in: the session comes in the answer, is kept on the phone, and goes out as Bearer', async () => {
-  await renderScreen(<Index />);
+  await renderScreen(<Welcome />);
   await fireEvent.press(screen.getByRole('button', { name: 'Играй като гост' }));
-  await waitFor(() => expect(screen.getByText('Гост_1234567')).toBeTruthy());
+  // Signed in: the player is in the store, and the router takes them to the tabs (_layout.tsx).
+  await waitFor(() => expect(getState().me?.username).toBe('Гост_1234567'));
   expect(sent.at(-1)?.url).toMatch(/\/api\/auth\/guest$/);
   expect(SecureStore.setItemAsync).toHaveBeenCalled();
   const token = 'app-token-'.padEnd(43, 'x');
@@ -79,7 +80,7 @@ test('signed out, the token leaves the phone: no Bearer goes out after', async (
 });
 
 test('the way in says what playing accepts, and links the terms and the policy', async () => {
-  await renderScreen(<Index />);
+  await renderScreen(<Welcome />);
   expect(screen.getByRole('link', { name: 'Условията за ползване' })).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Политиката за поверителност' })).toBeTruthy();
   expect(screen.getByText(/под 14/)).toBeTruthy();
