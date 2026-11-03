@@ -1,5 +1,5 @@
-import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from '@almanac/client';
-import { categoryById, EVENING, isQueueMode, MODES, REVIEW, TEAMS } from '@almanac/shared';
+import { actions, fmt, getState, type LiveGame, matchOutcome, toast, useStore } from '@almanac/client';
+import { categoryById, EVENING, isQueueMode, MODES, TEAMS } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -44,47 +44,36 @@ export function Results({ game }: { game: LiveGame }) {
   const roomGuest = useStore((s) => !!s.me?.roomGuest);
   const me = useStore((s) => s.me);
   const [busy, setBusy] = useState(false);
-  const youId = game.start.youId;
-  const mine = end.standings.find((s) => s.id === youId)!;
-  const solo = end.mode === 'solo';
-  const daily = end.mode === 'daily';
-  const challenge = end.mode === 'challenge';
-  const review = end.mode === 'review';
-  // More missed questions back already: another „Поправителен“; else „Моите знания“, where they went.
-  const moreReview = review && (me?.knowledge.due ?? 0) >= REVIEW.min;
-  const single = game.start.players.length === 1;
-  const teamScores = end.teamScores;
-  const winningTeam = teamScores?.[0].team ?? null;
-  const rewards = end.rewards;
-  // A pupil in a class, as a guest only for the room: the account and all it earned go within the hour of leaving, so
-  // nothing is celebrated as theirs — no level, no new avatar, no achievements (the 31 October review, UX-2). The
-  // podium, their place, the review of the questions and a line on what happens to it stay.
-  const classPupil = roomGuest && !!end.roomCode;
+  // How it went, as the app says it too (packages/client → matchOutcome).
+  const {
+    mine,
+    solo,
+    daily,
+    challenge,
+    review,
+    moreReview,
+    single,
+    teamScores,
+    winningTeam,
+    rewards,
+    classPupil,
+    link,
+    duel,
+    won,
+    byWalkout,
+    rivals,
+    lost,
+    quiet,
+    best,
+    newBest,
+    unrated,
+    fanfare,
+    headline,
+    againIsHome,
+  } = matchOutcome(game, { roomGuest, reviewDue: me?.knowledge.due ?? 0 });
   // A new level or a new avatar or frame: one beat at a time before the page (RewardMoment).
   const [steps] = useState(() => rewardSteps(end.noContest || classPupil ? null : rewards));
   const [moment, setMoment] = useState(steps.length > 0);
-  // A challenge link is played alone, but it has a board: first place over others is a win too. A friend duel is won
-  // once the friend has played it too.
-  const link = rewards?.challenge ?? null;
-  const duel = link?.duel ?? null;
-  const won =
-    (!single && mine.placement === 1 && !end.noContest) ||
-    (!!link && !duel && link.rank === 1 && link.total > 1) ||
-    duel?.outcome === 'won';
-  // Everyone else walked out (after the match got going, or it would be no contest). A link is played alone: its win
-  // is a place on the board, never a walkout.
-  const byWalkout = won && !single && !teamScores && end.standings.every((s) => s.id === youId || s.left);
-  const rivals = end.standings.length > 2 ? 'Съперниците напуснаха' : 'Съперникът напусна';
-  const perfect = mine.correct === game.start.totalQuestions;
-  // Beaten on a link's board (or by the friend, in a duel): played alone, but lost all the same.
-  const lostLink = !!link && (duel ? duel.outcome === 'lost' : link.rank > 1);
-  // Lost to other people, or under half right alone: no fanfare (a level gained along the way still says so, quietly).
-  const lost = (!single && !won && !end.noContest) || lostLink;
-  const quiet = lost || (single && mine.correct * 2 < game.start.totalQuestions);
-  const best = rewards?.soloBest ?? null;
-  const newBest = best !== null && best > 0 && mine.score > best;
-  // A no contest says so in the headline; the other reasons a rating stayed put get a card.
-  const unrated = rewards?.unrated && rewards.unrated !== 'no_contest' ? rewards.unrated : null;
   // A no contest has no podium to show, and nothing to award unless a question or two were answered.
   const rewardsCard = !classPupil && (!end.noContest || (!!rewards && rewards.xpGained > 0));
   const sideCards =
@@ -123,7 +112,6 @@ export function Results({ game }: { game: LiveGame }) {
 
   // The end of a match has one order to its sounds: this sting first, then the reward dialog's (RewardMoment, `after`),
   // then the achievements card's once the dialog is gone — and one burst of confetti.
-  const fanfare = won || (single && perfect && !lostLink) || newBest;
   const sting = fanfare || !single;
   useEffect(() => {
     if (fanfare) {
@@ -209,38 +197,6 @@ export function Results({ game }: { game: LiveGame }) {
   const linkBoard = (id: string) => navigate(`/c/${id}`);
 
   const category = categoryById(game.start.category);
-  const headline = end.noContest
-    ? rivals
-    : daily
-      ? perfect
-        ? 'Перфектен ден!'
-        : 'Денят е изигран'
-      : duel
-        ? duel.outcome
-          ? { won: 'Победа!', lost: 'Загуба', draw: 'Равенство' }[duel.outcome]
-          : 'Ходът ти е изигран'
-        : link
-          ? link.total <= 1
-            ? mine.score > 0
-              ? 'Летвата е поставена!'
-              : 'Линкът е готов'
-            : link.rank === 1
-              ? 'Първо място!'
-              : `${ordinal(link.rank)} място`
-          : single
-            ? perfect
-              ? 'Перфектно!'
-              : 'Готово!'
-            : teamScores
-              ? won
-                ? 'Победа!'
-                : 'Загуба'
-              : won
-                ? 'Победа!'
-                : // Second of two is a loss, and says so (the rating below says it anyway).
-                  end.standings.length === 2
-                  ? 'Загуба'
-                  : `${ordinal(mine.placement)} място`;
   // A long word ("Перфектно!", "поставена!") is wider than a small phone at the usual size: such headlines scale with
   // the screen instead (10vw always leaves room for ten letters).
   const longWord = headline.split(' ').some((w) => w.length > 7);
@@ -506,7 +462,7 @@ export function Results({ game }: { game: LiveGame }) {
                 <>
                   <BookOpen className="size-5" /> Моите знания
                 </>
-              ) : (MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening' ? (
+              ) : againIsHome ? (
                 <>
                   <Home className="size-5" /> Към началото
                 </>
@@ -535,14 +491,7 @@ export function Results({ game }: { game: LiveGame }) {
               evening Роял (their "again" is the home screen). */}
           {!(challenge && guest) &&
             !(duel && !duel.outcome && !duel.expired) &&
-            !(
-              !daily &&
-              !duel &&
-              !challenge &&
-              end.mode !== 'custom' &&
-              !(review && !moreReview) &&
-              ((MODES[end.mode].teams && !end.roomCode) || end.mode === 'evening')
-            ) && (
+            !(!daily && !duel && !challenge && end.mode !== 'custom' && !(review && !moreReview) && againIsHome) && (
               <Button size="lg" variant="secondary" className="max-sm:w-14 max-sm:px-0" onClick={home}>
                 <Home className="size-5" />
                 <span className="max-sm:sr-only">{daily ? 'Към началото' : 'Начало'}</span>
