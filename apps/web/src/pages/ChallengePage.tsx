@@ -2,7 +2,6 @@ import { actions, api, fmt, plural, seconds, timeAgo, toast, useNow, useStore } 
 import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, ordinal, titleName } from '@almanac/shared';
 import clsx from 'clsx';
 import { Clock, Gamepad2, Plus, RotateCcw, Save, Share2, Swords } from 'lucide-react';
-import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -14,6 +13,7 @@ import { LoadError } from '../components/LoadError';
 import { MoreTimeNote } from '../components/MoreTimeNote';
 import { Button, Card, EmptyState, Pill, SectionTitle, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 

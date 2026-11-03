@@ -22,7 +22,6 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lock } from 'lucide-react';
-import { m } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Avatar, LevelBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
@@ -32,6 +31,7 @@ import { itemName, LevelChoice } from '../components/LevelChoice';
 import { Card, Modal, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';

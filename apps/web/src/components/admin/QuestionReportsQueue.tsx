@@ -18,9 +18,10 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, EyeOff, Flag, Lightbulb, Pencil, RefreshCw, RotateCcw, Wrench } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
+import { m } from '../../lib/motion';
 import { Emoji } from '../Emoji';
 import { LETTERS } from '../game/answers';
 import { RightOrderList } from '../game/OrderQuestion';

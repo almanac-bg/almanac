@@ -2,10 +2,11 @@ import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '
 import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type QuestionPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
-import { AnimatePresence, m, useReducedMotion } from 'motion/react';
+import { AnimatePresence, useReducedMotion } from 'motion/react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
 import { useMediaQuery } from '../../lib/media';
+import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
 import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';

@@ -1,8 +1,9 @@
 import { dismissToast, type Toast, useStore } from '@almanac/client';
 import clsx from 'clsx';
 import { AlertTriangle, Info, Sparkles, X } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef } from 'react';
+import { m } from '../lib/motion';
 import { Emoji } from './Emoji';
 
 /** How far a toast has to be swiped to go. */

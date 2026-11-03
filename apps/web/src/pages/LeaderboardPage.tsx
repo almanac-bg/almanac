@@ -10,7 +10,6 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { CalendarDays, Share2, Trophy, Users } from 'lucide-react';
-import { m } from 'motion/react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
@@ -21,6 +20,7 @@ import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
 import { useMediaQuery } from '../lib/media';
+import { m } from '../lib/motion';
 import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 

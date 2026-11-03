@@ -1,6 +1,7 @@
 import { type LiveGame, plural } from '@almanac/client';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';

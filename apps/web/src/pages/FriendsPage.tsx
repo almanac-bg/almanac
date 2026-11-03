@@ -2,7 +2,7 @@ import { actions, api, errorMessage, timeAgo, toast, useStore } from '@almanac/c
 import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -16,6 +16,7 @@ import { LoadError } from '../components/LoadError';
 import { PRESENCE } from '../components/presence';
 import { Button, Card, EmptyState, Modal, PageSpinner, SectionTitle } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { shareText } from '../lib/share';
 import { usePageTitle } from '../lib/title';
 

@@ -2,7 +2,7 @@ import { actions, type LiveGame, useStore } from '@almanac/client';
 import { MODES, type PowerupId } from '@almanac/shared';
 import clsx from 'clsx';
 import { DoorOpen } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { Emoji } from '../components/Emoji';
@@ -20,6 +20,7 @@ import { TopBar } from '../components/game/TopBar';
 import { Button, Modal, Restoring } from '../components/ui';
 import { matchKeysOn } from '../lib/matchKeys';
 import { useMediaQuery } from '../lib/media';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 import { Results } from './Results';
 

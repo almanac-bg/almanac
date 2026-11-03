@@ -2,7 +2,7 @@ import { api, errorMessage, plural, timeAgo, toast, useStore } from '@almanac/cl
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { GuestNudge } from '../components/ClaimAccount';
@@ -21,6 +21,7 @@ import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { Button, Card, EmptyState, Modal, ProgressBar, SectionTitle, Spinner } from '../components/ui';
 import { keepDraft, loadDraft } from '../lib/drafts';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 export function SubmitPage() {

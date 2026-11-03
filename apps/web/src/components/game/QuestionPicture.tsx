@@ -1,7 +1,7 @@
 import type { ImageCredit, QuestionImage } from '@almanac/shared';
 import clsx from 'clsx';
-import { m } from 'motion/react';
 import { useState } from 'react';
+import { m } from '../../lib/motion';
 import { PICTURE_SIZES } from './pictureSizes';
 
 const LICENSES: Record<string, string> = { PD: 'обществено достояние' };

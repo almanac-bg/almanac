@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import {
   type ButtonHTMLAttributes,
   type ReactNode,
@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { m } from '../lib/motion';
 import { Emoji } from './Emoji';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'accent';

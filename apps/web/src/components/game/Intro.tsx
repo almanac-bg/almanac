@@ -12,9 +12,10 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { Skull, Timer } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../../lib/media';
+import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, machineTag, RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';

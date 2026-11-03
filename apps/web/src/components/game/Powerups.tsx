@@ -1,9 +1,10 @@
 import { actions, type LiveGame } from '@almanac/client';
 import { POWERUPS, type PowerupDef, type PowerupId } from '@almanac/shared';
 import clsx from 'clsx';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
+import { m } from '../../lib/motion';
 import { Emoji } from '../Emoji';
 
 /**

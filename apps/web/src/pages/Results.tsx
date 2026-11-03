@@ -2,7 +2,6 @@ import { actions, fmt, getState, type LiveGame, ordinal, toast, useStore } from 
 import { categoryById, EVENING, isQueueMode, MODES, REVIEW, TEAMS } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, BookOpen, ChartColumn, Home, RotateCcw, Share2, Skull, Swords } from 'lucide-react';
-import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { BottomBar } from '../components/BottomBar';
@@ -30,6 +29,7 @@ import {
 import { RewardMoment, rewardSteps } from '../components/results/RewardMoment';
 import { ChallengeStanding, Podium, TeamResult } from '../components/results/Standings';
 import { Button, Card, Spinner } from '../components/ui';
+import { m } from '../lib/motion';
 import { matchShareText, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 

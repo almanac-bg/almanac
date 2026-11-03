@@ -1,5 +1,6 @@
 import { useStore } from '@almanac/client';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
+import { m } from '../lib/motion';
 import { Emoji } from './Emoji';
 
 /** While the server restarts for an update: running matches finish, new ones wait a minute or two. */

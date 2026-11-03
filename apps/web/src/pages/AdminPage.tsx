@@ -7,7 +7,7 @@ import {
   type SubmissionStatus,
 } from '@almanac/shared';
 import { Check, Pencil, ShieldCheck, Undo2, X } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge } from '../components/Avatar';
@@ -32,6 +32,7 @@ import { QuestionPreview } from '../components/questions/QuestionPreview';
 import { SecondFactorGate } from '../components/SecondFactor';
 import { Button, Card, EmptyState, PageSpinner, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 type Section = 'questions' | 'flags' | 'reports' | 'players' | 'log' | 'play' | 'stats';
