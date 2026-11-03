@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import type { IncomingHttpHeaders } from 'node:http';
 import { availableParallelism } from 'node:os';
 import { promisify } from 'node:util';
+import { type AppSession, CLIENT_HEADER, DEVICE_HEADER, parseClient } from '@almanac/shared';
 import { parseCookie, stringifySetCookie } from 'cookie';
 import type { NextFunction, Request, Response } from 'express';
 import { config } from './config';
@@ -179,6 +181,46 @@ export function sessionTokenFromCookieHeader(header: string | undefined): string
   return header ? (parseCookie(header)[SESSION_COOKIE] ?? null) : null;
 }
 
+/** An app's session, as it sends it: `Authorization: Bearer <token>` (the tokens createSession makes). */
+const bearerToken = (headers: IncomingHttpHeaders) =>
+  /^Bearer ([\w-]{20,100})$/.exec(headers.authorization ?? '')?.[1] ?? null;
+
+/**
+ * The session a request carries: an app's in `Authorization: Bearer` (an app keeps no cookies), the web's in its cookie.
+ * The one way every route reads it, so none reads the cookie alone and misses the app (the 31 October review,
+ * MOBILE-5). A browser never sends the header by itself, and no other site may make it (no CORS here).
+ */
+export function sessionTokenOf(req: { headers: IncomingHttpHeaders }): string | null {
+  return bearerToken(req.headers) ?? sessionTokenFromCookieHeader(req.headers.cookie);
+}
+
+/**
+ * An app, not a web page: it says so (CLIENT_HEADER), and comes without either of the headers every browser adds to
+ * a request and no page can take off (Origin, Sec-Fetch-Site). Only an app is handed a new session in the answer; a
+ * page — or a script slipped into one — only ever gets it as the httpOnly cookie, out of its reach.
+ */
+export function fromApp(req: Request): boolean {
+  const client = parseClient(req.headers[CLIENT_HEADER])?.client;
+  return (client === 'ios' || client === 'android') && !req.get('origin') && !req.get('sec-fetch-site');
+}
+
+/**
+ * Signs the client in on a new session: the web gets it as its cookie (and, with `device`, this device's mark for the
+ * sign-in allowance: knownDevice), an app in the answer, to keep and send back. Returns what goes into the answer.
+ */
+export function issueSession(
+  req: Request,
+  res: Response,
+  userId: number,
+  { withPassword = true, device = true } = {},
+): { session?: AppSession } {
+  const token = createSession(userId, withPassword);
+  if (fromApp(req)) return { session: { token, ...(device && { device: deviceMark(userId) }) } };
+  setSessionCookie(res, token);
+  if (device) setDeviceCookie(res, userId);
+  return {};
+}
+
 /**
  * The user behind a session token. Expired sessions are deleted; a banned player's sessions don't work however they
  * were obtained (login, password reset…). Sessions slide: one used in the second half of its life is extended
@@ -230,11 +272,14 @@ export function confirmSession(token: string) {
   run('UPDATE sessions SET confirmed_at = ? WHERE token = ?', Date.now(), hashToken(token));
 }
 
-/** The signed-in user of a request. When the session slides forward, the cookie is renewed too (else browsers drop it). */
+/**
+ * The signed-in user of a request. When the session slides forward, the web's cookie is renewed too (else browsers drop
+ * it); an app's token is the same, only longer-lived.
+ */
 export function userIdFromRequest(req: Request, res: Response): number | null {
-  const token = sessionTokenFromCookieHeader(req.headers.cookie);
+  const token = sessionTokenOf(req);
   const session = resolveSession(token);
-  if (session?.renewed) setSessionCookie(res, token);
+  if (session?.renewed && !bearerToken(req.headers)) setSessionCookie(res, token);
   res.locals.confirmedAt = session?.confirmedAt ?? null;
   res.locals.secondFactorAt = session?.secondFactorAt ?? null;
   return session?.userId ?? null;
@@ -266,13 +311,12 @@ const deviceSignature = (userId: number, device: string) =>
  * device holding this has an allowance of its own, so nobody can lock a player out of their own account (see the login
  * route).
  */
-export function setDeviceCookie(res: Response, userId: number) {
-  const device = randomBytes(16).toString('base64url');
+function setDeviceCookie(res: Response, userId: number) {
   res.append(
     'Set-Cookie',
     stringifySetCookie({
       name: DEVICE_COOKIE,
-      value: `${device}.${deviceSignature(userId, device)}`,
+      value: deviceMark(userId),
       httpOnly: true,
       sameSite: 'lax',
       secure: config.cookieSecure,
@@ -282,9 +326,19 @@ export function setDeviceCookie(res: Response, userId: number) {
   );
 }
 
-/** The device's id, when the request carries a genuine device cookie for this account; null otherwise. */
+/** A new device's mark for this account: its id and the signature that proves it's ours. */
+function deviceMark(userId: number): string {
+  const device = randomBytes(16).toString('base64url');
+  return `${device}.${deviceSignature(userId, device)}`;
+}
+
+/**
+ * The device's id, when the request carries a genuine mark for this account (the web's cookie, an app's
+ * DEVICE_HEADER); null otherwise. Bound to the account, so one can't be lent from another.
+ */
 export function knownDevice(req: Request, userId: number): string | null {
-  const [device, signature] = (parseCookie(req.headers.cookie ?? '')[DEVICE_COOKIE] ?? '').split('.');
+  const mark = req.get(DEVICE_HEADER) ?? parseCookie(req.headers.cookie ?? '')[DEVICE_COOKIE] ?? '';
+  const [device, signature] = mark.split('.');
   if (!device || !signature) return null;
   const [given, expected] = [Buffer.from(signature), Buffer.from(deviceSignature(userId, device))];
   return given.length === expected.length && timingSafeEqual(given, expected) ? device : null;

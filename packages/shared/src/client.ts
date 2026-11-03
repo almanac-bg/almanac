@@ -27,6 +27,22 @@ export interface ClientInfo {
 /** The header every /api request carries: "web 1 5c7bdf4". */
 export const CLIENT_HEADER = 'x-almanac-client';
 
+/**
+ * An app's „this device has signed in to this account before“ (the web's is a cookie): what a sign-in gave it as
+ * `session.device`, sent back to the sign-in addresses, so wrong passwords from elsewhere can't lock it out.
+ */
+export const DEVICE_HEADER = 'x-almanac-device';
+
+/**
+ * A new session, given to an app in the answer (`session`) instead of a cookie: it keeps both and sends them back,
+ * the token as `Authorization: Bearer <token>` on /api and as `token` in the socket's `auth`.
+ */
+export interface AppSession {
+  token: string;
+  /** For DEVICE_HEADER; a guest's way in has none (there's no password to protect). */
+  device?: string;
+}
+
 /** The refusal, as the socket's connect error and the /api answer's `code` (with HTTP 426). */
 export const UPDATE_REQUIRED = 'update-required';
 
