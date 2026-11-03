@@ -25,28 +25,18 @@ const questions = (...ids: (string | null)[]) =>
 
 test('the sets from before (v43) come in with their pictures: those in a set are used, the rest unused since upload', () => {
   const file = path.join(tmp, 'v43.db');
-  const boot = () =>
+  // MIGRATE_TO: only this far, a database as v43 left it (none of v44), then the rest at the next start.
+  const boot = (to?: number) =>
     spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
       cwd: path.resolve(import.meta.dirname, '..'),
-      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
+      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off', ...(to !== undefined && { MIGRATE_TO: String(to) }) },
       encoding: 'utf8',
     });
-  assert.equal(boot().status, 0, 'a new database');
+  assert.equal(boot(43).status, 0, 'a database as v43 left it');
   const db = new DatabaseSync(file);
   try {
-    // As v43 left it: none of v44, and two sets written without it.
+    // Two sets written before v44.
     db.exec(`
-      DROP TRIGGER set_pictures_added; DROP TRIGGER set_pictures_changed; DROP TRIGGER picture_used;
-      DROP TRIGGER picture_unused; DROP TRIGGER picture_uploaded;
-      DROP TABLE unused_pictures; DROP TABLE set_image_uses;
-      -- And what the steps after v44 added, which come again after it (v45–v50).
-      ALTER TABLE users DROP COLUMN must_rename;
-      DROP TABLE hidden_set_texts; ALTER TABLE question_sets DROP COLUMN hidden_at;
-      ALTER TABLE question_reports DROP COLUMN question_hash; ALTER TABLE hidden_questions DROP COLUMN awaiting_fix;
-      DROP INDEX set_images_unmade; ALTER TABLE set_images DROP COLUMN print;
-      ALTER TABLE blocked_pictures DROP COLUMN print;
-      DROP TABLE staff_passkeys;
-      PRAGMA user_version = 43;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'host', 'host', 'x', 0);
     `);
     for (const [id, at] of [

@@ -1232,6 +1232,11 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
     CREATE INDEX question_reports_recent ON question_reports(question_id, created_at);
     `,
   },
+
+  // v53, which of its host's sets a room's match played (the 31 October review, 8n.4b): its players — a class's
+  // pupils, guests most of them — can report that set from the match's review, with no link to it. A plain number, no
+  // foreign key: a set deleted since is simply not found. Older code doesn't write it; a match it saves has none.
+  { compatible: 'ALTER TABLE matches ADD COLUMN set_id INTEGER;' },
 ];
 
 /** The schema version this code brings a database to. */
@@ -1296,6 +1301,14 @@ function copyBeforeMigrating(from: number) {
   prunePreMigrationCopies();
 }
 
+/**
+ * Tests only, never in production: a database brought this far and no further (MIGRATE_TO=48), to be filled as an older
+ * release left it before the steps after it run (test/migrations.test.ts). Rewinding a database that's further along
+ * ran its later steps twice.
+ */
+const migrateTo =
+  process.env.MIGRATE_TO && process.env.NODE_ENV !== 'production' ? Number(process.env.MIGRATE_TO) : MIGRATIONS.length;
+
 function migrate() {
   const { user_version: current } = db.prepare('PRAGMA user_version').get() as { user_version: number };
   // A database from newer code: this is a rollback. Fine while every step since this code's version is compatible;
@@ -1315,7 +1328,7 @@ function migrate() {
   if (current > 0 && current < MIGRATIONS.length) copyBeforeMigrating(current);
   // On a database from before the floor was kept, no older code is known to be able to run on it.
   let floor = schemaFloor() ?? current;
-  for (let v = current; v < MIGRATIONS.length; v++) {
+  for (let v = current; v < migrateTo; v++) {
     const entry = MIGRATIONS[v];
     const compatible = typeof entry === 'object';
     const step = compatible ? entry.compatible : entry;
@@ -1483,7 +1496,8 @@ function savepoint<T>(fn: () => T): T {
 }
 
 migrate();
-repair();
+// What repair() fills in may not be there yet on a test's older database (MIGRATE_TO).
+if (migrateTo === MIGRATIONS.length) repair();
 optimize(true);
 
 /**

@@ -24,6 +24,17 @@ const { all, one, SCHEMA_VERSION, schemaFloor } = await import('../src/db');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
+/**
+ * Starts the database module on this file, as a server's start would (migrating it); `to`: only this far (MIGRATE_TO), a
+ * database as an older release left it.
+ */
+const bootDb = (file: string, to?: number) =>
+  spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
+    cwd: path.resolve(import.meta.dirname, '..'),
+    env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off', ...(to !== undefined && { MIGRATE_TO: String(to) }) },
+    encoding: 'utf8',
+  });
+
 const DAY = 86_400_000;
 /** Rows as plain objects (SQLite's have no prototype, which deep equality counts). */
 const rows = (sql: string) => all<Record<string, unknown>>(sql).map((r) => ({ ...r }));
@@ -83,7 +94,8 @@ test('the database as it was is kept beside the backups before migrating', () =>
 test('the database knows the oldest code that can run on it: the one its last breaking step needs', () => {
   // Every step up to v14 counts as breaking (they're from before steps were marked); v15–v48 are compatible; v49 (the
   // ids of „Моите знания“'s achievements and quest, renamed) is breaking, v50 compatible, and v51 (the last of the old
-  // names: the quests for козове, Трио's matches) breaking; v52 (a question flag outlives its account) compatible.
+  // names: the quests for козове, Трио's matches) breaking; v52 (a question flag outlives its account) and v53 (the set a
+  // room played) compatible.
   assert.equal(schemaFloor(), 51);
 });
 
@@ -144,19 +156,11 @@ test('a database from newer code is refused, not opened', () => {
 
 test('„Моят алманах“ became „Моите знания“: its achievements and quest move to their new ids, kept as they were', () => {
   const file = path.join(tmp, 'knowledge.db');
-  const boot = () =>
-    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
-      encoding: 'utf8',
-    });
-  assert.equal(boot().status, 0, 'a new database');
+  const boot = () => bootDb(file);
+  assert.equal(bootDb(file, 48).status, 0, 'a database as v48 left it');
   const db = new DatabaseSync(file);
   try {
     db.exec(`
-      -- And what the steps after v49 added, which come again after it (v50).
-      DROP TABLE staff_passkeys;
-      PRAGMA user_version = 48;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'ana', 'ana', 'x', 0);
       INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES
         (1, 'almanac_100', 10), (1, 'almanac_500', 20), (1, 'first_game', 5);
@@ -186,17 +190,11 @@ test('„Моят алманах“ became „Моите знания“: its ac
 
 test('the last of the old names go: the quests for козове are powerup ones, and Трио’s matches are Арена’s', () => {
   const file = path.join(tmp, 'old-names.db');
-  const boot = () =>
-    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
-      encoding: 'utf8',
-    });
-  assert.equal(boot().status, 0, 'a new database');
+  const boot = () => bootDb(file);
+  assert.equal(bootDb(file, 50).status, 0, 'a database as v50 left it');
   const db = new DatabaseSync(file);
   try {
     db.exec(`
-      PRAGMA user_version = 50;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES (1, 'ana', 'ana', 'x', 0);
       INSERT INTO quest_progress (user_id, day, quest, progress) VALUES
         (1, '2026-11-03', 'joker1', 1), (1, '2026-11-03', 'jokers3', 2), (1, '2026-11-03', 'correct15', 4);
@@ -234,31 +232,12 @@ test('the last of the old names go: the quests for козове are powerup ones
 
 test('a question flag outlives the account that sent it, without its name or words (v52)', () => {
   const file = path.join(tmp, 'flags.db');
-  const boot = () =>
-    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
-      cwd: path.resolve(import.meta.dirname, '..'),
-      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
-      encoding: 'utf8',
-    });
-  assert.equal(boot().status, 0, 'a new database');
+  const boot = () => bootDb(file);
+  // As v51 left it: a flag went with its account (ON DELETE CASCADE).
+  assert.equal(bootDb(file, 51).status, 0, 'a database as v51 left it');
   const db = new DatabaseSync(file);
   try {
-    // The table as v51 left it: a flag went with its account (ON DELETE CASCADE).
     db.exec(`
-      DROP TABLE question_reports;
-      CREATE TABLE question_reports (
-        id INTEGER PRIMARY KEY,
-        question_id TEXT NOT NULL,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        reason TEXT NOT NULL,
-        details TEXT NOT NULL DEFAULT '',
-        status TEXT NOT NULL DEFAULT 'open',
-        created_at INTEGER NOT NULL,
-        resolved_at INTEGER,
-        resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        question_hash TEXT
-      );
-      PRAGMA user_version = 51;
       INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES
         (1, 'ana', 'ana', 'x', 0), (2, 'boris', 'boris', 'x', 0);
       INSERT INTO question_reports (id, question_id, user_id, reason, details, status, created_at, resolved_by, question_hash)
