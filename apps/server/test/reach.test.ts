@@ -149,6 +149,11 @@ test(
       400,
     );
     assert.equal((await api.send('POST', '/api/push/subscribe', F.cookie, device('https://10.0.0.1/x'))).status, 400);
+    // Read as a push service by one parser and as another host by the request that goes out (push.ts, pushEndpoint).
+    assert.equal(
+      (await api.send('POST', '/api/push/subscribe', F.cookie, device('https://127.0.0.1%2epush.apple.com/x'))).status,
+      400,
+    );
     const phone = device(`https://fcm.googleapis.com/fcm/send/${key(20)}`);
     const on = await api.send('POST', '/api/push/subscribe', F.cookie, phone);
     assert.equal(on.status, 200, on.body.error);
