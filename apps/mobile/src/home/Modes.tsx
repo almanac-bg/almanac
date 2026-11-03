@@ -1,24 +1,33 @@
 import { actions, fmt, useOpenQueues, useStore } from '@almanac/client';
 import { MODES, type QueueModeId, START_RATING } from '@almanac/shared';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { radius, useColors } from '@/theme';
 import { Card, T } from '@/ui';
+import { DuoSheet, useDuoNeed } from './DuoSheet';
 import { SoloSheet } from './SoloSheet';
 
 /**
- * „Избери битка“: Соло, and the ranked queues the server has open (their rating and who's searching now). Отбори — two
- * friends together — comes with the friends' tab.
+ * „Избери битка“: Соло, and the ranked queues the server has open (their rating and who's searching now). Отбори is two
+ * friends together: its tile says what it needs, and a tap asks who with.
  */
 export function Modes() {
   const colors = useColors();
   const me = useStore((s) => s.me);
   const lobby = useStore((s) => s.lobby);
   const connected = useStore((s) => s.connected);
-  const ranked = useOpenQueues().filter((id) => !MODES[id].teams);
+  const ranked = useOpenQueues();
   const [soloOpen, setSoloOpen] = useState(false);
+  const [duoOpen, setDuoOpen] = useState(false);
+  const duoNeed = useDuoNeed(ranked.some((id) => MODES[id].teams));
+  // In the queue as a pair: the question of who with is answered.
+  const queued = useStore((s) => !!s.queue);
+  useEffect(() => {
+    if (queued) setDuoOpen(false);
+  }, [queued]);
   const [error, setError] = useState<string | null>(null);
   const queue = async (mode: QueueModeId) => {
+    if (MODES[mode].teams) return setDuoOpen(true);
     setError(null);
     const res = await actions.joinQueue(mode);
     if (!res.ok) setError(res.error);
@@ -42,7 +51,7 @@ export function Modes() {
           name={MODES[id].name}
           tagline={MODES[id].tagline}
           accent={MODES[id].accent[0]}
-          detail={`Рейтинг ${fmt(me.ratings[id] ?? START_RATING)}${lobby?.queues[id] ? ` · ${lobby.queues[id]} търсят` : ''}`}
+          detail={`Рейтинг ${fmt(me.ratings[id] ?? START_RATING)}${MODES[id].teams ? ` · ${duoNeed.text}` : lobby?.queues[id] ? ` · ${lobby.queues[id]} търсят` : ''}`}
           disabled={!connected}
           onPress={() => void queue(id)}
         />
@@ -58,6 +67,7 @@ export function Modes() {
         </T>
       )}
       <SoloSheet open={soloOpen} onClose={() => setSoloOpen(false)} />
+      <DuoSheet open={duoOpen} onClose={() => setDuoOpen(false)} />
       <View style={{ height: 1, backgroundColor: colors.line, marginTop: 4 }} />
     </View>
   );

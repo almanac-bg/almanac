@@ -17,6 +17,8 @@ export interface ButtonProps {
   disabled?: boolean;
   /** What it does, when the title alone doesn't say (VoiceOver, TalkBack). */
   hint?: string;
+  /** Its name for a screen reader, when the title shows more than that (a countdown). Otherwise the title. */
+  label?: string;
   style?: ViewStyle;
 }
 
@@ -29,6 +31,7 @@ export function Button({
   loading,
   disabled,
   hint,
+  label,
   style,
 }: ButtonProps) {
   const colors = useColors();
@@ -52,6 +55,8 @@ export function Button({
       }}
       disabled={off}
       accessibilityRole="button"
+      // Named always, also while its spinner stands in for the title.
+      accessibilityLabel={label ?? title}
       accessibilityHint={hint}
       accessibilityState={{ disabled: off, busy: !!loading }}
       style={({ pressed }) => [
