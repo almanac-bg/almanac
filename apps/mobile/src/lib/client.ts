@@ -8,6 +8,7 @@ import * as Network from 'expo-network';
 import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 import { feel } from './feedback';
+import { loadPrefs } from './prefs';
 import { endSession, loadSession, saveSession, session } from './session';
 
 /** The server: the site, or another one for development (EXPO_PUBLIC_API_URL=http://192.168.1.5:3001). */
@@ -60,6 +61,7 @@ export async function signedIn({ user, session: given }: { user: MeUser; session
 
 /** At the start: the session this phone holds, and whose it is (null: nobody signed in, or it ended). */
 export async function restore() {
+  await loadPrefs();
   const held = await loadSession();
   if (!held?.token) {
     setState({ authChecked: true });
