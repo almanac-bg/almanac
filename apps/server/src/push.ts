@@ -43,11 +43,34 @@ const PUSH_HOSTS = [
   /\.notify\.windows\.com$/,
 ];
 
+/**
+ * The address a subscription is kept and pushed to, or null when it may not be one: https, a push service's host in
+ * plain letters, digits, hyphens and dots, and nothing else between `https://` and the path — no port, no name or
+ * password, no percent-escapes. web-push reads the host again with Node's old url.parse, which ends it at a `%` or `;`
+ * where the WHATWG parser (this check) decodes or keeps them: „%2e“ made a host this check read as Apple's one that
+ * the request went to as the sender's choice (the server's own address among them). Written the plain way, both read
+ * the same host.
+ */
+export function pushEndpoint(raw: string): string | null {
+  if (raw.length > 1000) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const { hostname } = url;
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(hostname) || !PUSH_HOSTS.some((h) => h.test(hostname))) return null;
+  if (!raw.startsWith(`https://${hostname}/`)) return null;
+  return url.href;
+}
+
 export const SubscriptionSchema = z.object({
-  endpoint: z
-    .url({ protocol: /^https$/ })
-    .max(1000)
-    .refine((url) => PUSH_HOSTS.some((h) => h.test(new URL(url).hostname)), 'Непозната услуга за известия.'),
+  endpoint: z.string().transform((raw, ctx) => {
+    const endpoint = pushEndpoint(raw);
+    if (endpoint === null) ctx.addIssue({ code: 'custom', message: 'Непозната услуга за известия.' });
+    return endpoint ?? '';
+  }),
   keys: z.object({ p256dh: z.string().min(16).max(200), auth: z.string().min(8).max(100) }),
 });
 
@@ -92,7 +115,7 @@ export function subscribe(userId: number, sub: z.infer<typeof SubscriptionSchema
 }
 
 export const unsubscribe = (userId: number, endpoint: string) =>
-  run('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', userId, endpoint);
+  run('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', userId, pushEndpoint(endpoint) ?? endpoint);
 
 export const setPushPrefs = (userId: number, prefs: PushPrefs) =>
   run('UPDATE users SET push_prefs = ? WHERE id = ?', JSON.stringify(prefs), userId);
@@ -127,7 +150,12 @@ export function push(
   const subs = all<{ endpoint: string; p256dh: string; auth: string }>(
     'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
     userId,
-  );
+  ).filter((s) => {
+    if (pushEndpoint(s.endpoint) === s.endpoint) return true;
+    // Kept before the check above was strict: never pushed to, and forgotten.
+    run('DELETE FROM push_subscriptions WHERE endpoint = ?', s.endpoint);
+    return false;
+  });
   if (!subs.length) return false;
   if (kind !== 'hello') {
     const row = one<Pick<UserRow, 'push_prefs'>>('SELECT push_prefs FROM users WHERE id = ?', userId);

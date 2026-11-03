@@ -69,8 +69,14 @@ export function buzz(pattern: number | number[] | undefined) {
 const IDLE_MS = 10_000;
 let idle: ReturnType<typeof setTimeout> | undefined;
 const sleep = () => {
-  if (ctx?.state === 'running') void ctx.suspend();
+  if (ctx?.state === 'running') ctx.suspend().catch(quiet);
 };
+/**
+ * An audio device that won't start or stop (none attached, another app holding it, a browser that says no) leaves the
+ * game silent, nothing worse: not an error to report (Sentry had „Failed to start the audio device“ as an unhandled
+ * rejection).
+ */
+const quiet = () => {};
 
 /** The master bus on a context: a gain, a compressor (a chord of effects never clips), and the gain back after it. */
 function bus(ac: BaseAudioContext): GainNode {
@@ -99,7 +105,7 @@ function audio(): BaseAudioContext | null {
       master = bus(ctx);
     }
     // Suspended until a tap, or asleep (IDLE_MS); „interrupted“ after a call on iOS: it has to be asked to run again.
-    if (ctx.state !== 'running') void ctx.resume();
+    if (ctx.state !== 'running') ctx.resume().catch(quiet);
     clearTimeout(idle);
     idle = setTimeout(sleep, IDLE_MS);
     return ctx;

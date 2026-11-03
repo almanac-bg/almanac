@@ -16,7 +16,7 @@ process.env.PUSH_OUTBOX = path.join(tmp, 'pushes');
 process.env.ERROR_OUTBOX = path.join(tmp, 'errors.jsonl');
 const { config } = await import('../src/config');
 const { one, run, tx } = await import('../src/db');
-const { dailyReminderPushes, push, subscribe, timedPushes } = await import('../src/push');
+const { dailyReminderPushes, push, pushEndpoint, subscribe, timedPushes } = await import('../src/push');
 const { defaultPushPrefs } = await import('@quiz/shared');
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -207,4 +207,52 @@ test('a push that fails never takes the server down: a gone device is forgotten,
   assert.equal(devices(other), 1);
   assert.deepEqual(errors(), ['push failed', 'push']);
   assert.deepEqual(unheard, []);
+});
+
+test('a push goes only to a push service, read as plainly as the request that goes out reads it', () => {
+  // What browsers hand out, kept as it came.
+  for (const endpoint of [
+    'https://fcm.googleapis.com/fcm/send/dQw4w9WgXcQ:APA91bH-x_y',
+    'https://updates.push.services.mozilla.com/wpush/v2/gAAAAABl-x_y',
+    'https://web.push.apple.com/QGuQyavXutnMUVHgIr2c',
+    'https://wns2-par02p.notify.windows.com/w/?token=BQYAAAD%2bx%2fy',
+  ])
+    assert.equal(pushEndpoint(endpoint), endpoint);
+  // Anything else is no subscription: another host, another scheme or port, a name and password, a percent-escape or
+  // a character web-push's url.parse ends the host at (it would read „%2e“ as the end, and post to what came before).
+  for (const endpoint of [
+    'https://evil.example/x',
+    'http://fcm.googleapis.com/fcm/send/x',
+    'https://fcm.googleapis.com:8443/fcm/send/x',
+    'https://user:pass@fcm.googleapis.com/fcm/send/x',
+    'https://127.0.0.1%2epush.apple.com/x',
+    'https://evil.example%2Ewns2.notify.windows.com/x',
+    'https://evil.example;.push.apple.com/x',
+    'https://evil.example,.push.apple.com/x',
+    'https://evil.example\t.push.apple.com/x',
+    'https://evil.example%00.push.apple.com/x',
+    'https://evil.example\u3002push.apple.com/x',
+    'https://FCM.GOOGLEAPIS.COM/fcm/send/x',
+    'https://fcm.googleapis.com',
+    'not a url',
+    `https://fcm.googleapis.com/${'x'.repeat(1000)}`,
+  ])
+    assert.equal(pushEndpoint(endpoint), null, endpoint);
+});
+
+test('a device kept before that check was strict is never pushed to, and forgotten', () => {
+  const id = player();
+  const bad = 'https://127.0.0.1%2epush.apple.com/x';
+  run(
+    `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES (?, ?, 'k', 'a', 0)`,
+    bad,
+    id,
+  );
+  clear();
+  assert.equal(push(id, 'hello', message), true, 'its good device still gets it');
+  assert.deepEqual(
+    sent().map((p) => p.devices),
+    [1],
+  );
+  assert.equal(one('SELECT 1 AS x FROM push_subscriptions WHERE endpoint = ?', bad), undefined);
 });
