@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 // One icon per import: from the package's index Metro would bundle all of Lucide's (it doesn't tree-shake).
+import ChartColumn from 'lucide-react-native/icons/chart-column';
 import Gamepad2 from 'lucide-react-native/icons/gamepad-2';
 import User from 'lucide-react-native/icons/user';
 import { fonts, useColors } from '@/theme';
@@ -24,6 +25,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: 'Играй', tabBarIcon: ({ color, size }) => <Gamepad2 color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="leaderboard"
+        options={{ title: 'Класации', tabBarIcon: ({ color, size }) => <ChartColumn color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="profile"

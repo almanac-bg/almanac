@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { gutter, useColors } from '@/theme';
 
@@ -7,7 +7,18 @@ import { gutter, useColors } from '@/theme';
  * A page: the theme's background to the edges, its content inside the phone's safe area, scrolling when it doesn't fit
  * (a large text size, a small phone, the keyboard up) — never cut off.
  */
-export function Screen({ children, centered = false }: { children: ReactNode; centered?: boolean }) {
+export function Screen({
+  children,
+  centered = false,
+  refreshing,
+  onRefresh,
+}: {
+  children: ReactNode;
+  centered?: boolean;
+  /** Pull to refresh, where the page loads something. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
@@ -15,6 +26,11 @@ export function Screen({ children, centered = false }: { children: ReactNode; ce
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.fg3} />
+            ) : undefined
+          }
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: centered ? 'center' : 'flex-start',
