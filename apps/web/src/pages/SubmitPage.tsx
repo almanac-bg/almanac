@@ -1,4 +1,4 @@
-import { api, errorMessage, plural, timeAgo, toast, useStore } from '@almanac/client';
+import { api, errorMessage, pendingLimit, plural, timeAgo, toast, useStore } from '@almanac/client';
 import { categoryById, type QuestionDraft, SUBMISSION_RULES, type Submission } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lock, Pencil, Send, Trash2 } from 'lucide-react';
@@ -129,14 +129,6 @@ function SubmitForm({ onSent }: { onSent: () => void }) {
       </div>
     </div>
   );
-}
-
-/** How many may wait at once (as the server counts it): a few until one is approved, one at a time after many turned down. */
-function pendingLimit(items: Submission[]) {
-  const approved = items.filter((s) => s.status === 'approved').length;
-  const rejected = items.filter((s) => s.status === 'rejected').length;
-  if (rejected >= SUBMISSION_RULES.rejectedLimit && rejected > approved) return SUBMISSION_RULES.maxPendingRejected;
-  return approved ? SUBMISSION_RULES.maxPending : SUBMISSION_RULES.maxPendingNew;
 }
 
 function MySubmissions({ refresh }: { refresh: number }) {

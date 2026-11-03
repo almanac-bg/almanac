@@ -70,6 +70,7 @@ export default function RootLayout() {
                 <Stack.Screen name="c/[id]" options={{ ...header, title: 'Предизвикателство' }} />
                 <Stack.Screen name="room" options={{ ...header, title: 'Частна стая' }} />
                 <Stack.Screen name="locker" options={{ ...header, title: 'Колекция' }} />
+                <Stack.Screen name="submit" options={{ ...header, title: 'Предложи въпрос' }} />
                 <Stack.Screen name="sets/index" options={{ ...header, title: 'Моите въпроси' }} />
                 <Stack.Screen name="sets/[id]" options={{ ...header, title: 'Набор' }} />
                 <Stack.Screen name="sets/shared/[code]" options={{ ...header, title: 'Набор с въпроси' }} />
