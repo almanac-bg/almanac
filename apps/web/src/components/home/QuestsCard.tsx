@@ -1,11 +1,10 @@
-import { refreshMe, useNow, useStore } from '@almanac/client';
+import { countdown, refreshMe, useNow, useStore } from '@almanac/client';
 import type { QuestInfo } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ListChecks } from 'lucide-react';
 import { useEffect } from 'react';
 import { Emoji } from '../Emoji';
 import { Card, ProgressBar } from '../ui';
-import { countdown } from './time';
 
 /** Today's three quests: any match moves them along and pays their XP by itself; all three earn a bonus on top. */
 export function QuestsCard({ className }: { className?: string }) {

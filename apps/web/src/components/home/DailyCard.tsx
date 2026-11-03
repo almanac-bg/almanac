@@ -1,4 +1,4 @@
-import { actions, api, fmt, plural, toast, useNow, useStore } from '@almanac/client';
+import { actions, api, countdown, fmt, plural, toast, useNow, useStore } from '@almanac/client';
 import {
   BRAND,
   type DailyInfo,
@@ -23,7 +23,6 @@ import { GroupStandings } from '../groups';
 import { LoadError } from '../LoadError';
 import { MoreTimeNote } from '../MoreTimeNote';
 import { Button, Card, Spinner } from '../ui';
-import { countdown } from './time';
 
 export function DailyCard({ className }: { className?: string }) {
   const me = useStore((s) => s.me)!;

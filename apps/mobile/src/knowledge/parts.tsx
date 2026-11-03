@@ -77,12 +77,8 @@ export function reviewLine(queue: ReviewQueue): string {
   return `${plural(queue.waiting, 'сгрешен въпрос чака', 'сгрешени въпроса чакат')}: следващият се връща ${timeAgo(queue.nextDueAt)}.`;
 }
 
-/**
- * „Поправителен“: the questions missed a few days ago, back to be answered again (the web's ReviewCard). Started, the
- * match screen opens by itself (lib/realtime).
- */
-export function ReviewCard({ queue }: { queue: ReviewQueue }) {
-  const colors = useColors();
+/** Starts „Поправителен“ (the match screen opens by itself once it does). */
+export function useStartReview() {
   const [busy, setBusy] = useState(false);
   const start = async () => {
     setBusy(true);
@@ -90,6 +86,16 @@ export function ReviewCard({ queue }: { queue: ReviewQueue }) {
     setBusy(false);
     if (!res.ok) Alert.alert('Поправителният не започна', res.error);
   };
+  return { busy, start };
+}
+
+/**
+ * „Поправителен“: the questions missed a few days ago, back to be answered again (the web's ReviewCard). Started, the
+ * match screen opens by itself (lib/realtime).
+ */
+export function ReviewCard({ queue }: { queue: ReviewQueue }) {
+  const colors = useColors();
+  const { busy, start } = useStartReview();
   return (
     <Card accent={queue.ready ? colors.good : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>

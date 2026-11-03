@@ -1,10 +1,9 @@
-import { actions, api, fmt, plural, toast, useNow, useStore } from '@almanac/client';
+import { actions, api, countdown, fmt, plural, toast, useNow, useStore } from '@almanac/client';
 import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@almanac/shared';
 import { ArrowRight, CalendarDays, ChartColumn, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Avatar } from '../components/Avatar';
-import { countdown } from '../components/home/time';
 import { LoadError } from '../components/LoadError';
 import { MoreTimeNote } from '../components/MoreTimeNote';
 import { DayField } from '../components/results/DayField';

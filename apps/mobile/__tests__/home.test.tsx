@@ -1,6 +1,6 @@
 // Играй, the home tab: who you are, the day's questions, what to play — and the search for a match. The moves go out
 // through the shared client's actions, watched here.
-import { actions, setState } from '@almanac/client';
+import { actions, api, setState } from '@almanac/client';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Play from '@/app/(tabs)/index';
@@ -27,7 +27,16 @@ const me = {
   daily: { day: '2026-11-03', played: false, streak: 4, shields: 0 },
   stats: { games: 12, wins: 5, answered: 120, correct: 80 },
   ratings: { duel: 1130 },
+  email: 'ana@example.bg',
+  unreadNotifications: 0,
+  knowledge: { facts: 40, due: 0 },
+  quests: { day: '2026-11-03', endsAt: Date.now() + 3_600_000, quests: [], bonusXp: 50, bonusDone: false },
 };
+
+// The cards that load something of their own: nothing there today.
+jest.spyOn(api, 'myChallenges').mockResolvedValue({ challenges: [] });
+jest.spyOn(api, 'evening').mockResolvedValue({ status: null, lastNight: null });
+jest.spyOn(api, 'duels').mockResolvedValue({ duels: [] });
 
 beforeEach(() => {
   jest.clearAllMocks();
