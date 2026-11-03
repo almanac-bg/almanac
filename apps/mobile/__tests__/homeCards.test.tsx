@@ -86,7 +86,9 @@ test('the evening Роял with its door open: how many wait, „Влез“, an
   jest.spyOn(api, 'evening').mockResolvedValue(evening());
   const join = jest.spyOn(actions, 'joinEvening').mockResolvedValue({ ok: true });
   await show(<EveningCard />);
-  await waitFor(() => expect(screen.getByText(/^Входът е отворен · 7 чакат · започва след 2:5\d$/)).toBeTruthy());
+  await waitFor(() =>
+    expect(screen.getByText(/^Входът е отворен · 7 чакат · започва след (2:5\d|3:00)$/)).toBeTruthy(),
+  );
   await fireEvent.press(screen.getByRole('button', { name: 'Влез' }));
   expect(join).toHaveBeenCalled();
   expect(screen.queryByText('Петър')).toBeNull();

@@ -78,3 +78,12 @@ export function countdown(ms: number) {
 
 /** How points are counted, in one line: speed is half of every answer's worth, and nothing in the game said so. */
 export const SCORING_LINE = `${SCORING.base} точки за верен отговор, до +${SCORING.speed} за бързина (след време за четене) и +${SCORING.streakStep} за всеки пореден верен (до +${SCORING.streakMax}).`;
+
+const LICENSES: Record<string, string> = { PD: 'обществено достояние' };
+
+/** A picture's licence as the credit line says it („CC BY-SA 3.0“, „обществено достояние“). */
+export const licenseName = (license: string) => LICENSES[license] ?? license;
+
+/** The credit's own source is Wikimedia Commons (and the credit doesn't say so already): said once, after it. */
+export const fromCommons = (c: { sourceUrl: string | null; credit: string }) =>
+  !!c.sourceUrl?.startsWith('https://commons.wikimedia.org/') && !/wikimedia/i.test(c.credit);

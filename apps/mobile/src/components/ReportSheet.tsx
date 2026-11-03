@@ -1,5 +1,5 @@
 import { errorMessage } from '@almanac/client';
-import { REPORT_REASONS, REPORT_REASONS_FOR, type ReportReason, type ReportSubjectKind } from '@almanac/shared';
+import { REPORT_REASONS, REPORT_REASONS_FOR, type ReportSubjectKind } from '@almanac/shared';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,26 +8,39 @@ import { Button, T } from '@/ui';
 
 const DETAILS_MAX = 500;
 
+/** The reasons a report about a player, a group or a set can give. */
+export const reasonsFor = (kind: ReportSubjectKind) =>
+  REPORT_REASONS.filter((r) => REPORT_REASONS_FOR[kind].includes(r.id));
+
 /**
- * A report (the web's report dialog): a reason, details if they help, and a word that it's anonymous. Sent, it says
- * thanks and closes; if it couldn't be sent, it says why and stays open with what was written.
+ * A report (the web's report dialogs): what it's about (`context`), a reason, details if they help, and a `note` (that
+ * it's anonymous). Sent, it says `thanks` and closes; if it couldn't be sent, it says why and stays open with what was
+ * written. A player, a group, a set, a question: the same sheet with its own reasons.
  */
-export function ReportSheet({
+export function ReportSheet<R extends string>({
   open,
   onClose,
-  kind,
   title,
+  reasons,
+  context,
+  placeholder = 'Подробности (по желание)',
+  note,
+  thanks = 'Модератор ще го прегледа, а ти ще научиш какво решихме.',
   send,
 }: {
   open: boolean;
   onClose: () => void;
-  kind: ReportSubjectKind;
   title: string;
-  send: (reason: ReportReason, details: string) => Promise<unknown>;
+  reasons: readonly { id: R; label: string }[];
+  context?: string;
+  placeholder?: string;
+  note?: string;
+  thanks?: string;
+  send: (reason: R, details: string) => Promise<unknown>;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [reason, setReason] = useState<ReportReason | null>(null);
+  const [reason, setReason] = useState<R | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async () => {
@@ -38,7 +51,7 @@ export function ReportSheet({
       setReason(null);
       setDetails('');
       onClose();
-      Alert.alert('Благодарим!', 'Модератор ще го прегледа, а ти ще научиш какво решихме.');
+      Alert.alert('Благодарим!', thanks);
     } catch (err) {
       Alert.alert('Докладът не се изпрати', errorMessage(err));
     } finally {
@@ -58,8 +71,15 @@ export function ReportSheet({
           <T variant="h1" role="heading">
             {title}
           </T>
+          {context ? (
+            <View style={{ padding: 12, borderRadius: radius.md, backgroundColor: colors.glass }}>
+              <T variant="small" tone="fg2">
+                {context}
+              </T>
+            </View>
+          ) : null}
           <View accessibilityRole="radiogroup" accessibilityLabel="Причина" style={{ gap: 8 }}>
-            {REPORT_REASONS.filter((r) => REPORT_REASONS_FOR[kind].includes(r.id)).map((r) => {
+            {reasons.map((r) => {
               const on = reason === r.id;
               return (
                 <Pressable
@@ -101,8 +121,8 @@ export function ReportSheet({
           <TextInput
             value={details}
             onChangeText={(text) => setDetails(text.slice(0, DETAILS_MAX))}
-            accessibilityLabel="Подробности (по желание)"
-            placeholder="Подробности (по желание)"
+            accessibilityLabel={placeholder}
+            placeholder={placeholder}
             placeholderTextColor={colors.fg3}
             multiline
             maxLength={DETAILS_MAX}
@@ -120,9 +140,11 @@ export function ReportSheet({
               textAlignVertical: 'top',
             }}
           />
-          <T variant="caption" tone="fg3">
-            {kind === 'player' ? 'Докладите са анонимни за докладвания играч.' : 'Докладите са анонимни.'}
-          </T>
+          {note ? (
+            <T variant="caption" tone="fg3">
+              {note}
+            </T>
+          ) : null}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button title="Отказ" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
             <Button

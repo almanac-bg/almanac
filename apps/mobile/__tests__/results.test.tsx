@@ -135,6 +135,8 @@ const show = (game: LiveGame) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // A ranked match with a person offers a rematch; leaving the results declines it (over the socket, not here).
+  jest.spyOn(actions, 'declineRematch').mockImplementation(() => {});
   setState({
     me: { id: 1, username: 'Ана', avatar: 'fox', frame: 'classic', isGuest: false, knowledge: { due: 0 } } as never,
     room: null,

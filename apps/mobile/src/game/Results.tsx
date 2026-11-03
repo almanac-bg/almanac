@@ -2,12 +2,9 @@ import {
   actions,
   challengeShareText,
   fmt,
-  keepTogether,
-  LETTERS,
   type LiveGame,
   matchOutcome,
   matchShareText,
-  numberText,
   rewardSteps,
   toast,
   useStore,
@@ -34,9 +31,11 @@ import {
   UnlocksCard,
   UnratedCard,
 } from '@/results/Cards';
+import { QuestionReview } from '@/results/QuestionReview';
+import { RematchStrip, useRematch } from '@/results/Rematch';
 import { ChallengeStanding, FriendsProvider, Podium, TeamResult } from '@/results/Standings';
 import { RewardMoment } from '@/rewards/RewardMoment';
-import { fonts, gutter, radius, useColors } from '@/theme';
+import { fonts, gutter, useColors } from '@/theme';
 import { Button, Card, COLUMN, T, usePagePadding } from '@/ui';
 
 /**
@@ -57,6 +56,7 @@ export function Results({ game }: { game: LiveGame }) {
   const { end, mine, rewards, link, duel, single, teamScores } = o;
   const category = categoryById(game.start.category);
   const headline = useRef<ComponentRef<typeof Text>>(null);
+  const rematch = useRematch(game);
   // A new level, a milestone to pick, a new avatar or frame: one beat at a time before the results (RewardMoment).
   const [steps] = useState(() => rewardSteps(end.noContest || o.classPupil ? null : rewards));
   const [moment, setMoment] = useState(steps.length > 0);
@@ -302,14 +302,18 @@ export function Results({ game }: { game: LiveGame }) {
           )}
 
           <LearnedToday items={game.history} added={rewards?.knowledge?.added ?? 0} />
-          <Questions game={game} />
+          {game.history.length > 0 && (
+            <QuestionReview
+              items={game.history}
+              set={game.start.questionSet ? { gameId: game.start.gameId, name: game.start.questionSet } : null}
+            />
+          )}
         </View>
       </ScrollView>
 
       <View
         style={{
-          flexDirection: 'row',
-          gap: 8,
+          gap: 10,
           paddingTop: 12,
           paddingBottom: insets.bottom + 12,
           paddingLeft: insets.left + gutter,
@@ -319,74 +323,33 @@ export function Results({ game }: { game: LiveGame }) {
           backgroundColor: colors.ink2,
         }}
       >
-        {duel ? (
-          duel.outcome || duel.expired ? (
-            <View style={{ flex: 1 }}>
-              <RematchButton standing={duel} />
-            </View>
+        {/* A rematch offer can come at any moment: in reach, over the next step. */}
+        {rematch && <RematchStrip rematch={rematch} />}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {duel ? (
+            duel.outcome || duel.expired ? (
+              <View style={{ flex: 1 }}>
+                <RematchButton standing={duel} />
+              </View>
+            ) : (
+              <Button title="Към началото" size="lg" onPress={home} style={{ flex: 1 }} />
+            )
           ) : (
-            <Button title="Към началото" size="lg" onPress={home} style={{ flex: 1 }} />
-          )
-        ) : (
-          main && (
-            <Button
-              title={main.title}
-              size="lg"
-              variant={o.challenge ? 'secondary' : 'primary'}
-              loading={busy}
-              onPress={main.onPress}
-              style={{ flex: 1 }}
-            />
-          )
-        )}
-        {shareable && <Button title="↗" label="Сподели резултата" size="lg" variant="secondary" onPress={share} />}
-        {!mainGoesHome && <Button title="⌂" label="Към началото" size="lg" variant="secondary" onPress={home} />}
-      </View>
-    </View>
-  );
-}
-
-/** The questions with their answers: yours right or not, the right one, and the fact behind it. */
-function Questions({ game }: { game: LiveGame }) {
-  const colors = useColors();
-  if (!game.history.length) return null;
-  return (
-    <View style={{ gap: 10 }}>
-      <T variant="h2" role="heading">
-        Въпросите
-      </T>
-      {game.history.map((item) => (
-        <View
-          key={item.index}
-          accessible
-          style={{
-            gap: 4,
-            padding: 12,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: colors.ink2,
-          }}
-        >
-          <T variant="caption" tone={item.right ? 'good' : 'bad'}>
-            {item.index + 1}. {item.right ? 'Верен' : 'Грешен'}
-          </T>
-          <T variant="bodyStrong">{keepTogether(item.q)}</T>
-          <T variant="small" tone="good">
-            ✓{' '}
-            {item.number
-              ? numberText(item.number.answer, item.number)
-              : item.order
-                ? item.order.right.map((i) => keepTogether(item.order!.items[i] ?? '')).join(' → ')
-                : `${LETTERS[item.correct]}) ${keepTogether(item.options[item.correct] ?? '')}`}
-          </T>
-          {item.fact && (
-            <T variant="small" tone="fg2">
-              💡 {keepTogether(item.fact)}
-            </T>
+            main && (
+              <Button
+                title={main.title}
+                size="lg"
+                variant={o.challenge ? 'secondary' : 'primary'}
+                loading={busy}
+                onPress={main.onPress}
+                style={{ flex: 1 }}
+              />
+            )
           )}
+          {shareable && <Button title="↗" label="Сподели резултата" size="lg" variant="secondary" onPress={share} />}
+          {!mainGoesHome && <Button title="⌂" label="Към началото" size="lg" variant="secondary" onPress={home} />}
         </View>
-      ))}
+      </View>
     </View>
   );
 }

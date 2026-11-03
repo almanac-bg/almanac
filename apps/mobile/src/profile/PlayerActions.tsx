@@ -3,7 +3,7 @@ import type { ProfileStats } from '@almanac/shared';
 import { useState } from 'react';
 import { AccessibilityInfo, Alert, View } from 'react-native';
 import { DuelButton } from '@/components/DuelButton';
-import { ReportSheet } from '@/components/ReportSheet';
+import { ReportSheet, reasonsFor } from '@/components/ReportSheet';
 import { fonts, useColors } from '@/theme';
 import { Button, T } from '@/ui';
 
@@ -80,7 +80,8 @@ export function PlayerActions({
       <ReportSheet
         open={reporting}
         onClose={() => setReporting(false)}
-        kind="player"
+        reasons={reasonsFor('player')}
+        note="Докладите са анонимни за докладвания играч."
         title={`Докладвай ${user.username}`}
         send={(reason, details) => api.report(user.username, reason, details)}
       />

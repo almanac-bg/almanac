@@ -1,4 +1,18 @@
-import { actions, getState, type LiveGame, useNow, useStore } from '@almanac/client';
+import {
+  actions,
+  getState,
+  type LiveGame,
+  REMATCH_NO_ANSWER_MS,
+  REMATCH_OFFER_MS,
+  type Rematch,
+  type RematchStatus,
+  rematchLines,
+  useNow,
+  useStore,
+} from '@almanac/client';
+
+export type { Rematch, RematchStatus } from '@almanac/client';
+
 import { type GamePlayer, isQueueMode } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, RotateCcw, Swords } from 'lucide-react';
@@ -6,35 +20,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Avatar } from '../Avatar';
 import { Button, Spinner } from '../ui';
 
-/** The server keeps an offer open for a minute after the match; the clock here starts a moment later, so a bit less. */
-const OFFER_MS = 58_000;
-/** Asked, but the server never answered: the offer was already gone (it doesn't say so when nobody had asked yet). */
-const NO_ANSWER_MS = 4000;
-
 /** When this device first showed each match's offer — a remount (back to /game) keeps the same clock. */
 const shownAt = new Map<string, number>();
 /** Offers this device declined (left the results); coming back to them shows them over. */
 const declined = new Set<string>();
-
-export type RematchStatus = 'open' | 'invited' | 'waiting' | 'over';
-
-export interface Rematch {
-  status: RematchStatus;
-  /** The other humans who stayed to the end: the rematch is with them. */
-  opponents: GamePlayer[];
-  /** Of them, who already asked. */
-  ready: Set<string>;
-  /**
-   * Whose side the others were on: `with` you (a team match with only your teammates left — one more match together,
-   * not a rematch against them), `mixed` (teammates and opponents), or `against` you.
-   */
-  sides: 'with' | 'mixed' | 'against';
-  /** Local time the offer runs out. */
-  until: number;
-  /** You asked, or someone asked you: worth saying so when it falls through. */
-  involved: boolean;
-  request: () => void;
-}
 
 /**
  * "Реванш" after a ranked queue match with other people: the same humans play again once all of them ask. Null when
@@ -61,7 +50,7 @@ export function useRematch(game: LiveGame): Rematch | null {
   const offer = useStore((s) => (s.rematch?.gameId === gameId ? s.rematch : null));
   const [until] = useState(() => {
     if (!shownAt.has(gameId)) shownAt.set(gameId, Date.now());
-    return shownAt.get(gameId)! + OFFER_MS;
+    return shownAt.get(gameId)! + REMATCH_OFFER_MS;
   });
   const [asked, setAsked] = useState(false);
   const [seen, setSeen] = useState(false);
@@ -82,7 +71,7 @@ export function useRematch(game: LiveGame): Rematch | null {
   const youReady = !!offer?.ready.includes(youId);
   useEffect(() => {
     if (!asked || youReady) return;
-    const timer = setTimeout(() => setUnanswered(true), NO_ANSWER_MS);
+    const timer = setTimeout(() => setUnanswered(true), REMATCH_NO_ANSWER_MS);
     return () => clearTimeout(timer);
   }, [asked, youReady]);
 
@@ -118,12 +107,6 @@ export function useRematch(game: LiveGame): Rematch | null {
   };
 }
 
-/** "Мария", "Мария и Иван", "Мария и още 3". */
-function names(players: GamePlayer[]) {
-  if (players.length <= 2) return players.map((p) => p.name).join(' и ');
-  return `${players[0].name} и още ${players.length - 1}`;
-}
-
 function SecondsLeft({ until }: { until: number }) {
   const now = useNow(1000);
   return <span className="tabular-nums">{Math.max(0, Math.ceil((until - now) / 1000))} с</span>;
@@ -136,34 +119,9 @@ function SecondsLeft({ until }: { until: number }) {
 export function RematchStrip({ rematch: r, bar, className }: { rematch: Rematch; bar?: boolean; className?: string }) {
   // Nobody asked before it ran out: nothing to report.
   if (r.status === 'over' && !r.involved) return null;
-  const readyPlayers = r.opponents.filter((p) => r.ready.has(p.id));
-  const pending = r.opponents.filter((p) => !r.ready.has(p.id));
   const invited = r.status === 'invited';
-
-  // Teammates aren't opponents: with them it's one more match side by side.
   const sameSide = r.sides === 'with';
-  const title =
-    r.status === 'over'
-      ? sameSide
-        ? 'Още един мач няма да има.'
-        : 'Реваншът няма да се състои.'
-      : r.status === 'waiting'
-        ? `Чакаме ${names(pending)}…`
-        : invited
-          ? `${names(readyPlayers)} ${readyPlayers.length === 1 ? 'иска' : 'искат'} ${sameSide ? 'още един мач' : 'реванш'}!`
-          : sameSide
-            ? 'Още един мач заедно?'
-            : r.sides === 'mixed'
-              ? 'Реванш със същите играчи?'
-              : r.opponents.length === 1
-                ? `Реванш срещу ${r.opponents[0].name}?`
-                : 'Реванш със същите съперници?';
-  const detail =
-    r.status === 'waiting'
-      ? 'Мачът започва, щом всички поискат'
-      : invited && pending.length === 0
-        ? 'Приеми и мачът започва веднага'
-        : 'Започва, щом всички поискат';
+  const { title, detail } = rematchLines(r);
 
   return (
     <div

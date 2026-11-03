@@ -1,9 +1,8 @@
 import { DIFFICULTY_LABEL, inDropZone, keepTogether, LETTERS, type LiveGame, nextElimination } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
-import { Image } from 'expo-image';
 import { type ComponentRef, useEffect, useRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, type Text, View } from 'react-native';
-import { pictureUri } from '@/lib/images';
+import { Picture } from '@/components/Picture';
 import { radius, useColors } from '@/theme';
 import { T } from '@/ui';
 import { FactNote, PauseAfterAnswer, UntimedEnding } from './Hold';
@@ -86,14 +85,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
           gap: 14,
         }}
       >
-        {q.image && (
-          <Image
-            source={{ uri: pictureUri(q.image) }}
-            accessibilityLabel={q.image.alt}
-            contentFit="contain"
-            style={{ width: '100%', aspectRatio: q.image.w / q.image.h, maxHeight: 260, borderRadius: radius.md }}
-          />
-        )}
+        {q.image && <Picture image={q.image} credit={reveal?.credit} />}
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
           <T
             ref={heading}
