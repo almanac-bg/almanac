@@ -113,3 +113,41 @@ test('the app icons are the mark as favicon.svg draws it, whole', async ({ page 
     expect(meanDiff, `${file}: mean difference from favicon.svg, per channel (0–255)`).toBeLessThan(3);
   }
 });
+
+test.describe('with motion on', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  // The drawn landing stays put as the app takes it over: the entrance it was drawn without isn't played afterwards
+  // (AuthPage's `drawn`). It was, with motion on: the guest button dropped 30 px and climbed back for half a second,
+  // and a tap aimed at it — the browser tests' too — hit the line below it.
+  test('the drawn landing doesn’t move as the app takes it over: a tap lands where it was aimed', async ({ page }) => {
+    await page.addInitScript(() => {
+      const notes = window as unknown as { tops: number[]; takenOver: number };
+      notes.tops = [];
+      notes.takenOver = 0;
+      const look = () => {
+        const guest = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Играй като гост');
+        if (guest && document.fonts.status === 'loaded') notes.tops.push(guest.getBoundingClientRect().top);
+        if (!document.getElementById('root')?.hasAttribute('data-painted') && !notes.takenOver)
+          notes.takenOver = performance.now();
+        // On for 1.5 s after the takeover: the entrance it replayed took half a second.
+        if (!notes.takenOver || performance.now() - notes.takenOver < 1500) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    await page.goto('/');
+    const notes = () =>
+      page.evaluate(() => {
+        const { tops, takenOver } = window as unknown as { tops: number[]; takenOver: number };
+        return { tops, takenOver };
+      });
+    await expect.poll(async () => (await notes()).takenOver, { timeout: 15_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(1700);
+    const { tops } = await notes();
+    expect(tops.length, 'frames seen').toBeGreaterThan(10);
+    expect(
+      Math.max(...tops) - Math.min(...tops),
+      `the guest button moved: ${[...new Set(tops.map(Math.round))].join(', ')}`,
+    ).toBeLessThanOrEqual(1);
+  });
+});

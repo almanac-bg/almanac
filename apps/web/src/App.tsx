@@ -94,8 +94,6 @@ export function App() {
     // This device has an account now: next time the sign-in page opens on "Вход".
     if (account) markReturning();
   }, [account]);
-  // The page the server drew is the app's own now.
-  useEffect(paintingDone, []);
 
   // Who's signed in. Only an answer says so: no connection, or a server restarting (a deploy), is no answer — the app
   // keeps asking (1, 2, 4… s, and at once when the device is back online or the tab comes back) rather than show a
@@ -252,6 +250,7 @@ export function App() {
             {isPublicPath(pathname) ? (
               <PageBoundary>
                 <Suspense fallback={<PageLoading />}>
+                  <PaintingDone />
                   <Routes>
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -272,6 +271,7 @@ export function App() {
             ) : (
               <Suspense fallback={<PageLoading />}>
                 <AuthPage />
+                <PaintingDone />
               </Suspense>
             )}
           </main>
@@ -281,6 +281,17 @@ export function App() {
       </MotionConfig>
     </LazyMotion>
   );
+}
+
+/**
+ * The page the server drew is the app's own now — said from inside the page's own Suspense boundary, which React
+ * hydrates after the app's shell: from the shell's effects it came too soon, and the page's first render (a pass later)
+ * took itself for one the browser draws. The landing then replayed its entrance on the drawn page (AuthPage's
+ * `drawn`): the guest button dropped 30 px and climbed back. Renders nothing, so the drawn markup is unchanged.
+ */
+function PaintingDone() {
+  useEffect(paintingDone, []);
+  return null;
 }
 
 /** While a page's code arrives (only on a first visit before the background prefetch finishes). */

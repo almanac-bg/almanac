@@ -33,7 +33,10 @@ export function paintedReturning(): boolean {
   return onServer ? drawingReturning : root?.dataset.returning === '1';
 }
 
-/** The app has taken over: from here on, everything on screen is its own (entrance animations and all). */
+/**
+ * The app has taken over: from here on, everything on screen is its own (entrance animations and all). Called once the
+ * drawn page itself has hydrated (App's PaintingDone, inside the page's Suspense boundary), not when the app's shell has.
+ */
 export function paintingDone() {
   root?.removeAttribute('data-painted');
   root?.removeAttribute('data-returning');
