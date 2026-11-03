@@ -51,7 +51,7 @@ function Heading({ title }: { title: string }) {
 }
 
 /** The player's link to today's questions: the same ten for whoever opens it (the day's page without it). */
-async function dailyLink(): Promise<string> {
+export async function dailyLink(): Promise<string> {
   try {
     return `${API_URL}/daily/${(await api.dailyLink()).code}`;
   } catch {
@@ -173,7 +173,7 @@ export function DailyResult({
 const people = (n: number) => `${fmt(n)} ${n === 1 ? 'човек' : 'души'}`;
 
 /** How the day went for everyone: „По-добър от 73% днес“, and how many got each number right, yours marked. */
-function DayField({ field, correct }: { field: DailyField; correct: number }) {
+export function DayField({ field, correct }: { field: DailyField; correct: number }) {
   const colors = useColors();
   const max = Math.max(1, ...field.histogram);
   // One per number of right answers, 0 to all of them.
