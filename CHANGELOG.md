@@ -8,6 +8,18 @@ is a `vX.Y.Z` tag and a [GitHub release](https://github.com/almanac-bg/almanac/r
 Bulgarian: [October 2026](docs/changelog/2026-10.md), with 0.9.0, 1.0.0 and 1.1.0, and
 [November 2026 until 1.2.0](docs/changelog/2026-11.md), what came after 1.1.0.
 
+## [1.2.0](https://github.com/almanac-bg/almanac/compare/v1.1.0...v1.2.0) (2026-11-03)
+
+
+### Bug Fixes
+
+* **web:** keep entrances still under reduced motion ([#84](https://github.com/almanac-bg/almanac/issues/84)) ([e8a90e4](https://github.com/almanac-bg/almanac/commit/e8a90e4c192ab840e1c8341d96c482e1d948d19b))
+
+
+### Miscellaneous Chores
+
+* **release:** release 1.2.0 ([79d5225](https://github.com/almanac-bg/almanac/commit/79d52250f7abbbe7a1d694173687450f347874a4))
+
 ## [1.1.0](https://github.com/almanac-bg/almanac/releases/tag/v1.1.0) (2026-11-03)
 
 October after the launch: [docs/changelog/2026-10.md](docs/changelog/2026-10.md).
