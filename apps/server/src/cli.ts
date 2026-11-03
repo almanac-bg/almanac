@@ -114,8 +114,11 @@ if (area === 'notice') {
 
 // What the players flagged and the answer log says, for the bank's re-check (bank.mjs reads it as a work list).
 if (area === 'flags') {
-  // Only the JSON on stdout (a script reads it): what loading the bank says goes to stderr.
-  console.log = (...args: unknown[]) => console.error(...args);
+  // Only the JSON on stdout (a script reads it): what loading the bank says goes to stderr — one line each, whatever it
+  // carries (a player's words from a report could otherwise start lines of their own in a log: CodeQL's
+  // js/log-injection, alert 56).
+  console.log = (...args: unknown[]) =>
+    process.stderr.write(`${args.map((a) => String(a).replace(/[\r\n\u2028\u2029]+/g, ' ')).join(' ')}\n`);
   const open = openQuestionReports().map((g) => ({
     id: g.question.id,
     q: g.question.q,
