@@ -128,8 +128,10 @@ test.describe('with motion on', () => {
       const look = () => {
         const guest = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Играй като гост');
         const at = performance.now();
-        if (guest && document.fonts.status === 'loaded')
-          notes.seen.push({ top: guest.getBoundingClientRect().top, at });
+        // Once the site's own type is in: before any font is asked for, `status` reads "loaded" too, and a look then
+        // measured the fallback's wrapping (a line shorter: 32 px higher) — the swap to the font, not the takeover.
+        const typeIn = document.fonts.status === 'loaded' && [...document.fonts].some((f) => f.status === 'loaded');
+        if (guest && typeIn) notes.seen.push({ top: guest.getBoundingClientRect().top, at });
         if (!document.getElementById('root')?.hasAttribute('data-painted') && !notes.takenOver) notes.takenOver = at;
       };
       // Every frame, and on a timer beside it: a slow runner draws few frames (CI's WebKit: 4 in 1.5 s).
