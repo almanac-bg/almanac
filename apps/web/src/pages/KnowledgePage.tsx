@@ -11,7 +11,7 @@ import { useLoad } from '../lib/load';
 import { usePageTitle } from '../lib/title';
 import { NotFoundPage } from './NotFoundPage';
 
-/** „Моите знания“ (/knowledge; „Моят алманах“ at /almanac until 2 November 2026), or one of its categories (/knowledge/<category>). */
+/** „Моите знания“ (/knowledge), or one of its categories (/knowledge/<category>). */
 export function KnowledgePage() {
   const { category } = useParams();
   if (category === undefined) return <Overview />;

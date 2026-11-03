@@ -247,7 +247,7 @@ test('the bank holds number, order and picture questions; a picture whose file i
       'a picture is played when its file is there',
     );
     assert.deepEqual(questionsWithoutImages(), ['geography-i2']);
-    assert.ok(questionById('geography-i2'), 'still known by id (reports, the almanac)');
+    assert.ok(questionById('geography-i2'), 'still known by id (reports, „Моите знания“)');
     // Questions with options are drawn without pictures: a match places those itself.
     assert.ok(!pickQuestions(30, 'geography', new Map()).some((q) => q.id.startsWith('geography-i')));
 

@@ -557,16 +557,3 @@ test('the service worker is never kept by a cache on the way; the other files be
   assert.equal((await fetch(`${srv.url}/sw.js`)).headers.get('cache-control'), 'no-cache');
   assert.equal((await fetch(`${srv.url}/theme.js`)).headers.get('cache-control'), 'public, max-age=3600');
 });
-
-test('„Моят алманах“ moved to /knowledge: an old link or bookmark is sent there for good', async () => {
-  for (const [from, to] of [
-    ['/almanac', '/knowledge'],
-    ['/almanac/history', '/knowledge/history'],
-  ]) {
-    const res = await fetch(`${srv.url}${from}`, { redirect: 'manual', headers: { accept: 'text/html' } });
-    assert.equal(res.status, 301, from);
-    assert.equal(res.headers.get('location'), to);
-  }
-  assert.equal(routeKind('/knowledge/history'), 'app');
-  assert.equal(routeKind('/almanac'), 'unknown', 'no screen of its own any more');
-});

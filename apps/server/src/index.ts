@@ -323,13 +323,6 @@ if (fs.existsSync(config.webDist)) {
   const notFoundPage = withHead(page, { title: pageTitle('Страницата не съществува'), index: false });
   app.use((req, res, next) => {
     if (!forPage(req)) return next();
-    // „Моят алманах“ was at /almanac until 2 November 2026 („Моите знания“, /knowledge): an old link or bookmark lands
-    // where it went.
-    const moved = /^\/almanac(\/[^/]+)?$/.exec(req.path);
-    if (moved) {
-      res.redirect(301, `/knowledge${moved[1] ?? ''}`);
-      return;
-    }
     // The page itself always revalidates, so a new deploy is picked up on the next visit.
     res.setHeader('cache-control', 'no-cache');
     const kind = routeKind(req.path);

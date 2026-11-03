@@ -12,7 +12,7 @@ const SHOWN = 3;
 /**
  * "Научи днес": a few "Знаеше ли?" facts from the match just played, the ones behind the questions you missed first —
  * that's when "so that's why" lands best. Here there's time to read, so the match itself never had to stop for them.
- * `added`: how many of them went into „Моят алманах“ (got right, or stopped on to read).
+ * `added`: how many of them went into „Моите знания“ (got right, or stopped on to read).
  */
 export function LearnedToday({ items, added }: { items: ReviewItem[]; added: number }) {
   const withFacts = items.filter((i) => i.fact);

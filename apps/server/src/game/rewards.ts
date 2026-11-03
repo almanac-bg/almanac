@@ -328,7 +328,7 @@ function rewardHuman(
   if (duelWon && counts && payDuelWin(userId, challengeResult!.duel!.friend.id))
     lines.push({ label: `Победа над ${challengeResult!.duel!.friend.username}`, amount: DUEL.winXp });
 
-  // „Моят алманах“ and „Поправителен“ (before the quests: one counts the facts added). A host's own questions aren't the
+  // „Моите знания“ and „Поправителен“ (before the quests: one counts the facts added). A host's own questions aren't the
   // bank's: nothing of them goes into „Моите знания“ or comes back to review.
   const factsAdded = ownSet ? 0 : noteMatch(userId, p.log, review);
 

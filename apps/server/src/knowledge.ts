@@ -25,7 +25,7 @@ import {
 } from './questions';
 
 /**
- * „Моят алманах“: a question's "Знаеше ли?" becomes a player's once they get it right, or stop on it to read it in a
+ * „Моите знания“: a question's "Знаеше ли?" becomes a player's once they get it right, or stop on it to read it in a
  * run played alone. Every question they get right is kept, fact or not: a fact written for it later is theirs too.
  * And „Поправителен“: each question they miss comes back REVIEW.afterDays later, until they've got it right at every
  * step.
