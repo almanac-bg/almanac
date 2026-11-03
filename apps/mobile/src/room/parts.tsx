@@ -1,11 +1,11 @@
 import { actions, api, PRESENCE, plural, toast, useStore } from '@almanac/client';
-import { avatarEmoji, type RoomPlayer, type RoomState, TEAMS, type TeamId } from '@almanac/shared';
+import { type RoomPlayer, type RoomState, TEAMS, type TeamId } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, LoadError, T } from '@/ui';
+import { Avatar, Button, Card, LoadError, T } from '@/ui';
 import { Toggle } from '@/ui/controls';
 
 /**
@@ -67,7 +67,7 @@ function PlayerRow({ room, p, meId, isHost }: { room: RoomState; p: RoomPlayer; 
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}
       >
         <View>
-          <T style={{ fontSize: 30, lineHeight: 36 }}>{avatarEmoji(p.avatar)}</T>
+          <Avatar avatar={p.avatar} frame={p.frame} size={40} />
           {tag && (
             <View
               style={{
@@ -351,7 +351,7 @@ export function InviteFriends({ room }: { room: RoomState }) {
                 borderTopColor: colors.line,
               }}
             >
-              <T style={{ fontSize: 26, lineHeight: 32 }}>{avatarEmoji(f.user.avatar)}</T>
+              <Avatar avatar={f.user.avatar} frame={f.user.frame} size={36} />
               <View style={{ flex: 1 }}>
                 <T variant="bodyStrong" numberOfLines={1}>
                   {f.user.username}

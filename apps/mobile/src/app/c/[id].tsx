@@ -1,5 +1,5 @@
 import { actions, api, fmt, ordinal, plural, seconds, timeAgo, useNow, useStore } from '@almanac/client';
-import { avatarEmoji, BRAND, type ChallengeEntry, type ChallengeInfo, MODES, titleName } from '@almanac/shared';
+import { BRAND, type ChallengeEntry, type ChallengeInfo, MODES, titleName } from '@almanac/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, View } from 'react-native';
@@ -8,7 +8,7 @@ import { DuelCard } from '@/duels/parts';
 import { API_URL } from '@/lib/client';
 import { useLoad, useReloadOnFocus } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, LoadError, Screen, T } from '@/ui';
+import { Avatar, Button, Card, LoadError, Screen, T } from '@/ui';
 
 const MODE = MODES.challenge;
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -129,7 +129,7 @@ function Challenge({ info }: { info: ChallengeInfo }) {
           </T>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          {info.creator && !own && <T style={{ fontSize: 44, lineHeight: 52 }}>{avatarEmoji(info.creator.avatar)}</T>}
+          {info.creator && !own && <Avatar avatar={info.creator.avatar} frame={info.creator.frame} size={56} />}
           <View style={{ flex: 1, gap: 4 }}>
             <T variant="h1" role="heading" style={{ fontFamily: fonts.bold }}>
               {title}
@@ -320,7 +320,11 @@ function EntryRow({ entry, creatorId }: { entry: ChallengeEntry; creatorId: numb
       <T variant="bodyStrong" style={{ minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }}>
         {MEDALS[entry.rank - 1] ?? entry.rank}
       </T>
-      <T style={{ fontSize: 26, lineHeight: 32 }}>{user ? avatarEmoji(user.avatar) : '❔'}</T>
+      {user ? (
+        <Avatar avatar={user.avatar} frame={user.frame} size={36} />
+      ) : (
+        <T style={{ fontSize: 26, lineHeight: 32 }}>❔</T>
+      )}
       <View style={{ flex: 1 }}>
         <T variant="bodyStrong" numberOfLines={1}>
           {name}

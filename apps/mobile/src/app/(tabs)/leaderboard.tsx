@@ -1,19 +1,11 @@
 import { api, fmt, useOpenQueues, useStore } from '@almanac/client';
-import {
-  avatarEmoji,
-  dayKey,
-  type LeaderboardBoard,
-  type LeaderboardEntry,
-  MODES,
-  rankFor,
-  TIME_ZONE,
-} from '@almanac/shared';
+import { dayKey, type LeaderboardBoard, type LeaderboardEntry, MODES, rankFor, TIME_ZONE } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { radius, useColors } from '@/theme';
-import { LoadError, Screen, T } from '@/ui';
+import { Avatar, LoadError, Screen, T } from '@/ui';
 import { Choices } from '@/ui/controls';
 
 const GUEST_LINE = 'Класациите са за играчи с профил: запази прогреса си, за да влезеш в тях.';
@@ -150,7 +142,7 @@ function Row({ entry: e, board, mine }: { entry: LeaderboardEntry; board: Leader
       <T variant="title" style={{ minWidth: 32, textAlign: 'center' }}>
         {MEDALS[e.rank - 1] ?? e.rank}
       </T>
-      <T style={{ fontSize: 24, lineHeight: 30 }}>{avatarEmoji(e.user.avatar)}</T>
+      <Avatar avatar={e.user.avatar} frame={e.user.frame} size={34} />
       <T variant="bodyStrong" style={{ flex: 1 }} numberOfLines={1}>
         {mine ? `${e.user.username} (ти)` : e.user.username}
       </T>

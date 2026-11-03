@@ -1,5 +1,5 @@
 import { api, errorMessage, PRESENCE, sortDuels, timeAgo, useStore } from '@almanac/client';
-import { avatarEmoji, BRAND, type FriendEntry, type FriendsResponse } from '@almanac/shared';
+import { BRAND, type FriendEntry, type FriendsResponse } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, View } from 'react-native';
@@ -9,7 +9,7 @@ import { GroupsSection } from '@/groups/parts';
 import { API_URL } from '@/lib/client';
 import { useLoad } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Field, LoadError, Screen, T } from '@/ui';
+import { Avatar, Button, Field, LoadError, Screen, T } from '@/ui';
 import { Section } from '@/ui/controls';
 
 /** Приятели: add by name, the requests, the list with where each friend is, and a Дуел with any of them. */
@@ -208,9 +208,7 @@ function Person({ entry, hint }: { entry: FriendEntry; hint: string }) {
       })}
     >
       <View>
-        <T style={{ fontSize: 30, lineHeight: 36, opacity: entry.presence === 'offline' ? 0.5 : 1 }}>
-          {avatarEmoji(entry.user.avatar)}
-        </T>
+        <Avatar avatar={entry.user.avatar} frame={entry.user.frame} size={40} dim={entry.presence === 'offline'} />
         <View
           style={{
             position: 'absolute',
