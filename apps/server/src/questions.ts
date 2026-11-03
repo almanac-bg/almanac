@@ -17,6 +17,7 @@ import {
 import { z } from 'zod';
 import { config } from './config';
 import { all, run, tx } from './db';
+import { aroundText, BG_ENDINGS, COMMON_ANSWER, plainWords } from './giveaways';
 import { reportError } from './monitoring';
 import { publicQuestions, questionKey } from './publicQuestions';
 import { installationSecret } from './settings';
@@ -189,14 +190,6 @@ let playable: Map<string, PlayableQuestion> | null = null;
 /** Each question's giveaways both ways (findConflicts): a match never deals two that clash. */
 let conflicts = new Map<string, Set<string>>();
 
-/** An answer named in more questions than this is common knowledge (a country, a big city), not a giveaway. */
-const COMMON_ANSWER = 20;
-const plainWords = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-
 /**
  * Pairs of questions where one names the other's answer — in its question, its "Знаеше ли?" fact (shown before the next
  * question), an order item or a picture's description — as whole words. The bank's tools catch the obvious ones when a
@@ -206,10 +199,7 @@ export function findConflicts(questions: readonly PlayableQuestion[]): Map<strin
   const texts = new Map<string, string>();
   const withWord = new Map<string, string[]>();
   for (const q of questions) {
-    const parts = [q.q, q.fact ?? ''];
-    if (q.kind === 'order') parts.push(...q.items.map((i) => i.text));
-    else if (q.kind !== 'number' && q.image) parts.push(q.image.alt);
-    const text = ` ${plainWords(parts.join(' '))} `;
+    const text = ` ${plainWords(`${q.q} ${aroundText(q)}`)} `;
     texts.set(q.id, text);
     for (const word of new Set(text.split(' ')))
       if (word) {
@@ -248,8 +238,6 @@ export function findConflicts(questions: readonly PlayableQuestion[]): Map<strin
 }
 
 /** Endings a Bulgarian word takes (the article, the plural) that leave it recognisable. */
-const BG_ENDINGS = ['а', 'я', 'ът', 'ят', 'та', 'то', 'те', 'и', 'ите', 'ове', 'овете'];
-
 /** Words most questions share, which say nothing about what a question is about. */
 const COMMON_WORDS = new Set(
   'година години годината колко около какво който която което които първи първия първият първата първото повече според държава държави игра през както между'.split(

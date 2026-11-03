@@ -26,10 +26,19 @@
 //                                                                       its `image` (for `add`). Needs a browser to convert
 //                                                                       them: BROWSER_PATH, or Playwright's own Chromium.
 //
-// bank: "private" (private/questions.json, the default) or "sample" (apps/server/src/data/questions.sample.json).
+// bank: "private" (private/questions.json, the default), "sample" (apps/server/src/data/questions.sample.json), or a
+// bank file's path (a copy to try something on).
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+// The giveaway words, stems and limits, as the server and the bank test have them (Node runs the .ts as it is).
+import {
+  aroundText,
+  COMMON_ANSWER,
+  COMMON_STEMS,
+  plainWords,
+  stems as wordStems,
+} from '../../../apps/server/src/giveaways.ts';
 
 const root = path.resolve(import.meta.dirname, '../../..');
 const BANKS = { private: 'private/questions.json', sample: 'apps/server/src/data/questions.sample.json' };
@@ -99,21 +108,23 @@ const line = (q) => JSON.stringify(Object.fromEntries(KEYS.filter((k) => q[k] !=
 const serialize = (questions) => `[\n${questions.map((q) => `  ${line(q)}`).join(',\n')}\n]\n`;
 
 function load(name = 'private') {
-  if (!BANKS[name]) fail(`unknown bank "${name}" (private or sample)`);
-  const file = path.join(root, BANKS[name]);
+  // A bank by its name, or a file of one (a copy to try something on: the tool's own tests use one).
+  const where = name.endsWith('.json') ? name : BANKS[name];
+  if (!where) fail(`unknown bank "${name}" (private, sample, or a .json file)`);
+  const file = path.resolve(root, where);
   if (!fs.existsSync(file)) {
     fail(
-      `${BANKS[name]} is missing${name === 'private' ? ': clone almanac-questions into private/ (docs/questions.md)' : ''}`,
+      `${where} is missing${name === 'private' ? ': clone almanac-questions into private/ (docs/questions.md)' : ''}`,
     );
   }
   const text = fs.readFileSync(file, 'utf8');
   const questions = JSON.parse(text);
   // Written back in the file's own layout or not at all: a save must never restyle every line.
-  if (serialize(questions) !== text) fail(`${BANKS[name]} isn't in the one-question-per-line layout; not touching it`);
+  if (serialize(questions) !== text) fail(`${where} isn't in the one-question-per-line layout; not touching it`);
   return {
     questions,
     save: () => fs.writeFileSync(file, serialize(questions)),
-    where: BANKS[name],
+    where,
   };
 }
 
@@ -133,32 +144,8 @@ const tidyFact = (fact) =>
     '$1\u00a0',
   );
 
-/** Question words: every other question has them, so they say nothing about two being the same. */
-const COMMON = new Set([
-  'колко',
-  'която',
-  'което',
-  'които',
-  'какво',
-  'какъв',
-  'каква',
-  'какви',
-  'годин',
-  'чийто',
-  'чиято',
-  'бълга',
-]);
-
-/** Rough word stems (the first five letters of each word of five or more): enough to spot the same question reworded. */
-const stems = (text) =>
-  new Set(
-    text
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((w) => w.length >= 5 || /^\d{3,}$/.test(w))
-      .map((w) => w.slice(0, 5))
-      .filter((w) => !COMMON.has(w)),
-  );
+/** Rough word stems (src/giveaways.ts, shared with the server and the bank test): numbers of three digits or more too. */
+const stems = (text) => wordStems(text, { numbers: true });
 
 /** Each category's counts, and what it lacks to be balanced: every category the same size, split as a match draws
  * (SHARE), reached by adding only — the smallest such size (a multiple of 5) that no category or difficulty is over.
@@ -180,9 +167,10 @@ function balance(all, atLeast = 0) {
     ) * 5,
   );
   const target = { easy: size * SHARE.easy, medium: size * SHARE.medium, hard: size * SHARE.hard };
-  for (const r of rows)
-    r.short = Object.fromEntries(DIFFICULTIES.map((d) => [d, Math.max(0, Math.round(target[d] - r.count[d]))]));
-  return { rows, size, target };
+  // What each category and difficulty lacks to get there.
+  const short = (r) =>
+    Object.fromEntries(DIFFICULTIES.map((d) => [d, Math.max(0, Math.round(target[d] - r.count[d]))]));
+  return { rows: rows.map((r) => ({ ...r, short: short(r) })), size, target };
 }
 
 /**
@@ -283,7 +271,9 @@ async function commonsFile(title) {
   const license = licence(short);
   if (!license || (meta.NonFree?.value && meta.NonFree.value !== 'false'))
     return { error: `the licence «${short || '?'}» isn't one the bank takes` };
-  const credit = plain(meta.Artist?.value ?? '').slice(0, 120) || (license === 'PD' ? 'неизвестен автор' : '');
+  // A public-domain work with no author on its page: credited as such (`license` is the licence's record, not its
+  // name: compared as a string, every one of them was left out — found by type-checking this file, REPO-9).
+  const credit = plain(meta.Artist?.value ?? '').slice(0, 120) || (license.license === 'PD' ? 'неизвестен автор' : '');
   if (!credit) return { error: 'no author to credit' };
   return { ...license, credit, page: info.descriptionurl, url: info.thumburl ?? info.url };
 }
@@ -304,7 +294,9 @@ async function convert(browser, bytes) {
           const w = Math.max(1, Math.round(bitmap.width * scale));
           const h = Math.max(1, Math.round(bitmap.height * scale));
           const canvas = new OffscreenCanvas(w, h);
+          // A 2D context: every browser that runs this has one (the check says so to the type checker too).
           const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('no 2D canvas in this browser');
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(bitmap, 0, 0, w, h);
           for (const quality of [0.86, 0.8, 0.72, 0.64, 0.56, 0.48]) {
@@ -335,9 +327,9 @@ switch (command) {
     console.log(`${where}: ${questions.length} questions, ${questions.filter((q) => q.fact).length} with a fact`);
     const { rows, size, target } = balance(questions);
     for (const r of rows) {
-      const short = DIFFICULTIES.map((d) => [d, r.short[d]]).filter(([, n]) => n > 0);
+      const short = DIFFICULTIES.filter((d) => r.short[d] > 0);
       console.log(
-        `${r.category.padEnd(11)} ${String(r.total).padStart(4)}  easy ${r.count.easy} · medium ${r.count.medium} · hard ${r.count.hard}  facts ${r.facts}  next ${r.next}${short.length ? `  to balance: ${short.map(([d, n]) => `+${n} ${d}`).join(', ')}` : ''}`,
+        `${r.category.padEnd(11)} ${String(r.total).padStart(4)}  easy ${r.count.easy} · medium ${r.count.medium} · hard ${r.count.hard}  facts ${r.facts}  next ${r.next}${short.length ? `  to balance: ${short.map((d) => `+${r.short[d]} ${d}`).join(', ')}` : ''}`,
       );
     }
     const missing = rows.reduce((sum, r) => sum + size - r.total, 0);
@@ -499,12 +491,8 @@ switch (command) {
     const { questions } = load(args[0]?.endsWith('.json') ? args[1] : args[0]);
     const all = [...questions, ...extra.map((q, i) => ({ ...q, id: q.id ?? q.tid ?? `#${i + 1}` }))];
     const mine = new Set(extra.length ? all.slice(questions.length) : all);
-    const norm = (s) =>
-      ` ${s
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, ' ')
-        .trim()} `;
-    const around = (q) => [q.fact ?? '', ...(q.items ?? []).map((i) => i.text), q.image?.alt ?? q.alt ?? ''].join(' ');
+    const norm = (s) => ` ${plainWords(s)} `;
+    const around = aroundText;
     const texts = all.map((q) => ({
       q,
       text: norm(q.q),
@@ -513,7 +501,6 @@ switch (command) {
       allWords: stems(`${q.q} ${around(q)}`),
     }));
     // As the server sees it: an answer more than COMMON_ANSWER questions name is common knowledge, not a giveaway.
-    const COMMON_ANSWER = 20;
     let found = 0;
     for (const a of all) {
       const isNumber = kindOf(a) === 'number';
@@ -543,7 +530,7 @@ switch (command) {
           .split(/[^\p{L}\p{N}]+/u)
           .filter((w) => w.length >= 4)
           .map((w) => w.slice(0, 4))
-          .filter((w) => !COMMON.has(w)),
+          .filter((w) => !COMMON_STEMS.has(w)),
       );
     let self = 0;
     for (const q of all) {
@@ -652,7 +639,7 @@ switch (command) {
           continue;
         }
         const file = await commonsFile(d.commons);
-        if (file.error) {
+        if (file.error !== undefined) {
           console.log(`${label}: ${file.error} — left out`);
           continue;
         }
