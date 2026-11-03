@@ -15,7 +15,13 @@ import {
   scrubPaths,
 } from '@almanac/shared';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { NetworkBusyError, resolveSession, ServerBusyError, sessionTokenFromCookieHeader } from './auth';
+import {
+  NetworkBusyError,
+  resolveSession,
+  ServerBusyError,
+  sessionTokenFromCookieHeader,
+  sessionTokenOf,
+} from './auth';
 import { challengePreview } from './challenges';
 import { requireProtocol } from './clients';
 import { config } from './config';
@@ -136,7 +142,7 @@ app.post('/api/monitoring', express.text({ type: () => true, limit: '256kb' }), 
     return;
   }
   // An account's reports have half the budget kept for them (a guest's are anyone's: a guest is one request away).
-  const userId = resolveSession(sessionTokenFromCookieHeader(req.headers.cookie))?.userId;
+  const userId = resolveSession(sessionTokenOf(req))?.userId;
   const account = !!userId && !getUser(userId)?.is_guest;
   res.status(typeof req.body === 'string' && forwardEnvelope(req.body, { account }) ? 200 : 400).end();
 });

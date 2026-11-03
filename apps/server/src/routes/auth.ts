@@ -1,20 +1,19 @@
 import { BRAND, USERNAME } from '@almanac/shared';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
-import { Router } from 'express';
+import { type Request, Router } from 'express';
 import { z } from 'zod';
 import { bannedDataToken, getMe } from '../account';
 import {
   confirmSession,
-  createSession,
   destroySession,
   hashPassword,
   hashToken,
+  issueSession,
   knownDevice,
   needsRehash,
   requireAuth,
   secondFactorGiven,
-  sessionTokenFromCookieHeader,
-  setDeviceCookie,
+  sessionTokenOf,
   setSessionCookie,
   userIdFromRequest,
   verifyPassword,
@@ -139,9 +138,8 @@ authRouter.post('/auth/register', async (req, res) => {
   // The account is made either way; a verification mail that couldn't go is said, not passed over.
   const mail = creds.email ? requestEmailChange(userId, creds.email, network(req.ip)) : null;
   count('signups');
-  setSessionCookie(res, createSession(userId));
-  setDeviceCookie(res, userId);
-  res.status(201).json({ user: getMe(userId), ...(mail && !mail.ok && { emailNotSent: mail.error }) });
+  const issued = issueSession(req, res, userId);
+  res.status(201).json({ user: getMe(userId), ...issued, ...(mail && !mail.ok && { emailNotSent: mail.error }) });
 });
 
 authRouter.post('/auth/login', async (req, res) => {
@@ -187,9 +185,8 @@ authRouter.post('/auth/login', async (req, res) => {
       user.id,
     );
   }
-  setSessionCookie(res, createSession(user.id));
-  setDeviceCookie(res, user.id);
-  res.json({ user: getMe(user.id) });
+  const issued = issueSession(req, res, user.id);
+  res.json({ user: getMe(user.id), ...issued });
 });
 
 /** Always answers the same way, so it can't be used to discover accounts or emails. */
@@ -225,9 +222,8 @@ authRouter.post('/auth/reset', async (req, res) => {
     res.status(403).json({ error: ban, dataToken: bannedDataToken(result.userId) });
     return;
   }
-  setSessionCookie(res, createSession(result.userId));
-  setDeviceCookie(res, result.userId);
-  res.json({ user: getMe(result.userId) });
+  const issued = issueSession(req, res, result.userId);
+  res.json({ user: getMe(result.userId), ...issued });
 });
 
 /** The token alone proves mailbox ownership, so this works signed out too. */
@@ -275,12 +271,12 @@ authRouter.post('/auth/guest', (req, res) => {
     void reportError(new Error('Over 5,000 new guests in an hour'), 'guest flood');
   const userId = createGuest({ room: (req.body as { room?: unknown } | undefined)?.room === true });
   count('guests');
-  setSessionCookie(res, createSession(userId, false));
-  res.status(201).json({ user: getMe(userId) });
+  const issued = issueSession(req, res, userId, { withPassword: false, device: false });
+  res.status(201).json({ user: getMe(userId), ...issued });
 });
 
 authRouter.post('/auth/logout', (req, res) => {
-  const token = sessionTokenFromCookieHeader(req.headers.cookie);
+  const token = sessionTokenOf(req);
   if (token) {
     destroySession(token);
     disconnectSession(hashToken(token)); // the socket of every tab on this session too
@@ -331,7 +327,7 @@ authRouter.post('/auth/2fa/enable', requireAuth, requireStaff, (req, res) => {
     return;
   }
   run('UPDATE users SET totp_on_at = ?, totp_step = ? WHERE id = ?', Date.now(), step, user.id);
-  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  secondFactorGiven(sessionTokenOf(req)!);
   res.json({ ok: true });
 });
 
@@ -371,14 +367,14 @@ authRouter.post('/auth/2fa', requireAuth, requireStaff, (req, res) => {
   }
   run('UPDATE users SET totp_step = ? WHERE id = ?', step, user.id);
   secondFactorPassed(user, 'code');
-  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  secondFactorGiven(sessionTokenOf(req)!);
   res.json({ ok: true });
 });
 
 // ─── Passkeys: the second factor without a code (passkeys.ts) ────────────────
 
 /** The session's own key for a ceremony (its token hashed: nothing raw is kept in memory). */
-const ceremonyKey = (cookie: string | undefined) => hashToken(sessionTokenFromCookieHeader(cookie)!);
+const ceremonyKey = (req: Request) => hashToken(sessionTokenOf(req)!);
 
 /** The second factors this staff member has: the app's code (on or not) and their passkeys. */
 authRouter.get('/auth/2fa/methods', requireAuth, requireStaff, (_req, res) => {
@@ -397,7 +393,7 @@ authRouter.post('/auth/2fa/passkeys/options', requireAuth, requireStaff, require
     res.status(400).json({ error: `Имаш ${MAX_PASSKEYS} ключа за достъп: премахни някой, преди да добавиш нов.` });
     return;
   }
-  res.json(await registrationOptions(user, ceremonyKey(req.headers.cookie)));
+  res.json(await registrationOptions(user, ceremonyKey(req)));
 });
 
 const Ceremony = z.object({ response: z.looseObject({ id: z.string().max(1024), type: z.literal('public-key') }) });
@@ -413,12 +409,12 @@ authRouter.post('/auth/2fa/passkeys', requireAuth, requireStaff, requireRecentPa
   const name = deviceName(req.headers['user-agent']);
   // The rest of the answer's shape is the library's to check (verifyRegistrationResponse).
   const response = body.response as unknown as RegistrationResponseJSON;
-  if (!(await registerPasskey(user, ceremonyKey(req.headers.cookie), response, name))) {
+  if (!(await registerPasskey(user, ceremonyKey(req), response, name))) {
     res.status(400).json({ error: 'Ключът не беше приет. Започни отначало.' });
     return;
   }
   passkeyChanged(user, 'passkey-added');
-  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  secondFactorGiven(sessionTokenOf(req)!);
   res.json({ ok: true });
 });
 
@@ -433,7 +429,7 @@ authRouter.post('/auth/2fa/passkey/options', requireAuth, requireStaff, async (r
     res.status(429).json({ error: 'Твърде много опити. Изчакай няколко минути.' });
     return;
   }
-  res.json(await signInOptions(user, ceremonyKey(req.headers.cookie)));
+  res.json(await signInOptions(user, ceremonyKey(req)));
 });
 
 /**
@@ -446,12 +442,12 @@ authRouter.post('/auth/2fa/passkey', requireAuth, requireStaff, async (req, res)
   const user = getUser(res.locals.userId)!;
   // The rest of the answer's shape is the library's to check (verifyAuthenticationResponse).
   const response = body.response as unknown as AuthenticationResponseJSON;
-  if (!(await signInWithPasskey(user, ceremonyKey(req.headers.cookie), response))) {
+  if (!(await signInWithPasskey(user, ceremonyKey(req), response))) {
     res.status(400).json({ error: 'Ключът не беше приет. Опитай пак.' });
     return;
   }
   secondFactorPassed(user, 'passkey');
-  secondFactorGiven(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  secondFactorGiven(sessionTokenOf(req)!);
   res.json({ ok: true });
 });
 
@@ -470,6 +466,6 @@ authRouter.delete('/auth/2fa/passkeys/:id', requireAuth, requireStaff, requireRe
 authRouter.post('/auth/confirm', requireAuth, requireAccount, async (req, res) => {
   const body = parse(z.object({ password: z.string().min(1, 'Въведи паролата си.').max(200) }), req, res);
   if (!body || !(await confirmPassword(res, body.password))) return;
-  confirmSession(sessionTokenFromCookieHeader(req.headers.cookie)!);
+  confirmSession(sessionTokenOf(req)!);
   res.json({ ok: true });
 });

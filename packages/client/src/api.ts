@@ -2,6 +2,7 @@ import type {
   AchievementProgress,
   AdminSummary,
   AppNotification,
+  AppSession,
   CaseDecision,
   CategoryId,
   ChallengeInfo,
@@ -53,6 +54,12 @@ import type {
 } from '@almanac/shared';
 import { CLIENT_HEADER, clientHeader, UPDATE_REQUIRED } from '@almanac/shared';
 import { clientConfig, clientInfo, updateRequired } from './config';
+
+/**
+ * A new session: the web's comes as its cookie, an app's in `session` (the server tells them apart: auth.ts →
+ * fromApp), for the app to keep and give back through ClientConfig.authHeaders and socketAuth.
+ */
+export type SignedIn = { user: MeUser; session?: AppSession };
 
 /** A set as its editor sends it: a name and its questions. */
 export type SetBody = { name: string; questions: SetQuestion[] };
@@ -170,20 +177,19 @@ async function request<T>(method: string, path: string, body?: unknown, again = 
 export const api = {
   me: () => request<{ user: MeUser | null }>('GET', '/me'),
   site: () => request<SiteInfo>('GET', '/legal'),
-  login: (username: string, password: string) =>
-    request<{ user: MeUser }>('POST', '/auth/login', { username, password }),
+  login: (username: string, password: string) => request<SignedIn>('POST', '/auth/login', { username, password }),
   /** `emailNotSent`: the account is made, but the verification mail couldn't go (why). */
   register: (username: string, password: string, email?: string) =>
-    request<{ user: MeUser; emailNotSent?: string }>('POST', '/auth/register', { username, password, email }),
+    request<SignedIn & { emailNotSent?: string }>('POST', '/auth/register', { username, password, email }),
   logout: () => request<{ ok: true }>('POST', '/auth/logout'),
   /** The password again, for what needs a recent one (see onPasswordNeeded). */
   confirmPassword: (password: string) => request<{ ok: true }>('POST', '/auth/confirm', { password }),
   /** Play first, sign up later: a guest account on this device. */
   /** `room`: to join a room from its link (a pupil in a class): the guest is erased within an hour of leaving. */
-  guest: (room = false) => request<{ user: MeUser }>('POST', '/auth/guest', room ? { room } : undefined),
+  guest: (room = false) => request<SignedIn>('POST', '/auth/guest', room ? { room } : undefined),
   /** A guest picks a name and password; everything played so far stays. */
   claim: (username: string, password: string, email?: string) =>
-    request<{ user: MeUser }>('POST', '/account/claim', { username, password, email: email || undefined }),
+    request<SignedIn>('POST', '/account/claim', { username, password, email: email || undefined }),
   setReminders: (on: boolean) => request<{ user: MeUser }>('POST', '/account/reminders', { on }),
   setBeatenMails: (on: boolean) => request<{ user: MeUser }>('POST', '/account/beaten-mails', { on }),
   pushKey: () => request<{ key: string | null }>('GET', '/push/key'),
@@ -202,8 +208,7 @@ export const api = {
   remindersOff: (u: string, k: string) =>
     request<{ ok: true }>('POST', `/reminders/off?u=${encodeURIComponent(u)}&k=${encodeURIComponent(k)}`),
   forgotPassword: (login: string) => request<{ ok: true }>('POST', '/auth/forgot', { login }),
-  resetPassword: (token: string, password: string) =>
-    request<{ user: MeUser }>('POST', '/auth/reset', { token, password }),
+  resetPassword: (token: string, password: string) => request<SignedIn>('POST', '/auth/reset', { token, password }),
   verifyEmail: (token: string) => request<{ ok: true }>('POST', '/auth/verify-email', { token }),
   /** A new address needs the password; re-sending the link to the pending one doesn't. */
   setEmail: (email: string, password?: string) =>

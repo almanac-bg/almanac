@@ -5,12 +5,11 @@ import { z } from 'zod';
 import { bannedDataUser, deleteAccount, exportAccount, getMe, updateLoadout } from '../account';
 import { achievementProgress } from '../achievements';
 import {
-  createSession,
   hashPassword,
   hashToken,
+  issueSession,
   requireAuth,
-  sessionTokenFromCookieHeader,
-  setDeviceCookie,
+  sessionTokenOf,
   setSessionCookie,
   userIdFromRequest,
 } from '../auth';
@@ -131,7 +130,7 @@ accountRouter.post('/account/password', requireAuth, requireAccount, async (req,
     res.locals.userId,
     body.current,
     body.next,
-    sessionTokenFromCookieHeader(req.headers.cookie),
+    sessionTokenOf(req),
     wideNetwork(req.ip),
   );
   if (!result.ok) {
@@ -208,19 +207,18 @@ accountRouter.post('/account/claim', requireAuth, async (req, res) => {
     res.status(409).json({ error: 'Това име вече е заето.' });
     return;
   }
-  // The account gets a session of its own: whoever else held the guest's cookie (copied off this device, or planted
+  // The account gets a session of its own: whoever else held the guest's session (copied off this device, or planted
   // in it before the name and password were set) is left holding nothing. Their open sockets go a few seconds later,
-  // once this answer has given the player's tabs the new cookie to come back with.
-  const guestSession = sessionTokenFromCookieHeader(req.headers.cookie);
+  // once this answer has given the player's tabs the new cookie (an app, its new token) to come back with.
+  const guestSession = sessionTokenOf(req);
   run('DELETE FROM sessions WHERE user_id = ?', me.id);
-  setSessionCookie(res, createSession(me.id));
+  const issued = issueSession(req, res, me.id);
   if (guestSession) setTimeout(() => disconnectSession(hashToken(guestSession)), 5_000).unref();
   if (creds.email) requestEmailChange(me.id, creds.email, network(req.ip));
   // Made before today, the account is on the day's board now, with today's run if it played one.
   joinBoardAfterSave(me.id);
   count('claims');
-  setDeviceCookie(res, me.id);
-  res.json({ user: getMe(me.id) });
+  res.json({ user: getMe(me.id), ...issued });
 });
 
 /**
@@ -412,7 +410,7 @@ accountRouter.post('/push/subscribe', requireAuth, requireAccount, (req, res) =>
     res.status(429).json({ error: 'Твърде много опити. Опитай утре.' });
     return;
   }
-  const token = sessionTokenFromCookieHeader(req.headers.cookie);
+  const token = sessionTokenOf(req);
   if (subscribe(res.locals.userId, sub, token ? hashToken(token) : null))
     push(res.locals.userId, 'hello', {
       title: 'Известията работят ✓',

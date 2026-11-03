@@ -210,7 +210,13 @@ export function createRealtime(httpServer: HttpServer, trustProxy: (addr: string
   io.use((socket, next) => {
     // A client too old for this server's protocol (clients.ts): told so before anything else, so it updates.
     if (tooOld(parseClient(socket.handshake.auth))) return next(new Error(UPDATE_REQUIRED));
-    const token = sessionTokenFromCookieHeader(socket.request.headers.cookie);
+    // An app's session comes in the socket's `auth` (it keeps no cookies), the web's in the cookie (auth.ts →
+    // sessionTokenOf, as for /api).
+    const given = (socket.handshake.auth as { token?: unknown } | undefined)?.token;
+    const token =
+      typeof given === 'string' && /^[\w-]{20,100}$/.test(given)
+        ? given
+        : sessionTokenFromCookieHeader(socket.request.headers.cookie);
     const userId = resolveSession(token)?.userId;
     if (!token || !userId || !getUser(userId)) return next(new Error('unauthorized'));
     // A handful of tabs is normal; dozens of sockets for one account is not.

@@ -1,8 +1,11 @@
 // End-to-end, which clients the server takes: each says what it is and which protocol it speaks (packages/shared →
-// client.ts), on the socket and on every /api request, and one older than its platform's minimum is told to update.
+// client.ts), on the socket and on every /api request, and one older than its platform's minimum is told to update;
+// and how an app, which keeps no cookies, holds its session.
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { CLIENT_HEADER, clientHeader, PROTOCOL, parseClient, UPDATE_REQUIRED } from '@almanac/shared';
+import { type AppSession, CLIENT_HEADER, clientHeader, PROTOCOL, parseClient, UPDATE_REQUIRED } from '@almanac/shared';
 import { io } from 'socket.io-client';
 import { type Account, guest, startServer, type TestServer } from './helpers';
 
@@ -110,3 +113,115 @@ test(
     assert.equal(await connectAs(undefined), 'connected', 'one that says nothing is let through');
   },
 );
+
+// An app keeps no cookies: a new session comes to it in the answer, and goes back as `Authorization: Bearer` (and in
+// the socket's `auth`). A web page never gets one that way (the 31 October review, 8n.6).
+const APP = { 'x-almanac-client': `ios ${PROTOCOL} 1.0.0+1`, 'content-type': 'application/json' };
+const signUpApp = (username: string, headers: Record<string, string> = {}) =>
+  fetch(`${srv.url}/api/auth/register`, {
+    method: 'POST',
+    headers: { ...APP, ...headers },
+    body: JSON.stringify({ username, password: 'secret123' }),
+  });
+
+test(
+  'an app signs up and gets its session in the answer, not as a cookie, and uses it as a Bearer token',
+  T,
+  async () => {
+    const res = await signUpApp('prilozhenie');
+    assert.equal(res.status, 201);
+    const { session, user } = (await res.json()) as { session: AppSession; user: { id: number } };
+    assert.match(session.token, /^[\w-]{43}$/);
+    assert.match(session.device!, /^[\w-]+\.[\w-]+$/);
+    assert.deepEqual(res.headers.getSetCookie(), [], 'no cookie for an app');
+    const me = (token: string) =>
+      fetch(`${srv.url}/api/me`, { headers: { ...APP, authorization: `Bearer ${token}` } }).then((r) => r.json());
+    assert.equal(((await me(session.token)) as { user: { id: number } }).user.id, user.id);
+
+    // The socket: the token in its auth.
+    const socket = io(srv.url, {
+      transports: ['websocket'],
+      forceNew: true,
+      reconnection: false,
+      auth: { token: session.token, client: 'ios', protocol: PROTOCOL, build: '1.0.0+1' },
+    });
+    assert.equal(
+      await new Promise<string>((resolve) => {
+        socket.on('connect', () => resolve('connected'));
+        socket.on('connect_error', (err) => resolve(err.message));
+      }),
+      'connected',
+    );
+    socket.close();
+
+    // Signing out ends that session, and the token with it.
+    const out = await fetch(`${srv.url}/api/auth/logout`, {
+      method: 'POST',
+      headers: { ...APP, authorization: `Bearer ${session.token}` },
+    });
+    assert.equal(out.status, 200);
+    assert.equal(((await me(session.token)) as { user: null }).user, null);
+  },
+);
+
+test(
+  'a page that says it is an app still gets a cookie: a session in the answer is only for what no browser sends',
+  T,
+  async () => {
+    for (const headers of [{ origin: 'https://almanac.test' }, { 'sec-fetch-site': 'same-origin' }]) {
+      const res = await signUpApp(`stranica_${'origin' in headers ? 'o' : 's'}`, headers);
+      assert.equal(res.status, 201, JSON.stringify(headers));
+      assert.equal(((await res.json()) as { session?: AppSession }).session, undefined, JSON.stringify(headers));
+      assert.ok(
+        res.headers.getSetCookie().some((c) => c.startsWith('almanac_session=')),
+        JSON.stringify(headers),
+      );
+    }
+  },
+);
+
+test(
+  "an app's device mark keeps its sign-in open while wrong passwords from elsewhere run the account's out",
+  T,
+  async () => {
+    const { session } = (await (await signUpApp('zaklyuchena_app')).json()) as { session: AppSession };
+    const login = (password: string, from: string, extra: Record<string, string> = {}) =>
+      fetch(`${srv.url}/api/auth/login`, {
+        method: 'POST',
+        headers: { ...APP, 'x-forwarded-for': from, ...extra },
+        body: JSON.stringify({ username: 'zaklyuchena_app', password }),
+      });
+    const statuses: number[] = [];
+    for (let net = 1; net <= 4; net++) {
+      const tries = await Promise.all(
+        Array.from({ length: 10 }, () => login('wrong-password', `198.51.100.${net + 10}`)),
+      );
+      statuses.push(...tries.map((r) => r.status));
+    }
+    assert.ok(statuses.includes(429), "the account's sign-in attempts ran out");
+    assert.equal((await login('secret123', '203.0.113.19')).status, 429, 'a device it has never signed in on waits');
+    const back = await login('secret123', '203.0.113.19', { 'x-almanac-device': session.device! });
+    assert.equal(back.status, 200, 'the one it signed in on before does not');
+    assert.ok(((await back.json()) as { session?: AppSession }).session?.token, 'and gets a session of its own');
+  },
+);
+
+test('a guest app gets a session with no device mark (no password to guard)', T, async () => {
+  const res = await fetch(`${srv.url}/api/auth/guest`, { method: 'POST', headers: APP });
+  assert.equal(res.status, 201);
+  const { session } = (await res.json()) as { session: AppSession };
+  assert.ok(session.token);
+  assert.equal(session.device, undefined);
+});
+
+// A route that read the cookie itself would sign an app out without a word: the session is read in one place
+// (auth.ts → sessionTokenOf), besides the page (index.ts: pages are the web's) and the socket's fallback for the web.
+test('no route reads the session cookie by itself', () => {
+  const src = path.resolve(import.meta.dirname, '../src');
+  const readers = fs
+    .readdirSync(src, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.ts'))
+    .filter((f) => /sessionTokenFromCookieHeader\(/.test(fs.readFileSync(path.join(src, f), 'utf8')))
+    .sort();
+  assert.deepEqual(readers, ['auth.ts', 'index.ts', 'realtime.ts']);
+});
