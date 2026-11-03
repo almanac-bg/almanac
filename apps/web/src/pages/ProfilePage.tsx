@@ -112,14 +112,12 @@ export function ProfilePage() {
               </Link>
             </div>
           ) : (
-            // Friends and reports need a saved account; a guest gets nothing here that would only be refused.
-            !me.isGuest && (
-              <div className={clsx('flex flex-wrap items-center gap-2', HEADER_ACTIONS)}>
-                <FriendActions profile={data} onChange={setData} />
-                <ReportButton username={user.username} />
-                <BlockButton profile={data} onChange={setData} />
-              </div>
-            )
+            // Friends need a saved account; reporting and blocking anyone may (the stores ask it of every player).
+            <div className={clsx('flex flex-wrap items-center gap-2', HEADER_ACTIONS)}>
+              {!me.isGuest && <FriendActions profile={data} onChange={setData} />}
+              <ReportButton username={user.username} />
+              <BlockButton profile={data} onChange={setData} />
+            </div>
           )}
         </div>
       </Card>
@@ -480,9 +478,9 @@ function BlockButton({ profile, onChange }: { profile: ProfileStats; onChange: (
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title={`Да блокирам ли ${user.username}?`}>
         <p className="text-fg-2">
-          Профилът изчезва от приятелите ти (ако е там) и никой от двама ви не може да праща покана на другия. Можеш да
-          го отблокираш по всяко време от Настройки. Ако има нарушение, докладвай го — блокирането не стига до
-          модераторите.
+          Профилът изчезва от приятелите ти (ако е там), никой от двама ви не праща покани на другия и не влиза в стаята
+          му, а класираните мачове не ви събират — нито със запис на мач на другия. Можеш да го отблокираш по всяко
+          време от Настройки. Ако има нарушение, докладвай го — блокирането не стига до модераторите.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setOpen(false)}>

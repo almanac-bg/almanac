@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { codeAt, stepAt } from '../../server/src/totp';
 import { serverDb } from '../playwright.config';
-import { choose, expect, makeModerator, type Page, signIn, signUp, test, uniqueName } from './support';
+import { choose, expect, makeModerator, type Page, signIn, signUp, startAsGuest, test, uniqueName } from './support';
 
 /** A moderator's authenticator app, set up from this page's session (as the admin page does it). */
 async function secondFactor(page: Page) {
@@ -142,6 +142,50 @@ test('a report about a set is a case: the moderator reads the set and hides it, 
       .notifications[0].text;
   expect(await note(owner)).toMatch(/Модератор скри набора ти „Обиден набор“.*Въпросът обижда човек\..*до 6 месеца/);
   expect(await note(reporter)).toMatch(/Разгледахме доклада ти за „Обиден набор“: наборът е скрит/);
+});
+
+// A guest meets names and sets like anyone: reporting and blocking are theirs too (the stores ask it of every player;
+// the 31 October review, 8n.4).
+test('a guest reports a player and blocks them from the profile, and reports a shared set', async ({
+  page,
+  newPlayer,
+}) => {
+  const other = await newPlayer();
+  const name = uniqueName('Нахален');
+  await signUp(other, name, 'parola-123');
+  const made = await other.request.post('/api/sets', {
+    data: {
+      name: 'Набор за сигнал',
+      questions: [{ kind: 'truefalse', q: `Въпрос ${uniqueName('гост')}?`, answer: true }],
+    },
+  });
+  expect(made.ok()).toBe(true);
+  const { id } = (await made.json()) as { id: number };
+  const { code } = (await (await other.request.get(`/api/sets/${id}`)).json()) as { code: string };
+
+  await startAsGuest(page);
+  await page.goto(`/profile/${encodeURIComponent(name)}`);
+  await expect(page.getByRole('button', { name: 'Добави приятел' }), 'friends are for an account').toHaveCount(0);
+  await page.getByRole('button', { name: 'Докладвай играча' }).click();
+  await page.getByLabel('Обидно или неподходящо име').check();
+  await page.getByRole('button', { name: 'Изпрати доклад' }).click();
+  await expect(page.getByText('Модератор ще го прегледа, а ти ще научиш какво решихме.')).toBeVisible();
+  await page.getByRole('button', { name: 'Блокирай' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Блокирай' }).click();
+  await expect(page.getByText(`${name} е блокиран профил`)).toBeVisible();
+  // …and Settings lists them, to unblock.
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Блокирани' })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  // A shared set's link: a guest sees it, and reports it; a copy is for an account.
+  await page.goto(`/sets/shared/${code}`);
+  await expect(page.getByRole('heading', { name: 'Набор за сигнал' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Вземи копие за моите стаи' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Сигнализирай' }).click();
+  await page.getByLabel('Обидно или неподходящо съдържание').check();
+  await page.getByRole('button', { name: 'Изпрати', exact: true }).click();
+  await expect(page.getByText('Модератор ще го прегледа, а ти ще научиш какво решихме.')).toBeVisible();
 });
 
 test('a proposed question names where its answer is checked; its author edits or withdraws it while it waits', async ({

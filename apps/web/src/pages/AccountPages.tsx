@@ -217,9 +217,9 @@ export function SettingsPage() {
             <ReminderSettings />
             <BeatenMailSettings />
             <RecordSettings />
-            <BlockedSettings />
           </>
         )}
+        <BlockedSettings />
         <ThemeSettings />
         <SoundSettings />
         <MoreTimeSettings />

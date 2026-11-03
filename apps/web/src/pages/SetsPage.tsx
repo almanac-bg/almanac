@@ -43,6 +43,8 @@ import { NotFoundPage } from './NotFoundPage';
 export function SetsPage() {
   const { id, code } = useParams();
   const guest = useStore((s) => !!s.me?.isGuest);
+  // Another host's set by its link: a guest sees it (and can report it) too; a copy of it is for an account.
+  if (code !== undefined) return <SharedSet code={code} />;
   if (guest)
     return (
       <div className="mx-auto max-w-xl space-y-6">
@@ -50,7 +52,6 @@ export function SetsPage() {
         <GuestNudge>Свои въпроси за стаите правят играчите с профил: запази своя с име и парола.</GuestNudge>
       </div>
     );
-  if (code !== undefined) return <SharedSet code={code} />;
   if (id === undefined) return <SetList />;
   return /^\d{1,12}$/.test(id) ? <SetEditor id={Number(id)} /> : <NotFoundPage />;
 }
@@ -788,6 +789,7 @@ function SharedSet({ code }: { code: string }) {
   usePageTitle('Набор с въпроси');
   const navigate = useNavigate();
   const admin = useStore((s) => !!s.me?.isAdmin);
+  const guest = useStore((s) => !!s.me?.isGuest);
   const { data, error, retry, setData } = useLoad(() => api.sharedSet(code), code);
   const [busy, setBusy] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -866,6 +868,10 @@ function SharedSet({ code }: { code: string }) {
           <Button size="lg" className="mt-6 w-full" onClick={() => navigate(`/sets/${data.mine}`)}>
             Отвори своя набор
           </Button>
+        ) : guest ? (
+          <GuestNudge className="mt-6 text-left">
+            Копие за своите стаи взимат играчите с профил: запази своя с име и парола.
+          </GuestNudge>
         ) : (
           <Button size="lg" className="mt-6 w-full" onClick={() => void copy()} loading={busy} disabled={data.hidden}>
             Вземи копие за моите стаи

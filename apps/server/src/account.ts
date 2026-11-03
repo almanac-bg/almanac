@@ -370,8 +370,10 @@ export function eraseAccount(userId: number) {
     run('UPDATE match_players SET user_id = NULL, name = ? WHERE user_id = ?', DELETED_NAME, userId);
     // Where their recording played someone: the name goes from that history too.
     run('UPDATE match_players SET record_owner_id = NULL, name = ? WHERE record_owner_id = ?', DELETED_NAME, userId);
-    // Reports they filed stay for the record, but their words go with them.
+    // Reports and question flags they filed stay for the record (a wrong answer is still wrong), but their words go
+    // with them; the flags lose their name as the account goes (ON DELETE SET NULL).
     run('UPDATE reports SET details = NULL WHERE reporter_id = ?', userId);
+    run("UPDATE question_reports SET details = '' WHERE user_id = ?", userId);
     // Decisions about them name them (an old name, a reason): they go too. A moderator's own stay, unsigned.
     run('DELETE FROM moderation_log WHERE target_user_id = ?', userId);
     run('DELETE FROM users WHERE id = ?', userId);

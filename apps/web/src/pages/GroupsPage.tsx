@@ -338,11 +338,9 @@ function GroupView({ id }: { id: number }) {
             <Trash2 className="size-4" /> Изтрий групата
           </Button>
         ) : (
-          !me.isGuest && (
-            <Button variant="ghost" onClick={() => setReporting(true)}>
-              <Flag className="size-4" /> Сигнал за името
-            </Button>
-          )
+          <Button variant="ghost" onClick={() => setReporting(true)}>
+            <Flag className="size-4" /> Сигнал за името
+          </Button>
         )}
       </div>
 
@@ -654,16 +652,15 @@ function GroupInvite({ code }: { code: string }) {
           </Button>
         )}
       </Card>
-      {guest ? (
+      {guest && (
         <GuestNudge>В групата ще се виждаш с името на гост. Запази профила си с име, за да те познаят.</GuestNudge>
-      ) : (
-        <div className="text-center">
-          <Button variant="ghost" size="sm" onClick={() => setReporting(true)}>
-            <Flag className="size-4" /> Сигнал за името на групата
-          </Button>
-          <ReportGroup code={code} open={reporting} onClose={() => setReporting(false)} />
-        </div>
       )}
+      <div className="text-center">
+        <Button variant="ghost" size="sm" onClick={() => setReporting(true)}>
+          <Flag className="size-4" /> Сигнал за името на групата
+        </Button>
+        <ReportGroup code={code} open={reporting} onClose={() => setReporting(false)} />
+      </div>
     </div>
   );
 }

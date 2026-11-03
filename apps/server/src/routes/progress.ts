@@ -18,7 +18,7 @@ import { knowledgeCategory, knowledgeOverview } from '../knowledge';
 import { fileReport } from '../moderation';
 import { count } from '../stats';
 import { network, throttled } from '../throttle';
-import { idParam, parse, requireAccount } from './common';
+import { guestCapped, idParam, parse, requireAccount } from './common';
 
 /** „Моите знания“ and groups: what a player builds up over time. */
 export const progress = Router();
@@ -158,7 +158,8 @@ function reportGroup(req: Request, res: Response, group: { id: number; name: str
   res.json({ ok: true });
 }
 
-progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
+progress.post('/groups/:id/report', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
   const id = idParam(req);
   const group = one<{ id: number; name: string }>(
     `SELECT g.id, g.name FROM player_groups g
@@ -169,6 +170,7 @@ progress.post('/groups/:id/report', requireAuth, requireAccount, (req, res) => {
   reportGroup(req, res, group ?? null);
 });
 
-progress.post('/groups/join/:code/report', requireAuth, requireAccount, (req, res) => {
+progress.post('/groups/join/:code/report', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
   reportGroup(req, res, groupByInvite(String(req.params.code)));
 });

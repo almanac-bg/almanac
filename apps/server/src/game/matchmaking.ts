@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type AckResult, MODES, QUEUE_MODES, type QueueModeId, type TeamId } from '@almanac/shared';
 import { config } from '../config';
-import { areFriends } from '../friends';
+import { areFriends, blockedPairs } from '../friends';
 import { guarded } from '../guard';
 import { reportError } from '../monitoring';
 import { friendsChanged, notifyUser } from '../notify';
@@ -175,14 +175,14 @@ export class Matchmaker {
       const q = this.queues[mode];
       const seats = MODES[mode].players;
       // Two pairs (Отбори), or a full match of players.
-      const full = () => (MODES[mode].teams ? q.length >= 2 : waiting(q) >= seats);
-      while (full()) {
-        const parties = MODES[mode].teams ? q.splice(0, 2) : q.splice(0, seats);
+      const need = MODES[mode].teams ? 2 : seats;
+      for (let parties = take(q, need); parties; parties = take(q, need)) {
         this.changed();
         this.launch(mode, parties);
       }
+      // Waited long enough: the first in line, with whoever else is there, and bots for the rest (Отбори: the pair).
       if (q.length > 0 && fill !== null && now - q[0].joinedAt >= fill) {
-        const parties = MODES[mode].teams ? q.splice(0, 1) : q.splice(0, seats);
+        const parties = take(q, MODES[mode].teams ? 1 : seats, 1)!;
         this.changed();
         this.launch(mode, parties);
       }
@@ -294,3 +294,22 @@ export class Matchmaker {
 }
 
 const waiting = (q: Party[]) => q.reduce((n, p) => n + p.userIds.length, 0);
+
+/**
+ * Up to `count` parties for one match, in the order they queued, passing over any with a player who blocked (or was
+ * blocked by) one already in it: blocked players never meet in a ranked match. One passed over waits for the next
+ * match, or for bots. Taken out of the queue only if there are `atLeast` (the first in line always is one).
+ */
+function take(q: Party[], count: number, atLeast = count): Party[] | null {
+  if (q.length < atLeast) return null;
+  const blocked = blockedPairs(q.flatMap((p) => p.userIds));
+  const picked: Party[] = [];
+  for (const party of q) {
+    if (picked.length === count) break;
+    const meets = party.userIds.some((a) => picked.some((p) => p.userIds.some((b) => blocked.has(`${a}:${b}`))));
+    if (!meets) picked.push(party);
+  }
+  if (picked.length < atLeast) return null;
+  for (const party of picked) q.splice(q.indexOf(party), 1);
+  return picked;
+}

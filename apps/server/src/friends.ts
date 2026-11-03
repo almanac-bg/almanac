@@ -36,7 +36,10 @@ export const areFriends = (a: number, b: number) => friendship(a, b) === 'friend
 
 // ─── Blocking ────────────────────────────────────────────────────────────────
 
-/** Either of the two blocked the other: no requests between them (friendship, and with it duels and invites, is gone). */
+/**
+ * Either of the two blocked the other: no requests between them (friendship, and with it duels and invites, is gone),
+ * neither enters the other's room, and no ranked match puts them together (blockedPairs; records.ts too).
+ */
 export const blockedBetween = (a: number, b: number) =>
   !!one(
     'SELECT 1 AS x FROM blocks WHERE (user_id = ? AND blocked_id = ?) OR (user_id = ? AND blocked_id = ?)',
@@ -68,6 +71,26 @@ export function blockPlayer(userId: number, otherId: number): { ok: true } | { o
     );
   });
   return { ok: true };
+}
+
+/**
+ * Who among these players blocked whom, each pair both ways as `${a}:${b}`: ranked matches never put them together
+ * (matchmaking.ts → take).
+ */
+export function blockedPairs(userIds: readonly number[]): Set<string> {
+  const pairs = new Set<string>();
+  if (userIds.length < 2) return pairs;
+  const list = JSON.stringify(userIds);
+  for (const { a, b } of all<{ a: number; b: number }>(
+    `SELECT user_id AS a, blocked_id AS b FROM blocks
+     WHERE user_id IN (SELECT value FROM json_each(?)) AND blocked_id IN (SELECT value FROM json_each(?))`,
+    list,
+    list,
+  )) {
+    pairs.add(`${a}:${b}`);
+    pairs.add(`${b}:${a}`);
+  }
+  return pairs;
 }
 
 export const unblockPlayer = (userId: number, otherId: number) =>
