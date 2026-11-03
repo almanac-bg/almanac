@@ -29,10 +29,11 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowUp, Check, Share2 } from 'lucide-react';
-import { animate, m } from 'motion/react';
+import { animate } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { dailyLinkUrl, offBoardWhy, placeShown } from '../../lib/daily';
+import { m } from '../../lib/motion';
 import { dailyShareText, rememberDailyShare, shareText } from '../../lib/share';
 import { sfx } from '../../lib/sound';
 import { Avatar, LevelBadge, RankBadge } from '../Avatar';

@@ -1,8 +1,9 @@
 import { useStore } from '@almanac/client';
 import clsx from 'clsx';
 import { Check, WifiOff } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { m } from '../lib/motion';
 
 /** A blip shorter than this isn't worth a banner. */
 const GRACE_MS = 1500;

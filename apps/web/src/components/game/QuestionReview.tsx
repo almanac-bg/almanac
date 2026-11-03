@@ -2,8 +2,9 @@ import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } fro
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useId, useState } from 'react';
+import { m } from '../../lib/motion';
 import { keepTogether } from '../../lib/typography';
 import { Radio } from '../controls';
 import { Emoji } from '../Emoji';

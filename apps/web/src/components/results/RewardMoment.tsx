@@ -1,8 +1,9 @@
 import { api, errorMessage, setState as setStore, toast, unlockPreview, useStore } from '@almanac/client';
 import { LEVEL_CHOICES, type MatchRewards, type UnlockRef } from '@almanac/shared';
 import { Check } from 'lucide-react';
-import { AnimatePresence, m, useIsPresent } from 'motion/react';
+import { AnimatePresence, useIsPresent } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
 import { Avatar } from '../Avatar';
 import { LevelChoice } from '../LevelChoice';

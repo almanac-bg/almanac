@@ -2,8 +2,8 @@ import { actions } from '@almanac/client';
 import { emoteById } from '@almanac/shared';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
-import { m } from 'motion/react';
 import { useId, useState } from 'react';
+import { m } from '../../lib/motion';
 import { sfx } from '../../lib/sound';
 import { Emoji } from '../Emoji';
 

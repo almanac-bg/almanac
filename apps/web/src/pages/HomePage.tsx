@@ -11,7 +11,6 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, DoorOpen, Swords } from 'lucide-react';
-import { m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useDuels, usePlayDuel } from '../components/duels';
@@ -29,6 +28,7 @@ import { ProfileCard } from '../components/home/ProfileCard';
 import { QuestsCard } from '../components/home/QuestsCard';
 import { useStartReview } from '../components/knowledge';
 import { Button } from '../components/ui';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 /** Below this the "N играят в момента" count reads as an empty room rather than a busy one, so it stays hidden. */

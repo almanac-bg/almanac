@@ -11,10 +11,11 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, BookOpen, Check, EyeOff, Flag, IdCard, PenLine, ShieldAlert } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useLoad } from '../../lib/load';
+import { m } from '../../lib/motion';
 import { Avatar, LevelBadge } from '../Avatar';
 import { LoadError } from '../LoadError';
 import { Button, Card, EmptyState, Spinner } from '../ui';

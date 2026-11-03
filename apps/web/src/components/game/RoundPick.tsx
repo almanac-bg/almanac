@@ -1,9 +1,9 @@
 import { actions, type LiveGame, useNow } from '@almanac/client';
 import { type CategoryId, categoryById, ROUNDS } from '@almanac/shared';
 import clsx from 'clsx';
-import { m } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useMatchKeysOn } from '../../lib/matchKeys';
+import { m } from '../../lib/motion';
 import { Emoji } from '../Emoji';
 import { Spinner } from '../ui';
 import { KeyHint } from './Powerups';

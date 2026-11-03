@@ -1,7 +1,8 @@
 import { useStore } from '@almanac/client';
 import { ChevronRight } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { Link } from 'react-router';
+import { m } from '../lib/motion';
 
 /** Shown on every other page while a match is still running (e.g. after the back button): one tap returns to it. */
 export function ActiveMatchBar() {

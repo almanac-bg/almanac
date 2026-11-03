@@ -8,7 +8,6 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowLeft, ArrowRight, DoorOpen, Presentation, UsersRound } from 'lucide-react';
-import { m } from 'motion/react';
 import { type FormEvent, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { BannedData } from '../components/BannedData';
@@ -25,6 +24,7 @@ import { type CredentialField, credentialsProblems } from '../lib/credentials';
 import { embeddedChallenge } from '../lib/embedded';
 import { useFitWidth } from '../lib/fitWidth';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { isPainted, paintedReturning } from '../lib/painted';
 import { isReturning, markReturning } from '../lib/returning';
 import { focusPageHeading } from '../lib/routeFocus';

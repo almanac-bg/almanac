@@ -33,7 +33,7 @@ import {
   UserPen,
   Users,
 } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { Avatar, PlayerTag } from '../components/Avatar';
@@ -50,6 +50,7 @@ import { PRESENCE } from '../components/presence';
 import { QrCode } from '../components/QrCode';
 import { Button, Card, Modal, Restoring, Segmented, Spinner, SwitchTrack } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { useForcedTheme } from '../lib/theme';
 import { usePageTitle } from '../lib/title';
 

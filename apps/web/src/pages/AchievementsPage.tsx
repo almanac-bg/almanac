@@ -1,7 +1,6 @@
 import { api, fmt, longDate } from '@almanac/client';
 import { type AchievementProgress, AVATARS, EMOTES, FRAMES, RARITIES, TITLES } from '@almanac/shared';
 import { Lock } from 'lucide-react';
-import { m } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Emoji } from '../components/Emoji';
@@ -10,6 +9,7 @@ import { availableAchievements, useOpenQueues } from '../components/home/openQue
 import { LoadError } from '../components/LoadError';
 import { Card, PageSpinner, ProgressBar, Segmented } from '../components/ui';
 import { useLoad } from '../lib/load';
+import { m } from '../lib/motion';
 import { usePageTitle } from '../lib/title';
 
 type Filter = 'all' | 'unlocked' | 'locked';

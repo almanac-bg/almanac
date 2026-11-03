@@ -1,9 +1,10 @@
 import { actions, dropInvite, toast, useNow, useStore } from '@almanac/client';
 import type { Invite } from '@almanac/shared';
 import { Users } from 'lucide-react';
-import { AnimatePresence, m } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { m } from '../lib/motion';
 import { Avatar } from './Avatar';
 import { Button } from './ui';
 

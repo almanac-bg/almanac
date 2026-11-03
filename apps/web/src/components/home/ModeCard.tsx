@@ -18,10 +18,10 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, CircleHelp, Trophy } from 'lucide-react';
-import { m } from 'motion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { accentFill } from '../../lib/accent';
+import { m } from '../../lib/motion';
 import { savedSoloPace, saveSoloPace } from '../../lib/soloPace';
 import { RankBadge } from '../Avatar';
 import { Emoji } from '../Emoji';

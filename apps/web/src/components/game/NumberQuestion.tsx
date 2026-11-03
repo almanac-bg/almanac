@@ -11,9 +11,9 @@ import {
 } from '@almanac/shared';
 import clsx from 'clsx';
 import { Delete, Flame, Lock, Minus, Plus } from 'lucide-react';
-import { m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { matchKeysOn } from '../../lib/matchKeys';
+import { m } from '../../lib/motion';
 import { Avatar } from '../Avatar';
 import { Slider } from '../controls';
 import { Emoji } from '../Emoji';
