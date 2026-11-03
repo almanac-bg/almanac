@@ -18,6 +18,8 @@ export const palettes = {
     bad: '#fb7185',
     gold: '#fbbf24',
     onFill: '#07060d',
+    avatarHi: '#2a2445',
+    avatarLo: '#0e0c18',
   },
   light: {
     ink: '#f4f3f9',
@@ -34,6 +36,8 @@ export const palettes = {
     bad: '#be123c',
     gold: '#b45309',
     onFill: '#ffffff',
+    avatarHi: '#ffffff',
+    avatarLo: '#e4e1f2',
   },
 } as const;
 

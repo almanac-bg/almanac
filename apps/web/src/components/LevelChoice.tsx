@@ -1,5 +1,5 @@
-import { api, errorMessage, setState as setStore, toast, useStore } from '@almanac/client';
-import { AVATARS, EMOTES, FRAMES, type PendingChoice, TITLES, type UnlockRef } from '@almanac/shared';
+import { api, errorMessage, ITEM_KIND, itemName, setState as setStore, toast, useStore } from '@almanac/client';
+import { EMOTES, type PendingChoice, type UnlockRef } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
@@ -7,16 +7,9 @@ import { Avatar } from './Avatar';
 import { Emoji } from './Emoji';
 import { Button } from './ui';
 
-/** An item's own name („Видра“), without its kind. */
-export function itemName(u: UnlockRef): string {
-  const list = { avatar: AVATARS, frame: FRAMES, title: TITLES, emote: EMOTES }[u.kind] as {
-    id: string;
-    name?: string;
-  }[];
-  return list.find((i) => i.id === u.id)?.name ?? '';
-}
+export { itemName };
 
-const KIND: Record<UnlockRef['kind'], string> = { avatar: 'аватар', frame: 'рамка', title: 'титла', emote: 'емоция' };
+const KIND = ITEM_KIND;
 
 /**
  * A level milestone's reward to pick: its two side by side, and what was left at the milestones before it. Picked, it's
