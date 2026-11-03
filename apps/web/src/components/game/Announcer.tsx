@@ -1,9 +1,6 @@
-import { fmt, type LiveGame, plural } from '@almanac/client';
+import { fmt, LETTERS, type LiveGame, numberText, orderValueText, plural } from '@almanac/client';
 import { categoryById, MODES, ordinal } from '@almanac/shared';
 import { useEffect, useState } from 'react';
-import { LETTERS } from './answers';
-import { numberText } from './numbers';
-import { orderValueText } from './OrderQuestion';
 
 /** A class's host stopped the big screen on an answer: on the pupils' screens, and said to their screen readers. */
 export const PAUSED_NOTE = 'Пауза на големия екран — следващият въпрос идва след нея.';

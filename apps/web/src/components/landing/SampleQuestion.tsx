@@ -1,10 +1,11 @@
+import { LETTERS, OPTION_COLORS } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb, X } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { keepTogether } from '../../lib/typography';
 import { Emoji } from '../Emoji';
-import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
+import { accentText } from '../game/answers';
 
 /** The public sample bank's mus-016, as the game asks it. */
 const SAMPLE = {

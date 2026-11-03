@@ -1,4 +1,4 @@
-import { api, errorMessage, useStore } from '@almanac/client';
+import { actions, api, errorMessage, useStore } from '@almanac/client';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -55,16 +55,27 @@ function Welcome() {
 }
 
 function Home({ name, guest }: { name: string; guest: boolean }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'daily' | 'solo' | 'out' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const connected = useStore((s) => s.connected);
+
+  /** A run alone: the day's ten, or a Соло of mixed questions. The match screen opens as it starts (useRealtime). */
+  async function play(what: 'daily' | 'solo') {
+    setBusy(what);
+    setError(null);
+    const started = what === 'daily' ? await actions.startDaily() : await actions.startSolo('mixed');
+    if (!started.ok) setError(started.error);
+    setBusy(null);
+  }
   async function signOut() {
-    setBusy(true);
+    setBusy('out');
     try {
       await api.logout();
     } catch {
       /* signed out on the phone either way */
     }
     useStore.setState({ me: null });
-    setBusy(false);
+    setBusy(null);
   }
   return (
     <Screen centered>
@@ -74,11 +85,37 @@ function Home({ name, guest }: { name: string; guest: boolean }) {
       <T variant="h1" align="center" role="heading">
         {name}
       </T>
-      <T tone="fg2" align="center">
-        Играта идва в приложението екран по екран: дотогава тя е на almanac.bg, със същия профил.
+      <View style={{ gap: 12, marginTop: 8 }}>
+        <Button
+          title="Въпросите на деня"
+          size="lg"
+          loading={busy === 'daily'}
+          disabled={!connected || !!busy}
+          onPress={() => void play('daily')}
+        />
+        <Button
+          title="Соло"
+          variant="secondary"
+          loading={busy === 'solo'}
+          disabled={!connected || !!busy}
+          onPress={() => void play('solo')}
+        />
+        {!connected && (
+          <T variant="small" tone="fg3" align="center">
+            Свързваме се…
+          </T>
+        )}
+        {error ? (
+          <T variant="small" tone="bad" align="center" role="alert">
+            {error}
+          </T>
+        ) : null}
+      </View>
+      <T variant="small" tone="fg3" align="center">
+        Дуел, стаите и останалото идват в приложението скоро: дотогава са на almanac.bg, със същия профил.
       </T>
       {/* A guest has no name or password to come back with: leaving would lose the account (the web warns first). */}
-      {!guest && <Button title="Изход" variant="secondary" loading={busy} onPress={() => void signOut()} />}
+      {!guest && <Button title="Изход" variant="ghost" loading={busy === 'out'} onPress={() => void signOut()} />}
     </Screen>
   );
 }

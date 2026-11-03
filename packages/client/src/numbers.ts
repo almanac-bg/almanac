@@ -66,3 +66,10 @@ export function maxDigits(n: Pick<NumberInput, 'min' | 'max' | 'step'>): number 
   const whole = Math.max(String(Math.trunc(Math.abs(n.min))).length, String(Math.trunc(Math.abs(n.max))).length);
   return whole + decimalsOf(n.step);
 }
+
+/** An item's value as the reveal shows it: a year as it's written (BC ones „пр.н.е.“), any other number with its unit. */
+export function orderValueText(value: number, unit: string): string {
+  if (!unit && Number.isInteger(value)) return value < 0 ? `${-value} г. пр.н.е.` : String(value);
+  const text = value.toLocaleString('bg-BG', { maximumFractionDigits: 2 });
+  return unit ? `${text} ${unit}` : text;
+}

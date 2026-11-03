@@ -1,5 +1,5 @@
 import { QUIZ_COUNTS } from 'virtual:quiz-counts';
-import { fmt } from '@almanac/client';
+import { fmt, LETTERS } from '@almanac/client';
 import {
   BRAND,
   CATEGORIES,
@@ -28,7 +28,6 @@ import { ArrowRight, Check, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { Emoji } from '../components/Emoji';
-import { LETTERS } from '../components/game/answers';
 import { LegalLinks } from '../components/LegalLinks';
 import { Logo } from '../components/Logo';
 import { buttonClass, Card } from '../components/ui';

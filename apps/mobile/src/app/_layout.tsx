@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { UpdateScreen } from '@/components/UpdateScreen';
 import { restore, useApp } from '@/lib/client';
+import { useRealtime } from '@/lib/realtime';
 import { useColors } from '@/theme';
 
 // The splash stays until the fonts are in and the app knows whether someone is signed in: no flash of the way in for a
@@ -33,6 +34,7 @@ export default function RootLayout() {
   const authChecked = useStore((s) => s.authChecked);
   const updateRequired = useApp((s) => s.updateRequired);
   const ready = (fontsIn || !!fontError) && authChecked;
+  useRealtime();
 
   useEffect(() => {
     void restore();
@@ -49,7 +51,10 @@ export default function RootLayout() {
         {updateRequired ? (
           <UpdateScreen />
         ) : (
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }}>
+            {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
+            <Stack.Screen name="game" options={{ gestureEnabled: false }} />
+          </Stack>
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -2,6 +2,7 @@ import {
   api,
   DIFFICULTY_LABEL,
   errorMessage,
+  LETTERS,
   plural,
   type QuestionReports,
   timeAgo,
@@ -23,7 +24,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useLoad } from '../../lib/load';
 import { m } from '../../lib/motion';
 import { Emoji } from '../Emoji';
-import { LETTERS } from '../game/answers';
 import { RightOrderList } from '../game/OrderQuestion';
 import { QuestionPicture } from '../game/QuestionPicture';
 import { LoadError } from '../LoadError';

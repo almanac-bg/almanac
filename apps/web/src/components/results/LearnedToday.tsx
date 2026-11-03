@@ -1,8 +1,8 @@
 import type { ReviewItem } from '@almanac/client';
+import { numberText } from '@almanac/client';
 import { BookOpen, Lightbulb } from 'lucide-react';
 import { Link } from 'react-router';
 import { keepTogether } from '../../lib/typography';
-import { numberText } from '../game/numbers';
 import { Thumbnail } from '../game/QuestionPicture';
 import { Card } from '../ui';
 

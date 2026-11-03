@@ -3,9 +3,11 @@
 import { configureClient, getState, setState, useStore } from '@almanac/client';
 import type { AppSession, MeUser } from '@almanac/shared';
 import * as Application from 'expo-application';
+import { Image } from 'expo-image';
 import * as Network from 'expo-network';
 import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
+import { feel } from './feedback';
 import { endSession, loadSession, saveSession, session } from './session';
 
 /** The server: the site, or another one for development (EXPO_PUBLIC_API_URL=http://192.168.1.5:3001). */
@@ -43,6 +45,9 @@ configureClient({
     const token = session()?.token;
     return token ? { token } : {};
   },
+  effect: feel,
+  // The next question's picture, fetched during the reveal before it (expo-image keeps it in its cache).
+  preload: ({ src }) => void Image.prefetch(src.startsWith('http') ? src : `${API_URL}${src}`),
 });
 
 /** A sign-in's answer: the session to keep, and the player. */

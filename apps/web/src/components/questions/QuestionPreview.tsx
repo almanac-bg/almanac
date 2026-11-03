@@ -1,9 +1,9 @@
-import { DIFFICULTY_LABEL } from '@almanac/client';
+import { DIFFICULTY_LABEL, LETTERS, OPTION_COLORS } from '@almanac/client';
 import { categoryById, type QuestionDraft } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Lightbulb } from 'lucide-react';
 import { Emoji } from '../Emoji';
-import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
+import { accentText } from '../game/answers';
 
 /** Read-only question card styled like the in-game one, with the correct answer highlighted. */
 export function QuestionPreview({ draft, compact }: { draft: QuestionDraft; compact?: boolean }) {
