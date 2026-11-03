@@ -1,3 +1,5 @@
+import { SCORING } from '@almanac/shared';
+
 const numberFormat = new Intl.NumberFormat('bg-BG');
 // Not every JS engine (e.g. some Hermes builds) ships RelativeTimeFormat — fall back to plain Bulgarian.
 const relative =
@@ -59,3 +61,20 @@ export const DIFFICULTY_LABEL = { easy: 'Лесен', medium: 'Среден', ha
 /** Answer letters and accent colours: the same in the match, the review afterwards, the question editor and admin. */
 export const LETTERS = ['А', 'Б', 'В', 'Г'];
 export const OPTION_COLORS = ['#a78bfa', '#22d3ee', '#fbbf24', '#f472b6'];
+
+/**
+ * Time left, in words while it's long — „21 ч. 56 мин.“, „49 мин.“ (abbreviated with the dot, as everywhere in the
+ * game) — and as a ticking clock only in its last ten minutes, „4:12“: a clock for hours away („след 21:56:34“, next to
+ * „в 21:00“) read as a time of day.
+ */
+export function countdown(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0) return minutes > 0 ? `${hours} ч. ${minutes} мин.` : `${hours} ч.`;
+  if (minutes >= 10) return `${minutes} мин.`;
+  return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** How points are counted, in one line: speed is half of every answer's worth, and nothing in the game said so. */
+export const SCORING_LINE = `${SCORING.base} точки за верен отговор, до +${SCORING.speed} за бързина (след време за четене) и +${SCORING.streakStep} за всеки пореден верен (до +${SCORING.streakMax}).`;

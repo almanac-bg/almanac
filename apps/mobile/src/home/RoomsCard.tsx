@@ -3,18 +3,25 @@ import { ROOM_CODE_DIGITS } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
+import { DuelList, useDuels } from '@/duels/parts';
 import { fonts, radius, useColors } from '@/theme';
 import { Button, Card, T } from '@/ui';
 
 /**
- * Частна стая (the web's FriendsCard): one of your own, or a friend's or a teacher's by its code. A guest can join one
- * but not open one: the button still shows, and says why.
+ * „С приятели“ (the web's FriendsCard): the friend duels still open, and Частна стая — one of your own, or a friend's
+ * or a teacher's by its code. A guest can join one but not open one: the button still shows, and says why.
  */
 export function RoomsCard() {
   const colors = useColors();
   const guest = useStore((s) => !!s.me?.isGuest);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  // Friend duels still open: yours to play first, then the ones waiting for the friend.
+  const { data } = useDuels();
+  const open = (data?.duels ?? [])
+    .filter((d) => d.state === 'yours' || d.state === 'theirs')
+    .sort((a, b) => Number(b.state === 'yours') - Number(a.state === 'yours'))
+    .slice(0, 3);
   const create = async () => {
     setBusy(true);
     const res = await actions.createRoom();
@@ -38,6 +45,14 @@ export function RoomsCard() {
           ? 'До 40 играчи. Имаш код от приятел или от учителя? Въведи го и влизаш в стаята.'
           : 'До 40 играчи, твои правила. Сподели кода и започвай.'}
       </T>
+      {open.length > 0 && (
+        <View>
+          <T variant="label" tone="fg3">
+            Дуели
+          </T>
+          <DuelList duels={open} />
+        </View>
+      )}
       {guest ? (
         <Button
           title="🔒 Създай своя стая"

@@ -1,4 +1,4 @@
-import { actions, api, fmt, toast, useNow, useStore } from '@almanac/client';
+import { actions, api, countdown, fmt, toast, useNow, useStore } from '@almanac/client';
 import { EVENING, type EveningStatus, MODES } from '@almanac/shared';
 import clsx from 'clsx';
 import { ChevronDown, Moon } from 'lucide-react';
@@ -8,7 +8,6 @@ import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { PlayerName } from '../FitName';
 import { Button, Card } from '../ui';
-import { countdown } from './time';
 
 const waitingText = (n: number) => (n === 0 ? 'още никой не чака' : n === 1 ? '1 чака' : `${n} чакат`);
 

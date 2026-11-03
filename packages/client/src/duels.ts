@@ -1,4 +1,4 @@
-import type { DuelEntry, DuelStanding } from '@almanac/shared';
+import { BRAND, type DuelEntry, type DuelStanding, MODES } from '@almanac/shared';
 import { fmt } from './format';
 
 /** "остават 21 ч.", "остава 1 мин.": how long the second of a duel has to play it. */
@@ -42,4 +42,21 @@ export function duelLine(duel: DuelEntry, now: number): string {
 export function sortDuels(duels: DuelEntry[]): DuelEntry[] {
   const order = { yours: 0, theirs: 1, done: 2, expired: 3 } as const;
   return [...duels].sort((a, b) => order[a.state] - order[b.state] || b.createdAt - a.createdAt);
+}
+
+/**
+ * What goes into the chat with a challenge link: the score to beat (when there is one) and the link (`origin`: the
+ * site's address, as the page or the app knows it).
+ */
+export function challengeShareText(
+  origin: string,
+  id: string,
+  score: number | null,
+  questions: number = MODES.challenge.questions,
+) {
+  const pitch =
+    score === null
+      ? `${questions} въпроса в ${BRAND.name}. Можеш ли да ме биеш?`
+      : `Изкарах ${fmt(score)} ${score === 1 ? 'точка' : 'точки'} на ${questions} въпроса в ${BRAND.name}. Можеш ли повече?`;
+  return `${pitch}\n${origin}/c/${id}`;
 }
