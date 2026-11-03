@@ -8,6 +8,7 @@ import { API_URL } from './client';
  */
 const SCREENS: readonly RegExp[] = [
   /^\/$/,
+  /^\/game$/,
   /^\/knowledge(\/[^/]+)?$/,
   /^\/leaderboard$/,
   /^\/friends$/,
@@ -19,6 +20,7 @@ const SCREENS: readonly RegExp[] = [
   /^\/settings$/,
   /^\/locker$/,
   /^\/achievements$/,
+  /^\/daily(\/[^/]+)?$/,
 ];
 
 /** Whether the app has a screen for a site's path ("/profile/Мария", "/knowledge/history"). */
