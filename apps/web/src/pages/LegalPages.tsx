@@ -14,7 +14,8 @@ function LegalLayout({
   children,
 }: {
   title: string;
-  updated: string;
+  /** When the text last changed: the policy's and the terms' own (none for a page that only explains them). */
+  updated?: string;
   /** What the last change changed, in a line or three (§12). */
   changes?: string[];
   children: ReactNode;
@@ -26,7 +27,7 @@ function LegalLayout({
       </Link>
       <Card className="mt-6 bg-ink-2/70 p-6 sm:p-10">
         <h1 className="t-page">{title}</h1>
-        <p className="mt-2 text-sm text-fg-3">Последна промяна: {updated}</p>
+        {updated && <p className="mt-2 text-sm text-fg-3">Последна промяна: {updated}</p>}
         {changes && (
           <div className="mt-4 rounded-2xl border border-line bg-sunk/20 px-4 py-3 text-sm text-fg-2">
             <p className="font-semibold text-fg">Какво се промени</p>
@@ -46,9 +47,10 @@ function LegalLayout({
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** `id`: an address a link can point to (/privacy#retention), in English as the site's paths are. */
+function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section>
+    <section id={id} className="scroll-mt-6">
       <h2 className="mb-3 t-card text-fg">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
@@ -389,7 +391,7 @@ export function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="6. Колко дълго пазим данните">
+      <Section title="6. Колко дълго пазим данните" id="retention">
         <ul>
           <li>
             Данните на профила — докато не го изтриеш или докато три години никой не влезе в него: тогава профилът се
@@ -498,14 +500,15 @@ export function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="8. Твоите права">
+      <Section title="8. Твоите права" id="rights">
         <ul>
           <li>
             <b>Достъп и преносимост</b> — от Настройки → „Изтегли данните си“ получаваш всичко, което пазим за теб, във
             формат JSON.
           </li>
           <li>
-            <b>Изтриване</b> — от Настройки → „Изтрий профила“, по всяко време.
+            <b>Изтриване</b> — от Настройки → „Изтрий профила“, по всяко време; без вход — както е описано в{' '}
+            <Link to="/delete-account">Изтриване на профила</Link>.
           </li>
           <li>
             <b>Оттегляне на съгласие</b> — писмата по желание спираш от Настройки или от линка за отказ във всяко писмо;
@@ -577,6 +580,80 @@ export function PrivacyPage() {
           Промените публикуваме тук, с датата и кратко описание най-горе („Какво се промени“). За нова цел, за която е
           нужно съгласието ти, ще те попитаме, преди да започнем. Всички предишни версии са в историята на кода на
           играта.
+        </p>
+      </Section>
+    </LegalLayout>
+  );
+}
+
+/**
+ * How to delete an account, for anyone — signed in or not, from the site or an app, or with no way in at all: the
+ * address the stores ask for (Google Play's account deletion URL), linked from the policy (the 31 October review,
+ * MOBILE-9).
+ */
+export function DeleteAccountPage() {
+  usePageTitle('Изтриване на профила');
+  return (
+    <LegalLayout title="Изтриване на профила">
+      <p>
+        Профилът си в {BRAND.name} изтриваш сам, по всяко време, и той изчезва веднага — заедно с всичко в него. Ето
+        как, и какво остава.
+      </p>
+
+      <Section title="От сайта или от приложението" id="steps">
+        <ol className="list-decimal space-y-1.5 pl-5">
+          <li>Влез в профила си.</li>
+          <li>
+            Отвори <Link to="/settings">Настройки</Link> и слез до „Твоите данни“. Там можеш първо да изтеглиш данните
+            си.
+          </li>
+          <li>Натисни „Изтрий профила“ и го потвърди с паролата си. Профил на гост няма парола: само потвърждаваш.</li>
+        </ol>
+        <p>Изтрит, профилът не може да се върне, а името му се освобождава.</p>
+      </Section>
+
+      <Section title="Ако не можеш да влезеш" id="no-access">
+        <p>
+          Не помниш паролата, а профилът има потвърден имейл: на входа натисни „Забравена парола?“, задай нова и го
+          изтрий, както е по-горе.
+        </p>
+        <p>
+          Иначе ни пиши на <ContactEmail /> с името на профила — от имейла му, ако има такъв, за да знаем, че е твой. Ще
+          поискаме нещо, което само ти знаеш за профила, ако е нужно, и ще го изтрием до месец (чл.&nbsp;12&nbsp;от
+          ОРЗД).
+        </p>
+        <p>
+          Профил на гост, в който никой вече не може да влезе (след изход от него или щом бисквитката изтече), се
+          изтрива сам около ден след това.
+        </p>
+      </Section>
+
+      <Section title="Какво се изтрива" id="what">
+        <p>
+          Всичко на профила: името, имейлът, паролата, нивото и наградите, статистиката, историята на мачовете ти,
+          записите ти, приятелите, групите, наборите ти с въпроси и снимките в тях, известията и устройствата, на които
+          идват, сесиите на всяко устройство. В резервните копия данните изчезват до 30&nbsp;дни.
+        </p>
+      </Section>
+
+      <Section title="Какво остава, без името ти" id="kept">
+        <ul>
+          <li>В историята на мачовете на другите играчи — ред „Изтрит играч“.</li>
+          <li>Одобрените ти въпроси остават в играта, без името ти.</li>
+          <li>
+            Докладите ти и сигналите ти за грешки във въпроси — без името ти и без думите ти към тях: казват какво не е
+            наред в играта, не нещо за теб.
+          </li>
+          <li>Решенията ти като модератор остават в дневника без името ти.</li>
+          <li>В известията на другите, в които се споменава името ти, то може да остане до 90&nbsp;дни.</li>
+          <li>
+            Ако профилът е бил спрян: 12&nbsp;месеца — неразгадаем отпечатък от имейла му, основанието и докога е било
+            спирането (Условия, т. 3).
+          </li>
+        </ul>
+        <p>
+          Цялото описание е в <Link to="/privacy#retention">Политиката за поверителност, т. 6</Link>, а правата ти — в{' '}
+          <Link to="/privacy#rights">т. 8</Link>.
         </p>
       </Section>
     </LegalLayout>
