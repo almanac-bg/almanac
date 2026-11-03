@@ -16,6 +16,7 @@ import { markReturning } from './lib/returning';
 import { useRouteFocus } from './lib/routeFocus';
 import {
   AuthPage,
+  DeleteAccountPage,
   FactsPage,
   HowToPlayPage,
   PrivacyPage,
@@ -49,6 +50,7 @@ const PUBLIC_PATHS = [
   '/unsubscribe',
   '/privacy',
   '/terms',
+  '/delete-account',
   '/how-to-play',
   '/quiz',
   '/facts',
@@ -257,6 +259,7 @@ export function App() {
                     <Route path="/unsubscribe" element={<UnsubscribePage />} />
                     <Route path="/privacy" element={<PrivacyPage />} />
                     <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/delete-account" element={<DeleteAccountPage />} />
                     <Route path="/how-to-play" element={<HowToPlayPage />} />
                     <Route path="/quiz" element={<QuizHubPage />} />
                     <Route path="/quiz/:category" element={<QuizCategoryPage />} />

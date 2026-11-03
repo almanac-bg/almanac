@@ -121,6 +121,7 @@ export const SettingsPage = page('account', 'SettingsPage');
 export const SetsPage = page('sets', 'SetsPage');
 export const SubmitPage = page('submit', 'SubmitPage');
 export const TermsPage = page('legal', 'TermsPage');
+export const DeleteAccountPage = page('legal', 'DeleteAccountPage');
 export const HowToPlayPage = page('guide', 'HowToPlayPage');
 export const QuizHubPage = page('guide', 'QuizHubPage');
 export const QuizCategoryPage = page('guide', 'QuizCategoryPage');

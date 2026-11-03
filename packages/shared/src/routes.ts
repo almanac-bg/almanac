@@ -92,6 +92,10 @@ export const PUBLIC_PAGES: Record<string, { title: string; description: string }
     title: `Знаеше ли? Интересни факти — ${BRAND.name}`,
     description: `Интересни факти от въпросите на ${BRAND.name} — от география и история до природата, всеки с източник.`,
   },
+  '/delete-account': {
+    title: `Изтриване на профила — ${BRAND.name}`,
+    description: `Как да изтриеш профила си в ${BRAND.name} — от сайта, от приложението или без вход — и какво остава след това.`,
+  },
   '/teachers': {
     title: `Викторина за класната стая — ${BRAND.name} за учители`,
     description: `Стая до 40 ученици с код, голям екран за проектора, ваши въпроси и картини, без реклами и без регистрация за учениците.`,
@@ -144,7 +148,7 @@ export function routeKind(path: string): 'public' | 'app' | 'unknown' {
  */
 export function publicPageCode(path: string): { page: 'auth' | 'legal' | 'guide'; quiz?: string } | null {
   if (path === '/') return { page: 'auth' };
-  if (path === '/privacy' || path === '/terms') return { page: 'legal' };
+  if (path === '/privacy' || path === '/terms' || path === '/delete-account') return { page: 'legal' };
   if (routeKind(path) !== 'public') return null;
   if (path === '/facts') return { page: 'guide', quiz: 'sample' };
   const slug = /^\/quiz\/([a-z-]+)$/.exec(path)?.[1];
