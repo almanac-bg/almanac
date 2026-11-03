@@ -49,6 +49,7 @@ test('opening the list marks it seen; a link goes to its screen, or to the site'
       note(1, 'Мария те добави за приятел', '/profile/Мария'),
       note(2, 'Някой изигра линка ти', '/c/abc123'),
       note(3, 'Въпросът ти е одобрен', null, true),
+      note(4, 'Влезе в групата „Клас 7б“', '/groups/k7b', true),
     ],
   });
   const read = jest.spyOn(api, 'readNotifications').mockResolvedValue({ ok: true });
@@ -60,7 +61,10 @@ test('opening the list marks it seen; a link goes to its screen, or to the site'
   await fireEvent.press(screen.getByRole('link', { name: /^Ново: Мария те добави за приятел/ }));
   expect(router.push).toHaveBeenCalledWith('/profile/Мария');
   await fireEvent.press(screen.getByRole('link', { name: /^Ново: Някой изигра линка ти/ }));
-  expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://almanac.bg/c/abc123');
+  expect(router.push).toHaveBeenCalledWith('/c/abc123');
+  // No screen for it in the app yet: the site, in the in-app browser.
+  await fireEvent.press(screen.getByRole('link', { name: /^Влезе в групата/ }));
+  expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://almanac.bg/groups/k7b');
 });
 
 test('nothing new: no call to mark it seen, and the empty line', async () => {

@@ -1,4 +1,4 @@
-import { actions, api, errorMessage, PRESENCE, timeAgo, toast, useStore } from '@almanac/client';
+import { actions, api, errorMessage, PRESENCE, sortDuels, timeAgo, toast, useStore } from '@almanac/client';
 import { BRAND, type FriendEntry, type FriendsResponse, titleName, USERNAME } from '@almanac/shared';
 import clsx from 'clsx';
 import { Ban, Check, DoorOpen, Save, Share2, UserMinus, UserPlus, X } from 'lucide-react';
@@ -93,16 +93,13 @@ function DuelsSection() {
   const { playing, play } = usePlayDuel();
   const duels = data?.duels ?? [];
   if (!duels.length) return null;
-  const order = { yours: 0, theirs: 1, done: 2, expired: 3 } as const;
   return (
     <section>
       <SectionTitle>Дуели</SectionTitle>
       <Card className="divide-y divide-line px-4 py-1 sm:px-5">
-        {[...duels]
-          .sort((a, b) => order[a.state] - order[b.state] || b.createdAt - a.createdAt)
-          .map((d) => (
-            <DuelRow key={d.id} duel={d} onPlay={() => play(d.id)} playing={playing === d.id} />
-          ))}
+        {sortDuels(duels).map((d) => (
+          <DuelRow key={d.id} duel={d} onPlay={() => play(d.id)} playing={playing === d.id} />
+        ))}
       </Card>
     </section>
   );

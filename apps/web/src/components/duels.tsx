@@ -1,4 +1,4 @@
-import { actions, api, fmt, recordLine, toast, useNow, useStore } from '@almanac/client';
+import { actions, api, duelLine, duelStatus, fmt, recordLine, toast, useNow, useStore } from '@almanac/client';
 import {
   CATEGORIES,
   type CategoryId,
@@ -17,15 +17,6 @@ import { Avatar } from './Avatar';
 import { Emoji } from './Emoji';
 import { PlayerName } from './FitName';
 import { Button, Modal } from './ui';
-
-/** "остават 21 ч.", "остава 1 мин.": how long the second of a duel has to play it. */
-export function timeLeft(expiresAt: number, now: number): string {
-  const ms = expiresAt - now;
-  if (ms <= 0) return 'времето изтече';
-  const hours = Math.floor(ms / 3_600_000);
-  const [n, unit] = hours >= 1 ? [hours, 'ч.'] : [Math.max(1, Math.ceil(ms / 60_000)), 'мин.'];
-  return `${n === 1 ? 'остава' : 'остават'} ${n} ${unit}`;
-}
 
 /** Your friend duels, reloaded when news comes in (a friend played, a note arrived). */
 export function useDuels(enabled = true) {
@@ -142,8 +133,6 @@ function RematchPicker({ friend, open, onClose }: { friend: PublicUser; open: bo
   );
 }
 
-const OUTCOME = { won: 'Победа', lost: 'Загуба', draw: 'Равенство' } as const;
-
 /**
  * A duel head to head, for one of its two: both scores (or whose turn it is), how it ended, and the two of them so
  * far; then what's next — playing it, or a rematch.
@@ -169,15 +158,7 @@ export function DuelCard({
 }) {
   const now = useNow(60_000);
   const { friend, mine, theirs, outcome, record, expired } = standing;
-  const status = outcome
-    ? OUTCOME[outcome]
-    : expired
-      ? mine
-        ? `${friend.username} не го изигра навреме`
-        : 'Времето изтече'
-      : mine
-        ? `Чакаме ${friend.username} · ${timeLeft(standing.expiresAt, now)}`
-        : `Твой ред · ${timeLeft(standing.expiresAt, now)}`;
+  const status = duelStatus(standing, now);
   const side = (who: Pick<PublicUser, 'avatar' | 'frame' | 'username'>, run: DuelStanding['mine'], you: boolean) => (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
       <Avatar avatar={who.avatar} frame={who.frame} size={64} />
@@ -239,16 +220,7 @@ export function DuelCard({
 export function DuelRow({ duel, onPlay, playing }: { duel: DuelEntry; onPlay: () => void; playing: boolean }) {
   const now = useNow(60_000);
   const { friend } = duel;
-  const line =
-    duel.state === 'yours'
-      ? `${duel.theirs ? `${fmt(duel.theirs.score)} т. за биене` : 'Ти започваш'} · ${timeLeft(duel.expiresAt, now)}`
-      : duel.state === 'theirs'
-        ? `Чакаме — ${timeLeft(duel.expiresAt, now)}`
-        : duel.state === 'expired'
-          ? duel.mine
-            ? 'Не го изигра навреме'
-            : 'Времето изтече'
-          : `${OUTCOME[duel.outcome!]} · ${fmt(duel.mine!.score)} : ${fmt(duel.theirs!.score)}`;
+  const line = duelLine(duel, now);
   return (
     <div className="flex items-center gap-3 py-2">
       <Link

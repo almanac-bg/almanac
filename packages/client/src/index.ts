@@ -1,6 +1,7 @@
 /** Client core: state, realtime, API calls, formatting. The website plugs in its sounds via configureClient(). */
 export * from './api';
 export * from './config';
+export * from './duels';
 export * from './elimination';
 export * from './format';
 export * from './hooks';

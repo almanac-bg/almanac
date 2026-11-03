@@ -2,13 +2,14 @@ import { useStore } from '@almanac/client';
 import { View } from 'react-native';
 import { NotificationsBell } from '@/home/Bell';
 import { DailyCard } from '@/home/DailyCard';
+import { DuelTurn } from '@/home/DuelTurn';
 import { Modes } from '@/home/Modes';
 import { ProfileCard } from '@/home/ProfileCard';
 import { Screen, T } from '@/ui';
 
 /**
- * Играй: who you are, the day's questions, what to play (the web's home on a phone, top to bottom). The day's ten come
- * first for someone who has played before and not yet today.
+ * Играй: a friend's duel waiting for you, who you are, the day's questions, what to play (the web's home on a phone, top
+ * to bottom). The day's ten come first for someone who has played before and not yet today.
  */
 export default function Play() {
   const dailyFirst = useStore((s) => !!s.me && !s.me.daily.played && s.me.stats.games > 0);
@@ -20,6 +21,7 @@ export default function Play() {
         </T>
         <NotificationsBell />
       </View>
+      <DuelTurn />
       <ProfileCard />
       {dailyFirst && <DailyCard />}
       <Modes />

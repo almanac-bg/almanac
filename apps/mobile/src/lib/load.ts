@@ -1,5 +1,6 @@
 import { ApiError, errorMessage } from '@almanac/client';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Data a screen loads (the web's useLoad): loaded again when `key` changes, and on demand (pull to refresh, „Опитай
@@ -38,4 +39,18 @@ export function useLoad<T>(fetch: () => Promise<T>, key: unknown = null) {
   }, [key, round]);
   const reload = useCallback(() => setRound((r) => r + 1), []);
   return { data, error, status, loading, reload, set: setData };
+}
+
+/**
+ * Loads again when the screen comes back into view (back from a match, from another tab), not when it first opens:
+ * useLoad has just loaded it then.
+ */
+export function useReloadOnFocus(reload: () => void) {
+  const first = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (first.current) first.current = false;
+      else reload();
+    }, [reload]),
+  );
 }
