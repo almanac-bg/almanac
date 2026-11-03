@@ -311,7 +311,11 @@ export async function playMatch(
       continue;
     }
     if (await pick.isVisible()) {
-      await page.locator('[data-answer="0"]').click({ timeout: gameMs(2_000) });
+      // The first category on offer, on the pick itself: once the pick is over (its time can run out while the tiles
+      // come in, and the category is drawn) a bare `[data-answer="0"]` is the next question's first answer — a click
+      // that waited on answered it, uncounted (a rematch's 9 of 10). Briefly; a pick that ends by itself is no failure.
+      const first = page.locator('section', { has: pick }).locator('button[data-answer="0"]').first();
+      await first.click({ timeout: gameMs(1_000) }).catch(() => {});
       await expect(pick).toBeHidden({ timeout: gameMs(5_000) });
       continue;
     }
