@@ -168,7 +168,8 @@ test(
   'a page that says it is an app still gets a cookie: a session in the answer is only for what no browser sends',
   T,
   async () => {
-    for (const headers of [{ origin: 'https://almanac.test' }, { 'sec-fetch-site': 'same-origin' }]) {
+    const pages: Record<string, string>[] = [{ origin: 'https://almanac.test' }, { 'sec-fetch-site': 'same-origin' }];
+    for (const headers of pages) {
       const res = await signUpApp(`stranica_${'origin' in headers ? 'o' : 's'}`, headers);
       assert.equal(res.status, 201, JSON.stringify(headers));
       assert.equal(((await res.json()) as { session?: AppSession }).session, undefined, JSON.stringify(headers));
