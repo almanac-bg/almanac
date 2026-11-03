@@ -23,6 +23,8 @@ const SCREENS: readonly RegExp[] = [
   /^\/daily(\/[^/]+)?$/,
   /^\/groups(\/[^/]+)?$/,
   /^\/groups\/join\/[^/]+$/,
+  /^\/sets(\/[^/]+)?$/,
+  /^\/sets\/shared\/[^/]+$/,
 ];
 
 /** Whether the app has a screen for a site's path ("/profile/Мария", "/knowledge/history"). */

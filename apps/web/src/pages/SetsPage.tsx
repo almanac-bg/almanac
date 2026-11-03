@@ -1,5 +1,21 @@
-import { api, errorMessage, LETTERS, OPTION_COLORS, type SetBody, timeAgo, toast, useStore } from '@almanac/client';
-import { type ModerationBasis, SETS, type SetImage, type SetQuestion, setPictureUrl } from '@almanac/shared';
+import {
+  api,
+  blankDraft,
+  defaultTolerance,
+  draftContent,
+  errorMessage,
+  LETTERS,
+  OPTION_COLORS,
+  type SetDraft,
+  setKinds,
+  switchKind,
+  timeAgo,
+  toast,
+  toDraft,
+  toSetBody,
+  useStore,
+} from '@almanac/client';
+import { type ModerationBasis, SETS, type SetImage, setPictureUrl } from '@almanac/shared';
 import clsx from 'clsx';
 import {
   ArrowDown,
@@ -142,88 +158,10 @@ function SetList() {
 
 // ─── The editor ──────────────────────────────────────────────────────────────
 
-/**
- * A question as the editor holds it: numbers as typed (a comma, a minus on its way), turned into numbers on save; `key`
- * keeps each one itself while they're moved around.
- */
-type Draft = { key: number } & (
-  | { kind: 'choice'; q: string; options: string[]; answer: number; image?: SetImage }
-  | { kind: 'truefalse'; q: string; answer: boolean; image?: SetImage }
-  | { kind: 'number'; q: string; answer: string; unit: string; tolerance: string }
-  | { kind: 'order'; q: string; items: { text: string; value: string }[]; unit: string }
-);
-
-const blankItems = () => Array.from({ length: 4 }, () => ({ text: '', value: '' }));
-
-let nextKey = 0;
-const blank = (): Draft => ({ key: nextKey++, kind: 'choice', q: '', options: ['', '', '', ''], answer: 0 });
-
-const numberText = (n: number) => String(n).replace('.', ',');
-
-function toDraft(q: SetQuestion): Draft {
-  if (q.kind === 'order')
-    return {
-      key: nextKey++,
-      kind: 'order',
-      q: q.q,
-      items: q.items.map((i) => ({ text: i.text, value: i.value === null ? '' : numberText(i.value) })),
-      unit: q.unit,
-    };
-  if (q.kind !== 'number') return { ...q, key: nextKey++ };
-  return {
-    key: nextKey++,
-    kind: 'number',
-    q: q.q,
-    answer: String(q.number.answer).replace('.', ','),
-    unit: q.number.unit,
-    tolerance: String(q.number.tolerance).replace('.', ','),
-  };
-}
-
-/** What's saved, keys aside: for telling unsaved changes. */
-const content = (name: string, drafts: Draft[]) => JSON.stringify([name, drafts.map(({ key: _, ...d }) => d)]);
-
-const parseNumber = (s: string) => {
-  const n = Number(s.trim().replace(/\s/g, '').replace(',', '.'));
-  return s.trim() && Number.isFinite(n) ? n : null;
-};
-
-/** The set as the server takes it, or what's wrong with a number in it. */
-function toBody(name: string, drafts: Draft[]): { body: SetBody } | { error: string } {
-  const questions: SetQuestion[] = [];
-  for (const [i, { key: _, ...d }] of drafts.entries()) {
-    if (d.kind === 'order') {
-      const values = d.items.map((item) => (item.value.trim() ? parseNumber(item.value) : null));
-      if (d.items.some((item, j) => item.value.trim() && values[j] === null))
-        return { error: `Въпрос ${i + 1}: числата за подреждане трябва да са числа.` };
-      questions.push({
-        kind: 'order',
-        q: d.q,
-        items: d.items.map((item, j) => ({ text: item.text, value: values[j] })),
-        unit: d.unit,
-      });
-      continue;
-    }
-    if (d.kind !== 'number') {
-      questions.push(d);
-      continue;
-    }
-    const answer = parseNumber(d.answer);
-    const tolerance = parseNumber(d.tolerance);
-    if (answer === null) return { error: `Въпрос ${i + 1}: напиши верния отговор като число.` };
-    if (tolerance === null || tolerance <= 0) return { error: `Въпрос ${i + 1}: отклонението е число над нула.` };
-    questions.push({ kind: 'number', q: d.q, number: { answer, unit: d.unit, tolerance } });
-  }
-  return { body: { name, questions } };
-}
-
-/** A sensible "how far off scores nothing": ten years for a year, a tenth of anything else. */
-function defaultTolerance(answer: string): string {
-  const n = parseNumber(answer);
-  if (n === null) return '';
-  if (Number.isInteger(n) && n >= 1000 && n <= 2100) return '10';
-  return String(Math.max(1, Math.round(Math.abs(n) / 10))).replace('.', ',');
-}
+type Draft = SetDraft;
+const blank = blankDraft;
+const content = draftContent;
+const toBody = toSetBody;
 
 function SetEditor({ id }: { id: number }) {
   const navigate = useNavigate();
@@ -432,14 +370,7 @@ function QuestionCard({
 }) {
   const id = useId();
   // A picture stays with the question between the kinds that can have one.
-  const image = 'image' in d ? d.image : undefined;
-  const kind = (k: Draft['kind']) => {
-    if (k === d.kind) return;
-    if (k === 'choice') onChange({ key: d.key, kind: 'choice', q: d.q, options: ['', '', '', ''], answer: 0, image });
-    else if (k === 'truefalse') onChange({ key: d.key, kind: 'truefalse', q: d.q, answer: true, image });
-    else if (k === 'order') onChange({ key: d.key, kind: 'order', q: d.q, items: blankItems(), unit: '' });
-    else onChange({ key: d.key, kind: 'number', q: d.q, answer: '', unit: '', tolerance: '' });
-  };
+  const kind = (k: Draft['kind']) => onChange(switchKind(d, k));
   return (
     <Card className="p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -822,13 +753,7 @@ function SharedSet({ code }: { code: string }) {
       <LoadError title="Наборът не се зареди" error={error} onRetry={retry} />
     );
   if (!data) return <PageSpinner />;
-  const parts = [
-    data.kinds.choice && `${data.kinds.choice} с избор`,
-    data.kinds.truefalse && `${data.kinds.truefalse} вярно/невярно`,
-    data.kinds.number && `${data.kinds.number} с число`,
-    // From a server before „Подреди“ in sets: none.
-    data.kinds.order && `${data.kinds.order} за подреждане`,
-  ].filter(Boolean);
+  const kinds = setKinds(data.kinds);
   return (
     <div className="mx-auto max-w-md space-y-4">
       <Card className="p-6 text-center sm:p-8">
@@ -841,7 +766,7 @@ function SharedSet({ code }: { code: string }) {
           {data.questions} {data.questions === 1 ? 'въпрос' : 'въпроса'}
           {data.author && ` · от ${data.author}`}
         </p>
-        {parts.length > 0 && <p className="mt-1 text-sm text-fg-3">{parts.join(', ')}</p>}
+        {kinds && <p className="mt-1 text-sm text-fg-3">{kinds}</p>}
         {data.hidden && <p className="mt-3 text-sm text-rose-300">Скрит от модератор.</p>}
         {data.mine ? (
           <Button size="lg" className="mt-6 w-full" onClick={() => navigate(`/sets/${data.mine}`)}>
