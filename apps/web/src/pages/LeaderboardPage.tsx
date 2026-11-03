@@ -1,4 +1,4 @@
-import { api, fmt, pct, useStore } from '@almanac/client';
+import { api, fmt, pct, useOpenQueues, useStore } from '@almanac/client';
 import {
   BRAND,
   dayKey,
@@ -15,7 +15,6 @@ import { Link, useSearchParams } from 'react-router';
 import { Avatar, LevelBadge, RankBadge } from '../components/Avatar';
 import { Emoji } from '../components/Emoji';
 import { FitName, PlayerName } from '../components/FitName';
-import { useOpenQueues } from '../components/home/openQueues';
 import { LoadError } from '../components/LoadError';
 import { Button, buttonClass, Card, EmptyState, Segmented, Spinner } from '../components/ui';
 import { useLoad } from '../lib/load';

@@ -1,4 +1,4 @@
-import { actions, fmt, plural, toast, useNow, useStore } from '@almanac/client';
+import { actions, fmt, plural, toast, useNow, useOpenQueues, useStore } from '@almanac/client';
 import {
   EVENING,
   levelProgress,
@@ -23,7 +23,6 @@ import { EmailNudge } from '../components/home/EmailNudge';
 import { EveningCard } from '../components/home/EveningCard';
 import { FriendsCard } from '../components/home/FriendsCard';
 import { ModeCard, RankInfo, SoloPicker } from '../components/home/ModeCard';
-import { useOpenQueues } from '../components/home/openQueues';
 import { ProfileCard } from '../components/home/ProfileCard';
 import { QuestsCard } from '../components/home/QuestsCard';
 import { useStartReview } from '../components/knowledge';

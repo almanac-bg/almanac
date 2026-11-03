@@ -23,7 +23,7 @@ export function AccountForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
           ? await api.register(username.trim(), password, email.trim() || undefined)
           : await api.login(username.trim(), password),
       );
-      router.replace('/');
+      // Signed in: the router takes the player to the tabs (_layout.tsx → Stack.Protected).
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
