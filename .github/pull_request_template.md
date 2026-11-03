@@ -5,7 +5,7 @@
   type(scope): summary
 
 type: feat (нещо ново) · fix (поправка) · perf · refactor · docs · test · build · ci · chore · revert
-scope (по желание): web · server · client · shared · bank · deploy · ci · docs · deps · e2e · security · release
+scope (по желание): web · mobile · server · client · shared · bank · deploy · ci · docs · deps · e2e · security · release
 Промяна, която иска действие от поддържащите (настройка, преместени данни): `feat!:` / `fix!:` и ред
 „BREAKING CHANGE: …“ в описанието.
 
@@ -19,7 +19,7 @@ scope (по желание): web · server · client · shared · bank · deploy
 ## Проверено
 
 - [ ] `npm run lint`, `npm run typecheck` и `npm test` минават
-- [ ] Новото поведение има тест (сървър: `apps/server/test`, браузър: `apps/web/e2e`)
+- [ ] Новото поведение има тест (сървър: `apps/server/test`, браузър: `apps/web/e2e`, приложение: `apps/mobile/__tests__`)
 - [ ] Текстът за играчите е на български и неутрален по отношение на пола; работи на телефон с ширина 320 px
 - [ ] Промяна в базата е нова миграция в края на `apps/server/src/db.ts`, съвместима (`compatible`), когато може: така връщането към предишната версия работи без възстановяване
 - [ ] Промяна в протокола (сокети, REST) само добавя: отворените табове на предишната версия продължават да работят до презареждането си

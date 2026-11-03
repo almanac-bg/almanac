@@ -8,6 +8,13 @@
 // - favicon.ico: the 32-pixel icon in an .ico wrapper, for what still asks for /favicon.ico;
 // - badge-96.png: the rosette in white on transparent, as Android reads only the alpha channel of a notification's
 //   status-bar badge.
+// And the native app's (apps/mobile/assets, read by its app.config.ts):
+// - icon.png: the rosette on the full tile, 1024 px (iOS rounds the corners itself, and needs no transparency);
+// - android-icon-foreground.png, android-icon-monochrome.png: Android's adaptive icon, the rosette alone (in colour,
+//   and in one colour for themed icons) inside the circle every launcher's mask leaves whole — 66 of the layer's 108
+//   units; the tile's colour is the background layer (app.config.ts);
+// - splash-icon.png: the rosette alone, on the splash's own background;
+// - notification-icon.png: as badge-96, for the app's pushes on Android.
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
@@ -53,6 +60,26 @@ function ico(image, size) {
   head.writeUInt32LE(22, 18); // where the image starts
   return Buffer.concat([head, image]);
 }
+// Android's adaptive layers: the rosette (23.2 units from the middle) scaled to stay within a radius of 33/108 of the
+// layer, round the layer's middle.
+const adaptive = (body) => {
+  const k = ((33 / 108) * 64) / 23.2;
+  return svg(`<g transform="translate(32 32) scale(${k.toFixed(4)}) translate(-32 -32)">${body}</g>`);
+};
+const white = rosette.replace(/fill="#[0-9a-f]{6}"/g, 'fill="#fff"');
+const app = path.join(import.meta.dirname, '../../mobile/assets');
+if (fs.existsSync(app))
+  for (const [file, data] of [
+    ['icon.png', await png(fullBleed, 1024)],
+    ['android-icon-foreground.png', await png(adaptive(rosette), 1024)],
+    ['android-icon-monochrome.png', await png(adaptive(white), 1024)],
+    ['splash-icon.png', await png(svg(rosette), 512)],
+    ['notification-icon.png', await png(badge, 96)],
+  ]) {
+    fs.writeFileSync(path.join(app, file), data);
+    console.log(`apps/mobile/assets/${file}`);
+  }
+
 for (const [file, data] of [
   ['icon-192.png', await png(icon, 192)],
   ['icon-512.png', await png(icon, 512)],

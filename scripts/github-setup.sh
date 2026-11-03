@@ -110,7 +110,7 @@ checks=$(cat <<'JSON'
       "required_status_checks": [
         {"context": "test (Node 24)", "integration_id": 15368}, {"context": "test (Node 26)", "integration_id": 15368},
         {"context": "docker", "integration_id": 15368}, {"context": "browser tests", "integration_id": 15368},
-        {"context": "PR title", "integration_id": 15368}
+        {"context": "PR title", "integration_id": 15368}, {"context": "app", "integration_id": 15368}
       ]
     }},
     {"type": "code_scanning", "parameters": {"code_scanning_tools": [

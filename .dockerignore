@@ -13,3 +13,5 @@ private
 **/data/questions.json
 *.log
 .DS_Store
+# The native app: built by Expo's service, never in the server's image.
+apps/mobile

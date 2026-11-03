@@ -1,9 +1,8 @@
-import { MODES, ROOM_CODE_DIGITS } from '@almanac/shared';
+import { MINORS_NOTICE, MODES, ROOM_CODE_DIGITS } from '@almanac/shared';
 import { ArrowRight, CalendarDays, DoorOpen, LogIn, Play } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { accentText } from '../game/answers';
-import { MINORS_NOTICE } from '../LegalLinks';
 import { Button } from '../ui';
 
 /** Playing as a guest also accepts the terms, so the line (and the age note) sits under every way in. */

@@ -49,8 +49,8 @@ Pull request-ът се слива със squash: заглавието и опи�
 - **type**: `feat` (нещо ново за играчите или поддържащите), `fix` (поправка), `perf`, `refactor`, `docs`, `test`,
   `build`, `ci`, `chore`, `revert`. От него зависи следващата версия, а `feat`, `fix`, `perf` и `revert` влизат в
   бележките към изданието.
-- **scope** (по желание): къде е промяната — `web`, `server`, `client`, `shared`, `bank`, `deploy`, `ci`, `docs`,
-  `deps`, `e2e`, `security`, `release`.
+- **scope** (по желание): къде е промяната — `web`, `mobile`, `server`, `client`, `shared`, `bank`, `deploy`, `ci`,
+  `docs`, `deps`, `e2e`, `security`, `release`.
 - **summary**: на английски, в повелително наклонение, с малка буква и без точка; целият ред е до 72 знака (CI пуска до 100, за заглавията на Dependabot). Казва
   какво се променя за човека, който ще го прочете в бележките към изданието: `fix(web): keep entrances still under
   reduced motion`, а не `fix: bug`.
@@ -62,6 +62,25 @@ Pull request-ът се слива със squash: заглавието и опи�
 
 `CHANGELOG.md`, версиите и таговете не се пипат на ръка: release-please ги прави от тези заглавия при изданието
 ([docs/maintainers.md → Издания](docs/maintainers.md#издания)).
+
+## Приложението
+
+`apps/mobile` е приложението за iOS и Android: Expo SDK 58 (React Native 0.88) със същото ядро като сайта
+(`packages/client`, `packages/shared`).
+
+- **Инсталира се отделно**, не с workspaces на корена: `cd apps/mobile && npm ci`. Така има React и TypeScript на
+  React Native, а не на сайта, и сървърът и образът му не теглят React Native. Metro билдва `packages/*` от изходния им
+  код, а каквото те внасят (react, zustand, socket.io-client), търси в приложението: един React (`metro.config.js`).
+- **Пускане:** нужен е development build — Xcode за iOS, Android Studio за Android, или услугата на Expo за билдове.
+  `npx expo run:ios` или `npx expo run:android`, после `npm start`. Срещу локален сървър:
+  `EXPO_PUBLIC_API_URL=http://192.168.1.5:3001 npm start`.
+- **Проверки:** `npm run typecheck`, `npm test`, `npm run bundle` (двете платформи, както ги билдва магазинът). CI ги пуска
+  в задачата `app`.
+- **Пакети:** `npx expo install <пакет>` избира версията, която SDK-то очаква. Нов SDK: `npx expo install expo@^NN --fix`.
+- **Линковете:** след промяна в `APP_PATHS` (`packages/shared/src/routes.ts`) — `npm run app-links` в корена. Тестът на
+  приложението пада, докато филтрите му се различават.
+- **Иконите** се рисуват от `favicon.svg`, заедно с тези на сайта: `npm run icons -w @almanac/web`.
+- Целият текст минава през `<T>` (`src/ui/Text.tsx`), който расте с размера на текста на телефона, без таван.
 
 ## Стил
 

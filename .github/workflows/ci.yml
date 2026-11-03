@@ -147,6 +147,34 @@ jobs:
         env:
           RESULT: ${{ needs.browsers.result }}
 
+  # The native app (apps/mobile), on its own install (CONTRIBUTING.md → Приложението): the versions the Expo SDK
+  # expects, its type checks and tests, and both platforms' bundles, built as a store build would be (Metro). Native
+  # builds and the stores are Expo's service (docs/app-stores.md).
+  app:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    name: app
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes: the token isn't left in .git for the steps that follow.
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - run: npx expo install --check
+      - run: npm run typecheck
+      - run: npm test -- --ci
+      - run: npm run bundle
+
   # Its own build, so it starts at once beside the others (`image` and `publish` wait for every job).
   docker:
     runs-on: ubuntu-24.04

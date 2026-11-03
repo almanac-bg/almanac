@@ -21,3 +21,7 @@ export const LEGAL = {
   privacyIso: '2026-11-03',
   termsIso: '2026-11-03',
 } as const;
+
+/** Small print where an account is made: under 14 (Bulgaria's age of consent online) the terms ask for a parent's. */
+export const MINORS_NOTICE =
+  'Ако си под 14 години, за профил, за писмата по желание и за известията на устройството е нужно съгласие на родител или настойник.';
