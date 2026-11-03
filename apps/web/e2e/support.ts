@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto';
 import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
+import { hasBlockedWords, mixesScripts, passesForTheGame } from '../../server/src/names';
 import { serverDb } from '../playwright.config';
 
 export type { Page };
@@ -74,9 +75,17 @@ export const test = base.extend<Fixtures>({
   },
 });
 
-/** A name nobody has yet: the prefix, then random digits (which never spell a blocked word). At most 20 characters. */
+/**
+ * A name nobody has yet: the prefix, then random digits. At most 20 characters. Never one the game refuses: digits can
+ * spell a code the name filter blocks („1488“, once in about 2000 names — a sign-up that failed with a 400 now and
+ * then), so it's checked with the server's own filter and drawn again.
+ */
 export function uniqueName(prefix: string): string {
-  return `${prefix}_${String(randomInt(1e8)).padStart(8, '0')}`;
+  for (let tries = 0; tries < 100; tries++) {
+    const name = `${prefix}_${String(randomInt(1e8)).padStart(8, '0')}`;
+    if (!hasBlockedWords(name, { username: true }) && !passesForTheGame(name) && !mixesScripts(name)) return name;
+  }
+  throw new Error(`names starting „${prefix}“ are refused by the name filter`);
 }
 
 /** A score as the app shows it ("1234 т." or "1 234 т.", however the locale groups it). */
