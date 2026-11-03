@@ -16,12 +16,13 @@ import { fileReport, playerSubject } from '../moderation';
 import { sendFriendsUpdate } from '../notify';
 import { throttled } from '../throttle';
 import { usernameKey } from '../users';
-import { idParam, parse, requireAccount } from './common';
+import { guestCapped, idParam, parse, requireAccount } from './common';
 
 /** Friends, blocking, and reporting a player. */
 export const socialRouter = Router();
 
-socialRouter.post('/reports', requireAuth, requireAccount, (req, res) => {
+socialRouter.post('/reports', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
   const body = parse(
     z.object({
       username: z.string().trim().min(1).max(40),
@@ -93,11 +94,12 @@ socialRouter.delete('/friends/:id', requireAuth, (req, res) => {
 });
 
 /** Players this one blocked (Settings), and blocking or unblocking one (from a request, a profile, the list). */
-socialRouter.get('/blocks', requireAuth, requireAccount, (_req, res) => {
+socialRouter.get('/blocks', requireAuth, (_req, res) => {
   res.json({ players: blockedPlayers(res.locals.userId) });
 });
 
-socialRouter.post('/blocks/:id', requireAuth, requireAccount, (req, res) => {
+socialRouter.post('/blocks/:id', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'blocks')) return;
   // The answer names whoever was blocked: a player's ids walked one by one would name every account (SEC-8).
   if (throttled(`block:${res.locals.userId}`, 30, 60 * 60_000)) {
     res.status(429).json({ error: 'Твърде много опити. Изчакай малко.' });
@@ -114,7 +116,7 @@ socialRouter.post('/blocks/:id', requireAuth, requireAccount, (req, res) => {
   res.json({ players: blockedPlayers(res.locals.userId) });
 });
 
-socialRouter.delete('/blocks/:id', requireAuth, requireAccount, (req, res) => {
+socialRouter.delete('/blocks/:id', requireAuth, (req, res) => {
   unblockPlayer(res.locals.userId, idParam(req));
   res.json({ players: blockedPlayers(res.locals.userId) });
 });

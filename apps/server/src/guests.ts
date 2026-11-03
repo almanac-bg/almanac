@@ -6,7 +6,7 @@ import { nameShape } from './names';
 import { presence } from './notify';
 import { getUserByName, usernameKey } from './users';
 
-/** For what needs a real account: friends, rooms of your own, writing questions, reports, email. */
+/** For what needs a real account: friends and invites, rooms, sets and groups of your own, writing questions, email. */
 export const ACCOUNT_ONLY = 'Това е за играчи с профил — запази прогреса си с име и парола. Отнема 10 секунди.';
 
 /**

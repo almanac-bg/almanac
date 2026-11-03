@@ -89,8 +89,8 @@ interface Candidate {
 
 /**
  * A recording for this player to play a Дуел against, or null when none fits: its owner's skill within
- * RECORDS.skillBand of theirs, at most RECORDS.maxSeen of its questions seen, not their own, its owner neither a guest
- * nor banned nor opted out, every question still in play.
+ * RECORDS.skillBand of theirs, at most RECORDS.maxSeen of its questions seen, not their own, its owner neither a guest,
+ * banned, opted out nor blocked either way, every question still in play.
  */
 export function pickRecord(userId: number, rating: number | null, rng: Rng = Math.random): RecordPick | null {
   const centre = skillCentre(userId, rating);
@@ -101,9 +101,14 @@ export function pickRecord(userId: number, rating: number | null, rng: Rng = Mat
      LEFT JOIN player_skill s ON s.user_id = r.user_id AND s.category = 'all'
      WHERE r.mode IN (${SOURCES.map(() => '?').join(', ')}) AND r.category = 'mixed' AND r.played_at > ?
        AND r.user_id <> ? AND u.is_guest = 0 AND u.share_runs = 1 AND ${NOT_BANNED}
+       -- Not a player either of them blocked: a recording is a match against them too.
+       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.user_id = ? AND b.blocked_id = r.user_id)
+                                                 OR (b.user_id = r.user_id AND b.blocked_id = ?))
      ORDER BY r.played_at DESC LIMIT ?`,
     ...SOURCES,
     Date.now() - RECORDS.maxAgeDays * 24 * 60 * 60_000,
+    userId,
+    userId,
     userId,
     RECORDS.candidates,
   );

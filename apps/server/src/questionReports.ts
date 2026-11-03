@@ -321,11 +321,12 @@ export function resolveQuestionReports(
       ok: false,
       error: `Избери основание и напиши причина (поне ${MODERATION.reasonMin} знака): авторът ще ги прочете.`,
     };
-  const open = all<{ id: number; user_id: number }>(
+  const open = all<{ id: number; user_id: number | null }>(
     "SELECT id, user_id FROM question_reports WHERE question_id = ? AND status = 'open'",
     questionId,
   );
-  const reporters = open.map((r) => r.user_id);
+  // Who to tell how it went: not a flag whose player has since gone.
+  const reporters = open.flatMap((r) => (r.user_id === null ? [] : [r.user_id]));
   let shown = false;
   tx(() => {
     // Dismissed: those players' flags on this question never count toward hiding it again (reportQuestion).

@@ -83,7 +83,7 @@ test('the database as it was is kept beside the backups before migrating', () =>
 test('the database knows the oldest code that can run on it: the one its last breaking step needs', () => {
   // Every step up to v14 counts as breaking (they're from before steps were marked); v15–v48 are compatible; v49 (the
   // ids of „Моите знания“'s achievements and quest, renamed) is breaking, v50 compatible, and v51 (the last of the old
-  // names: the quests for козове, Трио's matches) breaking.
+  // names: the quests for козове, Трио's matches) breaking; v52 (a question flag outlives its account) compatible.
   assert.equal(schemaFloor(), 51);
 });
 
@@ -227,6 +227,82 @@ test('the last of the old names go: the quests for козове are powerup ones
     assert.deepEqual(all('SELECT achievement_id AS id FROM user_achievements'), [{ id: 'first_game' }]);
     // Counted again from the rows at the next start (tallies.ts).
     assert.deepEqual(all("SELECT key FROM settings WHERE key IN ('tallies_kept', 'tallied_to')"), []);
+  } finally {
+    db.close();
+  }
+});
+
+test('a question flag outlives the account that sent it, without its name or words (v52)', () => {
+  const file = path.join(tmp, 'flags.db');
+  const boot = () =>
+    spawnSync(process.execPath, ['--import', 'tsx', '-e', "await import('./src/db.ts')"], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      env: { ...process.env, DB_PATH: file, BACKUP_DIR: 'off' },
+      encoding: 'utf8',
+    });
+  assert.equal(boot().status, 0, 'a new database');
+  const db = new DatabaseSync(file);
+  try {
+    // The table as v51 left it: a flag went with its account (ON DELETE CASCADE).
+    db.exec(`
+      DROP TABLE question_reports;
+      CREATE TABLE question_reports (
+        id INTEGER PRIMARY KEY,
+        question_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        reason TEXT NOT NULL,
+        details TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'open',
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER,
+        resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        question_hash TEXT
+      );
+      PRAGMA user_version = 51;
+      INSERT INTO users (id, username, username_key, password_hash, created_at) VALUES
+        (1, 'ana', 'ana', 'x', 0), (2, 'boris', 'boris', 'x', 0);
+      INSERT INTO question_reports (id, question_id, user_id, reason, details, status, created_at, resolved_by, question_hash)
+        VALUES (1, 'q1', 1, 'wrong', 'Годината е 1878.', 'open', 10, NULL, 'h1'),
+               (2, 'q1', 2, 'wrong', 'Не е 1876.', 'resolved', 20, 1, 'h1');
+    `);
+    const migrated = boot();
+    assert.equal(migrated.status, 0, migrated.stderr);
+    const all = (sql: string) =>
+      db
+        .prepare(sql)
+        .all()
+        .map((r) => ({ ...r }));
+    assert.deepEqual(
+      all('SELECT id, user_id, details, status, resolved_by, question_hash FROM question_reports ORDER BY id'),
+      [
+        { id: 1, user_id: 1, details: 'Годината е 1878.', status: 'open', resolved_by: null, question_hash: 'h1' },
+        { id: 2, user_id: 2, details: 'Не е 1876.', status: 'resolved', resolved_by: 1, question_hash: 'h1' },
+      ],
+    );
+    assert.deepEqual(
+      all("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'question_reports' ORDER BY name"),
+      [
+        'question_reports_once',
+        'question_reports_open',
+        'question_reports_recent',
+        'question_reports_resolver',
+        'question_reports_user',
+      ].map((name) => ({ name })),
+    );
+    // An account erased, as older code (which doesn't clear the words) would: the flag stays, nameless…
+    db.exec('PRAGMA foreign_keys = ON; DELETE FROM users WHERE id = 2;');
+    assert.deepEqual(all('SELECT id, user_id, details FROM question_reports ORDER BY id'), [
+      { id: 1, user_id: 1, details: 'Годината е 1878.' },
+      { id: 2, user_id: null, details: 'Не е 1876.' },
+    ]);
+    // …and its words go at the next start (repair).
+    assert.equal(boot().status, 0);
+    assert.deepEqual(all('SELECT id, details FROM question_reports ORDER BY id'), [
+      { id: 1, details: 'Годината е 1878.' },
+      { id: 2, details: '' },
+    ]);
+    const floor = db.prepare("SELECT value FROM settings WHERE key = 'schema_floor'").get() as { value: string };
+    assert.equal(floor.value, '51', 'compatible: the code before it runs on it');
   } finally {
     db.close();
   }

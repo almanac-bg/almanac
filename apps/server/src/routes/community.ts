@@ -4,7 +4,7 @@ import { requireAuth } from '../auth';
 import { reportQuestion } from '../questionReports';
 import { DraftSchema, editSubmission, mySubmissions, submitQuestion, withdrawSubmission } from '../submissions';
 import { throttled } from '../throttle';
-import { idParam, parse, requireAccount } from './common';
+import { guestCapped, idParam, parse, requireAccount } from './common';
 
 /** Questions players propose, and reports about the bank's questions. */
 export const communityRouter = Router();
@@ -45,7 +45,8 @@ communityRouter.delete('/submissions/:id', requireAuth, requireAccount, (req, re
   res.json({ ok: true });
 });
 
-communityRouter.post('/questions/:id/report', requireAuth, requireAccount, (req, res) => {
+communityRouter.post('/questions/:id/report', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
   const body = parse(z.object({ reason: z.string(), details: z.string().max(500).default('') }), req, res);
   if (!body) return;
   if (throttled(`question-report:${res.locals.userId}`, 30, 60 * 60_000)) {

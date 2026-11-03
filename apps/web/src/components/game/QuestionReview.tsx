@@ -1,4 +1,4 @@
-import { api, errorMessage, fmt, percent, type ReviewItem, toast, useStore } from '@almanac/client';
+import { api, errorMessage, fmt, percent, type ReviewItem, toast } from '@almanac/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
@@ -22,8 +22,6 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
   const [reporting, setReporting] = useState<ReviewItem | null>(null);
-  // Flagging needs a saved account (the server refuses guests).
-  const canReport = useStore((s) => !s.me?.isGuest);
   const [reported, setReported] = useState<Set<string>>(new Set());
   const right = items.filter((i) => i.right).length;
 
@@ -44,13 +42,8 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
             </button>
           </h2>
           <p className="text-sm text-fg-3">
-            {right} от {items.length} верни
-            {canReport && (
-              <>
-                {' '}
-                · видя ли грешка във въпрос? Сигнализирай с <Flag aria-label="знамето" className="inline size-3.5" />
-              </>
-            )}
+            {right} от {items.length} верни · видя ли грешка във въпрос? Сигнализирай с{' '}
+            <Flag aria-label="знамето" className="inline size-3.5" />
           </p>
         </div>
         <ChevronDown
@@ -73,7 +66,7 @@ export function QuestionReview({ items }: { items: ReviewItem[] }) {
                 item={item}
                 reported={reported.has(item.id)}
                 // A host's own question isn't the bank's to fix.
-                onReport={canReport && !ownQuestion(item) ? () => setReporting(item) : null}
+                onReport={ownQuestion(item) ? null : () => setReporting(item)}
               />
             ))}
           </m.ol>

@@ -1198,6 +1198,40 @@ const MIGRATIONS: (Step | { compatible: Step })[] = [
   DELETE FROM user_achievements WHERE achievement_id = 'trio_win';
   DELETE FROM settings WHERE key IN ('tallies_kept', 'tallied_to');
   `,
+
+  // v52, a question flag outlives the account that sent it (the 31 October review, 8n.4): guests flag questions now,
+  // and a room's guest is gone within the hour — a wrong answer is wrong after the pupil who saw it has left. The flag
+  // keeps no name (user_id ON DELETE SET NULL, was CASCADE) and no words (account.ts clears them first). SQLite can't
+  // change a foreign key in place: the table is made again, as it was otherwise. Older code runs on it; what it gets
+  // wrong is only an erased account's flag: its words stay (repair() clears them), and its thanks for a fix fails after
+  // the fix is saved.
+  {
+    compatible: `
+    CREATE TABLE question_reports_v52 (
+      id INTEGER PRIMARY KEY,
+      question_id TEXT NOT NULL,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reason TEXT NOT NULL,
+      details TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at INTEGER NOT NULL,
+      resolved_at INTEGER,
+      resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      question_hash TEXT
+    );
+    INSERT INTO question_reports_v52
+      (id, question_id, user_id, reason, details, status, created_at, resolved_at, resolved_by, question_hash)
+      SELECT id, question_id, user_id, reason, details, status, created_at, resolved_at, resolved_by, question_hash
+      FROM question_reports;
+    DROP TABLE question_reports;
+    ALTER TABLE question_reports_v52 RENAME TO question_reports;
+    CREATE UNIQUE INDEX question_reports_once ON question_reports(question_id, user_id) WHERE status = 'open';
+    CREATE INDEX question_reports_open ON question_reports(status, question_id);
+    CREATE INDEX question_reports_user ON question_reports(user_id);
+    CREATE INDEX question_reports_resolver ON question_reports(resolved_by) WHERE resolved_by IS NOT NULL;
+    CREATE INDEX question_reports_recent ON question_reports(question_id, created_at);
+    `,
+  },
 ];
 
 /** The schema version this code brings a database to. */
@@ -1311,6 +1345,8 @@ function repair() {
   // Wins older code saved while it ran on this database: counted the old way (the stayer of a no contest included).
   db.exec(`UPDATE match_players SET won = (placement = 1 AND left_match = 0
     AND (SELECT player_count FROM matches m WHERE m.id = match_id) > 1) WHERE won IS NULL`);
+  // Question flags of accounts older code erased (v52): their words go with the account.
+  db.exec("UPDATE question_reports SET details = '' WHERE user_id IS NULL AND details <> ''");
   if (!unshaped.length) return;
   const update = db.prepare('UPDATE users SET username_shape = ? WHERE id = ?');
   tx(() => {

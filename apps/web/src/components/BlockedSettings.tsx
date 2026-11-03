@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 import { PlayerName } from './FitName';
 import { Button, Card } from './ui';
 
-/** Settings → the players this one blocked (they can't send a friend request), each a tap from unblocking. */
+/** Settings → the players this one blocked (friends.ts → blockPlayer says what it keeps apart), each a tap from unblocking. */
 export function BlockedSettings() {
   const { data, setData } = useLoad(() => api.blocked());
   const [busy, setBusy] = useState<number | null>(null);
@@ -32,7 +32,9 @@ export function BlockedSettings() {
         <Ban className="size-5 text-fg-3" />
         <h2 className="t-card">Блокирани</h2>
       </div>
-      <p className="mt-2 text-sm text-fg-2">Не могат да ти пращат покани за приятелство, нито ти на тях.</p>
+      <p className="mt-2 text-sm text-fg-2">
+        Класираните мачове не ви събират, не влизате в стаите си и не си пращате покани.
+      </p>
       <ul className="mt-4 divide-y divide-line">
         {players.map((p) => (
           <li key={p.id} className="flex items-center gap-3 py-2.5">

@@ -4,7 +4,7 @@ import type { z } from 'zod';
 import { verifyPassword } from '../auth';
 import { ACCOUNT_ONLY } from '../guests';
 import { hasPasskey } from '../passkeys';
-import { throttled, wideNetwork } from '../throttle';
+import { throttled, throttledNetwork, wideNetwork } from '../throttle';
 import { getUser, isAdmin, isOwner } from '../users';
 
 /**
@@ -30,6 +30,19 @@ export function requireAccount(_req: Request, res: Response, next: NextFunction)
 }
 
 export const idParam = (req: Request) => Number(req.params.id);
+
+/**
+ * Guests report and block too: a guest meets names, rooms and sets like anyone, and the stores ask it of every player
+ * (Apple 1.2, Play's UGC policy). A guest costs nothing to make, though: on top of each account's own caps, a network's
+ * guests share one. A school's class behind one address stays well under it. Says whether it answered 429.
+ */
+export function guestCapped(req: Request, res: Response, what: 'reports' | 'blocks'): boolean {
+  if (!getUser(res.locals.userId)?.is_guest) return false;
+  const [limit, windowMs] = what === 'reports' ? [30, 24 * 60 * 60_000] : [60, 60 * 60_000];
+  if (!throttledNetwork(`guest-${what}`, req.ip, limit, windowMs)) return false;
+  res.status(429).json({ error: 'Твърде много от тази мрежа. Опитай по-късно или запази профила си.' });
+  return true;
+}
 
 /** Staff (the owner or a moderator), for what needs no second factor: the count of what waits, setting one up. */
 export function requireStaff(_req: Request, res: Response, next: NextFunction) {

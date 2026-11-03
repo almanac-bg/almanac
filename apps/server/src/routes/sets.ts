@@ -18,7 +18,7 @@ import {
 } from '../sets';
 import { throttled } from '../throttle';
 import { getUser, isAdmin } from '../users';
-import { idParam, parse, requireAccount, requireAdmin, requireRecentPassword } from './common';
+import { guestCapped, idParam, parse, requireAccount, requireAdmin, requireRecentPassword } from './common';
 
 /** „Моите въпроси“: a host's own question sets for their rooms, and the links they're shared by. */
 export const setsRouter = Router();
@@ -152,7 +152,8 @@ setsRouter.post('/sets/shared/:code/copy', requireAuth, requireAccount, (req, re
 });
 
 /** Something wrong with a shared set (offensive, illegal, not what it says): a report about the set. */
-setsRouter.post('/sets/shared/:code/report', requireAuth, requireAccount, (req, res) => {
+setsRouter.post('/sets/shared/:code/report', requireAuth, (req, res) => {
+  if (guestCapped(req, res, 'reports')) return;
   const body = parse(z.object({ reason: z.string(), details: z.string().max(400).default('') }), req, res);
   if (!body) return;
   const code = shareCode(req);
