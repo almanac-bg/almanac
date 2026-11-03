@@ -8,6 +8,14 @@ is a `vX.Y.Z` tag and a [GitHub release](https://github.com/almanac-bg/almanac/r
 Bulgarian: [October 2026](docs/changelog/2026-10.md), with 0.9.0, 1.0.0 and 1.1.0, and
 [November 2026 until 1.2.0](docs/changelog/2026-11.md), what came after 1.1.0.
 
+## [1.2.1](https://github.com/almanac-bg/almanac/compare/v1.2.0...v1.2.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **deps:** bump node from 26.12.1-alpine to 26.13.0-alpine ([#87](https://github.com/almanac-bg/almanac/issues/87)) ([2d3bd68](https://github.com/almanac-bg/almanac/commit/2d3bd68f79a41d438b1ad051df2406a7360dd099))
+* **deps:** bump nodemailer from 10.3.0 to 10.3.1 in the npm-minor group across 1 directory ([#88](https://github.com/almanac-bg/almanac/issues/88)) ([264acda](https://github.com/almanac-bg/almanac/commit/264acdafecbd44fb27b940bffa5ff852c320cb14))
+
 ## [1.2.0](https://github.com/almanac-bg/almanac/compare/v1.1.0...v1.2.0) (2026-11-03)
 
 
