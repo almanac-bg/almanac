@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, Switch, View } from 'react-native';
 import { radius, useColors } from '@/theme';
-import { T } from '@/ui';
+import { T } from './Text';
 
 /** A group of settings with its heading. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -62,17 +62,19 @@ export function Toggle({
   );
 }
 
-/** One of a few: a row of choices, the chosen one marked (and said). */
+/** One of a few: a row of choices, the chosen one marked (and said). `disabled`: shown, not changed (not yours to). */
 export function Choices<Id extends string>({
   options,
   value,
   onChange,
   label,
+  disabled = false,
 }: {
   options: readonly { id: Id; label: string }[];
   value: Id;
   onChange: (id: Id) => void;
   label: string;
+  disabled?: boolean;
 }) {
   const colors = useColors();
   return (
@@ -87,9 +89,11 @@ export function Choices<Id extends string>({
           <Pressable
             key={o.id}
             onPress={() => onChange(o.id)}
+            disabled={disabled}
             accessibilityRole="radio"
-            accessibilityState={{ checked: on }}
+            accessibilityState={{ checked: on, disabled }}
             style={{
+              opacity: disabled && !on ? 0.55 : 1,
               minHeight: 44,
               paddingHorizontal: 14,
               justifyContent: 'center',

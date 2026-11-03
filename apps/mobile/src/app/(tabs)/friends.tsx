@@ -7,9 +7,9 @@ import { DuelButton } from '@/components/DuelButton';
 import { DuelList, useDuels } from '@/duels/parts';
 import { API_URL } from '@/lib/client';
 import { useLoad } from '@/lib/load';
-import { Section } from '@/settings/parts';
 import { fonts, radius, useColors } from '@/theme';
 import { Button, Field, LoadError, Screen, T } from '@/ui';
+import { Section } from '@/ui/controls';
 
 /** Приятели: add by name, the requests, the list with where each friend is, and a Дуел with any of them. */
 export default function Friends() {

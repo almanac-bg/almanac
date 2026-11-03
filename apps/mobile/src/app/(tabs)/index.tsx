@@ -5,6 +5,7 @@ import { DailyCard } from '@/home/DailyCard';
 import { DuelTurn } from '@/home/DuelTurn';
 import { Modes } from '@/home/Modes';
 import { ProfileCard } from '@/home/ProfileCard';
+import { RoomBanner, RoomsCard } from '@/home/RoomsCard';
 import { Screen, T } from '@/ui';
 
 /**
@@ -21,11 +22,13 @@ export default function Play() {
         </T>
         <NotificationsBell />
       </View>
+      <RoomBanner />
       <DuelTurn />
       <ProfileCard />
       {dailyFirst && <DailyCard />}
       <Modes />
       {!dailyFirst && <DailyCard />}
+      <RoomsCard />
     </Screen>
   );
 }

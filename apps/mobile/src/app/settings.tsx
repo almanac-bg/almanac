@@ -6,8 +6,8 @@ import { Alert } from 'react-native';
 import { API_URL } from '@/lib/client';
 import { setTheme, type ThemeChoice, usePrefs } from '@/lib/prefs';
 import { DeleteAccount, EmailForm, PasswordForm, SaveAccount } from '@/settings/forms';
-import { Choices, Section, Toggle } from '@/settings/parts';
 import { Button, Screen, T } from '@/ui';
+import { Choices, Section, Toggle } from '@/ui/controls';
 
 const THEMES = [
   { id: 'system', label: 'Като телефона' },

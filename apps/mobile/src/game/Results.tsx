@@ -1,4 +1,4 @@
-import { actions, fmt, keepTogether, LETTERS, type LiveGame, numberText } from '@almanac/client';
+import { actions, fmt, keepTogether, LETTERS, type LiveGame, numberText, useStore } from '@almanac/client';
 import { MODES } from '@almanac/shared';
 import { router } from 'expo-router';
 import { View } from 'react-native';
@@ -14,9 +14,15 @@ export function Results({ game }: { game: LiveGame }) {
   const alone = game.start.players.length === 1;
   const right = game.history.filter((i) => i.right).length;
   const daily = rewards?.daily;
+  // A room's match: back to the room (still in it), for the next one.
+  const inRoom = useStore((s) => !!s.room) && end.mode === 'custom';
   const home = () => {
     actions.closeGame();
     router.replace('/');
+  };
+  const toRoom = () => {
+    actions.closeGame();
+    router.replace('/room');
   };
   const again = async () => {
     actions.closeGame();
@@ -80,7 +86,8 @@ export function Results({ game }: { game: LiveGame }) {
 
       <View style={{ gap: 10 }}>
         {end.mode === 'solo' && <Button title="Още едно Соло" size="lg" onPress={() => void again()} />}
-        <Button title="Към началото" variant={end.mode === 'solo' ? 'secondary' : 'primary'} onPress={home} />
+        {inRoom && <Button title="Обратно в стаята" size="lg" onPress={toRoom} />}
+        <Button title="Към началото" variant={end.mode === 'solo' || inRoom ? 'secondary' : 'primary'} onPress={home} />
       </View>
 
       {game.history.length > 0 && (

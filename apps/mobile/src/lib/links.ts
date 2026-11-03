@@ -14,6 +14,8 @@ const SCREENS: readonly RegExp[] = [
   /^\/profile(\/[^/]+)?$/,
   /^\/c\/[^/]+$/,
   /^\/notifications$/,
+  /^\/room$/,
+  /^\/join\/[^/]+$/,
   /^\/settings$/,
 ];
 

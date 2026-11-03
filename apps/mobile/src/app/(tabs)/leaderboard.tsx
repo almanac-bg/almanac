@@ -12,9 +12,9 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
-import { Choices } from '@/settings/parts';
 import { radius, useColors } from '@/theme';
 import { LoadError, Screen, T } from '@/ui';
+import { Choices } from '@/ui/controls';
 
 const GUEST_LINE = 'Класациите са за играчи с профил: запази прогреса си, за да влезеш в тях.';
 

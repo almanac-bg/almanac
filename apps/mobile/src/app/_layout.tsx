@@ -68,6 +68,8 @@ export default function RootLayout() {
                 <Stack.Screen name="profile/[username]" options={header} />
                 <Stack.Screen name="notifications" options={{ ...header, title: 'Известия' }} />
                 <Stack.Screen name="c/[id]" options={{ ...header, title: 'Предизвикателство' }} />
+                <Stack.Screen name="room" options={{ ...header, title: 'Частна стая' }} />
+                <Stack.Screen name="join/[code]" options={{ ...header, title: 'Стая' }} />
               </Stack.Protected>
               <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="welcome" />
