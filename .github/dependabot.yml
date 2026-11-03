@@ -7,8 +7,9 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly, day: monday }
-    # Conventional Commits, as every title on main (commitlint.config.mjs): "build(deps): bump …".
-    commit-message: { prefix: "build(deps)", prefix-development: "build(deps)" }
+    # Conventional Commits, as every title on main (commitlint.config.mjs). What ships is a fix: an update to it makes
+    # a patch release, with its line in the notes (docs/maintainers.md → Издания); a dev tool's is a build change.
+    commit-message: { prefix: "fix(deps)", prefix-development: "build(deps)" }
     open-pull-requests-limit: 5
     cooldown:
       default-days: 5
@@ -20,7 +21,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
-    commit-message: { prefix: "build(deps)" }
+    commit-message: { prefix: "fix(deps)" }
     cooldown:
       default-days: 5
 
@@ -28,7 +29,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly, day: monday }
-    commit-message: { prefix: "build(deps)" }
+    commit-message: { prefix: "fix(deps)" }
     cooldown:
       default-days: 5
 

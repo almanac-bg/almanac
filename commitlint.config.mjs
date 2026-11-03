@@ -12,8 +12,9 @@ export default {
       'always',
       ['web', 'server', 'client', 'shared', 'bank', 'deploy', 'ci', 'docs', 'deps', 'e2e', 'security', 'release'],
     ],
-    // A line a log and a release note can show whole.
-    'header-max-length': [2, 'always', 72],
+    // commitlint's own limit: Dependabot's group titles run past 72 ("… in the npm-minor group"), and nobody can
+    // shorten those. A person's title aims for 72, a line a log shows whole (CONTRIBUTING.md).
+    'header-max-length': [2, 'always', 100],
     'subject-case': [2, 'never', ['sentence-case', 'start-case', 'pascal-case', 'upper-case']],
   },
 };

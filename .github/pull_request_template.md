@@ -1,6 +1,6 @@
 <!--
 Заглавието става commit-ът в main (squash), затова е по Conventional Commits — на английски, в повелително наклонение,
-с малка буква, без точка, до 72 знака; CI го проверява (commitlint.config.mjs):
+с малка буква, без точка, до 72 знака (CI пуска до 100); CI го проверява (commitlint.config.mjs):
 
   type(scope): summary
 
