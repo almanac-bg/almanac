@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, View } from 'react-native';
 import { DuelButton } from '@/components/DuelButton';
 import { DuelList, useDuels } from '@/duels/parts';
+import { GroupsSection } from '@/groups/parts';
 import { API_URL } from '@/lib/client';
 import { useLoad } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
@@ -55,6 +56,7 @@ export default function Friends() {
       </T>
       <AddFriend onAdded={(next) => setShown(next)} />
       <Duels />
+      <GroupsSection />
       {error && !list ? (
         <LoadError title="Приятелите не се заредиха" error={error} onRetry={reload} />
       ) : !list ? (
