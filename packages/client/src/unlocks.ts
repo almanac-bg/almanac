@@ -14,6 +14,23 @@ import {
   type UnlockRef,
 } from '@almanac/shared';
 
+/** An item's own name („Видра“), without its kind. */
+export function itemName(u: UnlockRef): string {
+  const list = { avatar: AVATARS, frame: FRAMES, title: TITLES, emote: EMOTES }[u.kind] as {
+    id: string;
+    name?: string;
+  }[];
+  return list.find((x) => x.id === u.id)?.name ?? '';
+}
+
+/** What kind of item it is, in a word (an option's caption). */
+export const ITEM_KIND: Record<UnlockRef['kind'], string> = {
+  avatar: 'аватар',
+  frame: 'рамка',
+  title: 'титла',
+  emote: 'емоция',
+};
+
 export function unlockPreview(u: UnlockRef): { icon: string; name: string } {
   switch (u.kind) {
     case 'avatar': {

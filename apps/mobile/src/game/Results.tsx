@@ -8,6 +8,7 @@ import {
   matchOutcome,
   matchShareText,
   numberText,
+  rewardSteps,
   toast,
   useStore,
 } from '@almanac/client';
@@ -34,6 +35,7 @@ import {
   UnratedCard,
 } from '@/results/Cards';
 import { ChallengeStanding, FriendsProvider, Podium, TeamResult } from '@/results/Standings';
+import { RewardMoment } from '@/rewards/RewardMoment';
 import { fonts, gutter, radius, useColors } from '@/theme';
 import { Button, Card, COLUMN, T, usePagePadding } from '@/ui';
 
@@ -55,14 +57,21 @@ export function Results({ game }: { game: LiveGame }) {
   const { end, mine, rewards, link, duel, single, teamScores } = o;
   const category = categoryById(game.start.category);
   const headline = useRef<ComponentRef<typeof Text>>(null);
+  // A new level, a milestone to pick, a new avatar or frame: one beat at a time before the results (RewardMoment).
+  const [steps] = useState(() => rewardSteps(end.noContest || o.classPupil ? null : rewards));
+  const [moment, setMoment] = useState(steps.length > 0);
 
-  // The outcome is felt (a win, a perfect run, a record) and said first: a screen reader starts on the headline.
+  // The outcome is felt (a win, a perfect run, a record) as the results come in.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the results come in
   useEffect(() => {
     if (o.fanfare) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, []);
+  // A screen reader starts on the headline — once the reward moment, if there is one, has closed.
+  useEffect(() => {
+    if (moment) return;
     const node = headline.current && findNodeHandle(headline.current);
     if (node) AccessibilityInfo.setAccessibilityFocus(node);
-  }, []);
+  }, [moment]);
 
   const home = () => {
     actions.closeGame();
@@ -153,6 +162,7 @@ export function Results({ game }: { game: LiveGame }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
+      <RewardMoment steps={steps} open={moment} onDone={() => setMoment(false)} />
       <ScrollView contentContainerStyle={[padding, { paddingBottom: 24 }]}>
         <View style={[COLUMN, { gap: 16 }]}>
           <View style={{ alignItems: 'center', gap: 8 }}>
@@ -258,7 +268,8 @@ export function Results({ game }: { game: LiveGame }) {
           {rewardsCard &&
             (rewards ? (
               <>
-                <UnlockReveal rewards={rewards} />
+                {/* The reward moment offered the new avatar or frame already („Сложи го“): not a second time here. */}
+                {steps.length === 0 && <UnlockReveal rewards={rewards} />}
                 <RewardsCard rewards={rewards} />
               </>
             ) : end.saving ? (
