@@ -141,3 +141,23 @@ test('APNs takes all four settings or none, and a real key; FCM a real service a
     assert.match(err, /Invalid setting: FCM_SERVICE_ACCOUNT/, value);
   }
 });
+
+test('the apps the links open: a wrong id, a package without its certificate or a bad fingerprint stops the start', () => {
+  const print = Array.from({ length: 32 }, () => 'AB').join(':');
+  assert.equal(
+    load({ IOS_APP_ID: 'ABCDE12345.bg.almanac.app', ANDROID_PACKAGE: 'bg.almanac.app', ANDROID_CERT_SHA256: print })
+      .status,
+    0,
+  );
+  for (const [env, problem] of [
+    [{ IOS_APP_ID: 'bg.almanac.app' }, /IOS_APP_ID/],
+    [{ ANDROID_PACKAGE: 'bg.almanac.app' }, /go together/],
+    [{ ANDROID_CERT_SHA256: print }, /go together/],
+    [{ ANDROID_PACKAGE: 'bg.almanac.app', ANDROID_CERT_SHA256: 'AB:CD' }, /ANDROID_CERT_SHA256 has/],
+    [{ ANDROID_PACKAGE: 'almanac', ANDROID_CERT_SHA256: print }, /ANDROID_PACKAGE is/],
+  ] as const) {
+    const { status, err } = load(env);
+    assert.notEqual(status, 0, JSON.stringify(env));
+    assert.match(err, problem, JSON.stringify(env));
+  }
+});

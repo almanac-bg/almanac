@@ -88,3 +88,19 @@ Google), с проверка при значима промяна и с обра
   или същият в base64).
 
 Ключовете стоят само в `.env` на сървъра и в Bitwarden, както другите тайни.
+
+## Линковете
+
+Линк към екран на играта (покана за стая, дуел с приятел, днешните въпроси, профил…) отваря приложението, щом то е на
+телефона: universal links на iOS, App Links на Android. Кои пътища са екрани на приложението, казва `APP_PATHS` в
+`packages/shared/src/routes.ts` (всеки със `app: true` или `false`). От тях `appLinkPatterns()` прави шаблоните, които
+сървърът дава в двата файла на Apple и Google:
+
+- `/.well-known/apple-app-site-association`: с `IOS_APP_ID` (`TEAMID.bundle.id`). Там са линковете и
+  `webcredentials`, тоест паролите, запазени за сайта, се предлагат и в приложението.
+- `/.well-known/assetlinks.json`: с `ANDROID_PACKAGE` и `ANDROID_CERT_SHA256`, отпечатъкът на сертификата, с който
+  Google Play подписва приложението (Play Console → App integrity → App signing). Тук са и линковете, и паролите.
+
+Приложението обявява същите пътища: Associated Domains (`applinks:almanac.bg`, `webcredentials:almanac.bg`) и intent
+filters, направени от същия `appLinkPatterns()`. Cloudflare не бива да проверява заявките към `/.well-known/` (Bot
+Fight, Under Attack): Apple и Google ги четат без браузър.

@@ -166,6 +166,29 @@ function fcm() {
 }
 
 /**
+ * The apps this site's links open (8o): IOS_APP_ID, the iOS app's id as Apple writes it (TEAMID.bundle.id), and
+ * ANDROID_PACKAGE with ANDROID_CERT_SHA256 (the signing certificate's fingerprint, or several, comma-separated, as
+ * Play Console → App integrity shows them). Unset, the site claims no app. A typo stops the start: a wrong id would
+ * quietly send nobody to the app.
+ */
+function appLinks() {
+  const ios = process.env.IOS_APP_ID?.trim() || null;
+  if (ios && !/^[A-Z0-9]{10}\.[A-Za-z0-9.-]+$/.test(ios))
+    throw new Error(`Invalid setting: IOS_APP_ID is "${ios}"; use TEAMID.bundle.id (Apple's ten-character team id).`);
+  const pkg = process.env.ANDROID_PACKAGE?.trim() || null;
+  const prints = (process.env.ANDROID_CERT_SHA256 ?? '')
+    .split(',')
+    .map((p) => p.trim().toUpperCase())
+    .filter(Boolean);
+  if (!pkg !== !prints.length) throw new Error('Invalid setting: ANDROID_PACKAGE and ANDROID_CERT_SHA256 go together.');
+  if (pkg && !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(pkg))
+    throw new Error(`Invalid setting: ANDROID_PACKAGE is "${pkg}"; use the app's package name (bg.almanac.app).`);
+  const bad = prints.find((p) => !/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(p));
+  if (bad) throw new Error(`Invalid setting: ANDROID_CERT_SHA256 has "${bad}"; use the SHA-256 fingerprint, AA:BB:….`);
+  return { ios, android: pkg ? { package: pkg, fingerprints: prints } : null };
+}
+
+/**
  * When the evening Роял starts, Sofia time: EVENING_AT=21:00 (the default), or with seconds for tests ("13:05:30");
  * "off" turns it off. A typo stops the server.
  */
@@ -264,6 +287,8 @@ export const config = {
   /** The apps' pushes (nativePush.ts): Apple's service for iOS, Google's for Android; unset, that app gets none. */
   apns: apns(),
   fcm: fcm(),
+  /** The apps this site's links open, and whose saved passwords are its own (index.ts → /.well-known). */
+  appLinks: appLinks(),
   /** Error reports go to this Sentry project (EU region recommended); unset, errors only reach the log. */
   sentryDsn: process.env.SENTRY_DSN || null,
   /**

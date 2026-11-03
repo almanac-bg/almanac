@@ -226,3 +226,8 @@ test('no route reads the session cookie by itself', () => {
     .sort();
   assert.deepEqual(readers, ['auth.ts', 'index.ts', 'realtime.ts']);
 });
+
+test('a site with no app claims none: the links stay in the browser', T, async () => {
+  for (const file of ['apple-app-site-association', 'assetlinks.json'])
+    assert.equal((await fetch(`${srv.url}/.well-known/${file}`)).status, 404, file);
+});
