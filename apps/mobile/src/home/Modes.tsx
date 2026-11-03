@@ -13,7 +13,7 @@ import { SoloSheet } from './SoloSheet';
  */
 export function Modes() {
   const colors = useColors();
-  const me = useStore((s) => s.me)!;
+  const me = useStore((s) => s.me);
   const lobby = useStore((s) => s.lobby);
   const connected = useStore((s) => s.connected);
   const ranked = useOpenQueues().filter((id) => !MODES[id].teams);
@@ -24,6 +24,7 @@ export function Modes() {
     const res = await actions.joinQueue(mode);
     if (!res.ok) setError(res.error);
   };
+  if (!me) return null;
   return (
     <View style={{ gap: 12 }}>
       <T variant="h2" role="heading">

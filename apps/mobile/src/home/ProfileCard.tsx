@@ -8,7 +8,8 @@ import { Card } from './Card';
 /** Who you are: your avatar and name, your level and how far into it. */
 export function ProfileCard() {
   const colors = useColors();
-  const me = useStore((s) => s.me)!;
+  const me = useStore((s) => s.me);
+  if (!me) return null;
   const progress = levelProgress(me.xp);
   return (
     <Card>

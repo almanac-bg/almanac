@@ -61,6 +61,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
                 <Stack.Screen name="game" options={{ gestureEnabled: false }} />
+                <Stack.Screen name="settings" />
               </Stack.Protected>
               <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="welcome" />

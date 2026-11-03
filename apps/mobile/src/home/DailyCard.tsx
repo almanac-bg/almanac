@@ -6,7 +6,7 @@ import { Card } from './Card';
 
 /** The day's ten: to play, or played (with the streak either way). One attempt until midnight. */
 export function DailyCard() {
-  const daily = useStore((s) => s.me!.daily);
+  const daily = useStore((s) => s.me?.daily);
   const connected = useStore((s) => s.connected);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +17,7 @@ export function DailyCard() {
     if (!started.ok) setError(started.error);
     setBusy(false);
   };
+  if (!daily) return null;
   return (
     <Card accent={MODES.daily.accent[0]}>
       <T variant="label" tone="fg3">
