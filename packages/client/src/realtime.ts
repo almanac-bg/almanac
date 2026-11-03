@@ -45,7 +45,8 @@ export function getSocket(): GameSocket {
     socket = io(clientConfig().baseUrl || undefined, {
       autoConnect: false,
       // Which client and protocol this is (packages/shared → client.ts): one the server no longer takes is refused.
-      auth: { ...clientInfo() },
+      // Asked again at every connection: an app's session may have changed since.
+      auth: (send) => send({ ...clientConfig().socketAuth?.(), ...clientInfo() }),
       transports: ['websocket', 'polling'],
       tryAllTransports: true,
     });
@@ -108,10 +109,9 @@ function watchLink(s: GameSocket) {
   s.io.on('ping', heard);
   s.on('connect', heard);
   // A tab back from the background (a locked phone) gets a fresh window: its timers were asleep, not the link.
-  if (typeof document !== 'undefined')
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') lastHeard = Date.now();
-    });
+  clientConfig().onResume?.(() => {
+    lastHeard = Date.now();
+  });
   const timer = setInterval(() => {
     const { connected, stalled, game } = getState();
     const now = Date.now();
@@ -128,15 +128,11 @@ function bind(s: GameSocket) {
   // Back online, or back on a tab that was asleep (a locked phone): try again at once. Left to itself, Socket.IO waits
   // out its own back-off first (14 s in Chrome and Safari), and in Firefox it never came back after a lost network
   // until the page was reloaded. Not after signing out: that socket was closed on purpose (`active` is false).
-  if (typeof window !== 'undefined') {
-    const retry = () => {
-      if (!s.connected && s.active) s.disconnect().connect();
-    };
-    window.addEventListener('online', retry);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') retry();
-    });
-  }
+  const retry = () => {
+    if (!s.connected && s.active) s.disconnect().connect();
+  };
+  clientConfig().onOnline?.(retry);
+  clientConfig().onResume?.(retry);
   s.on('connect', () => {
     crowded = false;
     s.io.reconnectionDelay(RECONNECT.delayMs).randomizationFactor(RECONNECT.jitter);
