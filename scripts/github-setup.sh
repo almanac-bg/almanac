@@ -158,7 +158,9 @@ try "only GitHub-owned and verified actions, pinned to a commit" gh api -X PUT "
 try "which ones: GitHub's own" gh api -X PUT "repos/$repo/actions/permissions/selected-actions" \
   --input - <<<'{"github_owned_allowed": true, "verified_allowed": false, "patterns_allowed": []}'
 # Workflows' tokens read only, unless a job asks for more; and a workflow may open a pull request: release-please's
-# "chore(release): X.Y.Z" (.github/workflows/release.yml, docs/maintainers.md → Издания).
+# "chore(release): X.Y.Z" (.github/workflows/release.yml, docs/maintainers.md → Издания). The organization's own
+# setting must allow it first, or this answers "Conflict": Organization → Settings → Actions → General → Workflow
+# permissions → "Allow GitHub Actions to create and approve pull requests" (no API for it without admin:org).
 try "workflow tokens read-only by default; workflows may open pull requests (the release one)" gh api -X PUT \
   "repos/$repo/actions/permissions/workflow" -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
 # A pull request from someone outside runs CI only once a maintainer approves it, every time, not only for a first
