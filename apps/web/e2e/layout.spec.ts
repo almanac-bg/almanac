@@ -179,12 +179,15 @@ test('on a phone the answer just tapped stays under the finger when the answer c
   await startAsGuest(page);
   await startSolo(page, 'Микс');
   const counter = page.getByText(/^Въпрос \d+ от \d+$/);
+  const ordering = page.getByRole('list', { name: 'Твоят ред', exact: true });
   const moved: number[] = [];
   for (let n = 1; n <= 8 && moved.length < 3; n++) {
     await expect(counter).toHaveText(new RegExp(`^Въпрос ${n} от`), { timeout: gameMs(15_000) });
-    // Г, the lowest: anything added under the answers pushed it up the most. A number or an order is let go by.
+    // Г, the lowest: anything added under the answers pushed it up the most. A number or an order is let go by. An
+    // order's items are lettered too, and a tap on one only places it: the answer would come when time ran out, with
+    // the order's own reveal (CI's WebKit, slow to look, found the items pressable and measured that: 52, 68 px).
     const tile = page.getByRole('button', { name: /^Г\) /, disabled: false });
-    if (!(await tile.isVisible())) continue;
+    if ((await ordering.isVisible()) || !(await tile.isVisible())) continue;
     const before = (await tile.boundingBox())!;
     await tile.click();
     // The answer is in once the result and the stop („Спри, за да прочета“ or „Пауза“) are there.
