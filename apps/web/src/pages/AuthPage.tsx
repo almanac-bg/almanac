@@ -56,8 +56,11 @@ export function AuthPage() {
   // A challenge or daily link's page comes with its own title from the server: "Мария те предизвиква в АЛМАНАХ".
   usePageTitle(challengeId || daily ? undefined : null);
   // Newcomers mostly arrive to play (or sign up); a device that has signed in before most likely wants to sign in again.
-  // A page the server drew is hydrated as drawn: its first render takes the version the server chose.
-  const drawn = isPainted();
+  // A page the server drew is hydrated as drawn: its first render takes the version the server chose. Decided once,
+  // on that first render (App's PaintingDone says the takeover is over only after it): the page renders again once
+  // the mark is gone, and motion's features, loaded later, read `initial` when they come — a fresh one would replay
+  // the entrance on a page already on screen (the guest button dropped 30 px and climbed back).
+  const [drawn] = useState(isPainted);
   const [returning] = useState(() => (drawn ? paintedReturning() : isReturning()));
   // A returning device on a computer types its name at once (a phone's keyboard would cover the page). Focused by an
   // effect rather than autoFocus, so the server's markup and the first render stay the same.
