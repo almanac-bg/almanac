@@ -482,9 +482,12 @@ test(
     assert.equal((await emitAck(sg, 'daily:start', {})).ok, false, 'still one run a day');
 
     // Saved the same day it was made: an account made today could still be a throwaway, so it stays off the board.
+    // Named in turn, not at random: random digits can spell a code the name filter refuses („1488“), and the save
+    // then failed now and then with a 400.
+    let saves = 0;
     const claim = (cookie: string) =>
       api.send('POST', '/api/account/claim', cookie, {
-        username: `saver${Math.floor(Math.random() * 1e6)}`,
+        username: `saver${++saves}`,
         password: 'secret123',
       });
     const saved = await claim(G.cookie);
