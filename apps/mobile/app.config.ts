@@ -50,6 +50,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-font',
     ['expo-splash-screen', { backgroundColor: '#07060d', image: './assets/splash-icon.png', imageWidth: 160 }],
+    // A picture for a question of your own („Моите въпроси“): from the library only, never the camera or the mic.
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'За снимка към твой въпрос в „Моите въпроси“.',
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
   ],
   // tsconfig's paths are the type checker's; Metro resolves on its own (metro.config.js).
   experiments: { typedRoutes: true, reactCompiler: true, tsconfigPaths: false },

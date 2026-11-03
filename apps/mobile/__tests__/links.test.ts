@@ -13,7 +13,7 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
 
 /** Still on the site: until their screens come, a link to them shows „Това е на сайта“ (app/+not-found). */
-const COMING = ['/sets', '/sets/x', '/sets/shared/x', '/submit'];
+const COMING = ['/submit'];
 
 /** An address an app path's expression takes: `[^/]+` as „x“, an optional part both without and with it. */
 function samples(path: RegExp): string[] {

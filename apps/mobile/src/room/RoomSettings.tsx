@@ -1,7 +1,9 @@
 import { actions, api, plural, useStore } from '@almanac/client';
 import { CATEGORIES, type CategoryChoice, ROOM_LIMITS, type RoomSettingsPatch, type RoomState } from '@almanac/shared';
-import { View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, View } from 'react-native';
 import { useLoad } from '@/lib/load';
+import { fonts } from '@/theme';
 import { Button, Card, T } from '@/ui';
 import { Choices, Toggle } from '@/ui/controls';
 
@@ -244,7 +246,11 @@ function QuestionSource({ room, isHost }: { room: RoomState; isHost: boolean }) 
           text={`Всичките ${current.questions} въпроса, в реда на набора. Без XP за отговорите: въпросите са на домакина.`}
         />
       ) : mayPick ? (
-        <Note text="Или твои въпроси — направи набор на сайта, в „Моите въпроси“." />
+        <Pressable accessibilityRole="link" onPress={() => router.push('/sets')} hitSlop={6}>
+          <T variant="caption" tone="link" style={{ fontFamily: fonts.semibold }}>
+            Или твои въпроси: „Моите въпроси“ →
+          </T>
+        </Pressable>
       ) : null}
     </Setting>
   );
