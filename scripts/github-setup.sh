@@ -75,6 +75,7 @@ label questions 34d399 "Въпросите в играта и предложен
 label security b60205 "Сигурност или поверителност"
 label dependencies 0366d6 "Обновяване на зависимости (Dependabot)"
 label "good first issue" 7057ff "Малка, ясна задача за начало"
+label flaky d93f0b "Тест, който минава чак при повторния опит — пак и пак (.github/flaky-ledger.mjs)"
 
 echo "Branch protection"
 # Two rulesets. "main: history": main can't be deleted or force-pushed, by anyone — no bypass, admins included, so its
@@ -82,7 +83,8 @@ echo "Branch protection"
 # review's GH-1). "main: checks": a pull request merges only once CI passed, in all three browsers too, and CodeQL found
 # nothing high or critical (Dependabot's auto-merge included); admins bypass these, so a maintainer can still push a
 # fast-forward straight to main. Each check must come from GitHub Actions (integration 15368), not a status anyone with
-# write access could post under the same name (GH-9).
+# write access could post under the same name (GH-9). "browser tests" is CI's one check over all the browser parts
+# (.github/workflows/ci.yml), so splitting them differently never touches these rules.
 history=$(cat <<'JSON'
 {
   "name": "main: history",
@@ -107,11 +109,7 @@ checks=$(cat <<'JSON'
       "do_not_enforce_on_create": false,
       "required_status_checks": [
         {"context": "test (Node 24)", "integration_id": 15368}, {"context": "test (Node 26)", "integration_id": 15368},
-        {"context": "docker", "integration_id": 15368},
-        {"context": "browser tests (webkit 1/2)", "integration_id": 15368},
-        {"context": "browser tests (webkit 2/2)", "integration_id": 15368},
-        {"context": "browser tests (firefox 1/2)", "integration_id": 15368},
-        {"context": "browser tests (firefox 2/2)", "integration_id": 15368}
+        {"context": "docker", "integration_id": 15368}, {"context": "browser tests", "integration_id": 15368}
       ]
     }},
     {"type": "code_scanning", "parameters": {"code_scanning_tools": [
@@ -128,8 +126,24 @@ apply() { # apply <name> <label> <json>: replaces the ruleset of that name, or m
   if [ -n "$id" ]; then try "$2" gh api -X PUT "repos/$repo/rulesets/$id" --input - <<<"$3"
   else try "$2" gh api -X POST "repos/$repo/rulesets" --input - <<<"$3"; fi
 }
+# "releases": a version's tag (v1.1.0…) can't be moved or deleted once pushed, by anyone, so a release always points
+# at the code it was made from (the 31 October review, GH-6).
+tags=$(cat <<'JSON'
+{
+  "name": "releases",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+  "bypass_actors": [],
+  "rules": [{"type": "deletion"}, {"type": "update"}]
+}
+JSON
+)
 apply "main: history" "main's history can't be rewritten or deleted, by anyone" "$history"
 apply "main: checks" "main needs green CI and CodeQL (admins may push past them)" "$checks"
+apply "releases" "a version's tag can't be moved or deleted" "$tags"
+# A release, once published, can't be changed: its notes, its files and its tag stay what they were.
+try "releases can't be changed once published" gh api -X PUT "repos/$repo/immutable-releases"
 # The single ruleset of before 31 October, now split in two.
 old=$(awk '{ id = $1; $1 = ""; sub(/^ /, ""); if ($0 == "Protect main") print id }' <<<"$rulesets")
 [ -z "$old" ] || try "the old combined ruleset removed" gh api -X DELETE "repos/$repo/rulesets/$old"

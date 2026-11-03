@@ -46,7 +46,8 @@ test('a solo match plays a picture (whose it is shows with the answer) and „П
       await expect(page.getByRole('list', { name: 'Правилният ред', exact: true })).toBeVisible({
         timeout: gameMs(5_000),
       });
-      await expect(page.getByText(/^(\d от 4 на място|🎯 Всичко на място!)$/)).toBeVisible();
+      // (The 🎯 is a picture, and the text after it starts with a space.)
+      await expect(page.getByText(/^\s*(\d от 4 на място|Всичко на място!)$/)).toBeVisible();
     } else if (await picture.isVisible()) {
       pictures++;
       expect(await picture.getAttribute('alt')).toBeTruthy();

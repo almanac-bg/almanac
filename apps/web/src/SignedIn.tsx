@@ -59,7 +59,6 @@ export function SignedIn() {
       {!bare && frame('active match', <ActiveMatchBar />)}
       <main
         id="content"
-        tabIndex={-1}
         className={
           inGame
             ? 'outline-none'

@@ -1,9 +1,6 @@
-import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { serverDb } from '../playwright.config';
 import { choose, expect, gameMs, me, playMatch, png, roomCode, signUp, test, uniqueName } from './support';
-
-/** The test server's database (playwright.config.ts): what the tests can't do through the app. */
-const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
 
 test('a class: the teacher writes a set, runs it on a big screen, and a pupil joins by link under a name of their own', async ({
   page: teacher,
@@ -92,6 +89,31 @@ test('a class: the teacher writes a set, runs it on a big screen, and a pupil jo
   await expect(pupil.getByRole('dialog')).toHaveCount(0);
 });
 
+// A field focused the moment its page opens keeps the focus: the move's focus on the page heading (lib/routeFocus.ts)
+// came between a tap and the typing, and the name went nowhere — „Нов набор“ was saved (the 31 October review,
+// REPO-1; a loaded CI runner hit it in WebKit and Firefox).
+test('a field taken as its page opens keeps the focus: what is typed lands in it', async ({ page }) => {
+  await signUp(page, uniqueName('Бърз'), 'parola-123');
+  await page.goto('/sets');
+  // The name field taken the instant it's drawn, before the move's own focus looks for the heading.
+  await page.evaluate(() => {
+    new MutationObserver((_, observer) => {
+      const field = document.getElementById('set-name');
+      if (!field) return;
+      field.focus();
+      observer.disconnect();
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.getByRole('button', { name: 'Нов набор' }).click();
+  const setName = page.getByLabel('Име на набора');
+  await expect(setName).toBeVisible();
+  // As a busy device would: a moment between taking the field and the first key. The focus stays put meanwhile.
+  await page.waitForTimeout(300);
+  await expect(setName).toBeFocused();
+  await page.keyboard.insertText(' за 5 клас');
+  await expect(setName).toHaveValue('Нов набор за 5 клас');
+});
+
 test('a teacher from /teachers: one way in to a room for the class, through sign-up; a set goes into a room from its card (UX-4)', async ({
   page: teacher,
 }) => {
@@ -178,7 +200,7 @@ test('a picture for a set’s question: picked on the device, made small, upload
   const name = uniqueName('Учител');
   await signUp(page, name, 'parola-123');
   // Pictures come from an account with a confirmed address (or one that has played a while): as if confirmed.
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(serverDb);
   db.exec('PRAGMA busy_timeout = 5000');
   db.prepare('UPDATE users SET email = ?, email_key = ? WHERE username = ?').run(
     `${name}@example.test`.toLowerCase(),

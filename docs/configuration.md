@@ -76,6 +76,7 @@
 | `TEST_TARGET`                | `dist`: сървърните тестове пускат продукционния bundle вместо кода                                                  |
 | `E2E_PORT`, `E2E_TIME_SCALE` | Портът и скоростта на сървъра в браузърните тестове (`3210`, `0.15`)                                                |
 | `E2E_ENGINES`, `E2E_FIREFOX` | `webkit,firefox` добавя браузърите на Safari и Firefox; `E2E_FIREFOX=app` кара инсталирания Firefox                 |
+| `E2E_OUTPUT`                 | Папка за всичко, което пишат браузърните тестове (резултати, база, грешки, SQL лог, доклад): два пуска наведнъж     |
 | `BROWSER_PATH`               | Браузър на Chromium (Brave, Chromium, Edge…) за браузърните тестове вместо системния Chrome                         |
 
 Името на марката е в `packages/shared/src/brand.ts`.

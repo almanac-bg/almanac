@@ -61,3 +61,39 @@ test('a click in a room on a wide screen leaves the page where it is (the bar hi
   await host.waitForTimeout(300);
   expect(await host.evaluate(() => window.scrollY)).toBe(before);
 });
+
+// The game's own select (components/controls.tsx) on a phone: its list opens under it, on the screen, and the page
+// stays where it was. In WebKit a click doesn't focus a button: the tap focused the page itself, the start button's bar
+// (lib/bottomBar.ts) scrolled all of the page clear of itself — to its end — and the list opened off the screen.
+test('a select opens its list on the screen, under it, and the page stays where it was', async ({ page: host }) => {
+  await signUp(host, uniqueName('host'), 'tajna-parola-1');
+  await host.getByRole('button', { name: /^Създай (своя )?стая$/ }).click();
+  await expect(host).toHaveURL(/\/room$/);
+  const select = host.getByRole('combobox', { name: 'Въпроси', exact: true });
+  await select.scrollIntoViewIfNeeded();
+  const before = await host.evaluate(() => window.scrollY);
+  await select.click();
+  const list = host.getByRole('listbox');
+  await expect(list).toBeVisible();
+  await host.waitForTimeout(300);
+  expect(await host.evaluate(() => window.scrollY), 'the page stayed').toBe(before);
+  const [field, box, height] = await Promise.all([
+    select.boundingBox(),
+    list.boundingBox(),
+    host.evaluate(() => window.innerHeight),
+  ]);
+  expect(box!.y, 'the list is on the screen').toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height, 'the list is on the screen').toBeLessThanOrEqual(height);
+  // Under the field, or above it where the screen has more room there.
+  expect(box!.y >= field!.y + field!.height || box!.y + box!.height <= field!.y).toBe(true);
+  // And an option is chosen with a tap.
+  await list.getByRole('option').last().click();
+  await expect(list).toBeHidden();
+  // A tap on the page beside the fields (it focused the page itself) leaves it where it is too: the browser scrolled
+  // the page to its top, and the start button's bar then all of it clear of itself, to the end.
+  const still = await host.evaluate(() => window.scrollY);
+  const beside = await select.boundingBox();
+  await host.mouse.click(6, beside!.y + beside!.height / 2);
+  await host.waitForTimeout(300);
+  expect(await host.evaluate(() => window.scrollY), 'a tap beside the fields').toBe(still);
+});

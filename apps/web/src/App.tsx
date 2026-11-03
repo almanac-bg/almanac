@@ -248,7 +248,7 @@ export function App() {
           </PageBoundary>
         ) : (
           // The page itself (SignedIn has its header and tab bar around its own <main>).
-          <main id="content" tabIndex={-1} className="outline-none">
+          <main id="content" className="outline-none">
             {isPublicPath(pathname) ? (
               <PageBoundary>
                 <Suspense fallback={<PageLoading />}>

@@ -1,4 +1,4 @@
-import { expect, expectPressable, gameMs, playMatch, startAsGuest, startSolo, test } from './support';
+import { expect, expectPressable, gameMs, noteWhenShown, playMatch, startAsGuest, startSolo, test } from './support';
 
 test.describe('with motion on', () => {
   // Everything else runs with reduced motion (playwright.config.ts): here the animations play, from the lazily loaded
@@ -52,11 +52,11 @@ test('a whole match from the keyboard: Tab to the category, Enter, then 1–4 to
     }
     if (await ordering.isVisible()) {
       await expectPressable(ordering);
+      // „Редът е заключен.“ is on screen only until the reveal, which in Соло comes at once.
+      const locked = await noteWhenShown(page, /Редът е заключен\./);
       for (const key of ['1', '2', '3', '4']) await page.keyboard.press(key);
       await page.keyboard.press('Enter');
-      await expect(page.getByText('Редът е заключен.'), `order ${index}: the keys didn't lock it`).toBeAttached({
-        timeout: gameMs(2_000),
-      });
+      await locked(`order ${index}: the keys didn't lock it`, gameMs(2_000));
     } else if (await lock.isVisible()) {
       const slider = page.getByRole('slider', { name: 'Твоят отговор', exact: true });
       if (await slider.isVisible()) {

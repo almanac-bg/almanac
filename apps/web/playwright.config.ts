@@ -21,9 +21,20 @@ const baseURL = `http://127.0.0.1:${PORT}`;
 const root = path.resolve(import.meta.dirname, '../..');
 const serverEntry = path.join(root, 'apps/server/dist/index.mjs');
 const webIndex = path.join(root, 'apps/web/dist/index.html');
-const outputDir = path.join(import.meta.dirname, 'test-results');
+/**
+ * Where a run writes: its results, the test server's database and error outbox, the SQL log, the report. In the
+ * checkout by default; E2E_OUTPUT (with its own E2E_PORT) moves all of it to a folder of its own, so two runs in one
+ * checkout don't collide (the 31 October review, REPO-10).
+ */
+const elsewhere = process.env.E2E_OUTPUT ? path.resolve(process.env.E2E_OUTPUT) : null;
+const outputDir = path.join(elsewhere ?? import.meta.dirname, 'test-results');
+/** The test server's database (the tests that check what the app can't show read it). */
+export const serverDb = path.join(outputDir, 'server', 'quiz.db');
 /** What the server reports as errors during the run (ERROR_OUTBOX): e2e/teardown.ts fails the run on any. */
 export const serverErrors = path.join(outputDir, 'server', 'errors.jsonl');
+/** Every statement the server runs, for `npm run plans -w @quiz/server` (beside the server tests' own by default). */
+const sqlLog = elsewhere ? path.join(elsewhere, 'sql-log') : path.join(root, 'apps/server/.sql-log');
+const reportDir = path.join(elsewhere ?? import.meta.dirname, 'playwright-report');
 
 // A missing build would surface as a server that can't start or pages that 404. Checked once, in the runner.
 if (!process.env.TEST_WORKER_INDEX) {
@@ -62,8 +73,13 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   // In CI also as JSON: .github/flaky.mjs lists the tests that passed only on their retry.
   reporter: CI
-    ? [['github'], ['list'], ['html', { open: 'never' }], ['json', { outputFile: 'reports/results.json' }]]
-    : [['list'], ['html', { open: 'never' }]],
+    ? [
+        ['github'],
+        ['list'],
+        ['html', { open: 'never', outputFolder: reportDir }],
+        ['json', { outputFile: path.join(elsewhere ?? import.meta.dirname, 'reports/results.json') }],
+      ]
+    : [['list'], ['html', { open: 'never', outputFolder: reportDir }]],
 
   use: {
     baseURL,
@@ -73,7 +89,11 @@ export default defineConfig({
     reducedMotion: 'reduce',
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
-    trace: 'on-first-retry',
+    // Every attempt that fails keeps its trace, the first included, and so does its retry: a flake's trace is the
+    // failing run's, not only the one that passed (the 31 October review, REPO-4). The page as it was at each step,
+    // without the film of the screen: recording that on every first attempt slowed the tests enough for them to fall
+    // behind a match at the tests' speed (a screenshot of a failure is kept all the same).
+    trace: { mode: 'retain-on-failure-and-retries', screenshots: false, snapshots: true, sources: true },
     screenshot: 'only-on-failure',
   },
 
@@ -136,7 +156,7 @@ export default defineConfig({
       NODE_ENV: 'production',
       PORT: String(PORT),
       // Inside the output folder, which Playwright empties before each run (and before starting the server).
-      DB_PATH: path.join(outputDir, 'server', 'quiz.db'),
+      DB_PATH: serverDb,
       ERROR_OUTBOX: serverErrors,
       APP_URL: baseURL,
       // Fast timers: a 15-second question lasts 2.25 s, a whole match takes about 12 s. E2E_TIME_SCALE gives slower
@@ -163,7 +183,7 @@ export default defineConfig({
       // No evening Роял at whatever hour the tests run (CI often runs at 21:00 Sofia).
       EVENING_AT: 'off',
       // Every statement it runs, beside the server tests' (`npm run plans -w @quiz/server` checks them all).
-      SQL_LOG: path.join(root, 'apps/server/.sql-log'),
+      SQL_LOG: sqlLog,
     },
   },
 });

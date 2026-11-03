@@ -8,6 +8,7 @@ import {
   type Account,
   autoPlay,
   type Client,
+  clearOfMidnight,
   connect,
   connected,
   emitAck,
@@ -35,21 +36,27 @@ let sb: Client;
 /** Today's shared daily questions, as the first player of the day saw them. */
 let sharedDaily: string[] = [];
 
-before(async () => {
-  srv = await startServer({ EMAIL_EVENTS_SECRET: 'events-secret-for-tests' });
-  api = http(srv.url);
-  A = await register(srv.url, 'Иван_тест');
-  B = await register(srv.url, 'maria_test');
-  // A is the first account, so the owner: /admin wants their second factor.
-  await withSecondFactor(srv.url, A.cookie);
-  // Accounts from yesterday: they play the shared daily (a brand-new account gets its own: the guest's daily below).
-  srv.db
-    .prepare('UPDATE users SET created_at = ? WHERE id IN (?, ?)')
-    .run(Date.now() - RATED_AFTER.ms, A.user.id, B.user.id);
-  sa = connect(srv.url, A.cookie);
-  sb = connect(srv.url, B.cookie);
-  await connected(sa, sb);
-});
+before(
+  async () => {
+    // The day's questions are compared across these tests: all of them on one day.
+    await clearOfMidnight();
+    srv = await startServer({ EMAIL_EVENTS_SECRET: 'events-secret-for-tests' });
+    api = http(srv.url);
+    A = await register(srv.url, 'Иван_тест');
+    B = await register(srv.url, 'maria_test');
+    // A is the first account, so the owner: /admin wants their second factor.
+    await withSecondFactor(srv.url, A.cookie);
+    // Accounts from yesterday: they play the shared daily (a brand-new account gets its own: the guest's daily below).
+    srv.db
+      .prepare('UPDATE users SET created_at = ? WHERE id IN (?, ?)')
+      .run(Date.now() - RATED_AFTER.ms, A.user.id, B.user.id);
+    sa = connect(srv.url, A.cookie);
+    sb = connect(srv.url, B.cookie);
+    await connected(sa, sb);
+    // (Room for clearOfMidnight's wait.)
+  },
+  { timeout: 180_000 },
+);
 
 after(async () => {
   sa?.close();
