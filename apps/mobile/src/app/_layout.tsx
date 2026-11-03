@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { TopOverlays } from '@/components/TopOverlays';
 import { UpdateScreen } from '@/components/UpdateScreen';
 import { QueueOverlay } from '@/home/QueueOverlay';
 import { restore, useApp } from '@/lib/client';
@@ -75,6 +76,7 @@ export default function RootLayout() {
               </Stack.Protected>
             </Stack>
             {signedIn && <QueueOverlay />}
+            <TopOverlays signedIn={signedIn} />
           </>
         )}
       </SafeAreaProvider>
