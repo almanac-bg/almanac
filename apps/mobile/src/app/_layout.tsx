@@ -65,6 +65,7 @@ export default function RootLayout() {
                 <Stack.Screen name="game" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="settings" options={{ ...header, title: 'Настройки' }} />
                 <Stack.Screen name="profile/[username]" options={header} />
+                <Stack.Screen name="notifications" options={{ ...header, title: 'Известия' }} />
               </Stack.Protected>
               <Stack.Protected guard={!signedIn}>
                 <Stack.Screen name="welcome" />
