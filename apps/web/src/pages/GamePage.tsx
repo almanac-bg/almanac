@@ -1,4 +1,4 @@
-import { actions, type LiveGame, useStore } from '@almanac/client';
+import { actions, type LiveGame, othersStillIn, useStore } from '@almanac/client';
 import { MODES, type PowerupId } from '@almanac/shared';
 import clsx from 'clsx';
 import { DoorOpen } from 'lucide-react';
@@ -10,7 +10,7 @@ import { MatchAnnouncer } from '../components/game/Announcer';
 import { leaveMatchScreen, useBackGuard } from '../components/game/backGuard';
 import { EmoteBar } from '../components/game/EmoteBar';
 import { Intro } from '../components/game/Intro';
-import { EliminationBanner, Feed, othersStillIn, StreakBurst } from '../components/game/Moments';
+import { EliminationBanner, Feed, StreakBurst } from '../components/game/Moments';
 import { POWERUP_KEYS } from '../components/game/Powerups';
 import { PresenterScreen } from '../components/game/PresenterScreen';
 import { QuestionView } from '../components/game/QuestionView';

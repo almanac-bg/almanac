@@ -1,4 +1,4 @@
-import { type LiveGame, plural } from '@almanac/client';
+import { type LiveGame, othersStillIn, plural } from '@almanac/client';
 import { AnimatePresence } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { m } from '../../lib/motion';
@@ -27,16 +27,6 @@ export function Feed({ game }: { game: LiveGame }) {
       </AnimatePresence>
     </div>
   );
-}
-
-/**
- * People other than you still playing (bots don't count, nor the knocked out or gone). With none, the server doesn't
- * keep anyone waiting for the bots' final: it decides it at once and the results come, so there's nothing to watch.
- */
-export function othersStillIn(game: LiveGame) {
-  return game.standings.filter(
-    (s) => s.id !== game.start.youId && !game.players[s.id]?.isBot && s.eliminatedAt === null && !s.left,
-  ).length;
 }
 
 /** Streaks worth a moment of their own (the chip in the reveal counts every one). */

@@ -1,4 +1,4 @@
-import { DIFFICULTY_LABEL, LETTERS, type LiveGame } from '@almanac/client';
+import { DIFFICULTY_LABEL, inDropZone, LETTERS, type LiveGame, nextElimination } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
 import { Image } from 'expo-image';
 import { type ComponentRef, useEffect, useRef } from 'react';
@@ -9,6 +9,7 @@ import { T } from '@/ui';
 import { FactNote, PauseAfterAnswer, UntimedEnding } from './Hold';
 import { NumberAnswer, NumberReveal, NumberSummary } from './NumberAnswer';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderAnswer';
+import { ActivePowerups, PowerupBar } from './Powerups';
 import { AnswerTile, Chip, CrowdNote, LockStatus, RevealSummary, TimerRing } from './parts';
 
 /** The largest picture in a srcSet ("/qimg/a-512.webp 512w, /qimg/a-1024.webp 1024w"): a phone's screen is dense. */
@@ -34,6 +35,8 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
   // A run alone without a clock (Соло's „Без часовник“, „Повече време“): every answer waits for „Продължи“.
   const untimedRun = game.start.pace === 'untimed' && !game.start.roomCode;
   const cat = categoryById(q.category);
+  // Knocked out: the questions go on, and can still be answered — for XP and „Моите знания“, outside the race.
+  const out = game.eliminated.includes(youId);
 
   // Each new question takes the screen reader's focus: read whole — which one, a picture's description, the question,
   // then the options — rather than in a live message the focus move would cut off.
@@ -63,6 +66,23 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
           </>
         )}
         {q.elimination && <Chip text="💀 Отпадане след този въпрос" tone="bad" />}
+        {out && (
+          <Chip text={`💀 Отпадна · ${game.closesAt && !reveal ? 'другите вече отговориха' : 'отговаряш за XP'}`} />
+        )}
+        {inDropZone(game).has(youId) && !reveal && (
+          <Chip
+            tone="bad"
+            text={
+              game.start.mode === 'evening'
+                ? q.elimination
+                  ? 'Ти си сред отпадащите: изпревари някого!'
+                  : `Ти си сред отпадащите · отпадане след въпрос ${nextElimination(game)}`
+                : q.elimination
+                  ? 'На последно място си: изпревари някого!'
+                  : `На последно място си · отпадане след въпрос ${nextElimination(game)}`
+            }
+          />
+        )}
       </View>
 
       <View
@@ -164,7 +184,14 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
               <RevealSummary result={mine} />
             )
           ) : !reveal && game.myChoice !== null ? (
-            <LockStatus game={game} offline={offline} />
+            <View style={{ gap: 8 }}>
+              <LockStatus game={game} offline={offline} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <ActivePowerups game={game} />
+              </View>
+            </View>
+          ) : active && !out && q.kind === 'choice' ? (
+            <PowerupBar game={game} offline={offline} />
           ) : null}
           {reveal?.crowd && <CrowdNote crowd={reveal.crowd} kind={q.kind} />}
         </View>

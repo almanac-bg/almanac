@@ -2,8 +2,10 @@ import {
   actions,
   DIFFICULTY_LABEL,
   fmt,
+  inDropZone,
   LETTERS,
   type LiveGame,
+  nextElimination,
   numberText,
   OPTION_COLORS,
   percent,
@@ -24,7 +26,6 @@ import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
 import { PAUSED_NOTE, QUESTION_PAUSED_NOTE } from './Announcer';
 import { accentText } from './answers';
-import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderQuestion';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
