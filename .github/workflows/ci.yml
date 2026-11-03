@@ -4,11 +4,17 @@ name: CI
 on:
   push:
     branches: [main]
+    # A deploy's CHANGELOG line changes no code: no run and no image for it (deploy/deploy.sh then runs the newest
+    # commit before it that has one). Everything else, Markdown included, is built and tested.
+    paths-ignore: [CHANGELOG.md, docs/changelog/**]
   pull_request:
 
 # The workflow only reads the code; nothing in it needs to write to the repository.
 permissions:
   contents: read
+  # .github/flaky.mjs reads the earlier runs on main (their jobs and annotations).
+  actions: read
+  checks: read
 
 # A newer push to a pull request's branch makes the run before it pointless. Not on main: every commit there gets its
 # run to the end, and so its image (deploy/rollback.sh <commit> can go back to any of them) — so each of main's runs
@@ -50,42 +56,26 @@ jobs:
       # Sources, then the production bundle that ships in the Docker image (the tests that start a server on it).
       - run: npm test
       - run: npm run test:dist -w @quiz/server
-      # The built app in a real browser (the runner's Google Chrome): guest play, challenge links, saving an account,
-      # layouts. See apps/web/playwright.config.ts. On production's Node; the browser doesn't care which the server ran.
-      - if: matrix.node == 26
-        run: npm run test:browser -w @quiz/web
-      # How SQLite runs every statement the server ran in the tests above, browser tests included: a read of a whole
-      # table that grows with players fails (apps/server/test/plans.ts; `npm test` checks the server tests' alone).
-      - if: matrix.node == 26
-        run: npm run plans -w @quiz/server
-      # A test that passed only on its retry, written down (and its trace uploaded below): green, but worth a look.
-      - id: flaky
-        if: always() && matrix.node == 26
-        run: node .github/flaky.mjs
-      # What went wrong, to look at: the HTML report, with screenshots and the retry's trace.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: matrix.node == 26 && (failure() || steps.flaky.outputs.flaky > 0)
-        with:
-          name: playwright-report-node${{ matrix.node }}
-          path: |
-            apps/web/playwright-report/
-            apps/web/test-results/
-          if-no-files-found: ignore
-          retention-days: 14
 
-  # The same browser tests in Safari's engine and in Firefox's (the test job runs them in Chrome): Playwright's own builds
-  # of WebKit and Firefox, on the production build, the game at 0.5 speed (a question lasts 7.5 s: on the runner their
-  # clicks take far longer than Chrome's).
-  # Each engine in two halves on two runners: WebKit alone took nine minutes, the longest job in the run.
+  # The built app in a real browser, on production's Node and the production build (apps/web/playwright.config.ts):
+  # Chrome (the runner's own), and Playwright's builds of Safari's engine and Firefox's at 0.5 speed (a question lasts
+  # 7.5 s: on the runner their clicks take far longer than Chrome's). Each in parts on runners of their own, WebKit — the
+  # slowest — in three: no part takes much longer than the server tests (the 31 October review, REPO-10).
   browsers:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        engine: [webkit, firefox]
-        shard: [1, 2]
-    name: browser tests (${{ matrix.engine }} ${{ matrix.shard }}/2)
+        include:
+          - { engine: chromium, shard: 1, shards: 2 }
+          - { engine: chromium, shard: 2, shards: 2 }
+          - { engine: webkit, shard: 1, shards: 3 }
+          - { engine: webkit, shard: 2, shards: 3 }
+          - { engine: webkit, shard: 3, shards: 3 }
+          - { engine: firefox, shard: 1, shards: 2 }
+          - { engine: firefox, shard: 2, shards: 2 }
+    name: browser tests (${{ matrix.engine }} ${{ matrix.shard }}/${{ matrix.shards }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,19 +87,42 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps ${{ matrix.engine }}
+      # Playwright's WebKit and Firefox, kept between runs for the Playwright version that wants them (Chrome is the
+      # runner's). The system packages they need are installed each time.
+      - id: playwright
+        if: matrix.engine != 'chromium'
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: apps/web
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.engine != 'chromium'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ matrix.engine }}-${{ steps.playwright.outputs.version }}
+      - if: matrix.engine != 'chromium'
+        run: npx playwright install --with-deps ${{ matrix.engine }}
         working-directory: apps/web
       - run: npm run build
-      - run: >-
-          npx playwright test --project=${{ matrix.engine }}-phone --project=${{ matrix.engine }}-desktop
-          --shard=${{ matrix.shard }}/2
+      # Chrome's projects are the plain ones (phone, desktop); the others carry the engine's name (webkit-phone…).
+      - run: |
+          prefix=$([ "$ENGINE" = chromium ] || echo "$ENGINE-")
+          npx playwright test --project="${prefix}phone" --project="${prefix}desktop" --shard="$SHARD"
         working-directory: apps/web
         env:
-          E2E_ENGINES: ${{ matrix.engine }}
-          E2E_TIME_SCALE: "0.5"
+          ENGINE: ${{ matrix.engine }}
+          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
+          E2E_ENGINES: ${{ matrix.engine != 'chromium' && matrix.engine || '' }}
+          E2E_TIME_SCALE: ${{ matrix.engine == 'chromium' && '0.15' || '0.5' }}
+      # How SQLite runs every statement the server ran in these tests: a read of a whole table that grows with players
+      # fails (apps/server/test/plans.ts; `npm test` checks the server tests' own).
+      - run: npm run plans -w @quiz/server
+      # A test that passed only on its retry, written down (and both attempts' traces uploaded below): green, but worth
+      # a look — and on main, the same test flaky three runs in a row fails the job.
       - id: flaky
         if: always()
         run: node .github/flaky.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      # What went wrong, to look at: the HTML report, with screenshots and the traces.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure() || steps.flaky.outputs.flaky > 0
         with:
@@ -119,6 +132,19 @@ jobs:
             apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # One check for all the parts above, the one the repository's rules require: parts can be added or split without
+  # touching the rules (scripts/github-setup.sh).
+  browser-tests:
+    if: always()
+    needs: browsers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    name: browser tests
+    steps:
+      - run: test "$RESULT" = success
+        env:
+          RESULT: ${{ needs.browsers.result }}
 
   # Its own build, so it starts at once beside the others (`image` and `publish` wait for every job).
   docker:
@@ -237,7 +263,7 @@ jobs:
   # ARM-only one): each built and started on its own kind of runner, then one tag for both.
   image:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, browsers, docker]
+    needs: [test, browser-tests, docker]
     strategy:
       matrix:
         include:

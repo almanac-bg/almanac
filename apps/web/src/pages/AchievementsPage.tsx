@@ -81,6 +81,9 @@ export function AchievementsPage() {
             <m.div
               key={a.id}
               layout
+              // As narrow as the column: a grid cell is as wide as its longest line otherwise, and with a reader's wider
+              // letter spacing a card ran off a 320 px screen (WCAG 1.4.12).
+              className="min-w-0"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.02, 0.4) }}
@@ -110,7 +113,8 @@ export function AchievementsPage() {
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
+                    {/* The rarity beside the name, or under it when the two don't fit side by side. */}
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2">
                       <h2 className="font-semibold">{a.name}</h2>
                       <span className="text-xs font-bold" style={{ color: accentText(rarity.color) }}>
                         {rarity.name}

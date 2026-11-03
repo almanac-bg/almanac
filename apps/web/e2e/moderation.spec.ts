@@ -2,15 +2,15 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { codeAt, stepAt } from '../../server/src/totp';
+import { serverDb } from '../playwright.config';
 import { choose, expect, type Page, signIn, signUp, test, uniqueName } from './support';
 
 // The server the tests run against (playwright.config.ts): its database, and the admin command line next to it.
 const root = path.resolve(import.meta.dirname, '../../..');
-const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
 
 function makeModerator(username: string) {
   const cli = spawnSync(process.execPath, [path.join(root, 'apps/server/dist/cli.mjs'), 'admin', 'add', username], {
-    env: { ...process.env, DB_PATH: dbPath },
+    env: { ...process.env, DB_PATH: serverDb },
     encoding: 'utf8',
   });
   expect(cli.status, cli.stderr).toBe(0);
@@ -29,7 +29,7 @@ async function secondFactor(page: Page) {
 
 /** Far past the level that unlocks proposing questions (as if they'd played a lot). */
 function giveXp(username: string) {
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(serverDb);
   db.exec('PRAGMA busy_timeout = 5000');
   db.prepare('UPDATE users SET xp = 100000 WHERE username = ?').run(username);
   db.close();

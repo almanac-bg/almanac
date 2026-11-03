@@ -111,6 +111,30 @@ after(() => {
 });
 
 /**
+ * Tests about "today" (the day's questions, a day's links, who played when) mustn't start in the last minutes of a
+ * Sofia day: the day would turn half-way through them, and the questions they compare change under them (main's CI
+ * once ran these at 23:59 and failed on a 409 and a different day's ten). Started then, they wait for the new day.
+ */
+export async function clearOfMidnight(margin = 120_000) {
+  const now = new Date();
+  const clock = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Sofia',
+      hourCycle: 'h23',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  const left = ((24 - clock.hour) * 3600 - clock.minute * 60 - clock.second) * 1000 - now.getMilliseconds();
+  if (left > margin) return;
+  console.log(`🕛 ${Math.ceil(left / 1000)} s to midnight in Sofia: waiting for the new day`);
+  await new Promise((resolve) => setTimeout(resolve, left + 2000));
+}
+
+/**
  * Boots a real server on a free port with a throwaway database, fixture questions, fast timers
  * (GAME_TIME_SCALE) and quick bot fill. TEST_TARGET=dist runs the production bundle instead of the sources.
  */

@@ -151,8 +151,9 @@ step(
   `INSERT INTO season_ratings (user_id, season, mode, rating, peak, games, wins)
    SELECT u.id, s.season, s.mode, 1000 + (u.id * 37) % 800, 1100 + (u.id * 37) % 800, 15 + u.id % 30, 8
    FROM users u JOIN (SELECT strftime('%Y-%m', 'now') AS season, 'duel' AS mode UNION ALL
-     SELECT strftime('%Y-%m', 'now'), 'royale' UNION ALL SELECT strftime('%Y-%m', 'now', '-1 month'), 'duel' UNION ALL
-     SELECT strftime('%Y-%m', 'now', '-2 months'), 'duel') s
+     SELECT strftime('%Y-%m', 'now'), 'royale' UNION ALL
+     SELECT strftime('%Y-%m', 'now', 'start of month', '-1 month'), 'duel' UNION ALL
+     SELECT strftime('%Y-%m', 'now', 'start of month', '-2 months'), 'duel') s
    WHERE u.is_guest = 0`,
 );
 step(

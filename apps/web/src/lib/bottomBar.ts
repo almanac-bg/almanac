@@ -34,7 +34,10 @@ export function useBottomBar<T extends HTMLElement>() {
     let frame = 0;
     const keepClear = (event: FocusEvent) => {
       const field = event.target;
-      if (!(field instanceof HTMLElement) || bar.contains(field)) return;
+      // Not the bar's own, and not what holds the bar: a tap on the page's plain text focuses <main> (it takes the
+      // focus after a move: tabindex -1), and keeping all of <main> clear of the bar scrolled to the page's end — on a
+      // phone, a tap anywhere in a room took it down to the start button.
+      if (!(field instanceof HTMLElement) || bar.contains(field) || field.contains(bar)) return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (!pinnedNow()) return;
@@ -42,6 +45,8 @@ export function useBottomBar<T extends HTMLElement>() {
         const edge = bar.getBoundingClientRect();
         // Only what the bar covers: a field below a bar that sits where the page puts it is in view as it is.
         if (box.top >= edge.bottom) return;
+        // …and only what fits above it: something taller can't be brought clear by scrolling, only lost.
+        if (box.height > edge.top - 16) return;
         const over = box.bottom - (edge.top - 16);
         if (over > 0) window.scrollBy({ top: over, behavior: 'instant' });
       });

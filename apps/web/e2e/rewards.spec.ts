@@ -1,12 +1,11 @@
-import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { serverDb } from '../playwright.config';
 import { expect, signUp, test, uniqueName } from './support';
 
 // The server the tests run against (playwright.config.ts): its database.
-const dbPath = path.resolve(import.meta.dirname, '../test-results/server/quiz.db');
 
 function setLevel(username: string, level: number) {
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(serverDb);
   db.exec('PRAGMA busy_timeout = 5000');
   db.prepare('UPDATE users SET xp = ? WHERE username = ?').run(50 * level * (level - 1), username);
   db.close();

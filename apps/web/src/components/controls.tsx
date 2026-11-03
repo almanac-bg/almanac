@@ -126,9 +126,17 @@ export function Select<T extends string | number>({
     return () => document.removeEventListener('pointerdown', away, true);
   }, [open]);
 
-  // The active option in view as the keys move it.
+  // The active option in view as the keys move it — by scrolling the list alone. (scrollIntoView scrolled the page too
+  // in WebKit, to where the list sat for the moment before it was placed: on an iPhone the page jumped to its end and
+  // the list opened off the screen.)
   useEffect(() => {
-    if (open) document.getElementById(optionId(active))?.scrollIntoView({ block: 'nearest' });
+    const box = list.current;
+    const option = open ? document.getElementById(optionId(active)) : null;
+    if (!box || !option) return;
+    const top = option.offsetTop;
+    const bottom = top + option.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
   });
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {

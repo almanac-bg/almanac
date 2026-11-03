@@ -25,9 +25,19 @@ main() {
   bank=$([ -d private/.git ] && echo git || echo file)
   [ "$bank" = file ] || git -C private fetch --quiet origin
   commit=$(git rev-parse origin/main)
+  while :; do
+    pulled=0
+    image=$(deploy/pull-image.sh "$commit") || pulled=$?
+    [ "$pulled" = 1 ] || break
+    # No image for it. A commit that changes only Markdown (a deploy's CHANGELOG line, which CI doesn't build:
+    # .github/workflows/ci.yml) runs the image of the newest commit before it that has one: the code is the same. The
+    # checkout still goes to main's, text and all.
+    git diff --quiet "$commit~1" "$commit" -- . ':(exclude)*.md' 2>/dev/null || break
+    commit=$(git rev-parse "$commit~1")
+  done
   release=$(git rev-parse --short "$commit")
-  pulled=0
-  image=$(deploy/pull-image.sh "$commit") || pulled=$?
+  [ "$commit" = "$(git rev-parse origin/main)" ] ||
+    echo "$release is the newest commit with an image: the ones after it change only Markdown"
   if [ "$pulled" = 3 ]; then
     echo "The image for $release has no build provenance from its repository's CI: not deployed. Was the tag pushed by hand?"
     exit 1
