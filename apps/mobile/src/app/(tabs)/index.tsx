@@ -1,4 +1,6 @@
 import { useStore } from '@almanac/client';
+import { View } from 'react-native';
+import { NotificationsBell } from '@/home/Bell';
 import { DailyCard } from '@/home/DailyCard';
 import { Modes } from '@/home/Modes';
 import { ProfileCard } from '@/home/ProfileCard';
@@ -12,9 +14,12 @@ export default function Play() {
   const dailyFirst = useStore((s) => !!s.me && !s.me.daily.played && s.me.stats.games > 0);
   return (
     <Screen>
-      <T variant="h1" role="heading" accessibilityLabel="Играй">
-        Играй
-      </T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <T variant="h1" role="heading" accessibilityLabel="Играй">
+          Играй
+        </T>
+        <NotificationsBell />
+      </View>
       <ProfileCard />
       {dailyFirst && <DailyCard />}
       <Modes />
