@@ -298,8 +298,11 @@ export async function playMatch(
       // Briefly, then a look again: it may be going by itself (a hold's own end, or one pressed before playMatch
       // fading out), and the next question's clock runs meanwhile. Two seconds spent on a fading one took a
       // question's whole time (2.25 s at the tests' speed): the click then waited on and answered the question after.
+      // From the keyboard, as a click would land wherever the button was: a fact below the fold scrolls itself into
+      // reach (FactNote), smoothly, and WebKit's look for a button holding still can pass mid-scroll (a picture's
+      // reveal at 1280×800 — the press went 24 px under it, and the match waited on).
       if (
-        await goOn.click({ timeout: gameMs(500) }).then(
+        await goOn.press('Enter', { timeout: gameMs(500) }).then(
           () => true,
           () => false,
         )
