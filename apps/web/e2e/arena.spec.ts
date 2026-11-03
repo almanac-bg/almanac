@@ -1,7 +1,11 @@
 import { expect, gameMs, playMatch, startAsGuest, test } from './support';
 
-test('Арена: filled to three (bots for whoever is missing), played to the end, three places', async ({ page }) => {
+test('Арена: filled to three (bots for whoever is missing), played to the end, three places', async ({
+  page,
+  queue,
+}) => {
   await startAsGuest(page);
+  await queue('arena');
   await page.getByRole('button', { name: 'Играй Арена', exact: true }).click();
   await expect(page).toHaveURL(/\/game$/);
 

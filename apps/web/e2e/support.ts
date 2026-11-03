@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, test as base, expect, type Locator, type Page } from '@playwright/test';
@@ -25,7 +26,21 @@ interface Fixtures {
    * fails the test when it ends.
    */
   pageProblems: string[];
+  /**
+   * Takes one of the server's matchmaking queues for the rest of the test. The queues are shared by every test running
+   * at once: two tests queueing Дуел together pair across each other (guest.spec's lone player took one of
+   * duel.spec's two, and the other got a bot). Tests that queue a mode take its lock, across files and workers, and
+   * play one at a time; the wait doesn't count against the test's time.
+   */
+  queue: (mode: Queue) => Promise<void>;
 }
+
+/** The matchmaking queues tests play in with strangers. */
+type Queue = 'duel' | 'arena' | 'teams' | 'royale';
+
+const LOCKS = path.join(path.dirname(serverDb), 'locks');
+/** Older than this, a lock was left by a worker that died mid-test. */
+const STALE_LOCK_MS = 10 * 60_000;
 
 /**
  * WebKit's word for a request the page dropped (a navigation cut it short): "… due to access control checks", even for
@@ -61,6 +76,37 @@ export const test = base.extend<Fixtures>({
   context: async ({ context, pageProblems }, use) => {
     watch(context, pageProblems);
     await use(context);
+  },
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object pattern here, even an empty one
+  queue: async ({}, use, testInfo) => {
+    const held: string[] = [];
+    await use(async (mode) => {
+      const lock = path.join(LOCKS, mode);
+      fs.mkdirSync(LOCKS, { recursive: true });
+      const started = Date.now();
+      // No clock while waiting (a queue's tests can line up for minutes), then the test's own time, as it was.
+      const timeout = testInfo.timeout;
+      if (timeout) testInfo.setTimeout(0);
+      // Making a directory either succeeds or finds one there, in one step, for every process at once.
+      for (;;) {
+        try {
+          fs.mkdirSync(lock);
+          break;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          try {
+            if (Date.now() - fs.statSync(lock).mtimeMs > STALE_LOCK_MS)
+              fs.rmSync(lock, { recursive: true, force: true });
+          } catch {
+            // Released meanwhile.
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+      held.push(lock);
+      if (timeout) testInfo.setTimeout(timeout + (Date.now() - started));
+    });
+    for (const lock of held) fs.rmSync(lock, { recursive: true, force: true });
   },
   newPlayer: async ({ browser, pageProblems }, use) => {
     const contexts: BrowserContext[] = [];

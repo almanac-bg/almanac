@@ -5,9 +5,11 @@ test.describe.configure({ mode: 'serial' });
 
 test('Роял through an elimination: knocked out at the first cut, the player gets the last place and when it ended', async ({
   page,
+  queue,
 }) => {
   test.setTimeout(120_000);
   await startAsGuest(page);
+  await queue('royale');
   await page.getByRole('button', { name: 'Играй Роял', exact: true }).click();
   await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByText(/^Въпрос 1 от \d+$/)).toBeVisible({ timeout: gameMs(15_000) });
@@ -21,9 +23,11 @@ test('Роял through an elimination: knocked out at the first cut, the player 
 
 test('Роял: knocked out with only bots left, the player answers on and „Към резултата“ brings the result at once', async ({
   page,
+  queue,
 }) => {
   test.setTimeout(150_000);
   await startAsGuest(page);
+  await queue('royale');
   await page.getByRole('button', { name: 'Играй Роял', exact: true }).click();
   await expect(page).toHaveURL(/\/game$/);
 

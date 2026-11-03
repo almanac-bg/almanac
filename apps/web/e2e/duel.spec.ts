@@ -3,12 +3,13 @@ import { expect, gameMs, me, playMatch, startAsGuest, test } from './support';
 // Both tests queue for a Дуел: one at a time, so they can't pair with each other's players.
 test.describe.configure({ mode: 'serial' });
 
-test('two players pressing "Играй" on Дуел together play each other', async ({ page: anna, newPlayer }) => {
+test('two players pressing "Играй" on Дуел together play each other', async ({ page: anna, newPlayer, queue }) => {
   const boris = await newPlayer();
   await Promise.all([startAsGuest(anna), startAsGuest(boris)]);
   const [annaMe, borisMe] = await Promise.all([me(anna), me(boris)]);
 
   // The queue pairs them at once; bots would only fill the seat after a second (BOT_FILL_SECONDS).
+  await queue('duel');
   const play = (player: typeof anna) => player.getByRole('button', { name: 'Играй Дуел', exact: true }).click();
   await Promise.all([play(anna), play(boris)]);
   await Promise.all([anna, boris].map((player) => expect(player).toHaveURL(/\/game$/)));
@@ -35,10 +36,12 @@ test('level after the first round, one of the two picks the next category, and b
   page: anna,
   newPlayer,
   browserName,
+  queue,
 }) => {
   const boris = await newPlayer();
   await Promise.all([startAsGuest(anna), startAsGuest(boris)]);
   const borisMe = await me(boris);
+  await queue('duel');
   const play = (player: typeof anna) => player.getByRole('button', { name: 'Играй Дуел', exact: true }).click();
   await Promise.all([play(anna), play(boris)]);
   await Promise.all([anna, boris].map((player) => expect(player).toHaveURL(/\/game$/)));
@@ -89,9 +92,11 @@ test('level after the first round, one of the two picks the next category, and b
 test('a rematch: one asks from the results, the other accepts, and the same two play again', async ({
   page: anna,
   newPlayer,
+  queue,
 }) => {
   const boris = await newPlayer();
   await Promise.all([startAsGuest(anna), startAsGuest(boris)]);
+  await queue('duel');
   const play = (player: typeof anna) => player.getByRole('button', { name: 'Играй Дуел', exact: true }).click();
   await Promise.all([play(anna), play(boris)]);
   await Promise.all([playMatch(anna), playMatch(boris)]);

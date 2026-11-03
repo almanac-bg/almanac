@@ -22,7 +22,7 @@ test('a newcomer plays a first solo match as a guest', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Запази прогреса', exact: true })).toBeVisible();
 });
 
-test('results open at the top, however far down the lobby was when the match began', async ({ page }) => {
+test('results open at the top, however far down the lobby was when the match began', async ({ page, queue }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Играй като гост', exact: true }).first().click();
   await expectLobby(page);
@@ -31,6 +31,7 @@ test('results open at the top, however far down the lobby was when the match beg
   await duel.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollBy(0, 150));
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await queue('duel');
   await duel.click();
   await expect(page).toHaveURL(/\/game$/);
   await playMatch(page);
