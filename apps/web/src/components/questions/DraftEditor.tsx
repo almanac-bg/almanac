@@ -1,10 +1,11 @@
+import { LETTERS, OPTION_COLORS } from '@almanac/client';
 import { CATEGORIES, type CategoryId, type Difficulty, type QuestionDraft, SUBMISSION_RULES } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import { useId } from 'react';
 import { Select } from '../controls';
 import { Emoji } from '../Emoji';
-import { accentText, LETTERS, OPTION_COLORS } from '../game/answers';
+import { accentText } from '../game/answers';
 import { Segmented } from '../ui';
 import type { DraftErrors } from './draft';
 

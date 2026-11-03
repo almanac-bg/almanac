@@ -1,11 +1,10 @@
-import { actions, plural, timeAgo, toast } from '@almanac/client';
+import { actions, numberText, plural, timeAgo, toast } from '@almanac/client';
 import { type KnowledgeFact, MASTERY_TIERS, REVIEW, type ReviewQueue } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { keepTogether } from '../lib/typography';
 import { Emoji } from './Emoji';
-import { numberText } from './game/numbers';
 import { Thumbnail } from './game/QuestionPicture';
 import { Button, Card } from './ui';
 

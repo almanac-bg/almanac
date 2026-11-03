@@ -51,3 +51,7 @@ export const plural = (n: number, one: string, many: string) => `${fmt(n)} ${n =
 export { ordinal } from '@almanac/shared';
 
 export const DIFFICULTY_LABEL = { easy: 'Лесен', medium: 'Среден', hard: 'Труден' } as const;
+
+/** Answer letters and accent colours: the same in the match, the review afterwards, the question editor and admin. */
+export const LETTERS = ['А', 'Б', 'В', 'Г'];
+export const OPTION_COLORS = ['#a78bfa', '#22d3ee', '#fbbf24', '#f472b6'];

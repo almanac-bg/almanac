@@ -4,6 +4,7 @@ export * from './config';
 export * from './format';
 export * from './hooks';
 export * from './library';
+export * from './numbers';
 export * from './realtime';
 export * from './store';
 export * from './unlocks';

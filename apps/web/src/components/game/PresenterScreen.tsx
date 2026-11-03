@@ -1,4 +1,14 @@
-import { actions, fmt, type LiveGame, ordinal, useNow } from '@almanac/client';
+import {
+  actions,
+  fmt,
+  LETTERS,
+  type LiveGame,
+  numberText,
+  OPTION_COLORS,
+  orderValueText,
+  ordinal,
+  useNow,
+} from '@almanac/client';
 import { BRAND, categoryById, type FinalStanding, type Standing } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Eye, Lightbulb, Pause, Play, Users } from 'lucide-react';
@@ -14,9 +24,7 @@ import { FitName } from '../FitName';
 import { Logo } from '../Logo';
 import { burst } from '../results/confetti';
 import { Button } from '../ui';
-import { accentText, LETTERS, OPTION_COLORS } from './answers';
-import { numberText } from './numbers';
-import { orderValueText } from './OrderQuestion';
+import { accentText } from './answers';
 import { QuestionPicture } from './QuestionPicture';
 
 /**

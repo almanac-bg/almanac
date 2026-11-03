@@ -1,4 +1,4 @@
-import { api, errorMessage, fmt, percent, type ReviewItem, toast } from '@almanac/client';
+import { api, errorMessage, fmt, LETTERS, numberText, offText, percent, type ReviewItem, toast } from '@almanac/client';
 import { categoryById, QUESTION_REPORT_REASONS, type QuestionReportReason } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, ChevronDown, Flag, Lightbulb, X } from 'lucide-react';
@@ -10,8 +10,6 @@ import { Radio } from '../controls';
 import { Emoji } from '../Emoji';
 import { ReportSet } from '../ReportSet';
 import { Button, Card, Modal } from '../ui';
-import { LETTERS } from './answers';
-import { numberText, offText } from './numbers';
 import { RightOrderList } from './OrderQuestion';
 import { QuestionPicture } from './QuestionPicture';
 

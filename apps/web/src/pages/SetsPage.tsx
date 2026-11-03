@@ -1,4 +1,4 @@
-import { api, errorMessage, type SetBody, timeAgo, toast, useStore } from '@almanac/client';
+import { api, errorMessage, LETTERS, OPTION_COLORS, type SetBody, timeAgo, toast, useStore } from '@almanac/client';
 import { type ModerationBasis, SETS, type SetImage, type SetQuestion, setPictureUrl } from '@almanac/shared';
 import clsx from 'clsx';
 import {
@@ -21,7 +21,7 @@ import { BottomBar } from '../components/BottomBar';
 import { GuestNudge } from '../components/ClaimAccount';
 import { Radio } from '../components/controls';
 import { Emoji } from '../components/Emoji';
-import { accentText, LETTERS, OPTION_COLORS } from '../components/game/answers';
+import { accentText } from '../components/game/answers';
 import { LoadError } from '../components/LoadError';
 import { ABOVE_TAB_BAR } from '../components/NavBar';
 import { ReportSet } from '../components/ReportSet';

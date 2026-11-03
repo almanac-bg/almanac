@@ -1,4 +1,14 @@
-import { actions, DIFFICULTY_LABEL, fmt, type LiveGame, percent, useNow } from '@almanac/client';
+import {
+  actions,
+  DIFFICULTY_LABEL,
+  fmt,
+  LETTERS,
+  type LiveGame,
+  numberText,
+  OPTION_COLORS,
+  percent,
+  useNow,
+} from '@almanac/client';
 import { answerPoints, type Crowd, categoryById, type GamePlayer, HOLD, type QuestionPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { ArrowRight, Check, Flame, Lightbulb, Pause, Skull, Users, WifiOff, X } from 'lucide-react';
@@ -13,10 +23,9 @@ import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button, Spinner } from '../ui';
 import { PAUSED_NOTE, QUESTION_PAUSED_NOTE } from './Announcer';
-import { accentText, LETTERS, OPTION_COLORS } from './answers';
+import { accentText } from './answers';
 import { inDropZone, nextElimination } from './elimination';
 import { NumberAnswer, NumberLine, NumberSummary } from './NumberQuestion';
-import { numberText } from './numbers';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderQuestion';
 import { ActivePowerups, KeyHint, PowerupBar } from './Powerups';
 import { QuestionPicture } from './QuestionPicture';

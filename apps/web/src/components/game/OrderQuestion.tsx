@@ -1,4 +1,4 @@
-import { actions, fmt, type LiveGame } from '@almanac/client';
+import { actions, fmt, LETTERS, type LiveGame, orderValueText } from '@almanac/client';
 import { type GamePlayer, ORDER, type PlayerResult, type QuestionPayload, type RevealPayload } from '@almanac/shared';
 import clsx from 'clsx';
 import { Check, Flame, Lock } from 'lucide-react';
@@ -9,15 +9,7 @@ import { keepTogether } from '../../lib/typography';
 import { Avatar } from '../Avatar';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';
-import { LETTERS } from './answers';
 import { KeyHint } from './Powerups';
-
-/** An item's value as the reveal shows it: a year as it's written (BC ones „пр.н.е.“), any other number with its unit. */
-export function orderValueText(value: number, unit: string): string {
-  if (!unit && Number.isInteger(value)) return value < 0 ? `${-value} г. пр.н.е.` : String(value);
-  const text = value.toLocaleString('bg-BG', { maximumFractionDigits: 2 });
-  return unit ? `${text} ${unit}` : text;
-}
 
 /**
  * „Подреди“: the four things are tapped in the order they go, each moving up to its place with its number; a tap on a

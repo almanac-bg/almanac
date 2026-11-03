@@ -1,4 +1,14 @@
-import { actions, fmt, type LiveGame } from '@almanac/client';
+import {
+  actions,
+  fmt,
+  type LiveGame,
+  lineRange,
+  maxDigits,
+  numberText,
+  offText,
+  placeOn,
+  unitFor,
+} from '@almanac/client';
 import {
   decimalsOf,
   type GamePlayer,
@@ -18,7 +28,6 @@ import { Avatar } from '../Avatar';
 import { Slider } from '../controls';
 import { Emoji } from '../Emoji';
 import { Button } from '../ui';
-import { lineRange, maxDigits, numberText, offText, placeOn, unitFor } from './numbers';
 
 type Input = NonNullable<QuestionPayload['number']>;
 

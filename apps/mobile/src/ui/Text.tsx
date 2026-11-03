@@ -1,3 +1,4 @@
+import type { ComponentRef, Ref } from 'react';
 import { Text as RNText, type TextProps, type TextStyle } from 'react-native';
 import { fonts, useColors } from '@/theme';
 
@@ -16,6 +17,7 @@ const VARIANTS: Record<TextVariant, TextStyle> = {
 };
 
 export interface TProps extends TextProps {
+  ref?: Ref<ComponentRef<typeof RNText>>;
   variant?: TextVariant;
   tone?: 'fg' | 'fg2' | 'fg3' | 'link' | 'bad' | 'good' | 'gold';
   align?: TextStyle['textAlign'];

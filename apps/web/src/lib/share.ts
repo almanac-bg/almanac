@@ -1,6 +1,5 @@
-import { fmt, ordinal, type ReviewItem, toast } from '@almanac/client';
+import { fmt, numberText, ordinal, type ReviewItem, toast } from '@almanac/client';
 import { BRAND, dayKey, dayNumber, isExact, type NumberInput } from '@almanac/shared';
-import { numberText } from '../components/game/numbers';
 
 const storageKey = (day: string) => `almanac:daily-share:${day}`;
 
