@@ -72,6 +72,15 @@ async function deviceWithPasskeys(page: Page) {
       response,
     });
 
+    // An engine built without WebAuthn (Playwright's WebKit on Linux): the shape the app and its library look for.
+    if (typeof window.PublicKeyCredential !== 'function')
+      Object.defineProperty(window, 'PublicKeyCredential', {
+        value: function PublicKeyCredential() {},
+        configurable: true,
+        writable: true,
+      });
+    if (!navigator.credentials) Object.defineProperty(navigator, 'credentials', { value: {}, configurable: true });
+
     navigator.credentials.create = (async (options?: CredentialCreationOptions) => {
       const publicKey = options!.publicKey!;
       const pair = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [

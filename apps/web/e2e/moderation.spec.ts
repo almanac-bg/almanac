@@ -45,7 +45,8 @@ test('a moderator stops a profile with a basis and a reason the player reads, an
   // /admin opens with a second factor to set up; here an authenticator app (passkeys: passkeys.spec.ts): its key on the
   // page, then the code it shows.
   await page.goto('/admin');
-  await page.getByRole('button', { name: 'С приложение за удостоверяване', exact: true }).click();
+  // („Включи“ where the browser can't make passkeys: then the app is the only way.)
+  await page.getByRole('button', { name: /^(С приложение за удостоверяване|Включи)$/ }).click();
   // Focus goes where the next step is, never back to the page (A11Y-6): the code field, then the page's heading.
   await expect(page.getByLabel('Код от приложението')).toBeFocused();
   const key = (await page.locator('code').first().textContent())!.replace(/\s/g, '');
