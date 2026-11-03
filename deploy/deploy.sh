@@ -29,9 +29,9 @@ main() {
     pulled=0
     image=$(deploy/pull-image.sh "$commit") || pulled=$?
     [ "$pulled" = 1 ] || break
-    # No image for it. A commit that changes only Markdown (a deploy's CHANGELOG line, which CI doesn't build:
-    # .github/workflows/ci.yml) runs the image of the newest commit before it that has one: the code is the same. The
-    # checkout still goes to main's, text and all.
+    # No image for it. A commit that changes only Markdown (one CI doesn't build: .github/workflows/ci.yml →
+    # paths-ignore) runs the image of the newest commit before it that has one: the code is the same. The checkout
+    # still goes to main's, text and all.
     git diff --quiet "$commit~1" "$commit" -- . ':(exclude)*.md' 2>/dev/null || break
     commit=$(git rev-parse "$commit~1")
   done

@@ -32,6 +32,11 @@ Anything written after `/a-to-z` adjusts the run (e.g. "infrastructure only", "s
 
 - **The best possible product, not one tuned to today's player count.** Effort and cost are never a reason to leave
   something out. No go-to-market plan unless asked.
+- **The way it's made is part of it.** How changes are named, recorded, versioned, tagged, released, deployed and
+  documented is judged against established open-source practice — Conventional Commits, Semantic Versioning, a
+  generated changelog, tagged releases with notes, enforced by tools rather than habit — not against the project's own
+  conventions. A home-grown habit where a standard exists, an inconsistency (versions that disagree, names from
+  before a rename, a step done by hand that a tool should do) or a leftover is a finding like any bug.
 - **Know what's decided.** Read the memory, `CHANGELOG.md`, `docs/` and `README.md` first, and give the reviewers what
   is decided and what is already planned. They don't re-raise it without new evidence; with it, they mark it a re-open
   and say why.

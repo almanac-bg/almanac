@@ -60,23 +60,40 @@ CodeQL (разширеният набор заявки) проверява ко�
 образа `ghcr.io/almanac-bg/almanac:<commit>` с подписано удостоверение за произход (build provenance): че точно този
 образ е направен от CI на това хранилище за този commit. `deploy/deploy.sh` на сървъра взема цифровия отпечатък (digest)
 на образа, проверява удостоверението и пуска точно него (виж [Поддръжка → Обновяване](operations.md#обновяване)); ръчна
-проверка: `gh attestation verify oci://ghcr.io/almanac-bg/almanac:<commit> --repo almanac-bg/almanac`. Всяко внедряване
-получава запис в [CHANGELOG.md](../CHANGELOG.md): датата и часът (софийско време), commit-ът и какво влезе. Записът е
-commit само с Markdown направо в `main`: за такъв CI не прави нищо (`paths-ignore`), а `deploy.sh` пуска образа на
-последния commit преди него, който има образ — кодът е същият.
+проверка: `gh attestation verify oci://ghcr.io/almanac-bg/almanac:<commit> --repo almanac-bg/almanac`. Commit само с
+Markdown в `docs/changelog/` не пуска CI (`paths-ignore`), а `deploy.sh` тогава пуска образа на последния commit преди
+него, който има образ — кодът е същият.
 
-Съобщението на squash commit-а е заглавието и описанието на pull request-а. `[skip ci]` (или `[ci skip]`, `[no ci]`…)
-където и да е в тях спира CI на `main` за този commit: няма тестове и няма образ. Dependabot цитира в описанието
-commit-ите на обновените пакети, а някои ги носят. Затова проверката „squash message“ в CI пада за такъв pull request
-и той се слива със собствено съобщение: `gh pr merge <n> -R almanac-bg/almanac --squash --admin --body "<един ред>"`.
-Така се изпусна 89f14e2 (3 ноември): няма образ, а промените му влязоха с commit-а след него.
-
-**В края на месеца** записите му отиват във файл за себе си, `docs/changelog/<година>-<месец>.md` (линковете към
-commit-и са пълни адреси, за да работят отвсякъде), а последният му деплой получава release: следващата версия
-(`v1.1.0` е октомври, `v1.2.0` — ноември), с тага върху commit-а на този деплой и бележки, които сочат файла на
-месеца. Таговете `v*` не могат да се местят или трият, а публикуван release — да се променя (`github-setup.sh`).
+Съобщението на squash commit-а е заглавието и описанието на pull request-а, затова заглавието е по Conventional Commits
+(CONTRIBUTING.md → Commits и pull requests) и `.github/workflows/pr-title.yml` го проверява с commitlint при всяко
+отваряне и редакция. Същата проверка пада и за `[skip ci]` (или `[ci skip]`, `[no ci]`…) където и да е в заглавието или
+описанието: това спира CI на `main` за този commit — няма тестове и няма образ. Dependabot цитира в описанието
+commit-ите на обновените пакети, а някои ги носят; такъв pull request се слива със собствено съобщение:
+`gh pr merge <n> -R almanac-bg/almanac --squash --admin --body "<един ред>"`. Така се изпусна 89f14e2 (3 ноември): няма
+образ, а промените му влязоха с commit-а след него.
 
 **Тестове, минали чак при повторния опит.** CI ги изписва като предупреждение и качва доклада с trace и на двата
 опита. Тест, който е такъв в три поредни пуска на `main`, проваля CI: нестабилен тест е бъг (в теста или в
 приложението), не шум. Всеки понеделник `.github/workflows/flaky-ledger.yml` брои тези тестове във всички пускове
 от седмицата и води issue с етикет `flaky` за всеки, повторил се два пъти; затваря го след 14 дни без повторение.
+
+## Издания
+
+Всяко пускане в продукцията е издание: версия по [Semantic Versioning](https://semver.org/spec/v2.0.0.html), таг
+`vX.Y.Z` и [GitHub release](https://github.com/almanac-bg/almanac/releases) с бележки. Нищо от това не се пише на ръка:
+
+1. При всеки push в `main` `.github/workflows/release.yml` (release-please, от npm) поддържа отворен един pull request
+   `chore(release): X.Y.Z`. В него е следващата версия — MAJOR при несъвместима промяна (`!` или `BREAKING CHANGE:`),
+   MINOR при `feat`, PATCH при `fix` и `perf` — във всеки `package.json` и `package-lock.json`, и разделът ѝ в
+   [CHANGELOG.md](../CHANGELOG.md) от заглавията на commit-ите (`feat`, `fix`, `perf`, `revert`).
+2. Сливането му е изданието: `gh pr merge <n> -R almanac-bg/almanac --squash --admin` (направен с токена на workflow-а,
+   той няма свой CI: в него са само версия и бележки). Push-ът от сливането тагва commit-а `vX.Y.Z` и публикува
+   release-а; CI на `main` го тества и публикува образа му.
+3. Деплоят е на този commit ([Поддръжка → Обновяване](operations.md#обновяване)): в продукцията е винаги издание, а
+   бележките му казват какво влезе.
+
+MAJOR значи, че обновяването иска действие от поддържащ сървъра (настройка, преместени данни, премахнато нещо, на
+което някой разчита); кое, казва редът `BREAKING CHANGE:` в бележките. Таговете `v*` не могат да се местят или трият,
+а публикуван release — да се променя; release-please отваря своя pull request, защото „Allow GitHub Actions to create
+pull requests“ е включено (всичко това: `scripts/github-setup.sh`). Историята от преди 1.2.0, по деплой и на български,
+е в `docs/changelog/`.

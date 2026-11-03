@@ -109,7 +109,8 @@ checks=$(cat <<'JSON'
       "do_not_enforce_on_create": false,
       "required_status_checks": [
         {"context": "test (Node 24)", "integration_id": 15368}, {"context": "test (Node 26)", "integration_id": 15368},
-        {"context": "docker", "integration_id": 15368}, {"context": "browser tests", "integration_id": 15368}
+        {"context": "docker", "integration_id": 15368}, {"context": "browser tests", "integration_id": 15368},
+        {"context": "PR title", "integration_id": 15368}
       ]
     }},
     {"type": "code_scanning", "parameters": {"code_scanning_tools": [
@@ -156,6 +157,10 @@ try "only GitHub-owned and verified actions, pinned to a commit" gh api -X PUT "
 # GitHub's own only: every action CI uses is (actions/*), and a "verified creator" is a badge, not a review (GH-9).
 try "which ones: GitHub's own" gh api -X PUT "repos/$repo/actions/permissions/selected-actions" \
   --input - <<<'{"github_owned_allowed": true, "verified_allowed": false, "patterns_allowed": []}'
+# Workflows' tokens read only, unless a job asks for more; and a workflow may open a pull request: release-please's
+# "chore(release): X.Y.Z" (.github/workflows/release.yml, docs/maintainers.md → Издания).
+try "workflow tokens read-only by default; workflows may open pull requests (the release one)" gh api -X PUT \
+  "repos/$repo/actions/permissions/workflow" -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
 # A pull request from someone outside runs CI only once a maintainer approves it, every time, not only for a first
 # contribution: needed before any release secret exists (GH-8).
 try "outside contributors' pull requests run CI only once approved" gh api -X PUT \

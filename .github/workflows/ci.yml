@@ -4,9 +4,10 @@ name: CI
 on:
   push:
     branches: [main]
-    # A deploy's CHANGELOG line changes no code: no run and no image for it (deploy/deploy.sh then runs the newest
-    # commit before it that has one). Everything else, Markdown included, is built and tested.
-    paths-ignore: [CHANGELOG.md, docs/changelog/**]
+    # The history before 1.2.0 (docs/changelog/) is no code: no run and no image for a commit that changes only it
+    # (deploy/deploy.sh then runs the newest commit before it that has one). Everything else, Markdown included, is
+    # built and tested — a release's CHANGELOG.md comes with its versions.
+    paths-ignore: [docs/changelog/**]
   pull_request:
 
 # The workflow only reads the code; nothing in it needs to write to the repository.
@@ -27,27 +28,6 @@ concurrency:
 # Actions are pinned to a commit (a tag can be moved to other code); Dependabot updates the commit and the comment.
 
 jobs:
-  # The squash commit's message is the pull request's title and description (scripts/github-setup.sh). A „[skip ci]“
-  # anywhere in it, and main's run for that commit never starts: no tests, no image to deploy or roll back to. Dependabot
-  # quotes the updated packages' own commits in its description, and theirs carry it (89f14e2, 3 November). Such a pull
-  # request is merged with a message of its own (docs/maintainers.md).
-  squash-message:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    name: squash message
-    steps:
-      - name: Nothing in it that would skip main's run
-        env:
-          # Through the environment, never into the script: the text is whoever opened the pull request's.
-          TITLE: ${{ github.event.pull_request.title }}
-          BODY: ${{ github.event.pull_request.body }}
-        run: |
-          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -qiE '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]|^skip-checks: *true'; then
-            echo "::error title=The squash commit would skip main's CI::The title or description holds [skip ci] or the like. Merge with a message of its own: gh pr merge <n> -R almanac-bg/almanac --squash --body '<one line>'"
-            exit 1
-          fi
-
   test:
     runs-on: ubuntu-24.04
     # A hung test would otherwise hold the runner for six hours.

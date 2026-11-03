@@ -1,0 +1,52 @@
+# Releases (docs/maintainers.md → Издания). On every push to main release-please reads the Conventional Commits since
+# the last version and keeps one pull request open, "chore(release): X.Y.Z": the next version (SemVer, from the commit
+# types) in every package.json and package-lock.json, and the CHANGELOG.md section that goes with it. Merging that pull
+# request is the release: on the push it makes, this tags the merge commit vX.Y.Z and publishes the GitHub release with
+# the same notes. That commit is what gets deployed.
+#
+# release-please runs from npm (pinned in package-lock.json, kept current by Dependabot), not as a third-party action:
+# the repository allows GitHub's own actions only (scripts/github-setup.sh). Its pull request needs "Allow GitHub
+# Actions to create pull requests" on (github-setup.sh), and, made with this token, it runs no CI of its own: its
+# changes are a version and a changelog, and the push of its merge runs CI in full.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# One at a time, and none cut short: a release half made would leave a tag without its release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      # Tags, releases and the release branch.
+      contents: write
+      # The release pull request, and its labels (release-please marks a pull request it has released).
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      # Only the packages, none of their scripts: release-please is all this needs.
+      - run: npm ci --ignore-scripts
+      - name: Tag and publish a release pull request that was merged
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npx release-please github-release --token "$GITHUB_TOKEN" --repo-url "$GITHUB_REPOSITORY"
+      - name: Open or update the next release pull request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npx release-please release-pr --token "$GITHUB_TOKEN" --repo-url "$GITHUB_REPOSITORY"

@@ -7,6 +7,8 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly, day: monday }
+    # Conventional Commits, as every title on main (commitlint.config.mjs): "build(deps): bump …".
+    commit-message: { prefix: "build(deps)", prefix-development: "build(deps)" }
     open-pull-requests-limit: 5
     cooldown:
       default-days: 5
@@ -18,6 +20,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "build(deps)" }
     cooldown:
       default-days: 5
 
@@ -25,6 +28,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "build(deps)" }
     cooldown:
       default-days: 5
 
@@ -32,6 +36,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "ci(deps)" }
     cooldown:
       default-days: 5
     groups:
