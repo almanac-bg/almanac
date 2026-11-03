@@ -15,6 +15,7 @@
     "@expo-google-fonts/unbounded": "^0.4.1",
     "expo": "~58.0.23",
     "expo-application": "~58.1.2",
+    "expo-audio": "~58.0.11",
     "expo-constants": "~58.0.15",
     "expo-dev-client": "~58.0.18",
     "expo-font": "~58.0.11",
@@ -64,10 +65,14 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/dist/"
+      "/dist/",
+      "/__tests__/setup/"
     ],
     "modulePaths": [
       "<rootDir>/node_modules"
+    ],
+    "setupFiles": [
+      "<rootDir>/__tests__/setup/native.ts"
     ]
   }
 }

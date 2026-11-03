@@ -17,6 +17,7 @@ import { AccessibilityInfo, findNodeHandle, ScrollView, Share, type Text, View }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DuelCard, RematchButton } from '@/duels/parts';
 import { API_URL } from '@/lib/client';
+import { play } from '@/lib/sounds';
 import {
   AchievementsCard,
   Chip,
@@ -64,7 +65,10 @@ export function Results({ game }: { game: LiveGame }) {
   // The outcome is felt (a win, a perfect run, a record) as the results come in.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the results come in
   useEffect(() => {
-    if (o.fanfare) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (o.fanfare) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      play('win');
+    } else if (!single) play('lose');
   }, []);
   // A screen reader starts on the headline — once the reward moment, if there is one, has closed.
   useEffect(() => {
