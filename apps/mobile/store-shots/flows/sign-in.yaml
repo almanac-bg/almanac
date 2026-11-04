@@ -1,0 +1,25 @@
+# Signs in from the welcome screen: -e NAME=… -e PASSWORD=… (an account made on the local server first, through its
+# API: iOS's Strong Password sheet gets in the way of the app's own sign-up form). Submits with the keyboard's return:
+# hiding the keyboard is a swipe that closes the sheet. iOS's "save password?" is the system's: declined by its place.
+appId: bg.almanac.app
+---
+- tapOn: "Имам профил — вход"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Име.*"
+    index: 1
+- inputText: ${NAME}
+- tapOn:
+    text: "Парола"
+    index: 1
+- inputText: ${PASSWORD}
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Not Now"
+    commands:
+      - tapOn: "Not Now"
+- extendedWaitUntil:
+    visible: "Избери битка"
+    timeout: 30000

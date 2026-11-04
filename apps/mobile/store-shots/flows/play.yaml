@@ -1,0 +1,74 @@
+# Plays the match on screen to its end, answering right where answers.js knows the answer, and takes a screenshot of
+# every question before and after the answer (${P}-q3, ${P}-r3-a, ${P}-r3-b…) and of the end: run it with -e P=<name>
+# right after a start-*.yaml. Maestro keeps them under ~/.maestro/tests/<run>/play/takeScreenshot/.
+appId: bg.almanac.app
+---
+- runScript: answers.js
+- repeat:
+    while:
+      visible: "Напусни мача"
+    commands:
+      - runFlow:
+          when:
+            visible: "Въпрос \\d+ от \\d+: .*"
+          commands:
+            - copyTextFrom: "Въпрос \\d+ от \\d+: .*"
+            - runScript: pick.js
+            - runFlow:
+                when:
+                  true: ${output.fresh}
+                commands:
+                  - waitForAnimationToEnd:
+                      timeout: 1200
+                  - takeScreenshot: ${P}-q${output.n}
+                  - runFlow:
+                      when:
+                        true: ${output.ans != null}
+                      commands:
+                        - tapOn:
+                            text: ${output.re}
+                            optional: true
+                  - runFlow:
+                      when:
+                        true: ${output.num != null}
+                      commands:
+                        - tapOn:
+                            text: ${output.k0}
+                            optional: true
+                        - runFlow:
+                            {
+                              when: { true: "${output.k1 != ''}" },
+                              commands: [{ tapOn: { text: "${output.k1}", optional: true } }],
+                            }
+                        - runFlow:
+                            {
+                              when: { true: "${output.k2 != ''}" },
+                              commands: [{ tapOn: { text: "${output.k2}", optional: true } }],
+                            }
+                        - runFlow:
+                            {
+                              when: { true: "${output.k3 != ''}" },
+                              commands: [{ tapOn: { text: "${output.k3}", optional: true } }],
+                            }
+                        - runFlow:
+                            {
+                              when: { true: "${output.k4 != ''}" },
+                              commands: [{ tapOn: { text: "${output.k4}", optional: true } }],
+                            }
+                        - runFlow:
+                            {
+                              when: { true: "${output.k5 != ''}" },
+                              commands: [{ tapOn: { text: "${output.k5}", optional: true } }],
+                            }
+                        - takeScreenshot: ${P}-q${output.n}-typed
+                        - tapOn:
+                            text: "Заключи"
+                            optional: true
+                  - takeScreenshot: ${P}-r${output.n}-a
+                  - waitForAnimationToEnd:
+                      timeout: 1500
+                  - takeScreenshot: ${P}-r${output.n}-b
+      - waitForAnimationToEnd:
+          timeout: 1500
+- waitForAnimationToEnd
+- takeScreenshot: ${P}-end
