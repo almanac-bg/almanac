@@ -8,6 +8,21 @@ is a `vX.Y.Z` tag and a [GitHub release](https://github.com/almanac-bg/almanac/r
 Bulgarian: [October 2026](docs/changelog/2026-10.md), with 0.9.0, 1.0.0 and 1.1.0, and
 [November 2026 until 1.2.0](docs/changelog/2026-11.md), what came after 1.1.0.
 
+## [1.5.0](https://github.com/almanac-bg/almanac/compare/v1.4.0...v1.5.0) (2026-11-04)
+
+
+### Features
+
+* **mobile:** licences and the source of this version, in Settings ([#138](https://github.com/almanac-bg/almanac/issues/138)) ([b740fd2](https://github.com/almanac-bg/almanac/commit/b740fd2e3231112577c9e0b9958dd4acc268db7c))
+
+
+### Bug Fixes
+
+* **deps:** bump motion from 14.7.1 to 14.8.0 in the npm-minor group across 1 directory ([#109](https://github.com/almanac-bg/almanac/issues/109)) ([e57fc09](https://github.com/almanac-bg/almanac/commit/e57fc0989af347d3751962b2534e35725cfed0b4))
+* **mobile:** pushes that reach the phone, on iOS and on Android ([#140](https://github.com/almanac-bg/almanac/issues/140)) ([f84d2f9](https://github.com/almanac-bg/almanac/commit/f84d2f9c5bedd5c1dfcec83b49ea05bdaf80e97d))
+* **mobile:** the sounds' expo-asset built in; Expo's doctor in CI ([#142](https://github.com/almanac-bg/almanac/issues/142)) ([032b941](https://github.com/almanac-bg/almanac/commit/032b941d78147a676624acd06d6a1dac42155ce3))
+* **web:** a retry of a page's code that fails again reloads the page ([#143](https://github.com/almanac-bg/almanac/issues/143)) ([b995832](https://github.com/almanac-bg/almanac/commit/b995832d7ba10fac777563b680d50982fe07c380))
+
 ## [1.4.0](https://github.com/almanac-bg/almanac/compare/v1.3.0...v1.4.0) (2026-11-04)
 
 
