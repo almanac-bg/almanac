@@ -96,6 +96,26 @@ development build: тогава се преглежда и лицензите и
 
 Ключовете стоят само в `.env` на сървъра и в Bitwarden, както другите тайни.
 
+В самото приложение:
+
+- **iOS:** нищо повече. Към коя от двете услуги на Apple е токенът, казва профилът, с който е подписано приложението
+  (`apps/mobile/src/lib/push.ts`), и сървърът праща там. С профил за разработка (Xcode, по кабел) е sandbox. Билдовете
+  на Expo (и тези за разработка: подписани са ad hoc), TestFlight и App Store са на истинската услуга. Токен, пратен
+  към другата, не стига до телефона: Apple отговаря `BadDeviceToken`.
+- **Android:** без файла на Firebase телефонът не дава токен. Firebase → Project settings → General → Add app →
+  Android, пакет `bg.almanac.app` → `google-services.json`. Файлът не влиза в хранилището (`.gitignore`): в него са
+  проектът и ключът му, а всяко копие на играта има свой проект. Пази се в Bitwarden и в услугата на Expo, като таен
+  файл:
+
+  ```sh
+  cd apps/mobile
+  npx eas-cli env:set --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret \
+    --environment development --environment preview --environment production
+  ```
+
+  За билд на този компютър: `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`. Без файла
+  приложението върви, само без известия на Android.
+
 ## Линковете
 
 Линк към екран на играта (покана за стая, дуел с приятел, днешните въпроси, профил…) отваря приложението, щом то е на

@@ -433,8 +433,8 @@ accountRouter.post('/push/subscribe', requireAuth, requireAccount, (req, res) =>
 });
 
 /**
- * An app's device gets pushes: the token Apple's or Google's service knows it by (`sandbox`: an iOS app built for
- * development). Which service is the app's own (CLIENT_HEADER); the first device confirms it works, as in a browser.
+ * An app's device gets pushes: the token Apple's or Google's service knows it by (`sandbox`: from Apple's sandbox, for
+ * an iOS app signed with a development provisioning profile). Which service is the app's own (CLIENT_HEADER); the first device confirms it works, as in a browser.
  */
 accountRouter.post('/push/devices', requireAuth, requireAccount, (req, res) => {
   const platform = parseClient(req.headers[CLIENT_HEADER])?.client;

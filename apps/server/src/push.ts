@@ -140,7 +140,8 @@ export const DEVICE_TOKEN: Record<DevicePlatform, RegExp> = {
 
 /**
  * Keeps an app's device for the player, with the session it came with (the trigger drops it with that session).
- * True when it's new to them, as for a browser's (subscribe). `sandbox`: an iOS app built for development.
+ * True when it's new to them, as for a browser's (subscribe). `sandbox`: a token from Apple's sandbox (an iOS
+ * app signed with a development provisioning profile).
  */
 export function registerDevice(
   userId: number,

@@ -48,6 +48,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'bg.almanac.app',
+    // Firebase's file, without which Android gives the app no token for pushes (FCM): its path in GOOGLE_SERVICES_JSON
+    // — on Expo's build service a file variable, for a build here the downloaded file's. Never in the repository
+    // (.gitignore): it names the Firebase project and its key, and a fork has a project of its own. Without it the app
+    // builds and runs, with no pushes on Android (docs/app-stores.md → Известията).
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON || undefined,
     adaptiveIcon: {
       backgroundColor: '#140f26',
       foregroundImage: './assets/android-icon-foreground.png',

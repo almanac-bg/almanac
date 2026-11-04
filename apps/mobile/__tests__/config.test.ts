@@ -26,6 +26,18 @@ test('the privacy manifest: each required-reason API with its reason, and no tra
   });
 });
 
+test('Firebase’s file for pushes on Android: the one GOOGLE_SERVICES_JSON names, none in the repository', () => {
+  expect(config.android?.googleServicesFile).toBeUndefined();
+  process.env.GOOGLE_SERVICES_JSON = '/home/expo/workingdir/google-services.json';
+  try {
+    expect(appConfig({ config: {} } as never).android?.googleServicesFile).toBe(
+      '/home/expo/workingdir/google-services.json',
+    );
+  } finally {
+    delete process.env.GOOGLE_SERVICES_JSON;
+  }
+});
+
 test('the photo library only, never the camera or the microphone', () => {
   const picker = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-image-picker') as [string, object];
   expect(picker[1]).toMatchObject({ cameraPermission: false, microphonePermission: false });

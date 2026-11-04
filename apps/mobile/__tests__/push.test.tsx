@@ -1,13 +1,14 @@
-// Notifications on this phone: on after the consent (the token to the server), off again, blocked by the phone's own
-// settings; what to send, saved for all devices; and a push tapped opening where it leads.
+// Notifications on this phone: on after the consent (the token to the server, with the service it's from), off again,
+// blocked by the phone's own settings; what to send, saved for all devices; and a push tapped opening where it leads.
 import { api, setState } from '@almanac/client';
 import { defaultPushPrefs } from '@almanac/shared';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { Alert, Text } from 'react-native';
+import { Alert, Platform, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { usePush } from '@/lib/push';
+import { enablePush, usePush } from '@/lib/push';
 import { PushSection } from '@/settings/PushSection';
 
 const mockStore = new Map<string, string>();
@@ -18,6 +19,11 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async (k: string) => void mockStore.delete(k)),
 }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
+// As Expo's builds are signed (ad hoc): the real service's tokens.
+jest.mock('expo-application', () => ({
+  ...jest.requireActual('expo-application'),
+  getIosPushNotificationServiceEnvironmentAsync: jest.fn(async () => 'production'),
+}));
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
@@ -60,11 +66,32 @@ test('on after the consent: the phone asks, its token goes to the server; then o
   expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
   expect(alert.mock.calls[0]?.[1]).toMatch(/навършени 14 години/);
   await act(async () => alert.mock.calls[0]?.[2]?.find((b) => b.text === 'Потвърждавам, включи')?.onPress?.());
-  expect(register).toHaveBeenCalledWith('tok-1', true);
+  expect(register).toHaveBeenCalledWith('tok-1', false);
   await waitFor(() => expect(screen.getByText('✓ Включени на този телефон')).toBeTruthy());
   await fireEvent.press(screen.getByRole('button', { name: 'Изключи тук' }));
   expect(forget).toHaveBeenCalledWith('tok-1');
   await waitFor(() => expect(screen.getByRole('button', { name: 'Включи на този телефон' })).toBeTruthy());
+});
+
+// A token sent to the other service than it's from never arrives: Apple answers BadDeviceToken.
+test.each([
+  ['with a development provisioning profile (Xcode, over a cable): the sandbox', 'development', true],
+  ['ad hoc, as Expo’s builds for testing are, development builds too: the real service', 'production', false],
+  ['from TestFlight or the App Store, with no provisioning profile in the app: the real service', null, false],
+])('the token’s service on iOS, as the app is signed — %s', async (_, environment, sandbox) => {
+  jest.mocked(Application.getIosPushNotificationServiceEnvironmentAsync).mockResolvedValueOnce(environment as never);
+  const register = jest.spyOn(api, 'registerPushDevice').mockResolvedValue({ user: me as never });
+  expect(await enablePush()).toBe(true);
+  expect(register).toHaveBeenCalledWith('tok-1', sandbox);
+});
+
+test('on Android, Google’s one service: never the sandbox', async () => {
+  const os = jest.replaceProperty(Platform, 'OS', 'android');
+  const register = jest.spyOn(api, 'registerPushDevice').mockResolvedValue({ user: me as never });
+  expect(await enablePush()).toBe(true);
+  expect(register).toHaveBeenCalledWith('tok-1', false);
+  expect(Application.getIosPushNotificationServiceEnvironmentAsync).not.toHaveBeenCalled();
+  os.restore();
 });
 
 test('stopped in the phone’s own settings: said so, with the way there', async () => {
