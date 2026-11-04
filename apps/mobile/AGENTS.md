@@ -9,4 +9,5 @@
 - Its own install (`npm ci` here), outside the root's workspaces; `npx expo install <package>` for any dependency.
 - Routes in `src/app/` (every file a screen), everything else outside it; text through `<T>` (`src/ui/Text.tsx`).
 - Never create or edit `ios/` or `android/`: they're generated from `app.config.ts` (and config plugins).
-- Before calling a change done: `npm run typecheck`, `npm test`, `npm run bundle`, and `npm run lint` at the root.
+- Before calling a change done: `npm run typecheck`, `npm test`, `npm run bundle`, `npx expo-doctor` (what a native
+  build needs that no test sees), and `npm run lint` at the root.

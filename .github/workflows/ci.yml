@@ -171,6 +171,9 @@ jobs:
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci
       - run: npx expo install --check
+      # Expo's own checks of what a native build needs and no test here sees: a native module another one needs, there
+      # only through a third package, isn't built into the app (expo-asset for expo-audio: a crash on the phone).
+      - run: npx expo-doctor
       - run: npm run typecheck
       - run: npm test -- --ci
       - run: npm run bundle

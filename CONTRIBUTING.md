@@ -74,8 +74,8 @@ Pull request-ът се слива със squash: заглавието и опи�
 - **Пускане:** нужен е development build — Xcode за iOS, Android Studio за Android, или услугата на Expo за билдове.
   `npx expo run:ios` или `npx expo run:android`, после `npm start`. Срещу локален сървър:
   `EXPO_PUBLIC_API_URL=http://192.168.1.5:3001 npm start`.
-- **Проверки:** `npm run typecheck`, `npm test`, `npm run bundle` (двете платформи, както ги билдва магазинът). CI ги пуска
-  в задачата `app`.
+- **Проверки:** `npm run typecheck`, `npm test`, `npm run bundle` (двете платформи, както ги билдва магазинът) и
+  `npx expo-doctor` (каквото трябва на нативния билд, а тест не го вижда). CI ги пуска в задачата `app`.
 - **Пакети:** `npx expo install <пакет>` избира версията, която SDK-то очаква. Нов SDK: `npx expo install expo@^NN --fix`.
 - **Линковете:** след промяна в `APP_PATHS` (`packages/shared/src/routes.ts`) — `npm run app-links` в корена. Тестът на
   приложението пада, докато филтрите му се различават.
