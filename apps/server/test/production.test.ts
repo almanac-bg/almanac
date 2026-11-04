@@ -524,7 +524,7 @@ test('what the site says about itself: who runs it (configuration, not code), it
   assert.equal(legal.name, 'Тест Тестов');
   assert.equal(legal.address, 'ул. Примерна 1, София');
   assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
-  assert.deepEqual(legal.appPush, { apple: false, google: false }, 'no keys for the apps\' pushes here');
+  assert.deepEqual(legal.appPush, { apple: false, google: false }, "no keys for the apps' pushes here");
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
   assert.equal(legal.backups, 'Примерни бекъпи');
   assert.equal(legal.proxy, 'Примерно прокси');
