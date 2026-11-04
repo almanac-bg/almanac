@@ -12,8 +12,9 @@ const tagged = (file = '') => `${notices.source}/${file ? `blob/v${pkg.version}/
 
 /**
  * Лицензи (the site's /licenses.txt): the game's own licence and its source — the exact version this app runs, as the
- * AGPL asks — then the fonts and every package inside the app, each with its licence's text, as theirs ask to travel
- * with the code (scripts/licenses.mjs writes the list from the app's bundle).
+ * AGPL asks — then the fonts, every package inside the app and the native libraries the iOS and Android builds add,
+ * each with its licence's text, as theirs ask to travel with the code (scripts/licenses.mjs writes the list from the
+ * app's bundle and native-notices/).
  */
 export default function Licenses() {
   const open = (url: string) => void WebBrowser.openBrowserAsync(url);
@@ -55,6 +56,19 @@ export default function Licenses() {
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {notices.packages.map((p, i) => (
           <Notice key={p.name} name={p.name} licence={p.licence} text={p.text} first={i === 0} />
+        ))}
+      </Card>
+
+      <T variant="h2" role="heading">
+        Нативни библиотеки ({notices.native.length})
+      </T>
+      <T variant="small" tone="fg2">
+        Кодът, който версиите за iOS и Android добавят към пакетите по-горе: за картинките, видеото, известията и самия
+        JavaScript.
+      </T>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        {notices.native.map((n, i) => (
+          <Notice key={n.name} name={n.name} licence={`${n.licence} · ${n.platforms}`} text={n.text} first={i === 0} />
         ))}
       </Card>
     </Screen>

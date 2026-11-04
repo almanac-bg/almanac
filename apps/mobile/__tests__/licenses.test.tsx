@@ -1,5 +1,6 @@
-// Лицензи: the game's own licence and the source of the exact version that runs, then the fonts and every package in
-// the app with its licence's text (src/settings/licenses.json, written from the bundle by scripts/licenses.mjs).
+// Лицензи: the game's own licence and the source of the exact version that runs, then the fonts, every package in the
+// app and the native libraries its builds add, each with its licence's text (src/settings/licenses.json, written from
+// the bundle and native-notices/ by scripts/licenses.mjs).
 import { setState } from '@almanac/client';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
@@ -48,6 +49,26 @@ test('the notices: every package with a licence and its text, the app’s own am
   }
 });
 
+test('the native libraries the builds add: each with its licence, and Apache-2.0’s full text once, last', () => {
+  const names = notices.native.map((n) => n.name);
+  for (const used of ['Hermes', 'SDWebImage', 'libavif', 'Fresco', 'OkHttp', 'Glide', 'libjpeg-turbo'])
+    expect(names).toContain(used);
+  for (const n of notices.native) {
+    expect(n.licence).toMatch(/\S/);
+    expect(n.platforms).toMatch(/^(iOS|Android|iOS, Android)$/);
+    expect(n.text.length).toBeGreaterThan(100);
+  }
+  const apache = notices.native.filter((n) => n.text.includes('TERMS AND CONDITIONS FOR USE'));
+  expect(apache.at(-1)?.name).toBe('Apache License 2.0 (пълният текст)');
+  // Every other Apache-2.0 notice without the text in it points to that one.
+  for (const n of notices.native.filter((n) => n.licence.includes('Apache-2.0') && !apache.includes(n)))
+    expect(n.text).toContain('„Apache License 2.0 (пълният текст)“');
+  // libjpeg-turbo's IJG part asks for this line wherever only the compiled code goes.
+  expect(notices.native.find((n) => n.name === 'libjpeg-turbo')?.text).toMatch(
+    /^This software is based in part on the work of the Independent JPEG Group\./,
+  );
+});
+
 test('the source of this version, its licence, then a package’s licence unfolded and folded again', async () => {
   await show(<Licenses />);
   expect(screen.getByText(`АЛМАНАХ ${pkg.version}`)).toBeTruthy();
@@ -60,6 +81,8 @@ test('the source of this version, its licence, then a package’s licence unfold
     `https://github.com/almanac-bg/almanac/blob/v${pkg.version}/LICENSE`,
   );
   expect(screen.getByText(`Библиотеки (${notices.packages.length})`)).toBeTruthy();
+  expect(screen.getByText(`Нативни библиотеки (${notices.native.length})`)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'SDWebImage, MIT · iOS' })).toBeTruthy();
 
   const zustand = notices.packages.find((p) => p.name === 'zustand')!;
   const row = screen.getByRole('button', { name: `zustand, ${zustand.licence}` });
