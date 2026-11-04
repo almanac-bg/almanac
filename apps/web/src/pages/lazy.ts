@@ -2,7 +2,7 @@ import { publicPageCode, routeKind } from '@almanac/shared';
 import { type ComponentType, createElement, lazy, useState } from 'react';
 import { matchPath } from 'react-router';
 import { loadQuiz } from '../content/quizzes';
-import { holdForReload, reloadForNewVersion } from '../lib/reload';
+import { holdForReload, reloadAfterRetry, reloadForNewVersion } from '../lib/reload';
 
 /**
  * Pages beyond the first screen load on demand, so visitors download the sign-in page or the lobby first.
@@ -59,9 +59,10 @@ function load(loader: Loader): Promise<Module> {
 const failed = new Set<() => void>();
 
 /**
- * „Опитай пак“ on a page whose code didn't arrive: its next mount imports the file anew. (A failed import stays failed
- * in the component React made for it; and a new one on every render would ask again in a loop, since a page that
- * suspends while it first mounts is rendered from scratch each time.)
+ * „Опитай пак“ on a page whose code didn't arrive: its next mount imports the file anew, and if that fails too, the
+ * page reloads (lib/reload.ts → reloadAfterRetry). (A failed import stays failed in the component React made for it;
+ * and a new one on every render would ask again in a loop, since a page that suspends while it first mounts is
+ * rendered from scratch each time.)
  */
 export function retryFailedPages() {
   for (const forget of failed) forget();
@@ -73,19 +74,27 @@ function page<L extends Loader, N extends keyof Exports<L> & string>(
   name: N,
 ): LazyPage<PropsOf<Exports<L>[N]>> {
   let Lazy: ComponentType | null = null;
-  const loading = () =>
-    (Lazy ??= lazy(() =>
+  /** The player pressed „Опитай пак“: the next load is theirs. */
+  let retrying = false;
+  const loading = () => {
+    if (Lazy) return Lazy;
+    const asked = retrying;
+    retrying = false;
+    Lazy = lazy(() =>
       load(loader).then(
         (mod) => ({ default: mod[name] }),
         (err: unknown) => {
           failed.add(() => {
             Lazy = null;
+            retrying = true;
           });
-          if (reloadForNewVersion()) return holdForReload();
+          if (asked ? reloadAfterRetry() : reloadForNewVersion()) return holdForReload();
           throw err;
         },
       ),
-    ));
+    );
+    return Lazy;
+  };
   // biome-ignore lint/correctness/noComponentHookFactories: made once per page when this module loads, never in a render, so each page's component stays the same
   function Page(props: PropsOf<Exports<L>[N]>) {
     // Decided once per mount: a page whose code is here already renders at once (no "loading" in between, and a page
