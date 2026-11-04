@@ -47,7 +47,13 @@ export function ChallengeCard() {
           onPress={() => router.push('/settings')}
         />
       ) : (
-        <Button title="⚔️ Създай предизвикателство" variant="secondary" loading={busy} onPress={() => void create()} />
+        <Button
+          title="Създай предизвикателство"
+          icon="⚔️"
+          variant="secondary"
+          loading={busy}
+          onPress={() => void create()}
+        />
       )}
       {recent.length > 0 && (
         <View style={{ gap: 8 }}>

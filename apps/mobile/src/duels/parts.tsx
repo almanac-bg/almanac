@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, T, useSheetPadding } from '@/ui';
+import { Avatar, Button, Card, IconText, T, useSheetPadding } from '@/ui';
 
 /** Your friend duels, loaded again when news comes in (a friend played, a note arrived). A guest has none. */
 export function useDuels() {
@@ -155,7 +155,7 @@ export function DuelCard({
         </T>
       </T>
       {!withActions ? null : canPlay && !expired ? (
-        <Button title="⚔️ Играй дуела" loading={playing} onPress={onPlay} />
+        <Button title="Играй дуела" icon="⚔️" loading={playing} onPress={onPlay} />
       ) : outcome || expired ? (
         <RematchButton standing={standing} />
       ) : null}
@@ -191,9 +191,9 @@ function Side({
         </T>
       )}
       {run?.moreTime && (
-        <T variant="caption" tone="link">
-          ⏱ с повече време
-        </T>
+        <IconText icon="⏱" variant="caption" tone="link">
+          с повече време
+        </IconText>
       )}
     </View>
   );
@@ -308,7 +308,8 @@ function RematchPicker({
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Button title="Отказ" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
           <Button
-            title={`⚔️ Играй (${picked.length}/${ROUNDS.count})`}
+            title={`Играй (${picked.length}/${ROUNDS.count})`}
+            icon="⚔️"
             disabled={picked.length !== ROUNDS.count}
             loading={busy}
             onPress={() => onPlay(picked)}

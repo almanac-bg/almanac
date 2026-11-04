@@ -153,7 +153,14 @@ export default function Room() {
           </T>
         </View>
         {isHost && (
-          <Button title="▶ Започни" size="lg" loading={starting} disabled={!canStart} onPress={() => void start()} />
+          <Button
+            title="Започни"
+            icon="▶"
+            size="lg"
+            loading={starting}
+            disabled={!canStart}
+            onPress={() => void start()}
+          />
         )}
       </View>
     </View>

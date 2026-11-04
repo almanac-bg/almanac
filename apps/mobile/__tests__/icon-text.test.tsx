@@ -46,3 +46,19 @@ test('no icon joined to words in one text anywhere in the app (IconText, or an `
   // The mastery tiers' line names all three at once, and their icons (🥉🥈🥇) are outside the old symbol range.
   expect(joined.filter((l) => !l.includes('MASTERY_TIERS.map'))).toEqual([]);
 });
+
+test('no emoji from the old range written before words either („⚔️ Дуел“): it goes in an icon', () => {
+  const src = path.resolve(__dirname, '../src');
+  // An emoji below U+10000 (⚽ ⚔️ ✍️ ⏱ ⬆️ ▶ …; not ✓ ✎ ↻, which are no emoji and are drawn from the text's own font),
+  // then a space and words — outside comments.
+  const oldEmojiThenWords = /(?=\p{Extended_Pictographic})[\u0080-￿]️?[  ]+[\p{L}„"'({]/u;
+  const found = sources(src).flatMap((file) =>
+    fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .map((line, i) => ({ line, at: `${path.relative(src, file)}:${i + 1}` }))
+      .filter(({ line }) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(line) && oldEmojiThenWords.test(line))
+      .map(({ at, line }) => `${at}: ${line.trim()}`),
+  );
+  expect(found).toEqual([]);
+});

@@ -308,9 +308,9 @@ export function RewardsCard({ rewards }: { rewards: MatchRewards }) {
         valueText={`${fmt(p.into)} от ${fmt(p.needed)} XP до следващото`}
       />
       {leveled && (
-        <T variant="title" align="center" style={{ paddingVertical: 6 }}>
-          ⬆️ Ново ниво {rewards.levelAfter}!
-        </T>
+        <IconText icon="⬆️" variant="title" align="center" containerStyle={{ paddingVertical: 6 }}>
+          Ново ниво {rewards.levelAfter}!
+        </IconText>
       )}
       <View style={{ gap: 6 }}>
         {lines.map((line) => (

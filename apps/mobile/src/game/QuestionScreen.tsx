@@ -5,7 +5,7 @@ import { AccessibilityInfo, findNodeHandle, type Text, View } from 'react-native
 import { Picture } from '@/components/Picture';
 import { streak } from '@/lib/sounds';
 import { radius, useColors } from '@/theme';
-import { T } from '@/ui';
+import { IconText, T } from '@/ui';
 import { FactNote, PauseAfterAnswer, UntimedEnding } from './Hold';
 import { NumberAnswer, NumberReveal, NumberSummary } from './NumberAnswer';
 import { OrderAnswer, OrderReveal, OrderSummary } from './OrderAnswer';
@@ -115,9 +115,9 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
           />
         </View>
         {q.author ? (
-          <T variant="caption" tone="fg3">
-            ✍️ Въпрос от {q.author}
-          </T>
+          <IconText icon="✍️" variant="caption" tone="fg3">
+            Въпрос от {q.author}
+          </IconText>
         ) : null}
       </View>
 

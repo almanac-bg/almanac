@@ -131,7 +131,7 @@ test('a challenge link: one made at once; yours listed with who leads, a tap ope
   });
   const start = jest.spyOn(actions, 'startChallenge').mockResolvedValue({ ok: true, id: 'new' });
   await show(<ChallengeCard />);
-  await fireEvent.press(screen.getByRole('button', { name: '⚔️ Създай предизвикателство' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Създай предизвикателство' }));
   expect(start).toHaveBeenCalledWith();
   await waitFor(() => expect(screen.getByText('Мария води с 1500 т.')).toBeTruthy());
   await fireEvent.press(screen.getByRole('link', { name: /^Мария води с 1500 т\., 3 играчи/ }));

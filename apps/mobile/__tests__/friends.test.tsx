@@ -42,7 +42,7 @@ test('a request accepted, and a friend challenged to a Дуел', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Приеми' }));
   expect(accept).toHaveBeenCalledWith(3);
   await waitFor(() => expect(screen.queryByText('Петър')).toBeNull());
-  await fireEvent.press(screen.getByRole('button', { name: '⚔️ Дуел' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Дуел' }));
   expect(duel).toHaveBeenCalledWith(2);
 });
 
