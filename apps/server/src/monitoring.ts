@@ -114,9 +114,13 @@ export function reportError(
   // `where` can hold a request path: an argument, never part of the format string (a "%s" in it would garble the log).
   console.error('💥 %s:', where, err);
   const error = err instanceof Error ? err : new Error(String(err));
-  // Tests: every report goes to a file too, so a test fails on an error nobody expected (test/helpers.ts).
+  // Tests: every report goes to a file too, so a test fails on an error nobody expected (test/helpers.ts), with what
+  // the report says beside it (a stall's worst hold-up, for one).
   if (config.errorOutbox)
-    fs.appendFileSync(config.errorOutbox, `${JSON.stringify({ where, message: error.message })}\n`);
+    fs.appendFileSync(
+      config.errorOutbox,
+      `${JSON.stringify({ where, message: error.message, ...(details.extra && { extra: details.extra }) })}\n`,
+    );
   if (!dsn) return Promise.resolve();
   const now = Date.now();
   if (!allowed(`${where}|${error.name}|${error.message}`, now)) return Promise.resolve();
