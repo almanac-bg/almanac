@@ -97,8 +97,9 @@ export function NumberAnswer({ game, q, disabled }: { game: LiveGame; q: Questio
                   <T variant="h2">{key}</T>
                 </Pressable>
               ) : (
+                // A key of its own, not the bare index: the slot sits 10th, and React took index 9 for the 9 key's "9".
                 // biome-ignore lint/suspicious/noArrayIndexKey: an empty slot in a fixed keypad
-                <View key={i} style={{ width: '31.5%' }} />
+                <View key={`gap-${i}`} style={{ width: '31.5%' }} />
               ),
             )}
           </View>

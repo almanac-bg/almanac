@@ -136,6 +136,8 @@ test('the reveal says which was right and that your pick was wrong — in words,
 });
 
 test('a number is typed on the keypad, kept in its range, and locked in', async () => {
+  // Each key its own: the blank beside 0 once shared "9" with the 9 key (index and label alike to React).
+  const errors = jest.spyOn(console, 'error').mockImplementation(() => {});
   await show(
     game({
       kind: 'number',
@@ -147,6 +149,8 @@ test('a number is typed on the keypad, kept in its range, and locked in', async 
   for (const key of ['1', '8', '7', '8']) await fireEvent.press(screen.getByRole('button', { name: key }));
   await fireEvent.press(lock);
   expect(guess).toHaveBeenCalledWith(1878);
+  expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+  errors.mockRestore();
 });
 
 test('„Подреди“: tapped in order, then locked in once all four are placed', async () => {
