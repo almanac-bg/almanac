@@ -4,10 +4,16 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Consent } from '@/components/Consent';
 import { signedIn } from '@/lib/client';
-import { Button, Screen, T } from '@/ui';
+import { entryKind, useEntry } from '@/lib/entry';
+import { Button, Card, Screen, T } from '@/ui';
 
-/** The way in: as a guest, or with an account (the router sends a signed-in player to the tabs: _layout.tsx). */
+/**
+ * The way in: as a guest, or with an account (the router sends a signed-in player to the tabs: _layout.tsx). A link
+ * that brought someone here waits (lib/entry) and is said: a room's code makes a guest only for that room — a pupil in
+ * a class, erased within the hour of leaving.
+ */
 export default function Welcome() {
+  const entry = entryKind(useEntry((s) => s.path));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +21,7 @@ export default function Welcome() {
     setBusy(true);
     setError(null);
     try {
-      await signedIn(await api.guest());
+      await signedIn(await api.guest(entry?.kind === 'room'));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -31,6 +37,19 @@ export default function Welcome() {
       <T tone="fg2" align="center">
         10 въпроса на деня — едни и същи за цяла България. Три минути, една класация. Кой знае най-много?
       </T>
+      {entry && (
+        <Card accent="#e879f9">
+          <T variant="small" tone="fg2">
+            {entry.kind === 'room'
+              ? `Имаш покана за стая ${entry.code} — влез като гост или с профила си, за да се присъединиш. Гостът е само за стаята: без имейл и парола, а до час, след като излезеш, се изтрива с всичко изиграно.`
+              : entry.kind === 'group'
+                ? 'Имаш покана за група: седмична класация на въпросите на деня. Влез и я отваряме.'
+                : entry.kind === 'challenge'
+                  ? 'Предизвикателство те чака: влез като гост или с профила си и го отваряме.'
+                  : 'Приятел ти прати въпросите на деня: влез и играй същите.'}
+          </T>
+        </Card>
+      )}
       <View style={{ gap: 12, marginTop: 8 }}>
         <Button title="Играй като гост" size="lg" loading={busy} onPress={() => void playAsGuest()} />
         <T variant="small" tone="fg3" align="center">
