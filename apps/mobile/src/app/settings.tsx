@@ -3,7 +3,7 @@ import { MORE_TIME, type MoreTime } from '@almanac/shared';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Alert } from 'react-native';
-import { API_URL } from '@/lib/client';
+import { API_URL, BUILD } from '@/lib/client';
 import { setSound, setTheme, type ThemeChoice, usePrefs } from '@/lib/prefs';
 import { DeleteAccount, EmailForm, PasswordForm, SaveAccount } from '@/settings/forms';
 import { PushSection } from '@/settings/PushSection';
@@ -112,6 +112,13 @@ export default function Settings() {
           variant="ghost"
           onPress={() => open('/delete-account')}
         />
+      </Section>
+      <Section title="За приложението">
+        <T variant="small" tone="fg2">
+          Версия {BUILD.replace(/\+(.*)$/, ' ($1)')}. Свободен софтуер под GNU AGPL-3.0, с кода на други автори под
+          техните лицензи.
+        </T>
+        <Button title="Лицензи и изходен код" variant="ghost" onPress={() => router.push('/licenses')} />
       </Section>
       <Section title="Профилът">
         {!me.isGuest && <Button title="Изход" variant="secondary" onPress={() => void signOut()} />}

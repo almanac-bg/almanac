@@ -84,6 +84,7 @@ export default function RootLayout() {
                 <Stack.Screen name="daily/index" options={{ ...header, title: 'Въпросите на деня' }} />
                 <Stack.Screen name="daily/[code]" options={{ ...header, title: 'Въпросите на деня' }} />
                 <Stack.Screen name="achievements" options={{ ...header, title: 'Постижения' }} />
+                <Stack.Screen name="licenses" options={{ ...header, title: 'Лицензи' }} />
                 <Stack.Screen name="join/[code]" options={{ ...header, title: 'Стая' }} />
               </Stack.Protected>
               <Stack.Protected guard={!signedIn}>

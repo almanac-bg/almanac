@@ -2,6 +2,10 @@
   "name": "almanac",
   "version": "1.4.0",
   "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/almanac-bg/almanac.git"
+  },
   "private": true,
   "type": "module",
   "workspaces": [
