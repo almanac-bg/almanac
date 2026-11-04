@@ -5,13 +5,11 @@
 //   node scripts/licenses.mjs <output file>      (the web build runs it: apps/web/dist/licenses.txt)
 import fs from 'node:fs';
 import path from 'node:path';
+import { readNotice, rule } from './notices.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const out = process.argv[2];
 if (!out) throw new Error('Usage: node scripts/licenses.mjs <output file>');
-
-const LICENCE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt|markdown))?$/i;
-const rule = (title) => `${title}\n${'='.repeat([...title].length)}\n`;
 
 const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
 const packages = new Map();
@@ -20,24 +18,9 @@ for (const [where, entry] of Object.entries(lock.packages)) {
   if (!where.startsWith('node_modules/') || entry.dev || entry.link) continue;
   const dir = path.join(root, where);
   if (!fs.existsSync(path.join(dir, 'package.json'))) continue;
-  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-  const id = `${pkg.name}@${pkg.version}`;
+  const { name, version, licence, texts } = readNotice(dir, entry.license);
+  const id = `${name}@${version}`;
   if (packages.has(id)) continue;
-  const files = fs
-    .readdirSync(dir)
-    .filter((f) => LICENCE_FILE.test(f))
-    .sort();
-  const licence = typeof pkg.license === 'string' ? pkg.license : (pkg.license?.type ?? entry.license ?? 'see below');
-  const texts = files.map((f) => fs.readFileSync(path.join(dir, f), 'utf8').trim());
-  // A package that keeps its licences in its README instead: sharp's libvips build, a table of the libraries in it.
-  const readme = fs.readdirSync(dir).find((f) => /^readme\.md$/i.test(f));
-  if (!texts.length && readme) {
-    const section = fs
-      .readFileSync(path.join(dir, readme), 'utf8')
-      .split(/^## /m)
-      .find((part) => part.startsWith('Licensing'));
-    if (section) texts.push(`## ${section.trim()}`);
-  }
   packages.set(id, { id, licence, texts });
 }
 
