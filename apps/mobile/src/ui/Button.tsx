@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { ActivityIndicator, Pressable, type ViewStyle } from 'react-native';
 import { fills, fonts, radius, useColors } from '@/theme';
-import { T } from './Text';
+import { IconText } from './Text';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'gold' | 'danger';
 type Size = 'md' | 'lg';
@@ -10,6 +10,8 @@ const HEIGHT: Record<Size, number> = { md: 48, lg: 56 };
 
 export interface ButtonProps {
   title: string;
+  /** An emoji before the title, drawn apart from it (ui/Text.tsx → IconText). */
+  icon?: string | null;
   onPress?: () => void;
   variant?: Variant;
   size?: Size;
@@ -25,6 +27,7 @@ export interface ButtonProps {
 /** The web's buttons (components/ui.tsx): at least 48 points tall, a tap's light tick, a spinner while it works. */
 export function Button({
   title,
+  icon,
   onPress,
   variant = 'primary',
   size = 'md',
@@ -78,9 +81,13 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={text} />
       ) : (
-        <T style={{ fontFamily: fonts.semibold, fontSize: size === 'lg' ? 17 : 16, color: text }} align="center">
+        <IconText
+          icon={icon}
+          style={{ fontFamily: fonts.semibold, fontSize: size === 'lg' ? 17 : 16, color: text }}
+          align="center"
+        >
           {title}
-        </T>
+        </IconText>
       )}
     </Pressable>
   );

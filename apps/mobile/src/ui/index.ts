@@ -6,4 +6,4 @@ export { useHeader } from './header';
 export { LoadError } from './LoadError';
 export { Progress } from './Progress';
 export { COLUMN, Screen, usePagePadding, useSheetPadding } from './Screen';
-export { T } from './Text';
+export { IconText, T } from './Text';

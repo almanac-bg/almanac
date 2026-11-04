@@ -3,7 +3,7 @@ import { CATEGORIES, type CategoryChoice, SOLO_PACES, type SoloPace } from '@alm
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { radius, useColors } from '@/theme';
-import { Button, T, useSheetPadding } from '@/ui';
+import { Button, IconText, T, useSheetPadding } from '@/ui';
 
 /** Соло's choices: a category (or all of them mixed) and a pace, then the match. */
 export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -21,9 +21,9 @@ export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => voi
     if (started.ok) onClose();
     else setError(started.error);
   };
-  const choices: { id: CategoryChoice; label: string }[] = [
-    { id: 'mixed', label: '🎲 Смесени' },
-    ...CATEGORIES.map((c) => ({ id: c.id as CategoryChoice, label: `${c.icon} ${c.name}` })),
+  const choices: { id: CategoryChoice; label: string; icon: string }[] = [
+    { id: 'mixed', label: 'Смесени', icon: '🎲' },
+    ...CATEGORIES.map((c) => ({ id: c.id as CategoryChoice, label: c.name, icon: c.icon })),
   ];
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -37,7 +37,13 @@ export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => voi
           </T>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {choices.map((c) => (
-              <Choice key={c.id} label={c.label} selected={category === c.id} onPress={() => setCategory(c.id)} />
+              <Choice
+                key={c.id}
+                label={c.label}
+                icon={c.icon}
+                selected={category === c.id}
+                onPress={() => setCategory(c.id)}
+              />
             ))}
           </View>
           <T variant="label" tone="fg3">
@@ -78,7 +84,17 @@ export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function Choice({
+  label,
+  icon,
+  selected,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
   const colors = useColors();
   return (
     <Pressable
@@ -95,9 +111,9 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
         backgroundColor: selected ? `${colors.violet}22` : colors.ink2,
       }}
     >
-      <T variant="small" tone={selected ? 'fg' : 'fg2'}>
+      <IconText icon={icon} variant="small" tone={selected ? 'fg' : 'fg2'}>
         {label}
-      </T>
+      </IconText>
     </Pressable>
   );
 }

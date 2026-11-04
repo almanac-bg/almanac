@@ -1,7 +1,7 @@
 import { actions, type LiveGame, useNow } from '@almanac/client';
 import { categoryById } from '@almanac/shared';
 import { View } from 'react-native';
-import { Button, T } from '@/ui';
+import { Button, IconText, T } from '@/ui';
 
 /** A round's category, picked by whoever is asked (the others watch it being picked). */
 export function RoundPick({ game }: { game: LiveGame }) {
@@ -15,9 +15,9 @@ export function RoundPick({ game }: { game: LiveGame }) {
       <T variant="label" tone="fg3" align="center">
         Рунд {pick.round + 1}
       </T>
-      <T variant="h1" align="center" role="heading">
-        {chosen ? `${chosen.icon} ${chosen.name}` : mine ? 'Избери категория' : 'Избира се категория…'}
-      </T>
+      <IconText icon={chosen?.icon} variant="h1" align="center" role="heading">
+        {chosen ? chosen.name : mine ? 'Избери категория' : 'Избира се категория…'}
+      </IconText>
       {!chosen && (
         <T variant="small" tone="fg3" align="center">
           {secs} с
@@ -30,7 +30,8 @@ export function RoundPick({ game }: { game: LiveGame }) {
           return (
             <Button
               key={id}
-              title={cat ? `${cat.icon} ${cat.name}` : id}
+              title={cat ? cat.name : id}
+              icon={cat?.icon}
               variant={pick.sent === id ? 'primary' : 'secondary'}
               disabled={!!pick.sent}
               onPress={() => actions.pickCategory(id)}

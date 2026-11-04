@@ -15,7 +15,7 @@ import { Pressable, View } from 'react-native';
 import { Picture } from '@/components/Picture';
 import { ReportSheet, reasonsFor } from '@/components/ReportSheet';
 import { fonts, radius, useColors } from '@/theme';
-import { Card, T } from '@/ui';
+import { Card, IconText, T } from '@/ui';
 
 /** A question from a room host's own set („Моите въпроси“), not the bank. */
 const ownQuestion = (item: ReviewItem) => item.id.startsWith('set-');
@@ -131,10 +131,14 @@ function Row({ item, reported, onReport }: { item: ReviewItem; reported: boolean
         </T>
       </View>
       <View style={{ flex: 1, gap: 6 }}>
-        <T variant="caption" tone="fg3">
-          {item.index + 1}.{' '}
-          {ownQuestion(item) ? '📝 От набора на домакина' : `${category?.icon ?? ''} ${category?.name ?? ''}`}
-        </T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <T variant="caption" tone="fg3">
+            {item.index + 1}.
+          </T>
+          <IconText icon={ownQuestion(item) ? '📝' : category?.icon} variant="caption" tone="fg3">
+            {ownQuestion(item) ? 'От набора на домакина' : (category?.name ?? '')}
+          </IconText>
+        </View>
         <T variant="bodyStrong">{keepTogether(item.q)}</T>
         {item.image && <Picture image={item.image} credit={item.image.credit} maxHeight={150} />}
         <Answer item={item} />

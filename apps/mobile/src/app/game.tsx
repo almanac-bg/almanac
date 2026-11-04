@@ -12,7 +12,7 @@ import { RoundPick } from '@/game/RoundPick';
 import { Strip } from '@/game/Strip';
 import { TopBar } from '@/game/TopBar';
 import { gutter, useColors } from '@/theme';
-import { T } from '@/ui';
+import { IconText, T } from '@/ui';
 
 /** The match on screen, from its countdown to its results (the web's GamePage). */
 export default function GameScreen() {
@@ -128,8 +128,15 @@ function Feed({ game }: { game: LiveGame }) {
   }, [last]);
   if (!last || shown !== last.key) return null;
   return (
-    <T variant="small" tone="fg2" align="center" accessibilityLiveRegion="polite" style={{ paddingTop: 8 }}>
-      {last.icon} {last.text}
-    </T>
+    <IconText
+      icon={last.icon}
+      variant="small"
+      tone="fg2"
+      align="center"
+      accessibilityLiveRegion="polite"
+      containerStyle={{ paddingTop: 8 }}
+    >
+      {last.text}
+    </IconText>
   );
 }

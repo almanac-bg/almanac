@@ -140,7 +140,7 @@ export function RoomSettings({ room, isHost }: { room: RoomState; isHost: boolea
             <Choices<CategoryChoice>
               label="Категория"
               disabled={off}
-              options={CATEGORIES.map((c) => ({ id: c.id, label: `${c.icon} ${c.name}` }))}
+              options={CATEGORIES.map((c) => ({ id: c.id, label: c.name, icon: c.icon }))}
               value={s.category}
               onChange={(category) => update({ category })}
             />

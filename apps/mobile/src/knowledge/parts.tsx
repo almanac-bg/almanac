@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { pictureUri } from '@/lib/images';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, T } from '@/ui';
+import { Button, Card, IconText, T } from '@/ui';
 
 /** A category's mastery tier, as a small badge: „🥈 Експерт“. */
 export function TierBadge({ tier }: { tier: number }) {
@@ -22,9 +22,9 @@ export function TierBadge({ tier }: { tier: number }) {
         backgroundColor: `${colors.good}1f`,
       }}
     >
-      <T variant="caption" tone="good" style={{ fontFamily: fonts.bold }}>
-        {t.icon} {t.name}
-      </T>
+      <IconText icon={t.icon} variant="caption" tone="good" style={{ fontFamily: fonts.bold }}>
+        {t.name}
+      </IconText>
     </View>
   );
 }

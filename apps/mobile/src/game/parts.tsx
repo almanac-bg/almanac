@@ -5,10 +5,10 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { tick } from '@/lib/sounds';
 import { fonts, radius, useColors } from '@/theme';
-import { T } from '@/ui';
+import { IconText, T } from '@/ui';
 
 /** A small label on the question: its category, its difficulty, the final. */
-export function Chip({ text, tone = 'fg2' }: { text: string; tone?: 'fg2' | 'gold' | 'bad' }) {
+export function Chip({ text, icon, tone = 'fg2' }: { text: string; icon?: string; tone?: 'fg2' | 'gold' | 'bad' }) {
   const colors = useColors();
   return (
     <View
@@ -21,9 +21,9 @@ export function Chip({ text, tone = 'fg2' }: { text: string; tone?: 'fg2' | 'gol
         paddingVertical: 4,
       }}
     >
-      <T variant="caption" tone={tone} style={{ fontFamily: fonts.bold }}>
+      <IconText icon={icon} variant="caption" tone={tone} style={{ fontFamily: fonts.bold }}>
         {text}
-      </T>
+      </IconText>
     </View>
   );
 }
