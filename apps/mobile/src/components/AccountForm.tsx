@@ -80,7 +80,12 @@ export function AccountForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         disabled={!username.trim() || !password}
         onPress={() => void submit()}
       />
-      <Button title="Назад" variant="ghost" onPress={() => router.back()} />
+      {/* Back to where the player came from; opened first (a link, a restart), to the welcome. */}
+      <Button
+        title="Назад"
+        variant="ghost"
+        onPress={() => (router.canGoBack() ? router.back() : router.replace('/welcome'))}
+      />
       {signUp && <Consent />}
     </Screen>
   );

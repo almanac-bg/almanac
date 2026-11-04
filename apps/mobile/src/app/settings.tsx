@@ -124,7 +124,12 @@ export default function Settings() {
         {!me.isGuest && <Button title="Изход" variant="secondary" onPress={() => void signOut()} />}
         <DeleteAccount />
       </Section>
-      <Button title="Назад" variant="ghost" onPress={() => router.back()} />
+      {/* Opened first (a link to /settings, a restart), there's nothing behind it: the tabs. */}
+      <Button
+        title="Назад"
+        variant="ghost"
+        onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      />
     </Screen>
   );
 }
