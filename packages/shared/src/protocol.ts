@@ -1303,6 +1303,8 @@ export interface SiteInfo {
   /** Error reports go to a provider (Sentry), and web push is on: the privacy policy names them only then. */
   monitoring: boolean;
   push: boolean;
+  /** The apps' pushes go out through Apple's service (iOS) and Google's (Android): the policy names each only then. */
+  appPush: { apple: boolean; google: boolean };
 }
 
 // ─── „Моите знания“ ──────────────────────────────────────────────────────────

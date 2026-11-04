@@ -17,4 +17,5 @@ export const siteInfo: SiteInfo = {
   year: new Date().getFullYear(),
   monitoring: !!config.sentryDsn,
   push: !!config.vapid,
+  appPush: { apple: !!config.apns, google: !!config.fcm },
 };
