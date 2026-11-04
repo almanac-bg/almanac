@@ -8,6 +8,26 @@ is a `vX.Y.Z` tag and a [GitHub release](https://github.com/almanac-bg/almanac/r
 Bulgarian: [October 2026](docs/changelog/2026-10.md), with 0.9.0, 1.0.0 and 1.1.0, and
 [November 2026 until 1.2.0](docs/changelog/2026-11.md), what came after 1.1.0.
 
+## [1.6.0](https://github.com/almanac-bg/almanac/compare/v1.5.0...v1.6.0) (2026-11-04)
+
+
+### Features
+
+* **mobile:** the native libraries' licences in Настройки → Лицензи ([#157](https://github.com/almanac-bg/almanac/issues/157)) ([489c7fd](https://github.com/almanac-bg/almanac/commit/489c7fd956c034951ef8d3e4e0e9dd4ffa83f1db))
+
+
+### Bug Fixes
+
+* **mobile:** a dev build starts signed in; each keypad key its own ([#147](https://github.com/almanac-bg/almanac/issues/147)) ([083a164](https://github.com/almanac-bg/almanac/commit/083a16406d3b5a8b19a13c3f0c9e2bfeeaca9bdc))
+* **mobile:** a first start opens on the welcome, not the sign-in form ([#145](https://github.com/almanac-bg/almanac/issues/145)) ([07a18a1](https://github.com/almanac-bg/almanac/commit/07a18a13d993c5807b70e060dabd0fc8d4d23edb))
+* **mobile:** a match in a column on a tablet, as the pages are ([#149](https://github.com/almanac-bg/almanac/issues/149)) ([b54693f](https://github.com/almanac-bg/almanac/commit/b54693f05e672dd59b8bc9fdbc5ee81a59fdb33b))
+* **mobile:** every emoji from the old range drawn apart from its words ([#151](https://github.com/almanac-bg/almanac/issues/151)) ([3b54522](https://github.com/almanac-bg/almanac/commit/3b545229fa4e523fb9fcf0400acd30f7b0bfe836))
+* **mobile:** icons drawn apart from text, so „⚽ Спорт“ keeps its word ([#150](https://github.com/almanac-bg/almanac/issues/150)) ([84dd36f](https://github.com/almanac-bg/almanac/commit/84dd36f6013106de13041b5d5d9c6569131a19b6))
+* **mobile:** no fingerprint, install-referrer or launcher-badge permissions ([#154](https://github.com/almanac-bg/almanac/issues/154)) ([3da6e48](https://github.com/almanac-bg/almanac/commit/3da6e48968bb79e915e6c251d20e35a2e793ee95))
+* **mobile:** on a tablet, the answers right under the question ([#158](https://github.com/almanac-bg/almanac/issues/158)) ([913cbaa](https://github.com/almanac-bg/almanac/commit/913cbaa2522ac78696b568f2094322e106e1d761))
+* **mobile:** screen-reader labels without a doubled full stop ([#156](https://github.com/almanac-bg/almanac/issues/156)) ([7c4c323](https://github.com/almanac-bg/almanac/commit/7c4c32304fdd3623d543a9da0c605de2fb1d4418))
+* **mobile:** sheets, pictures and the connecting notice fit a phone ([#146](https://github.com/almanac-bg/almanac/issues/146)) ([111bf14](https://github.com/almanac-bg/almanac/commit/111bf1418fb63d2245d573541cac01bb93e0473a))
+
 ## [1.5.0](https://github.com/almanac-bg/almanac/compare/v1.4.0...v1.5.0) (2026-11-04)
 
 
