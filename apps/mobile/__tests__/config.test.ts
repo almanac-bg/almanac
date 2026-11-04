@@ -49,14 +49,20 @@ test('the photo library only, never the camera or the microphone', () => {
   expect(picker[1]).toMatchObject({ cameraPermission: false, microphonePermission: false });
 });
 
-test('nothing asked that the app doesn’t use: no drawing over other apps, no storage, no Face ID', () => {
-  expect(config.android?.blockedPermissions).toEqual(
+test('nothing asked that the app doesn’t use: drawing over apps, storage, Face ID, fingerprints, referrers, badges', () => {
+  const blocked = config.android?.blockedPermissions ?? [];
+  expect(blocked).toEqual(
     expect.arrayContaining([
       'android.permission.SYSTEM_ALERT_WINDOW',
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.USE_BIOMETRIC',
+      'android.permission.USE_FINGERPRINT',
+      'com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE',
     ]),
   );
+  // Every badge permission (16, as the preview build's merged manifest listed them on 4 November 2026).
+  expect(blocked.filter((p) => /badge|launcher|BADGE|badger|home\.permission/.test(p))).toHaveLength(16);
   const store = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-secure-store') as [string, object];
   expect(store[1]).toMatchObject({ faceIDPermission: false });
 });
