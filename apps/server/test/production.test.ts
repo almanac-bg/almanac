@@ -306,6 +306,9 @@ test('the landing page and the legal pages arrive drawn; with a session, the app
     // A proxy in front is named, with the cookie it may set.
     assert.match(privacy.html, /<b>Защита от атаки:<\/b> (<!-- -->)?Примерно прокси/);
     assert.match(privacy.html, /<code>cf_clearance<\/code>/);
+    // The apps' push services are named only by a server that sends through them (this one has no keys for them).
+    assert.doesNotMatch(privacy.html, /Известия в приложенията|Firebase Cloud Messaging|Apple Push Notification/);
+    assert.match(privacy.html, /Приложенията в App Store и Google Play са с оценка 13\+/);
   }
   const terms = await get('/terms');
   assert.equal(terms.root, '<div id="root" data-painted="">');
@@ -521,6 +524,7 @@ test('what the site says about itself: who runs it (configuration, not code), it
   assert.equal(legal.name, 'Тест Тестов');
   assert.equal(legal.address, 'ул. Примерна 1, София');
   assert.equal(legal.email, 'privacy@almanac.bg', 'a default contact address');
+  assert.deepEqual(legal.appPush, { apple: false, google: false }, 'no keys for the apps\' pushes here');
   assert.equal(legal.sourceUrl, 'https://example.test/almanac');
   assert.equal(legal.backups, 'Примерни бекъпи');
   assert.equal(legal.proxy, 'Примерно прокси');
