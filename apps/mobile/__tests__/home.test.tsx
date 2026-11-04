@@ -100,6 +100,15 @@ test('a guest with progress worth keeping is asked to save it; a room’s guest 
   expect(screen.queryByText('Запази прогреса')).toBeNull();
 });
 
+test('the server out of reach: the modes are off, and why is said above them, on the screen', async () => {
+  setState({ connected: false });
+  await show(<Play />);
+  expect(screen.getByRole('button', { name: /^Соло:/ })).toBeDisabled();
+  const drawn = JSON.stringify(screen.toJSON());
+  expect(drawn.indexOf('Свързваме се…')).toBeGreaterThan(-1);
+  expect(drawn.indexOf('Свързваме се…')).toBeLessThan(drawn.indexOf('Тренирай ума'));
+});
+
 test('Соло: a category and a pace, then the match', async () => {
   await show(<Play />);
   await fireEvent.press(screen.getByRole('button', { name: /^Соло:/ }));

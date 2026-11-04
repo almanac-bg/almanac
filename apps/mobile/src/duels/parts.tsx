@@ -11,10 +11,9 @@ import {
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Avatar, Button, Card, T, useSheetPadding } from '@/ui';
 
 /** Your friend duels, loaded again when news comes in (a friend played, a note arrived). A guest has none. */
 export function useDuels() {
@@ -244,16 +243,13 @@ function RematchPicker({
   onPlay: (categories: CategoryId[]) => void;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const [picked, setPicked] = useState<CategoryId[]>([]);
   const toggle = (id: CategoryId) =>
     setPicked((p) => (p.includes(id) ? p.filter((c) => c !== id) : p.length < ROUNDS.count ? [...p, id] : p));
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 14 }}
-      >
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ ...sheet, gap: 14 }}>
         <T variant="h1" role="heading">
           Избери категориите
         </T>

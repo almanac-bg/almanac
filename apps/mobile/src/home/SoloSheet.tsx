@@ -2,14 +2,13 @@ import { actions } from '@almanac/client';
 import { CATEGORIES, type CategoryChoice, SOLO_PACES, type SoloPace } from '@almanac/shared';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { gutter, radius, useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { radius, useColors } from '@/theme';
+import { Button, T, useSheetPadding } from '@/ui';
 
 /** Соло's choices: a category (or all of them mixed) and a pace, then the match. */
 export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const [category, setCategory] = useState<CategoryChoice>('mixed');
   const [pace, setPace] = useState<SoloPace>('normal');
   const [busy, setBusy] = useState(false);
@@ -29,7 +28,7 @@ export function SoloSheet({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.ink }}>
-        <ScrollView contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ ...sheet, gap: 16 }}>
           <T variant="h1" role="heading">
             Соло
           </T>

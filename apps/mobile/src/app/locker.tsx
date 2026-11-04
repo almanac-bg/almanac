@@ -32,11 +32,10 @@ import {
 } from '@almanac/shared';
 import { type ReactNode, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
 import { LevelChoice } from '@/rewards/LevelChoice';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, Progress, Screen, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Avatar, Button, Card, Progress, Screen, T, useSheetPadding } from '@/ui';
 import { Choices } from '@/ui/controls';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
@@ -331,13 +330,10 @@ function LockedInfo({
   children?: ReactNode;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 14 }}
-      >
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ ...sheet, gap: 14 }}>
         <T variant="h1" role="heading">
           {name}
         </T>

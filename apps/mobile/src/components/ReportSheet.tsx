@@ -2,9 +2,8 @@ import { errorMessage } from '@almanac/client';
 import { REPORT_REASONS, REPORT_REASONS_FOR, type ReportSubjectKind } from '@almanac/shared';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Button, T, useSheetPadding } from '@/ui';
 
 const DETAILS_MAX = 500;
 
@@ -39,7 +38,7 @@ export function ReportSheet<R extends string>({
   send: (reason: R, details: string) => Promise<unknown>;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const [reason, setReason] = useState<R | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,10 +63,7 @@ export function ReportSheet<R extends string>({
         style={{ flex: 1, backgroundColor: colors.ink }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 12 }}
-        >
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ ...sheet, gap: 12 }}>
           <T variant="h1" role="heading">
             {title}
           </T>

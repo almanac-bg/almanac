@@ -3,12 +3,11 @@ import { GROUPS, type GroupEntry, type GroupInfo } from '@almanac/shared';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ReportSheet, reasonsFor } from '@/components/ReportSheet';
 import { inviteUrl, NameLength, shareInvite, weekName } from '@/groups/parts';
 import { useLoad } from '@/lib/load';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, Field, LoadError, Screen, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Avatar, Button, Card, Field, LoadError, Screen, T, useSheetPadding } from '@/ui';
 
 const openProfile = (username: string) => router.push({ pathname: '/profile/[username]', params: { username } });
 
@@ -412,7 +411,7 @@ function RenameSheet({
   onSave: (name: string) => Promise<void>;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const [value, setValue] = useState(name);
   const [busy, setBusy] = useState(false);
   const [tooShort, setTooShort] = useState(false);
@@ -433,7 +432,7 @@ function RenameSheet({
       <ScrollView
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 12 }}
+        contentContainerStyle={{ ...sheet, gap: 12 }}
       >
         <T variant="h1" role="heading">
           Ново име

@@ -62,6 +62,12 @@ export function Modes() {
           </T>
         )}
       </View>
+      {/* Above the modes it dims: below them it was off the screen, and the dimmed modes said nothing. */}
+      {!connected && (
+        <T variant="small" tone="fg3" role="status">
+          Свързваме се…
+        </T>
+      )}
       <ModeTile
         name={MODES.solo.name}
         tagline={MODES.solo.tagline}
@@ -88,11 +94,6 @@ export function Modes() {
           {error}
         </T>
       ) : null}
-      {!connected && (
-        <T variant="small" tone="fg3">
-          Свързваме се…
-        </T>
-      )}
       <SoloSheet open={soloOpen} onClose={() => setSoloOpen(false)} />
       <DuoSheet open={duoOpen} onClose={() => setDuoOpen(false)} />
       <RankSheet mode={rankOf} onClose={() => setRankOf(null)} />
