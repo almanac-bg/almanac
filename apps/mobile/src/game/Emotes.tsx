@@ -2,6 +2,7 @@ import { actions } from '@almanac/client';
 import { emoteById } from '@almanac/shared';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { play } from '@/lib/sounds';
 import { radius, useColors } from '@/theme';
 import { T } from '@/ui';
 
@@ -14,6 +15,7 @@ export function Emotes({ emotes, offline }: { emotes: string[]; offline: boolean
   const send = (id: string) => {
     if (cooldown || offline) return;
     actions.react(id);
+    play('pop');
     setOpen(false);
     setCooldown(true);
     setTimeout(() => setCooldown(false), 800);

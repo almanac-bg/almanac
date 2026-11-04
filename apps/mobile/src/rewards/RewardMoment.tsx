@@ -3,6 +3,7 @@ import { LEVEL_CHOICES, type UnlockRef } from '@almanac/shared';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Modal, ScrollView, View } from 'react-native';
+import { play } from '@/lib/sounds';
 import { useWear } from '@/results/Cards';
 import { fonts, gutter, radius, useColors } from '@/theme';
 import { Button, T } from '@/ui';
@@ -17,9 +18,10 @@ export function RewardMoment({ steps, open, onDone }: { steps: RewardStep[]; ope
   const colors = useColors();
   const [at, setAt] = useState(0);
   const step = steps[at];
-  // A beat felt as it comes: the new level the most.
+  // A beat felt and heard as it comes: the new level the most.
   useEffect(() => {
     if (!open || !step) return;
+    play(step.kind === 'level' ? 'levelUp' : 'achievement');
     void (
       step.kind === 'level'
         ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)

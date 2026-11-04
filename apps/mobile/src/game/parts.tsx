@@ -1,7 +1,9 @@
 import { actions, fmt, keepTogether, LETTERS, type LiveGame, OPTION_COLORS, percent, useNow } from '@almanac/client';
 import type { Crowd, PlayerResult, QuestionPayload } from '@almanac/shared';
+import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { tick } from '@/lib/sounds';
 import { fonts, radius, useColors } from '@/theme';
 import { T } from '@/ui';
 
@@ -44,6 +46,11 @@ export function TimerRing({
   const colors = useColors();
   const now = useNow(100, !stopped && !untimed);
   const size = 56;
+  const left = untimed ? 0 : Math.ceil(Math.max(0, deadline - now) / 1000);
+  // The last five seconds tick, higher with each of the last three; not once the answer is in.
+  useEffect(() => {
+    if (!stopped && !untimed && left > 0 && left <= 5) tick(left);
+  }, [left, stopped, untimed]);
   if (untimed)
     return (
       <View

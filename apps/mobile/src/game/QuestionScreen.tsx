@@ -3,6 +3,7 @@ import { categoryById } from '@almanac/shared';
 import { type ComponentRef, useEffect, useRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, type Text, View } from 'react-native';
 import { Picture } from '@/components/Picture';
+import { streak } from '@/lib/sounds';
 import { radius, useColors } from '@/theme';
 import { T } from '@/ui';
 import { FactNote, PauseAfterAnswer, UntimedEnding } from './Hold';
@@ -11,6 +12,9 @@ import { OrderAnswer, OrderReveal, OrderSummary } from './OrderAnswer';
 import { ActivePowerups, PowerupBar } from './Powerups';
 import { AnswerTile, Chip, CrowdNote, LockStatus, RevealSummary, TimerRing } from './parts';
 
+/** The streaks of right answers that sound: a run at each (as the web plays them, Moments.tsx). */
+const STREAK_MILESTONES = new Set([3, 5, 7, 10, 15, 20]);
+
 /** A question on screen: the clock, the answers, your pick and how it went (the web's QuestionView). */
 export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boolean }) {
   const colors = useColors();
@@ -18,6 +22,13 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
   const youId = game.start.youId;
   const mine = reveal?.results[youId];
+  // A streak of right answers at its milestones: a rising run, once the reveal is in.
+  const milestone = mine?.correct && STREAK_MILESTONES.has(mine.streak) ? mine.streak : null;
+  useEffect(() => {
+    if (!milestone) return;
+    const later = setTimeout(() => streak(milestone), 380);
+    return () => clearTimeout(later);
+  }, [milestone]);
   const active = !reveal && !game.resyncing;
   const inert = !active || offline;
   const alone = game.start.players.length === 1;

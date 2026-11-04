@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Alert } from 'react-native';
 import { API_URL } from '@/lib/client';
-import { setTheme, type ThemeChoice, usePrefs } from '@/lib/prefs';
+import { setSound, setTheme, type ThemeChoice, usePrefs } from '@/lib/prefs';
 import { DeleteAccount, EmailForm, PasswordForm, SaveAccount } from '@/settings/forms';
 import { PushSection } from '@/settings/PushSection';
 import { Button, Screen, T } from '@/ui';
@@ -20,6 +20,7 @@ const THEMES = [
 export default function Settings() {
   const me = useStore((s) => s.me);
   const theme = usePrefs((s) => s.theme);
+  const sound = usePrefs((s) => s.sound);
   /** One of the account's choices, saved at once (the switch shows it, and goes back if it couldn't be saved). */
   const save = async (fn: () => Promise<{ user: typeof me }>) => {
     try {
@@ -49,6 +50,12 @@ export default function Settings() {
       )}
       <Section title="Изглед">
         <Choices label="Тема" options={THEMES} value={theme} onChange={(t) => void setTheme(t)} />
+        <Toggle
+          label="Звуци"
+          hint="Звуците на играта. Беззвучният режим на телефона ги спира и без това."
+          value={sound}
+          onChange={(on) => void setSound(on)}
+        />
       </Section>
       <Section title="Игра">
         <T variant="bodyStrong">Повече време</T>

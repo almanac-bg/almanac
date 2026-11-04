@@ -12,7 +12,8 @@
     "icons": "node scripts/icons.mjs",
     "share-images": "node scripts/share-images.mjs",
     "lockup": "node scripts/lockup.mjs",
-    "store-shots": "node scripts/store-shots.mjs"
+    "store-shots": "node scripts/store-shots.mjs",
+    "app-sounds": "node scripts/app-sounds.mjs"
   },
   "dependencies": {
     "@almanac/client": "*",

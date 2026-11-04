@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import { feel } from './feedback';
 import { loadPrefs } from './prefs';
 import { endSession, loadSession, saveSession, session } from './session';
+import { sound } from './sounds';
 
 /** The server: the site, or another one for development (EXPO_PUBLIC_API_URL=http://192.168.1.5:3001). */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'https://almanac.bg').replace(/\/$/, '');
@@ -46,7 +47,11 @@ configureClient({
     const token = session()?.token;
     return token ? { token } : {};
   },
-  effect: feel,
+  // Felt and heard: the phone's haptics, and the web's sounds (lib/sounds).
+  effect: (name) => {
+    feel(name);
+    sound(name);
+  },
   // The next question's picture, fetched during the reveal before it (expo-image keeps it in its cache).
   preload: ({ src }) => void Image.prefetch(src.startsWith('http') ? src : `${API_URL}${src}`),
 });
