@@ -15,8 +15,19 @@ import { AnswerTile, Chip, CrowdNote, LockStatus, RevealSummary, TimerRing } fro
 /** The streaks of right answers that sound: a run at each (as the web plays them, Moments.tsx). */
 const STREAK_MILESTONES = new Set([3, 5, 7, 10, 15, 20]);
 
-/** A question on screen: the clock, the answers, your pick and how it went (the web's QuestionView). */
-export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boolean }) {
+/**
+ * A question on screen: the clock, the answers, your pick and how it went (the web's QuestionView). The answers sit at
+ * the bottom, by the thumb — or, `centred` (a tablet), right under the question, the two together in the middle.
+ */
+export function QuestionScreen({
+  game,
+  offline,
+  centred = false,
+}: {
+  game: LiveGame;
+  offline: boolean;
+  centred?: boolean;
+}) {
   const colors = useColors();
   const q = game.question!;
   const reveal = game.reveal?.index === q.index ? game.reveal : null;
@@ -54,7 +65,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
         : q.options.map((o, i) => `${LETTERS[i]}) ${o}.`).join(' ');
 
   return (
-    <View style={{ flex: 1, gap: 14 }}>
+    <View style={centred ? { gap: 14 } : { flex: 1, gap: 14 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {q.final && <Chip text={`🎯 Финал${q.times > 1 ? ` · ×${q.times}` : ''}`} tone="gold" />}
         {game.start.questionSet ? (
@@ -138,7 +149,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
         </View>
       )}
 
-      <View style={{ marginTop: 'auto', gap: 10 }}>
+      <View style={{ marginTop: centred ? 10 : 'auto', gap: 10 }}>
         {q.kind === 'number' ? (
           reveal?.answerNumber !== undefined ? (
             <NumberReveal q={q} answer={reveal.answerNumber} guess={mine?.number?.guess ?? null} />
