@@ -1,6 +1,6 @@
 // The shared game client (packages/client) as the app runs it: what the web gets from the browser, the app gives through
 // ClientConfig's hooks — the foreground, the network, the session it holds instead of a cookie.
-import { configureClient, getState, setState, useStore } from '@almanac/client';
+import { api, configureClient, getState, setState, useStore } from '@almanac/client';
 import type { AppSession, MeUser } from '@almanac/shared';
 import * as Application from 'expo-application';
 import { Image } from 'expo-image';
@@ -72,7 +72,6 @@ export async function restore() {
     setState({ authChecked: true });
     return;
   }
-  const { api } = await import('@almanac/client');
   try {
     const { user } = await api.me();
     if (!user) await endSession();
