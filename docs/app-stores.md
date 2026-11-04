@@ -29,6 +29,11 @@ Ad hoc значи само за регистрираните телефони (�
 - **Ключ за известия от Expo не трябва** (`promptToConfigurePushNotifications: false`). Сървърът праща сам, с ключа от
   „Известията“ по-долу. Ако Expo предложи да направи ключ за push, отговорът е не.
 
+**Към магазините** (`submit` в `eas.json`): `npx eas-cli submit --platform ios --latest` качва последния билд за
+магазина в App Store Connect (приложението `6830662784`, екипът `CA38SQWUTC`), откъдето е в TestFlight. Или направо с
+билда: `npx eas-cli build --profile production --platform ios --auto-submit`. За Android пътят е вътрешният тест
+(`internal`), но първото качване на приложение Google Play иска на ръка, в Play Console; след него — пак с `submit`.
+
 ### Първият билд
 
 Веднъж, в терминал, в `apps/mobile`. В терминал, а не в чата: входът и въпросите са интерактивни. Преди това
