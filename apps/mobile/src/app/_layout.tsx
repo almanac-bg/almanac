@@ -62,9 +62,11 @@ export default function RootLayout() {
         ) : (
           <>
             {/* Signed in, the tabs and the match; signed out, the way in. The router moves between them as the session
-                comes and goes (a sign-in, a sign-out, a session the server ended). */}
+                comes and goes (a sign-in, a sign-out, a session the server ended). Each side says where the other's
+                screens lead: left to itself the router takes the first open screen by file name, and signed out that
+                was the sign-in form — a first start without „Играй като гост“. */}
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ink } }}>
-              <Stack.Protected guard={signedIn}>
+              <Stack.Protected guard={signedIn} redirectTo="/welcome">
                 <Stack.Screen name="(tabs)" />
                 {/* A swipe from the edge mustn't walk out of a match: ✕ (and Android's back) ask first. */}
                 <Stack.Screen name="game" options={{ gestureEnabled: false }} />
@@ -87,7 +89,7 @@ export default function RootLayout() {
                 <Stack.Screen name="licenses" options={{ ...header, title: 'Лицензи' }} />
                 <Stack.Screen name="join/[code]" options={{ ...header, title: 'Стая' }} />
               </Stack.Protected>
-              <Stack.Protected guard={!signedIn}>
+              <Stack.Protected guard={!signedIn} redirectTo="/">
                 <Stack.Screen name="welcome" />
                 <Stack.Screen name="sign-in" />
                 <Stack.Screen name="sign-up" />
