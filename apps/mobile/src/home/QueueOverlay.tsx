@@ -1,8 +1,8 @@
 import { actions, plural, useNow, useStore } from '@almanac/client';
-import { avatarEmoji, MODES } from '@almanac/shared';
+import { MODES } from '@almanac/shared';
 import { Modal, View } from 'react-native';
 import { useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { Avatar, Button, T } from '@/ui';
 
 /** Searching for a match: who you're waiting with, how long it's been, when bots fill in — and the way out. */
 export function QueueOverlay() {
@@ -41,7 +41,7 @@ export function QueueOverlay() {
           gap: 14,
         }}
       >
-        <T style={{ fontSize: 64, lineHeight: 76 }}>{avatarEmoji(me.avatar)}</T>
+        <Avatar avatar={me.avatar} frame={me.frame} size={96} />
         <T variant="label" style={{ color: mode.accent[0] }}>
           {mode.name} · {mode.short}
         </T>

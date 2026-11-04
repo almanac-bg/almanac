@@ -17,7 +17,6 @@ import {
 } from '@almanac/client';
 import {
   achievementById,
-  avatarEmoji,
   type CategoryMastery,
   categoryById,
   DAILY_FIELD,
@@ -40,7 +39,7 @@ import { Pressable, Share, View } from 'react-native';
 import { API_URL } from '@/lib/client';
 import { RankBadge } from '@/profile/parts';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, Progress, T } from '@/ui';
+import { Avatar, Button, Card, Progress, T } from '@/ui';
 
 function Heading({ title }: { title: string }) {
   return (
@@ -243,9 +242,9 @@ function AgainstSharer({
   const me = useStore((s) => s.me);
   const verdict =
     score > sharer.score ? 'Ти водиш!' : score < sharer.score ? `${sharer.user.username} води` : 'Равни сте';
-  const line = (emoji: string, name: string, c: number, sc: number, you = false) => (
+  const line = (who: { avatar: string; frame: string }, name: string, c: number, sc: number, you = false) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <T>{emoji}</T>
+      <Avatar avatar={who.avatar} frame={who.frame} size={28} />
       <T variant="small" tone={you ? 'link' : 'fg'} style={{ flex: 1, fontFamily: fonts.semibold }} numberOfLines={1}>
         {name}
       </T>
@@ -259,8 +258,8 @@ function AgainstSharer({
       <T variant="label" tone="fg3">
         По линка на {sharer.user.username}
       </T>
-      {line(avatarEmoji(sharer.user.avatar), sharer.user.username, sharer.correct, sharer.score)}
-      {line(me ? avatarEmoji(me.avatar) : '🙂', 'Ти', correct, score, true)}
+      {line(sharer.user, sharer.user.username, sharer.correct, sharer.score)}
+      {me && line(me, 'Ти', correct, score, true)}
       <T variant="title" tone="gold">
         {verdict}
       </T>
@@ -467,7 +466,11 @@ export function UnlockReveal({ rewards }: { rewards: MatchRewards }) {
   const it = unlock.kind === 'avatar' ? 'го' : 'я';
   return (
     <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-      <T style={{ fontSize: 56, lineHeight: 66 }}>{avatarEmoji(unlock.kind === 'avatar' ? unlock.id : me.avatar)}</T>
+      <Avatar
+        avatar={unlock.kind === 'avatar' ? unlock.id : me.avatar}
+        frame={unlock.kind === 'frame' ? unlock.id : me.frame}
+        size={72}
+      />
       <View style={{ flex: 1, gap: 6 }}>
         <T variant="label" tone="gold">
           Ново за теб

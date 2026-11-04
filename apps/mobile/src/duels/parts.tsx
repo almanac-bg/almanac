@@ -1,6 +1,5 @@
 import { actions, api, duelLine, duelStatus, fmt, recordLine, useNow, useStore } from '@almanac/client';
 import {
-  avatarEmoji,
   CATEGORIES,
   type CategoryId,
   type DuelEntry,
@@ -15,7 +14,7 @@ import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
 import { fonts, gutter, radius, useColors } from '@/theme';
-import { Button, Card, T } from '@/ui';
+import { Avatar, Button, Card, T } from '@/ui';
 
 /** Your friend duels, loaded again when news comes in (a friend played, a note arrived). A guest has none. */
 export function useDuels() {
@@ -58,7 +57,7 @@ export function DuelRow({ duel, onPlay, playing }: { duel: DuelEntry; onPlay: ()
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <T style={{ fontSize: 26, lineHeight: 32 }}>{avatarEmoji(duel.friend.avatar)}</T>
+        <Avatar avatar={duel.friend.avatar} frame={duel.friend.frame} size={36} />
         <View style={{ flex: 1, gap: 2 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8 }}>
             <T variant="bodyStrong" numberOfLines={1}>
@@ -170,7 +169,7 @@ function Side({
   run,
   you = false,
 }: {
-  who: Pick<PublicUser, 'avatar' | 'username'>;
+  who: Pick<PublicUser, 'avatar' | 'frame' | 'username'>;
   run: DuelStanding['mine'];
   you?: boolean;
 }) {
@@ -180,7 +179,7 @@ function Side({
       accessibilityLabel={`${you ? 'Ти' : who.username}: ${run ? `${fmt(run.score)} т., ${run.correct} от ${MODES.challenge.questions} верни${run.moreTime ? ', с повече време' : ''}` : 'още не е играно'}`}
       style={{ flex: 1, alignItems: 'center', gap: 4 }}
     >
-      <T style={{ fontSize: 40, lineHeight: 48 }}>{avatarEmoji(who.avatar)}</T>
+      <Avatar avatar={who.avatar} frame={who.frame} size={56} />
       <T variant="small" tone={you ? 'link' : 'fg'} numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
         {you ? 'Ти' : who.username}
       </T>

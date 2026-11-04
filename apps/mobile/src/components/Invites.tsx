@@ -1,10 +1,10 @@
 import { actions, dropInvite, toast, useNow, useStore } from '@almanac/client';
-import { avatarEmoji, type Invite } from '@almanac/shared';
+import type { Invite } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { Avatar, Button, T } from '@/ui';
 
 /**
  * A friend's invitation as it comes (the web's Invites): into their room, or to play Отбори together — who, and a
@@ -78,7 +78,7 @@ function InviteCard({ invite }: { invite: Invite }) {
         }}
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <T style={{ fontSize: 34, lineHeight: 42 }}>{avatarEmoji(invite.from.avatar)}</T>
+        <Avatar avatar={invite.from.avatar} frame={invite.from.frame} size={48} />
         <View style={{ flex: 1 }}>
           <T variant="label" style={{ color: colors.link }}>
             Покана

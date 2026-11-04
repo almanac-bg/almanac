@@ -9,12 +9,12 @@ import {
   useOpenQueues,
   useStore,
 } from '@almanac/client';
-import { avatarEmoji, levelProgress, type ProfileStats, titleName } from '@almanac/shared';
+import { levelProgress, type ProfileStats, titleName } from '@almanac/shared';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { radius, useColors } from '@/theme';
-import { Button, Card, LoadError, Progress, Screen, T } from '@/ui';
+import { Avatar, Button, Card, LoadError, Progress, Screen, T } from '@/ui';
 import { PlayerActions } from './PlayerActions';
 import { CategoryBars, LatestAchievements, Modes, RecentMatches, Seasons } from './parts';
 
@@ -65,7 +65,7 @@ function Profile({
   guest: boolean;
   onChange: (p: ProfileStats) => void;
 }) {
-  const colors = useColors();
+  const _colors = useColors();
   const openQueues = useOpenQueues();
   const { user, overview: o } = data;
   const progress = levelProgress(user.xp);
@@ -74,20 +74,7 @@ function Profile({
     <>
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <View
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 36,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: colors.ink2,
-              borderWidth: 1,
-              borderColor: colors.line,
-            }}
-          >
-            <T style={{ fontSize: 40, lineHeight: 48 }}>{avatarEmoji(user.avatar)}</T>
-          </View>
+          <Avatar avatar={user.avatar} frame={user.frame} size={72} />
           <View style={{ flex: 1, gap: 2 }}>
             <T variant="small" tone="link">
               {titleName(user.title)}

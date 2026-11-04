@@ -1,32 +1,19 @@
 import { fmt, useStore } from '@almanac/client';
-import { avatarEmoji, levelProgress } from '@almanac/shared';
+import { levelProgress } from '@almanac/shared';
 import { View } from 'react-native';
 import { useColors } from '@/theme';
-import { Card, Progress, T } from '@/ui';
+import { Avatar, Card, Progress, T } from '@/ui';
 
 /** Who you are: your avatar and name, your level and how far into it. */
 export function ProfileCard() {
-  const colors = useColors();
+  const _colors = useColors();
   const me = useStore((s) => s.me);
   if (!me) return null;
   const progress = levelProgress(me.xp);
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.ink2,
-            borderWidth: 1,
-            borderColor: colors.line,
-          }}
-        >
-          <T style={{ fontSize: 30, lineHeight: 36 }}>{avatarEmoji(me.avatar)}</T>
-        </View>
+        <Avatar avatar={me.avatar} frame={me.frame} size={56} />
         <View style={{ flex: 1 }}>
           <T variant="title" numberOfLines={1}>
             {me.username}

@@ -1,10 +1,10 @@
 import { actions, api, countdown, fmt, toast, useNow, useStore } from '@almanac/client';
-import { avatarEmoji, EVENING, type EveningStatus, MODES } from '@almanac/shared';
+import { EVENING, type EveningStatus, MODES } from '@almanac/shared';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { fonts, useColors } from '@/theme';
-import { Button, Card, T } from '@/ui';
+import { Avatar, Button, Card, T } from '@/ui';
 
 const waitingText = (n: number) => (n === 0 ? 'още никой не чака' : n === 1 ? '1 чака' : `${n} чакат`);
 
@@ -112,7 +112,7 @@ export function EveningCard({ compact = false }: { compact?: boolean }) {
                 <T variant="small" tone="fg3" style={{ width: 24, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
                   {t.placement}.
                 </T>
-                <T>{avatarEmoji(t.user.avatar)}</T>
+                <Avatar avatar={t.user.avatar} frame={t.user.frame} size={26} />
                 <T variant="small" style={{ flex: 1 }} numberOfLines={1}>
                   {t.user.username}
                 </T>

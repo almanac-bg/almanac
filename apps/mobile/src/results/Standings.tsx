@@ -11,7 +11,6 @@ import {
   useStore,
 } from '@almanac/client';
 import {
-  avatarEmoji,
   type FinalStanding,
   type Friendship,
   type FriendsResponse,
@@ -27,7 +26,7 @@ import { createContext, type ReactNode, useContext, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, T } from '@/ui';
+import { Avatar, Button, Card, T } from '@/ui';
 
 // ─── „+ Приятел“ beside the people you played with ─────────────────────────────
 
@@ -181,15 +180,7 @@ export function Podium({ game, standings }: { game: LiveGame; standings: FinalSt
               style={{ flex: 1, alignItems: 'center', gap: 4 }}
             >
               {s.placement === 1 && <T style={{ fontSize: 30, lineHeight: 36 }}>👑</T>}
-              <T
-                style={{
-                  fontSize: s.placement === 1 ? 44 : 34,
-                  lineHeight: s.placement === 1 ? 52 : 42,
-                  opacity: s.left ? 0.5 : 1,
-                }}
-              >
-                {avatarEmoji(p.avatar)}
-              </T>
+              <Avatar avatar={p.avatar} frame={p.frame} size={s.placement === 1 ? 64 : 52} dim={s.left} />
               <T variant="small" tone={me ? 'link' : 'fg'} numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
                 {p.name}
               </T>
@@ -293,7 +284,7 @@ function Row({
         <T variant="small" tone="fg3" style={{ width: 40, fontFamily: fonts.bold }}>
           {ordinal(s.placement)}
         </T>
-        <T style={{ fontSize: 24, lineHeight: 30, opacity: s.left ? 0.5 : 1 }}>{avatarEmoji(p.avatar)}</T>
+        <Avatar avatar={p.avatar} frame={p.frame} size={32} dim={s.left} />
         <View style={{ flex: 1 }}>
           <T variant="small" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
             {p.name}
@@ -373,7 +364,7 @@ export function TeamResult({ game, end }: { game: LiveGame; end: GameEndPayload 
                     backgroundColor: s.id === game.start.youId ? `${colors.violet}1f` : undefined,
                   }}
                 >
-                  <T style={{ fontSize: 22, lineHeight: 28 }}>{avatarEmoji(p.avatar)}</T>
+                  <Avatar avatar={p.avatar} frame={p.frame} size={30} dim={s.left} />
                   <T variant="small" style={{ flex: 1, fontFamily: fonts.semibold }} numberOfLines={1}>
                     {p.name}
                     {machineTag(p) ? `  · ${machineTag(p)}` : ''}

@@ -10,16 +10,7 @@ import {
   useNow,
   useStore,
 } from '@almanac/client';
-import {
-  avatarEmoji,
-  BRAND,
-  type DailyInfo,
-  type DailyPreview,
-  dayKey,
-  dayTheme,
-  MODES,
-  TIME_ZONE,
-} from '@almanac/shared';
+import { BRAND, type DailyInfo, type DailyPreview, dayKey, dayTheme, MODES, TIME_ZONE } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Share, View } from 'react-native';
@@ -199,7 +190,7 @@ function Daily({ info, link, code }: { info: DailyInfo; link: DailyPreview | nul
           </T>
           {info.fromMyLink.map((p) => (
             <View key={p.user.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <T>{avatarEmoji(p.user.avatar)}</T>
+              <Avatar avatar={p.user.avatar} frame={p.user.frame} size={28} />
               <T variant="small" style={{ flex: 1, fontFamily: fonts.semibold }} numberOfLines={1}>
                 {p.user.username}
               </T>

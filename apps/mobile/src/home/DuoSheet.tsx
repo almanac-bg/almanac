@@ -1,12 +1,12 @@
 import { actions, api, PRESENCE, useStore } from '@almanac/client';
-import { avatarEmoji, type FriendEntry } from '@almanac/shared';
+import type { FriendEntry } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
 import { fonts, gutter, useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { Avatar, Button, T } from '@/ui';
 
 /** A friend who could say yes now: online, in a room or in a queue (not mid-match or away). */
 const available = (f: FriendEntry) => f.presence === 'online' || f.presence === 'room' || f.presence === 'queue';
@@ -100,7 +100,7 @@ export function DuoSheet({ open, onClose }: { open: boolean; onClose: () => void
                     borderTopColor: colors.line,
                   }}
                 >
-                  <T style={{ fontSize: 28, lineHeight: 34 }}>{avatarEmoji(f.user.avatar)}</T>
+                  <Avatar avatar={f.user.avatar} frame={f.user.frame} size={40} />
                   <View style={{ flex: 1 }}>
                     <T variant="bodyStrong" numberOfLines={1}>
                       {f.user.username}
