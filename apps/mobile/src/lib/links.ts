@@ -25,6 +25,7 @@ const SCREENS: readonly RegExp[] = [
   /^\/groups\/join\/[^/]+$/,
   /^\/sets(\/[^/]+)?$/,
   /^\/sets\/shared\/[^/]+$/,
+  /^\/submit$/,
 ];
 
 /** Whether the app has a screen for a site's path ("/profile/Мария", "/knowledge/history"). */

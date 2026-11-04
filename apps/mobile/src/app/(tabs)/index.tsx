@@ -3,6 +3,7 @@ import { EVENING, sofiaHour } from '@almanac/shared';
 import { View } from 'react-native';
 import { NotificationsBell } from '@/home/Bell';
 import { ChallengeCard } from '@/home/ChallengeCard';
+import { CommunityCard } from '@/home/CommunityCard';
 import { DailyCard } from '@/home/DailyCard';
 import { DuelTurn } from '@/home/DuelTurn';
 import { EveningCard } from '@/home/EveningCard';
@@ -44,6 +45,7 @@ export default function Play() {
       <QuestsCard />
       <ChallengeCard />
       <RoomsCard />
+      <CommunityCard />
       {!eveningNear && <EveningCard compact />}
     </Screen>
   );

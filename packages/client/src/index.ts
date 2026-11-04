@@ -16,5 +16,6 @@ export * from './results';
 export * from './sets';
 export * from './share';
 export * from './store';
+export * from './submissions';
 export * from './typography';
 export * from './unlocks';
