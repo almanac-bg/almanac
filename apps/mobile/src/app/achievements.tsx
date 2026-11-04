@@ -7,7 +7,7 @@ import {
   longDate,
   useOpenQueues,
 } from '@almanac/client';
-import { type AchievementProgress, RARITIES } from '@almanac/shared';
+import { type AchievementProgress, RARITIES, sentences } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -97,7 +97,7 @@ function List({
           <Card key={a.id} accent={done ? rarity.color : undefined} style={{ gap: 8 }}>
             <View
               accessible
-              accessibilityLabel={`${a.name}${done ? '' : ' (заключено)'}, ${rarity.name}: ${a.description}. +${a.xp} XP${extras.length ? `, ${extras.join(', ')}` : ''}. ${status}`}
+              accessibilityLabel={`${a.name}${done ? '' : ' (заключено)'}, ${rarity.name}: ${sentences(a.description, `+${a.xp} XP${extras.length ? `, ${extras.join(', ')}` : ''}`, status)}`}
               style={{ flexDirection: 'row', gap: 12 }}
             >
               <View
