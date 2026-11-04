@@ -71,8 +71,9 @@ Pull request-ът се слива със squash: заглавието и опи�
 - **Инсталира се отделно**, не с workspaces на корена: `cd apps/mobile && npm ci`. Така има React и TypeScript на
   React Native, а не на сайта, и сървърът и образът му не теглят React Native. Metro билдва `packages/*` от изходния им
   код, а каквото те внасят (react, zustand, socket.io-client), търси в приложението: един React (`metro.config.js`).
-- **Пускане:** нужен е development build — Xcode за iOS, Android Studio за Android, или услугата на Expo за билдове.
-  `npx expo run:ios` или `npx expo run:android`, после `npm start`. Срещу локален сървър:
+- **Пускане:** нужен е development build. Прави го услугата на Expo (`npx eas-cli build --profile development`,
+  профилите са в `eas.json`, стъпките — в [docs/app-stores.md → Билдовете](docs/app-stores.md#билдовете)) или този
+  компютър: Xcode с `npx expo run:ios`, Android Studio с `npx expo run:android`. После `npm start`. Срещу локален сървър:
   `EXPO_PUBLIC_API_URL=http://192.168.1.5:3001 npm start`.
 - **Проверки:** `npm run typecheck`, `npm test`, `npm run bundle` (двете платформи, както ги билдва магазинът) и
   `npx expo-doctor` (каквото трябва на нативния билд, а тест не го вижда). CI ги пуска в задачата `app`.
@@ -80,8 +81,6 @@ Pull request-ът се слива със squash: заглавието и опи�
 - **Линковете:** след промяна в `APP_PATHS` (`packages/shared/src/routes.ts`) — `npm run app-links` в корена. Тестът на
   приложението пада, докато филтрите му се различават.
 - **Иконите** се рисуват от `favicon.svg`, заедно с тези на сайта: `npm run icons -w @almanac/web`.
-- **Лицензите** (Настройки → Лицензи) са на пакетите в бъндъла: след нов или махнат пакет —
-  `npm run bundle && npm run licenses` и `src/settings/licenses.json` в комита. CI проверява, че списъкът е този на бъндъла.
 - **Лицензите** (Настройки → Лицензи) са на пакетите в бъндъла: след нов или махнат пакет —
   `npm run bundle && npm run licenses` и `src/settings/licenses.json` в комита. CI проверява, че списъкът е този на бъндъла.
 - Целият текст минава през `<T>` (`src/ui/Text.tsx`), който расте с размера на текста на телефона, без таван.

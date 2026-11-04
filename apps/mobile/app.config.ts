@@ -58,6 +58,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/android-icon-foreground.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
+    // Only what the app uses: no drawing over other apps (Expo's template asks for it) and no storage (the library's
+    // own, up to Android 12): the system's photo picker hands over the one picture chosen, with nothing to allow.
+    blockedPermissions: [
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ],
     // The system's back gesture with its preview (Android 16 asks for it).
     predictiveBackGestureEnabled: true,
     softwareKeyboardLayoutMode: 'resize',
@@ -72,7 +79,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
-    'expo-secure-store',
+    // The session in the keychain, never behind Face ID: no reason to ask for it (else the plugin writes one, in
+    // English).
+    ['expo-secure-store', { faceIDPermission: false }],
     'expo-font',
     ['expo-splash-screen', { backgroundColor: '#07060d', image: './assets/splash-icon.png', imageWidth: 160 }],
     // Pushes from Apple's and Google's services (the server sends them; nativePush.ts): the mark in white on Android.

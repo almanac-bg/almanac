@@ -42,3 +42,15 @@ test('the photo library only, never the camera or the microphone', () => {
   const picker = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-image-picker') as [string, object];
   expect(picker[1]).toMatchObject({ cameraPermission: false, microphonePermission: false });
 });
+
+test('nothing asked that the app doesn’t use: no drawing over other apps, no storage, no Face ID', () => {
+  expect(config.android?.blockedPermissions).toEqual(
+    expect.arrayContaining([
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ]),
+  );
+  const store = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-secure-store') as [string, object];
+  expect(store[1]).toMatchObject({ faceIDPermission: false });
+});
