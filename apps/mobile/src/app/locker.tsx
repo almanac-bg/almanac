@@ -35,7 +35,7 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useLoad } from '@/lib/load';
 import { LevelChoice } from '@/rewards/LevelChoice';
 import { fonts, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, Progress, Screen, T, useSheetPadding } from '@/ui';
+import { Avatar, Button, Card, IconText, Progress, Screen, T, useSheetPadding } from '@/ui';
 import { Choices } from '@/ui/controls';
 
 type Tab = 'avatar' | 'frame' | 'title' | 'emote' | 'powerup';
@@ -162,9 +162,9 @@ export default function Locker() {
           </T>
           {CATEGORIES.map((c) => (
             <Card key={c.id} style={{ gap: 8, padding: 12 }}>
-              <T variant="small" style={{ fontFamily: fonts.semibold }}>
-                {c.icon} {c.name}
-              </T>
+              <IconText icon={c.icon} variant="small" style={{ fontFamily: fonts.semibold }}>
+                {c.name}
+              </IconText>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 {MASTERY_TIERS.map((tier, i) => {
                   const t = TITLES.find((x) => x.id === masteryTitleId({ category: c.id, tier: i }));

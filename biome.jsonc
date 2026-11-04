@@ -57,10 +57,13 @@
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "overrides": [
     {
-      // The app's text is all in its own component (src/ui/Text.tsx), which renders React Native's <Text>.
+      // The app's text is all in its own components (src/ui/Text.tsx: T, and IconText for an icon and words), which
+      // render React Native's <Text>.
       "includes": ["apps/mobile/**"],
       "linter": {
-        "rules": { "correctness": { "noReactNativeRawText": { "level": "error", "options": { "skip": ["T"] } } } }
+        "rules": {
+          "correctness": { "noReactNativeRawText": { "level": "error", "options": { "skip": ["T", "IconText"] } } }
+        }
       }
     }
   ]

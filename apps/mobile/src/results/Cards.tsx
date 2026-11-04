@@ -39,7 +39,7 @@ import { Pressable, Share, View } from 'react-native';
 import { API_URL } from '@/lib/client';
 import { RankBadge } from '@/profile/parts';
 import { fonts, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, Progress, T } from '@/ui';
+import { Avatar, Button, Card, IconText, Progress, T } from '@/ui';
 
 function Heading({ title }: { title: string }) {
   return (
@@ -422,9 +422,9 @@ export function MasteryCard({ mastery }: { mastery: CategoryMastery[] }) {
             <T style={{ fontSize: 36, lineHeight: 44 }}>{tier?.icon}</T>
             <View style={{ flex: 1 }}>
               <T variant="title">{masteryName(earned)}</T>
-              <T variant="small" tone="fg2">
-                {category?.icon} Нова степен — и титла, която можеш да носиш.
-              </T>
+              <IconText icon={category?.icon} variant="small" tone="fg2">
+                Нова степен — и титла, която можеш да носиш.
+              </IconText>
             </View>
           </View>
         );

@@ -61,7 +61,7 @@ export function QuestionScreen({ game, offline }: { game: LiveGame; offline: boo
           <Chip text={`📝 ${game.start.questionSet}`} />
         ) : (
           <>
-            {cat && <Chip text={`${cat.icon} ${cat.name}`} />}
+            {cat && <Chip icon={cat.icon} text={cat.name} />}
             <Chip text={DIFFICULTY_LABEL[q.difficulty]} />
           </>
         )}

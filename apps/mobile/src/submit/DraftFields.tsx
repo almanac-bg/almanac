@@ -72,7 +72,7 @@ export function DraftFields({
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <Choices<CategoryId>
             label="Категория"
-            options={CATEGORIES.map((c) => ({ id: c.id, label: `${c.icon} ${c.name}` }))}
+            options={CATEGORIES.map((c) => ({ id: c.id, label: c.name, icon: c.icon }))}
             value={draft.category}
             onChange={(category) => set({ category })}
           />

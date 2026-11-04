@@ -16,7 +16,7 @@ import {
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { fonts, radius, useColors } from '@/theme';
-import { Button, Card, Progress, T } from '@/ui';
+import { Button, Card, IconText, Progress, T } from '@/ui';
 
 const MODE_ORDER: ModeId[] = ['solo', 'daily', 'duel', 'teams', 'squad', 'royale', 'evening', 'custom'];
 
@@ -191,10 +191,10 @@ export function CategoryBars({ categories }: { categories: ProfileStats['categor
               style={{ gap: 6 }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <T variant="small" tone="fg2" style={{ flex: 1 }}>
-                  {r.icon} {r.name}
+                <IconText icon={r.icon} variant="small" tone="fg2" containerStyle={{ flex: 1 }}>
+                  {r.name}
                   {tier ? ` ${tier.icon}` : ''}
-                </T>
+                </IconText>
                 <T
                   variant="small"
                   tone={r.answered ? 'fg' : 'fg3'}

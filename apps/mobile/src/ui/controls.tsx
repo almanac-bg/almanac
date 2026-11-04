@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, Switch, View } from 'react-native';
 import { radius, useColors } from '@/theme';
-import { T } from './Text';
+import { IconText, T } from './Text';
 
 /** A group of settings with its heading. */
 export function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -70,7 +70,8 @@ export function Choices<Id extends string>({
   label,
   disabled = false,
 }: {
-  options: readonly { id: Id; label: string }[];
+  /** `icon`: an emoji before the label, drawn apart from it (ui/Text.tsx → IconText); a screen reader hears the label. */
+  options: readonly { id: Id; label: string; icon?: string }[];
   value: Id;
   onChange: (id: Id) => void;
   label: string;
@@ -103,9 +104,9 @@ export function Choices<Id extends string>({
               backgroundColor: on ? `${colors.violet}22` : colors.ink2,
             }}
           >
-            <T variant="small" tone={on ? 'fg' : 'fg2'}>
+            <IconText icon={o.icon} variant="small" tone={on ? 'fg' : 'fg2'}>
               {o.label}
-            </T>
+            </IconText>
           </Pressable>
         );
       })}
