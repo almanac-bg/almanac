@@ -85,7 +85,19 @@ export default function GameScreen() {
           Няма връзка — връщаме те веднага щом се появи
         </T>
       )}
-      <View style={{ flex: 1, paddingHorizontal: gutter, paddingTop: 14, paddingBottom: insets.bottom + 16 }}>
+      {/* A column on a tablet, as the pages are (COLUMN), a little wider for the question and its picture: across a
+          whole iPad the answers were bars 700 wide under an empty middle. On a phone it's the whole width. */}
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: 640,
+          alignSelf: 'center',
+          paddingHorizontal: gutter,
+          paddingTop: 14,
+          paddingBottom: insets.bottom + 16,
+        }}
+      >
         {game.phase === 'countdown' ? (
           <Intro game={game} />
         ) : game.phase === 'pick' && game.pick ? (
