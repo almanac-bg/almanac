@@ -1,0 +1,11 @@
+# A Соло at the 15 s pace, from the home screen.
+appId: bg.almanac.app
+---
+- tapOn: "Соло.*"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Започни"
+- tapOn: "Започни"
+- extendedWaitUntil:
+    visible: "Въпрос \\d+ от .*"
+    timeout: 30000

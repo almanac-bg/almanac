@@ -1,0 +1,27 @@
+# After a match: past the level-ups and unlocks (taking none), then the results, top and scrolled.
+appId: bg.almanac.app
+---
+- repeat:
+    times: 6
+    while:
+      visible: "Нататък|Избери по-късно|Към резултата"
+    commands:
+      - runFlow:
+          when:
+            visible: "Избери по-късно"
+          commands:
+            - tapOn: "Избери по-късно"
+      - runFlow:
+          when:
+            visible: "Нататък"
+          commands:
+            - tapOn: "Нататък"
+      - runFlow:
+          when:
+            visible: "Към резултата"
+          commands:
+            - tapOn: "Към резултата"
+      - waitForAnimationToEnd
+- takeScreenshot: result
+- scroll
+- takeScreenshot: result-2

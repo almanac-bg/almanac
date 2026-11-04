@@ -1,0 +1,7 @@
+# Today's daily from the home screen (once per account and day: a second capture needs another account).
+appId: bg.almanac.app
+---
+- tapOn: "Играй въпросите на деня"
+- extendedWaitUntil:
+    visible: "Въпрос \\d+ от .*"
+    timeout: 30000
