@@ -35,7 +35,7 @@
         "appleTeamId": "CA38SQWUTC"
       },
       "android": {
-        "track": "internal"
+        "track": "alpha"
       }
     }
   }

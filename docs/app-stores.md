@@ -31,8 +31,10 @@ Ad hoc значи само за регистрираните телефони (�
 
 **Към магазините** (`submit` в `eas.json`): `npx eas-cli submit --platform ios --latest` качва последния билд за
 магазина в App Store Connect (приложението `6830662784`, екипът `CA38SQWUTC`), откъдето е в TestFlight. Или направо с
-билда: `npx eas-cli build --profile production --platform ios --auto-submit`. За Android пътят е вътрешният тест
-(`internal`), но първото качване на приложение Google Play иска на ръка, в Play Console; след него — пак с `submit`.
+билда: `npx eas-cli build --profile production --platform ios --auto-submit`. За Android пътят е затвореният тест
+(`alpha`, в Play Console — Closed testing - Alpha). Първото качване Google Play го иска на ръка, а `submit` качва там
+едва когато Expo има ключ на service account с достъп до Play Console (още няма): дотогава AAB-ът от Expo се качва на
+ръка, в Closed testing - Alpha → Create new release.
 
 ### Първият билд
 
