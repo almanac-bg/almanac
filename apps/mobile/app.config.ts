@@ -10,6 +10,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'АЛМАНАХ',
   slug: 'almanac',
+  // The project on Expo's build service, @hpivanov/almanac (`eas init`, 4 November 2026): its builds, credentials and
+  // build numbers. The owner named too, so whoever is logged in builds this project, not one of their own.
+  owner: 'hpivanov',
+  extra: { ...config.extra, eas: { projectId: 'e497207e-ea34-4199-8608-fc8835104dc3' } },
   scheme: 'almanac',
   version: pkg.version,
   orientation: 'default',

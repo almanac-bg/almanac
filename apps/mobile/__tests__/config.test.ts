@@ -4,6 +4,12 @@ import appConfig from '../app.config';
 
 const config = appConfig({ config: {} } as never);
 
+test('the project on Expo’s build service: @hpivanov/almanac', () => {
+  expect(config.owner).toBe('hpivanov');
+  expect(config.slug).toBe('almanac');
+  expect(config.extra?.eas?.projectId).toBe('e497207e-ea34-4199-8608-fc8835104dc3');
+});
+
 test('iPad and the predictive back gesture are on; links for the site open the app', () => {
   expect(config.ios?.supportsTablet).toBe(true);
   expect(config.android?.predictiveBackGestureEnabled).toBe(true);
