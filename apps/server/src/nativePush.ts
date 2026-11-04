@@ -68,7 +68,10 @@ function apnsSession(origin: string): http2.ClientHttp2Session {
   return session;
 }
 
-/** An iOS device's push: `sandbox` for an app built for development, which Apple's other host serves. */
+/**
+ * An iOS device's push: `sandbox` for a token from Apple's sandbox (an app signed with a development provisioning
+ * profile), which Apple's other host serves.
+ */
 export function sendApns(token: string, sandbox: boolean, message: NativeMessage): Promise<Sent> {
   const apns = config.apns!;
   const origin = apns.url ?? (sandbox ? 'https://api.sandbox.push.apple.com' : 'https://api.push.apple.com');

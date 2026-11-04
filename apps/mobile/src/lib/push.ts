@@ -1,4 +1,5 @@
 import { api, setState, useStore } from '@almanac/client';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
@@ -8,12 +9,21 @@ import { openPath } from './links';
 /** This phone's token from Apple's or Google's service, as last given to the server: to take it back here. */
 const TOKEN_KEY = 'almanac.push-token';
 
-/** A development build talks to Apple's sandbox service; a store build, to the real one. */
-const sandbox = __DEV__ && Platform.OS === 'ios';
+/**
+ * Whether this phone's token is from Apple's sandbox service (the server sends there then): only for an app signed with
+ * a development provisioning profile — Xcode, over a cable. Expo's builds for testing, development builds too, are
+ * signed ad hoc and get the real service's tokens, as TestFlight's and the App Store's do (those keep no provisioning
+ * profile in the app: null). So the provisioning profile says, not __DEV__: that is how the JavaScript runs, not how
+ * the app was signed.
+ */
+async function apnsSandbox(): Promise<boolean> {
+  if (Platform.OS !== 'ios') return false;
+  return (await Application.getIosPushNotificationServiceEnvironmentAsync()) === 'development';
+}
 
 /** The phone's token given to the server, and kept here; the profile that comes back says what's on. */
 async function register(token: string) {
-  const { user } = await api.registerPushDevice(token, sandbox);
+  const { user } = await api.registerPushDevice(token, await apnsSandbox());
   setState({ me: user });
   await SecureStore.setItemAsync(TOKEN_KEY, token, {
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,

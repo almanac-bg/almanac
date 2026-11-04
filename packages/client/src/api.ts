@@ -197,8 +197,9 @@ export const api = {
     request<{ user: MeUser }>('POST', '/push/subscribe', subscription),
   pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/push/unsubscribe', { endpoint }),
   /**
-   * An app's device gets pushes: the token Apple's or Google's service gave it (`sandbox`: an iOS build for
-   * development). Which service is the app's own, from ClientConfig.client.
+   * An app's device gets pushes: the token Apple's or Google's service gave it (`sandbox`: from Apple's sandbox, for
+   * an iOS app signed with a development provisioning profile). Which service is the app's own, from
+   * ClientConfig.client.
    */
   registerPushDevice: (token: string, sandbox = false) =>
     request<{ user: MeUser }>('POST', '/push/devices', { token, sandbox }),
