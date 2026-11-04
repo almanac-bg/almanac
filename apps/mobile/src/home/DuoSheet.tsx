@@ -3,10 +3,9 @@ import type { FriendEntry } from '@almanac/shared';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
-import { fonts, gutter, useColors } from '@/theme';
-import { Avatar, Button, T } from '@/ui';
+import { fonts, useColors } from '@/theme';
+import { Avatar, Button, T, useSheetPadding } from '@/ui';
 
 /** A friend who could say yes now: online, in a room or in a queue (not mid-match or away). */
 const available = (f: FriendEntry) => f.presence === 'online' || f.presence === 'room' || f.presence === 'queue';
@@ -35,7 +34,7 @@ export function useDuoNeed(open: boolean): { text: string; ready: boolean } {
  */
 export function DuoSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const guest = useStore((s) => !!s.me?.isGuest);
   const version = useStore((s) => s.friendsVersion);
   const { data } = useLoad(() => (open && !guest ? api.friends() : Promise.resolve(null)), `${open}:${version}`);
@@ -59,10 +58,7 @@ export function DuoSheet({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 14 }}
-      >
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ ...sheet, gap: 14 }}>
         <T variant="h1" role="heading">
           Отбори: с кого играеш?
         </T>

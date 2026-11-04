@@ -25,6 +25,21 @@ export function usePagePadding(): ViewStyle {
 }
 
 /**
+ * A sheet's padding (a Modal with presentationStyle "pageSheet"). On iOS the sheet is a card that starts below the
+ * status bar; on Android it's the whole screen, edge to edge, so its top keeps clear of the status bar itself (without
+ * it, a sheet's title ran into the clock on Android 16). The bottom clears the home indicator or the gesture bar.
+ */
+export function useSheetPadding(): ViewStyle {
+  const insets = useSafeAreaInsets();
+  return {
+    paddingTop: (Platform.OS === 'android' ? insets.top : 0) + gutter,
+    paddingBottom: insets.bottom + 24,
+    paddingLeft: insets.left + gutter,
+    paddingRight: insets.right + gutter,
+  };
+}
+
+/**
  * A page: the theme's background to the edges, its content in the page's padding, scrolling when it doesn't fit (a
  * large text size, a small phone, the keyboard up) — never cut off. A long list is a FlatList with the same padding
  * (usePagePadding) instead.

@@ -18,11 +18,10 @@ import { categoryById, levelFromXp, type QuestionDraft, SUBMISSION_RULES, type S
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLoad } from '@/lib/load';
 import { DraftFields } from '@/submit/DraftFields';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Button, Card, LoadError, Progress, Screen, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Button, Card, LoadError, Progress, Screen, T, useSheetPadding } from '@/ui';
 
 /**
  * Предложи въпрос (the web's SubmitPage): a question for the game, checked by a moderator and, approved, played with
@@ -247,7 +246,7 @@ function EditSheet({
   onWithdrawn: (id: number) => void;
 }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const [draft, setDraft] = useState<QuestionDraft | null>(null);
   const [errors, setErrors] = useState<DraftErrors>({});
   const [busy, setBusy] = useState(false);
@@ -298,7 +297,7 @@ function EditSheet({
       <ScrollView
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 14 }}
+        contentContainerStyle={{ ...sheet, gap: 14 }}
       >
         <T variant="h1" role="heading">
           Промени предложението

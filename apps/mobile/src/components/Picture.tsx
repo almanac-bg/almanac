@@ -28,6 +28,9 @@ export function Picture({
       style={{
         width: '100%',
         maxWidth: maxHeight * ratio,
+        // Said too, not only implied by maxWidth: the layout takes the height from the width before maxWidth cuts it, so
+        // a square flag in a phone's column stood 260 wide and 333 tall — grey bands that pushed the козове off a Pixel 9.
+        maxHeight,
         alignSelf: 'center',
         aspectRatio: ratio,
         borderRadius: radius.md,

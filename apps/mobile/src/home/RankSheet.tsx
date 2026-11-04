@@ -10,23 +10,19 @@ import {
   START_RATING,
 } from '@almanac/shared';
 import { Modal, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RankBadge } from '@/profile/parts';
-import { fonts, gutter, radius, useColors } from '@/theme';
-import { Button, T } from '@/ui';
+import { fonts, radius, useColors } from '@/theme';
+import { Button, T, useSheetPadding } from '@/ui';
 
 /** What the rank on a ranked mode means (the web's RankInfo): your rating there, the ranks, the points, the season. */
 export function RankSheet({ mode, onClose }: { mode: QueueModeId | null; onClose: () => void }) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
+  const sheet = useSheetPadding();
   const rating = useStore((s) => (mode ? (s.me?.ratings[mode] ?? START_RATING) : START_RATING));
   const tier = rankFor(rating);
   return (
     <Modal visible={!!mode} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.ink }}
-        contentContainerStyle={{ padding: gutter, paddingBottom: insets.bottom + 24, gap: 14 }}
-      >
+      <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ ...sheet, gap: 14 }}>
         <T variant="h1" role="heading">
           Рейтинг и рангове
         </T>
