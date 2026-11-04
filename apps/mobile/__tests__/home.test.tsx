@@ -2,6 +2,7 @@
 // through the shared client's actions, watched here.
 import { actions, api, setState } from '@almanac/client';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Play from '@/app/(tabs)/index';
 import { QueueOverlay } from '@/home/QueueOverlay';
@@ -17,13 +18,18 @@ const joinQueue = jest.spyOn(actions, 'joinQueue').mockResolvedValue({ ok: true 
 const startSolo = jest.spyOn(actions, 'startSolo').mockResolvedValue({ ok: true });
 const startDaily = jest.spyOn(actions, 'startDaily').mockResolvedValue({ ok: true });
 const leaveQueue = jest.spyOn(actions, 'leaveQueue').mockImplementation(() => {});
+const push = jest.spyOn(router, 'push').mockImplementation(() => {});
 
 const me = {
   id: 7,
   username: 'Ана',
   avatar: 'fox',
   xp: 1200,
+  title: 'curious',
   isGuest: false,
+  roomGuest: false,
+  dailyBonusAvailable: false,
+  choices: [],
   daily: { day: '2026-11-03', played: false, streak: 4, shields: 0 },
   stats: { games: 12, wins: 5, answered: 120, correct: 80 },
   ratings: { duel: 1130 },
@@ -58,12 +64,40 @@ const show = (ui: React.ReactElement) =>
 test('who you are, the day’s questions first (played before, not today), and the open ranked queues', async () => {
   await show(<Play />);
   expect(screen.getByText('Ана')).toBeTruthy();
+  expect(screen.getByText('Любопитен ум · Ниво 5')).toBeTruthy();
+  expect(screen.queryByText(/Първият мач за деня/)).toBeNull();
+  expect(screen.queryByText('Запази прогреса')).toBeNull();
   expect(screen.getByRole('progressbar')).toBeTruthy();
   expect(screen.getByText(/Серия 4/)).toBeTruthy();
   await fireEvent.press(screen.getByRole('button', { name: 'Играй въпросите на деня' }));
   expect(startDaily).toHaveBeenCalled();
   await fireEvent.press(screen.getByRole('button', { name: /^Дуел: .*Рейтинг 1130/ }));
   expect(joinQueue).toHaveBeenCalledWith('duel');
+});
+
+test('what waits under the level: the day’s first-match bonus, a level’s reward to pick (to the collection)', async () => {
+  setState({ me: { ...me, dailyBonusAvailable: true, choices: [{ level: 5, options: [] }] } as never });
+  await show(<Play />);
+  expect(screen.getByText('🎁 Първият мач за деня носи +100 XP')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('link', { name: 'Избери награда за ниво 5' }));
+  expect(push).toHaveBeenCalledWith('/locker');
+});
+
+test('a guest with progress worth keeping is asked to save it; a room’s guest is told it goes in an hour', async () => {
+  setState({ me: { ...me, isGuest: true, email: null } as never });
+  await show(<Play />);
+  expect(screen.getByText(/прогресът е само на този телефон/)).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Запази прогреса' }));
+  expect(push).toHaveBeenCalledWith('/settings');
+  await screen.unmount();
+  setState({ me: { ...me, isGuest: true, roomGuest: true, email: null } as never });
+  await show(<Play />);
+  expect(screen.getByText(/до час, след като излезеш/)).toBeTruthy();
+  // Before the first match or two (level 1), not yet.
+  await screen.unmount();
+  setState({ me: { ...me, isGuest: true, xp: 0, email: null } as never });
+  await show(<Play />);
+  expect(screen.queryByText('Запази прогреса')).toBeNull();
 });
 
 test('Соло: a category and a pace, then the match', async () => {
