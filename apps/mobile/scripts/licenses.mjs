@@ -92,7 +92,7 @@ function noticeOf(dir) {
   const same = byRepository.get(repo);
   if (same) return { ...notice, texts: same };
   const author = HOLDERS[repo] ?? (typeof pkg.author === 'string' ? pkg.author : pkg.author?.name);
-  if (notice.licence === 'MIT' && author) return { ...notice, texts: [MIT(author.replace(/\s*<[^>]*>/, ''))] };
+  if (notice.licence === 'MIT' && author) return { ...notice, texts: [MIT(author.split(/[<(]/)[0]?.trim() ?? author)] };
   throw new Error(`${notice.name}: no licence text found — add one here`);
 }
 
