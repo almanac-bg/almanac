@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p __tests__",
     "test": "jest",
     "bundle": "expo export --platform ios --platform android --output-dir dist --no-minify --source-maps",
-    "licenses": "node scripts/licenses.mjs"
+    "licenses": "node scripts/licenses.mjs",
+    "native-notices": "node scripts/native-notices.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/onest": "^0.4.2",

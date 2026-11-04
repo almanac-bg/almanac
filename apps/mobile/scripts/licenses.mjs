@@ -1,7 +1,8 @@
 // The third-party notices the app ships with (Настройки → Лицензи): every npm package inside the app's bundle — read
 // from the bundle's own source maps, so the list is what's in the app, not every tool the install brings — with its
 // licence text, and the fonts'. The code that runs natively comes with those same packages (React Native, Expo's
-// modules); the libraries the iOS and Android builds add on top of them are the build's to list (docs/app-stores.md).
+// modules); the libraries the iOS and Android builds add on top of them are in native-notices/ (notices.json, which
+// `npm run native-notices -- <.app|.apk>` checks against a build).
 // Written to src/settings/licenses.json; `--check` fails when that file is no longer what the bundle holds (CI).
 //
 //   npm run bundle && npm run licenses [-- --check]          (in apps/mobile)
@@ -109,6 +110,42 @@ for (const dir of dirs) {
   });
 }
 
+// The native libraries (native-notices/notices.json): each with its licence's own text, or — under Apache-2.0 — its
+// holder and the licence's notice, the one full text of which comes last.
+const nativeDir = path.join(app, 'native-notices');
+const manifest = JSON.parse(fs.readFileSync(path.join(nativeDir, 'notices.json'), 'utf8'));
+/** A licence file as its project wrote it, less the indent every line shares (some are indented whole). */
+const readText = (file) => {
+  const lines = fs.readFileSync(path.join(nativeDir, file), 'utf8').replace(/\r\n/g, '\n').trimEnd().split('\n');
+  const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.length - l.trimStart().length));
+  return lines
+    .map((l) => l.slice(indent))
+    .join('\n')
+    .replace(/^\n+/, '');
+};
+const APACHE_FULL = 'Apache License 2.0 (пълният текст)';
+const apacheNotice = (holder) =>
+  [
+    `Copyright © ${holder}`,
+    '',
+    'Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0',
+    '',
+    'Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.',
+  ].join('\n');
+const native = manifest.notices.map((n) => {
+  const parts = [
+    n.intro,
+    n.holder && apacheNotice(n.holder),
+    ...[n.text ?? []].flat().map(readText),
+    n.notice && readText(n.notice),
+  ].filter(Boolean);
+  if (/Apache-2\.0/.test(n.licence) && !parts.some((p) => p.includes('TERMS AND CONDITIONS FOR USE')))
+    parts.push(`Пълният текст на лиценза е последен в този списък: „${APACHE_FULL}“.`);
+  if (!parts.length) throw new Error(`native-notices: ${n.name} has no text`);
+  return { name: n.name, platforms: n.platforms, licence: n.licence, text: parts.join('\n\n') };
+});
+native.push({ name: APACHE_FULL, platforms: 'iOS, Android', licence: 'Apache-2.0', text: readText('apache-2.0.txt') });
+
 const repository = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).repository?.url ?? '';
 const notices = {
   // Where the app's own code is (AGPL-3.0-or-later): the screen links the tag of the version that's running.
@@ -127,6 +164,7 @@ const notices = {
       licence,
       text: texts.join('\n\n'),
     })),
+  native,
 };
 if (!notices.source.startsWith('https://')) throw new Error('The root package.json has no repository URL.');
 
@@ -144,12 +182,14 @@ if (check) {
         .map((n) => `~ ${n}`),
     ];
     console.error(
-      `src/settings/licenses.json is not what the bundle holds${changed.length ? `:\n${changed.join('\n')}` : ' (the source or the fonts)'}\nRun \`npm run bundle && npm run licenses\` in apps/mobile and commit it.`,
+      `src/settings/licenses.json is not what the bundle holds${changed.length ? `:\n${changed.join('\n')}` : ' (the source, the fonts or the native libraries)'}\nRun \`npm run bundle && npm run licenses\` in apps/mobile and commit it.`,
     );
     process.exit(1);
   }
-  console.log(`src/settings/licenses.json: up to date (${notices.packages.length} packages, 2 fonts)`);
+  console.log(
+    `src/settings/licenses.json: up to date (${notices.packages.length} packages, ${native.length} native, 2 fonts)`,
+  );
 } else {
   fs.writeFileSync(out, written);
-  console.log(`src/settings/licenses.json: ${notices.packages.length} packages, 2 fonts`);
+  console.log(`src/settings/licenses.json: ${notices.packages.length} packages, ${native.length} native, 2 fonts`);
 }
