@@ -92,7 +92,7 @@ function game(question: Partial<QuestionPayload> = {}, { start, ...more }: Parti
   } as unknown as LiveGame;
 }
 
-const show = (g: LiveGame) =>
+const show = (g: LiveGame, centred = false) =>
   render(
     <SafeAreaProvider
       initialMetrics={{
@@ -100,9 +100,20 @@ const show = (g: LiveGame) =>
         insets: { top: 47, left: 0, right: 0, bottom: 34 },
       }}
     >
-      <QuestionScreen game={g} offline={false} />
+      <QuestionScreen game={g} offline={false} centred={centred} />
     </SafeAreaProvider>,
   );
+
+test('on a phone the answers sit low, by the thumb; on a tablet right under the question, the two in the middle', async () => {
+  await show(game());
+  expect(JSON.stringify(screen.toJSON())).toContain('"marginTop":"auto"');
+  await screen.unmount();
+  await show(game(), true);
+  const drawn = JSON.stringify(screen.toJSON());
+  expect(drawn).not.toContain('"marginTop":"auto"');
+  // Nothing stretched to the column's height either: what's drawn is as tall as it is, centred by the match screen.
+  expect(screen.getByRole('button', { name: 'Б) 1877' })).toBeTruthy();
+});
 
 test('the four answers are there, lettered, and a tap picks one', async () => {
   await show(game());

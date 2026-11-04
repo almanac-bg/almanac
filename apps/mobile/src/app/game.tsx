@@ -1,7 +1,7 @@
 import { actions, type LiveGame, useStore } from '@almanac/client';
 import { Redirect, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Emotes } from '@/game/Emotes';
 import { Intro } from '@/game/Intro';
@@ -21,6 +21,9 @@ export default function GameScreen() {
   const offline = !useStore((s) => s.connected);
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // A tablet's height: the question and its answers together in the middle. On a phone the answers sit low, where the
+  // thumb is; on an iPad that left them half a screen under the question, across an empty middle.
+  const centred = useWindowDimensions().height >= 1000;
   const [asking, setAsking] = useState(false);
 
   // What leaving costs, said before it happens (and Android's back asks the same, as ✕ does).
@@ -96,6 +99,7 @@ export default function GameScreen() {
           paddingHorizontal: gutter,
           paddingTop: 14,
           paddingBottom: insets.bottom + 16,
+          justifyContent: centred ? 'center' : undefined,
         }}
       >
         {game.phase === 'countdown' ? (
@@ -103,7 +107,7 @@ export default function GameScreen() {
         ) : game.phase === 'pick' && game.pick ? (
           <RoundPick game={game} />
         ) : game.question ? (
-          <QuestionScreen key={`q${game.question.index}`} game={game} offline={offline} />
+          <QuestionScreen key={`q${game.question.index}`} game={game} offline={offline} centred={centred} />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <T tone="fg3">Следващият въпрос идва…</T>
