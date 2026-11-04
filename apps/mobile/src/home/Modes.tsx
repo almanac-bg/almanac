@@ -1,5 +1,5 @@
 import { actions, fmt, useOpenQueues, useStore } from '@almanac/client';
-import { levelProgress, MODES, type QueueModeId, START_RATING } from '@almanac/shared';
+import { levelProgress, MODES, type QueueModeId, START_RATING, sentences } from '@almanac/shared';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { fonts, radius, useColors } from '@/theme';
@@ -130,7 +130,7 @@ function ModeTile({
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`${name}${starter ? ' (започни оттук)' : ''}: ${tagline}${detail ? `. ${detail}` : ''}`}
+        accessibilityLabel={`${name}${starter ? ' (започни оттук)' : ''}: ${sentences(tagline, detail)}`}
         style={({ pressed }) => ({ opacity: disabled ? 0.5 : pressed ? 0.85 : 1, borderRadius: radius.xl })}
       >
         <Card accent={accent}>

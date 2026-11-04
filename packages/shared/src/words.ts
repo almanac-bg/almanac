@@ -13,3 +13,15 @@ export function ordinal(n: number): string {
   if (last === 7 || last === 8) return `${n}-мо`;
   return `${n}-о`;
 }
+
+/**
+ * Sentences joined for a screen reader, each with its stop: one that already ends in its own ("Гони рекорда си.",
+ * "Кой ще те бие?") gets no second, which VoiceOver and TalkBack read as a stray dot („…си.. Рейтинг 1000“).
+ */
+export function sentences(...parts: (string | false | null | undefined)[]): string {
+  return parts
+    .map((part) => (part || '').trim())
+    .filter(Boolean)
+    .map((part) => (/[.!?…]$/.test(part) ? part : `${part}.`))
+    .join(' ');
+}

@@ -31,6 +31,7 @@ import {
   RATED_AFTER,
   RATED_GAMES_PER_PAIR,
   rankFor,
+  sentences,
   type UnratedReason,
 } from '@almanac/shared';
 import { router } from 'expo-router';
@@ -375,7 +376,7 @@ export function AchievementsCard({ ids }: { ids: string[] }) {
           <View
             key={id}
             accessible
-            accessibilityLabel={`${a.name}: ${a.description}. ${rarity.name}, +${a.xp} XP`}
+            accessibilityLabel={`${a.name}: ${sentences(a.description, `${rarity.name}, +${a.xp} XP`)}`}
             style={{
               flexDirection: 'row',
               alignItems: 'center',

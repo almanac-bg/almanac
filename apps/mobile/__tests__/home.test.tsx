@@ -100,6 +100,18 @@ test('a guest with progress worth keeping is asked to save it; a room’s guest 
   expect(screen.queryByText('Запази прогреса')).toBeNull();
 });
 
+test('the mode cards read as sentences: a tagline’s own stop is not doubled („…си.. Рейтинг“)', async () => {
+  await show(<Play />);
+  expect(
+    screen.getByRole('button', { name: /^Соло( \(започни оттук\))?: Тренирай ума\. Гони рекорда си\.$/ }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole('button', {
+      name: /^Дуел( \(започни оттук\))?: Лице в лице\. Печели по-бързият ум\. Рейтинг [\d\s]+\.$/,
+    }),
+  ).toBeTruthy();
+});
+
 test('the server out of reach: the modes are off, and why is said above them, on the screen', async () => {
   setState({ connected: false });
   await show(<Play />);

@@ -41,7 +41,7 @@ process.env.DB_PATH = path.join(tmp, 'rules.db');
 process.env.QUESTIONS_PATH = path.join(tmp, 'questions.json');
 writeFixtureQuestions(process.env.QUESTIONS_PATH);
 const { pickQuestions, seededRng } = await import('../src/questions');
-const { ordinal } = await import('@almanac/shared');
+const { ordinal, sentences } = await import('@almanac/shared');
 const { nameProblem } = await import('../src/moderation');
 const { BLOCKED_EDGES, BLOCKED_STARTS, BLOCKED_STEMS, BRAND, STAFF, mixesScripts, nameShape, textProblem } =
   await import('../src/names');
@@ -296,6 +296,19 @@ test('question picking: unseen first, then what the players saw longest ago', ()
     pickQuestions(10, 'history', seen).some((q) => q.id === fresh.id),
     'a question nobody saw beats them all',
   );
+});
+
+test('sentences for a screen reader: one stop each, never two', () => {
+  assert.equal(
+    sentences('Тренирай ума. Гони рекорда си.', 'Рейтинг 1000'),
+    'Тренирай ума. Гони рекорда си. Рейтинг 1000.',
+  );
+  assert.equal(
+    sentences('Твоите 10 въпроса. Кой ще те бие?', undefined, ' Рейтинг 980 '),
+    'Твоите 10 въпроса. Кой ще те бие? Рейтинг 980.',
+  );
+  assert.equal(sentences('Завърши първия си мач', false, ''), 'Завърши първия си мач.');
+  assert.equal(sentences(), '');
 });
 
 test('Bulgarian ordinals', () => {
