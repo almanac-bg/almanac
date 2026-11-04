@@ -1,7 +1,63 @@
 # Магазините за приложения
 
-Какво се попълва в App Store Connect и Google Play Console за приложенията на iOS и Android и защо. Решенията тук са
-взети веднъж (прегледът от 31 октомври 2026, MOBILE-3 и решение D11); промяна в тях е промяна в този файл.
+Как се правят билдовете на приложенията за iOS и Android, какво се попълва в App Store Connect и Google Play Console и
+защо. Решенията тук са взети веднъж (прегледът от 31 октомври 2026, MOBILE-3 и решение D11); промяна в тях е промяна в
+този файл.
+
+## Билдовете
+
+Правят се в услугата на Expo (Expo Build), с профилите от `apps/mobile/eas.json`:
+
+| Профил                  | За какво                                                                   | Какво се получава              |
+| ----------------------- | -------------------------------------------------------------------------- | ------------------------------ |
+| `development`           | разработка: JavaScript-ът идва от `npm start` на компютъра, с презареждане | APK за Android, ad hoc за iOS  |
+| `development-simulator` | същото, за iOS Simulator (с Xcode)                                         | приложение за симулатора       |
+| `preview`               | проба без компютър: цялото приложение, както ще е в магазина               | APK за Android, ad hoc за iOS  |
+| `production`            | за магазините                                                              | AAB за Google Play, IPA за iOS |
+
+Ad hoc значи само за регистрираните телефони (до 100 iPhone-а годишно).
+
+Защо са така:
+
+- **Само от комит** (`requireCommit`): качва се последният комит и нищо друго. Нито `private/` с банката въпроси, нито
+  `.env`. Билдът за магазина се прави от тага на версията (release-please го слага). Така линкът „Изходният код на
+  версия …“ в Настройки → Лицензи води точно до кода на билда.
+- **Номерът на билда** (build number на iOS, versionCode на Android) се брои от Expo (`appVersionSource: remote`,
+  `autoIncrement`). Версията е тази от `package.json`, която release-please вдига.
+- **Node е този на хранилището** (`.nvmrc` и CI), а не този на образа на Expo: при нова версия на Node 24 се сменя и в
+  `eas.json` (точна версия, такъв е форматът).
+- **Ключ за известия от Expo не трябва** (`promptToConfigurePushNotifications: false`). Сървърът праща сам, с ключа от
+  „Известията“ по-долу. Ако Expo предложи да направи ключ за push, отговорът е не.
+
+### Първият билд
+
+Веднъж, в терминал, в `apps/mobile`. В терминал, а не в чата: входът и въпросите са интерактивни. Преди това
+`git pull` на `main`, без промени.
+
+1. **Профил** в expo.dev (с 2FA), после вход: `npx eas-cli login`.
+2. **Проектът:** `npx eas-cli init`. Номерът, който показва (projectId), влиза в `app.config.ts` като
+   `extra.eas.projectId`, с комит.
+3. **Android:** `npx eas-cli build --profile development --platform android`. На въпроса за keystore отговорът е нов.
+   Expo го пази, а копие отива в Bitwarden: `npx eas-cli credentials -p android` → Download. Линкът (или QR кодът) от
+   края се отваря на телефона и APK-то се инсталира. Android иска разрешение да инсталира от браузъра.
+4. **iPhone:**
+   - телефонът се регистрира с `npx eas-cli device:create`: линкът се отваря на iPhone-а → Download Profile, после
+     Settings → Install;
+   - Developer Mode: Settings → Privacy & Security → Developer Mode (телефонът се рестартира);
+   - `npx eas-cli build --profile development --platform ios`: вход с Apple ID, нов Distribution Certificate и
+     телефонът от списъка. При нов абонамент за Apple Developer регистрацията на телефона може да отнеме 24–72 часа:
+     ако билдът падне, пак по-късно;
+   - QR кодът от края се сканира с камерата и приложението се инсталира.
+5. **Пускане:** `npm start` на компютъра. На телефона (в същата Wi-Fi мрежа) се сканира QR кодът или в приложението се
+   избира сървърът. Без друга настройка приложението играе срещу almanac.bg. Срещу локален сървър:
+   `EXPO_PUBLIC_API_URL=http://<адресът на компютъра>:<порт> npm start`.
+
+Без услугата на Expo: Xcode (`npx expo run:ios`) или Android Studio (`npx expo run:android`) на този компютър. За
+известия на Android и тук трябва файлът на Firebase (виж „Известията“).
+
+**Линковете към сайта** се отварят в тестовия билд на Android, ако отпечатъкът на неговия ключ е в `ANDROID_CERT_SHA256`
+на сървъра, със запетая след този на Google Play. Отпечатъкът се вижда с `npx eas-cli credentials -p android` → SHA-256
+Fingerprint.
 
 ## Възрастова оценка: 13+
 
