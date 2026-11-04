@@ -16,6 +16,7 @@ import { TopOverlays } from '@/components/TopOverlays';
 import { UpdateScreen } from '@/components/UpdateScreen';
 import { QueueOverlay } from '@/home/QueueOverlay';
 import { restore, useApp } from '@/lib/client';
+import { usePush } from '@/lib/push';
 import { useRealtime } from '@/lib/realtime';
 import { useColors } from '@/theme';
 import { useHeader } from '@/ui';
@@ -40,6 +41,7 @@ export default function RootLayout() {
   const updateRequired = useApp((s) => s.updateRequired);
   const ready = (fontsIn || !!fontError) && authChecked;
   useRealtime();
+  usePush();
 
   useEffect(() => {
     void restore();

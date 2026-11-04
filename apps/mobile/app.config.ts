@@ -50,6 +50,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-font',
     ['expo-splash-screen', { backgroundColor: '#07060d', image: './assets/splash-icon.png', imageWidth: 160 }],
+    // Pushes from Apple's and Google's services (the server sends them; nativePush.ts): the mark in white on Android.
+    ['expo-notifications', { icon: './assets/notification-icon.png', color: '#8b5cf6' }],
     // A picture for a question of your own („Моите въпроси“): from the library only, never the camera or the mic.
     [
       'expo-image-picker',

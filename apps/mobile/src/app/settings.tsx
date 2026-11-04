@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import { API_URL } from '@/lib/client';
 import { setTheme, type ThemeChoice, usePrefs } from '@/lib/prefs';
 import { DeleteAccount, EmailForm, PasswordForm, SaveAccount } from '@/settings/forms';
+import { PushSection } from '@/settings/PushSection';
 import { Button, Screen, T } from '@/ui';
 import { Choices, Section, Toggle } from '@/ui/controls';
 
@@ -95,6 +96,7 @@ export default function Settings() {
           <PasswordForm />
         </Section>
       )}
+      <PushSection />
       <Section title="Правила и данни">
         <Button title="Условия за ползване" variant="ghost" onPress={() => open('/terms')} />
         <Button title="Политика за поверителност" variant="ghost" onPress={() => open('/privacy')} />
