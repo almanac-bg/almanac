@@ -8,7 +8,7 @@ import { DuelCard } from '@/duels/parts';
 import { API_URL } from '@/lib/client';
 import { useLoad, useReloadOnFocus } from '@/lib/load';
 import { fonts, radius, useColors } from '@/theme';
-import { Avatar, Button, Card, LoadError, Screen, T } from '@/ui';
+import { Avatar, Button, Card, IconText, LoadError, Screen, T } from '@/ui';
 
 const MODE = MODES.challenge;
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -121,9 +121,9 @@ function Challenge({ info }: { info: ChallengeInfo }) {
             gap: 8,
           }}
         >
-          <T variant="label" style={{ color: colors.link }}>
-            ⚔️ Предизвикателство
-          </T>
+          <IconText icon="⚔️" variant="label" style={{ color: colors.link }}>
+            Предизвикателство
+          </IconText>
           <T variant="caption" tone="fg3">
             🕐 {clock}
           </T>
@@ -185,7 +185,8 @@ function Challenge({ info }: { info: ChallengeInfo }) {
               )}
             </View>
             <Button
-              title="⚔️ Приеми предизвикателството"
+              title="Приеми предизвикателството"
+              icon="⚔️"
               size="lg"
               loading={starting}
               disabled={inGame}

@@ -22,7 +22,7 @@ export function CommunityCard() {
         Знаеш нещо интересно? Изпрати въпрос — одобрените влизат в играта с твоето име и +{SUBMISSION_RULES.approvedXp}{' '}
         XP.
       </T>
-      <Button title="✍️ Напиши въпрос" variant="secondary" onPress={() => router.push('/submit')} />
+      <Button title="Напиши въпрос" icon="✍️" variant="secondary" onPress={() => router.push('/submit')} />
     </Card>
   );
 }

@@ -82,7 +82,7 @@ test('a link: the score to beat, accepted, and shared with its address', async (
   // The score to beat, and the board's first row.
   expect(screen.getAllByText('1450 т.')).toHaveLength(2);
   expect(screen.getByLabelText('1-во място: Мария, 1450 т., 8 от 10 верни за 41,0 с')).toBeTruthy();
-  await fireEvent.press(screen.getByRole('button', { name: '⚔️ Приеми предизвикателството' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Приеми предизвикателството' }));
   expect(start).toHaveBeenCalledWith('abc123');
   await fireEvent.press(screen.getByRole('button', { name: 'Сподели линка' }));
   expect(share.mock.calls[0]?.[0].message).toMatch(/Можеш ли да биеш 1450 точки\?\nhttps:\/\/almanac\.bg\/c\/abc123$/);
@@ -102,7 +102,7 @@ test('a link played: your place, and no second try', async () => {
   await show(<ChallengeScreen />);
   await waitFor(() => expect(screen.getByText('Твоят резултат')).toBeTruthy());
   expect(screen.getByText(/2-ро място от 2/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: '⚔️ Приеми предизвикателството' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Приеми предизвикателството' })).toBeNull();
 });
 
 test('a link nobody has: it says so, and offers one of your own', async () => {
@@ -122,7 +122,7 @@ test('a duel your turn: both sides, and played from its card', async () => {
   await waitFor(() => expect(screen.getByText('Ти срещу Мария')).toBeTruthy());
   expect(screen.getByText(/^Твой ред · остават/)).toBeTruthy();
   expect(screen.getByLabelText('Мария: 1200 т., 7 от 10 верни')).toBeTruthy();
-  await fireEvent.press(screen.getByRole('button', { name: '⚔️ Играй дуела' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Играй дуела' }));
   expect(start).toHaveBeenCalledWith('abc123');
 });
 
@@ -141,7 +141,7 @@ test('a duel lost: the rematch on your ground, three categories in order', async
   await show(<ChallengeScreen />);
   await waitFor(() => expect(screen.getByText('Загуба')).toBeTruthy());
   await fireEvent.press(screen.getByRole('button', { name: '↻ Реванш' }));
-  const play = () => screen.getByRole('button', { name: /^⚔️ Играй \(\d\/3\)$/ });
+  const play = () => screen.getByRole('button', { name: /^Играй \(\d\/3\)$/ });
   expect(play().props.accessibilityState?.disabled).toBe(true);
   for (const name of ['История', 'Наука', 'География']) await fireEvent.press(screen.getByRole('checkbox', { name }));
   expect(screen.getByRole('checkbox', { name: 'Наука, рунд 2' })).toBeTruthy();

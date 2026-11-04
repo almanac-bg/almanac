@@ -142,17 +142,18 @@ export function Results({ game }: { game: LiveGame }) {
   const eveningChampion = game.start.players.filter((p) => !p.isBot && !p.record).length >= EVENING.titleFrom;
   const shareable = !o.daily && !o.challenge && !o.review && !end.noContest;
   // The main button: what comes next, by the mode.
-  const main = o.daily
+  const main: { title: string; icon?: string; onPress: () => void } | null = o.daily
     ? rewards?.daily?.offBoard
-      ? { title: '⚔️ Играй Дуел', onPress: playDuel }
+      ? { title: 'Играй Дуел', icon: '⚔️', onPress: playDuel }
       : { title: '📊 Класация за деня', onPress: toBoard }
     : duel
       ? null
       : o.challenge && guest
         ? { title: 'Към началото', onPress: home }
         : {
+            icon: o.challenge ? '⚔️' : undefined,
             title: o.challenge
-              ? '⚔️ Ново предизвикателство'
+              ? 'Ново предизвикателство'
               : end.mode === 'custom'
                 ? 'Обратно в стаята'
                 : o.review && !o.moreReview
@@ -342,6 +343,7 @@ export function Results({ game }: { game: LiveGame }) {
             main && (
               <Button
                 title={main.title}
+                icon={main.icon}
                 size="lg"
                 variant={o.challenge ? 'secondary' : 'primary'}
                 loading={busy}

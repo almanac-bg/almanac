@@ -110,7 +110,7 @@ test('the host’s lobby: a bot to start with, a setting changed, the start', as
   expect(screen.getByLabelText('Код 1 2 3 4 5 6')).toBeTruthy();
   // Alone: the start waits for someone.
   expect(screen.getByText('Покани приятел или добави бот, за да започнеш.')).toBeTruthy();
-  expect(screen.getByRole('button', { name: '▶ Започни' }).props.accessibilityState?.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Започни' }).props.accessibilityState?.disabled).toBe(true);
   await fireEvent.press(screen.getByRole('button', { name: '🤖 Добави бот' }));
   expect(bot).toHaveBeenCalledWith('add');
   await fireEvent.press(screen.getByRole('radio', { name: '20 с' }));
@@ -120,7 +120,7 @@ test('the host’s lobby: a bot to start with, a setting changed, the start', as
       room: room({ players: [player('u7', 'Ана', { isHost: true }), player('b1', 'Бот Боби', { isBot: true })] }),
     }),
   );
-  await fireEvent.press(screen.getByRole('button', { name: '▶ Започни' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Започни' }));
   expect(start).toHaveBeenCalled();
 });
 
@@ -156,7 +156,7 @@ test('a player’s lobby: the settings shown, not changed; waiting for the host'
   await show(<Room />);
   expect(screen.getByText('Чакаме домакина да започне…')).toBeTruthy();
   expect(screen.getByText('Само домакинът ги променя')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: '▶ Започни' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Започни' })).toBeNull();
   expect(screen.getByRole('radio', { name: '20 с' }).props.accessibilityState?.disabled).toBe(true);
   expect(settings).not.toHaveBeenCalled();
 });

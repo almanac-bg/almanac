@@ -15,7 +15,8 @@ export function DuelButton({ friendId, style }: { friendId: number; style?: View
   };
   return (
     <Button
-      title="⚔️ Дуел"
+      title="Дуел"
+      icon="⚔️"
       hint="Изиграваш въпросите сега, а приятелят ти — до един ден"
       loading={busy}
       disabled={inGame}
