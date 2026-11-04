@@ -89,6 +89,17 @@ test('a page whose code won’t download: one reload to fetch it again, then a w
   await page.waitForTimeout(2_500);
   expect(loads, 'reloaded once to try again').toBe(1);
 
+  // „Опитай пак“ while the file still won't come: the import fails again, so the page reloads, once (a new page asks the
+  // server anew, where Chromium's next import now and then doesn't: lib/reload.ts → reloadAfterRetry), and says so
+  // again without reloading by itself.
+  await page.getByRole('button', { name: 'Опитай пак', exact: true }).click();
+  await expect.poll(() => loads, { message: 'reloaded for the press' }).toBe(2);
+  await expect(page.getByRole('heading', { name: 'Страницата не се зареди', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.waitForTimeout(2_500);
+  expect(loads, 'one reload per press, never a loop').toBe(2);
+
   // The deploy is through: „Опитай пак“ asks for the page anew, in every engine. (WebKit once kept the failed file for
   // the tab, reloads included, because the app asked for it through <link rel="modulepreload">: vite.config.ts.)
   await page.unroute(LEGAL_CODE);

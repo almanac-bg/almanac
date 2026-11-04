@@ -10,6 +10,14 @@ function reloadedRecently(): boolean {
   }
 }
 
+function stamp() {
+  try {
+    sessionStorage.setItem('almanac:reloadedAt', String(Date.now()));
+  } catch {
+    /* storage unavailable: reload anyway */
+  }
+}
+
 /**
  * Code that was about to be shown didn't arrive. A tab opened before a deploy asks for files that are gone: one reload
  * gets the new version. Not while offline (that would only swap the app for the offline page), and not twice in a
@@ -25,13 +33,23 @@ export function reloadForNewVersion(): boolean {
   if (!navigator.onLine || reloadedRecently()) return false;
   setTimeout(() => {
     if (reloadedRecently()) return;
-    try {
-      sessionStorage.setItem('almanac:reloadedAt', String(Date.now()));
-    } catch {
-      /* storage unavailable: reload anyway */
-    }
+    stamp();
     window.location.reload();
   }, LEAVING_MS);
+  return true;
+}
+
+/**
+ * „Опитай пак“, and the page's code failed again: the page itself loads anew, at once (the player asked). A new import
+ * isn't always a new download: Chromium now and then keeps a file's failed download for the tab and hands it to every
+ * later import without asking the server again (CI's traces, 4 November 2026), and only a new page asks. Says whether
+ * it will reload; not while offline. Stamped, so the new page shows its error instead of reloading by itself: one
+ * reload per press, never a loop.
+ */
+export function reloadAfterRetry(): boolean {
+  if (!navigator.onLine) return false;
+  stamp();
+  window.location.reload();
   return true;
 }
 
