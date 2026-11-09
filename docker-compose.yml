@@ -107,7 +107,7 @@ services:
   # Continuous SQLite backups to S3-compatible storage (Cloudflare R2, or any other). On by default through
   # COMPOSE_PROFILES=backup in .env; see deploy/litestream.yml for restoring.
   litestream:
-    image: litestream/litestream:0.5.17@sha256:4b02b9859a6b6b4087d8b8944e15f7e984bd7957cba322bbeee38b0e27b9656a
+    image: litestream/litestream:0.5.18@sha256:513bff62a88fc0c86c73d27333c41c54c89fe890a7c32a551600adff9309b11b
     profiles: ["backup"]
     restart: unless-stopped
     logging: *logging
