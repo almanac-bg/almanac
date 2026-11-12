@@ -1,7 +1,7 @@
 // The signals and scopes the UI rests on (the DOM parts are covered by the browser tests).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { batch, computed, effect, onCleanup, scope, signal } from "./dom.ts";
+import { batch, computed, effect, onCleanup, safeURL, scope, signal } from "./dom.ts";
 
 test("an effect runs again when what it read changes, and only then", () => {
   const a = signal(1);
@@ -70,4 +70,24 @@ test("computed values follow their sources", () => {
   const [double] = scope(() => computed(() => a() * 2));
   a.set(5);
   assert.equal(double(), 10);
+});
+
+test("links go to this site, the web or mail only", () => {
+  for (const ok of [
+    "/play",
+    "/qimg/a.webp 600w, /qimg/b.webp 1200w",
+    "https://commons.wikimedia.org/x",
+    "mailto:a@b.bg",
+  ]) {
+    assert.ok(safeURL(ok), ok);
+  }
+  for (const bad of [
+    "javascript:alert(1)",
+    " JavaScript:alert(1)",
+    "data:text/html,x",
+    "//evil.example",
+    "/ok, javascript:x",
+  ]) {
+    assert.ok(!safeURL(bad), bad);
+  }
 });

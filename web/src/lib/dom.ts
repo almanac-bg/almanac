@@ -194,10 +194,33 @@ function setAttr(el: HTMLElement, key: string, value: Value): void {
     (el as HTMLInputElement)[key] = !!value;
     return;
   }
+  // No handler from a string (they're functions, added as listeners), and no link anywhere but the web and mail.
+  if (/^on/i.test(key)) throw new Error(`h(): ${key} must be a function`);
+  if (urlAttributes.has(key.toLowerCase()) && typeof value === "string" && !safeURL(value)) {
+    el.removeAttribute(key);
+    return;
+  }
   // ARIA states are the words "true" and "false"; other attributes are there or not.
   if (key.startsWith("aria-") && typeof value === "boolean") el.setAttribute(key, String(value));
   else if (value === false || value == null) el.removeAttribute(key);
   else el.setAttribute(key, value === true ? "" : String(value));
+}
+
+const urlAttributes = new Set(["href", "src", "srcset", "action", "formaction", "poster", "xlink:href"]);
+
+/** A link to this site, or to http(s) and mail: never javascript: or data: (srcset: each of its addresses). */
+export function safeURL(value: string): boolean {
+  return value
+    .split(",")
+    .map((part) => part.trim().split(/\s+/)[0] ?? "")
+    .every((url) => {
+      if (url.startsWith("/") && !url.startsWith("//")) return true;
+      try {
+        return ["https:", "http:", "mailto:"].includes(new URL(url).protocol);
+      } catch {
+        return false;
+      }
+    });
 }
 
 /** Adds children to a parent node. */
