@@ -6,12 +6,15 @@
 //	almanac backup now                  copy the database to the backups at once
 //	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
 //	almanac admin [-remove] <email>     make a player an admin (the /admin page), or no longer one
+//	almanac push keys                   make a key pair for notifications (PUSH_PUBLIC_KEY, PUSH_PRIVATE_KEY)
 //	almanac version
 package main
 
 import (
 	"fmt"
 	"os"
+
+	"github.com/almanac-bg/almanac/internal/push"
 )
 
 // version is set when a release is built (-ldflags "-X main.version=…").
@@ -37,6 +40,15 @@ func run(args []string) error {
 		return backupCommand(args[1:])
 	case "admin":
 		return adminCommand(args[1:])
+	case "push":
+		if len(args) == 2 && args[1] == "keys" {
+			pub, priv, err := push.NewKeys()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("PUSH_PUBLIC_KEY=%s\nPUSH_PRIVATE_KEY=%s\n", pub, priv)
+			return nil
+		}
 	case "version":
 		fmt.Println(version)
 		return nil
@@ -45,5 +57,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [dir] | bank fmt [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | version")
+	return fmt.Errorf("usage: almanac serve | bank check [dir] | bank fmt [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | push keys | version")
 }

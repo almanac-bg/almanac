@@ -3,6 +3,9 @@ package server
 import (
 	"bufio"
 	"context"
+	"crypto/ecdh"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -21,6 +24,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -534,5 +538,116 @@ func TestTwoPeopleAskForADuel(t *testing.T) {
 		if v["duel"] != true || v["canLead"] == true {
 			t.Fatalf("a duel: %v", v)
 		}
+	}
+}
+
+// fakePushService takes pushes and counts them.
+type fakePushService struct {
+	mu   sync.Mutex
+	hits map[string]int
+}
+
+func (f *fakePushService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	f.hits[r.URL.Path]++
+	f.mu.Unlock()
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (f *fakePushService) count(path string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.hits[path]
+}
+
+func TestNotifications(t *testing.T) {
+	fake := &fakePushService{hits: map[string]int{}}
+	ps := httptest.NewTLSServer(fake)
+	defer ps.Close()
+	pub, priv, _ := push.NewKeys()
+	keys, _ := push.ParseKeys(pub, priv)
+
+	db, _ := store.Open(filepath.Join(t.TempDir(), "game.db"))
+	defer db.Close()
+	b, _ := bank.Load("../../bank/sample")
+	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
+	ts := httptest.NewUnstartedServer(nil)
+	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: ps.Client()}},
+		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.Config.Handler = s.Handler()
+	ts.Start()
+	defer ts.Close()
+	g := &game{t: t, db: db, url: ts.URL}
+
+	// The page offers notifications, with the key to subscribe with.
+	if res, _ := http.Get(ts.URL + "/"); res != nil {
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if !strings.Contains(string(body), pub) {
+			t.Fatal("the page doesn't carry the push key")
+		}
+	}
+	subscribe := func(p *player, path string) {
+		browser, _ := ecdh.P256().GenerateKey(rand.Reader)
+		sub := map[string]any{"endpoint": ps.URL + path, "keys": map[string]string{
+			"p256dh": base64.RawURLEncoding.EncodeToString(browser.PublicKey().Bytes()),
+			"auth":   base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef")),
+		}}
+		if status, _ := p.call("POST", "/api/push", sub); status != 200 {
+			t.Fatalf("subscribe: %d", status)
+		}
+	}
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	subscribe(ana, "/ana")
+	subscribe(bo, "/bo")
+	if status, _ := ana.call("POST", "/api/push", map[string]any{"endpoint": "http://plain.example/x"}); status != 400 {
+		t.Fatalf("a bad subscription: %d", status)
+	}
+
+	// Ana plays the day; at 19:05 only Bo is reminded, and only once.
+	_, run := ana.call("POST", "/api/day", map[string]any{})
+	id := strconv.Itoa(int(run["id"].(float64)))
+	for n := range 10 {
+		_, st := ana.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		view := st["question"].(map[string]any)["view"].(map[string]any)
+		a := map[string]any{"pick": 0}
+		if view["type"] == "number" {
+			a = map[string]any{"value": view["min"]}
+		} else if view["type"] == "order" {
+			a = map[string]any{"order": []int{0, 1, 2, 3}}
+		}
+		ana.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
+	}
+	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
+	_, _ = db.Write.Exec(`UPDATE runs SET day = ?`, evening.Format(time.DateOnly))
+	if n := s.remind(t.Context(), evening); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 0 {
+		t.Fatalf("reminded %d; bo %d, ana %d", n, fake.count("/bo"), fake.count("/ana"))
+	}
+	if n := s.remind(t.Context(), evening.Add(time.Minute)); n != 0 {
+		t.Fatal("reminded twice in a day")
+	}
+	if n := s.remind(t.Context(), evening.Add(-2*time.Hour)); n != 0 {
+		t.Fatal("reminded before the hour")
+	}
+
+	// Bo plays Ana's challenge: Ana hears of it.
+	_, c := ana.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
+	_, st := bo.call("POST", "/api/challenges/"+c["code"].(string), map[string]any{})
+	cid := strconv.Itoa(int(st["id"].(float64)))
+	for n := range 10 {
+		bo.call("POST", "/api/runs/"+cid+"/show", map[string]any{})
+		bo.call("POST", "/api/runs/"+cid+"/answer", map[string]any{"n": n, "answer": nil})
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for fake.count("/ana") == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if fake.count("/ana") != 1 {
+		t.Fatal("Ana wasn't told her challenge was played")
 	}
 }

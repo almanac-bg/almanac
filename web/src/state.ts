@@ -19,6 +19,7 @@ interface Boot {
   user: User | null;
   categories: Category[];
   version: string;
+  push: string;
 }
 
 const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{}");
@@ -26,6 +27,8 @@ const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{
 export const user = signal<User | null>(boot.user ?? null);
 export const categories: Category[] = boot.categories ?? [];
 export const version = boot.version ?? "";
+/** The key browsers subscribe to notifications with ("": none here). */
+export const pushKey = boot.push ?? "";
 
 /** The player, made a guest first if they have no account yet (the first time they play). */
 export async function player(): Promise<User> {

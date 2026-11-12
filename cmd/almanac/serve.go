@@ -17,6 +17,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/server"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -34,6 +35,8 @@ import (
 //	TLS_CERT, TLS_KEY   serve HTTPS with this certificate (behind Cloudflare: its origin certificate)
 //	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header (only if nothing else can reach the server)
 //	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once)
+//	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
+//	PUSH_PRIVATE_KEY    no notifications
 //	BACKUP_ENDPOINT     S3-compatible storage for hourly copies of the database (R2), with BACKUP_BUCKET,
 //	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
 //	OPERATOR_NAME       who runs the game, for the privacy page
@@ -110,6 +113,13 @@ func serve([]string) error {
 
 	outbox := mail.NewOutbox(db, sender, env("MAIL_FROM", "АЛМАНАХ <no-reply@almanac.bg>"))
 	accounts := &account.Accounts{DB: db, Outbox: outbox, Secret: key[:]}
+	if pub, priv := os.Getenv("PUSH_PUBLIC_KEY"), os.Getenv("PUSH_PRIVATE_KEY"); pub != "" || priv != "" {
+		keys, err := push.ParseKeys(pub, priv)
+		if err != nil {
+			return err
+		}
+		cfg.Push = &push.Sender{Keys: keys, Subject: "mailto:" + cfg.Contact}
+	}
 	srv, err := server.New(cfg, server.Deps{DB: db, Accounts: accounts, Outbox: outbox, Bank: b})
 	if err != nil {
 		return err
@@ -124,6 +134,7 @@ func serve([]string) error {
 		}
 	})
 	go reloadOnHangup(ctx, bankDir, srv)
+	go srv.Remind(ctx)
 	if to := os.Getenv("ALERT_EMAIL"); to != "" {
 		go srv.MailProblems(ctx, to, time.Hour)
 	}

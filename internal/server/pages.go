@@ -37,6 +37,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#140f26" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 {{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
 {{if .JS}}<script type="module" src="/{{.JS}}"></script>{{end}}
@@ -71,6 +72,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"user":       u,
 		"categories": b.Categories,
 		"version":    s.cfg.Version,
+		"push":       s.pushKey(),
 	})
 	m := assets.Manifest(s.client)
 	var out bytes.Buffer
@@ -98,10 +100,16 @@ func (s *Server) asset(w http.ResponseWriter, r *http.Request) {
 }
 
 // publicFiles are served from the site's root as they are (web/public).
-var publicFiles = []string{"favicon.svg", "bimi.svg", "robots.txt", "manifest.webmanifest"}
+var publicFiles = []string{
+	"favicon.svg", "bimi.svg", "robots.txt", "manifest.webmanifest", "sw.js",
+	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
+}
 
 func (s *Server) publicFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if r.URL.Path == "/sw.js" { // a new service worker reaches every browser at once
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	serveFile(w, r, s.client, strings.TrimPrefix(r.URL.Path, "/"))
 }
 

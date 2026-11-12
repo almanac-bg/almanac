@@ -1,5 +1,6 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
+import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { type User, user } from "../state.ts";
 import { stats } from "./stats.ts";
@@ -14,6 +15,7 @@ export function me() {
       () => user(),
       () => [
         stats(),
+        reminders(),
         nameForm(),
         account(),
         deleteAccount(),
@@ -100,6 +102,56 @@ function account(): Child {
         signIn(),
       ],
     ),
+  );
+}
+
+/** Notifications: the evening reminder, and word when someone plays your challenge. */
+function reminders(): Child {
+  if (needsHomeScreen()) {
+    return h(
+      "section",
+      { class: "stack" },
+      h("h2", null, "Напомняния"),
+      h(
+        "p",
+        { class: "muted" },
+        "На iPhone известията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран. После ги включи оттук.",
+      ),
+    );
+  }
+  if (!pushable()) return null;
+  const on = signal<boolean | null>(null);
+  const error = signal("");
+  pushOn().then(on.set, () => on.set(false));
+  const toggle = async () => {
+    error.set("");
+    try {
+      if (on.peek()) {
+        await turnOff();
+        on.set(false);
+      } else {
+        const why = await turnOn();
+        if (why) error.set(why);
+        else on.set(true);
+      }
+    } catch {
+      error.set("Не успяхме. Опитай пак.");
+    }
+  };
+  return h(
+    "section",
+    { class: "stack" },
+    h("h2", null, "Напомняния"),
+    h(
+      "p",
+      { class: "muted" },
+      "Вечер в 19:00, ако въпросите на деня още те чакат, и когато някой приеме твое предизвикателство.",
+    ),
+    () =>
+      on() === null
+        ? null
+        : h("button", { class: on() ? "link" : "btn", onclick: toggle }, on() ? "Спри напомнянията" : "Напомняй ми"),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
