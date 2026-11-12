@@ -1,5 +1,6 @@
 // Заедно: playing at the same time, in one room — on everyone's phone, around a table or across a classroom.
 
+import { findDuel } from "../game/duel.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
@@ -39,12 +40,20 @@ export function together() {
     "section",
     { class: "screen" },
     h("h1", null, "Заедно"),
+    h("h2", null, "Дуел"),
     h(
       "p",
       null,
-      "Всички получават един и същ въпрос в един и същ момент, всеки на телефона си. Точките се трупат за верен и бърз отговор.",
+      "Ти срещу някого, сега: десет въпроса от всички теми. Ако в момента никой друг не търси, играеш срещу запис на истинска игра.",
     ),
-    h("h2", null, "Влез в стая"),
+    findDuel(),
+    h("h2", null, "Стая"),
+    h(
+      "p",
+      null,
+      "За приятели, семейство или клас: всички получават един и същ въпрос в един и същ момент, всеки на телефона си.",
+    ),
+    h("h3", null, "Влез в стая"),
     h(
       "form",
       {
@@ -68,7 +77,7 @@ export function together() {
       h("button", { class: "btn" }, "Влез"),
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    h("h2", null, "Отвори стая"),
+    h("h3", null, "Отвори стая"),
     h("p", { class: "muted" }, "Избери тема. После дай кода на другите."),
     h(
       "ul",

@@ -69,23 +69,29 @@ func Open(path string) (*DB, error) {
 func (db *DB) Close() error { return errors.Join(db.Read.Close(), db.Write.Close()) }
 
 // migrate applies migrations/NNNN_*.sql in order, each in a transaction, and keeps the count in user_version.
-func (db *DB) migrate() error {
+func (db *DB) migrate() error { return db.migrateTo(-1) }
+
+// migrateTo migrates up to migration n (all of them for -1).
+func (db *DB) migrateTo(n int) error {
 	files, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
 		return err
 	}
 	slices.Sort(files)
 	for i, f := range files {
-		n, _, _ := strings.Cut(strings.TrimPrefix(f, "migrations/"), "_")
-		if v, err := strconv.Atoi(n); err != nil || v != i+1 {
+		num, _, _ := strings.Cut(strings.TrimPrefix(f, "migrations/"), "_")
+		if v, err := strconv.Atoi(num); err != nil || v != i+1 {
 			return fmt.Errorf("%s: migrations are numbered 0001, 0002… without gaps", f)
 		}
+	}
+	if n >= 0 {
+		files = files[:n]
 	}
 	var version int
 	if err := db.Write.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > len(files) {
+	if version > len(files) && n < 0 {
 		return fmt.Errorf("the database is at version %d, newer than this program (%d): run a newer release", version, len(files))
 	}
 	for i := version; i < len(files); i++ {
@@ -93,18 +99,49 @@ func (db *DB) migrate() error {
 		if err != nil {
 			return err
 		}
-		err = db.Tx(context.Background(), func(tx *sql.Tx) error {
-			if _, err := tx.Exec(string(body)); err != nil {
-				return err
-			}
-			_, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1))
-			return err
-		})
-		if err != nil {
+		if err := db.apply(string(body), i+1); err != nil {
 			return fmt.Errorf("%s: %w", files[i], err)
 		}
 	}
 	return nil
+}
+
+// rebuildMark starts a migration that rebuilds a table (SQLite changes a constraint only that way). It runs with
+// foreign keys off, so that dropping the old table doesn't take the rows that point to it along, and is checked
+// for broken references before it's committed: SQLite's own procedure (sqlite.org/lang_altertable.html).
+const rebuildMark = "-- rebuild"
+
+func (db *DB) apply(body string, version int) error {
+	ctx := context.Background()
+	conn, err := db.Write.Conn(ctx) // the one write connection: the pragmas hold for the transaction on it
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	rebuild := strings.HasPrefix(body, rebuildMark)
+	if rebuild {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+			return err
+		}
+		defer conn.ExecContext(ctx, "PRAGMA foreign_keys = ON")
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(body); err != nil {
+		return errors.Join(err, tx.Rollback())
+	}
+	if rebuild {
+		var broken int
+		if err := tx.QueryRow("SELECT count(*) FROM pragma_foreign_key_check").Scan(&broken); err != nil || broken > 0 {
+			return errors.Join(fmt.Errorf("%d broken references after the rebuild", broken), err, tx.Rollback())
+		}
+	}
+	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", version)); err != nil {
+		return errors.Join(err, tx.Rollback())
+	}
+	return tx.Commit()
 }
 
 // Tx runs fn in a write transaction: committed if fn returns nil, rolled back otherwise.

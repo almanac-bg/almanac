@@ -391,3 +391,41 @@ func TestStats(t *testing.T) {
 		t.Fatalf("topics %+v, recent %+v", s.Topics, s.Recent)
 	}
 }
+
+func TestRecordingsAndDuels(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	if rec, err := w.g.RecordingFor(ctx, bo); err != nil || rec != nil {
+		t.Fatalf("a recording with nothing played: %v %v", rec, err)
+	}
+	run, _ := w.g.StartTopic(ctx, ana, "")
+	w.play(ana, run.ID, repeat(w.right, Length)...)
+	if rec, _ := w.g.RecordingFor(ctx, ana); rec != nil {
+		t.Fatal("a player got their own game as a recording")
+	}
+	rec, err := w.g.RecordingFor(ctx, bo)
+	if err != nil || rec == nil || len(rec.Picks) != Length || len(rec.Answers) != Length || rec.Answers[0].Ms != 3000 {
+		t.Fatalf("Bo's recording: %+v %v", rec, err)
+	}
+	// What the recording gave grades right again, dealt the same way.
+	q, _ := w.b.Get(rec.Picks[0].ID)
+	if g, err := q.Deal(rec.Picks[0].Seed).Grade(rec.Answers[0].Shown); err != nil || !g.Right {
+		t.Fatalf("the recorded answer: %+v %v", g, err)
+	}
+
+	d := Duel{UserID: bo, Picks: rec.Picks, Opponent: "Ана", Recorded: true, Outcome: "lost"}
+	for _, p := range rec.Picks {
+		d.Answers = append(d.Answers, DuelAnswer{QuestionID: p.ID, Ms: 15000})
+	}
+	if err := w.g.SaveDuel(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := w.g.StatsOf(ctx, bo)
+	if s.Games != 1 || s.Answers != Length || s.Recent[0].Kind != "duel" || s.Duels != 1 || s.Won != 0 {
+		t.Fatalf("Bo's stats after a duel: %+v", s)
+	}
+	if err := w.g.SaveDuel(ctx, Duel{UserID: bo, Picks: rec.Picks}); err == nil {
+		t.Fatal("kept a duel without its answers")
+	}
+}

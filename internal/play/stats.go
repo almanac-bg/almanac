@@ -11,6 +11,8 @@ type Stats struct {
 	Days    int          `json:"days"`    // days' questions finished
 	Games   int          `json:"games"`   // runs finished, of every kind
 	Answers int          `json:"answers"` // questions answered (or timed out)
+	Duels   int          `json:"duels"`
+	Won     int          `json:"won"`
 	Right   int          `json:"right"`
 	Topics  []TopicStats `json:"topics"`
 	Recent  []Played     `json:"recent"`
@@ -32,6 +34,10 @@ type Played struct {
 	Total    int    `json:"total"`
 	Points   int    `json:"points"`
 	At       int64  `json:"at"`
+	// A duel's: against whom, a recording or not, and how it ended.
+	Opponent string `json:"opponent,omitempty"`
+	Recorded bool   `json:"recorded,omitempty"`
+	Outcome  string `json:"outcome,omitempty"`
 }
 
 // StatsOf reads a player's stats.
@@ -42,8 +48,9 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		return s, err
 	}
 	db := g.DB.Read
-	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day') FROM runs
-		WHERE user_id = ? AND finished_at IS NOT NULL`, userID).Scan(&s.Games, &s.Days)
+	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'), count(*) FILTER (WHERE kind = 'duel'),
+		count(*) FILTER (WHERE outcome = 'won') FROM runs WHERE user_id = ? AND finished_at IS NOT NULL`, userID).
+		Scan(&s.Games, &s.Days, &s.Duels, &s.Won)
 	if err != nil {
 		return s, err
 	}
@@ -89,8 +96,8 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		}
 	}
 	rows, err = db.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights, points,
-		json_array_length(questions), finished_at FROM runs WHERE user_id = ? AND finished_at IS NOT NULL
-		ORDER BY finished_at DESC LIMIT 20`, userID)
+		json_array_length(questions), finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
+		FROM runs WHERE user_id = ? AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 20`, userID)
 	if err != nil {
 		return s, err
 	}
@@ -98,7 +105,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	s.Recent = []Played{}
 	for rows.Next() {
 		var p Played
-		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Points, &p.Total, &p.At); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Points, &p.Total, &p.At, &p.Opponent, &p.Recorded, &p.Outcome); err != nil {
 			return s, err
 		}
 		s.Recent = append(s.Recent, p)
