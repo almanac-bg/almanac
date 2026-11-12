@@ -26,6 +26,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/together$`),
+	regexp.MustCompile(`^/challenge$`),
 }
 
 var shell = template.Must(template.New("shell").Parse(`<!doctype html>
