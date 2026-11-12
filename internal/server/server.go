@@ -100,6 +100,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if s.secure {
 		s.cookie = "__Host-sid"
 	}
+	s.limits.off = cfg.Dev
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.push = cfg.Push

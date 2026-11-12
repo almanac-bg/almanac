@@ -20,22 +20,9 @@ export function together() {
       error.set((err as ApiError).message);
     }
   };
+  // Opening a room is an action, not a place: a button (that reads like the topic list on Игра).
   const topic = (id: string, name: string): Child =>
-    h(
-      "li",
-      null,
-      h(
-        "a",
-        {
-          href: "#",
-          onclick: (e: Event) => {
-            e.preventDefault();
-            open(id);
-          },
-        },
-        name,
-      ),
-    );
+    h("li", null, h("button", { class: "link", type: "button", onclick: () => open(id) }, name));
   return h(
     "section",
     { class: "screen" },

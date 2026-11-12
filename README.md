@@ -43,7 +43,8 @@ DEV=1 go run ./cmd/almanac serve     # http://localhost:8080 — пощата о
 
 ```bash
 go vet ./... && go test -race ./...
-npm ci && npx tsc -p web && npx biome ci . && npm test
+npm ci && npm run check && npm test
+npm run e2e                          # играта в Chromium, WebKit и Firefox (BROWSER_PATH: свой Chromium)
 go run ./cmd/almanac bank check      # банката: private/, ако я има, иначе bank/sample
 ```
 

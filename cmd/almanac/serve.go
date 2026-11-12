@@ -24,7 +24,7 @@ import (
 
 // serve runs the game, configured by the environment (deploy/almanac.env lists every setting):
 //
-//	DEV=1               development: the client from disk, mail to the log, a fixed secret
+//	DEV=1               development: the client from disk, mail to the log (and to MAIL_DIR, if set), a fixed secret
 //	ADDR                where to listen (:8080)
 //	PUBLIC_URL          the address players use (http://localhost:8080)
 //	DB_PATH             the database file (almanac.db); copies are made beside it
@@ -80,7 +80,7 @@ func serve([]string) error {
 	}
 	key := sha256.Sum256([]byte(secret))
 
-	var sender mail.Sender = mail.Log{}
+	var sender mail.Sender = mail.Log{Dir: os.Getenv("MAIL_DIR")}
 	if u := os.Getenv("SMTP_URL"); u != "" {
 		s, err := mail.NewSMTP(u)
 		if err != nil {
