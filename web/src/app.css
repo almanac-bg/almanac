@@ -204,6 +204,24 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .join {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .join input {
+    flex: 1;
+  }
+
+  .join .btn {
+    width: auto;
+  }
+
+  .players {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
   /* ---- Topics ---- */
 
   .topics {

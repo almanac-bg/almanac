@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -360,5 +362,107 @@ func TestHosts(t *testing.T) {
 	}
 	if res, _ := get("evil.example", "/"); res.StatusCode != 404 {
 		t.Errorf("another site's name: %d", res.StatusCode)
+	}
+}
+
+// stream is a room's event stream as a browser reads it.
+type stream struct {
+	t   *testing.T
+	r   *bufio.Reader
+	res *http.Response
+}
+
+func (p *player) follow(code string) *stream {
+	p.g.t.Helper()
+	req, _ := http.NewRequest("GET", p.g.url+"/api/rooms/"+code+"/events", nil)
+	res, err := p.client.Do(req)
+	if err != nil {
+		p.g.t.Fatal(err)
+	}
+	if res.Header.Get("Content-Type") != "text/event-stream" {
+		p.g.t.Fatalf("not a stream: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+	p.g.t.Cleanup(func() { res.Body.Close() })
+	return &stream{t: p.g.t, r: bufio.NewReader(res.Body), res: res}
+}
+
+// until reads views until one passes ok.
+func (s *stream) until(ok func(map[string]any) bool) map[string]any {
+	s.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		line, err := s.r.ReadString('\n')
+		if err != nil {
+			s.t.Fatal(err)
+		}
+		data, found := strings.CutPrefix(strings.TrimSpace(line), "data: ")
+		if !found {
+			continue
+		}
+		var v map[string]any
+		if err := json.Unmarshal([]byte(data), &v); err != nil {
+			s.t.Fatal(err)
+		}
+		if ok(v) {
+			return v
+		}
+	}
+	s.t.Fatal("no such view in time")
+	return nil
+}
+
+func TestARoomOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	status, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code, _ := out["code"].(string)
+	if status != 200 || len(code) != 6 {
+		t.Fatalf("open: %d %v", status, out)
+	}
+	as, bs := ana.follow(code), bo.follow(code)
+	as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 2 })
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/start", map[string]any{}); status != 403 {
+		t.Fatalf("a guest started: %d", status)
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", map[string]any{}); status != 200 {
+		t.Fatalf("start: %d", status)
+	}
+	v := bs.until(func(v map[string]any) bool { return v["phase"] == "question" })
+	if v["question"].(map[string]any)["view"] == nil {
+		t.Fatalf("no question: %v", v)
+	}
+	for _, p := range []*player{ana, bo} {
+		if status, out := p.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": nil}); status != 400 {
+			t.Fatalf("an empty answer: %d %v", status, out)
+		}
+	}
+	answer := map[string]any{"pick": 0}
+	if q := v["question"].(map[string]any)["view"].(map[string]any); q["type"] == "number" {
+		answer = map[string]any{"value": q["min"]}
+	} else if q["type"] == "order" {
+		answer = map[string]any{"order": []int{0, 1, 2, 3}}
+	}
+	ana.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
+	bo.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
+	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
+	if v["question"].(map[string]any)["reveal"] == nil {
+		t.Fatalf("no answer shown: %v", v)
+	}
+	if status, _ := g.player().call("GET", "/api/rooms/000000/events", nil); status != 401 {
+		t.Fatalf("a stranger's stream: %d", status)
+	}
+	stranger := g.player()
+	stranger.call("POST", "/api/guest", map[string]any{})
+	req, _ := http.NewRequest("GET", g.url+"/api/rooms/999999/events", nil)
+	res, err := stranger.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.HasPrefix(string(body), "event: closed") {
+		t.Fatalf("no such room: %q", body)
 	}
 }

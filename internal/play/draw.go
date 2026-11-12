@@ -155,9 +155,10 @@ func topicSlots(skill float64) []slot {
 	return slots
 }
 
-// drawTopic draws a topic run ("" for all topics), questions the player hasn't seen before those they have. Choices
-// come with a picture or without, whichever is drawn.
-func drawTopic(b *bank.Bank, category string, skill float64, seen map[string]bool, r *rand.Rand) []Pick {
+// Draw draws ten questions of a topic ("" for all topics) for a player of a skill (how often they're right, 0…1),
+// questions they haven't seen (seen) before those they have. Choices come with a picture or without, whichever is
+// drawn. Topic runs and rooms draw this way.
+func Draw(b *bank.Bank, category string, skill float64, seen map[string]bool, r *rand.Rand) []Pick {
 	pool := b.Live(category, "")
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
