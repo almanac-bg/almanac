@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -71,4 +72,70 @@ func TestTxRollsBack(t *testing.T) {
 	if err == nil || n != 0 {
 		t.Fatalf("err %v, %d users", err, n)
 	}
+}
+
+// A migration that rebuilds a table keeps the rows that point to it.
+func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Back to before the rebuild (0004), with a run, an answer and a challenge in it.
+	db.Close()
+	db = openAt(t, path, 3)
+	for _, q := range []string{
+		`INSERT INTO users (id, name, name_key, created_at, seen_at) VALUES (1, 'Аз', 'аз', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, category, questions, at, points, started_at, finished_at) VALUES (7, 1, 'topic', '', '[]', 1, 100, 1, 2)`,
+		`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at) VALUES (7, 0, 'his-001', 1, 100, 1, 900, 2)`,
+		`INSERT INTO challenges (code, run_id, created_at) VALUES ('abc234', 7, 3)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var answers, challenges int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM answers`).Scan(&answers)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM challenges`).Scan(&challenges)
+	if answers != 1 || challenges != 1 {
+		t.Fatalf("after the rebuild: %d answers, %d challenges", answers, challenges)
+	}
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, opponent, recorded, outcome)
+		VALUES (1, 'duel', '[]', 3, 'Бо', 1, 'won')`); err != nil {
+		t.Fatalf("a duel: %v", err)
+	}
+	var fk int
+	_ = db.Write.QueryRow(`PRAGMA foreign_keys`).Scan(&fk)
+	if fk != 1 {
+		t.Fatal("foreign keys stayed off")
+	}
+	// Deleting the run still takes its answers along: the reference survived the rebuild.
+	_, _ = db.Write.Exec(`DELETE FROM runs WHERE id = 7`)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM answers`).Scan(&answers)
+	if answers != 0 {
+		t.Fatal("the answers' reference to runs didn't survive the rebuild")
+	}
+	db.Close()
+}
+
+// openAt opens a new database migrated only up to migration n.
+func openAt(t *testing.T, path string, n int) *DB {
+	t.Helper()
+	_ = os.Remove(path)
+	_ = os.Remove(path + "-wal")
+	_ = os.Remove(path + "-shm")
+	w, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_txlock=immediate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.SetMaxOpenConns(1)
+	r, _ := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	db := &DB{Write: w, Read: r}
+	if err := db.migrateTo(n); err != nil {
+		t.Fatal(err)
+	}
+	return db
 }

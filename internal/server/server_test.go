@@ -510,3 +510,29 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		t.Fatal("the report is still open")
 	}
 }
+
+func TestTwoPeopleAskForADuel(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	codes := make(chan string, 2)
+	for _, p := range []*player{ana, bo} {
+		go func() {
+			_, out := p.call("POST", "/api/duel", map[string]any{})
+			code, _ := out["code"].(string)
+			codes <- code
+		}()
+	}
+	a, b := <-codes, <-codes
+	if a == "" || a != b {
+		t.Fatalf("matched into %q and %q", a, b)
+	}
+	as, bs := ana.follow(a), bo.follow(a)
+	for _, s := range []*stream{as, bs} {
+		v := s.until(func(v map[string]any) bool { return v["phase"] == "question" })
+		if v["duel"] != true || v["canLead"] == true {
+			t.Fatalf("a duel: %v", v)
+		}
+	}
+}

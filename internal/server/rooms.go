@@ -157,3 +157,23 @@ func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {
 	}
 	return ok(w, map[string]bool{"ok": true})
 }
+
+// DuelWait is how long a player waits for someone else before playing a recording.
+const DuelWait = 12 * time.Second
+
+// duel finds the player an opponent: someone asking now, or a recording of someone's game. It answers with the
+// duel's room.
+func (s *Server) duel(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	if !s.limits.allow("duel:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
+		return errTooMany
+	}
+	code, err := s.rooms.Match(r.Context(), room.Player{ID: u.ID, Name: u.Name}, DuelWait)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]string{"code": code})
+}

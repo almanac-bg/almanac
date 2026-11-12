@@ -99,6 +99,15 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.rooms = room.NewHub(s.bank.Load)
+	s.rooms.Recording = s.game.RecordingFor
+	s.rooms.Kept = func(d play.Duel) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.game.SaveDuel(ctx, d); err != nil {
+			slog.Error("keeping a duel", "err", err)
+			s.problems.add("keeping a duel: " + err.Error())
+		}
+	}
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
@@ -138,6 +147,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/challenges/{code}", s.startChallenge)
 	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
+	api("POST /api/duel", s.duel)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/next", s.roomNext)

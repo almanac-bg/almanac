@@ -1,6 +1,7 @@
 // A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
+import { findDuel } from "../game/duel.ts";
 import { answered, ask, picture } from "../game/questions.ts";
 import { report } from "../game/report.ts";
 import { shareButton } from "../game/results.ts";
@@ -12,6 +13,7 @@ import { categories, player } from "../state.ts";
 
 interface RoomView {
   code: string;
+  duel?: boolean;
   phase: "lobby" | "question" | "reveal" | "end";
   host: string;
   isHost: boolean;
@@ -26,6 +28,7 @@ interface RoomView {
     online: boolean;
     answered: boolean;
     me?: boolean;
+    recording?: boolean;
     gained?: number;
     right?: boolean;
   }[];
@@ -40,10 +43,13 @@ interface RoomView {
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
+const nameOf = (p: RoomView["players"][number]) => (p.recording ? `${p.name} (запис)` : p.name);
+/** In a duel: the other one. */
+const opponent = (v: RoomView) => v.players.find((p) => !p.me);
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
 export function room([code = ""]: string[]) {
-  title(`Стая ${spaced(code)}`);
+  title("Заедно");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
 
@@ -128,12 +134,15 @@ async function lead(code: string, action: "start" | "next", error: (s: string) =
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
+    if (v.duel) return v.phase === "reveal" ? h("p", { class: "muted" }, "Следващият въпрос идва след малко.") : null;
     return v.canLead ? null : h("p", { class: "muted" }, `Чакаме ${v.host} да ${what}.`);
   };
 }
 
 function lobby(view: () => RoomView, code: string): Child {
   const error = signal("");
+  if (view().duel)
+    return h("div", { class: "stack" }, h("h1", null, "Дуел"), h("p", { class: "muted" }, "Чакаме съперника…"));
   return h(
     "div",
     { class: "stack" },
@@ -155,10 +164,15 @@ function lobby(view: () => RoomView, code: string): Child {
 
 function head(v: RoomView, left?: () => string): Child {
   const q = v.question;
+  const against = v.duel ? opponent(v) : undefined;
   return h(
     "p",
     { class: "question-head muted" },
-    h("span", null, `${v.n + 1} от ${v.total} · ${topicName(q?.category ?? "")}`),
+    h(
+      "span",
+      null,
+      `${v.n + 1} от ${v.total} · ${topicName(q?.category ?? "")}${against ? ` · срещу ${nameOf(against)}` : ""}`,
+    ),
     left ? h("span", { role: "timer" }, left) : null,
   );
 }
@@ -272,7 +286,7 @@ function standings(view: () => RoomView, gains: boolean): Child {
           "li",
           { class: p.me ? "row me" : "row" },
           h("span", { class: "place" }, String(i + 1)),
-          h("span", { class: "who" }, p.name),
+          h("span", { class: "who" }, nameOf(p)),
           h("span", { class: "pts" }, gains && p.gained ? `+${p.gained} · ${p.points}` : String(p.points)),
         ),
       ),
@@ -282,6 +296,21 @@ function standings(view: () => RoomView, gains: boolean): Child {
 
 function end(view: () => RoomView, code: string): Child {
   const error = signal("");
+  if (view().duel) {
+    const v = view();
+    const me = v.players.find((p) => p.me);
+    const them = opponent(v);
+    const verdict =
+      !me || !them || me.points === them.points ? "Равенство" : me.points > them.points ? "Победа!" : "Загуба";
+    return h(
+      "div",
+      { class: "stack" },
+      h("h1", null, verdict),
+      h("p", { class: "muted" }, them ? `Дуел срещу ${nameOf(them)}` : "Дуел"),
+      standings(view, false),
+      findDuel("Нов дуел"),
+    );
+  }
   return h(
     "div",
     { class: "stack" },

@@ -10,16 +10,21 @@ interface Stats {
   games: number;
   answers: number;
   right: number;
+  duels: number;
+  won: number;
   topics: { category: string; answers: number; right: number }[];
   recent: {
     id: number;
-    kind: "day" | "topic" | "challenge";
+    kind: "day" | "topic" | "challenge" | "duel";
     day?: string;
     category?: string;
     rights: number;
     total: number;
     points: number;
     at: number;
+    opponent?: string;
+    recorded?: boolean;
+    outcome?: "won" | "lost" | "draw";
   }[];
 }
 
@@ -34,8 +39,15 @@ export function stats(): Child {
     const s = data();
     if (!s) return null;
     if (s.games === 0) return h("p", { class: "muted" }, "Още няма изиграни игри.");
+    const outcome = { won: "победа", lost: "загуба", draw: "равенство" };
     const what = (p: Stats["recent"][number]) =>
-      p.kind === "day" ? `Въпросите на деня` : p.kind === "challenge" ? "Предизвикателство" : topicName(p.category);
+      p.kind === "day"
+        ? "Въпросите на деня"
+        : p.kind === "challenge"
+          ? "Предизвикателство"
+          : p.kind === "duel"
+            ? `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`
+            : topicName(p.category);
     return h(
       "section",
       { class: "stack" },
@@ -45,6 +57,7 @@ export function stats(): Child {
         null,
         s.streak > 0 ? `Серия: ${s.streak} ${s.streak === 1 ? "ден" : "дни"}. ` : "",
         `${s.games} ${s.games === 1 ? "игра" : "игри"}, ${s.answers} въпроса, ${percent(s.right, s.answers)} верни.`,
+        s.duels > 0 ? ` Дуели: ${s.won} ${s.won === 1 ? "победа" : "победи"} от ${s.duels}.` : "",
       ),
       h(
         "table",
