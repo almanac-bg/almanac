@@ -33,6 +33,10 @@ type Config struct {
 	// TrustCloudflare takes the player's address from CF-Connecting-IP. Only when nothing but Cloudflare can reach the
 	// server, or anyone could claim any address.
 	TrustCloudflare bool
+	// MTASTS are the domain's mail servers, for its MTA-STS policy at mta-sts.<domain> (none: no policy), and
+	// MTASTSMode the policy's mode ("testing" until reports are clean, then "enforce").
+	MTASTS     []string
+	MTASTSMode string
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
 	// Dev serves the client from disk, as the build rewrites it.
@@ -60,6 +64,7 @@ type Server struct {
 	limits   *limiter
 	problems *problems
 	secure   bool
+	host     string
 	cookie   string
 	handler  http.Handler
 }
@@ -80,6 +85,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 		client: assets.FS(cfg.Dev),
 		limits: newLimiter(), problems: newProblems(),
 		secure: u.Scheme == "https",
+		host:   strings.ToLower(u.Hostname()),
 	}
 	// A __Host- cookie is bound to this exact host, over HTTPS, for the whole site: nothing else can set or read it.
 	s.cookie = "sid"
@@ -137,6 +143,7 @@ func (s *Server) routes() http.Handler {
 	var h http.Handler = mux
 	h = http.NewCrossOriginProtection().Handler(h)
 	h = s.headers(h)
+	h = s.hosts(h)
 	h = s.logged(h)
 	return s.recovered(h)
 }
