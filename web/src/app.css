@@ -222,6 +222,34 @@
     padding-left: 1.25rem;
   }
 
+  .stats {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stats th,
+  .stats td {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--line);
+    text-align: right;
+  }
+
+  .stats th:first-child,
+  .stats td:first-child {
+    text-align: left;
+  }
+
+  .stats th {
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .recent {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
   /* ---- Topics ---- */
 
   .topics {

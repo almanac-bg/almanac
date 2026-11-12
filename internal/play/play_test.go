@@ -367,3 +367,27 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestStats(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	empty, err := w.g.StatsOf(ctx, u)
+	if err != nil || empty.Games != 0 || len(empty.Topics) != 0 || empty.Recent == nil {
+		t.Fatalf("a newcomer's stats: %+v %v", empty, err)
+	}
+	day, _ := w.g.StartDay(ctx, u)
+	w.play(u, day.ID, append(repeat(w.right, 6), repeat(w.wrong, 4)...)...)
+	topic, _ := w.g.StartTopic(ctx, u, "music")
+	w.play(u, topic.ID, repeat(w.right, Length)...)
+	s, err := w.g.StatsOf(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Streak != 1 || s.Days != 1 || s.Games != 2 || s.Answers != 20 || s.Right != 16 || len(s.Recent) != 2 {
+		t.Fatalf("stats %+v", s)
+	}
+	if s.Topics[0].Category != "music" || s.Topics[0].Answers < 10 || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
+		t.Fatalf("topics %+v, recent %+v", s.Topics, s.Recent)
+	}
+}

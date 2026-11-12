@@ -212,3 +212,15 @@ func (s *Server) startChallenge(w http.ResponseWriter, r *http.Request) error {
 	}
 	return ok(w, st)
 }
+
+func (s *Server) stats(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	st, err := s.game.StatsOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, st)
+}
