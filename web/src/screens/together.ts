@@ -6,6 +6,7 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player, user } from "../state.ts";
 import { toneOf } from "../ui.ts";
+import { friendsCard } from "./friends.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 export function together() {
@@ -54,17 +55,7 @@ export function together() {
       ),
       findDuel(),
     ),
-    h(
-      "section",
-      { class: "card" },
-      h("h2", null, "Предизвикателство"),
-      h(
-        "p",
-        { class: "muted" },
-        "Изиграй десет въпроса и прати линка: приятелите играят същите, когато им е удобно, и виждате кой колко има.",
-      ),
-      h("a", { class: "btn", href: "/challenge" }, "Предизвикай"),
-    ),
+    friendsCard(),
     h(
       "section",
       { class: "card" },

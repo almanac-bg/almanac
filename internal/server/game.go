@@ -40,6 +40,13 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	out["board"] = board
+	if u != nil {
+		friends, err := s.game.FriendsBoard(r.Context(), day, u.ID)
+		if err != nil {
+			return err
+		}
+		out["friends"] = friends
+	}
 	return ok(w, out)
 }
 
@@ -164,56 +171,6 @@ func (s *Server) review(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]any{"questions": items})
-}
-
-func (s *Server) challenge(w http.ResponseWriter, r *http.Request) error {
-	user, id, err := s.runOf(r)
-	if err != nil {
-		return err
-	}
-	code, err := s.game.Challenge(r.Context(), user, id)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]string{"code": code, "url": s.cfg.PublicURL + "/c/" + code})
-}
-
-var codePattern = regexp.MustCompile(`^[a-z0-9]{6}$`)
-
-func (s *Server) challengeInfo(w http.ResponseWriter, r *http.Request) error {
-	code := r.PathValue("code")
-	if !codePattern.MatchString(code) {
-		return errNotFound
-	}
-	u, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	var viewer int64
-	if u != nil {
-		viewer = u.ID
-	}
-	c, err := s.game.ChallengeOf(r.Context(), code, viewer)
-	if err != nil {
-		return err
-	}
-	return ok(w, c)
-}
-
-func (s *Server) startChallenge(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	code := r.PathValue("code")
-	if !codePattern.MatchString(code) {
-		return errNotFound
-	}
-	st, err := s.game.StartChallenge(r.Context(), u.ID, code)
-	if err != nil {
-		return err
-	}
-	return ok(w, st)
 }
 
 func (s *Server) stats(w http.ResponseWriter, r *http.Request) error {

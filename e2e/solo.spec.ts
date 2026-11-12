@@ -7,7 +7,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Започни" }).click();
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  await expect(page.getByRole("button", { name: "Сподели резултата" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Играй по теми" })).toBeVisible();
   await page.getByRole("button", { name: "Виж въпросите и отговорите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
@@ -32,17 +32,9 @@ test("a question can be reported", async ({ page }) => {
   await expect(page.getByText("Благодарим! Ще го прегледаме.")).toBeVisible();
 });
 
-test("a challenge from Заедно: ten questions, the link, and a friend takes it", async ({ page, browser }) => {
-  test.setTimeout(90_000);
-  await page.goto("/together");
-  await page.getByRole("link", { name: "Предизвикай" }).click();
-  await playRun(page);
-  await expect(page.getByRole("button", { name: "Изпрати предизвикателството" })).toBeVisible();
-  const link = await page.locator(".challenge-link").getAttribute("href");
-  expect(link).toMatch(/^\/c\/[a-z0-9]{6}$/);
-  const friend = await (await browser.newContext()).newPage();
-  await friend.goto(link ?? "");
-  await expect(friend.getByRole("heading", { name: /те предизвиква/ })).toBeVisible();
-  await friend.getByRole("button", { name: "Приеми" }).click();
-  await expect(friend.locator(".question-head")).toContainText("1 от 10");
+test("an old challenge link says where playing with friends went", async ({ page }) => {
+  await page.goto("/c/abc234");
+  await expect(page.getByRole("heading", { name: "Предизвикателствата ги няма" })).toBeVisible();
+  await page.getByRole("link", { name: "Към Заедно" }).click();
+  await expect(page.getByRole("heading", { name: "Заедно" })).toBeVisible();
 });

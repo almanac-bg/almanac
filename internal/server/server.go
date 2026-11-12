@@ -106,7 +106,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.push = cfg.Push
-	s.game.Finished = s.challengeDone
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Recording = s.game.RecordingFor
 	s.rooms.Kept = func(d play.Duel) {
@@ -154,9 +153,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/show", s.show)
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
-	api("POST /api/runs/{id}/challenge", s.challenge)
-	api("GET /api/challenges/{code}", s.challengeInfo)
-	api("POST /api/challenges/{code}", s.startChallenge)
 	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
 	api("POST /api/duel", s.duel)
@@ -164,6 +160,13 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/next", s.roomNext)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
+	api("POST /api/rooms/{code}/decline", s.roomDecline)
+	api("GET /api/friends", s.friends)
+	api("GET /api/friends/invites", s.duelInvites)
+	api("DELETE /api/friends/{id}", s.unfriend)
+	api("POST /api/friends/{id}/duel", s.duelFriend)
+	api("GET /api/invites/{code}", s.inviteInfo)
+	api("POST /api/invites/{code}", s.acceptInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)

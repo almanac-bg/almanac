@@ -96,7 +96,11 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-sub.Done:
-			send("event: closed\ndata: {}\n\n")
+			event := "closed" // or why: a duel turned down, an invitation not answered in time
+			if why := rm.Ended(); why != "" {
+				event = why
+			}
+			send("event: " + event + "\ndata: {}\n\n")
 			return
 		case <-s.closing:
 			return

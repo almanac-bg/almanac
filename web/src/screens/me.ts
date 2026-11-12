@@ -115,7 +115,7 @@ function account(): Child {
   );
 }
 
-/** Notifications: the evening reminder, and word when someone plays your challenge. */
+/** Notifications: the evening reminder, and word when a friend accepts your link or calls you to a duel. */
 function reminders(): Child {
   if (needsHomeScreen()) {
     return h(
@@ -156,7 +156,7 @@ function reminders(): Child {
     h(
       "p",
       { class: "muted" },
-      "Вечер в 19:00, ако въпросите на деня още те чакат, и когато някой приеме твое предизвикателство.",
+      "Вечер в 19:00, ако въпросите на деня още те чакат, и когато приятел те покани на дуел.",
     ),
     () =>
       on() === null

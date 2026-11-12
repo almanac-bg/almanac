@@ -33,7 +33,7 @@ takes a token.
 - **What each colour means:**
   - `right`: a right answer.
   - `wrong`: a wrong answer, the last five seconds, deleting.
-  - `rose`: duels and challenges.
+  - `rose`: duels and friends (an invitation to a duel, the record between two friends).
   - `sky`: rooms.
   - `lilac`: levels.
   - `silver` and `bronze`: second and third place.
@@ -77,7 +77,7 @@ takes a token.
 - **Layout:** `.screen`, `.stack`, `.intro`, `.title-row`, `.card` and `.card.hero`.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.bad` (errors) and `.status`.
 - **Controls:**
-  - `.btn`, with `primary`, `big`, `danger` and `inline`; and `.link`.
+  - `.btn`, with `primary`, `big`, `rose` (accepting a duel), `danger` and `inline`; and `.link`.
   - `.field` and `input.code`; `.join` for an input with its button.
   - `.tag` and `.chip`.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.rings`/`.ring`, `.games`/`.game`.
@@ -87,6 +87,8 @@ takes a token.
   - `.verdict` and `.fact`.
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`.
+- **Friends:** `.card.friends`, `.invitation` (a call to a duel, accepted with `.btn.rose`), `.friend-list`/`.friend`
+  (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
   - `ui.ts` has `verdict`, `fact`, `streak`, `stat`, `figure`, `ring`, `level`, `levelBadge`, `meter` and
     `toneOf`.
@@ -97,7 +99,7 @@ takes a token.
 - **Test hooks:** the browser tests depend on these classes; keep them:
   - `.question-head`, `.options .option`, `.number` and `.number-input`
   - `.after .next`, `.summary`, `.reviewed` and `.verdict`
-  - `.players li` and `.challenge-link`
+  - `.players li`, `.friend`, `.invitation` and `.invite-link`
 
 ## Game feel
 
@@ -110,7 +112,8 @@ Every element that looks like a game measures something the game already counts:
 | Place       | Place on the day's board („12-и от 318 днес.“)                                                                               | Result, Профил          |
 | Mastery     | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил            |
 | Rank change | Places moved since the previous answer                                                                                       | Room boards             |
-| Duels       | Duels won of played                                                                                                          | Заедно, Профил          |
+| Duels       | Duels won of played; between two friends, their record („3 : 2“)                                                             | Заедно, Профил          |
+| Friends     | The day's board among you and your friends („Приятели днес“), once a friend has played                                       | Result                  |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
@@ -129,7 +132,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - a decimal comma;
   - a unit after a space („15 с“);
   - places as „12-и“.
-- **No emoji in the interface.** A shared result keeps its squares (🟩🟨⬛), because that text leaves the app.
+- **No emoji in the interface.**
 
 ## Motion
 

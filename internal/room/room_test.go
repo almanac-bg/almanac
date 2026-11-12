@@ -313,3 +313,84 @@ func TestNobodyToDuel(t *testing.T) {
 		}
 	})
 }
+
+func TestADuelBetweenFriends(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		var mu sync.Mutex
+		var kept []play.Duel
+		hub.Kept = func(d play.Duel) { mu.Lock(); kept = append(kept, d); mu.Unlock() }
+		ana, bo := Player{1, "Ана"}, Player{2, "Бо"}
+		r, err := hub.Invite(ana, bo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(hub.InvitesFor(2)) != 0 {
+			t.Fatal("an invitation listed before whoever asked is waiting in it")
+		}
+		sa, _ := r.Follow(1)
+		inv := hub.InvitesFor(2)
+		if len(inv) != 1 || inv[0].Code != r.Code() || inv[0].From != "Ана" || len(hub.InvitesFor(1)) != 0 {
+			t.Fatalf("invitations %+v", inv)
+		}
+		if again, _ := hub.Invite(ana, bo); again != r {
+			t.Fatal("asking again opened a second duel")
+		}
+		if err := r.Join(Player{3, "Трети"}); !errors.Is(err, ErrFull) {
+			t.Fatalf("a third joined a friends' duel: %v", err)
+		}
+		if v := r.View(1); v.Phase != Lobby || !v.Invite || !v.Duel {
+			t.Fatalf("waiting: %+v", v)
+		}
+		_ = r.Join(bo)
+		_, _ = r.Follow(2)
+		if r.View(2).Phase != Question {
+			t.Fatal("the duel didn't start once the friend came")
+		}
+		if len(hub.InvitesFor(2)) != 0 {
+			t.Fatal("a started duel still listed as an invitation")
+		}
+		for n := range play.Length {
+			_ = r.Answer(1, n, answer(r, true))
+			_ = r.Answer(2, n, answer(r, false))
+			time.Sleep(Pause + time.Millisecond)
+			synctest.Wait()
+		}
+		synctest.Wait()
+		mu.Lock()
+		if len(kept) != 2 {
+			t.Fatalf("%d duels kept", len(kept))
+		}
+		for _, d := range kept {
+			if want := map[int64]int64{1: 2, 2: 1}[d.UserID]; d.OpponentID != want || d.Recorded {
+				t.Fatalf("kept %+v", d)
+			}
+		}
+		mu.Unlock()
+		r.Unfollow(sa)
+
+		// Turned down: both screens hear why.
+		r2, _ := hub.Invite(ana, bo)
+		s2, _ := r2.Follow(1)
+		if err := r2.Decline(3); !errors.Is(err, ErrNotNow) {
+			t.Fatalf("a stranger declined: %v", err)
+		}
+		if err := r2.Decline(2); err != nil {
+			t.Fatal(err)
+		}
+		<-s2.Done
+		if r2.Ended() != Declined {
+			t.Fatalf("ended %q", r2.Ended())
+		}
+
+		// Not answered in time: it expires.
+		r3, _ := hub.Invite(ana, bo)
+		s3, _ := r3.Follow(1)
+		time.Sleep(InviteTime + time.Second)
+		hub.Sweep()
+		<-s3.Done
+		if r3.Ended() != Expired || len(hub.InvitesFor(2)) != 0 {
+			t.Fatalf("ended %q", r3.Ended())
+		}
+	})
+}

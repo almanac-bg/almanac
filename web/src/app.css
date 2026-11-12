@@ -469,6 +469,13 @@
     color: var(--on-fill);
   }
 
+  /* Duels: accepting a friend's call to one. */
+  .btn.rose {
+    border-color: transparent;
+    background: var(--rose);
+    color: var(--on-fill);
+  }
+
   .btn.big {
     min-height: 3.75rem;
     border-radius: var(--radius-lg);
@@ -1672,6 +1679,102 @@
     width: 10px;
     height: 10px;
     border-radius: 4px;
+  }
+
+  /* ---- Friends ---- */
+
+  .friend-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .friend {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+  }
+
+  .friend + .friend {
+    border-top: 1px solid var(--line);
+  }
+
+  .friend-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .friend-name {
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .friend-day {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .record {
+    color: var(--rose-ink);
+    font: 800 1.375rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .invitation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--rose) 16%, var(--surface));
+    box-shadow: inset 0 0 0 1px var(--rose-ink);
+  }
+
+  .invitation-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .invite-link {
+    overflow-wrap: anywhere;
+  }
+
+  .small {
+    font-size: 0.875rem;
+  }
+
+  /* Read by screen readers, not shown. */
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Something waits on that screen (a friend calls to a duel). */
+  .top nav a.news::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--rose);
+    box-shadow: 0 0 0 2px var(--bg);
   }
 
   /* ---- Rooms ---- */

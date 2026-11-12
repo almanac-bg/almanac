@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -295,16 +296,8 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) {
 		t.Fatalf("today: %v", today)
 	}
-	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
-	code, _ := c["code"].(string)
 	friend := g.player()
-	if status, info := friend.call("GET", "/api/challenges/"+code, nil); status != 200 || len(info["players"].([]any)) != 1 {
-		t.Fatalf("the challenge as a stranger sees it: %d %v", status, info)
-	}
 	friend.call("POST", "/api/guest", map[string]any{})
-	if status, st := friend.call("POST", "/api/challenges/"+code, map[string]any{}); status != 200 || st["kind"] != "challenge" {
-		t.Fatalf("taking the challenge: %d %v", status, st)
-	}
 	if status, _ := friend.call("GET", "/api/runs/"+id, nil); status != 404 {
 		t.Fatalf("someone else's run: %d", status)
 	}
@@ -636,21 +629,24 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("reminded before the hour")
 	}
 
-	// Bo plays Ana's challenge: Ana hears of it.
-	_, c := ana.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
-	_, st := bo.call("POST", "/api/challenges/"+c["code"].(string), map[string]any{})
-	cid := strconv.Itoa(int(st["id"].(float64)))
-	for n := range 10 {
-		bo.call("POST", "/api/runs/"+cid+"/show", map[string]any{})
-		bo.call("POST", "/api/runs/"+cid+"/answer", map[string]any{"n": n, "answer": nil})
+	// Bo accepts Ana's invite link: Ana hears of it. Ana asks Bo to a duel: Bo hears of it.
+	pushes := func(path string, want int) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); fake.count(path) < want && time.Now().Before(deadline); {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if got := fake.count(path); got != want {
+			t.Fatalf("%s: %d pushes, want %d", path, got, want)
+		}
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for fake.count("/ana") == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if fake.count("/ana") != 1 {
-		t.Fatal("Ana wasn't told her challenge was played")
-	}
+	_, mine := ana.call("GET", "/api/friends", nil)
+	link := mine["invite"].(string)
+	bo.call("POST", "/api/invites/"+link[strings.LastIndex(link, "/")+1:], nil)
+	pushes("/ana", 1)
+	_, mine = ana.call("GET", "/api/friends", nil)
+	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
+	ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	pushes("/bo", 2)
 }
 
 func TestLinkPreviews(t *testing.T) {
@@ -676,11 +672,11 @@ func TestLinkPreviews(t *testing.T) {
 		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
 		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
 	}
-	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
+	_, friends := p.call("GET", "/api/friends", nil)
+	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page("/c/" + c["code"].(string)); !strings.Contains(body, `og:title" content="`+who+` те предизвиква"`) ||
-		!strings.Contains(body, "има 0 от 10. Можеш ли повече?") {
-		t.Fatalf("the challenge's preview:\n%s", body[:min(len(body), 1500)])
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани в АЛМАНАХ"`) {
+		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}
 	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
 	code := room["code"].(string)
@@ -718,5 +714,84 @@ func TestALeftRequestIsNoProblem(t *testing.T) {
 	// Bo asks now: Ana is gone, so he isn't matched with her (with nobody about and no recordings: nobody).
 	if status, out := bo.call("POST", "/api/duel", map[string]any{}); status != 404 || out["error"] != "nobody" {
 		t.Fatalf("Bo was matched with someone gone: %d %v", status, out)
+	}
+}
+
+func TestFriendsOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	_, a := ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	_, mine := ana.call("GET", "/api/friends", nil)
+	link, _ := mine["invite"].(string)
+	code := link[strings.LastIndex(link, "/")+1:]
+	if !strings.HasSuffix(link, "/f/"+code) || len(code) != 8 {
+		t.Fatalf("Ana's invite link: %q", link)
+	}
+	if _, info := ana.call("GET", "/api/invites/"+code, nil); info["own"] != true {
+		t.Fatalf("Ana's own link: %v", info)
+	}
+	if _, info := bo.call("GET", "/api/invites/"+code, nil); info["by"] != name(a) || info["own"] != false {
+		t.Fatalf("Ana's link, as Bo sees it: %v", info)
+	}
+	if status, _ := bo.call("POST", "/api/invites/nosuchcd", nil); status != http.StatusNotFound {
+		t.Fatalf("a made-up link: %d", status)
+	}
+	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusOK || out["name"] != name(a) {
+		t.Fatalf("Bo accepts: %d %v", status, out)
+	}
+	_, mine = ana.call("GET", "/api/friends", nil)
+	friends, _ := mine["friends"].([]any)
+	if len(friends) != 1 {
+		t.Fatalf("Ana's friends: %v", mine)
+	}
+	boID := int64(friends[0].(map[string]any)["id"].(float64))
+
+	// A duel: Ana asks, Bo sees the invitation, comes, and it starts.
+	_, out := ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	room, _ := out["code"].(string)
+	as := ana.follow(room)
+	as.until(func(v map[string]any) bool { return v["phase"] == "lobby" && v["invite"] == true })
+	_, his := bo.call("GET", "/api/friends", nil)
+	if inv, _ := his["invites"].([]any); len(inv) != 1 || inv[0].(map[string]any)["code"] != room {
+		t.Fatalf("Bo's invitations: %v", his)
+	}
+	bs := bo.follow(room)
+	for _, s := range []*stream{as, bs} {
+		s.until(func(v map[string]any) bool { return v["phase"] == "question" && v["duel"] == true })
+	}
+
+	// Another, turned down: Ana's screen hears it was.
+	_, out = ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	second, _ := out["code"].(string)
+	if second == room {
+		t.Fatal("a started duel was offered again")
+	}
+	as2 := ana.follow(second)
+	as2.until(func(v map[string]any) bool { return v["phase"] == "lobby" })
+	if status, _ := bo.call("POST", "/api/rooms/"+second+"/decline", nil); status != http.StatusOK {
+		t.Fatalf("Bo declines: %d", status)
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		line, err := as2.r.ReadString('\n')
+		if err != nil || time.Now().After(deadline) {
+			t.Fatalf("no word of the decline: %v", err)
+		}
+		if strings.TrimSpace(line) == "event: declined" {
+			break
+		}
+	}
+
+	// Strangers can't ask each other.
+	vi := g.player()
+	vi.call("POST", "/api/guest", map[string]any{})
+	if status, _ := vi.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil); status != http.StatusNotFound {
+		t.Fatalf("a stranger asked Bo to a duel: %d", status)
+	}
+	if status, _ := bo.call("DELETE", fmt.Sprintf("/api/friends/%d", int64(a["user"].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
+		t.Fatalf("unfriending: %d", status)
+	}
+	if _, his = bo.call("GET", "/api/friends", nil); len(his["friends"].([]any)) != 0 {
+		t.Fatalf("still friends: %v", his)
 	}
 }

@@ -74,10 +74,9 @@ export interface Shown {
 
 export interface State {
   id: number;
-  kind: "day" | "topic" | "challenge";
+  kind: "day" | "topic";
   day?: string;
   category?: string;
-  challenge?: string;
   total: number;
   at: number;
   points: number;

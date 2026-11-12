@@ -323,40 +323,6 @@ func TestTopics(t *testing.T) {
 	}
 }
 
-func TestChallenge(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "music")
-	if _, err := w.g.Challenge(ctx, ana, s.ID); !errors.Is(err, ErrOutOfStep) {
-		t.Fatalf("a challenge from an unfinished run: %v", err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, err := w.g.Challenge(ctx, ana, s.ID)
-	if err != nil || len(code) != 6 {
-		t.Fatalf("code %q %v", code, err)
-	}
-	if again, _ := w.g.Challenge(ctx, ana, s.ID); again != code {
-		t.Fatal("a second code for the same run")
-	}
-	theirs, err := w.g.StartChallenge(ctx, bo, code)
-	if err != nil || theirs.Kind != "challenge" {
-		t.Fatalf("%+v %v", theirs, err)
-	}
-	if a, b := w.picks(s.ID), w.picks(theirs.ID); a[3] != b[3] {
-		t.Fatal("not the same questions, dealt the same way")
-	}
-	// The maker opening their own link gets their own run back.
-	if own, _ := w.g.StartChallenge(ctx, ana, code); own.ID != s.ID {
-		t.Fatal("the maker got a new run")
-	}
-	w.play(bo, theirs.ID, append(repeat(w.right, 4), repeat(w.wrong, 6)...)...)
-	c, err := w.g.ChallengeOf(ctx, code, bo)
-	if err != nil || len(c.Players) != 2 || c.Players[0].Rights != 10 || !c.Players[1].Me || c.Mine != theirs.ID {
-		t.Fatalf("%+v %v", c, err)
-	}
-}
-
 func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -438,5 +404,89 @@ func TestRecordingsAndDuels(t *testing.T) {
 	}
 	if err := w.g.SaveDuel(ctx, Duel{UserID: bo, Picks: rec.Picks}); err == nil {
 		t.Fatal("kept a duel without its answers")
+	}
+}
+
+func TestFriends(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi := w.user(), w.user(), w.user()
+	code, err := w.g.InviteCode(ctx, ana)
+	if again, _ := w.g.InviteCode(ctx, ana); err != nil || len(code) != 8 || again != code {
+		t.Fatalf("Ana's invite: %q, again %q, %v", code, again, err)
+	}
+	if _, _, err := w.g.Befriend(ctx, ana, code); !errors.Is(err, ErrOwnInvite) {
+		t.Fatalf("befriended oneself: %v", err)
+	}
+	if _, _, err := w.g.Befriend(ctx, bo, "nosuchcd"); !errors.Is(err, ErrNoInvite) {
+		t.Fatalf("a made-up invite: %v", err)
+	}
+	if id, _, err := w.g.Befriend(ctx, bo, code); err != nil || id != ana {
+		t.Fatalf("Bo befriends Ana: %d %v", id, err)
+	}
+	if _, _, err := w.g.Befriend(ctx, bo, code); err != nil {
+		t.Fatalf("befriending again: %v", err)
+	}
+	for _, p := range [][2]int64{{ana, bo}, {bo, ana}} {
+		if _, err := w.g.Friend(ctx, p[0], p[1]); err != nil {
+			t.Fatalf("%d and %d aren't friends both ways: %v", p[0], p[1], err)
+		}
+	}
+	if _, err := w.g.Friend(ctx, ana, vi); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("Ana and Vi: %v", err)
+	}
+
+	// The day: nobody's board until a friend has played; then both, best first.
+	day := w.g.Today()
+	if b, _ := w.g.FriendsBoard(ctx, day, ana); b != nil {
+		t.Fatalf("a friends' board before anyone played: %+v", b)
+	}
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, append(repeat(w.right, 4), repeat(w.wrong, Length-4)...)...)
+	if b, _ := w.g.FriendsBoard(ctx, day, ana); b != nil {
+		t.Fatalf("a friends' board with only oneself on it: %+v", b)
+	}
+	s, _ = w.g.StartDay(ctx, bo)
+	w.play(bo, s.ID, repeat(w.right, Length)...)
+	b, err := w.g.FriendsBoard(ctx, day, ana)
+	if err != nil || len(b) != 2 || b[0].Me || !b[1].Me || b[0].Rights != Length {
+		t.Fatalf("the friends' board: %+v %v", b, err)
+	}
+
+	// A duel between them counts in the record, from each side.
+	picks := w.picks(s.ID)
+	for _, d := range []Duel{
+		{UserID: ana, OpponentID: bo, Opponent: "Бо", Outcome: "won"},
+		{UserID: bo, OpponentID: ana, Opponent: "Ана", Outcome: "lost"},
+	} {
+		d.Picks = picks
+		for _, p := range picks {
+			d.Answers = append(d.Answers, DuelAnswer{QuestionID: p.ID, Ms: 1000})
+		}
+		if err := w.g.SaveDuel(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err := w.g.FriendsOf(ctx, ana)
+	if err != nil || len(list) != 1 || list[0].ID != bo || list[0].Won != 1 || list[0].Lost != 0 ||
+		list[0].Today == nil || list[0].Today.Rights != Length {
+		t.Fatalf("Ana's friends: %+v %v", list, err)
+	}
+	if list, _ := w.g.FriendsOf(ctx, bo); len(list) != 1 || list[0].Lost != 1 {
+		t.Fatalf("Bo's friends: %+v", list)
+	}
+
+	// A guest who signs in to an account brings their friends and their record along.
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, bo, vi) }); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := w.g.FriendsOf(ctx, ana); len(list) != 1 || list[0].ID != vi || list[0].Won != 1 {
+		t.Fatalf("Ana's friends after Bo signed in as Vi: %+v", list)
+	}
+	if err := w.g.Unfriend(ctx, vi, ana); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := w.g.FriendsOf(ctx, ana); len(list) != 0 {
+		t.Fatalf("still friends: %+v", list)
 	}
 }

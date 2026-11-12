@@ -1,6 +1,6 @@
 // Игра: questions by topic, as many as you like, shaped by how well you know the topic.
 
-import { shareButton, summary } from "../game/results.ts";
+import { summary } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -86,31 +86,8 @@ export function topic([id = ""]: string[]) {
           "div",
           { class: "actions" },
           h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-          challengeButton(s),
-          h("a", { href: "/play" }, "Друга тема"),
+          h("a", { class: "btn", href: "/play" }, "Друга тема"),
         ),
-      ),
-    ),
-  );
-}
-
-/** Предизвикай: ten questions from every topic, then the link for others to play the same ten. */
-export function challengeNew() {
-  title("Предизвикай");
-  return run("", (s) =>
-    h(
-      "div",
-      { class: "screen" },
-      h("p", { class: "kicker" }, "Предизвикателство"),
-      summary(
-        s,
-        null,
-        h(
-          "p",
-          null,
-          "Сега прати линка: приятелите ти играят същите десет въпроса, когато им е удобно, и виждате кой колко има.",
-        ),
-        challengeButton(s, true),
       ),
     ),
   );
@@ -138,35 +115,4 @@ function run(category: string, finished: (s: State, again: () => void) => Child)
   };
   start();
   return h("div", null, () => screen());
-}
-
-/** Makes a challenge link from a finished run (at once, if now), and shares it. */
-export function challengeButton(s: State, now = false): Child {
-  const link = signal<string | null>(null);
-  const error = signal("");
-  const make = async () => {
-    try {
-      link.set((await api<{ url: string }>("POST", `/api/runs/${s.id}/challenge`, {})).url);
-    } catch (err) {
-      error.set((err as ApiError).message);
-    }
-  };
-  if (now) make();
-  return h("div", { class: "stack" }, () => {
-    const url = link();
-    if (url)
-      return [
-        shareButton(
-          "Изпрати предизвикателството",
-          () => `Аз имам ${s.rights} от ${s.total}. Ти колко ще имаш?`,
-          url,
-          now,
-        ),
-        h("p", { class: "muted" }, "Линкът: ", h("a", { href: new URL(url).pathname, class: "challenge-link" }, url)),
-      ];
-    return [
-      h("button", { class: "btn", onclick: make }, "Предизвикай някого"),
-      error() && h("p", { class: "bad" }, error()),
-    ];
-  });
 }
