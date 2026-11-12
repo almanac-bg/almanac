@@ -66,7 +66,9 @@ type Server struct {
 	rooms    *room.Hub
 	push     *push.Sender
 	// closing ends the streams (rooms) when the server stops, so that it needn't wait for them.
-	closing  chan struct{}
+	closing chan struct{}
+	// duelWait is how long a duel search waits for someone else (DuelWait; tests make it short).
+	duelWait time.Duration
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
@@ -116,6 +118,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 		}
 	}
 	s.closing = make(chan struct{})
+	s.duelWait = DuelWait
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
 	return s, nil

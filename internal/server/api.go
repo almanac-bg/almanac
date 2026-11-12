@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,6 +60,11 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 		w.Header().Set("Cache-Control", "no-store")
 		err := h(w, r)
 		if err == nil {
+			return
+		}
+		// The player went away (closed the page, cancelled a search): nobody to answer, nothing wrong.
+		if errors.Is(err, context.Canceled) && r.Context().Err() != nil {
+			w.WriteHeader(499)
 			return
 		}
 		var ae *apiError

@@ -171,7 +171,11 @@ func (s *Server) duel(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("duel:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
 		return errTooMany
 	}
-	code, err := s.rooms.Match(r.Context(), room.Player{ID: u.ID, Name: u.Name}, DuelWait)
+	// Read the (empty) body first: only then does the server notice a player who leaves, and free their place.
+	if err := readJSON(r, &struct{}{}); err != nil {
+		return err
+	}
+	code, err := s.rooms.Match(r.Context(), room.Player{ID: u.ID, Name: u.Name}, s.duelWait)
 	if err != nil {
 		return err
 	}

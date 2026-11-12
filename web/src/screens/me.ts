@@ -1,5 +1,6 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
+import { reportProblem } from "../lib/errors.ts";
 import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { type User, user } from "../state.ts";
@@ -134,7 +135,8 @@ function reminders(): Child {
         if (why) error.set(why);
         else on.set(true);
       }
-    } catch {
+    } catch (err) {
+      reportProblem(`reminders: ${(err as Error).name}: ${(err as Error).message}`);
       error.set("Не успяхме. Опитай пак.");
     }
   };
