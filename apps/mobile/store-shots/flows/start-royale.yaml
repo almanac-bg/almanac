@@ -1,7 +1,0 @@
-# A Роял from the home screen, filled with bots on a local server.
-appId: bg.almanac.app
----
-- tapOn: "Роял: .*"
-- extendedWaitUntil:
-    visible: "Въпрос \\d+ от .*"
-    timeout: 60000

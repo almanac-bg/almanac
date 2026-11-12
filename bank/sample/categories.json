@@ -1,0 +1,12 @@
+[
+  {"id": "general", "name": "Обща култура"},
+  {"id": "science", "name": "Наука"},
+  {"id": "history", "name": "История"},
+  {"id": "geography", "name": "География"},
+  {"id": "movies", "name": "Кино и телевизия"},
+  {"id": "music", "name": "Музика"},
+  {"id": "sports", "name": "Спорт"},
+  {"id": "technology", "name": "Технологии и игри"},
+  {"id": "literature", "name": "Изкуство и литература"},
+  {"id": "nature", "name": "Природа и животни"}
+]

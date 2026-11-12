@@ -1,7 +1,0 @@
-// The tests and the scripts they read run on Node (Jest): its globals and types, beside the app's.
-{
-  "extends": "../tsconfig.json",
-  "compilerOptions": { "types": ["jest", "node"] },
-  "include": ["./**/*.ts", "./**/*.tsx", "../scripts/**/*.ts", "../src/**/*.ts", "../src/**/*.tsx"],
-  "exclude": []
-}

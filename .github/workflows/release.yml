@@ -1,23 +1,14 @@
-# Releases (docs/maintainers.md → Издания). On every push to main release-please reads the Conventional Commits since
-# the last version and keeps one pull request open, "chore(release): X.Y.Z": the next version (SemVer, from the commit
-# types) in every package.json and package-lock.json, and the CHANGELOG.md section that goes with it. Merging that pull
-# request is the release: on the push it makes, this tags the merge commit vX.Y.Z and publishes the GitHub release with
-# the same notes. That commit is what gets deployed.
-#
-# release-please runs from npm (pinned in package-lock.json, kept current by Dependabot), not as a third-party action:
-# the repository allows GitHub's own actions only (scripts/github-setup.sh). Its pull request needs "Allow GitHub
-# Actions to create pull requests" on (github-setup.sh), and, made with this token, it runs no CI of its own: its
-# changes are a version and a changelog, and the push of its merge runs CI in full.
+# A release is a tag: push vX.Y.Z (SemVer, from the commits since the last: feat → minor, fix → patch, ! → major)
+# and this builds the program for the server, attests where it came from, and publishes the GitHub release with
+# notes made from the pull requests in it. deploy/deploy.sh installs a release by its tag.
 name: Release
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags: ["v*.*.*"]
 
 permissions: {}
 
-# One at a time, and none cut short: a release half made would leave a tag without its release.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -25,28 +16,31 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
-      # Tags, releases and the release branch.
       contents: write
-      # The release pull request, and its labels (release-please marks a pull request it has released).
-      pull-requests: write
-      issues: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          node-version: 24
-          cache: npm
-      # Only the packages, none of their scripts: release-please is all this needs.
-      - run: npm ci --ignore-scripts
-      - name: Tag and publish a release pull request that was merged
+          go-version-file: go.mod
+      - run: go vet ./... && go test -race ./...
+      - name: Build for the server (Linux, ARM)
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: npx release-please github-release --token "$GITHUB_TOKEN" --repo-url "$GITHUB_REPOSITORY"
-      - name: Open or update the next release pull request
+          VERSION: ${{ github.ref_name }}
+        run: |
+          go run ./cmd/build
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o almanac-linux-arm64 ./cmd/almanac
+          sha256sum almanac-linux-arm64 > almanac-linux-arm64.sha256
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: almanac-linux-arm64
+      - name: Publish the release
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: npx release-please release-pr --token "$GITHUB_TOKEN" --repo-url "$GITHUB_REPOSITORY"
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" almanac-linux-arm64 almanac-linux-arm64.sha256 --generate-notes --verify-tag

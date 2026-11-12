@@ -1,27 +1,13 @@
 <!--
-Заглавието става commit-ът в main (squash), затова е по Conventional Commits — на английски, в повелително наклонение,
-с малка буква, без точка, до 72 знака (CI пуска до 100); CI го проверява (commitlint.config.mjs):
-
-  type(scope): summary
-
-type: feat (нещо ново) · fix (поправка) · perf · refactor · docs · test · build · ci · chore · revert
-scope (по желание): web · mobile · server · client · shared · bank · deploy · ci · docs · deps · e2e · security · release
-Промяна, която иска действие от поддържащите (настройка, преместени данни): `feat!:` / `fix!:` и ред
-„BREAKING CHANGE: …“ в описанието.
-
-Пример: fix(web): keep entrances still under reduced motion
+The title becomes the commit on main (squash), so it's a Conventional Commit, checked by CI: `type(scope): summary`,
+English, imperative, lowercase, no full stop. Types: feat · fix · perf · refactor · docs · test · build · ci · chore ·
+revert. Scopes (optional): web · server · bank · game · deploy · ci · docs · deps · security · release.
 -->
 
-## Какво и защо
+## What and why
 
-<!-- Какво променя това и защо? Добави линк към issue-то, ако има такова. -->
+## Checked
 
-## Проверено
-
-- [ ] `npm run lint`, `npm run typecheck` и `npm test` минават
-- [ ] Новото поведение има тест (сървър: `apps/server/test`, браузър: `apps/web/e2e`, приложение: `apps/mobile/__tests__`)
-- [ ] Текстът за играчите е на български и неутрален по отношение на пола; работи на телефон с ширина 320 px
-- [ ] Промяна в базата е нова миграция в края на `apps/server/src/db.ts`, съвместима (`compatible`), когато може: така връщането към предишната версия работи без възстановяване
-- [ ] Промяна в протокола (сокети, REST) само добавя: отворените табове на предишната версия продължават да работят до презареждането си
-- [ ] Заглавието казва какво ще забележат играчите или поддържащите: от типа му зависят следващата версия и бележките към
-  изданието (`CHANGELOG.md` се пише сам при изданието — не го пипай)
+- [ ] `go test ./...`, `npx tsc -p web`, `npx biome ci .` and `npm test` pass
+- [ ] New behaviour has a test
+- [ ] Text for players is Bulgarian, gender-neutral, and fits a 320 px wide phone

@@ -1,380 +1,62 @@
+# Every push to main and every pull request: the server's tests (with the race detector), the client's types, lint and
+# tests, and both builds — the client within its size budget.
 name: CI
 
-# Pushes to main, and pull requests (a pull request's branch isn't also built on push: one run each).
 on:
   push:
     branches: [main]
-    # The history before 1.2.0 (docs/changelog/) is no code: no run and no image for a commit that changes only it
-    # (deploy/deploy.sh then runs the newest commit before it that has one). Everything else, Markdown included, is
-    # built and tested — a release's CHANGELOG.md comes with its versions.
-    paths-ignore: [docs/changelog/**]
   pull_request:
 
-# The workflow only reads the code; nothing in it needs to write to the repository.
-permissions:
-  contents: read
-  # .github/flaky.mjs reads the earlier runs on main (their jobs and annotations).
-  actions: read
-  checks: read
+permissions: {}
 
-# A newer push to a pull request's branch makes the run before it pointless. Not on main: every commit there gets its
-# run to the end, and so its image (deploy/rollback.sh <commit> can go back to any of them) — so each of main's runs
-# is a group of its own. (One group for main let a third push cancel the second's waiting run: GitHub keeps one run
-# and one waiting per group. The 31 October review, REPO-11.)
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-# Actions are pinned to a commit (a tag can be moved to other code); Dependabot updates the commit and the comment.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  test:
+  go:
+    name: Server
     runs-on: ubuntu-24.04
-    # A hung test would otherwise hold the runner for six hours.
-    timeout-minutes: 25
-    # Node 24 (development, and the floor in `engines`) and Node 26 (what the Docker image, so production, runs).
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [24, 26]
-    name: test (Node ${{ matrix.node }})
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Nothing here pushes: the token isn't left in .git for the steps that follow.
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      # Formatting, lint rules and import order (Biome; `npm run format` fixes most of it).
-      - run: npm run lint
-      # The server's scripts (deploy, rollback, the daily checks): the runner has ShellCheck.
-      - run: shellcheck --severity=warning deploy/*.sh scripts/*.sh
-      - run: npm run typecheck
-      - run: npm run build
-      # Sources, then the production bundle that ships in the Docker image (the tests that start a server on it).
-      - run: npm test
-      - run: npm run test:dist -w @almanac/server
+          go-version-file: go.mod
+      - name: Formatted
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "::error::gofmt these: $unformatted"; exit 1; fi
+      - run: go vet ./...
+      - name: The client, within its budget
+        run: go run ./cmd/build
+      - run: go test -race ./...
+      - name: The program
+        run: CGO_ENABLED=0 go build -trimpath -o almanac ./cmd/almanac
+      - name: The sample bank passes its checks
+        run: ./almanac bank check bank/sample
 
-  # The built app in a real browser, on production's Node and the production build (apps/web/playwright.config.ts):
-  # Chrome (the runner's own), and Playwright's builds of Safari's engine and Firefox's at 0.5 speed (a question lasts
-  # 7.5 s: on the runner their clicks take far longer than Chrome's). Each in parts on runners of their own, WebKit — the
-  # slowest — in three: no part takes much longer than the server tests (the 31 October review, REPO-10).
-  browsers:
+  web:
+    name: Client
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { engine: chromium, shard: 1, shards: 2 }
-          - { engine: chromium, shard: 2, shards: 2 }
-          - { engine: webkit, shard: 1, shards: 3 }
-          - { engine: webkit, shard: 2, shards: 3 }
-          - { engine: webkit, shard: 3, shards: 3 }
-          - { engine: firefox, shard: 1, shards: 2 }
-          - { engine: firefox, shard: 2, shards: 2 }
-    name: browser tests (${{ matrix.engine }} ${{ matrix.shard }}/${{ matrix.shards }})
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Nothing here pushes: the token isn't left in .git for the steps that follow.
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          # Production's.
-          node-version: 26
-          cache: npm
-      - run: npm ci
-      # Playwright's WebKit and Firefox, kept between runs for the Playwright version that wants them (Chrome is the
-      # runner's). The system packages they need are installed each time.
-      - id: playwright
-        if: matrix.engine != 'chromium'
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-        working-directory: apps/web
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: matrix.engine != 'chromium'
-        with:
-          path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-${{ matrix.engine }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.engine != 'chromium'
-        run: npx playwright install --with-deps ${{ matrix.engine }}
-        working-directory: apps/web
-      - run: npm run build
-      # Chrome's projects are the plain ones (phone, desktop); the others carry the engine's name (webkit-phone…).
-      - run: |
-          prefix=$([ "$ENGINE" = chromium ] || echo "$ENGINE-")
-          npx playwright test --project="${prefix}phone" --project="${prefix}desktop" --shard="$SHARD"
-        working-directory: apps/web
-        env:
-          ENGINE: ${{ matrix.engine }}
-          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
-          E2E_ENGINES: ${{ matrix.engine != 'chromium' && matrix.engine || '' }}
-          E2E_TIME_SCALE: ${{ matrix.engine == 'chromium' && '0.15' || '0.5' }}
-      # How SQLite runs every statement the server ran in these tests: a read of a whole table that grows with players
-      # fails (apps/server/test/plans.ts; `npm test` checks the server tests' own).
-      - run: npm run plans -w @almanac/server
-      # A test that passed only on its retry, written down (and both attempts' traces uploaded below): green, but worth
-      # a look — and on main, the same test flaky three runs in a row fails the job.
-      - id: flaky
-        if: always()
-        run: node .github/flaky.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      # What went wrong, to look at: the HTML report, with screenshots and the traces.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure() || steps.flaky.outputs.flaky > 0
-        with:
-          name: playwright-report-${{ matrix.engine }}-${{ matrix.shard }}
-          path: |
-            apps/web/playwright-report/
-            apps/web/test-results/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  # One check for all the parts above, the one the repository's rules require: parts can be added or split without
-  # touching the rules (scripts/github-setup.sh).
-  browser-tests:
-    if: always()
-    needs: browsers
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    name: browser tests
-    steps:
-      - run: test "$RESULT" = success
-        env:
-          RESULT: ${{ needs.browsers.result }}
-
-  # The native app (apps/mobile), on its own install (CONTRIBUTING.md → Приложението): the versions the Expo SDK
-  # expects, its type checks and tests, and both platforms' bundles, built as a store build would be (Metro). Native
-  # builds and the stores are Expo's service (docs/app-stores.md).
-  app:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    name: app
-    defaults:
-      run:
-        working-directory: apps/mobile
-    env:
-      EXPO_NO_TELEMETRY: 1
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Nothing here pushes: the token isn't left in .git for the steps that follow.
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
-      - run: npx expo install --check
-      # Expo's own checks of what a native build needs and no test here sees: a native module another one needs, there
-      # only through a third package, isn't built into the app (expo-asset for expo-audio: a crash on the phone).
-      - run: npx expo-doctor
-      - run: npm run typecheck
-      - run: npm test -- --ci
-      - run: npm run bundle
-      # The licences shown in the app (Настройки → Лицензи) are what this bundle holds: a package added, gone or changed
-      # asks for `npm run licenses` (scripts/licenses.mjs) and the file it writes.
-      - run: npm run licenses -- --check
-
-  # Its own build, so it starts at once beside the others (`image` and `publish` wait for every job).
-  docker:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Nothing here pushes: the token isn't left in .git for the steps that follow.
-          persist-credentials: false
-      # The production compose file must parse (anchors, profiles, env interpolation)…
-      - run: DOMAIN=example.test docker compose config --quiet
-      # …and Caddy must accept its config: a mistake there takes HTTPS down.
-      # (The same Caddy version the compose file runs.)
-      - run: >-
-          docker run --rm -e DOMAIN=example.test -v "$PWD/deploy:/etc/caddy:ro"
-          "$(sed -n 's/.*image: \(caddy:.*\)/\1/p' docker-compose.yml)"
-          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-      - run: docker build -t almanac .
-      # Boot the image and wait for the health check to pass.
-      - run: |
-          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI almanac
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:3001/api/health && exit 0
-            sleep 1
-          done
-          docker logs almanac
-          exit 1
-      # The picture codec (sharp, the one package beside the bundle) loads and encodes in the image.
-      - run: >-
-          docker run --rm -w /app almanac
-          node --input-type=module -e "import sharp from 'sharp';
-          const jpeg = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#c33' } }).jpeg().toBuffer();
-          const webp = await sharp(jpeg).webp().toBuffer();
-          if (webp.toString('latin1', 8, 12) !== 'WEBP') process.exit(1);
-          console.log('libvips', sharp.versions.vips)"
-      # Backups, end to end with the production Litestream config: stream the live database to S3-compatible storage
-      # (moto stands in for the real thing), write more, then restore it the way docs/operations.md does on a new server and
-      # run the app on the restored copy — it must be able to write there too. A backup that has never been restored
-      # isn't a backup.
-      - name: Backup and restore with Litestream
-        run: |
-          set -eu
-          LITESTREAM=$(sed -n 's/.*image: \(litestream\/litestream:.*\)/\1/p' docker-compose.yml)
-          export BACKUP_BUCKET=backups BACKUP_ENDPOINT=http://s3:5000 BACKUP_REGION=us-east-1
-          export BACKUP_ACCESS_KEY_ID=test BACKUP_SECRET_ACCESS_KEY=test
-          env_args="-e BACKUP_BUCKET -e BACKUP_ENDPOINT -e BACKUP_REGION -e BACKUP_ACCESS_KEY_ID -e BACKUP_SECRET_ACCESS_KEY"
-          config="-v $PWD/deploy/litestream.yml:/etc/litestream.yml:ro"
-          app_env="-e OPERATOR_NAME=CI"
-          # As in docker-compose.yml: Litestream runs as the app's user.
-          as_app="--user 1000:1000"
-          healthy() {
-            for i in $(seq 1 30); do docker exec "$1" wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1 && return 0; sleep 1; done
-            docker logs "$1"; return 1
-          }
-          register() {
-            docker exec "$1" wget -qO- --header='content-type: application/json' \
-              --post-data="{\"username\":\"$2\",\"password\":\"secret123\"}" http://127.0.0.1:3001/api/auth/register
-          }
-          users() {
-            docker exec "$1" node -e \
-              "const db = new (require('node:sqlite').DatabaseSync)('/data/almanac.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)"
-          }
-
-          docker network create backup
-          docker run -d --name s3 --network backup motoserver/moto:5.2.4@sha256:120b1589c6df7e35d2092935f6ff724486bb2c4189d0e36ce795baba1400ffd2
-          docker run -d --name app --network backup -v data:/data $app_env almanac
-          healthy app
-          docker run --rm --network backup curlimages/curl:8.11.1@sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69 -sf -X PUT http://s3:5000/backups
-
-          register app before_backup
-          docker run -d --name litestream --network backup $as_app -v data:/data $config $env_args "$LITESTREAM" replicate
-          sleep 5
-          register app after_backup
-          sleep 5
-          docker logs litestream
-
-          # A new server: the data volume created by the app's image (so it's the app user's), restored into, and the
-          # app started on it.
-          docker run --rm -v restored:/data --entrypoint true almanac
-          docker run --rm --network backup $as_app -v restored:/data $config $env_args "$LITESTREAM" restore -o /data/almanac.db /data/almanac.db
-          docker run -d --name restored --network backup -v restored:/data $app_env almanac
-          healthy restored
-          register restored after_restore
-          echo "restored users: $(users restored)"
-          test "$(users restored)" = "before_backup,after_backup,after_restore"
-
-          # A daily copy put back over the live database, as docs/operations.md does it (`litestream reset` after the
-          # copy): Litestream must carry on from the copy, so a restore after that brings back the copy and what was
-          # written since — not the old database, and not nothing. Litestream 0.5 doesn't document this case.
-          docker exec app node -e "require('node:fs').mkdirSync('/data/backups', { recursive: true }); new (require('node:sqlite').DatabaseSync)('/data/almanac.db').exec(\"VACUUM INTO '/data/backups/almanac-2026-01-01.db'\")"
-          register app after_copy
-          sleep 5
-          docker stop app litestream
-          docker run --rm -v data:/data --entrypoint sh almanac -c \
-            'cp /data/backups/almanac-2026-01-01.db /data/almanac.db && rm -f /data/almanac.db-wal /data/almanac.db-shm'
-          docker run --rm $as_app -v data:/data $config $env_args "$LITESTREAM" reset /data/almanac.db
-          docker start litestream app
-          healthy app
-          register app after_copy_restore
-          sleep 5
-          docker logs litestream
-          docker run --rm -v again:/data --entrypoint true almanac
-          docker run --rm --network backup $as_app -v again:/data $config $env_args "$LITESTREAM" restore -o /data/almanac.db /data/almanac.db
-          again=$(docker run --rm -v again:/data --entrypoint node almanac -e \
-            "const db = new (require('node:sqlite').DatabaseSync)('/data/almanac.db'); console.log(db.prepare('SELECT group_concat(username) AS u FROM (SELECT username FROM users ORDER BY id)').get().u)")
-          echo "restored after the copy: $again"
-          test "$again" = "before_backup,after_backup,after_copy_restore"
-
-  # On main, once every check above has passed (the browser tests in all three engines too): the image production runs,
-  # built for its ARM server (Hetzner CAX11) on GitHub's ARM runners, started once, and pushed to the GitHub Container
-  # Registry under the commit. deploy/deploy.sh pulls exactly that image: what runs is what was tested, nothing is built
-  # on the server, and a commit that failed here has no image to deploy. The image holds only this repository's code;
-  # the private question bank is mounted at run time (docker-compose.yml).
-  # The image for every server the docs recommend, x86 and ARM (a recovery onto an x86 server crash-looped on an
-  # ARM-only one): each built and started on its own kind of runner, then one tag for both.
-  image:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, browser-tests, docker]
-    strategy:
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    name: image (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      packages: write
-    env:
-      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}-${{ matrix.arch }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Nothing here pushes: the token isn't left in .git for the steps that follow.
-          persist-credentials: false
-      - run: >-
-          docker build -t "$IMAGE"
-          --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}"
-          --label "org.opencontainers.image.revision=${{ github.sha }}" .
-      - name: The image starts and answers
-        run: |
-          docker run -d --name almanac -p 3001:3001 -e OPERATOR_NAME=CI "$IMAGE"
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:3001/api/health && exit 0
-            sleep 1
-          done
-          docker logs almanac
-          exit 1
-      - name: The picture codec loads and encodes on this platform
-        run: >-
-          docker run --rm -w /app "$IMAGE"
-          node --input-type=module -e "import sharp from 'sharp';
-          const jpeg = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#c33' } }).jpeg().toBuffer();
-          const webp = await sharp(jpeg).webp().toBuffer();
-          if (webp.toString('latin1', 8, 12) !== 'WEBP') process.exit(1);
-          console.log('libvips', sharp.versions.vips)"
-      # The token from the environment, not written into the script (a value in ${{ }} becomes part of the shell code).
-      - run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTOR: ${{ github.actor }}
-      - run: docker push "$IMAGE"
-
-  # ghcr.io/…:<commit>, what deploy/deploy.sh pulls: a list of the two, so each server gets its own. With a signed
-  # statement (build provenance) that this workflow, on this commit, made exactly that list: a tag can be pushed again
-  # by anyone with write access to the package, the statement can't, and deploy/deploy.sh pulls only what it covers.
-  publish:
-    needs: image
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      packages: write
-      id-token: write
-      attestations: write
-    env:
-      IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
-    steps:
-      # The token from the environment, not written into the script (a value in ${{ }} becomes part of the shell code).
-      - run: printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTOR: ${{ github.actor }}
-      - run: docker buildx imagetools create -t "$IMAGE" "$IMAGE-amd64" "$IMAGE-arm64"
-      - name: Both kinds are in it
-        id: list
-        run: |
-          docker buildx imagetools inspect "$IMAGE" | tee /dev/stderr | grep -q 'linux/amd64'
-          docker buildx imagetools inspect "$IMAGE" | grep -q 'linux/arm64'
-          echo "digest=$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' | jq -r .digest)" >> "$GITHUB_OUTPUT"
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.list.outputs.digest }}
-          create-storage-record: false
+      - run: npm ci --ignore-scripts
+      - name: Types
+        run: npx tsc -p web
+      - name: Lint and format
+        run: npx biome ci .
+      - run: npm test

@@ -1,0 +1,12 @@
+{
+  "name": "АЛМАНАХ",
+  "short_name": "АЛМАНАХ",
+  "description": "Десет въпроса на ден, игра по теми и предизвикателства към приятели.",
+  "lang": "bg",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#140f26",
+  "theme_color": "#140f26",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

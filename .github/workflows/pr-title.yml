@@ -1,6 +1,5 @@
-# A pull request's title and description become its squash commit on main (scripts/github-setup.sh), so they're held
-# to what a commit on main must be (CONTRIBUTING.md → Commits and pull requests). Its own workflow: an edited title is
-# checked again without running CI.
+# A pull request's title becomes its squash commit on main, so it's a Conventional Commit:
+# `type(scope): summary` (scope optional, `!` for a breaking change), lowercase, at most 100 characters.
 name: PR title
 
 on:
@@ -9,41 +8,25 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: pr-title-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   title:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
     name: PR title
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
     steps:
-      # A „[skip ci]“ anywhere in the squash message, and main's run for that commit never starts: no tests, no image to
-      # deploy or roll back to. Dependabot quotes the updated packages' own commits in its description, and some carry
-      # it (89f14e2, 3 November). Such a pull request is merged with a message of its own (docs/maintainers.md).
-      - name: Nothing in the squash message that would skip main's CI
+      - name: The title is a Conventional Commit
         env:
-          # Through the environment, never into the script: the text is whoever opened the pull request's.
+          # Through the environment, never into the script: the title is whoever opened the pull request's.
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -qiE '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]|^skip-checks: *true'; then
-            echo "::error title=The squash commit would skip main's CI::The title or description holds [skip ci] or the like. Merge with a message of its own: gh pr merge <n> -R almanac-bg/almanac --squash --body '<one line>'"
+          types='feat|fix|perf|refactor|docs|test|build|ci|chore|revert'
+          if ! printf '%s' "$TITLE" | grep -qE "^($types)(\([a-z-]+\))?!?: [a-z0-9].{0,90}[^.]$"; then
+            echo "::error::Expected 'type(scope): summary' (types: $types), lowercase, no full stop, up to 100 characters."
             exit 1
           fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --ignore-scripts
-      # Conventional Commits (commitlint.config.mjs): `type(scope): summary`, the type choosing the next version.
-      - name: The title is a Conventional Commit
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$TITLE" | npx commitlint
+          # A [skip ci] in the squash message would skip main's CI, and with it the build that gets deployed.
+          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -qiE '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]'; then
+            echo "::error::The title or description holds [skip ci] or the like."
+            exit 1
+          fi
