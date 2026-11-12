@@ -7,7 +7,7 @@ import { fact } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
-import type { Mark, Reviewed, Score, State } from "./types.ts";
+import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
  * then whatever the screen adds, and the questions to go over. */
@@ -40,11 +40,6 @@ export function summary(s: State, line: Child, ...more: Child[]): Child {
     more,
     review(s.id),
   );
-}
-
-/** The marks as squares, for sharing as text. */
-export function squares(marks: Mark[]): string {
-  return marks.map((m) => (m.right ? "🟩" : m.partial ? "🟨" : "⬛")).join("");
 }
 
 /** Shares through the phone's own sheet, or copies where there's none. */

@@ -296,16 +296,8 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) {
 		t.Fatalf("today: %v", today)
 	}
-	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
-	code, _ := c["code"].(string)
 	friend := g.player()
-	if status, info := friend.call("GET", "/api/challenges/"+code, nil); status != 200 || len(info["players"].([]any)) != 1 {
-		t.Fatalf("the challenge as a stranger sees it: %d %v", status, info)
-	}
 	friend.call("POST", "/api/guest", map[string]any{})
-	if status, st := friend.call("POST", "/api/challenges/"+code, map[string]any{}); status != 200 || st["kind"] != "challenge" {
-		t.Fatalf("taking the challenge: %d %v", status, st)
-	}
 	if status, _ := friend.call("GET", "/api/runs/"+id, nil); status != 404 {
 		t.Fatalf("someone else's run: %d", status)
 	}
@@ -637,21 +629,24 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("reminded before the hour")
 	}
 
-	// Bo plays Ana's challenge: Ana hears of it.
-	_, c := ana.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
-	_, st := bo.call("POST", "/api/challenges/"+c["code"].(string), map[string]any{})
-	cid := strconv.Itoa(int(st["id"].(float64)))
-	for n := range 10 {
-		bo.call("POST", "/api/runs/"+cid+"/show", map[string]any{})
-		bo.call("POST", "/api/runs/"+cid+"/answer", map[string]any{"n": n, "answer": nil})
+	// Bo accepts Ana's invite link: Ana hears of it. Ana asks Bo to a duel: Bo hears of it.
+	pushes := func(path string, want int) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); fake.count(path) < want && time.Now().Before(deadline); {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if got := fake.count(path); got != want {
+			t.Fatalf("%s: %d pushes, want %d", path, got, want)
+		}
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for fake.count("/ana") == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if fake.count("/ana") != 1 {
-		t.Fatal("Ana wasn't told her challenge was played")
-	}
+	_, mine := ana.call("GET", "/api/friends", nil)
+	link := mine["invite"].(string)
+	bo.call("POST", "/api/invites/"+link[strings.LastIndex(link, "/")+1:], nil)
+	pushes("/ana", 1)
+	_, mine = ana.call("GET", "/api/friends", nil)
+	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
+	ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	pushes("/bo", 2)
 }
 
 func TestLinkPreviews(t *testing.T) {
@@ -677,11 +672,11 @@ func TestLinkPreviews(t *testing.T) {
 		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
 		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
 	}
-	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
+	_, friends := p.call("GET", "/api/friends", nil)
+	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page("/c/" + c["code"].(string)); !strings.Contains(body, `og:title" content="`+who+` те предизвиква"`) ||
-		!strings.Contains(body, "има 0 от 10. Можеш ли повече?") {
-		t.Fatalf("the challenge's preview:\n%s", body[:min(len(body), 1500)])
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани в АЛМАНАХ"`) {
+		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}
 	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
 	code := room["code"].(string)

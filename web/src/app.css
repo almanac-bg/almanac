@@ -469,7 +469,7 @@
     color: var(--on-fill);
   }
 
-  /* Duels and challenges: accepting a friend's call to a duel. */
+  /* Duels: accepting a friend's call to one. */
   .btn.rose {
     border-color: transparent;
     background: var(--rose);

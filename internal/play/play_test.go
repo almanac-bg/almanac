@@ -323,40 +323,6 @@ func TestTopics(t *testing.T) {
 	}
 }
 
-func TestChallenge(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "music")
-	if _, err := w.g.Challenge(ctx, ana, s.ID); !errors.Is(err, ErrOutOfStep) {
-		t.Fatalf("a challenge from an unfinished run: %v", err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, err := w.g.Challenge(ctx, ana, s.ID)
-	if err != nil || len(code) != 6 {
-		t.Fatalf("code %q %v", code, err)
-	}
-	if again, _ := w.g.Challenge(ctx, ana, s.ID); again != code {
-		t.Fatal("a second code for the same run")
-	}
-	theirs, err := w.g.StartChallenge(ctx, bo, code)
-	if err != nil || theirs.Kind != "challenge" {
-		t.Fatalf("%+v %v", theirs, err)
-	}
-	if a, b := w.picks(s.ID), w.picks(theirs.ID); a[3] != b[3] {
-		t.Fatal("not the same questions, dealt the same way")
-	}
-	// The maker opening their own link gets their own run back.
-	if own, _ := w.g.StartChallenge(ctx, ana, code); own.ID != s.ID {
-		t.Fatal("the maker got a new run")
-	}
-	w.play(bo, theirs.ID, append(repeat(w.right, 4), repeat(w.wrong, 6)...)...)
-	c, err := w.g.ChallengeOf(ctx, code, bo)
-	if err != nil || len(c.Players) != 2 || c.Players[0].Rights != 10 || !c.Players[1].Me || c.Mine != theirs.ID {
-		t.Fatalf("%+v %v", c, err)
-	}
-}
-
 func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

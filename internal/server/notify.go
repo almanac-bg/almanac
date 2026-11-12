@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -170,29 +169,6 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	}
 	slog.Info("reminded", "players", len(users))
 	return len(users)
-}
-
-// challengeDone tells a challenge's maker that someone has played it.
-func (s *Server) challengeDone(runID int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	var code, who string
-	var rights, total, owner, ownerRights int64
-	err := s.db.Read.QueryRowContext(ctx, `SELECT r.challenge, u.name, r.rights, json_array_length(r.questions), src.user_id, src.rights
-		FROM runs r JOIN users u ON u.id = r.user_id JOIN challenges c ON c.code = r.challenge JOIN runs src ON src.id = c.run_id
-		WHERE r.id = ? AND r.kind = 'challenge'`, runID).Scan(&code, &who, &rights, &total, &owner, &ownerRights)
-	if errors.Is(err, sql.ErrNoRows) {
-		return
-	}
-	if err != nil {
-		slog.Error("challenge notice", "err", err)
-		return
-	}
-	s.notify(ctx, push.Message{
-		Title: who + " прие предизвикателството ти",
-		Body:  fmt.Sprintf("%d от %d. Ти имаш %d.", rights, total, ownerRights),
-		URL:   "/c/" + code,
-	}, owner)
 }
 
 // pushKey is what a browser subscribes with (empty: no notifications here).

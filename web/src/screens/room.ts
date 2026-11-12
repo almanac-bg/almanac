@@ -171,11 +171,8 @@ function notToBe(v: RoomView | null, why: "declined" | "expired"): Child {
   const [heading, text] = !asked
     ? ["Дуелът е отменен", "Може би друг път."]
     : why === "declined"
-      ? ["Не може сега", `${them ?? "Приятелят ти"} отказа дуела. Предизвикай с линк: ще го изиграе, когато може.`]
-      : [
-          "Поканата изтече",
-          `${them ?? "Приятелят ти"} не дойде за 10 минути. Предизвикай с линк: ще го изиграе, когато може.`,
-        ];
+      ? ["Не може сега", `${them ?? "Приятелят ти"} отказа дуела. Покани отново по-късно.`]
+      : ["Поканата изтече", `${them ?? "Приятелят ти"} не дойде за 10 минути. Покани отново по-късно.`];
   return h(
     "div",
     { class: "screen" },
@@ -186,8 +183,7 @@ function notToBe(v: RoomView | null, why: "declined" | "expired"): Child {
       h("h1", null, heading),
       h("p", { class: "lead" }, text),
     ),
-    asked ? h("a", { class: "btn primary big", href: "/challenge" }, "Предизвикай") : null,
-    h("a", { class: "btn", href: "/together" }, "Към Заедно"),
+    h("a", { class: "btn primary big", href: "/together" }, "Към Заедно"),
   );
 }
 

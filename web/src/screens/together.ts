@@ -59,17 +59,6 @@ export function together() {
     h(
       "section",
       { class: "card" },
-      h("h2", null, "Предизвикателство"),
-      h(
-        "p",
-        { class: "muted" },
-        "Изиграй десет въпроса и прати линка: приятелите играят същите, когато им е удобно, и виждате кой колко има.",
-      ),
-      h("a", { class: "btn", href: "/challenge" }, "Предизвикай"),
-    ),
-    h(
-      "section",
-      { class: "card" },
       h("h2", null, "Стая"),
       h(
         "p",

@@ -1,5 +1,5 @@
-// Package play is the game: runs through a set of questions (the day's, a topic's, a challenge's), one question at a
-// time, against the server's clock.
+// Package play is the game: runs through a set of questions (the day's, a topic's), one question at a time, against
+// the server's clock; duels kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. Between questions a player reads the
 // answer and its fact for as long as they like. A question left showing past its time counts as unanswered, whenever
@@ -61,7 +61,7 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
-	// Finished, if set, hears of every run that ends (after it's kept): a challenge's maker is told, for one.
+	// Finished, if set, hears of every run that ends (after it's kept).
 	Finished func(runID int64)
 }
 
@@ -80,18 +80,18 @@ type Pick struct {
 
 // run is a run as the database has it.
 type run struct {
-	id, userID          int64
-	kind                string
-	day, category, code string
-	picks               []Pick
-	at                  int
-	shownAt             sql.NullInt64
-	points, rights      int
-	ms                  int64
-	finished            bool
+	id, userID     int64
+	kind           string
+	day, category  string
+	picks          []Pick
+	at             int
+	shownAt        sql.NullInt64
+	points, rights int
+	ms             int64
+	finished       bool
 }
 
-const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), coalesce(challenge, ''), questions,
+const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
 	at, shown_at, points, rights, ms, finished_at IS NOT NULL`
 
 type scanner interface{ Scan(...any) error }
@@ -99,7 +99,7 @@ type scanner interface{ Scan(...any) error }
 func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
-	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &r.code, &picks,
+	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
 		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
@@ -119,15 +119,14 @@ func load(q interface {
 
 // State is a run as a player sees it.
 type State struct {
-	ID        int64  `json:"id"`
-	Kind      string `json:"kind"`
-	Day       string `json:"day,omitempty"`
-	Category  string `json:"category,omitempty"`
-	Challenge string `json:"challenge,omitempty"`
-	Total     int    `json:"total"`
-	At        int    `json:"at"`
-	Points    int    `json:"points"`
-	Rights    int    `json:"rights"`
+	ID       int64  `json:"id"`
+	Kind     string `json:"kind"`
+	Day      string `json:"day,omitempty"`
+	Category string `json:"category,omitempty"`
+	Total    int    `json:"total"`
+	At       int    `json:"at"`
+	Points   int    `json:"points"`
+	Rights   int    `json:"rights"`
 	// Trail is how each answered question went, in order.
 	Trail []Mark `json:"trail"`
 	// Question is the one shown now, if one is.
@@ -174,7 +173,7 @@ func (g *Game) deal(p Pick) (bank.Dealt, bool) {
 // state builds what a player sees of a run.
 func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
-		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category, Challenge: r.code,
+		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category,
 		Total: len(r.picks), At: r.at, Points: r.points, Rights: r.rights, Done: r.finished, Trail: []Mark{},
 	}
 	rows, err := tx.Query(`SELECT points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)

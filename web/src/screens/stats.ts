@@ -24,7 +24,7 @@ export interface Stats {
   topics: TopicStats[];
   recent: {
     id: number;
-    kind: "day" | "topic" | "challenge" | "duel";
+    kind: "day" | "topic" | "challenge" | "duel"; // challenge: an all-topics game from when there were challenges
     day?: string;
     category?: string;
     rights: number;
@@ -48,8 +48,6 @@ function what(p: Stats["recent"][number]): string {
   switch (p.kind) {
     case "day":
       return "Въпросите на деня";
-    case "challenge":
-      return "Предизвикателство";
     case "duel":
       return `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`;
     default:

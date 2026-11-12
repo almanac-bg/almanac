@@ -1,6 +1,6 @@
 // Днес: the day's ten questions, the same for everyone, once.
 
-import { board, shareButton, squares, summary } from "../game/results.ts";
+import { board, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
 import type { Board, Score, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -22,10 +22,6 @@ interface Today {
 
 const longDate = (day: string) =>
   new Intl.DateTimeFormat("bg", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${day}T12:00:00Z`),
-  );
-const shortDate = (day: string) =>
-  new Intl.DateTimeFormat("bg", { day: "numeric", month: "long", timeZone: "UTC" }).format(
     new Date(`${day}T12:00:00Z`),
   );
 
@@ -115,11 +111,7 @@ function finished(t: Today, s: State): Child {
         const f = fresh();
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
       },
-      shareButton(
-        "Сподели резултата",
-        () => `АЛМАНАХ · ${shortDate(t.day)}\n${s.rights}/10 · ${s.points} т.\n${squares(s.trail)}`,
-        location.origin,
-      ),
+      h("a", { class: "btn primary big", href: "/play" }, "Играй по теми"),
       countdown(),
       () => {
         const f = fresh().friends;

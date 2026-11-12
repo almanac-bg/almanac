@@ -94,7 +94,7 @@ func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
 			t.Fatal(q, err)
 		}
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(4); err != nil {
 		t.Fatal(err)
 	}
 	var answers, challenges int
@@ -111,6 +111,15 @@ func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
 	_ = db.Write.QueryRow(`PRAGMA foreign_keys`).Scan(&fk)
 	if fk != 1 {
 		t.Fatal("foreign keys stayed off")
+	}
+	// Challenges went later (0007): their links with them, and their runs stay, as games.
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var runs int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM runs WHERE id = 7`).Scan(&runs)
+	if _, err := db.Read.Exec(`SELECT count(*) FROM challenges`); err == nil || runs != 1 {
+		t.Fatalf("after challenges went: table still there (%v), %d runs", err, runs)
 	}
 	// Deleting the run still takes its answers along: the reference survived the rebuild.
 	_, _ = db.Write.Exec(`DELETE FROM runs WHERE id = 7`)

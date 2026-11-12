@@ -1,4 +1,4 @@
-// Notifications: the evening reminder and word of a challenge played. The browser asks the player first; the
+// Notifications: the evening reminder and word from friends (a link accepted, a call to a duel). The browser asks the player first; the
 // service worker (/sw.js) shows them.
 
 import { pushKey } from "../state.ts";

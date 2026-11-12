@@ -55,5 +55,5 @@ test("a friend can turn a duel down", async ({ browser }) => {
   await b.goto("/together");
   await b.locator(".invitation").getByRole("button", { name: "Откажи" }).click();
   await expect(a.getByRole("heading", { name: "Не може сега" })).toBeVisible();
-  await expect(a.getByRole("link", { name: "Предизвикай" })).toBeVisible();
+  await expect(a.getByRole("link", { name: "Към Заедно" })).toBeVisible();
 });
