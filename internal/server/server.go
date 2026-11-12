@@ -19,6 +19,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -59,6 +60,9 @@ type Server struct {
 	accounts *account.Accounts
 	outbox   *mail.Outbox
 	game     *play.Game
+	rooms    *room.Hub
+	// closing ends the streams (rooms) when the server stops, so that it needn't wait for them.
+	closing  chan struct{}
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
@@ -94,6 +98,8 @@ func New(cfg Config, d Deps) (*Server, error) {
 	}
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
+	s.rooms = room.NewHub(s.bank.Load)
+	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
 	return s, nil
@@ -129,6 +135,11 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/challenge", s.challenge)
 	api("GET /api/challenges/{code}", s.challengeInfo)
 	api("POST /api/challenges/{code}", s.startChallenge)
+	api("POST /api/rooms", s.openRoom)
+	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
+	api("POST /api/rooms/{code}/start", s.roomStart)
+	api("POST /api/rooms/{code}/next", s.roomNext)
+	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)
@@ -176,8 +187,21 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 		})
 	}
 	slog.Info("serving", "addr", ln.Addr().String(), "url", s.cfg.PublicURL, "version", s.cfg.Version, "tls", s.cfg.TLSCert != "")
+	srv.RegisterOnShutdown(func() { close(s.closing) })
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }()
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.rooms.Sweep()
+			}
+		}
+	}()
 	select {
 	case err := <-errs:
 		return err
@@ -204,5 +228,8 @@ func (s *Server) clientIP(r *http.Request) string {
 
 // isAsset says whether a path is a static file (left out of the request log).
 func isAsset(path string) bool {
+	if strings.HasSuffix(path, "/events") { // a room's stream: logged when it ends, which says nothing
+		return true
+	}
 	return strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/qimg/") || path == "/favicon.svg"
 }

@@ -117,7 +117,7 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		if err != nil {
 			return err
 		}
-		picks := drawTopic(b, category, skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, category, skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
