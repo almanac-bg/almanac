@@ -194,7 +194,9 @@ function setAttr(el: HTMLElement, key: string, value: Value): void {
     (el as HTMLInputElement)[key] = !!value;
     return;
   }
-  if (value === false || value == null) el.removeAttribute(key);
+  // ARIA states are the words "true" and "false"; other attributes are there or not.
+  if (key.startsWith("aria-") && typeof value === "boolean") el.setAttribute(key, String(value));
+  else if (value === false || value == null) el.removeAttribute(key);
   else el.setAttribute(key, value === true ? "" : String(value));
 }
 

@@ -219,7 +219,7 @@ func TestLoadFindsProblems(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(CategoriesFile, `[{"id": "history", "name": "История", "icon": "🏛️", "color": "#f59e0b"}]`)
+	write(CategoriesFile, `[{"id": "history", "name": "История"}]`)
 	write("questions/history.json", `[
   {"id": "his-001", "type": "choice", "difficulty": "easy", "text": "Кога?", "answer": "1878", "wrong": ["1876", "1885", "1908"]},
   {"id": "his-001", "type": "choice", "difficulty": "easy", "text": "Кой?", "answer": "А", "wrong": ["Б", "В", "Г"]},

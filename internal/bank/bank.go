@@ -28,12 +28,10 @@ const (
 	ImagesDir      = "images"
 )
 
-// Category is a subject questions are about.
+// Category is a subject questions are about: a topic.
 type Category struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Icon  string `json:"icon"`
-	Color string `json:"color"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Bank is a loaded, checked bank.
@@ -74,10 +72,7 @@ func (b *Bank) Live(category, typ string) []Question {
 	return out
 }
 
-var (
-	categoryID = regexp.MustCompile(`^[a-z]+$`)
-	color      = regexp.MustCompile(`^#[0-9a-f]{6}$`)
-)
+var categoryID = regexp.MustCompile(`^[a-z]+$`)
 
 // types are the question types the game knows, by name.
 var types = map[string]func() Question{}
@@ -119,8 +114,8 @@ func Load(dir string) (*Bank, []Problem) {
 		if !categoryID.MatchString(c.ID) || known[c.ID] {
 			fail(CategoriesFile, 0, "", fmt.Sprintf("category id %q must be unique lowercase latin letters", c.ID))
 		}
-		if c.Name == "" || c.Icon == "" || !color.MatchString(c.Color) {
-			fail(CategoriesFile, 0, "", fmt.Sprintf("category %q needs a name, an icon and a color like #a1b2c3", c.ID))
+		if c.Name == "" {
+			fail(CategoriesFile, 0, "", fmt.Sprintf("category %q needs a name", c.ID))
 		}
 		known[c.ID] = true
 	}

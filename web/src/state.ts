@@ -13,8 +13,6 @@ export interface User {
 export interface Category {
   id: string;
   name: string;
-  icon: string;
-  color: string;
 }
 
 interface Boot {

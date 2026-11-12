@@ -61,7 +61,7 @@ function nameForm(): Child {
     h("button", { class: "btn", disabled: busy }, "Запази"),
     () => {
       const n = note();
-      return n && h("p", { class: n.bad ? "note bad" : "note", role: "status" }, n.text);
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: "status" }, n.text);
     },
   );
 }
@@ -69,7 +69,7 @@ function nameForm(): Child {
 function account(): Child {
   return h(
     "section",
-    { class: "card" },
+    { class: "stack" },
     when(
       () => user()?.email,
       () => [
@@ -81,7 +81,7 @@ function account(): Child {
           h("strong", null, () => user()?.email ?? ""),
           ".",
         ),
-        h("button", { class: "btn quiet", onclick: signOut }, "Изход"),
+        h("button", { class: "link", onclick: signOut }, "Изход"),
       ],
       () => [
         h("h2", null, "Запази профила си"),
@@ -126,7 +126,7 @@ function signIn(): Child {
       sent.set(true);
     });
 
-  const errorLine = () => error() && h("p", { class: "note bad", role: "alert" }, error());
+  const errorLine = () => error() && h("p", { class: "bad", role: "alert" }, error());
 
   return when(
     () => sent(),
@@ -166,7 +166,7 @@ function signIn(): Child {
         errorLine,
         h(
           "p",
-          { class: "muted small" },
+          { class: "muted" },
           "Няма го? Виж в спама или ",
           h("button", { type: "button", class: "link", onclick: send, disabled: busy }, "прати нов код"),
           ". ",
@@ -197,7 +197,7 @@ function signIn(): Child {
         ),
         h("button", { class: "btn", disabled: busy }, "Прати ми код"),
         errorLine,
-        h("p", { class: "muted small" }, "Без пароли: всеки път ти пращаме код за вход."),
+        h("p", { class: "muted" }, "Без пароли: всеки път ти пращаме код за вход."),
       ),
   );
 }

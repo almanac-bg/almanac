@@ -19,7 +19,7 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
   root = target;
   routes = list;
   missing = notFound;
-  addEventListener("popstate", () => render(false, true));
+  addEventListener("popstate", () => render(false));
   document.addEventListener("click", (e) => {
     const a = (e.target as Element).closest?.("a");
     if (
@@ -38,17 +38,17 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
     e.preventDefault();
     go(a.pathname + a.search + a.hash);
   });
-  render(false, false);
+  render(false);
 }
 
 /** Opens a path in the app. */
 export function go(to: string, replace = false): void {
   if (to === location.pathname + location.search + location.hash && !replace) return;
   history[replace ? "replaceState" : "pushState"](null, "", to);
-  render(true, true);
+  render(true);
 }
 
-function render(scrollTop: boolean, animate: boolean): void {
+function render(scrollTop: boolean): void {
   path.set(location.pathname);
   let view: () => Child = missing;
   for (const r of routes) {
@@ -58,20 +58,15 @@ function render(scrollTop: boolean, animate: boolean): void {
       break;
     }
   }
-  const swap = () => {
-    disposeView?.();
-    disposeView = mount(root, view);
-    if (scrollTop) scrollTo(0, 0);
-    // Screen readers start at the new screen's heading.
-    const heading = root.querySelector<HTMLElement>("h1");
-    if (heading) {
-      heading.tabIndex = -1;
-      heading.focus({ preventScroll: true });
-    }
-  };
-  if (animate && document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    document.startViewTransition(swap);
-  } else swap();
+  disposeView?.();
+  disposeView = mount(root, view);
+  if (scrollTop) scrollTo(0, 0);
+  // Screen readers start at the new screen's heading.
+  const heading = root.querySelector<HTMLElement>("h1");
+  if (heading) {
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
 }
 
 /** Sets the tab's title for the screen. */
