@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -33,7 +34,17 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>АЛМАНАХ</title>
-<meta name="description" content="Десет въпроса на ден, игра по теми и предизвикателства към приятели. Всеки отговор носи по нещо ново.">
+<meta name="description" content="{{.Description}}">
+<meta property="og:site_name" content="АЛМАНАХ">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:image" content="{{.Image}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="bg_BG">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#140f26" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -75,9 +86,12 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"push":       s.pushKey(),
 	})
 	m := assets.Manifest(s.client)
+	title, description := s.preview(r)
 	var out bytes.Buffer
 	if err := shell.Execute(&out, map[string]any{
 		"CSS": m["app.css"], "JS": m["app.js"], "Boot": template.JS(boot),
+		"Title": title, "Description": description,
+		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + "/og.png",
 	}); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -87,6 +101,30 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cache-Control", "no-cache")
 	w.WriteHeader(status)
 	_, _ = w.Write(out.Bytes())
+}
+
+// preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): a challenge says whose it
+// is and the score to beat; a room, its code.
+func (s *Server) preview(r *http.Request) (title, description string) {
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игра по теми, дуели и стаи с приятели. Всеки отговор носи по нещо ново."
+	switch path := r.URL.Path; {
+	case strings.HasPrefix(path, "/c/"):
+		if c, err := s.game.ChallengeOf(r.Context(), strings.TrimPrefix(path, "/c/"), 0); err == nil {
+			title = c.By + " те предизвиква"
+			description = fmt.Sprintf("%d въпроса в АЛМАНАХ. Можеш ли повече?", c.Total)
+			if len(c.Players) > 0 {
+				best := c.Players[0]
+				description = fmt.Sprintf("%s има %d от %d. Можеш ли повече?", best.Name, best.Rights, c.Total)
+			}
+		}
+	case strings.HasPrefix(path, "/r/"):
+		code := strings.TrimPrefix(path, "/r/")
+		if _, err := s.rooms.Get(code); err == nil {
+			title = "Ела в стая " + code[:3] + " " + code[3:]
+			description = "Играем АЛМАНАХ заедно: един и същ въпрос за всички, в един и същ момент."
+		}
+	}
+	return title, description
 }
 
 // asset serves the client's built files. Their names change with their content, so they're cached for good.
@@ -101,7 +139,7 @@ func (s *Server) asset(w http.ResponseWriter, r *http.Request) {
 
 // publicFiles are served from the site's root as they are (web/public).
 var publicFiles = []string{
-	"favicon.svg", "bimi.svg", "robots.txt", "manifest.webmanifest", "sw.js",
+	"favicon.svg", "bimi.svg", "robots.txt", "manifest.webmanifest", "sw.js", "og.png",
 	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
 }
 
