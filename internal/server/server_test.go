@@ -651,3 +651,39 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("Ana wasn't told her challenge was played")
 	}
 }
+
+func TestLinkPreviews(t *testing.T) {
+	g := start(t)
+	page := func(path string) string {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return string(body)
+	}
+	if home := page("/"); !strings.Contains(home, `property="og:image" content="`+g.url+`/og.png"`) {
+		t.Fatal("no preview picture")
+	}
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	_, me := p.call("GET", "/api/me", nil)
+	_, run := p.call("POST", "/api/topic", map[string]string{"category": "music"})
+	id := strconv.Itoa(int(run["id"].(float64)))
+	for n := range 10 {
+		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
+	}
+	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
+	who := me["user"].(map[string]any)["name"].(string)
+	if body := page("/c/" + c["code"].(string)); !strings.Contains(body, `og:title" content="`+who+` те предизвиква"`) ||
+		!strings.Contains(body, "има 0 от 10. Можеш ли повече?") {
+		t.Fatalf("the challenge's preview:\n%s", body[:min(len(body), 1500)])
+	}
+	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code := room["code"].(string)
+	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
+		t.Fatal("the room's preview")
+	}
+}
