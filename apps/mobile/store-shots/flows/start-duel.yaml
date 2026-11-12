@@ -1,7 +1,0 @@
-# A Дуел from the home screen: on a local server a bot joins after BOT_FILL_SECONDS.
-appId: bg.almanac.app
----
-- tapOn: "Дуел: .*"
-- extendedWaitUntil:
-    visible: "Въпрос \\d+ от .*"
-    timeout: 60000

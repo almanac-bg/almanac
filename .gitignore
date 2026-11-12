@@ -1,32 +1,18 @@
-node_modules/
-dist/
-dist-ssr/
+# The real question bank: a clone of the private almanac-questions repository.
+/private/
+
+# Built web assets (go run ./cmd/build); the folder itself stays so the server always compiles.
+/internal/web/dist/*
+!/internal/web/dist/.keep
+
+# Local databases and tools.
 *.db
 *.db-shm
 *.db-wal
-.env
-.env.local
+/node_modules/
+/test-results/
+/playwright-report/
 .DS_Store
-*.log
-*.db.partial
-# The statements the tests ran, for the query-plan check (apps/server/test/plans.ts)
-.sql-log/
-
-# Browser tests (apps/web/e2e): results, traces and the HTML report
-test-results/
-playwright-report/
-reports/
-blob-report/
-
-# The real question bank: a clone of the private almanac-questions repository (see docs/questions.md).
-/private/
-
-# Firebase's file for the app's pushes on Android: a file variable on Expo's build service (docs/app-stores.md).
-google-services.json
 
 # Claude Code settings for this checkout only (e.g. permission to deploy): personal, never in the public repo.
 .claude/settings.local.json
-
-# On the server: which commit runs and which ran before it (deploy/deploy.sh, deploy/rollback.sh).
-/.release
-/.release-previous
