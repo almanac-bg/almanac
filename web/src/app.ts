@@ -6,7 +6,7 @@ import { path, start } from "./lib/router.ts";
 import { challenge } from "./screens/challenge.ts";
 import { me } from "./screens/me.ts";
 import { missing } from "./screens/missing.ts";
-import { topic, topics } from "./screens/play.ts";
+import { challengeNew, topic, topics } from "./screens/play.ts";
 import { room } from "./screens/room.ts";
 import { today } from "./screens/today.ts";
 import { together } from "./screens/together.ts";
@@ -14,7 +14,7 @@ import { together } from "./screens/together.ts";
 const links: [href: string, label: string, here: (p: string) => boolean][] = [
   ["/", "Днес", (p) => p === "/"],
   ["/play", "Игра", (p) => p.startsWith("/play")],
-  ["/together", "Заедно", (p) => p === "/together" || p.startsWith("/r/")],
+  ["/together", "Заедно", (p) => p === "/together" || p === "/challenge" || p.startsWith("/r/") || p.startsWith("/c/")],
   ["/me", "Профил", (p) => p === "/me"],
 ];
 
@@ -46,6 +46,7 @@ if (root) {
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challenge },
       { path: /^\/together$/, view: together },
+      { path: /^\/challenge$/, view: challengeNew },
       { path: /^\/r\/([0-9]{6})$/, view: room },
       { path: /^\/me$/, view: me },
     ],
