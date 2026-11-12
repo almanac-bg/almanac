@@ -61,6 +61,8 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
+	// Finished, if set, hears of every run that ends (after it's kept): a challenge's maker is told, for one.
+	Finished func(runID int64)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -295,6 +297,7 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 // Answer grades an answer to question n, the one showing. A null answer gives up on it.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
 	var res Result
+	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, runID)
 		if err != nil {
@@ -303,6 +306,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		if r.finished || n != r.at {
 			return ErrOutOfStep
 		}
+		defer func() { finished = r.finished }()
 		d, ok := g.deal(r.picks[r.at])
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
@@ -328,6 +332,9 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		res.State, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && finished && g.Finished != nil {
+		go g.Finished(runID)
+	}
 	return res, err
 }
 

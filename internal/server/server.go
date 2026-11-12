@@ -19,6 +19,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -38,6 +39,8 @@ type Config struct {
 	// MTASTSMode the policy's mode ("testing" until reports are clean, then "enforce").
 	MTASTS     []string
 	MTASTSMode string
+	// Push sends notifications; nil: none.
+	Push *push.Sender
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
 	// Dev serves the client from disk, as the build rewrites it.
@@ -61,6 +64,7 @@ type Server struct {
 	outbox   *mail.Outbox
 	game     *play.Game
 	rooms    *room.Hub
+	push     *push.Sender
 	// closing ends the streams (rooms) when the server stops, so that it needn't wait for them.
 	closing  chan struct{}
 	bank     atomic.Pointer[bank.Bank]
@@ -98,6 +102,8 @@ func New(cfg Config, d Deps) (*Server, error) {
 	}
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
+	s.push = cfg.Push
+	s.game.Finished = s.challengeDone
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Recording = s.game.RecordingFor
 	s.rooms.Kept = func(d play.Duel) {
@@ -129,6 +135,8 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
 	api("GET /api/me/stats", s.stats)
+	api("POST /api/push", s.subscribe)
+	api("DELETE /api/push", s.unsubscribe)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
 	api("POST /api/auth/code", s.sendCode)
