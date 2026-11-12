@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -46,8 +47,8 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="bg_BG">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#140f26" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f3fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#110c20" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -127,6 +128,10 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 	}
 	return title, description
 }
+
+// The client's fonts are its own files: say what they are, wherever the server runs (not every system's MIME table
+// knows woff2).
+func init() { _ = mime.AddExtensionType(".woff2", "font/woff2") }
 
 // asset serves the client's built files. Their names change with their content, so they're cached for good.
 func (s *Server) asset(w http.ResponseWriter, r *http.Request) {

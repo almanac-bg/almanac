@@ -260,6 +260,10 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d after one day", n)
 	}
+	thursday := [7]bool{3: true} // 2026-11-12, Monday first
+	if week, _ := w.g.Week(ctx, ana); week != thursday {
+		t.Fatalf("week %v after Thursday", week)
+	}
 	w.wait(24 * time.Hour)
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d the next morning, before playing", n)
@@ -272,6 +276,13 @@ func TestBoardAndStreak(t *testing.T) {
 	w.wait(48 * time.Hour)
 	if n, _ := w.g.Streak(ctx, ana); n != 0 {
 		t.Fatalf("streak %d after missing a day", n)
+	}
+	if week, _ := w.g.Week(ctx, ana); week != [7]bool{3: true, 4: true} {
+		t.Fatalf("week %v on Sunday, after Thursday and Friday", week)
+	}
+	w.wait(24 * time.Hour)
+	if week, _ := w.g.Week(ctx, ana); week != [7]bool{} {
+		t.Fatalf("week %v on a new Monday", week)
 	}
 }
 

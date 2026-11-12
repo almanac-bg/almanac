@@ -6,20 +6,62 @@ import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { categories, player } from "../state.ts";
+import { type Category, categories, player, user } from "../state.ts";
+import { level, levelBadge, meter, questions, toneOf } from "../ui.ts";
+import { loadStats, type Stats, type TopicStats } from "./stats.ts";
 
 export function topics() {
   title("Игра");
+  const stats = signal<Stats | null>(null);
+  if (user.peek()) loadStats().then(stats.set, () => {});
   return h(
     "section",
     { class: "screen" },
-    h("h1", null, "Игра"),
-    h("p", null, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
     h(
-      "ul",
-      { class: "topics" },
-      h("li", null, h("a", { href: "/play/all" }, "Всички теми")),
-      categories.map((c) => h("li", null, h("a", { href: `/play/${c.id}` }, c.name))),
+      "div",
+      { class: "intro" },
+      h(
+        "div",
+        { class: "title-row" },
+        h("h1", null, "Игра"),
+        h("a", { class: "btn primary inline", href: "/play/all" }, "Всички теми"),
+      ),
+      h("p", { class: "lead" }, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
+    ),
+    h("ul", { class: "topics" }, () => {
+      const mine = stats()?.topics ?? [];
+      return categories.map((c) =>
+        h(
+          "li",
+          null,
+          tile(
+            c,
+            mine.find((t) => t.category === c.id),
+          ),
+        ),
+      );
+    }),
+  );
+}
+
+/** A topic: its colour, its name, and how well the player knows it (once they've played enough of it). */
+function tile(c: Category, t?: TopicStats): Child {
+  const l = t ? level(t.right, t.answers) : null;
+  return h(
+    "a",
+    { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
+    h("span", { class: "topic-head" }, h("span", { class: "dot", "aria-hidden": "true" }), l ? levelBadge(l) : null),
+    h("span", { class: "topic-name" }, c.name),
+    h(
+      "span",
+      { class: "topic-foot" },
+      h(
+        "span",
+        { class: "topic-meta" },
+        h("span", null, t?.answers ? questions(t.answers) : "Още не е играна"),
+        l ? h("span", null, `${l.percent}% верни`) : null,
+      ),
+      l ? meter(l.percent, `${l.percent}% верни`) : null,
     ),
   );
 }
@@ -36,13 +78,14 @@ export function topic([id = ""]: string[]) {
     h(
       "div",
       { class: "screen" },
-      h("p", { class: "muted" }, name),
+      h("p", { class: "kicker" }, name),
       summary(
         s,
+        null,
         h(
           "div",
           { class: "actions" },
-          h("button", { class: "btn", onclick: again }, "Още десет"),
+          h("button", { class: "btn primary big", onclick: again }, "Още десет"),
           challengeButton(s),
           h("a", { href: "/play" }, "Друга тема"),
         ),
@@ -58,9 +101,10 @@ export function challengeNew() {
     h(
       "div",
       { class: "screen" },
-      h("p", { class: "muted" }, "Предизвикателство"),
+      h("p", { class: "kicker" }, "Предизвикателство"),
       summary(
         s,
+        null,
         h(
           "p",
           null,
@@ -87,7 +131,7 @@ function run(category: string, finished: (s: State, again: () => void) => Child)
           "div",
           { class: "stack" },
           h("p", { role: "alert" }, (err as ApiError).message),
-          h("button", { class: "btn", onclick: start }, "Опитай пак"),
+          h("button", { class: "btn primary", onclick: start }, "Опитай пак"),
         ),
       );
     }
@@ -112,7 +156,12 @@ export function challengeButton(s: State, now = false): Child {
     const url = link();
     if (url)
       return [
-        shareButton("Изпрати предизвикателството", () => `Аз имам ${s.rights} от ${s.total}. Ти колко ще имаш?`, url),
+        shareButton(
+          "Изпрати предизвикателството",
+          () => `Аз имам ${s.rights} от ${s.total}. Ти колко ще имаш?`,
+          url,
+          now,
+        ),
         h("p", { class: "muted" }, "Линкът: ", h("a", { href: new URL(url).pathname, class: "challenge-link" }, url)),
       ];
     return [

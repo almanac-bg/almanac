@@ -1,16 +1,19 @@
 // Днес: the day's ten questions, the same for everyone, once.
 
 import { board, shareButton, squares, summary } from "../game/results.ts";
-import { playRun } from "../game/run.ts";
+import { playRun, trail } from "../game/run.ts";
 import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
-import { player } from "../state.ts";
+import { player, user } from "../state.ts";
+import { figure, streak } from "../ui.ts";
 
 interface Today {
   day: string;
   streak: number;
+  /** This week's days played, Monday first (for a player who has played). */
+  week?: boolean[];
   run: State | null;
   board: Board;
 }
@@ -41,16 +44,33 @@ export function today() {
   const intro = (t: Today): Child => {
     const busy = signal(false);
     const error = signal("");
+    const players = t.board.players;
     return h(
       "section",
       { class: "screen" },
-      h("p", { class: "muted" }, longDate(t.day)),
-      h("h1", null, "Десет въпроса за днес"),
-      h("p", null, "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит."),
+      h(
+        "div",
+        { class: "intro" },
+        h("p", { class: "kicker" }, longDate(t.day)),
+        h("h1", null, "Десет въпроса за днес"),
+        h("p", { class: "lead" }, "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит."),
+      ),
+      h(
+        "div",
+        { class: "card hero" },
+        h(
+          "div",
+          { class: "figures" },
+          figure("10", "въпроса"),
+          figure("15 с", "за въпрос"),
+          figure(String(players), players === 1 ? "човек днес" : "души днес"),
+        ),
+        trail([], 10),
+      ),
       h(
         "button",
         {
-          class: "btn",
+          class: "btn primary big",
           disabled: busy,
           onclick: async () => {
             busy.set(true);
@@ -67,7 +87,7 @@ export function today() {
         "Започни",
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
-      h("p", { class: "muted" }, about(t)),
+      user.peek() ? streak(t.streak, t.week) : null,
     );
   };
 
@@ -75,28 +95,23 @@ export function today() {
   return h("div", null, () => screen());
 }
 
-/** One line of what there is to know: the streak, who played, the time. */
-function about(t: Today): string {
-  const parts: string[] = [];
-  if (t.streak > 0) parts.push(t.streak === 1 ? "Серия: 1 ден" : `Серия: ${t.streak} дни`);
-  if (t.board.players > 0) parts.push(t.board.players === 1 ? "1 човек днес" : `${t.board.players} души днес`);
-  parts.push("15 секунди за въпрос");
-  return parts.join(" · ");
-}
-
 function finished(t: Today, s: State): Child {
-  const fresh = signal<Board>(t.board);
-  // The board as it is now, with this result on it.
-  api<Board>("GET", `/api/day/${t.day}/board`).then(fresh.set, () => {});
+  // The day as it is now, with this result on it: the board, the place, the streak it made.
+  const fresh = signal<Today>(t);
+  api<Today>("GET", "/api/day").then(fresh.set, () => {});
   return h(
     "div",
     { class: "screen" },
-    h("p", { class: "muted" }, longDate(t.day)),
+    h("p", { class: "kicker" }, longDate(t.day)),
     summary(
       s,
       () => {
-        const b = fresh();
-        return b.place ? h("p", null, `${b.place}-и от ${b.players} днес.`) : null;
+        const b = fresh().board;
+        return b.place ? h("p", { class: "place-line" }, `${b.place}-и от ${b.players} днес.`) : null;
+      },
+      () => {
+        const f = fresh();
+        return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
       },
       shareButton(
         "Сподели резултата",
@@ -105,7 +120,7 @@ function finished(t: Today, s: State): Child {
       ),
       countdown(),
       () => {
-        const b = fresh();
+        const b = fresh().board;
         return board("Днес", b.top, b.place, b.mine);
       },
     ),

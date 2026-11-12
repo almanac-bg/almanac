@@ -1,5 +1,5 @@
 // Command build turns the web client (web/) into the files the server serves (internal/assets/dist): one script and
-// one stylesheet, minified, named by their content, plus web/public as it is. It fails if either outgrows its budget:
+// one stylesheet, minified, and the fonts, all named by their content, plus web/public as it is. It fails if either outgrows its budget:
 // the game must stay light.
 //
 //	go run ./cmd/build           a release build
@@ -55,6 +55,7 @@ func build(watch bool) error {
 		Charset:       api.CharsetUTF8,
 		LegalComments: api.LegalCommentsNone,
 		Sourcemap:     api.SourceMapLinked,
+		Loader:        map[string]api.Loader{".woff2": api.LoaderFile}, // the fonts: files of their own, named by content
 		LogLevel:      api.LogLevelWarning,
 	}
 	if watch {

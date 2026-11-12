@@ -4,12 +4,14 @@
 import { findDuel } from "../game/duel.ts";
 import { answered, ask, picture } from "../game/questions.ts";
 import { report } from "../game/report.ts";
-import { shareButton } from "../game/results.ts";
+import { boardRow, shareButton } from "../game/results.ts";
+import { questionHead, timer } from "../game/run.ts";
 import type { Answer, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
+import { fact, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
@@ -21,17 +23,7 @@ interface RoomView {
   category: string;
   n: number;
   total: number;
-  players: {
-    name: string;
-    points: number;
-    rights: number;
-    online: boolean;
-    answered: boolean;
-    me?: boolean;
-    recording?: boolean;
-    gained?: number;
-    right?: boolean;
-  }[];
+  players: Player[];
   question?: {
     category: string;
     view: View;
@@ -42,8 +34,20 @@ interface RoomView {
   };
 }
 
+interface Player {
+  name: string;
+  points: number;
+  rights: number;
+  online: boolean;
+  answered: boolean;
+  me?: boolean;
+  recording?: boolean;
+  gained?: number;
+  right?: boolean;
+}
+
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
-const nameOf = (p: RoomView["players"][number]) => (p.recording ? `${p.name} (запис)` : p.name);
+const nameOf = (p: Player) => (p.recording ? `${p.name} (запис)` : p.name);
 /** In a duel: the other one. */
 const opponent = (v: RoomView) => v.players.find((p) => !p.me);
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
@@ -52,6 +56,8 @@ export function room([code = ""]: string[]) {
   title("Заедно");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
+  // Where each player stood at the last answer: how far they've moved since is the room's rank change.
+  const places = new Map<string, number>();
 
   let es: EventSource | null = null;
   player()
@@ -88,7 +94,12 @@ export function room([code = ""]: string[]) {
     { class: "screen" },
     () =>
       trouble() === "full"
-        ? h("div", { class: "stack" }, h("h1", null, "Стаята е пълна"), h("p", null, "В една стая играят до 50 души."))
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Стаята е пълна"),
+            h("p", { class: "lead" }, "В една стая играят до 50 души."),
+          )
         : null,
     () =>
       trouble() === "gone"
@@ -96,13 +107,13 @@ export function room([code = ""]: string[]) {
             "div",
             { class: "stack" },
             h("h1", null, "Няма такава стая"),
-            h("p", null, "Може кодът да е грешен или стаята да е затворена."),
-            h("a", { href: "/together" }, "Отвори нова стая"),
+            h("p", { class: "lead" }, "Може кодът да е грешен или стаята да е затворена."),
+            h("a", { class: "btn primary", href: "/together" }, "Отвори нова стая"),
           )
         : null,
     () =>
       trouble() === "reconnecting"
-        ? h("p", { class: "muted", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
+        ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
     () => {
       const k = key();
@@ -111,11 +122,12 @@ export function room([code = ""]: string[]) {
       const v = untracked(view) as RoomView;
       switch (v.phase) {
         case "lobby":
+          places.clear();
           return lobby(view as () => RoomView, code);
         case "question":
           return question(view as () => RoomView, code, v);
         case "reveal":
-          return reveal(view as () => RoomView, code, v);
+          return reveal(view as () => RoomView, code, v, places);
         case "end":
           return end(view as () => RoomView, code);
       }
@@ -134,47 +146,56 @@ async function lead(code: string, action: "start" | "next", error: (s: string) =
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
-    if (v.duel) return v.phase === "reveal" ? h("p", { class: "muted" }, "Следващият въпрос идва след малко.") : null;
-    return v.canLead ? null : h("p", { class: "muted" }, `Чакаме ${v.host} да ${what}.`);
+    if (v.duel) return v.phase === "reveal" ? h("p", { class: "status" }, "Следващият въпрос идва след малко.") : null;
+    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
   };
 }
 
 function lobby(view: () => RoomView, code: string): Child {
   const error = signal("");
   if (view().duel)
-    return h("div", { class: "stack" }, h("h1", null, "Дуел"), h("p", { class: "muted" }, "Чакаме съперника…"));
+    return h("div", { class: "stack" }, h("p", { class: "kicker" }, "Дуел"), h("h1", null, "Чакаме съперника…"));
   return h(
     "div",
-    { class: "stack" },
-    h("h1", null, `Стая ${spaced(code)}`),
-    h("p", null, () => `${topicName(view().category)}. Дай кода на другите или им прати линка.`),
-    shareButton("Прати линка", () => "Ела да играем на АЛМАНАХ:", `${location.origin}/r/${code}`),
-    h("h2", null, () => `Играчи (${view().players.length})`),
-    h("ul", { class: "players" }, () =>
-      view().players.map((p) =>
-        h("li", { class: p.online ? "" : "muted" }, p.name, p.me ? " (ти)" : "", p.online ? "" : " — извън стаята"),
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, () => topicName(view().category)),
+      h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
+      h("p", { class: "lead" }, "Дай кода на другите или им прати линка."),
+    ),
+    shareButton("Прати линка", () => "Ела да играем на АЛМАНАХ:", `${location.origin}/r/${code}`, false),
+    h(
+      "section",
+      { class: "card" },
+      h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
+      h("ul", { class: "players" }, () =>
+        view().players.map((p) =>
+          h(
+            "li",
+            { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
+            p.name,
+            p.me ? " (ти)" : "",
+            p.online ? "" : " — извън стаята",
+          ),
+        ),
       ),
     ),
     () =>
-      view().canLead ? h("button", { class: "btn", onclick: () => lead(code, "start", error.set) }, "Започни") : null,
+      view().canLead
+        ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни")
+        : null,
     waiting(view, "започне"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
-function head(v: RoomView, left?: () => string): Child {
-  const q = v.question;
+/** Which question, its topic, and in a duel, against whom. */
+function head(v: RoomView): Child {
   const against = v.duel ? opponent(v) : undefined;
-  return h(
-    "p",
-    { class: "question-head muted" },
-    h(
-      "span",
-      null,
-      `${v.n + 1} от ${v.total} · ${topicName(q?.category ?? "")}${against ? ` · срещу ${nameOf(against)}` : ""}`,
-    ),
-    left ? h("span", { role: "timer" }, left) : null,
-  );
+  const topic = topicName(v.question?.category ?? "");
+  return questionHead(v.n, v.total, against ? `${topic} · срещу ${nameOf(against)}` : topic);
 }
 
 function question(view: () => RoomView, code: string, first: RoomView): Child {
@@ -188,14 +209,6 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     if (left.peek() === 0) locked.set(true);
   }, 1000);
   onCleanup(() => clearInterval(tick));
-  const bar = h("div", { class: "time-bar" });
-  bar.style.transform = `scaleX(${q.leftMs / q.limitMs})`;
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      bar.style.transition = `transform ${q.leftMs}ms linear`;
-      bar.style.transform = "scaleX(0)";
-    }),
-  );
   const error = signal("");
   const asked = ask(
     q.view,
@@ -213,8 +226,8 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   return h(
     "article",
     { class: "question" },
-    head(first, () => `${left()} с`),
-    bar,
+    head(first),
+    timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     asked.node,
@@ -223,7 +236,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
       const done = v.players.filter((p) => p.answered).length;
       return h(
         "p",
-        { class: "muted", role: "status" },
+        { class: "status", role: "status" },
         sent() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${v.players.filter((p) => p.online || p.answered).length}.`,
       );
@@ -232,21 +245,26 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   );
 }
 
-function reveal(view: () => RoomView, code: string, first: RoomView): Child {
+function reveal(view: () => RoomView, code: string, first: RoomView, places: Map<string, number>): Child {
   const q = first.question;
   const r = q?.reveal;
   if (!q || !r) return null;
   const error = signal("");
   const last = first.n + 1 >= first.total;
-  const [text, cls] = r.missed
-    ? ["Без отговор.", "wrong"]
+  const kind: VerdictKind = r.missed
+    ? "time"
     : r.exact
-      ? ["Точно!", "right"]
+      ? "exact"
       : r.right
-        ? ["Вярно!", "right"]
+        ? "right"
         : r.points > 0
-          ? ["Близо.", "partial"]
-          : ["Не е това.", "wrong"];
+          ? "partial"
+          : "wrong";
+  // The rank change since the last answer (none in a duel: there are only two places).
+  const before = first.duel ? undefined : new Map(places);
+  first.players.forEach((p, i) => {
+    places.set(p.name, i + 1);
+  });
   return h(
     "article",
     { class: "question" },
@@ -254,43 +272,56 @@ function reveal(view: () => RoomView, code: string, first: RoomView): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     answered(q.view, r.answer, q.given ?? null),
-    h(
-      "p",
-      { class: `verdict ${cls}`, role: "status" },
-      h("strong", null, text),
-      r.points > 0 ? h("span", { class: "muted" }, ` +${r.points}`) : null,
-    ),
-    r.answer.fact ? h("p", { class: "fact" }, h("strong", null, "Знаеше ли? "), r.answer.fact) : null,
-    report(r.answer.id),
-    standings(view, true),
+    verdict(kind, r.points, r.missed ? "Без отговор." : undefined),
+    r.answer.fact ? fact(r.answer.fact) : null,
+    standings(view, true, before),
     () =>
       view().canLead
         ? h(
             "button",
-            { class: "btn", onclick: () => lead(code, "next", error.set) },
+            { class: "btn primary big", onclick: () => lead(code, "next", error.set) },
             last ? "Към класирането" : "Напред",
           )
         : null,
     waiting(view, last ? "покаже класирането" : "продължи"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    report(r.answer.id),
   );
 }
 
-function standings(view: () => RoomView, gains: boolean): Child {
-  return h("section", { class: "board" }, () =>
+/** The players by points; after an answer, what it brought each of them and how far they moved. */
+function standings(view: () => RoomView, gains: boolean, before?: Map<string, number>): Child {
+  return h("section", { class: "board" }, h("h2", null, "Класиране"), () =>
     h(
       "ol",
       null,
-      view().players.map((p, i) =>
-        h(
-          "li",
-          { class: p.me ? "row me" : "row" },
-          h("span", { class: "place" }, String(i + 1)),
-          h("span", { class: "who" }, nameOf(p)),
-          h("span", { class: "pts" }, gains && p.gained ? `+${p.gained} · ${p.points}` : String(p.points)),
-        ),
-      ),
+      view().players.map((p, i) => {
+        const row = boardRow(
+          i + 1,
+          nameOf(p),
+          gains && p.gained ? [h("small", { class: "sub" }, `+${p.gained} · `), String(p.points)] : String(p.points),
+          { me: p.me },
+        );
+        if (!p.online) row.classList.add("away");
+        if (before?.size) {
+          row.classList.add("moves");
+          row.append(move(before.get(p.name), i + 1));
+        }
+        return row;
+      }),
     ),
+  );
+}
+
+/** Places moved since the last answer: up, down, or none. */
+function move(was: number | undefined, now: number): HTMLElement {
+  const d = was === undefined ? 0 : was - now;
+  if (d === 0) return h("span", { class: "delta", "aria-label": "без промяна" }, "–");
+  return h(
+    "span",
+    { class: d > 0 ? "delta up" : "delta down", "aria-label": d > 0 ? `нагоре с ${d}` : `надолу с ${-d}` },
+    h("span", { class: "i delta-sign", "aria-hidden": "true" }),
+    String(Math.abs(d)),
   );
 }
 
@@ -300,28 +331,38 @@ function end(view: () => RoomView, code: string): Child {
     const v = view();
     const me = v.players.find((p) => p.me);
     const them = opponent(v);
-    const verdict =
+    const result =
       !me || !them || me.points === them.points ? "Равенство" : me.points > them.points ? "Победа!" : "Загуба";
     return h(
       "div",
-      { class: "stack" },
-      h("h1", null, verdict),
-      h("p", { class: "muted" }, them ? `Дуел срещу ${nameOf(them)}` : "Дуел"),
+      { class: "screen" },
+      h(
+        "div",
+        { class: "intro" },
+        h("p", { class: "kicker" }, them ? `Дуел срещу ${nameOf(them)}` : "Дуел"),
+        h("h1", null, result),
+      ),
       standings(view, false),
       findDuel("Нов дуел"),
     );
   }
   return h(
     "div",
-    { class: "stack" },
-    h("h1", null, () => {
-      const [best] = view().players;
-      return best ? `${best.name} печели` : "Край";
-    }),
-    h("p", { class: "muted" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
+      h("h1", null, () => {
+        const [best] = view().players;
+        return best ? `${best.name} печели` : "Край";
+      }),
+    ),
     standings(view, false),
     () =>
-      view().canLead ? h("button", { class: "btn", onclick: () => lead(code, "start", error.set) }, "Нова игра") : null,
+      view().canLead
+        ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра")
+        : null,
     waiting(view, "започне нова игра"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );

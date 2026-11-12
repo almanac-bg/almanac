@@ -37,10 +37,15 @@ export function challenge([code = ""]: string[]) {
     return h(
       "section",
       { class: "screen" },
-      h("h1", null, `${c.by} те предизвиква`),
+      h(
+        "div",
+        { class: "intro" },
+        h("p", { class: "kicker" }, "Предизвикателство"),
+        h("h1", null, `${c.by} те предизвиква`),
+      ),
       h(
         "p",
-        null,
+        { class: "lead" },
         best
           ? `${best.name} има ${best.rights} от ${c.total} на тези ${c.total} въпроса. Можеш ли повече?`
           : `${c.total} въпроса. Да видим колко знаеш.`,
@@ -48,7 +53,7 @@ export function challenge([code = ""]: string[]) {
       h(
         "button",
         {
-          class: "btn",
+          class: "btn primary big",
           onclick: async () => {
             try {
               await player();
@@ -74,8 +79,8 @@ export function challenge([code = ""]: string[]) {
     return h(
       "div",
       { class: "screen" },
-      h("p", { class: "muted" }, `Предизвикателството на ${c.by}`),
-      summary(s, () => board("Кой колко има", players())),
+      h("p", { class: "kicker" }, `Предизвикателството на ${c.by}`),
+      summary(s, null, () => board("Кой колко има", players())),
     );
   };
 

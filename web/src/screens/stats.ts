@@ -1,18 +1,27 @@
-// How a player has done: the streak, what they've played, how well in each topic, their latest games.
+// How a player has done: the streak and this week, their numbers, their strongest topics, their latest games.
 
+import type { Board } from "../game/types.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
+import { games, level, questions, ring, stat, streak, toneOf } from "../ui.ts";
 
-interface Stats {
+export interface TopicStats {
+  category: string;
+  answers: number;
+  right: number;
+}
+
+export interface Stats {
   streak: number;
+  week: boolean[];
   days: number;
   games: number;
   answers: number;
   right: number;
   duels: number;
   won: number;
-  topics: { category: string; answers: number; right: number }[];
+  topics: TopicStats[];
   recent: {
     id: number;
     kind: "day" | "topic" | "challenge" | "duel";
@@ -28,61 +37,90 @@ interface Stats {
   }[];
 }
 
-const percent = (right: number, of: number) => (of ? `${Math.round((100 * right) / of)}%` : "—");
+export const loadStats = () => api<Stats>("GET", "/api/me/stats");
+
+const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);
 const topicName = (id?: string) => (id ? (categories.find((c) => c.id === id)?.name ?? id) : "Всички теми");
 const date = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
+const outcome = { won: "победа", lost: "загуба", draw: "равенство" };
+
+function what(p: Stats["recent"][number]): string {
+  switch (p.kind) {
+    case "day":
+      return "Въпросите на деня";
+    case "challenge":
+      return "Предизвикателство";
+    case "duel":
+      return `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`;
+    default:
+      return topicName(p.category);
+  }
+}
 
 export function stats(): Child {
   const data = signal<Stats | null>(null);
-  api<Stats>("GET", "/api/me/stats").then(data.set, () => {});
+  const day = signal<Board | null>(null);
+  loadStats().then(data.set, () => {});
+  api<{ board: Board }>("GET", "/api/day").then(
+    (t) => day.set(t.board),
+    () => {},
+  );
   return () => {
     const s = data();
     if (!s) return null;
-    if (s.games === 0) return h("p", { class: "muted" }, "Още няма изиграни игри.");
-    const outcome = { won: "победа", lost: "загуба", draw: "равенство" };
-    const what = (p: Stats["recent"][number]) =>
-      p.kind === "day"
-        ? "Въпросите на деня"
-        : p.kind === "challenge"
-          ? "Предизвикателство"
-          : p.kind === "duel"
-            ? `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`
-            : topicName(p.category);
-    return h(
-      "section",
-      { class: "stack" },
-      h("h2", null, "Как се справяш"),
+    if (s.games === 0) return [streak(s.streak, s.week), h("p", { class: "muted" }, "Още няма изиграни игри.")];
+    const place = day()?.place;
+    // The strongest topics: those played enough to tell, best first.
+    const strongest = s.topics
+      .map((t) => ({ t, l: level(t.right, t.answers) }))
+      .filter((x) => x.l)
+      .sort((a, b) => (b.l?.percent ?? 0) - (a.l?.percent ?? 0))
+      .slice(0, 3);
+    return [
+      h("p", { class: "muted" }, `${games(s.games)} · ${questions(s.answers)}`),
+      streak(s.streak, s.week),
       h(
-        "p",
-        null,
-        s.streak > 0 ? `Серия: ${s.streak} ${s.streak === 1 ? "ден" : "дни"}. ` : "",
-        `${s.games} ${s.games === 1 ? "игра" : "игри"}, ${s.answers} въпроса, ${percent(s.right, s.answers)} верни.`,
-        s.duels > 0 ? ` Дуели: ${s.won} ${s.won === 1 ? "победа" : "победи"} от ${s.duels}.` : "",
-      ),
-      h(
-        "table",
+        "div",
         { class: "stats" },
-        h("thead", null, h("tr", null, h("th", null, "Тема"), h("th", null, "Въпроси"), h("th", null, "Верни"))),
-        h(
-          "tbody",
-          null,
-          s.topics.map((t) =>
+        place ? stat(`${place}-и`, "място днес", "gold") : stat(String(s.days), "дни с въпросите на деня", "gold"),
+        stat(`${percent(s.right, s.answers)}%`, "верни отговора", "mint"),
+        s.duels > 0 ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose") : stat(String(s.answers), "отговора"),
+        stat(String(s.games), "изиграни игри"),
+      ),
+      strongest.length
+        ? h(
+            "section",
+            { class: "card" },
+            h("h2", { class: "section-title" }, "Най-силни теми"),
             h(
-              "tr",
-              null,
-              h("td", null, topicName(t.category)),
-              h("td", null, String(t.answers)),
-              h("td", null, percent(t.right, t.answers)),
+              "div",
+              { class: "rings" },
+              strongest.map(({ t, l }) => ring(l?.percent ?? 0, topicName(t.category), toneOf(t.category))),
+            ),
+          )
+        : null,
+      h(
+        "section",
+        { class: "stack" },
+        h("h2", { class: "section-title" }, "Последни игри"),
+        h(
+          "ol",
+          { class: "games" },
+          s.recent.map((p) =>
+            h(
+              "li",
+              { class: "game" },
+              h(
+                "div",
+                { class: "game-text" },
+                h("strong", { class: "game-what" }, what(p)),
+                h("span", { class: "game-when" }, date(p.at)),
+              ),
+              h("b", { class: "game-score" }, `${p.rights} от ${p.total}`),
             ),
           ),
         ),
       ),
-      h("h2", null, "Последни игри"),
-      h(
-        "ol",
-        { class: "recent" },
-        s.recent.map((p) => h("li", null, `${date(p.at)} · ${what(p)} · ${p.rights} от ${p.total}`)),
-      ),
-    );
+    ];
   };
 }

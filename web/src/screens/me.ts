@@ -16,14 +16,23 @@ export function me() {
       () => user(),
       () => [
         stats(),
-        reminders(),
-        nameForm(),
-        account(),
-        deleteAccount(),
-        h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
+        h(
+          "div",
+          { class: "settings" },
+          reminders(),
+          nameForm(),
+          account(),
+          h(
+            "section",
+            null,
+            h("h2", null, "Данните ти"),
+            h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
+            deleteAccount(),
+          ),
+        ),
       ],
       () => [
-        h("p", { class: "muted" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
+        h("p", { class: "lead" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
         signIn(),
       ],
     ),
@@ -170,7 +179,7 @@ function deleteAccount(): Child {
           h(
             "button",
             {
-              class: "btn",
+              class: "btn danger",
               onclick: async () => {
                 try {
                   await api("DELETE", "/api/me");
@@ -254,7 +263,7 @@ function signIn(): Child {
             ref: (el) => queueMicrotask(() => el.focus()),
           }),
         ),
-        h("button", { class: "btn", disabled: busy }, "Влез"),
+        h("button", { class: "btn primary", disabled: busy }, "Влез"),
         errorLine,
         h(
           "p",
@@ -287,7 +296,7 @@ function signIn(): Child {
             oninput: (e: Event) => email.set((e.target as HTMLInputElement).value),
           }),
         ),
-        h("button", { class: "btn", disabled: busy }, "Прати ми код"),
+        h("button", { class: "btn primary", disabled: busy }, "Прати ми код"),
         errorLine,
         h("p", { class: "muted" }, "Без пароли: всеки път ти пращаме код за вход."),
       ),

@@ -8,6 +8,7 @@ import (
 // Stats is how a player has done: the streak, how much they've played, and how well in each topic.
 type Stats struct {
 	Streak  int          `json:"streak"`
+	Week    [7]bool      `json:"week"`    // this week's days played, Monday first
 	Days    int          `json:"days"`    // days' questions finished
 	Games   int          `json:"games"`   // runs finished, of every kind
 	Answers int          `json:"answers"` // questions answered (or timed out)
@@ -45,6 +46,9 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	var s Stats
 	var err error
 	if s.Streak, err = g.Streak(ctx, userID); err != nil {
+		return s, err
+	}
+	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}
 	db := g.DB.Read

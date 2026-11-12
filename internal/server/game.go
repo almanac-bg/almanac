@@ -22,6 +22,9 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		if out["streak"], err = s.game.Streak(r.Context(), u.ID); err != nil {
 			return err
 		}
+		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
+			return err
+		}
 		var runID int64
 		err := s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {

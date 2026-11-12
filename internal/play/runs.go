@@ -390,6 +390,30 @@ func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {
 	return streak, rows.Err()
 }
 
+// Week is which days of this week, Monday first, a player has finished the day's questions on: the streak's strip.
+func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
+	var week [7]bool
+	today, _ := time.Parse(time.DateOnly, g.Today())
+	monday := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day FROM runs WHERE user_id = ? AND kind = 'day'
+		AND finished_at IS NOT NULL AND day >= ? AND day <= ?`, userID, monday.Format(time.DateOnly), today.Format(time.DateOnly))
+	if err != nil {
+		return week, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var day string
+		if err := rows.Scan(&day); err != nil {
+			return week, err
+		}
+		d, _ := time.Parse(time.DateOnly, day)
+		if i := int(d.Sub(monday) / (24 * time.Hour)); i >= 0 && i < len(week) {
+			week[i] = true
+		}
+	}
+	return week, rows.Err()
+}
+
 // Merge moves a guest's runs to the account they signed in to (account.Accounts.Merge): all but a day the account
 // has played itself, which stays the account's.
 func Merge(tx *sql.Tx, from, to int64) error {
