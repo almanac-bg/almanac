@@ -208,13 +208,14 @@ function setAttr(el: HTMLElement, key: string, value: Value): void {
 
 const urlAttributes = new Set(["href", "src", "srcset", "action", "formaction", "poster", "xlink:href"]);
 
-/** A link to this site, or to http(s) and mail: never javascript: or data: (srcset: each of its addresses). */
+/** A link to this site (or this page: #…), or to http(s) and mail: never javascript: or data: (srcset: each of its
+ * addresses). */
 export function safeURL(value: string): boolean {
   return value
     .split(",")
     .map((part) => part.trim().split(/\s+/)[0] ?? "")
     .every((url) => {
-      if (url.startsWith("/") && !url.startsWith("//")) return true;
+      if ((url.startsWith("/") && !url.startsWith("//")) || url.startsWith("#")) return true;
       try {
         return ["https:", "http:", "mailto:"].includes(new URL(url).protocol);
       } catch {

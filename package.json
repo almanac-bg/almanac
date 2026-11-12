@@ -5,12 +5,15 @@
   "type": "module",
   "description": "Tools for developing the web client only: nothing from npm ships to players.",
   "scripts": {
-    "check": "tsc -p web && biome ci .",
+    "check": "tsc -p web && tsc -p e2e && biome ci .",
     "format": "biome check --write .",
-    "test": "node --test 'web/src/**/*.test.ts'"
+    "test": "node --test 'web/src/**/*.test.ts'",
+    "e2e": "playwright test -c e2e"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@biomejs/biome": "2.6.4",
+    "@playwright/test": "1.65.0",
     "@types/node": "24.19.2",
     "typescript": "7.0.2"
   },

@@ -18,6 +18,8 @@ import (
 	"net"
 	"net/smtp"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -132,12 +134,19 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 	return true
 }
 
-// Log is the development sender: the message goes to the log, where the sign-in code can be read.
-type Log struct{}
+// Log is the development sender: the message goes to the log, where the sign-in code can be read — and, if Dir is
+// set, to <Dir>/<address>.txt, where the browser tests read it.
+type Log struct{ Dir string }
 
-func (Log) Send(_ context.Context, from string, m Message) error {
+func (l Log) Send(_ context.Context, from string, m Message) error {
 	slog.Info("mail (not sent: development)", "to", m.To, "subject", m.Subject, "text", m.Text)
-	return nil
+	if l.Dir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(l.Dir, 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(l.Dir, filepath.Base(m.To)+".txt"), []byte(m.Subject+"\n\n"+m.Text), 0o600)
 }
 
 // SMTP sends through a mail server, with STARTTLS required: smtp://user:password@host:587.

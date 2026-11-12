@@ -88,6 +88,7 @@ func (s *Server) headers(next http.Handler) http.Handler {
 
 // limiter counts what each key (an address, an email) did in a window, to stop floods and guessing.
 type limiter struct {
+	off  bool // development and the browser tests: every request from one address
 	mu   sync.Mutex
 	hits map[string]*window
 	last time.Time
@@ -102,6 +103,9 @@ func newLimiter() *limiter { return &limiter{hits: map[string]*window{}} }
 
 // allow counts one for key and says whether it's within n per period.
 func (l *limiter) allow(key string, n int, per time.Duration) bool {
+	if l.off {
+		return true
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
