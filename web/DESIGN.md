@@ -103,14 +103,14 @@ takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element | Measures | Where |
-| --- | --- | --- |
-| Streak | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`) | Днес, Профил |
-| Points | Points per answer and per run, from the server | Verdict, result, boards |
-| Place | Place on the day's board („12-и от 318 днес.“) | Result, Профил |
-| Mastery | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил |
-| Rank change | Places moved since the previous answer | Room boards |
-| Duels | Duels won of played | Заедно, Профил |
+| Element     | Measures                                                                                                                     | Where                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Streak      | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)            | Днес, Профил            |
+| Points      | Points per answer and per run, from the server                                                                               | Verdict, result, boards |
+| Place       | Place on the day's board („12-и от 318 днес.“)                                                                               | Result, Профил          |
+| Mastery     | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил            |
+| Rank change | Places moved since the previous answer                                                                                       | Room boards             |
+| Duels       | Duels won of played                                                                                                          | Заедно, Профил          |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
