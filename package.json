@@ -1,0 +1,23 @@
+{
+  "name": "almanac",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "Tools for developing the web client only: nothing from npm ships to players.",
+  "scripts": {
+    "check": "tsc -p web && biome ci .",
+    "format": "biome check --write .",
+    "test": "node --test 'web/src/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@types/node": "24.19.2",
+    "release-please": "17.11.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

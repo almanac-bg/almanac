@@ -107,8 +107,6 @@
     "scale": "linear",
     "tolerance": 100,
     "fact": "За него трябват 12 поредни страйка.",
-    "factSource": "https://en.wikipedia.org/wiki/Perfect_game_(bowling)",
-    "answerSource": "https://en.wikipedia.org/wiki/Perfect_game_(bowling)",
     "added": "2026-10-28"
   },
   {
@@ -124,8 +122,6 @@
     "scale": "linear",
     "tolerance": 0.6,
     "fact": "При жените мрежата е на 2,24 м.",
-    "factSource": "https://en.wikipedia.org/wiki/Volleyball",
-    "answerSource": "https://en.wikipedia.org/wiki/Volleyball",
     "added": "2026-10-28"
   }
 ]

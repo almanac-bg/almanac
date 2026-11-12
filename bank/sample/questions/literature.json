@@ -70,8 +70,7 @@
     "text": "Кой художник с български произход опакова Райхстага в Берлин през 1995 г.?",
     "answer": "Кристо",
     "wrong": ["Жул Паскин", "Владимир Димитров — Майстора", "Светлин Русев"],
-    "fact": "Райхстагът остава опакован 14 дни, а около 5 милиона души идват да го видят.",
-    "factSource": "https://de.wikipedia.org/wiki/Verh%C3%BCllter_Reichstag"
+    "fact": "Райхстагът остава опакован 14 дни, а около 5 милиона души идват да го видят."
   },
   {
     "id": "lit-017",
@@ -109,8 +108,6 @@
     "scale": "linear",
     "tolerance": 40,
     "fact": "Трите части — „Ад“, „Чистилище“ и „Рай“ — имат по 33 песни, плюс една встъпителна.",
-    "factSource": "https://en.wikipedia.org/wiki/Divine_Comedy",
-    "answerSource": "https://en.wikipedia.org/wiki/Divine_Comedy",
     "added": "2026-10-28"
   },
   {
@@ -126,8 +123,6 @@
     "scale": "linear",
     "tolerance": 30,
     "fact": "Нарисувана е с маслени бои върху дъска от топола, а не върху платно.",
-    "factSource": "https://en.wikipedia.org/wiki/Mona_Lisa",
-    "answerSource": "https://collections.louvre.fr/en/ark:/53355/cl010062370",
     "added": "2026-10-28"
   }
 ]

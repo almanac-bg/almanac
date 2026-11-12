@@ -2,8 +2,8 @@
 /private/
 
 # Built web assets (go run ./cmd/build); the folder itself stays so the server always compiles.
-/internal/web/dist/*
-!/internal/web/dist/.keep
+/internal/assets/dist/*
+!/internal/assets/dist/.keep
 
 # Local databases and tools.
 *.db

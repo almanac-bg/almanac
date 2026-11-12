@@ -78,8 +78,7 @@
     "text": "Кой език за програмиране носи името на индонезийски остров?",
     "answer": "Java",
     "wrong": ["Python", "Ruby", "Perl"],
-    "fact": "Първоначално езикът се казва Oak — по дъба пред офиса на Джеймс Гослинг. Накрая е преименуван на Java по кафето, отглеждано на едноименния остров.",
-    "factSource": "https://en.wikipedia.org/wiki/Java_(programming_language)"
+    "fact": "Първоначално езикът се казва Oak — по дъба пред офиса на Джеймс Гослинг. Накрая е преименуван на Java по кафето, отглеждано на едноименния остров."
   },
   {
     "id": "tec-025",
@@ -109,8 +108,6 @@
     "scale": "linear",
     "tolerance": 10,
     "fact": "Стив Джобс го представя като iPod, телефон и интернет комуникатор в едно устройство.",
-    "factSource": "https://en.wikipedia.org/wiki/IPhone_(1st_generation)",
-    "answerSource": "https://en.wikipedia.org/wiki/IPhone_(1st_generation)",
     "added": "2026-10-28"
   },
   {
@@ -125,8 +122,6 @@
     "scale": "linear",
     "tolerance": 800,
     "fact": "Височината е 1080 пиксела — оттам и другото име на формата, 1080p.",
-    "factSource": "https://en.wikipedia.org/wiki/1080p",
-    "answerSource": "https://en.wikipedia.org/wiki/1080p",
     "added": "2026-10-28"
   }
 ]

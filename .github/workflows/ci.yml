@@ -1,0 +1,62 @@
+# Every push to main and every pull request: the server's tests (with the race detector), the client's types, lint and
+# tests, and both builds — the client within its size budget.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  go:
+    name: Server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Formatted
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "::error::gofmt these: $unformatted"; exit 1; fi
+      - run: go vet ./...
+      - name: The client, within its budget
+        run: go run ./cmd/build
+      - run: go test -race ./...
+      - name: The program
+        run: CGO_ENABLED=0 go build -trimpath -o almanac ./cmd/almanac
+      - name: The sample bank passes its checks
+        run: ./almanac bank check bank/sample
+
+  web:
+    name: Client
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Types
+        run: npx tsc -p web
+      - name: Lint and format
+        run: npx biome ci .
+      - run: npm test

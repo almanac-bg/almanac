@@ -226,7 +226,8 @@ func TestLoadFindsProblems(t *testing.T) {
   {"id": "his-003", "type": "choice", "difficulty": "easy", "text": "Кога?", "answer": "1878", "wrong": ["1876", "1885", "1908"]},
   {"id": "his-004", "type": "riddle", "difficulty": "easy", "text": "?"},
   {"id": "his-005", "type": "choice", "difficulty": "easy", "text": "Защо?", "answer": "А", "wrong": ["Б", "В", "Г"], "typo": 1},
-  {"id": "his-006", "type": "choice", "difficulty": "easy", "text": "Как?", "answer": "А", "wrong": ["Б", "а"], "fact": "Факт."},
+  {"id": "his-006", "type": "choice", "difficulty": "easy", "text": "Как?", "answer": "А", "wrong": ["Б", "а"], "fact": "Факт.", "factSource": "https://bg.wikipedia.org/"},
+  {"id": "his-009", "type": "choice", "difficulty": "easy", "text": "Как ли?", "answer": "А", "wrong": ["Б", "а"]},
   {"id": "his-007", "type": "number", "difficulty": "hard", "text": "Колко?", "answer": 10.5, "min": 0, "max": 20, "step": 1, "scale": "linear", "tolerance": 5},
   {"id": "his-008", "type": "choice", "difficulty": "easy", "text": "Чие?", "answer": "А", "wrong": ["Б", "В", "Г"],
    "image": {"file": "0123456789abcdef.webp", "w": 1200, "h": 800, "alt": "Знаме", "credit": "Някой", "license": "PD", "source": "https://commons.wikimedia.org/"}}
@@ -248,11 +249,11 @@ func TestLoadFindsProblems(t *testing.T) {
 		"questions/history.json:4: his-003: the same question as his-001",
 		`questions/history.json:5: his-004: unknown type "riddle"`,
 		`questions/history.json:6: his-005: json: unknown field "typo"`,
-		"questions/history.json:7: his-006: a fact needs its source",
-		"questions/history.json:7: his-006: a choice needs exactly 3 wrong options",
-		"questions/history.json:7: his-006: two options are the same: а",
-		"questions/history.json:8: his-007: the answer isn't on the step grid",
-		"questions/history.json:9: his-008: missing picture 0123456789abcdef.webp",
+		`questions/history.json:7: his-006: json: unknown field "factSource"`,
+		"questions/history.json:8: his-009: a choice needs exactly 3 wrong options",
+		"questions/history.json:8: his-009: two options are the same: а",
+		"questions/history.json:9: his-007: the answer isn't on the step grid",
+		"questions/history.json:10: his-008: missing picture 0123456789abcdef.webp",
 	} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in:\n%s", want, all)

@@ -1,13 +1,11 @@
-# Releases (docs/maintainers.md → Издания). On every push to main release-please reads the Conventional Commits since
-# the last version and keeps one pull request open, "chore(release): X.Y.Z": the next version (SemVer, from the commit
-# types) in every package.json and package-lock.json, and the CHANGELOG.md section that goes with it. Merging that pull
-# request is the release: on the push it makes, this tags the merge commit vX.Y.Z and publishes the GitHub release with
-# the same notes. That commit is what gets deployed.
+# Releases. On every push to main release-please reads the Conventional Commits since the last version and keeps one
+# pull request open, "chore(release): X.Y.Z": the next version (SemVer, from the commit types) in version.txt, and the
+# CHANGELOG.md section that goes with it. Merging that pull request is the release: this tags the merge commit vX.Y.Z
+# and publishes the GitHub release with the same notes. That commit is what gets deployed.
 #
-# release-please runs from npm (pinned in package-lock.json, kept current by Dependabot), not as a third-party action:
-# the repository allows GitHub's own actions only (scripts/github-setup.sh). Its pull request needs "Allow GitHub
-# Actions to create pull requests" on (github-setup.sh), and, made with this token, it runs no CI of its own: its
-# changes are a version and a changelog, and the push of its merge runs CI in full.
+# release-please runs from npm (pinned in package-lock.json), not as a third-party action: the repository allows
+# GitHub's own actions only. Made with this token, its pull request runs no CI of its own: its changes are a version
+# and a changelog, and the push of its merge runs CI in full.
 name: Release
 
 on:

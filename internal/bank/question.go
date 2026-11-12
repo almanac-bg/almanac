@@ -31,15 +31,12 @@ type Head struct {
 	Category string `json:"-"`
 }
 
-// Tail is what every question may end with: a picture, the fact behind the answer, and its paperwork.
+// Tail is what every question may end with: a picture, the fact behind the answer, and when it was added or needs
+// a look again.
 type Tail struct {
 	Image *Image `json:"image,omitempty"`
 	// Fact is "Знаеше ли?": something worth knowing behind the answer, shown once it's revealed.
 	Fact string `json:"fact,omitempty"`
-	// FactSource is where the fact can be checked (for whoever reviews the bank; players never see it).
-	FactSource string `json:"factSource,omitempty"`
-	// AnswerSource is where the answer can be checked.
-	AnswerSource string `json:"answerSource,omitempty"`
 	// Tags are topics across categories ("bg", "christmas"): themed sets draw on them.
 	Tags []string `json:"tags,omitempty"`
 	// Added is when the question joined the bank (YYYY-MM-DD).

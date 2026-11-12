@@ -107,8 +107,6 @@
     "scale": "linear",
     "tolerance": 80,
     "fact": "Излъчва се десет сезона — от 1994 до 2004 г.",
-    "factSource": "https://en.wikipedia.org/wiki/Friends",
-    "answerSource": "https://en.wikipedia.org/wiki/Friends",
     "added": "2026-10-28"
   },
   {
@@ -123,8 +121,6 @@
     "scale": "linear",
     "tolerance": 30,
     "fact": "Церемонията продължава около 15 минути, а победителите са обявени три месеца по-рано.",
-    "factSource": "https://en.wikipedia.org/wiki/1st_Academy_Awards",
-    "answerSource": "https://en.wikipedia.org/wiki/1st_Academy_Awards",
     "added": "2026-10-28"
   }
 ]

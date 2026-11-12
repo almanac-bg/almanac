@@ -22,8 +22,7 @@
     "text": "Какъв е химичният символ на златото?",
     "answer": "Au",
     "wrong": ["Ag", "Gd", "Go"],
-    "fact": "Символът идва от латинската дума aurum — „злато“.",
-    "factSource": "https://en.wikipedia.org/wiki/Gold"
+    "fact": "Символът идва от латинската дума aurum — „злато“."
   },
   {
     "id": "sci-005",
@@ -32,8 +31,7 @@
     "text": "Коя планета наричат „Червената планета“?",
     "answer": "Марс",
     "wrong": ["Венера", "Юпитер", "Меркурий"],
-    "fact": "Марс е червеникав заради железните оксиди — на практика ръжда — в праха по повърхността му.",
-    "factSource": "https://science.nasa.gov/mars/facts/"
+    "fact": "Марс е червеникав заради железните оксиди — на практика ръжда — в праха по повърхността му."
   },
   {
     "id": "sci-006",
@@ -112,8 +110,6 @@
     "scale": "linear",
     "tolerance": 6,
     "fact": "Ако Еверест се постави в най-дълбоката ѝ точка, върхът му ще остане на повече от 2 км под водата.",
-    "factSource": "https://en.wikipedia.org/wiki/Mariana_Trench",
-    "answerSource": "https://en.wikipedia.org/wiki/Mariana_Trench",
     "added": "2026-10-28"
   },
   {
@@ -129,8 +125,6 @@
     "scale": "linear",
     "tolerance": 120,
     "fact": "В сладка вода при 20 °C звукът е над 4 пъти по-бърз (около 1481 м/с), а в желязото — почти 15 пъти.",
-    "factSource": "https://en.wikipedia.org/wiki/Speed_of_sound",
-    "answerSource": "https://en.wikipedia.org/wiki/Speed_of_sound",
     "added": "2026-10-28"
   },
   {
@@ -146,7 +140,6 @@
     ],
     "direction": "asc",
     "unit": "млн. км",
-    "answerSource": "https://science.nasa.gov/solar-system/planets/",
     "added": "2026-10-29"
   }
 ]

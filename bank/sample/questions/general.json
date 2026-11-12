@@ -70,8 +70,7 @@
     "text": "В какъв цвят всъщност са боядисани „черните кутии“ на самолетите?",
     "answer": "Оранжев",
     "wrong": ["Черен", "Жълт", "Сребрист"],
-    "fact": "Яркооранжевият цвят е избран, за да се откриват кутиите по-лесно сред останките след катастрофа.",
-    "factSource": "https://en.wikipedia.org/wiki/Flight_recorder"
+    "fact": "Яркооранжевият цвят е избран, за да се откриват кутиите по-лесно сред останките след катастрофа."
   },
   {
     "id": "gen-018",
@@ -109,8 +108,6 @@
     "scale": "linear",
     "tolerance": 20,
     "fact": "Знамето с 50 звезди се вее от 4 юли 1960 г., след приемането на Хаваи за 50-и щат.",
-    "factSource": "https://en.wikipedia.org/wiki/Flag_of_the_United_States",
-    "answerSource": "https://en.wikipedia.org/wiki/Flag_of_the_United_States",
     "added": "2026-10-28"
   },
   {
@@ -125,8 +122,6 @@
     "scale": "linear",
     "tolerance": 20,
     "fact": "Датските избиратели първо го отхвърлят на референдум през 1992 г. и го одобряват едва на втори, през 1993 г.",
-    "factSource": "https://en.wikipedia.org/wiki/Maastricht_Treaty",
-    "answerSource": "https://en.wikipedia.org/wiki/Maastricht_Treaty",
     "added": "2026-10-28"
   }
 ]

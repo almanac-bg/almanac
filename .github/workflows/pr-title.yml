@@ -1,6 +1,5 @@
-# A pull request's title and description become its squash commit on main (scripts/github-setup.sh), so they're held
-# to what a commit on main must be (CONTRIBUTING.md → Commits and pull requests). Its own workflow: an edited title is
-# checked again without running CI.
+# A pull request's title and description become its squash commit on main, so they're held to what a commit on main
+# must be (commitlint.config.mjs). Its own workflow: an edited title is checked again without running CI.
 name: PR title
 
 on:
@@ -21,9 +20,8 @@ jobs:
       contents: read
     name: PR title
     steps:
-      # A „[skip ci]“ anywhere in the squash message, and main's run for that commit never starts: no tests, no image to
-      # deploy or roll back to. Dependabot quotes the updated packages' own commits in its description, and some carry
-      # it (89f14e2, 3 November). Such a pull request is merged with a message of its own (docs/maintainers.md).
+      # A „[skip ci]“ anywhere in the squash message, and main's run for that commit never starts: no tests, no build to
+      # deploy. Dependabot quotes updated packages' own commits in its description, and some carry it.
       - name: Nothing in the squash message that would skip main's CI
         env:
           # Through the environment, never into the script: the text is whoever opened the pull request's.

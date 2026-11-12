@@ -77,18 +77,6 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 	}
 	if t.Fact != "" {
 		errs = append(errs, checkLine("fact", t.Fact, factMax)...)
-		if t.FactSource == "" {
-			errs = append(errs, "a fact needs its source (factSource)")
-		}
-	}
-	if t.FactSource != "" {
-		if t.Fact == "" {
-			errs = append(errs, "factSource without a fact")
-		}
-		errs = append(errs, checkURL("factSource", t.FactSource)...)
-	}
-	if t.AnswerSource != "" {
-		errs = append(errs, checkURL("answerSource", t.AnswerSource)...)
 	}
 	seen := map[string]bool{}
 	for _, tag := range t.Tags {
