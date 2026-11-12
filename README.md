@@ -31,6 +31,7 @@ internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
 deploy           услугата и скриптовете на сървъра
 web/src          клиентът: lib/ (DOM, сигнали, рутер), game/ (въпросите, играта), screens/, ui.ts, fonts/
+web/DESIGN.md    дизайнът: правилата (стойностите са в web/src/app.css)
 e2e              играта в истински браузъри (Playwright)
 bank/sample      публична извадка от въпросите (истинските са частни)
 ```
