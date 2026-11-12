@@ -8,7 +8,9 @@ package bank
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand/v2"
+	"strings"
 )
 
 // Difficulty is how hard a question is meant to be. How hard it really is comes from the answers players give.
@@ -116,14 +118,16 @@ func viewOf(h *Head, t *Tail) view {
 	return view{Type: h.Type, Text: h.Text, Image: t.Image.view()}
 }
 
-// reveal is what every type's reveal ends with.
+// reveal is what every type's reveal ends with: the question's id (for reporting it, once it's answered), the fact
+// behind the answer, and the picture's credit.
 type reveal struct {
+	ID     string       `json:"id"`
 	Fact   string       `json:"fact,omitempty"`
 	Credit *ImageCredit `json:"credit,omitempty"`
 }
 
-func revealOf(t *Tail) reveal {
-	return reveal{Fact: t.Fact, Credit: t.Image.credit()}
+func revealOf(h *Head, t *Tail) reveal {
+	return reveal{ID: h.ID, Fact: t.Fact, Credit: t.Image.credit()}
 }
 
 func mustJSON(v any) json.RawMessage {
@@ -132,4 +136,29 @@ func mustJSON(v any) json.RawMessage {
 		panic(err)
 	}
 	return b
+}
+
+// AnswerText is a question's answer in words, for whoever keeps the bank (the admin page).
+func AnswerText(q Question) string {
+	switch q := q.(type) {
+	case *Choice:
+		return q.Answer
+	case *Number:
+		return strings.TrimSpace(formatNumber(q.Answer, q.Step) + " " + q.Unit)
+	case *Order:
+		items := make([]string, 0, len(q.Items))
+		for _, i := range q.right() {
+			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, formatNumber(q.Items[i].Value, 0.01)))
+		}
+		return strings.Join(items, " → ")
+	}
+	return ""
+}
+
+// Option is a choice's option by its place in the bank (0 is the answer), for reading the answer log.
+func Option(q Question, i int) string {
+	if c, ok := q.(*Choice); ok && i >= 0 && i < len(c.options()) {
+		return c.options()[i]
+	}
+	return ""
 }

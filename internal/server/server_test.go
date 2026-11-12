@@ -38,6 +38,7 @@ func (i *inbox) Send(_ context.Context, _ string, m mail.Message) error {
 
 type game struct {
 	t      *testing.T
+	db     *store.DB
 	url    string
 	outbox *mail.Outbox
 	inbox  *inbox
@@ -66,7 +67,7 @@ func start(t *testing.T) *game {
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)
-	return &game{t: t, url: ts.URL, outbox: out, inbox: in}
+	return &game{t: t, db: db, url: ts.URL, outbox: out, inbox: in}
 }
 
 // player is a browser: it keeps its cookies.
@@ -464,5 +465,48 @@ func TestARoomOverHTTP(t *testing.T) {
 	res.Body.Close()
 	if !strings.HasPrefix(string(body), "event: closed") {
 		t.Fatalf("no such room: %q", body)
+	}
+}
+
+func TestReportsAndTheAdminPage(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	if status, _ := p.call("POST", "/api/questions/geo-001/report", map[string]string{"text": "Отговорът е остарял от 2025 г."}); status != 200 {
+		t.Fatalf("report: %d", status)
+	}
+	if status, _ := p.call("POST", "/api/questions/geo-001/report", map[string]string{"text": "x"}); status != 400 {
+		t.Fatalf("a report of one letter: %d", status)
+	}
+	if status, _ := p.call("POST", "/api/questions/nope-1/report", map[string]string{"text": "няма го"}); status != 404 {
+		t.Fatalf("no such question: %d", status)
+	}
+	page := func() (int, string) {
+		req, _ := http.NewRequest("GET", g.url+"/admin", nil)
+		res, err := p.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return res.StatusCode, string(body)
+	}
+	if status, _ := page(); status != 404 {
+		t.Fatalf("the admin page for a player: %d", status)
+	}
+	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
+	status, body := page()
+	if status != 200 || !strings.Contains(body, "Отговорът е остарял") || !strings.Contains(body, "Мусала") {
+		t.Fatalf("the admin page: %d %s", status, body)
+	}
+	req, _ := http.NewRequest("POST", g.url+"/admin/reports/geo-001/resolve", nil)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	res, err := p.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if _, body := page(); !strings.Contains(body, "Няма нови") {
+		t.Fatal("the report is still open")
 	}
 }

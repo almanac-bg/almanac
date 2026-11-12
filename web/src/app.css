@@ -183,6 +183,22 @@
     gap: 0.25rem;
   }
 
+  textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--box);
+    color: var(--text);
+    font: 1rem / 1.4 var(--font);
+    resize: vertical;
+  }
+
+  textarea:focus {
+    border-color: var(--link);
+    outline: none;
+  }
+
   input {
     width: 100%;
     min-height: 3rem;

@@ -2,6 +2,7 @@
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
 import { answered, ask, picture } from "../game/questions.ts";
+import { report } from "../game/report.ts";
 import { shareButton } from "../game/results.ts";
 import type { Answer, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -246,6 +247,7 @@ function reveal(view: () => RoomView, code: string, first: RoomView): Child {
       r.points > 0 ? h("span", { class: "muted" }, ` +${r.points}`) : null,
     ),
     r.answer.fact ? h("p", { class: "fact" }, h("strong", null, "Знаеше ли? "), r.answer.fact) : null,
+    report(r.answer.id),
     standings(view, true),
     () =>
       view().canLead

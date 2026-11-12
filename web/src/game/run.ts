@@ -5,6 +5,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, h, listen, onCleanup, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
 import { ask, picture } from "./questions.ts";
+import { report } from "./report.ts";
 import type { Answer, Credit, Mark, Result, Shown, State } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. */
@@ -105,6 +106,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
         ? h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, res.reveal.fact))
         : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
+      report(res.reveal.id),
       h(
         "button",
         {

@@ -173,5 +173,5 @@ func (d *dealtOrder) Reveal() any {
 		Values []float64 `json:"values"`
 		Unit   string    `json:"unit,omitempty"`
 		reveal
-	}{order, values, d.q.Unit, revealOf(&d.q.Tail)}
+	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail)}
 }

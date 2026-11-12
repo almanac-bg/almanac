@@ -103,7 +103,7 @@ func (d *dealtChoice) Reveal() any {
 	return struct {
 		Pick int `json:"pick"`
 		reveal
-	}{right, revealOf(&d.q.Tail)}
+	}{right, revealOf(&d.q.Head, &d.q.Tail)}
 }
 
 // fold makes two texts compare the same when they differ only in case or spacing.

@@ -147,5 +147,5 @@ func (d *dealtNumber) Reveal() any {
 		Value float64 `json:"value"`
 		Unit  string  `json:"unit,omitempty"`
 		reveal
-	}{d.q.Answer, d.q.Unit, revealOf(&d.q.Tail)}
+	}{d.q.Answer, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail)}
 }
