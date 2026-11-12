@@ -45,6 +45,8 @@ export type View = ChoiceView | NumberView | OrderView;
 
 /** The answer, as the deal showed it, with the fact behind it. */
 export interface Reveal {
+  /** The question's id: for reporting it. */
+  id: string;
   pick?: number;
   value?: number;
   order?: number[];

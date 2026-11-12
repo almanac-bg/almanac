@@ -4,6 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
 import { answered, picture } from "./questions.ts";
+import { report } from "./report.ts";
 import { trail } from "./run.ts";
 import type { Mark, Reviewed, Score, State } from "./types.ts";
 
@@ -94,6 +95,7 @@ function review(id: number): Child {
           picture(it.view),
           answered(it.view, it.reveal, it.given),
           it.reveal.fact ? h("p", { class: "fact" }, it.reveal.fact) : null,
+          report(it.reveal.id),
         ),
       ),
     ];

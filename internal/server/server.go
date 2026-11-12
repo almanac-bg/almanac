@@ -136,6 +136,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/challenge", s.challenge)
 	api("GET /api/challenges/{code}", s.challengeInfo)
 	api("POST /api/challenges/{code}", s.startChallenge)
+	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
@@ -149,6 +150,8 @@ func (s *Server) routes() http.Handler {
 		mux.HandleFunc("GET /"+f, s.publicFile)
 	}
 	mux.HandleFunc("GET /privacy", s.privacy)
+	mux.HandleFunc("GET /admin", s.admin)
+	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
 	mux.HandleFunc("/", s.page)
 

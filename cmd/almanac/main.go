@@ -5,6 +5,7 @@
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
 //	almanac backup now                  copy the database to the backups at once
 //	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
+//	almanac admin [-remove] <email>     make a player an admin (the /admin page), or no longer one
 //	almanac version
 package main
 
@@ -34,6 +35,8 @@ func run(args []string) error {
 		return bankCommand(args[1:])
 	case "backup":
 		return backupCommand(args[1:])
+	case "admin":
+		return adminCommand(args[1:])
 	case "version":
 		fmt.Println(version)
 		return nil
@@ -42,5 +45,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [dir] | bank fmt [dir] | backup now | backup restore <key> <path> | version")
+	return fmt.Errorf("usage: almanac serve | bank check [dir] | bank fmt [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | version")
 }
