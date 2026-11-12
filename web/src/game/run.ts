@@ -2,8 +2,9 @@
 // the score; this shows them.
 
 import { type ApiError, api } from "../lib/api.ts";
-import { append, type Child, h, listen, onCleanup, signal } from "../lib/dom.ts";
+import { append, type Child, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
+import { fact, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import type { Answer, Credit, Mark, Result, Shown, State } from "./types.ts";
@@ -44,7 +45,7 @@ function failed(message: string, retry: () => void): Child {
     "div",
     { class: "stack" },
     h("p", { role: "alert" }, message),
-    h("button", { class: "btn", onclick: retry }, "Опитай пак"),
+    h("button", { class: "btn primary", onclick: retry }, "Опитай пак"),
   );
 }
 
@@ -53,32 +54,83 @@ function resume(s: State, next: () => void): Child {
   return h(
     "div",
     { class: "stack" },
-    trail(s.trail, s.total),
     h("h1", null, `Въпрос ${s.at + 1} от ${s.total}`),
+    trail(s.trail, s.total, s.at),
     h("p", { class: "muted" }, "Времето тръгва, щом го отвориш."),
-    h("button", { class: "btn", onclick: next }, "Продължи"),
+    h("button", { class: "btn primary big", onclick: next }, "Продължи"),
   );
 }
 
-/** A run's progress: a mark for each question, coloured by how it went. */
-export function trail(marks: Mark[], total: number): HTMLElement {
+/** A run's progress: a pip for each question, marked by how it went (and the one being asked, if any). */
+export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
+  const words: Record<string, string> = { right: "вярно", partial: "близо", wrong: "грешно" };
   return h(
     "ol",
     { class: "trail", "aria-label": `${marks.length} от ${total} въпроса` },
     Array.from({ length: total }, (_, i) => {
       const m = marks[i];
-      return h("li", { class: !m ? "" : m.right ? "right" : m.partial ? "partial" : "wrong" });
+      const how = !m ? (i === now ? "now" : "") : m.right ? "right" : m.partial ? "partial" : "wrong";
+      return h("li", { class: how || undefined, title: how && how !== "now" ? `${i + 1}: ${words[how]}` : null });
     }),
   );
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
+/** The top of a question: which one of how many, and its topic (and, in a duel, against whom). */
+export function questionHead(n: number, total: number, aside: string): Child {
+  return h(
+    "header",
+    { class: "question-head" },
+    h(
+      "p",
+      { class: "count" },
+      h("b", { class: "count-n" }, String(n + 1)),
+      h("span", { class: "count-of" }, ` от ${total}`),
+    ),
+    h("p", { class: "kicker" }, aside),
+  );
+}
+
+/** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. */
+export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
+  const bar = h("div", { class: "time-bar" });
+  bar.style.transform = `scaleX(${leftMs / limitMs})`;
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (locked.peek()) return;
+      bar.style.transition = `transform ${leftMs}ms linear`;
+      bar.style.transform = "scaleX(0)";
+    }),
+  );
+  // Once answered, the bar stops where it is.
+  const freeze = () => {
+    const now = getComputedStyle(bar).transform;
+    bar.style.transition = "none";
+    bar.style.transform = now === "none" ? bar.style.transform : now;
+  };
+  return h(
+    "div",
+    { class: () => (locked() ? "timer stopped" : left() <= 5 ? "timer low" : "timer") },
+    h("div", { class: "track" }, bar),
+    h(
+      "span",
+      { class: "secs", role: "timer", "aria-label": () => `${left()} секунди` },
+      () => String(left()),
+      h("small", null, "с"),
+    ),
+    () => {
+      if (locked()) freeze();
+      return null;
+    },
+  );
+}
+
 function question(s: State, q: Shown, next: () => void, reload: () => void): Child {
   const locked = signal(false);
   const problem = signal<Child>(null);
   const after = h("div", { class: "after", hidden: true });
-  const bar = h("div", { class: "time-bar" });
+  let progress = trail(s.trail, s.total, q.n);
   let sent = false;
 
   // An answer goes once; after a failed send, only its retry goes again.
@@ -96,21 +148,20 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
       problem.set(failed(e.message, () => send(answer, true)));
       return;
     }
-    clearTimeout(timer);
+    clearTimeout(timeout);
     clearInterval(tick);
-    bar.classList.add("stopped");
     asked.reveal(res.reveal, answer);
+    const now = trail(res.state.trail, s.total);
+    progress.replaceWith(now);
+    progress = now;
     append(after, [
-      verdict(res, answer),
-      res.reveal.fact
-        ? h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, res.reveal.fact))
-        : null,
+      verdict(kindOf(res, answer), res.points),
+      res.reveal.fact ? fact(res.reveal.fact) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
-      report(res.reveal.id),
       h(
         "button",
         {
-          class: "btn next",
+          class: "btn primary big next",
           onclick: res.state.done ? reload : next,
           ref: (el) =>
             requestAnimationFrame(() => {
@@ -120,27 +171,21 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
         },
         res.state.done ? "Към резултата" : "Напред",
       ),
+      report(res.reveal.id),
     ]);
     after.hidden = false;
   };
 
   const asked = ask(q.view, (a) => send(a), locked);
 
-  // The time: a bar that runs out, the seconds beside it, and an empty answer when it's up.
-  const timer = setTimeout(() => send(null), q.leftMs);
+  // The time: the seconds left, and an empty answer when it's up.
+  const timeout = setTimeout(() => send(null), q.leftMs);
   const left = signal(Math.ceil(q.leftMs / 1000));
   const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
   onCleanup(() => {
-    clearTimeout(timer);
+    clearTimeout(timeout);
     clearInterval(tick);
   });
-  bar.style.transform = `scaleX(${q.leftMs / q.limitMs})`;
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      bar.style.transition = `transform ${q.leftMs}ms linear`;
-      bar.style.transform = "scaleX(0)";
-    }),
-  );
 
   // Keys 1–4 answer a choice.
   listen(document, "keydown", (e: KeyboardEvent) => {
@@ -152,13 +197,9 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
   return h(
     "article",
     { class: "question" },
-    h(
-      "p",
-      { class: "question-head muted" },
-      h("span", null, `${q.n + 1} от ${s.total} · ${topicName(q.category)}`),
-      h("span", { role: "timer", "aria-label": () => `${left()} секунди` }, () => (locked() ? "" : `${left()} с`)),
-    ),
-    bar,
+    questionHead(q.n, s.total, topicName(q.category)),
+    progress,
+    timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     asked.node,
@@ -167,29 +208,17 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
   );
 }
 
-function verdict(r: Result, given: Answer | null): Child {
-  const [text, cls] =
-    r.timedOut || given === null
-      ? ["Времето изтече.", "wrong"]
-      : r.exact
-        ? ["Точно!", "right"]
-        : r.right
-          ? ["Вярно!", "right"]
-          : r.points > 0
-            ? ["Близо.", "partial"]
-            : ["Не е това.", "wrong"];
-  return h(
-    "p",
-    { class: `verdict ${cls}`, role: "status" },
-    h("strong", null, text),
-    r.points > 0 ? h("span", { class: "muted" }, ` +${r.points}`) : null,
-  );
+function kindOf(r: Result, given: Answer | null): VerdictKind {
+  if (r.timedOut || given === null) return "time";
+  if (r.exact) return "exact";
+  if (r.right) return "right";
+  return r.points > 0 ? "partial" : "wrong";
 }
 
 function credit(c: Credit): Child {
   return h(
     "p",
-    { class: "credit muted" },
+    { class: "credit" },
     "Снимка: ",
     h("a", { href: c.source, target: "_blank", rel: "noopener" }, c.credit),
     " · ",

@@ -47,6 +47,9 @@ export function picture(view: View): Child {
 
 const letters = ["А", "Б", "В", "Г"];
 
+/** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
+const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
+
 function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
   const buttons = view.choices.map((text, i) =>
     h(
@@ -69,9 +72,10 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
     node: h("div", { class: "options" }, buttons),
     reveal(reveal, given) {
       buttons.forEach((b, i) => {
-        if (i === reveal.pick) b.classList.add("right");
-        else if (given && "pick" in given && given.pick === i) b.classList.add("wrong");
-        else b.classList.add("dim");
+        b.classList.remove("picked");
+        const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
+        b.classList.add(how);
+        if (how !== "dim") b.append(sign());
       });
     },
   };
@@ -121,7 +125,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
         view.unit ? h("span", { class: "unit" }, view.unit) : null,
       ),
     ),
-    h("button", { class: "btn", disabled: () => locked() || !valid() }, "Отговори"),
+    h("button", { class: "btn primary", disabled: () => locked() || !valid() }, "Отговори"),
   );
   return {
     node: h("div", null, form, result),
@@ -130,7 +134,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
       result.hidden = false;
       const right = `${formatNumber(reveal.value ?? 0, view.step)}${unit}`;
       append(result, [
-        h("p", { class: "number-answer" }, "Отговор: ", h("strong", null, right)),
+        h("p", { class: "number-answer" }, h("span", { class: "kicker" }, "Отговор"), " ", h("strong", null, right)),
         given && "value" in given
           ? h("p", { class: "muted" }, `Ти каза ${formatNumber(given.value, view.step)}${unit}.`)
           : h("p", { class: "muted" }, "Без отговор."),
@@ -166,13 +170,13 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   const done = h(
     "button",
     {
-      class: "btn",
+      class: "btn primary",
       disabled: () => locked() || placed().length !== view.items.length,
       onclick: () => submit({ order: placed.peek() }),
     },
     "Готово",
   );
-  const hint = h("p", { class: "muted" }, "Докосни ги подред. Второ докосване маха избора.");
+  const hint = h("p", { class: "hint" }, "Докосни ги подред. Второ докосване маха избора.");
   return {
     node: h("div", { class: "stack" }, hint, list, done),
     reveal(reveal, given) {
@@ -188,6 +192,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
             h("span", { class: "letter" }, String(place + 1)),
             h("span", null, view.items[item] ?? ""),
             h("span", { class: "value" }, `${formatNumber(reveal.values?.[item] ?? 0, 0.01)}${unit}`),
+            sign(),
           ),
         ),
       );

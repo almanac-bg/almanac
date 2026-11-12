@@ -1,4 +1,4 @@
-// АЛМАНАХ's web client: a name, three links, and the screen the router puts under them.
+// АЛМАНАХ's web client: the mark and the name, four links, and the screen the router puts under them.
 
 import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
@@ -27,7 +27,12 @@ if (root) {
     h(
       "header",
       { class: "top" },
-      h("a", { href: "/", class: "name" }, "АЛМАНАХ"),
+      h(
+        "a",
+        { href: "/", class: "name" },
+        h("img", { class: "mark", src: "/favicon.svg", alt: "", width: 32, height: 32 }),
+        "АЛМАНАХ",
+      ),
       h(
         "nav",
         { "aria-label": "Основно" },

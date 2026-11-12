@@ -11,8 +11,9 @@
 
 - **Сървърът** (`cmd/almanac`, `internal/`) е един статичен файл: HTTP, HTTPS, базата данни (SQLite), пощата и
   клиентът са вътре. Зависи само от драйвера за SQLite.
-- **Клиентът** (`web/`) е около 12 kB (gzip) и се строи с esbuild през `go run ./cmd/build`. Бюджетът му (30 kB)
-  е в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`).
+- **Клиентът** (`web/`) е около 15 kB скрипт и 6 kB стилове (gzip) и се строи с esbuild през `go run ./cmd/build`.
+  Бюджетите му (30 kB и 10 kB) са в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
+  (Sofia Sans и Literata) са наши файлове: браузърът не пита никой друг за нищо.
 - **Въпросите** (`internal/bank`) са сърцето на играта: всеки вид въпрос (с избор, с число, за подреждане) сам се
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
 
@@ -29,7 +30,7 @@ internal/push    известията (Web Push)
 internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
 deploy           услугата и скриптовете на сървъра
-web/src          клиентът: lib/ (DOM, сигнали, рутер), game/ (въпросите, играта), screens/
+web/src          клиентът: lib/ (DOM, сигнали, рутер), game/ (въпросите, играта), screens/, ui.ts, fonts/
 e2e              играта в истински браузъри (Playwright)
 bank/sample      публична извадка от въпросите (истинските са частни)
 ```
@@ -72,11 +73,12 @@ go run ./cmd/almanac bank check      # банката: private/, ако я им�
 
 Кодът е под **GNU Affero General Public License v3.0 или по-нова** ([LICENSE](LICENSE)). Лицензът не обхваща името
 АЛМАНАХ, логото и домейна almanac.bg, нито частната банка с въпроси. Снимките във въпросите са под собствените си
-свободни лицензи, посочени при всяка.
+свободни лицензи, посочени при всяка. Шрифтовете Sofia Sans и Literata са под SIL Open Font License 1.1
+([web/src/fonts/OFL.txt](web/src/fonts/OFL.txt)).
 
 ## In English
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
 everyone; topic play that follows what you know; live duels and rooms; challenges to friends. One Go program (stdlib +
-SQLite) serves a plain TypeScript client of about 12 kB. Run it with `go run ./cmd/build && DEV=1 go run
+SQLite) serves a plain TypeScript client of about 15 kB. Run it with `go run ./cmd/build && DEV=1 go run
 ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in English are welcome.

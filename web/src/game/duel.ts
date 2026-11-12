@@ -34,11 +34,11 @@ export function findDuel(label = "Намери съперник"): Child {
   return h("div", { class: "stack" }, () =>
     state() === "searching"
       ? [
-          h("p", { role: "status" }, "Търсим съперник…"),
+          h("p", { class: "status", role: "status" }, "Търсим съперник…"),
           h("button", { class: "link", onclick: () => stop?.abort() }, "Отказ"),
         ]
       : [
-          h("button", { class: "btn", onclick: search }, label),
+          h("button", { class: "btn primary", onclick: search }, label),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         ],
   );

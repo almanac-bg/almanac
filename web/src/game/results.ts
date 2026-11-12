@@ -3,18 +3,40 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
+import { fact } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
 import type { Mark, Reviewed, Score, State } from "./types.ts";
 
-export function summary(s: State, ...more: Child[]): Child {
+/** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
+ * then whatever the screen adds, and the questions to go over. */
+export function summary(s: State, line: Child, ...more: Child[]): Child {
   return h(
     "section",
     { class: "summary" },
-    h("h1", null, `${s.rights} от ${s.total}`),
-    h("p", { class: "muted" }, `${s.points} точки`),
-    trail(s.trail, s.total),
+    h(
+      "div",
+      { class: "card hero" },
+      h(
+        "div",
+        { class: "score-row" },
+        h(
+          "h1",
+          { class: "score" },
+          h("b", { class: "score-n" }, String(s.rights)),
+          h("span", { class: "score-of" }, ` от ${s.total}`),
+        ),
+        h(
+          "p",
+          { class: "points" },
+          h("b", { class: "points-n" }, String(s.points)),
+          h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"),
+        ),
+      ),
+      line,
+      trail(s.trail, s.total),
+    ),
     more,
     review(s.id),
   );
@@ -26,7 +48,7 @@ export function squares(marks: Mark[]): string {
 }
 
 /** Shares through the phone's own sheet, or copies where there's none. */
-export function shareButton(label: string, text: () => string, url?: string): Child {
+export function shareButton(label: string, text: () => string, url?: string, primary = true): Child {
   const done = signal("");
   return h(
     "div",
@@ -34,7 +56,7 @@ export function shareButton(label: string, text: () => string, url?: string): Ch
     h(
       "button",
       {
-        class: "btn",
+        class: primary ? "btn primary big" : "btn",
         onclick: async () => {
           const body = text();
           if (navigator.share) {
@@ -88,19 +110,33 @@ function review(id: number): Child {
           { class: "reviewed" },
           h(
             "p",
-            { class: "muted" },
-            `${it.n + 1}. ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${it.points} т.`,
+            { class: "kicker" },
+            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${it.points} т.`,
           ),
-          h("h3", null, it.view.text),
+          h("h3", { class: "ask" }, it.view.text),
           picture(it.view),
           answered(it.view, it.reveal, it.given),
-          it.reveal.fact ? h("p", { class: "fact" }, it.reveal.fact) : null,
+          it.reveal.fact ? fact(it.reveal.fact) : null,
           report(it.reveal.id),
         ),
       ),
     ];
   });
 }
+
+/** One row of a board: the place (gold, silver, bronze for the first three), the name, the score. */
+export function boardRow(place: number, name: Child, score: Child, opts: { me?: boolean; gap?: boolean } = {}) {
+  const cls = ["row", place <= 3 && `p${place}`, opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ");
+  return h(
+    "li",
+    { class: cls },
+    h("span", { class: "place" }, String(place)),
+    h("span", { class: "who" }, name, opts.me ? h("span", { class: "you" }, "ти") : null),
+    h("span", { class: "pts" }, score),
+  );
+}
+
+const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), String(s.points)];
 
 /** A board of results: the best, and the viewer among them. */
 export function board(title: string, scores: Score[], place?: number, mine?: Score): Child {
@@ -112,23 +148,9 @@ export function board(title: string, scores: Score[], place?: number, mine?: Sco
     h(
       "ol",
       null,
-      rows.map((s, i) =>
-        h(
-          "li",
-          { class: s.me ? "row me" : "row" },
-          h("span", { class: "place" }, String(i + 1)),
-          h("span", { class: "who" }, s.name),
-          h("span", { class: "pts" }, `${s.rights}/10 · ${s.points}`),
-        ),
-      ),
+      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me })),
       place && mine && !rows.some((s) => s.me)
-        ? h(
-            "li",
-            { class: "row me" },
-            h("span", { class: "place" }, String(place)),
-            h("span", { class: "who" }, mine.name),
-            h("span", { class: "pts" }, `${mine.rights}/10 · ${mine.points}`),
-          )
+        ? boardRow(place, mine.name, scoreOf(mine), { me: true, gap: place > rows.length + 1 })
         : null,
     ),
   );
