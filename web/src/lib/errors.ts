@@ -12,6 +12,11 @@ function report(message: string, where: string, stack: string) {
   }).catch(() => {});
 }
 
+/** Reports a problem the page caught itself (it's shown to the player too), so it's seen on the server. */
+export function reportProblem(message: string): void {
+  report(message, "caught", "");
+}
+
 export function reportErrors(): void {
   addEventListener("error", (e) =>
     report(String(e.message), `${e.filename}:${e.lineno}:${e.colno}`, e.error?.stack ?? ""),

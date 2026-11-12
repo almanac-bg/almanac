@@ -62,6 +62,9 @@ func (s *Server) logged(next http.Handler) http.Handler {
 		if sw.status >= 500 {
 			level = slog.LevelError
 		}
+		if sw.status == 499 { // the player left before the answer: not worth a line
+			return
+		}
 		slog.Log(r.Context(), level, "request", "method", r.Method, "path", r.URL.Path, "status", sw.status,
 			"ms", time.Since(start).Milliseconds(), "ip", s.clientIP(r))
 	})

@@ -3,6 +3,7 @@
 
 import { pushKey } from "../state.ts";
 import { api } from "./api.ts";
+import { reportProblem } from "./errors.ts";
 
 /** Whether this browser can take notifications from the game. */
 export const pushable = () =>
@@ -34,7 +35,16 @@ export async function turnOn(): Promise<string | null> {
   }
   const reg = await registration();
   await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(pushKey) });
+  let sub: PushSubscription;
+  try {
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(pushKey) });
+  } catch (err) {
+    // The browser's push service said no. Brave keeps it off until it's switched on; the others have it on.
+    reportProblem(`push subscribe: ${(err as Error).name}: ${(err as Error).message}`);
+    return /Brave/.test(navigator.userAgent) || "brave" in navigator
+      ? "Brave изключва известията по подразбиране. Включи ги от Настройки → Поверителност и сигурност → „Use Google services for push messaging“ и опитай пак."
+      : "Браузърът не успя да включи известията. Опитай пак или в друг браузър (Chrome, Firefox, Safari).";
+  }
   await api("POST", "/api/push", sub.toJSON());
   return null;
 }

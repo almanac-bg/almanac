@@ -42,6 +42,7 @@ func (i *inbox) Send(_ context.Context, _ string, m mail.Message) error {
 
 type game struct {
 	t      *testing.T
+	srv    *Server
 	db     *store.DB
 	url    string
 	outbox *mail.Outbox
@@ -71,7 +72,7 @@ func start(t *testing.T) *game {
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)
-	return &game{t: t, db: db, url: ts.URL, outbox: out, inbox: in}
+	return &game{t: t, srv: s, db: db, url: ts.URL, outbox: out, inbox: in}
 }
 
 // player is a browser: it keeps its cookies.
@@ -685,5 +686,37 @@ func TestLinkPreviews(t *testing.T) {
 	code := room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
+	}
+}
+
+// A player who leaves while asking (a duel search cancelled) isn't a server error nor a problem to mail, and their
+// place in the queue is free at once: the next player isn't matched with someone gone.
+func TestALeftRequestIsNoProblem(t *testing.T) {
+	g := start(t)
+	g.srv.duelWait = 2 * time.Second // before any request reads it
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	ctx, cancel := context.WithCancel(t.Context())
+	req, _ := http.NewRequestWithContext(ctx, "POST", g.url+"/api/duel", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	done := make(chan struct{})
+	go func() {
+		if res, err := ana.client.Do(req); err == nil {
+			res.Body.Close()
+		}
+		close(done)
+	}()
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+	<-done
+	time.Sleep(300 * time.Millisecond)
+	if news := g.srv.problems.take(); len(news) != 0 {
+		t.Fatalf("a cancelled search became a problem: %v", news)
+	}
+	// Bo asks now: Ana is gone, so he isn't matched with her (with nobody about and no recordings: nobody).
+	if status, out := bo.call("POST", "/api/duel", map[string]any{}); status != 404 || out["error"] != "nobody" {
+		t.Fatalf("Bo was matched with someone gone: %d %v", status, out)
 	}
 }
