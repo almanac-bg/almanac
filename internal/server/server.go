@@ -119,6 +119,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/me", s.me)
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
+	api("GET /api/me/stats", s.stats)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
 	api("POST /api/auth/code", s.sendCode)

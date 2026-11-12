@@ -2,6 +2,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { type User, user } from "../state.ts";
+import { stats } from "./stats.ts";
 
 export function me() {
   title("Профил");
@@ -11,7 +12,13 @@ export function me() {
     h("h1", null, () => user()?.name ?? "Профил"),
     when(
       () => user(),
-      () => [nameForm(), account(), deleteAccount(), h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо"))],
+      () => [
+        stats(),
+        nameForm(),
+        account(),
+        deleteAccount(),
+        h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
+      ],
       () => [
         h("p", { class: "muted" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
         signIn(),

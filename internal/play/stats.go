@@ -1,0 +1,108 @@
+package play
+
+import (
+	"context"
+	"slices"
+)
+
+// Stats is how a player has done: the streak, how much they've played, and how well in each topic.
+type Stats struct {
+	Streak  int          `json:"streak"`
+	Days    int          `json:"days"`    // days' questions finished
+	Games   int          `json:"games"`   // runs finished, of every kind
+	Answers int          `json:"answers"` // questions answered (or timed out)
+	Right   int          `json:"right"`
+	Topics  []TopicStats `json:"topics"`
+	Recent  []Played     `json:"recent"`
+}
+
+type TopicStats struct {
+	Category string `json:"category"`
+	Answers  int    `json:"answers"`
+	Right    int    `json:"right"`
+}
+
+// Played is a finished run, as a list of games shows it.
+type Played struct {
+	ID       int64  `json:"id"`
+	Kind     string `json:"kind"`
+	Day      string `json:"day,omitempty"`
+	Category string `json:"category,omitempty"`
+	Rights   int    `json:"rights"`
+	Total    int    `json:"total"`
+	Points   int    `json:"points"`
+	At       int64  `json:"at"`
+}
+
+// StatsOf reads a player's stats.
+func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
+	var s Stats
+	var err error
+	if s.Streak, err = g.Streak(ctx, userID); err != nil {
+		return s, err
+	}
+	db := g.DB.Read
+	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day') FROM runs
+		WHERE user_id = ? AND finished_at IS NOT NULL`, userID).Scan(&s.Games, &s.Days)
+	if err != nil {
+		return s, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ?`, userID)
+	if err != nil {
+		return s, err
+	}
+	b := g.Bank()
+	byTopic := map[string]*TopicStats{}
+	for rows.Next() {
+		var id string
+		var right bool
+		if err := rows.Scan(&id, &right); err != nil {
+			rows.Close()
+			return s, err
+		}
+		s.Answers++
+		if right {
+			s.Right++
+		}
+		q, ok := b.Get(id)
+		if !ok {
+			continue
+		}
+		c := q.Base().Category
+		if byTopic[c] == nil {
+			byTopic[c] = &TopicStats{Category: c}
+		}
+		byTopic[c].Answers++
+		if right {
+			byTopic[c].Right++
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return s, err
+	}
+	s.Topics = []TopicStats{}
+	for _, c := range b.Categories { // in the bank's order
+		if t := byTopic[c.ID]; t != nil {
+			s.Topics = append(s.Topics, *t)
+		}
+	}
+	rows, err = db.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights, points,
+		json_array_length(questions), finished_at FROM runs WHERE user_id = ? AND finished_at IS NOT NULL
+		ORDER BY finished_at DESC LIMIT 20`, userID)
+	if err != nil {
+		return s, err
+	}
+	defer rows.Close()
+	s.Recent = []Played{}
+	for rows.Next() {
+		var p Played
+		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Points, &p.Total, &p.At); err != nil {
+			return s, err
+		}
+		s.Recent = append(s.Recent, p)
+	}
+	slices.SortStableFunc(s.Topics, func(a, b TopicStats) int { return b.Answers - a.Answers })
+	return s, rows.Err()
+}
