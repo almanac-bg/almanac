@@ -38,6 +38,8 @@ import (
 //	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
 //	OPERATOR_NAME       who runs the game, for the privacy page
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
+//	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
+//	                    MTA_STS_MODE testing (the default) or enforce
 //
 // SIGHUP reloads the bank; SIGTERM or SIGINT stop the server after the requests under way finish.
 func serve([]string) error {
@@ -59,6 +61,8 @@ func serve([]string) error {
 		TLSCert:         os.Getenv("TLS_CERT"),
 		TLSKey:          os.Getenv("TLS_KEY"),
 		TrustCloudflare: os.Getenv("TRUST_CLOUDFLARE") == "1",
+		MTASTS:          strings.FieldsFunc(os.Getenv("MTA_STS_MX"), func(r rune) bool { return r == ',' || r == ' ' }),
+		MTASTSMode:      os.Getenv("MTA_STS_MODE"),
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		Dev:             dev,

@@ -56,7 +56,7 @@ func start(t *testing.T) *game {
 	out := mail.NewOutbox(db, in, "АЛМАНАХ <no-reply@almanac.bg>")
 	accounts := &account.Accounts{DB: db, Outbox: out, Secret: []byte("test")}
 	ts := httptest.NewUnstartedServer(nil)
-	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Version: "test"},
+	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Version: "test", MTASTS: []string{"mx.example"}},
 		Deps{DB: db, Accounts: accounts, Outbox: out, Bank: b})
 	if err != nil {
 		t.Fatal(err)
@@ -330,5 +330,35 @@ func TestBrowserErrorsBecomeProblems(t *testing.T) {
 	}
 	if status, _ := p.call("POST", "/api/errors", map[string]any{"message": 1}); status != 400 {
 		t.Fatalf("a broken report: %d", status)
+	}
+}
+
+func TestHosts(t *testing.T) {
+	g := start(t)
+	_, port, _ := strings.Cut(strings.TrimPrefix(g.url, "http://"), ":")
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	get := func(host, path string) (*http.Response, string) {
+		req, _ := http.NewRequest("GET", g.url+path, nil)
+		req.Host = host + ":" + port
+		res, err := noRedirect.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return res, string(body)
+	}
+	if res, _ := get("www.127.0.0.1", "/play?x=1"); res.StatusCode != 301 || res.Header.Get("Location") != g.url+"/play?x=1" {
+		t.Errorf("www: %d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	if res, body := get("mta-sts.127.0.0.1", "/.well-known/mta-sts.txt"); res.StatusCode != 200 ||
+		body != "version: STSv1\r\nmode: testing\r\nmx: mx.example\r\nmax_age: 604800\r\n" {
+		t.Errorf("mta-sts: %d %q", res.StatusCode, body)
+	}
+	if res, _ := get("mta-sts.127.0.0.1", "/"); res.StatusCode != 404 {
+		t.Errorf("mta-sts /: %d", res.StatusCode)
+	}
+	if res, _ := get("evil.example", "/"); res.StatusCode != 404 {
+		t.Errorf("another site's name: %d", res.StatusCode)
 	}
 }
