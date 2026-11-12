@@ -1,7 +1,7 @@
 # АЛМАНАХ — almanac.bg
 
 Въпроси, от които научаваш нещо. Десет на ден, едни и същи за всички; игра по теми, която следва колко знаеш;
-предизвикателства към приятели и стаи за игра заедно. Играй на **[almanac.bg](https://almanac.bg)**.
+дуели и стаи за игра заедно, на живо; предизвикателства към приятели. Играй на **[almanac.bg](https://almanac.bg)**.
 
 Свободен софтуер под [AGPL-3.0](LICENSE).
 
@@ -11,7 +11,8 @@
 
 - **Сървърът** (`cmd/almanac`, `internal/`) е един статичен файл: HTTP, HTTPS, базата данни (SQLite), пощата и
   клиентът са вътре. Зависи само от драйвера за SQLite.
-- **Клиентът** (`web/`) е под 10 kB (gzip) и се строи с esbuild през `go run ./cmd/build`. Бюджетът му е в CI.
+- **Клиентът** (`web/`) е около 12 kB (gzip) и се строи с esbuild през `go run ./cmd/build`. Бюджетът му (30 kB)
+  е в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`).
 - **Въпросите** (`internal/bank`) са сърцето на играта: всеки вид въпрос (с избор, с число, за подреждане) сам се
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
 
@@ -22,11 +23,14 @@ internal/bank    въпросите: видовете, банката на ди�
 internal/store   SQLite и миграциите (internal/store/migrations)
 internal/account гости, вход с код по имейл, сесии, имена
 internal/mail    пощата: опашка в базата, SMTP
-internal/play    играта: денят, темите, предизвикателствата, класацията, серията
+internal/play    играта: денят, темите, предизвикателствата, дуелите, класацията, серията, статистиката
+internal/room    игра на живо: стаите и дуелите (Server-Sent Events)
+internal/push    известията (Web Push)
 internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
 deploy           услугата и скриптовете на сървъра
-web/src          клиентът: lib/ (DOM, сигнали, рутер), screens/
+web/src          клиентът: lib/ (DOM, сигнали, рутер), game/ (въпросите, играта), screens/
+e2e              играта в истински браузъри (Playwright)
 bank/sample      публична извадка от въпросите (истинските са частни)
 ```
 
@@ -74,6 +78,6 @@ go run ./cmd/almanac bank check      # банката: private/, ако я им�
 ## In English
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
-everyone; topic play that follows what you know; challenges and rooms to play with friends. One Go program (stdlib +
-SQLite) serves a plain TypeScript client of under 10 kB. Run it with `go run ./cmd/build && DEV=1 go run
+everyone; topic play that follows what you know; live duels and rooms; challenges to friends. One Go program (stdlib +
+SQLite) serves a plain TypeScript client of about 12 kB. Run it with `go run ./cmd/build && DEV=1 go run
 ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in English are welcome.
