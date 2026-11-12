@@ -40,6 +40,13 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	out["board"] = board
+	if u != nil {
+		friends, err := s.game.FriendsBoard(r.Context(), day, u.ID)
+		if err != nil {
+			return err
+		}
+		out["friends"] = friends
+	}
 	return ok(w, out)
 }
 

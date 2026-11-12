@@ -164,6 +164,13 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/next", s.roomNext)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
+	api("POST /api/rooms/{code}/decline", s.roomDecline)
+	api("GET /api/friends", s.friends)
+	api("GET /api/friends/invites", s.duelInvites)
+	api("DELETE /api/friends/{id}", s.unfriend)
+	api("POST /api/friends/{id}/duel", s.duelFriend)
+	api("GET /api/invites/{code}", s.inviteInfo)
+	api("POST /api/invites/{code}", s.acceptInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)

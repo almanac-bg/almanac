@@ -9,13 +9,15 @@ import { questionHead, timer } from "../game/run.ts";
 import type { Answer, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
+import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
 import { fact, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
   duel?: boolean;
+  /** A duel between friends: one asked the other to it. */
+  invite?: boolean;
   phase: "lobby" | "question" | "reveal" | "end";
   host: string;
   isHost: boolean;
@@ -55,7 +57,7 @@ const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 export function room([code = ""]: string[]) {
   title("Заедно");
   const view = signal<RoomView | null>(null);
-  const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
+  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "declined" | "expired">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<string, number>();
 
@@ -76,6 +78,13 @@ export function room([code = ""]: string[]) {
         es?.close();
         trouble.set("full");
       });
+      // A duel between friends that won't happen: turned down, or not answered in time.
+      for (const why of ["declined", "expired"] as const) {
+        es.addEventListener(why, () => {
+          es?.close();
+          trouble.set(why);
+        });
+      }
       es.onerror = () => {
         if (es?.readyState === EventSource.CLOSED) trouble.set("gone");
         else trouble.set("reconnecting"); // the browser tries again by itself
@@ -111,13 +120,17 @@ export function room([code = ""]: string[]) {
             h("a", { class: "btn primary", href: "/together" }, "Отвори нова стая"),
           )
         : null,
+    () => {
+      const why = trouble();
+      return why === "declined" || why === "expired" ? notToBe(view.peek(), why) : null;
+    },
     () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
     () => {
       const k = key();
-      if (trouble() === "gone" || trouble() === "full") return null;
+      if (trouble() !== "" && trouble() !== "reconnecting") return null;
       if (!k) return h("p", { class: "muted" }, "…");
       const v = untracked(view) as RoomView;
       switch (v.phase) {
@@ -151,8 +164,73 @@ function waiting(view: () => RoomView, what: string): Child {
   };
 }
 
+/** A duel between friends that won't happen, said to whoever is still looking at it. */
+function notToBe(v: RoomView | null, why: "declined" | "expired"): Child {
+  const asked = v?.players[0]?.me; // the one who asked is the first in the duel
+  const them = v ? opponent(v)?.name : undefined;
+  const [heading, text] = !asked
+    ? ["Дуелът е отменен", "Може би друг път."]
+    : why === "declined"
+      ? ["Не може сега", `${them ?? "Приятелят ти"} отказа дуела. Предизвикай с линк: ще го изиграе, когато може.`]
+      : [
+          "Поканата изтече",
+          `${them ?? "Приятелят ти"} не дойде за 10 минути. Предизвикай с линк: ще го изиграе, когато може.`,
+        ];
+  return h(
+    "div",
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, "Дуел"),
+      h("h1", null, heading),
+      h("p", { class: "lead" }, text),
+    ),
+    asked ? h("a", { class: "btn primary big", href: "/challenge" }, "Предизвикай") : null,
+    h("a", { class: "btn", href: "/together" }, "Към Заедно"),
+  );
+}
+
+/** Waiting for a friend asked to a duel: who, how long it stays open, and a way to call it off. */
+function invited(view: () => RoomView, code: string): Child {
+  const error = signal("");
+  const them = () => opponent(view())?.name ?? "";
+  return h(
+    "div",
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, "Дуел с приятел"),
+      h("h1", null, () => `Дуел с ${them()}`),
+      h("p", { class: "lead" }, "Чакаме да дойде. Поканата важи 10 минути. Щом влезе, започвате."),
+    ),
+    h("p", { class: "status", role: "status" }, () =>
+      opponent(view())?.online ? `${them()} е тук.` : `${them()} още не е в дуела.`,
+    ),
+    h(
+      "button",
+      {
+        class: "link",
+        type: "button",
+        onclick: async () => {
+          try {
+            await api("POST", `/api/rooms/${code}/decline`, {});
+            go("/together");
+          } catch (err) {
+            error.set((err as ApiError).message);
+          }
+        },
+      },
+      "Откажи",
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
+}
+
 function lobby(view: () => RoomView, code: string): Child {
   const error = signal("");
+  if (view().duel && view().invite) return invited(view, code);
   if (view().duel)
     return h("div", { class: "stack" }, h("p", { class: "kicker" }, "Дуел"), h("h1", null, "Чакаме съперника…"));
   return h(

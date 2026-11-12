@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -718,5 +719,84 @@ func TestALeftRequestIsNoProblem(t *testing.T) {
 	// Bo asks now: Ana is gone, so he isn't matched with her (with nobody about and no recordings: nobody).
 	if status, out := bo.call("POST", "/api/duel", map[string]any{}); status != 404 || out["error"] != "nobody" {
 		t.Fatalf("Bo was matched with someone gone: %d %v", status, out)
+	}
+}
+
+func TestFriendsOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	_, a := ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	_, mine := ana.call("GET", "/api/friends", nil)
+	link, _ := mine["invite"].(string)
+	code := link[strings.LastIndex(link, "/")+1:]
+	if !strings.HasSuffix(link, "/f/"+code) || len(code) != 8 {
+		t.Fatalf("Ana's invite link: %q", link)
+	}
+	if _, info := ana.call("GET", "/api/invites/"+code, nil); info["own"] != true {
+		t.Fatalf("Ana's own link: %v", info)
+	}
+	if _, info := bo.call("GET", "/api/invites/"+code, nil); info["by"] != name(a) || info["own"] != false {
+		t.Fatalf("Ana's link, as Bo sees it: %v", info)
+	}
+	if status, _ := bo.call("POST", "/api/invites/nosuchcd", nil); status != http.StatusNotFound {
+		t.Fatalf("a made-up link: %d", status)
+	}
+	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusOK || out["name"] != name(a) {
+		t.Fatalf("Bo accepts: %d %v", status, out)
+	}
+	_, mine = ana.call("GET", "/api/friends", nil)
+	friends, _ := mine["friends"].([]any)
+	if len(friends) != 1 {
+		t.Fatalf("Ana's friends: %v", mine)
+	}
+	boID := int64(friends[0].(map[string]any)["id"].(float64))
+
+	// A duel: Ana asks, Bo sees the invitation, comes, and it starts.
+	_, out := ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	room, _ := out["code"].(string)
+	as := ana.follow(room)
+	as.until(func(v map[string]any) bool { return v["phase"] == "lobby" && v["invite"] == true })
+	_, his := bo.call("GET", "/api/friends", nil)
+	if inv, _ := his["invites"].([]any); len(inv) != 1 || inv[0].(map[string]any)["code"] != room {
+		t.Fatalf("Bo's invitations: %v", his)
+	}
+	bs := bo.follow(room)
+	for _, s := range []*stream{as, bs} {
+		s.until(func(v map[string]any) bool { return v["phase"] == "question" && v["duel"] == true })
+	}
+
+	// Another, turned down: Ana's screen hears it was.
+	_, out = ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	second, _ := out["code"].(string)
+	if second == room {
+		t.Fatal("a started duel was offered again")
+	}
+	as2 := ana.follow(second)
+	as2.until(func(v map[string]any) bool { return v["phase"] == "lobby" })
+	if status, _ := bo.call("POST", "/api/rooms/"+second+"/decline", nil); status != http.StatusOK {
+		t.Fatalf("Bo declines: %d", status)
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		line, err := as2.r.ReadString('\n')
+		if err != nil || time.Now().After(deadline) {
+			t.Fatalf("no word of the decline: %v", err)
+		}
+		if strings.TrimSpace(line) == "event: declined" {
+			break
+		}
+	}
+
+	// Strangers can't ask each other.
+	vi := g.player()
+	vi.call("POST", "/api/guest", map[string]any{})
+	if status, _ := vi.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil); status != http.StatusNotFound {
+		t.Fatalf("a stranger asked Bo to a duel: %d", status)
+	}
+	if status, _ := bo.call("DELETE", fmt.Sprintf("/api/friends/%d", int64(a["user"].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
+		t.Fatalf("unfriending: %d", status)
+	}
+	if _, his = bo.call("GET", "/api/friends", nil); len(his["friends"].([]any)) != 0 {
+		t.Fatalf("still friends: %v", his)
 	}
 }

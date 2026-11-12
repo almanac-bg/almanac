@@ -6,6 +6,7 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player, user } from "../state.ts";
 import { toneOf } from "../ui.ts";
+import { friendsCard } from "./friends.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 export function together() {
@@ -54,6 +55,7 @@ export function together() {
       ),
       findDuel(),
     ),
+    friendsCard(),
     h(
       "section",
       { class: "card" },

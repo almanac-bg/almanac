@@ -106,8 +106,10 @@ type Duel struct {
 	Picks    []Pick
 	Answers  []DuelAnswer // one for each question, in order
 	Opponent string
-	Recorded bool   // against a recording
-	Outcome  string // won, lost or draw
+	// OpponentID is the other player's (0 for a recording): for the record between friends.
+	OpponentID int64
+	Recorded   bool   // against a recording
+	Outcome    string // won, lost or draw
 }
 
 type DuelAnswer struct {
@@ -136,9 +138,13 @@ func (g *Game) SaveDuel(ctx context.Context, d Duel) error {
 		}
 		picks, _ := json.Marshal(d.Picks)
 		now := store.Ms(g.Now())
-		res, err := tx.Exec(`INSERT INTO runs (user_id, kind, category, questions, at, points, rights, ms, opponent, recorded,
-			outcome, started_at, finished_at) VALUES (?, 'duel', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			d.UserID, string(picks), len(d.Picks), points, rights, ms, d.Opponent, d.Recorded, d.Outcome,
+		var opponentID any
+		if d.OpponentID > 0 {
+			opponentID = d.OpponentID
+		}
+		res, err := tx.Exec(`INSERT INTO runs (user_id, kind, category, questions, at, points, rights, ms, opponent,
+			opponent_id, recorded, outcome, started_at, finished_at) VALUES (?, 'duel', '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			d.UserID, string(picks), len(d.Picks), points, rights, ms, d.Opponent, opponentID, d.Recorded, d.Outcome,
 			now-ms-int64(len(d.Picks))*int64(5*time.Second/time.Millisecond), now)
 		if err != nil {
 			return err

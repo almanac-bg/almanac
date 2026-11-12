@@ -38,3 +38,29 @@ export async function player(): Promise<User> {
   user.set(r.user);
   return r.user;
 }
+
+/** A duel a friend asks the player to, waiting for them. */
+export interface Invitation {
+  code: string;
+  from: string;
+  fromId: number;
+  leftMs: number;
+}
+
+/** The duels friends ask the player to now: Заедно lists them, and the nav marks that there are some. */
+export const invitations = signal<Invitation[]>([]);
+
+/** Asks every half minute, while the page is in view, whether a friend calls the player to a duel. */
+export function watchInvitations(): void {
+  const check = async () => {
+    if (!user.peek() || document.hidden) return;
+    try {
+      invitations.set((await api<{ invites: Invitation[] }>("GET", "/api/friends/invites")).invites);
+    } catch {
+      // Offline for a moment: the next look will tell.
+    }
+  };
+  check();
+  setInterval(check, 30_000);
+  document.addEventListener("visibilitychange", check);
+}

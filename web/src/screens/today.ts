@@ -2,7 +2,7 @@
 
 import { board, shareButton, squares, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
-import type { Board, State } from "../game/types.ts";
+import type { Board, Score, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
@@ -16,6 +16,8 @@ interface Today {
   week?: boolean[];
   run: State | null;
   board: Board;
+  /** The day among the player and their friends, once a friend has finished it too. */
+  friends?: Score[] | null;
 }
 
 const longDate = (day: string) =>
@@ -119,6 +121,10 @@ function finished(t: Today, s: State): Child {
         location.origin,
       ),
       countdown(),
+      () => {
+        const f = fresh().friends;
+        return f?.length ? board("Приятели днес", f) : null;
+      },
       () => {
         const b = fresh().board;
         return board("Днес", b.top, b.place, b.mine);

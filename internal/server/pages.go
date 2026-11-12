@@ -28,6 +28,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/together$`),
 	regexp.MustCompile(`^/challenge$`),
+	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
 }
 
 var shell = template.Must(template.New("shell").Parse(`<!doctype html>
@@ -118,6 +119,11 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 				best := c.Players[0]
 				description = fmt.Sprintf("%s има %d от %d. Можеш ли повече?", best.Name, best.Rights, c.Total)
 			}
+		}
+	case strings.HasPrefix(path, "/f/"):
+		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
+			title = name + " те кани в АЛМАНАХ"
+			description = "Приеми и сте приятели: виждате резултатите си за деня и се каните на дуел."
 		}
 	case strings.HasPrefix(path, "/r/"):
 		code := strings.TrimPrefix(path, "/r/")

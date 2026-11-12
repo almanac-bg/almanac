@@ -414,12 +414,32 @@ func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
 	return week, rows.Err()
 }
 
-// Merge moves a guest's runs to the account they signed in to (account.Accounts.Merge): all but a day the account
-// has played itself, which stays the account's.
+// Merge moves a guest's runs and friends to the account they signed in to (account.Accounts.Merge): all runs but a
+// day the account has played itself, which stays the account's.
 func Merge(tx *sql.Tx, from, to int64) error {
 	_, err := tx.Exec(`UPDATE runs SET user_id = ? WHERE user_id = ?
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ? AND kind = 'day'))
 		AND NOT (kind = 'challenge' AND challenge IN (SELECT challenge FROM runs WHERE user_id = ? AND challenge IS NOT NULL))`,
 		to, from, to, to)
-	return err
+	if err != nil {
+		return err
+	}
+	// The guest's friends become the account's (the two aren't friends with themselves), and duels against the guest
+	// count against the account.
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since)
+			SELECT ?, friend_id, since FROM friends WHERE user_id = ? AND friend_id <> ?`, []any{to, from, to}},
+		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since)
+			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
+		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
+		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
+	} {
+		if _, err := tx.Exec(q.sql, q.args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
