@@ -5,12 +5,14 @@ export class ApiError extends Error {
   readonly status: number;
   constructor(code: string, message: string, status = 0) {
     super(message);
+    this.name = "ApiError";
     this.code = code;
     this.status = status;
   }
 }
 
 export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
+  if (body === undefined && method !== "GET") body = {};
   let res: Response;
   try {
     res = await fetch(path, {

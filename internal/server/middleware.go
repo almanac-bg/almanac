@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -8,8 +9,9 @@ import (
 	"time"
 )
 
-// recovered turns a panic in a handler into a 500 and a log entry with its stack, instead of a dropped connection.
-func recovered(next http.Handler) http.Handler {
+// recovered turns a panic in a handler into a 500, a log entry with its stack and a problem, instead of a dropped
+// connection.
+func (s *Server) recovered(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if v := recover(); v != nil {
@@ -17,6 +19,7 @@ func recovered(next http.Handler) http.Handler {
 					panic(v)
 				}
 				slog.Error("panic", "method", r.Method, "path", r.URL.Path, "err", v, "stack", string(debug.Stack()))
+				s.problems.add(fmt.Sprintf("panic: %s %s: %v", r.Method, r.Pattern, v))
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()

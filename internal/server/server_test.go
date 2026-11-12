@@ -201,6 +201,7 @@ func TestPages(t *testing.T) {
 	for path, want := range map[string]int{
 		"/": 200, "/play": 200, "/play/history": 200, "/me": 200, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
+		"/privacy": 200, "/.well-known/security.txt": 200,
 	} {
 		res, err := http.Get(g.url + path)
 		if err != nil {
@@ -214,7 +215,8 @@ func TestPages(t *testing.T) {
 		if res.Header.Get("Content-Security-Policy") == "" || res.Header.Get("X-Content-Type-Options") != "nosniff" {
 			t.Errorf("%s: missing security headers", path)
 		}
-		if want == 200 && !strings.HasPrefix(path, "/qimg/") && !strings.Contains(string(body), `id="boot"`) {
+		if want == 200 && !strings.HasPrefix(path, "/qimg/") && !strings.HasPrefix(path, "/privacy") &&
+			!strings.HasPrefix(path, "/.well-known") && !strings.Contains(string(body), `id="boot"`) {
 			t.Errorf("%s: not the app's page", path)
 		}
 	}
@@ -297,5 +299,36 @@ func TestPlayingOverHTTP(t *testing.T) {
 	}
 	if status, _ := friend.call("GET", "/api/runs/"+id, nil); status != 404 {
 		t.Fatalf("someone else's run: %d", status)
+	}
+}
+
+func TestDeletingAnAccount(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	_, run := p.call("POST", "/api/day", map[string]any{})
+	if status, _ := p.call("DELETE", "/api/me", nil); status != 200 {
+		t.Fatalf("delete: %d", status)
+	}
+	if _, me := p.call("GET", "/api/me", nil); me["user"] != nil {
+		t.Fatalf("still there: %v", me)
+	}
+	other := g.player()
+	other.call("POST", "/api/guest", map[string]any{})
+	if status, _ := other.call("GET", "/api/runs/"+strconv.Itoa(int(run["id"].(float64))), nil); status != 404 {
+		t.Fatalf("the deleted player's run: %d", status)
+	}
+}
+
+func TestBrowserErrorsBecomeProblems(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	for range 3 {
+		if status, _ := p.call("POST", "/api/errors", map[string]string{"message": "x is undefined", "where": "app.js:1:2"}); status != 200 {
+			t.Fatalf("report: %d", status)
+		}
+	}
+	if status, _ := p.call("POST", "/api/errors", map[string]any{"message": 1}); status != 400 {
+		t.Fatalf("a broken report: %d", status)
 	}
 }

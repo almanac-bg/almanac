@@ -1,0 +1,51 @@
+# The game, as a service: one program, its own user, and nothing it doesn't need (systemd-analyze security almanac).
+[Unit]
+Description=АЛМАНАХ (almanac.bg)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=almanac
+Group=almanac
+EnvironmentFile=/etc/almanac/env
+WorkingDirectory=/var/lib/almanac
+ExecStart=/usr/local/bin/almanac serve
+# SIGHUP reloads the question bank (deploy/bank.sh).
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=2
+# Requests under way get 30 seconds to finish.
+TimeoutStopSec=45
+
+# Port 443, and no other privilege.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+
+# Everything read-only but its own directory.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/almanac
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -32,7 +32,8 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
       e.altKey ||
       a.target ||
       a.hasAttribute("download") ||
-      a.origin !== location.origin
+      a.origin !== location.origin ||
+      !routes.some((r) => r.path.test(a.pathname)) // a page of the server's own (/privacy)
     )
       return;
     e.preventDefault();

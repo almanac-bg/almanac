@@ -11,7 +11,7 @@ export function me() {
     h("h1", null, () => user()?.name ?? "Профил"),
     when(
       () => user(),
-      () => [nameForm(), account()],
+      () => [nameForm(), account(), deleteAccount(), h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо"))],
       () => [
         h("p", { class: "muted" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
         signIn(),
@@ -94,6 +94,37 @@ function account(): Child {
       ],
     ),
   );
+}
+
+/** Deleting the profile: everything goes, after a second, explicit yes. */
+function deleteAccount(): Child {
+  const asking = signal(false);
+  const error = signal("");
+  return () =>
+    asking()
+      ? h(
+          "div",
+          { class: "stack" },
+          h("p", null, "Профилът, името и всички игри ще бъдат изтрити завинаги."),
+          h(
+            "button",
+            {
+              class: "btn",
+              onclick: async () => {
+                try {
+                  await api("DELETE", "/api/me");
+                  user.set(null);
+                } catch (err) {
+                  error.set((err as ApiError).message);
+                }
+              },
+            },
+            "Изтрий профила",
+          ),
+          h("button", { class: "link", onclick: () => asking.set(false) }, "Отказ"),
+          error() && h("p", { class: "bad", role: "alert" }, error()),
+        )
+      : h("button", { class: "link", onclick: () => asking.set(true) }, "Изтрий профила");
 }
 
 async function signOut() {

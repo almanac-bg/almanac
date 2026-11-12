@@ -1,6 +1,7 @@
 // АЛМАНАХ's web client: a name, three links, and the screen the router puts under them.
 
 import { h, mount } from "./lib/dom.ts";
+import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
 import { challenge } from "./screens/challenge.ts";
 import { me } from "./screens/me.ts";
@@ -13,6 +14,8 @@ const links: [href: string, label: string, here: (p: string) => boolean][] = [
   ["/play", "Игра", (p) => p.startsWith("/play")],
   ["/me", "Профил", (p) => p === "/me"],
 ];
+
+reportErrors();
 
 const root = document.getElementById("app");
 if (root) {

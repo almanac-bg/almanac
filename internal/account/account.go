@@ -157,6 +157,12 @@ func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
 	return &u, nil
 }
 
+// Delete deletes a player and, with them, everything of theirs (sessions; runs and answers through the schema).
+func (a *Accounts) Delete(ctx context.Context, userID int64) error {
+	_, err := a.DB.Write.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
+	return err
+}
+
 // SignOut ends a session.
 func (a *Accounts) SignOut(ctx context.Context, token string) error {
 	_, err := a.DB.Write.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, hashToken(token))

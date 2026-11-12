@@ -16,13 +16,16 @@
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
 
 ```
-cmd/almanac      програмата: serve, bank check, bank fmt
+cmd/almanac      програмата: serve, bank check/fmt, backup now/restore
 cmd/build        строи клиента в internal/assets/dist
 internal/bank    въпросите: видовете, банката на диска, проверките
 internal/store   SQLite и миграциите (internal/store/migrations)
 internal/account гости, вход с код по имейл, сесии, имена
 internal/mail    пощата: опашка в базата, SMTP
+internal/play    играта: денят, темите, предизвикателствата, класацията, серията
+internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
+deploy           услугата и скриптовете на сървъра
 web/src          клиентът: lib/ (DOM, сигнали, рутер), screens/
 bank/sample      публична извадка от въпросите (истинските са частни)
 ```
@@ -46,6 +49,19 @@ go run ./cmd/almanac bank check      # банката: private/, ако я им�
 
 Истинската банка е в частното хранилище `almanac-bg/almanac-questions`, клонирано в `private/`. Без нея играта
 върви с извадката в `bank/sample`.
+
+## Сървърът
+
+Един сървър (Hetzner), зад Cloudflare. Програмата работи като systemd услуга (`deploy/almanac.service`) и сама
+говори HTTPS със сертификата на Cloudflare за сървъра. Всеки час копира базата си в Cloudflare R2.
+
+- Ново издание: `git tag vX.Y.Z && git push origin vX.Y.Z` — GitHub строи програмата и пуска изданието.
+- На сървъра: `almanac-deploy vX.Y.Z` го слага; ако не тръгне до 30 секунди, връща предишното. Същата команда с
+  по-стара версия връща назад.
+- Нови въпроси: `almanac-bank` — дърпа банката, проверява я и я презарежда без рестарт.
+- Възстановяване: `almanac backup restore days/12.db.gz /var/lib/almanac/restored.db`, после смяна на файла при
+  спряна услуга.
+- Нов сървър: `deploy/setup.sh`, настройките по `deploy/env.example`, после `almanac-deploy`.
 
 ## Лиценз
 

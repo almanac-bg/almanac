@@ -8,11 +8,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/server"
@@ -24,13 +26,18 @@ import (
 //	DEV=1               development: the client from disk, mail to the log, a fixed secret
 //	ADDR                where to listen (:8080)
 //	PUBLIC_URL          the address players use (http://localhost:8080)
-//	DB_PATH             the database file (almanac.db)
+//	DB_PATH             the database file (almanac.db); copies are made beside it
 //	BANK_DIR            the question bank (private/ if there, else bank/sample)
 //	SECRET              32+ random characters, for the codes' hashes (required outside development)
 //	SMTP_URL            smtp://user:password@host:587 (required outside development)
 //	MAIL_FROM           "АЛМАНАХ <no-reply@almanac.bg>"
 //	TLS_CERT, TLS_KEY   serve HTTPS with this certificate (behind Cloudflare: its origin certificate)
 //	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header (only if nothing else can reach the server)
+//	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once)
+//	BACKUP_ENDPOINT     S3-compatible storage for hourly copies of the database (R2), with BACKUP_BUCKET,
+//	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
+//	OPERATOR_NAME       who runs the game, for the privacy page
+//	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
 //
 // SIGHUP reloads the bank; SIGTERM or SIGINT stop the server after the requests under way finish.
 func serve([]string) error {
@@ -52,6 +59,8 @@ func serve([]string) error {
 		TLSCert:         os.Getenv("TLS_CERT"),
 		TLSKey:          os.Getenv("TLS_KEY"),
 		TrustCloudflare: os.Getenv("TRUST_CLOUDFLARE") == "1",
+		Operator:        os.Getenv("OPERATOR_NAME"),
+		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		Dev:             dev,
 		Version:         version,
 	}
@@ -85,7 +94,11 @@ func serve([]string) error {
 	}
 	slog.Info("bank", "dir", bankDir, "questions", len(b.Questions), "live", len(b.Live("", "")))
 
-	db, err := store.Open(env("DB_PATH", "almanac.db"))
+	backups, err := backupStore()
+	if err != nil {
+		return err
+	}
+	db, err := store.Open(dbPath())
 	if err != nil {
 		return err
 	}
@@ -107,6 +120,15 @@ func serve([]string) error {
 		}
 	})
 	go reloadOnHangup(ctx, bankDir, srv)
+	if to := os.Getenv("ALERT_EMAIL"); to != "" {
+		go srv.MailProblems(ctx, to, time.Hour)
+	}
+	if backups != nil {
+		b := &backup.Backer{Store: backups, DB: db.Read, Dir: filepath.Dir(dbPath()), Heartbeat: os.Getenv("BACKUP_HEARTBEAT")}
+		go b.Run(ctx, func(err error) { srv.Problem("backup: " + err.Error()) })
+	} else if !dev {
+		slog.Warn("no backups configured (BACKUP_ENDPOINT)")
+	}
 
 	err = srv.Run(ctx, 30*time.Second)
 	flush, cancel := context.WithTimeout(context.Background(), 10*time.Second)

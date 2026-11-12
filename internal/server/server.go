@@ -33,6 +33,8 @@ type Config struct {
 	// TrustCloudflare takes the player's address from CF-Connecting-IP. Only when nothing but Cloudflare can reach the
 	// server, or anyone could claim any address.
 	TrustCloudflare bool
+	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
+	Operator, Contact string
 	// Dev serves the client from disk, as the build rewrites it.
 	Dev     bool
 	Version string
@@ -56,6 +58,7 @@ type Server struct {
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
+	problems *problems
 	secure   bool
 	cookie   string
 	handler  http.Handler
@@ -66,10 +69,16 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, errors.New("PUBLIC_URL must be like https://almanac.bg")
 	}
+	if cfg.Operator == "" {
+		cfg.Operator = "екипът на АЛМАНАХ"
+	}
+	if cfg.Contact == "" {
+		cfg.Contact = "privacy@almanac.bg"
+	}
 	s := &Server{
 		cfg: cfg, db: d.DB, accounts: d.Accounts, outbox: d.Outbox,
 		client: assets.FS(cfg.Dev),
-		limits: newLimiter(),
+		limits: newLimiter(), problems: newProblems(),
 		secure: u.Scheme == "https",
 	}
 	// A __Host- cookie is bound to this exact host, over HTTPS, for the whole site: nothing else can set or read it.
@@ -97,6 +106,8 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/health", s.health)
 	api("GET /api/me", s.me)
 	api("PATCH /api/me", s.rename)
+	api("DELETE /api/me", s.deleteAccount)
+	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
@@ -119,13 +130,15 @@ func (s *Server) routes() http.Handler {
 	for _, f := range publicFiles {
 		mux.HandleFunc("GET /"+f, s.publicFile)
 	}
+	mux.HandleFunc("GET /privacy", s.privacy)
+	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
 	mux.HandleFunc("/", s.page)
 
 	var h http.Handler = mux
 	h = http.NewCrossOriginProtection().Handler(h)
 	h = s.headers(h)
 	h = s.logged(h)
-	return recovered(h)
+	return s.recovered(h)
 }
 
 // Run serves until ctx ends, then stops taking requests and gives those under way up to drain to finish.

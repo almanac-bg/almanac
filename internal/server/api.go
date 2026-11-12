@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -62,6 +63,7 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 		}
 		if ae == nil {
 			slog.Error("api", "method", r.Method, "path", r.URL.Path, "err", err)
+			s.problems.add(fmt.Sprintf("server: %s %s: %v", r.Method, r.Pattern, err))
 			ae = &apiError{http.StatusInternalServerError, "server", "Нещо се обърка при нас. Опитай пак."}
 		}
 		writeJSON(w, ae.status, map[string]string{"error": ae.code, "message": ae.message})
@@ -232,4 +234,17 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]any{"user": u})
+}
+
+// deleteAccount deletes the player and everything of theirs: runs, answers, sessions.
+func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	if err := s.accounts.Delete(r.Context(), u.ID); err != nil {
+		return err
+	}
+	s.clearSession(w)
+	return ok(w, map[string]any{"user": nil})
 }
