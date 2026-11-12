@@ -86,7 +86,7 @@ func (d *dealtChoice) Grade(answer json.RawMessage) (Graded, error) {
 		return Graded{}, errors.New("no such option")
 	}
 	bank := d.order[*a.Pick]
-	g := Graded{Right: bank == 0, Given: mustJSON(ChoiceAnswer{Pick: bank})}
+	g := Graded{Right: bank == 0, Given: mustJSON(ChoiceAnswer{Pick: bank}), Shown: mustJSON(ChoiceAnswer{Pick: *a.Pick})}
 	if g.Right {
 		g.Score = 1
 	}

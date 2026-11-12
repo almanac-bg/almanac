@@ -85,6 +85,8 @@ type Graded struct {
 	// Given is the answer in the bank's own terms, independent of the deal (which option of the bank's, which order of
 	// the bank's items): what the answer log keeps, so stats add up across deals.
 	Given json.RawMessage
+	// Shown is the same answer as the deal showed it (for going over a run afterwards).
+	Shown json.RawMessage
 }
 
 // rng is the generator a deal shuffles with: the same seed, the same deal, on every platform and Go version.

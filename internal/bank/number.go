@@ -138,12 +138,8 @@ func (d *dealtNumber) Grade(answer json.RawMessage) (Graded, error) {
 	}
 	guess := d.q.snap(*a.Value)
 	score := d.q.Closeness(guess)
-	return Graded{
-		Score: score,
-		Right: score >= RightFrom,
-		Exact: d.q.Exact(guess),
-		Given: mustJSON(NumberAnswer{Value: guess}),
-	}, nil
+	given := mustJSON(NumberAnswer{Value: guess})
+	return Graded{Score: score, Right: score >= RightFrom, Exact: d.q.Exact(guess), Given: given, Shown: given}, nil
 }
 
 func (d *dealtNumber) Reveal() any {

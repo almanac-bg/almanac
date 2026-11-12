@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -55,7 +56,8 @@ func start(t *testing.T) *game {
 	out := mail.NewOutbox(db, in, "АЛМАНАХ <no-reply@almanac.bg>")
 	accounts := &account.Accounts{DB: db, Outbox: out, Secret: []byte("test")}
 	ts := httptest.NewUnstartedServer(nil)
-	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Version: "test"}, db, accounts, out, b)
+	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Version: "test"},
+		Deps{DB: db, Accounts: accounts, Outbox: out, Bank: b})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,5 +240,62 @@ func TestBootDataIsSafeInTheScript(t *testing.T) {
 	var v map[string]any
 	if err := json.Unmarshal([]byte(boot), &v); err != nil || v["user"] == nil || v["categories"] == nil {
 		t.Fatalf("boot data %q: %v", boot, err)
+	}
+}
+
+func TestPlayingOverHTTP(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	if status, _ := p.call("POST", "/api/day", map[string]any{}); status != 401 {
+		t.Fatalf("playing without even a guest: %d", status)
+	}
+	p.call("POST", "/api/guest", map[string]any{})
+	status, run := p.call("POST", "/api/day", map[string]any{})
+	if status != 200 || run["total"] != float64(10) {
+		t.Fatalf("start: %d %v", status, run)
+	}
+	id := strconv.Itoa(int(run["id"].(float64)))
+	for n := range 10 {
+		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		q := st["question"].(map[string]any)
+		view := q["view"].(map[string]any)
+		var answer any
+		switch view["type"] {
+		case "choice":
+			answer = map[string]int{"pick": 0}
+		case "number":
+			answer = map[string]float64{"value": view["min"].(float64)}
+		case "order":
+			answer = map[string][]int{"order": {0, 1, 2, 3}}
+		}
+		status, res := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": answer})
+		if status != 200 || res["reveal"] == nil {
+			t.Fatalf("answer %d: %d %v", n, status, res)
+		}
+		if n == 4 {
+			if status, _ := p.call("GET", "/api/runs/"+id+"/review", nil); status != 409 {
+				t.Fatalf("a review before the end: %d", status)
+			}
+		}
+	}
+	if status, out := p.call("GET", "/api/runs/"+id+"/review", nil); status != 200 || len(out["questions"].([]any)) != 10 {
+		t.Fatalf("review: %d %v", status, out)
+	}
+	_, today := p.call("GET", "/api/day", nil)
+	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) {
+		t.Fatalf("today: %v", today)
+	}
+	_, c := p.call("POST", "/api/runs/"+id+"/challenge", map[string]any{})
+	code, _ := c["code"].(string)
+	friend := g.player()
+	if status, info := friend.call("GET", "/api/challenges/"+code, nil); status != 200 || len(info["players"].([]any)) != 1 {
+		t.Fatalf("the challenge as a stranger sees it: %d %v", status, info)
+	}
+	friend.call("POST", "/api/guest", map[string]any{})
+	if status, st := friend.call("POST", "/api/challenges/"+code, map[string]any{}); status != 200 || st["kind"] != "challenge" {
+		t.Fatalf("taking the challenge: %d %v", status, st)
+	}
+	if status, _ := friend.call("GET", "/api/runs/"+id, nil); status != 404 {
+		t.Fatalf("someone else's run: %d", status)
 	}
 }

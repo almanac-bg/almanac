@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // apiError is an error a player can be shown: a code for the client, and the words for the player.
@@ -28,8 +29,13 @@ var (
 	errTooMany    = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много опити. Опитай пак малко по-късно."}
 )
 
-// playerErrors are the account errors a player may cause, as the API answers them.
+// playerErrors are the errors a player may cause, as the API answers them.
 var playerErrors = map[error]*apiError{
+	play.ErrNoRun:          {http.StatusNotFound, "no_run", "Няма такава игра."},
+	play.ErrNoTopic:        {http.StatusNotFound, "no_topic", "Няма такава тема."},
+	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
+	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
+	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти изпратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},

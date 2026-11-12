@@ -150,6 +150,7 @@ func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 		Score: float64(placed) / float64(n),
 		Right: placed == n,
 		Given: mustJSON(OrderAnswer{Order: bank}),
+		Shown: mustJSON(OrderAnswer{Order: a.Order}),
 	}, nil
 }
 

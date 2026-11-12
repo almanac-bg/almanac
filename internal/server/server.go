@@ -18,6 +18,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -37,12 +38,21 @@ type Config struct {
 	Version string
 }
 
+// Deps are what the server works with.
+type Deps struct {
+	DB       *store.DB
+	Accounts *account.Accounts
+	Outbox   *mail.Outbox
+	Bank     *bank.Bank
+}
+
 // Server is the game's HTTP side.
 type Server struct {
 	cfg      Config
 	db       *store.DB
 	accounts *account.Accounts
 	outbox   *mail.Outbox
+	game     *play.Game
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
@@ -51,13 +61,13 @@ type Server struct {
 	handler  http.Handler
 }
 
-func New(cfg Config, db *store.DB, accounts *account.Accounts, outbox *mail.Outbox, b *bank.Bank) (*Server, error) {
+func New(cfg Config, d Deps) (*Server, error) {
 	u, err := url.Parse(cfg.PublicURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, errors.New("PUBLIC_URL must be like https://almanac.bg")
 	}
 	s := &Server{
-		cfg: cfg, db: db, accounts: accounts, outbox: outbox,
+		cfg: cfg, db: d.DB, accounts: d.Accounts, outbox: d.Outbox,
 		client: assets.FS(cfg.Dev),
 		limits: newLimiter(),
 		secure: u.Scheme == "https",
@@ -67,7 +77,9 @@ func New(cfg Config, db *store.DB, accounts *account.Accounts, outbox *mail.Outb
 	if s.secure {
 		s.cookie = "__Host-sid"
 	}
-	s.bank.Store(b)
+	s.bank.Store(d.Bank)
+	s.game = play.New(d.DB, s.bank.Load)
+	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
 	return s, nil
 }
@@ -89,6 +101,17 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
 	api("POST /api/auth/signout", s.signOut)
+	api("GET /api/day", s.today)
+	api("POST /api/day", s.startDay)
+	api("GET /api/day/{day}/board", s.board)
+	api("POST /api/topic", s.startTopic)
+	api("GET /api/runs/{id}", s.runState)
+	api("POST /api/runs/{id}/show", s.show)
+	api("POST /api/runs/{id}/answer", s.answer)
+	api("GET /api/runs/{id}/review", s.review)
+	api("POST /api/runs/{id}/challenge", s.challenge)
+	api("GET /api/challenges/{code}", s.challengeInfo)
+	api("POST /api/challenges/{code}", s.startChallenge)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)

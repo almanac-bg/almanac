@@ -93,7 +93,7 @@ func serve([]string) error {
 
 	outbox := mail.NewOutbox(db, sender, env("MAIL_FROM", "АЛМАНАХ <no-reply@almanac.bg>"))
 	accounts := &account.Accounts{DB: db, Outbox: outbox, Secret: key[:]}
-	srv, err := server.New(cfg, db, accounts, outbox, b)
+	srv, err := server.New(cfg, server.Deps{DB: db, Accounts: accounts, Outbox: outbox, Bank: b})
 	if err != nil {
 		return err
 	}
