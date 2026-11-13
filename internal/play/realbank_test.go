@@ -8,8 +8,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// With the real bank (when it's there), the days keep their shape exactly for 50 days, and no question comes twice in
-// a year. (The bank has about 60 medium orders: past those, a day's order is of another difficulty, then a choice.)
+// With the real bank (when it's there), the days keep their shape exactly for 50 days while the bank has questions
+// for each place (it has only so many medium orders and matches: past those, a day's order is of another
+// difficulty, then a choice), and no question comes twice in a year.
 func TestAYearOfDays(t *testing.T) {
 	if _, err := os.Stat("../../private/" + bank.CategoriesFile); err != nil {
 		t.Skip("no private bank")
@@ -20,7 +21,21 @@ func TestAYearOfDays(t *testing.T) {
 	}
 	used := map[string]bool{}
 	r := rand.New(rand.NewPCG(1, 2))
+	// left is how many questions not yet dealt fit a place.
+	left := func(s slot) int {
+		n := 0
+		for _, q := range b.Live("", "") {
+			if !used[q.Base().ID] && matches(q, s, true, true) {
+				n++
+			}
+		}
+		return n
+	}
 	for day := range 365 {
+		var plenty []bool // whether each place has a question left in most topics
+		for _, s := range daySlots {
+			plenty = append(plenty, left(s) >= Length)
+		}
 		picks := drawDay(b, used, r)
 		topics := map[string]bool{}
 		for i, p := range picks {
@@ -31,7 +46,7 @@ func TestAYearOfDays(t *testing.T) {
 			q, _ := b.Get(p.ID)
 			s := daySlots[i]
 			// While the bank has none of a slot's type, the slot takes a choice (choose).
-			if day < 50 && len(b.Live("", s.typ)) > 0 && !matches(q, s, true, true) {
+			if day < 50 && plenty[i] && !matches(q, s, true, true) {
 				t.Fatalf("day %d, place %d: %s is a %s %s (picture %v), not as planned", day, i, p.ID,
 					q.Base().Difficulty, q.Base().Type, q.Extra().Image != nil)
 			}

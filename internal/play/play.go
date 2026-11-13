@@ -12,7 +12,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"math"
 	"math/rand/v2"
 	"time"
 	_ "time/tzdata" // Bulgaria's days, wherever the server runs
@@ -24,7 +23,7 @@ import (
 const (
 	// Length is how many questions a run has.
 	Length = 10
-	// MaxPoints is what a perfect answer is worth.
+	// MaxPoints is what a perfect answer to a medium question is worth (an easy one's less, a hard one's more: worth).
 	MaxPoints = 100
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
 	Grace = 2 * time.Second
@@ -93,23 +92,30 @@ type run struct {
 	points, rights int
 	ms             int64
 	finished       bool
+	// set is how the player wanted the run (the zero value: the standard run).
+	set Settings
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, ms, finished_at IS NOT NULL`
+	at, shown_at, points, rights, ms, finished_at IS NOT NULL, coalesce(settings, '')`
 
 type scanner interface{ Scan(...any) error }
 
 func scanRun(row scanner) (*run, error) {
 	var r run
-	var picks string
+	var picks, set string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished, &set)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
 	if err != nil {
 		return nil, err
+	}
+	if set != "" {
+		if err := json.Unmarshal([]byte(set), &r.set); err != nil {
+			return nil, err
+		}
 	}
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
 }
@@ -199,7 +205,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	if r.shownAt.Valid && !r.finished {
 		d, ok := g.deal(r.picks[r.at])
 		if ok {
-			limit := Limit(d.Question())
+			limit := r.set.limit(d.Question())
 			left := limit - g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
 				N: r.at, Category: d.Question().Base().Category, View: d.View(),
@@ -217,19 +223,18 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 		return false, nil
 	}
 	d, ok := g.deal(r.picks[r.at])
-	if ok && g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) <= Limit(d.Question())+Grace {
+	if ok && g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) <= r.set.limit(d.Question())+Grace {
 		return false, nil
 	}
 	ms := int64(0)
 	if ok {
-		ms = Limit(d.Question()).Milliseconds()
+		ms = r.set.limit(d.Question()).Milliseconds()
 	}
-	return true, g.record(tx, r, bank.Graded{}, ms)
+	return true, g.record(tx, r, bank.Graded{}, 0, ms)
 }
 
-// record keeps an answer and moves the run to the next question (or its end).
-func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
-	points := int(math.Round(gr.Score * MaxPoints))
+// record keeps an answer, and the points it earned, and moves the run to the next question (or its end).
+func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, points int, ms int64) error {
 	var given, shown any
 	if gr.Given != nil {
 		given, shown = string(gr.Given), string(gr.Shown)
@@ -316,7 +321,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 			return ErrOutOfStep
 		}
 		took := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
-		limit := Limit(d.Question())
+		limit := r.set.limit(d.Question())
 		var gr bank.Graded
 		switch {
 		case took > limit+Grace:
@@ -327,10 +332,10 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 				return ErrBadAnswer
 			}
 		}
-		if err := g.record(tx, r, gr, min(took, limit).Milliseconds()); err != nil {
+		res.Points = worth(d.Question(), gr.Score)
+		if err := g.record(tx, r, gr, res.Points, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
-		res.Points = int(math.Round(gr.Score * MaxPoints))
 		res.Score, res.Right, res.Exact = gr.Score, gr.Right, gr.Exact
 		res.Reveal = d.Reveal()
 		res.State, err = g.state(tx, r)

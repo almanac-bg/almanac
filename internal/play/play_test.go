@@ -190,6 +190,34 @@ func TestTheDay(t *testing.T) {
 	}
 }
 
+// The first level comes with the run that passes 1000 points, in the news once.
+func TestLevelUpNews(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	bo := w.user()
+	var n News
+	for range 5 {
+		s, _ := w.g.StartTopic(ctx, bo, "", Settings{})
+		w.play(bo, s.ID, repeat(w.right, Length)...)
+		var err error
+		if n, err = w.g.NewsOf(ctx, bo); err != nil {
+			t.Fatal(err)
+		}
+		if n.Points >= 1000 {
+			break
+		}
+		if n.LevelUp {
+			t.Fatalf("a level at %d points", n.Points)
+		}
+	}
+	if lvl, from, _ := LevelOf(n.Points); !n.LevelUp || n.Level != lvl || lvl < 2 || n.From != from {
+		t.Fatalf("news at %d points: %+v", n.Points, n)
+	}
+	if again, _ := w.g.NewsOf(ctx, bo); again.LevelUp {
+		t.Fatalf("the level twice: %+v", again)
+	}
+}
+
 func TestQuestionTime(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -218,7 +246,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != MaxPoints || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Points != worth(w.question(s.ID, 0), 1) || !res.Right || res.State.At != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 
@@ -302,10 +330,10 @@ func TestTopics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u := w.user()
-	if _, err := w.g.StartTopic(ctx, u, "astrology"); !errors.Is(err, ErrNoTopic) {
+	if _, err := w.g.StartTopic(ctx, u, "astrology", Settings{}); !errors.Is(err, ErrNoTopic) {
 		t.Fatalf("an unknown topic: %v", err)
 	}
-	first, err := w.g.StartTopic(ctx, u, "history")
+	first, err := w.g.StartTopic(ctx, u, "history", Settings{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +346,7 @@ func TestTopics(t *testing.T) {
 		firstPicks[p.ID] = true
 	}
 	// The next run starts with what the player hasn't seen.
-	second, _ := w.g.StartTopic(ctx, u, "history")
+	second, _ := w.g.StartTopic(ctx, u, "history", Settings{})
 	unseen := len(w.b.Live("history", "")) - len(firstPicks)
 	fresh := 0
 	for _, p := range w.picks(second.ID) {
@@ -329,7 +357,7 @@ func TestTopics(t *testing.T) {
 	if fresh < min(unseen, Length) {
 		t.Fatalf("%d fresh questions of %d unseen", fresh, unseen)
 	}
-	all, err := w.g.StartTopic(ctx, u, "")
+	all, err := w.g.StartTopic(ctx, u, "", Settings{})
 	if err != nil || all.Total != Length {
 		t.Fatalf("all topics: %+v %v", all, err)
 	}
@@ -340,7 +368,7 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	ctx := t.Context()
 	guest, owner := w.user(), w.user()
 	gs, _ := w.g.StartDay(ctx, guest)
-	topic, _ := w.g.StartTopic(ctx, guest, "science")
+	topic, _ := w.g.StartTopic(ctx, guest, "science", Settings{})
 	os, _ := w.g.StartDay(ctx, owner)
 	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
 	if err != nil {
@@ -367,7 +395,7 @@ func TestStats(t *testing.T) {
 	}
 	day, _ := w.g.StartDay(ctx, u)
 	w.play(u, day.ID, append(repeat(w.right, 6), repeat(w.wrong, 4)...)...)
-	topic, _ := w.g.StartTopic(ctx, u, "music")
+	topic, _ := w.g.StartTopic(ctx, u, "music", Settings{})
 	w.play(u, topic.ID, repeat(w.right, Length)...)
 	s, err := w.g.StatsOf(ctx, u)
 	if err != nil {
@@ -498,7 +526,9 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	if err != nil || !slices.Contains(ids, "perfect") || !n.LevelUp || n.Level != 2 || n.From != 1000 {
+	// (What a day earns depends on its questions' difficulties: a level comes with it if it passes 1000.)
+	if lvl, from, _ := LevelOf(n.Points); err != nil || !slices.Contains(ids, "perfect") || n.Level != lvl ||
+		n.From != from || n.LevelUp != (lvl > 1) {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
 	if again, _ := w.g.NewsOf(ctx, ana); len(again.Achievements) != 0 || again.LevelUp {
@@ -525,7 +555,7 @@ func TestProgress(t *testing.T) {
 			t.Fatalf("a hidden achievement's shape tells how: %+v", s)
 		}
 	}
-	run, _ := w.g.StartTopic(ctx, ana, "history")
+	run, _ := w.g.StartTopic(ctx, ana, "history", Settings{})
 	w.play(ana, run.ID, repeat(w.right, Length)...)
 	p, _ = w.g.ProgressOf(ctx, ana)
 	for _, a := range p.Achievements {
@@ -676,7 +706,11 @@ func TestAsyncDuels(t *testing.T) {
 		rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
 		t.Fatalf("the result: %+v / %+v, ratings %d %d", da[0], db[0], rating(ana), rating(bo))
 	}
-	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != Length*MaxPoints {
+	full := 0
+	for n := range Length {
+		full += worth(w.question(s.ID, n), 1)
+	}
+	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != full {
 		t.Fatalf("scores after the end: %+v / %+v", da[0].Opponent, db[0].Opponent)
 	}
 	if len(told) != 2 || told[0].Kind != "result" {
@@ -825,7 +859,7 @@ func TestAlmanac(t *testing.T) {
 	if err != nil || len(a.Facts) != 0 || len(a.Of) == 0 {
 		t.Fatalf("an empty almanac: %+v %v", a, err)
 	}
-	s, _ := w.g.StartTopic(ctx, ana, "general")
+	s, _ := w.g.StartTopic(ctx, ana, "general", Settings{})
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	a, _ = w.g.AlmanacOf(ctx, ana)
 	for _, f := range a.Facts {
@@ -851,7 +885,7 @@ func TestWardrobe(t *testing.T) {
 	}
 	// Two perfect runs make level 2: the ring is hers, and it shows wherever she does.
 	for range 2 {
-		s, _ := w.g.StartTopic(ctx, ana, "")
+		s, _ := w.g.StartTopic(ctx, ana, "", Settings{})
 		w.play(ana, s.ID, repeat(w.right, Length)...)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), ptr("")); err != nil {

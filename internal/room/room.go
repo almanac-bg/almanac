@@ -288,7 +288,7 @@ func (r *Room) Start(by int64) error {
 
 func (r *Room) start() error {
 	b := r.bank()
-	r.picks = play.Draw(b, r.category, 0.6, nil, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
+	r.picks = play.Draw(b, r.category, 0.6, play.Settings{}, nil, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
 	r.dealt = r.dealt[:0]
 	for _, p := range r.picks {
 		q, ok := b.Get(p.ID)

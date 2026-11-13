@@ -36,6 +36,34 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
 
+test("the game's settings: five true-or-not in double time, kept, five more, and back to the usual", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/play");
+  await page.getByRole("button", { name: "Промени" }).click();
+  await page.getByRole("group", { name: "Въпроси" }).getByRole("button", { name: "5", exact: true }).click();
+  await page.getByRole("group", { name: "Видове" }).getByRole("button", { name: "Вярно или не" }).click();
+  await page.getByRole("group", { name: "Време" }).getByRole("button", { name: "Двойно" }).click();
+  const summary = page.locator(".quiz-summary");
+  await expect(summary).toHaveText("5 въпроса · по моето ниво · вярно или не · двойно време");
+  await page.reload();
+  await expect(summary).toHaveText("5 въпроса · по моето ниво · вярно или не · двойно време");
+  await page.getByRole("link", { name: "Всички теми" }).click();
+  for (let n = 0; n < 5; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 5`, { timeout: 10_000 });
+    await expect(page.locator("article.question .tf-options")).toBeVisible();
+    await answer(page);
+    await expect(page.locator(".verdict")).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Още пет" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 5");
+  await page.goto("/play");
+  await page.getByRole("button", { name: "Промени" }).click();
+  await page.getByRole("button", { name: "Както по подразбиране" }).click();
+  await expect(summary).toHaveText("10 въпроса · по моето ниво · всички видове · обичайно време");
+});
+
 test("a run left between two questions goes on at once", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Започни" }).click();

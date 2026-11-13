@@ -1,4 +1,5 @@
-// Игра: questions by topic, as many as you like, shaped by how well you know the topic.
+// Игра: questions by topic, as many as you like, shaped by how well you know the topic, or as the player sets them:
+// how many, how hard, which kinds, and how much time.
 
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
@@ -6,6 +7,21 @@ import { playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
+import {
+  difficulties,
+  difficultyWords,
+  forServer,
+  isStandard,
+  kinds,
+  kindWords,
+  lengths,
+  lengthWords,
+  quiz,
+  setQuiz,
+  standard,
+  summaryOf,
+  toggleKind,
+} from "../lib/quiz.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
 import { level, levelBadge, meter, questions, toneOf } from "../ui.ts";
@@ -28,9 +44,14 @@ export function topics() {
         h("h1", null, "Играй"),
         h("a", { class: "btn primary inline", href: "/play/all" }, "Всички теми"),
       ),
-      h("p", { class: "lead" }, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
+      h(
+        "p",
+        { class: "lead" },
+        "Въпроси по тема — по подразбиране десет, които стават по-трудни, колкото повече знаеш. Или ги настрой.",
+      ),
     ),
     modes(["duel", "royal", "room"], "С други"),
+    settings(),
     h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.topics ?? [];
@@ -45,6 +66,102 @@ export function topics() {
         ),
       );
     }),
+  );
+}
+
+/** A group of chips to pick from; pressed: whether a chip is on. */
+function group<T>(
+  legend: string,
+  values: readonly T[],
+  label: (v: T) => string,
+  pressed: (v: T) => boolean,
+  pick: (v: T) => void,
+) {
+  return h(
+    "fieldset",
+    { class: "quiz-group" },
+    h("legend", null, legend),
+    h(
+      "ul",
+      { class: "chips" },
+      values.map((v) =>
+        h(
+          "li",
+          null,
+          h(
+            "button",
+            { class: "chip", type: "button", "aria-pressed": () => pressed(v), onclick: () => pick(v) },
+            label(v),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/** The game's settings: what a topic run will be, in a line, and the choices behind a button. */
+function settings(): Child {
+  const open = signal(false);
+  return h(
+    "section",
+    { class: "card quiz-settings", "aria-labelledby": "quiz-title" },
+    h(
+      "div",
+      { class: "card-head" },
+      h(
+        "div",
+        null,
+        h("h2", { class: "quiz-title", id: "quiz-title" }, "Настройки на играта"),
+        h("p", { class: "muted quiz-summary" }, () => summaryOf(quiz())),
+      ),
+      h(
+        "button",
+        {
+          class: "btn inline",
+          type: "button",
+          "aria-expanded": () => open(),
+          "aria-controls": "quiz-panel",
+          onclick: () => open.set(!open.peek()),
+        },
+        () => (open() ? "Готово" : "Промени"),
+      ),
+    ),
+    h(
+      "div",
+      { class: "quiz-panel", id: "quiz-panel", hidden: () => !open() },
+      group(
+        "Въпроси",
+        lengths,
+        (n) => String(n),
+        (n) => quiz().length === n,
+        (n) => setQuiz({ length: n }),
+      ),
+      group(
+        "Трудност",
+        difficulties,
+        (d) => difficultyWords[d],
+        (d) => quiz().difficulty === d,
+        (d) => setQuiz({ difficulty: d }),
+      ),
+      group(
+        "Видове",
+        ["all", ...kinds] as const,
+        (k) => (k === "all" ? "Всички" : kindWords[k]),
+        (k) => (k === "all" ? !quiz().kinds.length : quiz().kinds.includes(k)),
+        (k) => (k === "all" ? setQuiz({ kinds: [] }) : toggleKind(k)),
+      ),
+      group(
+        "Време",
+        [false, true],
+        (slow) => (slow ? "Двойно" : "Обичайно"),
+        (slow) => quiz().slow === slow,
+        (slow) => setQuiz({ slow }),
+      ),
+      () =>
+        isStandard(quiz())
+          ? null
+          : h("button", { class: "link", type: "button", onclick: () => setQuiz(standard) }, "Както по подразбиране"),
+    ),
   );
 }
 
@@ -90,7 +207,11 @@ export function topic([id = ""]: string[]) {
         h(
           "div",
           { class: "actions" },
-          h("button", { class: "btn primary big", onclick: again }, "Още десет"),
+          h(
+            "button",
+            { class: "btn primary big", onclick: again },
+            `Още ${lengthWords[s.total as 5 | 10 | 15] ?? s.total}`,
+          ),
           h("a", { class: "btn", href: "/play" }, "Друга тема"),
         ),
       ),
@@ -105,7 +226,7 @@ function run(category: string, finished: (s: State, again: () => void) => Child)
     screen.set(h("p", { class: "muted" }, "…"));
     try {
       await player();
-      const s = await api<State>("POST", "/api/topic", { category });
+      const s = await api<State>("POST", "/api/topic", { category, settings: forServer(quiz.peek()) });
       screen.set(playRun(s, (end) => finished(end, start)));
     } catch (err) {
       screen.set(

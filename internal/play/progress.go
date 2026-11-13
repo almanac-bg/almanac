@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -377,7 +378,9 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND `+bulgarianHour("finished_at")+` < 7),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
-			AND rights = json_array_length(questions))`, userID).
+			AND rights = json_array_length(questions) AND json_array_length(questions) >= `+strconv.Itoa(Length)+`
+			AND coalesce(json_extract(settings, '$.difficulty'), '') <> 'easy' AND json_extract(settings, '$.kinds') IS NULL)`,
+		userID).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
 			&topicPerfect)
 	if err != nil {
@@ -419,11 +422,13 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	}, nil
 }
 
-// anyLastSecond is whether a player has ever answered right in a question's last second.
+// anyLastSecond is whether a player has ever answered right in a question's last second (of the usual time: not in
+// a run with double time).
 func (g *Game) anyLastSecond(ctx context.Context, userID int64) (bool, error) {
 	shortest := Limit(&bank.TrueFalse{Head: bank.Head{Type: "truefalse"}}) // no question's time is shorter
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.ms FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND a.is_right AND a.ms >= ?`, userID, (shortest - time.Second).Milliseconds())
+		WHERE r.user_id = ? AND a.is_right AND a.ms >= ? AND json_extract(r.settings, '$.slow') IS NULL`,
+		userID, (shortest - time.Second).Milliseconds())
 	if err != nil {
 		return false, err
 	}

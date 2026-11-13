@@ -51,9 +51,14 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 }
 
 func (g *Game) insertRun(tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
+	return g.insertRunWith(tx, userID, kind, day, category, picks, Settings{})
+}
+
+// insertRunWith starts a run with the settings the player chose.
+func (g *Game) insertRunWith(tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick, set Settings) (*run, error) {
 	data, _ := json.Marshal(picks)
-	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at)
-		VALUES (?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()))
+	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, settings)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()), set.stored())
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +94,19 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 // skillWindow is how many of a player's latest answers in a topic tell how well they know it.
 const skillWindow = 40
 
-// StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it.
-func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
+// StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it and the settings
+// they chose.
+func (g *Game) StartTopic(ctx context.Context, userID int64, category string, set Settings) (State, error) {
 	b := g.Bank()
 	if category != "" && !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
 		return State{}, ErrNoTopic
 	}
+	set, err := set.Normal()
+	if err != nil {
+		return State{}, err
+	}
 	var s State
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		seen := map[string]bool{}
 		rows, err := tx.Query(`SELECT a.question_id FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID)
 		if err != nil {
@@ -115,11 +125,11 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, category, skill, set, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
-		r, err := g.insertRun(tx, userID, "topic", nil, category, picks)
+		r, err := g.insertRunWith(tx, userID, "topic", nil, category, picks, set)
 		if err != nil {
 			return err
 		}
