@@ -81,7 +81,9 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 		return nil, err
 	}
 	rank := map[bank.Difficulty]int{bank.Easy: 0, bank.Medium: 1, bank.Hard: 2}
-	off := func(c Calibrated) int { return max(rank[c.Observed]-rank[c.Labelled], rank[c.Labelled]-rank[c.Observed]) }
+	off := func(c Calibrated) int {
+		return max(rank[c.Observed]-rank[c.Labelled], rank[c.Labelled]-rank[c.Observed])
+	}
 	slices.SortStableFunc(out, func(a, b Calibrated) int {
 		if d := off(b) - off(a); d != 0 {
 			return d
