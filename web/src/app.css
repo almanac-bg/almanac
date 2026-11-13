@@ -87,6 +87,13 @@
     --rose-ink: #ff9fd0;
     --silver: #cfc8e3;
     --bronze: #e8a46c;
+    /* Divisions: each emblem's colour (art/emblem.ts). */
+    --div-bronze: #d08f5b;
+    --div-silver: #c9d1df;
+    --div-gold: var(--gold);
+    --div-platinum: #7fe0cf;
+    --div-diamond: #79c7ff;
+    --div-legend: #c4a3ff;
     /* Achievement tiers: the fill of a badge, and the ink of its words. */
     --tier-common: var(--silver);
     --tier-rare: var(--sky);
@@ -183,6 +190,11 @@
       --wrong-ink: #bf3018;
       --sky-ink: #1f63a8;
       --rose-ink: #b12a72;
+      --div-bronze: #b8743d;
+      --div-silver: #9aa4b6;
+      --div-platinum: #3fb5a0;
+      --div-diamond: #3c9be0;
+      --div-legend: #8b5cf6;
       --tier-common: #b8b0cf;
       --tier-common-ink: #5d5677;
       --tier-epic-ink: #6a35d6;
@@ -1596,6 +1608,239 @@
     font-weight: 700;
   }
 
+  /* Division emblems (art/emblem.ts): a crest in the division's colour. */
+  .d-bronze {
+    --div: var(--div-bronze);
+  }
+  .d-silver {
+    --div: var(--div-silver);
+  }
+  .d-gold {
+    --div: var(--div-gold);
+  }
+  .d-platinum {
+    --div: var(--div-platinum);
+  }
+  .d-diamond {
+    --div: var(--div-diamond);
+  }
+  .d-legend {
+    --div: var(--div-legend);
+  }
+
+  .emblem {
+    display: inline-grid;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    vertical-align: middle;
+  }
+
+  .emblem-s {
+    width: 22px;
+    height: 22px;
+  }
+
+  .emblem-l {
+    width: 72px;
+    height: 72px;
+  }
+
+  .emblem svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .emblem-face {
+    fill: var(--div);
+    stroke: color-mix(in srgb, var(--div) 60%, black);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  .emblem-line {
+    fill: none;
+    stroke: color-mix(in srgb, var(--div) 45%, black);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .emblem-wing {
+    fill: color-mix(in srgb, var(--div) 75%, white);
+    stroke: color-mix(in srgb, var(--div) 60%, black);
+    stroke-width: 2;
+  }
+
+  .emblem-mark,
+  .emblem-crown {
+    fill: color-mix(in srgb, var(--div) 35%, white);
+    stroke: color-mix(in srgb, var(--div) 55%, black);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
+  .emblem-crown {
+    fill: var(--gold);
+  }
+
+  .emblem-rays {
+    fill: color-mix(in srgb, var(--div) 30%, transparent);
+  }
+
+  .d-diamond .emblem svg,
+  .d-legend .emblem svg,
+  .emblem.d-diamond svg,
+  .emblem.d-legend svg {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--div) 55%, transparent));
+  }
+
+  /* A player's division: the emblem, the name in its colour, the rating and the way to the next. */
+  .standing {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .standing-text {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .standing-name {
+    color: color-mix(in srgb, var(--div) 80%, var(--text));
+    font: 900 1.5rem / 1.75rem var(--font-sans);
+  }
+
+  /* Tabs that switch what a screen shows. */
+  .segmented {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: var(--sunken);
+  }
+
+  .segmented button {
+    appearance: none;
+    flex: 1;
+    min-height: 2.5rem;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: none;
+    color: var(--text-muted);
+    font: 800 0.9375rem / 1 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .segmented button[aria-selected="true"] {
+    background: var(--raised);
+    box-shadow: var(--elev-1);
+    color: var(--text);
+  }
+
+  .segmented button:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  /* Duels as rows: the other player, how it stands, the rating it moved. */
+  .duel-list,
+  .duel-friends {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .duel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .duel-row:hover {
+    border-color: var(--line-strong);
+  }
+
+  .duel-row.s-play {
+    border-color: var(--rose);
+    box-shadow: 0 0 0 1px var(--rose);
+  }
+
+  .duel-row-end {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    font-size: 0.8125rem;
+    text-align: right;
+  }
+
+  .duel-state {
+    font-size: 0.9375rem;
+  }
+
+  .s-won .duel-state {
+    color: var(--right-ink);
+  }
+
+  .s-lost .duel-state {
+    color: var(--wrong-ink);
+  }
+
+  .duel-friends li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .duel-score {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+  }
+
+  .duel-side {
+    display: grid;
+    gap: 2px;
+  }
+
+  .duel-points {
+    font: 900 2.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .duel-vs {
+    color: var(--text-muted);
+    font: 900 2rem / 1 var(--font-numeral);
+  }
+
+  .duel-delta {
+    grid-column: 1 / -1;
+    font-weight: 800;
+  }
+
+  .duel-delta.up {
+    color: var(--right-ink);
+  }
+
+  .duel-delta.down {
+    color: var(--wrong-ink);
+  }
+
   /* The game moving on by itself: a line filling while the answer shows. */
   .up-next {
     display: grid;
@@ -2134,6 +2379,13 @@
     height: 100%;
     border-radius: inherit;
     background: var(--tone, var(--gold));
+  }
+  .standing .meter {
+    margin-top: var(--space-2);
+  }
+
+  .standing .meter-fill {
+    background: var(--div);
   }
 
   .chips {

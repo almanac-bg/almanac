@@ -6,6 +6,7 @@ import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge } from "../ui.ts";
+import { standingCard } from "./duel.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 import { stats } from "./stats.ts";
 
@@ -24,6 +25,10 @@ export function me() {
           () => {
             const p = progress();
             return p ? levelCard(p.level, p.points, p.from, p.to) : null;
+          },
+          () => {
+            const p = progress();
+            return p ? standingCard(p.standing) : null;
           },
           stats(),
           () => {

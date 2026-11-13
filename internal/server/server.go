@@ -105,6 +105,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.limits.off = cfg.Dev
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
+	s.game.DuelNews = s.duelNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Recording = s.game.RecordingFor
@@ -163,6 +164,11 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	api("POST /api/rooms/{code}/decline", s.roomDecline)
+	api("POST /api/duels", s.startDuel)
+	api("GET /api/duels", s.duels)
+	api("POST /api/duels/{id}/play", s.playDuel)
+	api("DELETE /api/duels/{id}", s.declineDuel)
+	api("GET /api/ranks", s.ranks)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)
 	api("POST /api/friends/requests", s.requestFriend)
@@ -233,6 +239,9 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 				return
 			case <-t.C:
 				s.rooms.Sweep()
+				if err := s.game.SettleDue(ctx); err != nil {
+					slog.Error("duels", "err", err)
+				}
 			}
 		}
 	}()

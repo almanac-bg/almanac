@@ -63,6 +63,8 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
+	// DuelNews, if set, is told of a duel to tell a player about: a friend asks, a result (a push, say).
+	DuelNews func(context.Context, DuelNews)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -332,8 +334,11 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		return err
 	})
 	if err == nil && finished {
-		// Before the answer goes back, so that the screen with the result can tell of what it earned.
-		_, err = g.Award(ctx, userID)
+		// A duel's run settles the duel once both have played (and awards both); then what the run earned, before
+		// the answer goes back, so that the screen with the result can tell of it.
+		if err = g.settleRun(ctx, runID); err == nil {
+			_, err = g.Award(ctx, userID)
+		}
 	}
 	return res, err
 }

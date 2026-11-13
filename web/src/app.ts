@@ -5,6 +5,7 @@ import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { duel, duelOne } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
@@ -16,7 +17,7 @@ import { room } from "./screens/room.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { together } from "./screens/together.ts";
-import { friendRequests, invitations, watchInvitations } from "./state.ts";
+import { duelTurns, friendRequests, invitations, watchInvitations } from "./state.ts";
 
 /** The five main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
@@ -53,13 +54,15 @@ if (root) {
               "aria-current": () => (here(path()) ? "page" : null),
               // A friend calls to a duel: a dot on Играй; someone asks to be friends: a dot on Профил.
               class: () =>
-                (href === "/play" && invitations().length) || (href === "/me" && friendRequests()) ? "news" : "",
+                (href === "/play" && (invitations().length || duelTurns())) || (href === "/me" && friendRequests())
+                  ? "news"
+                  : "",
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
             h("span", { class: "tab-label" }, label),
             () =>
-              href === "/play" && invitations().length
-                ? h("span", { class: "sr" }, " (покана за дуел)")
+              href === "/play" && (invitations().length || duelTurns())
+                ? h("span", { class: "sr" }, " (дуел те чака)")
                 : href === "/me" && friendRequests()
                   ? h("span", { class: "sr" }, " (покана за приятелство)")
                   : null,
@@ -76,7 +79,8 @@ if (root) {
       { path: /^\/play$/, view: topics },
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
-      { path: /^\/duel$/, view: () => together("duel") },
+      { path: /^\/duel$/, view: duel },
+      { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/room$/, view: () => together("room") },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },

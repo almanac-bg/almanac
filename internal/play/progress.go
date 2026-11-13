@@ -222,6 +222,8 @@ type Progress struct {
 	Title        string   `json:"title"` // the chosen achievement's id ("" for none)
 	Shapes       []Shape  `json:"shapes"`
 	Tones        []string `json:"tones"`
+	// Standing is the player's rating and division.
+	Standing Standing `json:"standing"`
 }
 
 func (g *Game) points(ctx context.Context, userID int64) (int, error) {
@@ -282,7 +284,8 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 		p.Avatar = DefaultAvatar(userID)
 	}
 	p.Shapes, p.Tones = shapes(earned, p.Level), Tones
-	return p, nil
+	p.Standing, err = g.StandingOf(ctx, userID)
+	return p, err
 }
 
 // Award gives a player every achievement their games have earned and they don't have yet, and returns those. It's
