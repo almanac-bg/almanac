@@ -89,8 +89,8 @@ const CrownLevel = 10
 
 // DefaultAvatar is the avatar the game gives a player until they choose one: a free shape and a tone, from their id.
 func DefaultAvatar(userID int64) string {
-	n := int(max(userID, 0))
-	return FreeShapes[n%len(FreeShapes)] + "-" + Tones[n/len(FreeShapes)%len(Tones)]
+	n, shapes, tones := max(userID, 0), int64(len(FreeShapes)), int64(len(Tones))
+	return FreeShapes[n%shapes] + "-" + Tones[n/shapes%tones]
 }
 
 // Shape is an avatar's shape as a player may pick it: free, unlocked, or still locked (and what unlocks it: the name
