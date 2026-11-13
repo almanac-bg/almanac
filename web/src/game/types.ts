@@ -134,6 +134,8 @@ export interface Reviewed {
 
 export interface Score {
   name: string;
+  /** The player's tag (a link to their profile); none in a room, where guests play by name. */
+  tag?: string;
   points: number;
   rights: number;
   ms: number;
