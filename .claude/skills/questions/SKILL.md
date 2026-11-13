@@ -22,8 +22,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 
 ## The aims (the owner's rules)
 
-- **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`). Easy means most adults in
-  Bulgaria know it; medium, a well-read person; hard, an enthusiast. Judge difficulty for Bulgarian players.
+- **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`), judged by the rubric below.
 - **Kinds: 60% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match**, in every category (`bank.TypeMix`),
   close to what the game draws (a run of ten has six choices and one of each other kind), so that no kind runs out
   long before the others. `bank check` reports what each category needs.
@@ -39,6 +38,37 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
   without them. Older questions get theirs as they're gone over.
 - Grow by adding: the balance report counts what it takes without dropping anything.
+
+## Difficulty: the rubric
+
+Difficulty is gameplay, not decoration: a run goes from easy to hard, a topic run follows how well a player knows the
+topic, Роял's rounds are easy, medium and hard. So every label means the same thing, by these rules, for players in
+Bulgaria (not for the writer).
+
+| | Who gets it | What it asks | The wrong options |
+| --- | --- | --- | --- |
+| **easy** | three of four adults, with no interest in the topic | what school to the 7th grade, everyday life, the news or a famous name gives everyone: national holidays and symbols, famous people, places and works, a round famous number | clearly of another kind or era: someone who knows the topic a little gets it |
+| **medium** | about one in two: a well-read person, someone with a passing interest | high-school level, or a known fact taken one step further: the year of a major event, the author of a known (not the best-known) work, the capital of a mid-sized country | plausible, of the same kind; knowing the answer is needed, not just the topic |
+| **hard** | one in four or fewer: an enthusiast | a detail: a lesser event's year, a secondary work, a record, a term, a smaller place | close to each other: only knowing it exactly gets it |
+
+By kind:
+
+- **Choice:** the options decide as much as the question. Close options make the same question harder; reword or
+  change them rather than mislabel.
+- **True or not:** easy is a famous fact stated plainly; hard is a plausible detail (true or false) that only an
+  enthusiast can tell. Never hard by a trick of wording.
+- **Number:** easy is a number everyone has met (1878, 7 continents); hard is a precise figure. The tolerance
+  follows: generous for easy, tight for hard.
+- **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
+  unfamiliar things.
+- **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
+  rights) alike.
+- **A picture** makes a question easier only if it shows the answer's look to people who'd recognise it.
+
+Check the label against the answers once a question has `play.CalibrateFrom` (30) of them:
+`DB_PATH=… almanac bank calibrate private` (on the server: as the almanac user) lists every question whose
+label disagrees with what players knew, above chance: easy from 65%, medium from 35%, hard below. Judge each again
+by the rubric; the answers usually win.
 
 ## The format
 

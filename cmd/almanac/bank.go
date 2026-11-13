@@ -26,6 +26,8 @@ func bankCommand(args []string) error {
 		return bankCheck(dir())
 	case "fmt":
 		return bankFmt(dir())
+	case "calibrate":
+		return bankCalibrate(dir())
 	}
 	return usage()
 }
