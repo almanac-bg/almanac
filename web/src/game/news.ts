@@ -62,7 +62,7 @@ function unlocked(a: AchievementInfo): Child {
   return h(
     "section",
     { class: `card unlock t-${a.tier}` },
-    badge(a, true),
+    badge(a, true, "l"),
     h(
       "div",
       { class: "unlock-text" },

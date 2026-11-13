@@ -111,8 +111,14 @@ takes a token.
 - **Four tiers of achievement**, each with its colour: обикновено (silver, `--tier-common`), рядко (sky,
   `--tier-rare`), епично (violet, `--tier-epic`) and легендарно (gold, `--tier-legendary`). Each has an `-ink`
   token for words. A `.t-<tier>` class sets `--tier` and `--tier-ink` for anything inside it.
-- A badge is filled with its tier's colour once earned (epic and legendary glow), and ringed with it while locked.
-  A title shows in its tier's ink wherever it's worn.
+- **Medals are generated** (`web/src/art/badge.ts`), never drawn by hand: the tier gives the form — common round,
+  rare a hexagon, epic an eight-pointed star, legendary a sunburst with laurels — and the achievement's shape sits in
+  the middle. Earned: filled in the tier's colour with a rim and a light (epic and legendary glow). Locked: hollow,
+  with a ring for its progress. Hidden and not found: a „?“, and nothing about how or what it gives.
+- Every achievement says how it's earned, how far along the player is, and its reward (the avatar shape, the
+  title). A title shows in its tier's ink wherever it's worn.
+- New visuals of the systems (division emblems, frames, season art) come from generators like the medal's, in
+  `web/src/art/`.
 
 ## Flow
 
@@ -206,4 +212,4 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Look at it** in both themes, at 320px and 390px wide. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 10 kB of CSS and 30 kB of JS, gzipped. `go run ./cmd/build` fails over them.
+- **Keep to the budgets:** 14 kB of CSS and 40 kB of JS, gzipped. `go run ./cmd/build` fails over them.

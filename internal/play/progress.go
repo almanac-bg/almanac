@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -31,14 +32,19 @@ func LevelOf(points int) (level, from, to int) {
 	return level, from, from + step
 }
 
-// Achievement is something a player has done, once and for good. Its name is also a title they may show.
+// Achievement is something a player has done, once and for good. Its name is also a title they may show, and its
+// shape an avatar they may wear.
 type Achievement struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	// About is how it's earned, said to whoever hasn't yet.
 	About string `json:"about"`
-	Icon  string `json:"icon"` // the shape it's drawn with; earning it unlocks that shape as an avatar
+	Icon  string `json:"icon"` // the shape it's drawn with; earning it unlocks that shape as an avatar (its reward)
 	Tier  Tier   `json:"tier"`
+	// Goal is how much of its measure it takes (3 days, 100 answers); 1 for a thing done once.
+	Goal int `json:"goal"`
+	// Hidden ones aren't told until they're earned: found while playing.
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 // Tier is how hard an achievement is to earn: common ones come in the first days, legendary ones take months. A
@@ -54,28 +60,33 @@ const (
 
 // Achievements are every achievement there is, by tier, in the order a profile shows them.
 var Achievements = []Achievement{
-	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common},
-	{"answers100", "Сто отговора", "Отговори на сто въпроса.", "book", Common},
-	{"fast", "Светкавица", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common},
-	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common},
-	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common},
+	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common, 3, false},
+	{"answers100", "Сто отговора", "Отговори на сто въпроса.", "book", Common, 100, false},
+	{"fast", "Светкавица", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
+	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
+	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
 
-	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare},
-	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare},
-	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare},
-	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "rosette", Rare},
-	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare},
-	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare},
+	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
+	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare, 1, false},
+	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
+	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "rosette", Rare, 10, false},
+	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
+	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
+	{"nightOwl", "Нощна птица", "Отговори на въпрос между полунощ и четири сутринта.", "eye", Rare, 1, true},
+	{"earlyBird", "Ранобудник", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
+	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
 
-	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic},
-	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic},
-	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic},
-	{"master", "Като на длан", "Отговаряй вярно на 80% от въпросите в една тема, след поне 30 въпроса в нея.", "trophy", Epic},
-	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic},
+	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
+	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
+	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
+	{"master", "Като на длан", "Отговаряй вярно на 80% от въпросите в една тема, след поне 30 въпроса в нея.", "trophy", Epic, 1, false},
+	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
+	{"topicPerfect", "Отличник", "Познай и десетте въпроса на игра по тема.", "spark", Epic, 1, true},
+	{"allTypes", "Всестранен", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, вярно или не, свързване.", "clover", Epic, 5, true},
 
-	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary},
-	{"master5", "Ходеща енциклопедия", "Отговаряй вярно на 80% от въпросите в пет теми, след поне 30 въпроса във всяка.", "trophy", Legendary},
-	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary},
+	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
+	{"master5", "Ходеща енциклопедия", "Отговаряй вярно на 80% от въпросите в пет теми, след поне 30 въпроса във всяка.", "trophy", Legendary, 5, false},
+	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 }
 
 func achievementByID(id string) (Achievement, bool) {
@@ -97,7 +108,10 @@ func TitleOf(id string) (string, Tier) {
 var (
 	Tones      = []string{"gold", "lilac", "sky", "rose", "mint"}
 	FreeShapes = []string{"petal", "rosette", "circle", "diamond", "triangle", "moon", "leaf", "wave", "hex"}
-	Unlockable = []string{"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "crown"}
+	Unlockable = []string{
+		"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "eye", "sun", "hourglass", "spark",
+		"clover", "crown",
+	}
 )
 
 // CrownLevel is the level that unlocks the crown.
@@ -141,6 +155,9 @@ func shapes(earned map[string]int64, level int) []Shape {
 				}
 				if sh.How == "" {
 					sh.How = a.Name // the first achievement drawn with it
+					if a.Hidden {
+						sh.How = "скрито постижение" // found while playing: not told
+					}
 				}
 			}
 		}
@@ -180,10 +197,18 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return lookOf(userID, avatar, title, points), err
 }
 
-// Earned is an achievement with when the player earned it (0: not yet).
+// Earned is an achievement as a player sees it: when they earned it (0: not yet), and how far they are towards its
+// goal. A hidden one not yet earned is told only as hidden: no name, no how, no reward.
 type Earned struct {
 	Achievement
-	At int64 `json:"at,omitempty"`
+	At       int64 `json:"at,omitempty"`
+	Progress int   `json:"progress"`
+}
+
+// hiddenAchievement is what a player sees of a hidden achievement they haven't found yet.
+func hiddenAchievement(a Achievement) Achievement {
+	return Achievement{ID: a.ID, Name: "Скрито постижение", About: "Открий го, докато играеш.", Icon: "secret",
+		Tier: a.Tier, Goal: 1, Hidden: true}
 }
 
 // Progress is a player's level, every achievement (earned or not), and what they may choose to look like.
@@ -239,8 +264,18 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
+	reached, err := g.measure(ctx, userID)
+	if err != nil {
+		return p, err
+	}
 	for _, a := range Achievements {
-		p.Achievements = append(p.Achievements, Earned{Achievement: a, At: earned[a.ID]})
+		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal)}
+		if e.At != 0 {
+			e.Progress = a.Goal
+		} else if a.Hidden {
+			e.Achievement, e.Progress = hiddenAchievement(a), 0
+		}
+		p.Achievements = append(p.Achievements, e)
 	}
 	p.Avatar, p.Title = avatar.String, title.String
 	if p.Avatar == "" {
@@ -254,25 +289,72 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 // called whenever something that counts happens (a run or a duel ends, a friend is made); it looks at everything, so
 // a player whose games came before an achievement existed gets it the next time too.
 func (g *Game) Award(ctx context.Context, userID int64) ([]string, error) {
+	reached, err := g.measure(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	earned, err := g.earned(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var news []string
+	now := store.Ms(g.Now())
+	for _, a := range Achievements {
+		if _, already := earned[a.ID]; already || reached[a.ID] < a.Goal {
+			continue
+		}
+		if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO achievements (user_id, id, at) VALUES (?, ?, ?)`,
+			userID, a.ID, now); err != nil {
+			return news, err
+		}
+		news = append(news, a.ID)
+	}
+	return news, nil
+}
+
+// bulgarianHour is a SQL expression for the hour in Bulgaria of a time in milliseconds: UTC+3 from April to October
+// (summer time, near enough for an achievement), UTC+2 the rest of the year.
+func bulgarianHour(ms string) string {
+	return `CAST(strftime('%H', ` + ms + `/1000 + CASE WHEN CAST(strftime('%m', ` + ms + `/1000, 'unixepoch') AS INT)
+		BETWEEN 4 AND 10 THEN 10800 ELSE 7200 END, 'unixepoch') AS INT)`
+}
+
+// measure is how far a player has come by each achievement's measure (days in a row, answers, duels won…), from
+// their records: what Award awards and a profile shows the progress of.
+func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error) {
 	db := g.DB.Read
 	streak, err := g.Streak(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	var games, duelsWon, friends, topicsPlayed int
-	var perfect, fast, friendWin bool
+	var games, duelsWon, friends, topicsPlayed, types int
+	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect bool
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
 			AND category <> ''),
+		(SELECT count(*) FROM (SELECT DISTINCT CASE
+				WHEN json_type(a.given, '$.pick') IS NOT NULL THEN 'choice'
+				WHEN json_type(a.given, '$.value') IS NOT NULL THEN 'number'
+				WHEN json_type(a.given, '$.order') IS NOT NULL THEN 'order'
+				WHEN json_type(a.given, '$.truth') IS NOT NULL THEN 'truefalse'
+				WHEN json_type(a.given, '$.pairs') IS NOT NULL THEN 'match' END AS t
+			FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right) WHERE t IS NOT NULL),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND rights = json_array_length(questions)),
 		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.ms < 2000),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'
-			AND opponent_id IN (SELECT friend_id FROM friends WHERE user_id = ?1))`, userID).
-		Scan(&games, &duelsWon, &friends, &topicsPlayed, &perfect, &fast, &friendWin)
+			AND opponent_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)),
+		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1
+			AND `+bulgarianHour("a.at")+` < 4),
+		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
+			AND `+bulgarianHour("finished_at")+` < 7),
+		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
+			AND rights = json_array_length(questions))`, userID).
+		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
+			&topicPerfect)
 	if err != nil {
 		return nil, err
 	}
@@ -290,33 +372,49 @@ func (g *Game) Award(ctx context.Context, userID int64) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := g.Bank()
-	has := map[string]bool{
-		"streak3": streak >= 3, "streak7": streak >= 7, "streak30": streak >= 30, "streak100": streak >= 100,
-		"perfect": perfect, "exact": exact, "fast": fast,
-		"answers100": answers >= 100, "answers1000": answers >= 1000, "games100": games >= 100,
-		"allTopics": len(b.Categories) > 0 && topicsPlayed >= len(b.Categories),
-		"master":    masters >= 1, "master5": masters >= 5,
-		"duel1": duelsWon >= 1, "duel10": duelsWon >= 10, "duel50": duelsWon >= 50,
-		"friend1": friends >= 1, "friends5": friends >= 5, "friendWin": friendWin,
-	}
-	earned, err := g.earned(ctx, userID)
+	lastSecond, err := g.anyLastSecond(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	var news []string
-	now := store.Ms(g.Now())
-	for _, a := range Achievements {
-		if _, already := earned[a.ID]; already || !has[a.ID] {
-			continue
+	one := func(ok bool) int {
+		if ok {
+			return 1
 		}
-		if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO achievements (user_id, id, at) VALUES (?, ?, ?)`,
-			userID, a.ID, now); err != nil {
-			return news, err
-		}
-		news = append(news, a.ID)
+		return 0
 	}
-	return news, nil
+	return map[string]int{
+		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak,
+		"perfect": one(perfect), "exact": one(exact), "fast": one(fast),
+		"answers100": answers, "answers1000": answers, "games100": games,
+		"allTopics": topicsPlayed, "master": masters, "master5": masters,
+		"duel1": duelsWon, "duel10": duelsWon, "duel50": duelsWon,
+		"friend1": friends, "friends5": friends, "friendWin": one(friendWin),
+		"nightOwl": one(nightOwl), "earlyBird": one(earlyBird), "lastSecond": one(lastSecond),
+		"topicPerfect": one(topicPerfect), "allTypes": types,
+	}, nil
+}
+
+// anyLastSecond is whether a player has ever answered right in a question's last second.
+func (g *Game) anyLastSecond(ctx context.Context, userID int64) (bool, error) {
+	shortest := Limit(&bank.TrueFalse{Head: bank.Head{Type: "truefalse"}}) // no question's time is shorter
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.ms FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ? AND a.is_right AND a.ms >= ?`, userID, (shortest - time.Second).Milliseconds())
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	b := g.Bank()
+	for rows.Next() {
+		var id string
+		var ms int64
+		if err := rows.Scan(&id, &ms); err != nil {
+			return false, err
+		}
+		if q, ok := b.Get(id); ok && ms >= (Limit(q)-time.Second).Milliseconds() {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // anyExact is whether a player has ever given a number exactly (a number question's answer kept with its value).
