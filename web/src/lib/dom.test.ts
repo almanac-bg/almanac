@@ -74,7 +74,7 @@ test("computed values follow their sources", () => {
 
 test("links go to this site, the web or mail only", () => {
   for (const ok of [
-    "/play",
+    "/play/history",
     "/qimg/a.webp 600w, /qimg/b.webp 1200w",
     "https://commons.wikimedia.org/x",
     "mailto:a@b.bg",

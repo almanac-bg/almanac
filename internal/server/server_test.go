@@ -208,7 +208,7 @@ func TestRefusesOtherSites(t *testing.T) {
 func TestPages(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string]int{
-		"/": 200, "/play": 200, "/play/history": 200, "/me": 200, "/nowhere": 404, "/api/nowhere": 404,
+		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
 	} {
@@ -353,7 +353,7 @@ func TestHosts(t *testing.T) {
 		res.Body.Close()
 		return res, string(body)
 	}
-	if res, _ := get("www.127.0.0.1", "/play?x=1"); res.StatusCode != 301 || res.Header.Get("Location") != g.url+"/play?x=1" {
+	if res, _ := get("www.127.0.0.1", "/ranks?x=1"); res.StatusCode != 301 || res.Header.Get("Location") != g.url+"/ranks?x=1" {
 		t.Errorf("www: %d %s", res.StatusCode, res.Header.Get("Location"))
 	}
 	if res, body := get("mta-sts.127.0.0.1", "/.well-known/mta-sts.txt"); res.StatusCode != 200 ||

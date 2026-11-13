@@ -590,7 +590,7 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64, show bool) (*D
 	return &s, nil
 }
 
-// DuelTurns is how many duels wait for the player to play (for the dot on Играй).
+// DuelTurns is how many duels wait for the player to play (for the dot on Начало).
 func (g *Game) DuelTurns(ctx context.Context, userID int64) (int, error) {
 	var n int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM duels d JOIN runs ra ON ra.id = d.a_run
