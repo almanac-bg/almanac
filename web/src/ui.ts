@@ -174,8 +174,23 @@ export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въ
 export interface Look {
   avatar?: string;
   title?: string;
+  /** The tier of the achievement the title comes from: the title shows in its colour. */
+  titleTier?: Tier;
   level?: number;
 }
+
+/** How hard an achievement is to earn, and so how rare its title. */
+export type Tier = "common" | "rare" | "epic" | "legendary";
+
+export const tiers: Tier[] = ["common", "rare", "epic", "legendary"];
+
+/** A tier's words: for a group of achievements, for one achievement (neuter), and for a title (feminine). */
+export const tierWords: Record<Tier, { group: string; one: string; title: string }> = {
+  common: { group: "Обикновени", one: "обикновено", title: "Обикновена" },
+  rare: { group: "Редки", one: "рядко", title: "Рядка" },
+  epic: { group: "Епични", one: "епично", title: "Епична" },
+  legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
+};
 
 export const shapeNames: Record<string, string> = {
   petal: "Венчелистче",
@@ -236,23 +251,24 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
       "span",
       { class: "who-text" },
       h("span", { class: "who-name" }, name, extra),
-      look.title ? h("span", { class: "who-title" }, look.title) : null,
+      look.title ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title) : null,
     ),
   );
 }
 
-/** An achievement: drawn with its shape, bright once earned. */
+/** An achievement: drawn with its shape in its tier's colour, bright once earned. `about` says how it's earned. */
 export interface AchievementInfo {
   id: string;
   name: string;
   about: string;
   icon: string;
+  tier: Tier;
   at?: number;
 }
 
 export function badge(a: AchievementInfo, earned: boolean): HTMLElement {
   return h("span", {
-    class: earned ? `badge-mark av-${a.icon}` : `badge-mark locked av-${a.icon}`,
+    class: `badge-mark t-${a.tier} av-${a.icon}${earned ? "" : " locked"}`,
     "aria-hidden": "true",
   });
 }

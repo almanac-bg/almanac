@@ -12,7 +12,7 @@ import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/do
 import { go, title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player } from "../state.ts";
-import { avatar, type VerdictKind, verdict } from "../ui.ts";
+import { avatar, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
@@ -52,6 +52,7 @@ interface Player {
   right?: boolean;
   avatar?: string;
   title?: string;
+  titleTier?: Tier;
   level?: number;
 }
 

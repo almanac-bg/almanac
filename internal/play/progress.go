@@ -33,33 +33,49 @@ func LevelOf(points int) (level, from, to int) {
 
 // Achievement is something a player has done, once and for good. Its name is also a title they may show.
 type Achievement struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// About is how it's earned, said to whoever hasn't yet.
 	About string `json:"about"`
 	Icon  string `json:"icon"` // the shape it's drawn with; earning it unlocks that shape as an avatar
+	Tier  Tier   `json:"tier"`
 }
 
-// Achievements are every achievement there is, in the order a profile shows them.
+// Tier is how hard an achievement is to earn: common ones come in the first days, legendary ones take months. A
+// title shows in its achievement's tier.
+type Tier string
+
+const (
+	Common    Tier = "common"
+	Rare      Tier = "rare"
+	Epic      Tier = "epic"
+	Legendary Tier = "legendary"
+)
+
+// Achievements are every achievement there is, by tier, in the order a profile shows them.
 var Achievements = []Achievement{
-	{"streak3", "Три поред", "Три дни поред с въпросите на деня.", "flame"},
-	{"streak7", "Цяла седмица", "Седем дни поред с въпросите на деня.", "flame"},
-	{"streak30", "Цял месец", "Тридесет дни поред с въпросите на деня.", "flame"},
-	{"streak100", "Сто дни", "Сто дни поред с въпросите на деня.", "flame"},
-	{"perfect", "Десет от десет", "Всички верни във въпросите на деня.", "star"},
-	{"exact", "Точно в целта", "Точно числото, без грешка.", "target"},
-	{"fast", "Светкавица", "Верен отговор за по-малко от 2 секунди.", "bolt"},
-	{"answers100", "Сто отговора", "Сто отговорени въпроса.", "book"},
-	{"answers1000", "Хиляда отговора", "Хиляда отговорени въпроса.", "book"},
-	{"games100", "Сто игри", "Сто изиграни игри.", "trophy"},
-	{"allTopics", "Обиколка", "Поне една игра във всяка тема.", "rosette"},
-	{"master", "Като на длан", "80% верни в тема, след поне 30 въпроса в нея.", "trophy"},
-	{"master5", "Ходеща енциклопедия", "80% верни в пет теми, след поне 30 въпроса във всяка.", "trophy"},
-	{"duel1", "Първа победа", "Спечели дуел.", "shield"},
-	{"duel10", "Десет победи", "Спечели десет дуела.", "shield"},
-	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield"},
-	{"friend1", "Двама сме", "Първият ти приятел в играта.", "heart"},
-	{"friends5", "Цяла компания", "Пет приятели в играта.", "heart"},
-	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart"},
+	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common},
+	{"answers100", "Сто отговора", "Отговори на сто въпроса.", "book", Common},
+	{"fast", "Светкавица", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common},
+	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common},
+	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common},
+
+	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare},
+	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare},
+	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare},
+	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "rosette", Rare},
+	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare},
+	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare},
+
+	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic},
+	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic},
+	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic},
+	{"master", "Като на длан", "Отговаряй вярно на 80% от въпросите в една тема, след поне 30 въпроса в нея.", "trophy", Epic},
+	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic},
+
+	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary},
+	{"master5", "Ходеща енциклопедия", "Отговаряй вярно на 80% от въпросите в пет теми, след поне 30 въпроса във всяка.", "trophy", Legendary},
+	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary},
 }
 
 func achievementByID(id string) (Achievement, bool) {
@@ -70,10 +86,10 @@ func achievementByID(id string) (Achievement, bool) {
 	return Achievements[i], true
 }
 
-// TitleOf is the name an achievement's id is shown by as a title ("" for none).
-func TitleOf(id string) string {
+// TitleOf is the name an achievement's id is shown by as a title, and its tier ("" for none).
+func TitleOf(id string) (string, Tier) {
 	a, _ := achievementByID(id)
-	return a.Name
+	return a.Name, a.Tier
 }
 
 // Avatars are a shape in a tone. Some shapes are everyone's from the start; the rest unlock: with an achievement
@@ -137,7 +153,9 @@ func shapes(earned map[string]int64, level int) []Shape {
 type Look struct {
 	Avatar string `json:"avatar"`
 	Title  string `json:"title,omitempty"`
-	Level  int    `json:"level"`
+	// TitleTier is the tier of the achievement the title comes from: it shows in that tier's colour.
+	TitleTier Tier `json:"titleTier,omitempty"`
+	Level     int  `json:"level"`
 }
 
 func lookOf(userID int64, avatar, title string, points int) Look {
@@ -145,7 +163,8 @@ func lookOf(userID int64, avatar, title string, points int) Look {
 		avatar = DefaultAvatar(userID)
 	}
 	level, _, _ := LevelOf(points)
-	return Look{Avatar: avatar, Title: TitleOf(title), Level: level}
+	name, tier := TitleOf(title)
+	return Look{Avatar: avatar, Title: name, TitleTier: tier, Level: level}
 }
 
 // lookColumns read a player's look in a query over users u: their avatar, title and points.

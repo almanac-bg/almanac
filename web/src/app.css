@@ -87,6 +87,15 @@
     --rose-ink: #ff9fd0;
     --silver: #cfc8e3;
     --bronze: #e8a46c;
+    /* Achievement tiers: the fill of a badge, and the ink of its words. */
+    --tier-common: var(--silver);
+    --tier-rare: var(--sky);
+    --tier-epic: #b48cff;
+    --tier-legendary: var(--gold);
+    --tier-common-ink: #cfc8e3;
+    --tier-rare-ink: var(--sky-ink);
+    --tier-epic-ink: #c7a8ff;
+    --tier-legendary-ink: var(--gold-ink);
     --on-fill: #140f26;
     --link: var(--accent);
     --elev-1: inset 0 1px 0 #ffffff0f, 0 2px 8px #00000066;
@@ -162,6 +171,9 @@
       --wrong-ink: #bf3018;
       --sky-ink: #1f63a8;
       --rose-ink: #b12a72;
+      --tier-common: #b8b0cf;
+      --tier-common-ink: #5d5677;
+      --tier-epic-ink: #6a35d6;
       --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
       --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
       --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
@@ -1619,7 +1631,7 @@
 
   .who-title {
     overflow: hidden;
-    color: var(--accent);
+    color: var(--tier-ink, var(--accent));
     font-size: 0.75rem;
     line-height: 1rem;
     font-weight: 700;
@@ -2008,7 +2020,7 @@
   }
 
   .me-title {
-    color: var(--accent);
+    color: var(--tier-ink, var(--accent));
     font-weight: 700;
   }
 
@@ -2066,10 +2078,150 @@
     mask: var(--shape) center / contain no-repeat;
   }
 
+  .t-common {
+    --tier: var(--tier-common);
+    --tier-ink: var(--tier-common-ink);
+  }
+
+  .t-rare {
+    --tier: var(--tier-rare);
+    --tier-ink: var(--tier-rare-ink);
+  }
+
+  .t-epic {
+    --tier: var(--tier-epic);
+    --tier-ink: var(--tier-epic-ink);
+  }
+
+  .t-legendary {
+    --tier: var(--tier-legendary);
+    --tier-ink: var(--tier-legendary-ink);
+  }
+
+  .badge-mark[class*="t-"] {
+    background: var(--tier);
+    box-shadow: none;
+  }
+
+  .badge-mark.t-epic,
+  .badge-mark.t-legendary {
+    box-shadow: 0 0 14px -3px var(--tier);
+  }
+
   .badge-mark.locked {
     background: var(--sunken);
     color: var(--line-strong);
-    box-shadow: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tier, var(--line)) 55%, transparent);
+  }
+
+  .tier {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .tier-head {
+    margin: var(--space-2) 0 0;
+    color: var(--tier-ink);
+    font: 800 0.8125rem / 1rem var(--font-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .tier-head .muted {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .achievement-when {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+  }
+
+  .achievement:not(.locked) .achievement-when {
+    color: var(--tier-ink);
+  }
+
+  .titles {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .title-pick {
+    appearance: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px var(--space-3);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--raised);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+  }
+
+  button.title-pick {
+    cursor: pointer;
+  }
+
+  button.title-pick:hover {
+    border-color: var(--line-strong);
+  }
+
+  button.title-pick:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .title-pick[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .title-name {
+    color: var(--tier-ink, var(--text));
+    font-weight: 800;
+  }
+
+  .title-tier {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .title-pick.t-common .title-name {
+    color: var(--text);
+  }
+
+  .title-pick.locked {
+    background: transparent;
+    padding-block: var(--space-2);
+  }
+
+  .title-pick.locked .title-name {
+    color: var(--text-muted);
+  }
+
+  .title-how {
+    flex-basis: 100%;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  .unlock.t-epic,
+  .unlock.t-legendary {
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--tier),
+      0 0 24px -12px var(--tier);
   }
 
   .achievements {

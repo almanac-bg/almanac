@@ -9,6 +9,12 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
 
   await page.goto("/me");
   await expect(page.getByRole("heading", { name: /Постижения · \d+ от 19/ })).toBeVisible();
+  // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
+  await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
+  await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");
+  await expect(page.locator(".title-pick.locked", { hasText: "Сто дни" })).toContainText(
+    "Отключва се: играй въпросите на деня сто дни поред.",
+  );
   await page.getByRole("button", { name: "Луна", exact: true }).click();
   await expect(page.getByRole("button", { name: "Луна", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Корона, заключена" }).click();
