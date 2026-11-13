@@ -4,7 +4,7 @@
 import { type Mastery, masteryBadge, masteryLeft } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
-import { playRun } from "../game/run.ts";
+import { getReady, playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -77,7 +77,7 @@ export function topic([id = ""]: string[]) {
     return null;
   }
   title(name);
-  return run(category, (s, again) =>
+  return run(category, name, (s, again) =>
     h(
       "div",
       { class: "screen" },
@@ -97,15 +97,17 @@ export function topic([id = ""]: string[]) {
   );
 }
 
-/** Plays a run of a topic ("" for all), and what finished draws at its end (again: another run). */
-function run(category: string, finished: (s: State, again: () => void) => Child): Child {
-  const screen = signal<Child>(h("p", { class: "muted" }, "…"));
+/** Plays a run of a topic ("" for all), and what finished draws at its end (again: another run). Each run starts
+ * after a short count, which the player can cut short or back out of. */
+function run(category: string, name: string, finished: (s: State, again: () => void) => Child): Child {
+  const screen = signal<Child>(null);
+  const ready = () => screen.set(getReady(name, start, () => go("/")));
   const start = async () => {
     screen.set(h("p", { class: "muted" }, "…"));
     try {
       await player();
       const s = await api<State>("POST", "/api/topic", { category });
-      screen.set(playRun(s, (end) => finished(end, start)));
+      screen.set(playRun(s, (end) => finished(end, ready)));
     } catch (err) {
       screen.set(
         h(
@@ -117,6 +119,6 @@ function run(category: string, finished: (s: State, again: () => void) => Child)
       );
     }
   };
-  start();
+  ready();
   return h("div", null, () => screen());
 }

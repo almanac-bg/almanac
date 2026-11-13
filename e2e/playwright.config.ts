@@ -6,7 +6,8 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 8098;
+// E2E_PORT lets two checkouts run their tests at once.
+const port = Number(process.env.E2E_PORT) || 8098;
 const db = "test-results/e2e.db";
 // A fresh database each run. Playwright reads this file again in every worker: only the main process clears it, or a
 // worker starting late would delete the database under the running server.

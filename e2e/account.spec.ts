@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 test("a guest keeps their game with a code by email, and can sign out", async ({ page }, info) => {
   const email = `player-${info.project.name}-${Date.now()}@example.com`;
   await page.goto("/play/music");
+  await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10"); // playing made a guest
   await page.goto("/settings");
   await page.getByLabel("Имейл").fill(email);

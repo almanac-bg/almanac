@@ -193,10 +193,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - presses 120ms; hover and colour 160–200ms;
   - the right answer's pop 360ms; the wrong answer's shake 320ms;
   - the points' rise 520ms;
-  - the timer runs linearly with the clock.
+  - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
+    (with „Започни сега“ and „Отказ“, so a tap on a topic never throws the player straight into a question).
 - **No ambient motion** and no confetti.
 - **Reduced motion:** under `prefers-reduced-motion` the pop, the shake, the rise and the transitions stop. The timer
-  still moves, because it is information.
+  and the count before a run still move, because they are information.
 
 ## Sound
 
@@ -207,6 +208,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - `key` for each key of the number pad and each move in an order;
   - `right`, `exact`, `partial`, `wrong` or `time` with the verdict;
   - the clock while a question waits: `tick` and `tock` in turn each second, then `hurry` in each of the last five;
+  - `tick` for each second of the count before a run;
   - `end` when a run's result opens;
   - `level` and `achievement` with the news;
   - `ping` when a game or a duel starts, or a friend calls to a duel.
