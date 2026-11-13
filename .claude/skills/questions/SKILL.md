@@ -27,6 +27,12 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - **Kinds: 60% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match**, in every category (`bank.TypeMix`),
   close to what the game draws (a run of ten has six choices and one of each other kind), so that no kind runs out
   long before the others. `bank check` reports what each category needs.
+- **The bank must be fully balanced** (the owner's rule): every category the same size; in it, the kinds in their
+  mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15% hard,
+  like its choices). `bank check` ends with the full grid — per category, kind and difficulty: `+n` to write, `−n`
+  too many — and how many questions are out of place in all; 0 is the goal. Close a `+` by writing for that cell;
+  a `−` by judging the questions again (move one to a neighbouring difficulty only where that's honest for
+  Bulgarian players; what players get right shows how hard a question really is) or retiring the weakest.
 - **Every category the same size.** No topic outweighs another, so a batch adds to every category, or closes the
   gaps that `bank check` reports, biggest first. Never add to a category that is ahead while another is behind.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**

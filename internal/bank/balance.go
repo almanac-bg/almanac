@@ -36,6 +36,19 @@ type Balance struct {
 	Types    map[string]map[string]int
 	TypeSize int
 	AddTypes map[string]map[string]int
+	// Full balance: every category at Target questions, its kinds in the TypeMix and each kind's difficulties in the
+	// Mix. Cells counts the live questions by category, kind and difficulty; Gaps is what each cell lacks (above 0:
+	// to write) or has too many of (below 0: to judge again into a neighbouring difficulty where that's honest, or
+	// retire). Off is how many questions are out of place in all; 0 is a fully balanced bank.
+	Target int
+	Cells  map[string]map[string]map[Difficulty]int
+	Gaps   map[string]map[string]map[Difficulty]int
+	Off    int
+}
+
+// Want is how many questions of a kind and a difficulty a category of size questions aims for.
+func Want(size int, kind string, d Difficulty) int {
+	return int(math.Round(float64(size) * TypeMix[kind] * Mix[d]))
 }
 
 // BalanceOf works out where the bank stands against Mix and equal categories.
@@ -69,6 +82,30 @@ func (b *Bank) BalanceOf() Balance {
 			add[t] = max(0, int(math.Round(float64(bal.TypeSize)*share))-bal.Types[c.ID][t])
 		}
 		bal.AddTypes[c.ID] = add
+	}
+	// The full balance aims at the larger of the two sizes (reachable for the kinds and for the difficulties by
+	// adding), and says per cell what's missing or too much.
+	bal.Target = max(bal.Size, bal.TypeSize)
+	bal.Cells, bal.Gaps = map[string]map[string]map[Difficulty]int{}, map[string]map[string]map[Difficulty]int{}
+	for _, c := range b.Categories {
+		cells := map[string]map[Difficulty]int{}
+		for _, q := range b.Live(c.ID, "") {
+			t := q.Base().Type
+			if cells[t] == nil {
+				cells[t] = map[Difficulty]int{}
+			}
+			cells[t][q.Base().Difficulty]++
+		}
+		gaps := map[string]map[Difficulty]int{}
+		for _, t := range TypeOrder {
+			gaps[t] = map[Difficulty]int{}
+			for _, d := range Difficulties {
+				g := Want(bal.Target, t, d) - cells[t][d]
+				gaps[t][d] = g
+				bal.Off += max(g, -g)
+			}
+		}
+		bal.Cells[c.ID], bal.Gaps[c.ID] = cells, gaps
 	}
 	// Split the size by the mix, rounding so the parts add up to it (the largest remainders get the spare ones).
 	want := map[Difficulty]int{}

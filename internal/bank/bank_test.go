@@ -328,6 +328,22 @@ func TestBalance(t *testing.T) {
 			}
 		}
 	}
+	// The full balance: each cell's gap brings it to the aim, and Off counts every question out of place.
+	off := 0
+	for _, c := range b.Categories {
+		for _, typ := range TypeOrder {
+			for _, d := range Difficulties {
+				g := bal.Gaps[c.ID][typ][d]
+				if bal.Cells[c.ID][typ][d]+g != Want(bal.Target, typ, d) {
+					t.Errorf("%s %s %s: %d %+d is not the aim %d", c.ID, typ, d, bal.Cells[c.ID][typ][d], g, Want(bal.Target, typ, d))
+				}
+				off += max(g, -g)
+			}
+		}
+	}
+	if off != bal.Off || bal.Target < bal.Size || bal.Target < bal.TypeSize {
+		t.Errorf("off %d (counted %d), target %d (sizes %d, %d)", bal.Off, off, bal.Target, bal.Size, bal.TypeSize)
+	}
 	sum := 0.0
 	for _, share := range TypeMix {
 		sum += share

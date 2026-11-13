@@ -134,6 +134,26 @@ func balance(b *bank.Bank) string {
 		}
 		fmt.Fprintf(&s, "  %-10s %s\n", c.ID, strings.Join(parts, "/"))
 	}
+	// Full balance: per category, kind and difficulty, what to write (+) or judge again or retire (−).
+	if bal.Off == 0 {
+		s.WriteString("balance      full: every category, kind and difficulty on its aim\n")
+		return s.String()
+	}
+	fmt.Fprintf(&s, "balance      %d questions out of place; every category at %d, each kind easy/medium/hard (+ write, − judge again or retire):\n",
+		bal.Off, bal.Target)
+	fmt.Fprintf(&s, "  %-10s", "")
+	for _, t := range bank.TypeOrder {
+		fmt.Fprintf(&s, "%16s", t)
+	}
+	s.WriteString("\n")
+	for _, c := range b.Categories {
+		fmt.Fprintf(&s, "  %-10s", c.ID)
+		for _, t := range bank.TypeOrder {
+			g := bal.Gaps[c.ID][t]
+			fmt.Fprintf(&s, "%16s", fmt.Sprintf("%+d/%+d/%+d", g[bank.Easy], g[bank.Medium], g[bank.Hard]))
+		}
+		s.WriteString("\n")
+	}
 	return s.String()
 }
 
