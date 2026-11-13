@@ -36,7 +36,6 @@ var (
 var playerErrors = map[error]*apiError{
 	play.ErrNoRun:          {http.StatusNotFound, "no_run", "Няма такава игра."},
 	play.ErrNoTopic:        {http.StatusNotFound, "no_topic", "Няма такава тема."},
-	play.ErrBadSettings:    {http.StatusBadRequest, "bad_settings", "Играта не може да се играе с тези настройки."},
 	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},

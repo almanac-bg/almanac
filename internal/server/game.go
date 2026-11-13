@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // today is the day screen's state: the day, the viewer's streak and run (if any), and how many have played it.
@@ -92,8 +90,7 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var in struct {
-		Category string        `json:"category"`
-		Settings play.Settings `json:"settings"`
+		Category string `json:"category"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -101,7 +98,7 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		return errTooMany
 	}
-	st, err := s.game.StartTopic(r.Context(), u.ID, in.Category, in.Settings)
+	st, err := s.game.StartTopic(r.Context(), u.ID, in.Category)
 	if err != nil {
 		return err
 	}
