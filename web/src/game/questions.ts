@@ -2,6 +2,7 @@
 // as the server has one Go file per type (internal/bank).
 
 import { append, type Child, h, type Signal, signal } from "../lib/dom.ts";
+import { play } from "../lib/sound.ts";
 import type { Answer, ChoiceView, NumberView, OrderView, Reveal, View } from "./types.ts";
 
 export interface Asked {
@@ -61,6 +62,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         onclick: () => {
           if (locked.peek()) return;
           buttons[i]?.classList.add("picked");
+          play("tap");
           submit({ pick: i });
         },
       },
@@ -99,7 +101,10 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
       class: "number",
       onsubmit: (e: SubmitEvent) => {
         e.preventDefault();
-        if (!locked.peek() && valid()) submit({ value: value() });
+        if (!locked.peek() && valid()) {
+          play("tap");
+          submit({ value: value() });
+        }
       },
     },
     h(
@@ -147,6 +152,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   const placed = signal<number[]>([]);
   const toggle = (i: number) => {
     if (locked.peek()) return;
+    play("tap");
     placed.update((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
   };
   const rows = view.items.map((text, i) =>

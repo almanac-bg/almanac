@@ -4,6 +4,7 @@ import { type Child, h, signal, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
+import { setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
 import { type AchievementInfo, avatar, badge, shapeNames, toneNames } from "../ui.ts";
 import { stats } from "./stats.ts";
@@ -34,6 +35,7 @@ export function me() {
             "div",
             { class: "settings" },
             look(progress, load),
+            sounds(),
             reminders(),
             nameForm(),
             account(),
@@ -302,6 +304,23 @@ function account(): Child {
         ),
         signIn(),
       ],
+    ),
+  );
+}
+
+/** Sounds: on or off, on this device. */
+function sounds(): Child {
+  return h(
+    "section",
+    null,
+    h("h2", null, "Звуци"),
+    h(
+      "p",
+      { class: "muted" },
+      "Кратки звуци при отговор, в последните секунди и при ново ниво. Важи за това устройство.",
+    ),
+    h("button", { class: "btn", type: "button", onclick: () => setSound(!soundOn.peek()) }, () =>
+      soundOn() ? "Изключи звуците" : "Включи звуците",
     ),
   );
 }
