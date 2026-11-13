@@ -2,6 +2,7 @@ package bank
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -271,6 +272,55 @@ func TestWebpSize(t *testing.T) {
 		w, h, err := webpSize(filepath.Join(sample, ImagesDir, im.File))
 		if err != nil || w != im.W || h != im.H {
 			t.Errorf("%s: %d×%d %v, want %d×%d", im.File, w, h, err, im.W, im.H)
+		}
+	}
+}
+
+func TestNewQuestionRules(t *testing.T) {
+	q := func(tail Tail) Question {
+		return &Choice{Head: Head{ID: "his-001", Type: "choice", Difficulty: Easy, Text: "Кой?"}, Answer: "А",
+			Wrong: []string{"Б", "В", "Г"}, Tail: tail}
+	}
+	for _, c := range []struct {
+		tail Tail
+		want string
+	}{
+		{Tail{Added: "2026-11-01"}, ""}, // from before the rules: gone over later
+		{Tail{Added: RulesFrom}, "needs a fact"},
+		{Tail{Added: RulesFrom, Fact: "Факт."}, "needs updated"},
+		{Tail{Added: RulesFrom, Fact: "Факт.", Updated: RulesFrom}, ""},
+		{Tail{Added: "2026-11-20", Updated: "2026-11-19", Fact: "Факт."}, "updated is before added"},
+		{Tail{Added: "2026-11-20", Updated: "2026-12-01", Fact: "Факт."}, "a date in the future"},
+		{Tail{Updated: "13.11.2026"}, "updated must be a date"},
+	} {
+		errs, _ := checkQuestion(q(c.tail), "2026-11-25")
+		all := strings.Join(errs, "; ")
+		if (c.want == "") != (all == "") || !strings.Contains(all, c.want) {
+			t.Errorf("%+v: got %q, want %q", c.tail, all, c.want)
+		}
+	}
+}
+
+func TestBalance(t *testing.T) {
+	b := loadSample(t)
+	bal := b.BalanceOf()
+	if bal.Total != len(b.Live("", "")) {
+		t.Fatalf("counted %d of %d", bal.Total, len(b.Live("", "")))
+	}
+	for _, c := range b.Categories {
+		got := 0
+		for _, d := range Difficulties {
+			if bal.Add[c.ID][d] < 0 {
+				t.Errorf("%s: %d %s to add", c.ID, bal.Add[c.ID][d], d)
+			}
+			after := bal.Live[c.ID][d] + bal.Add[c.ID][d]
+			if aim := float64(bal.Size) * Mix[d]; math.Abs(float64(after)-aim) >= 1 {
+				t.Errorf("%s: %s would be %d of %d, aim %.1f", c.ID, d, after, bal.Size, aim)
+			}
+			got += after
+		}
+		if got != bal.Size {
+			t.Errorf("%s grows to %d, not %d", c.ID, got, bal.Size)
 		}
 	}
 }

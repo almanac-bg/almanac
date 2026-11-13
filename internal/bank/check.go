@@ -23,10 +23,11 @@ const (
 	factMax      = 200 // "Знаеше ли?": one or two sentences, read at a glance
 )
 
-var (
-	idPattern  = regexp.MustCompile(`^[a-z]+-[0-9]+$`)
-	tagPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-)
+var idPattern = regexp.MustCompile(`^[a-z]+-[0-9]+$`)
+
+// RulesFrom is when the bank's rules for new questions took effect: a question added since then has a fact and
+// the date it last changed. (Older questions get theirs as they're gone over.)
+const RulesFrom = "2026-11-14"
 
 // Problem is something wrong with a bank. A bank with errors is never played; warnings are for whoever keeps it.
 type Problem struct {
@@ -78,18 +79,23 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 	if t.Fact != "" {
 		errs = append(errs, checkLine("fact", t.Fact, factMax)...)
 	}
-	seen := map[string]bool{}
-	for _, tag := range t.Tags {
-		if !tagPattern.MatchString(tag) {
-			errs = append(errs, "a tag must be lowercase latin letters, digits and dashes: "+tag)
-		}
-		if seen[tag] {
-			errs = append(errs, "a tag twice: "+tag)
-		}
-		seen[tag] = true
-	}
 	errs = append(errs, checkDate("added", t.Added)...)
+	errs = append(errs, checkDate("updated", t.Updated)...)
 	errs = append(errs, checkDate("reviewBy", t.ReviewBy)...)
+	switch {
+	case t.Updated != "" && t.Added != "" && t.Updated < t.Added:
+		errs = append(errs, "updated is before added")
+	case t.Updated > today || t.Added > today:
+		errs = append(errs, "a date in the future")
+	}
+	if t.Added >= RulesFrom && !t.Retired {
+		if t.Fact == "" {
+			errs = append(errs, "a question added since "+RulesFrom+" needs a fact („Знаеше ли?“)")
+		}
+		if t.Updated == "" {
+			errs = append(errs, "a question added since "+RulesFrom+" needs updated (the day it last changed)")
+		}
+	}
 	if t.ReviewBy != "" && t.ReviewBy <= today && !t.Retired {
 		warnings = append(warnings, "due for review since "+t.ReviewBy)
 	}
