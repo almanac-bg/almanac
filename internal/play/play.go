@@ -65,6 +65,8 @@ type Game struct {
 	Now func() time.Time
 	// DuelNews, if set, is told of a duel to tell a player about: a friend asks, a result (a push, say).
 	DuelNews func(context.Context, DuelNews)
+	// RoyalNews, if set, is told of each place when a tournament ends.
+	RoyalNews func(context.Context, RoyalNews)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -244,7 +246,8 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
 	}
 	r.ms += ms
 	r.shownAt = sql.NullInt64{}
-	r.finished = r.at >= len(r.picks)
+	// Роял: the first wrong answer (or the time running out) is the way out.
+	r.finished = r.at >= len(r.picks) || (r.kind == "royal" && !gr.Right)
 	var finishedAt any
 	if r.finished {
 		finishedAt = now
@@ -337,6 +340,9 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		// A duel's run settles the duel once both have played (and awards both); then what the run earned, before
 		// the answer goes back, so that the screen with the result can tell of it.
 		if err = g.settleRun(ctx, runID); err == nil {
+			err = g.royalRunDone(ctx, runID)
+		}
+		if err == nil {
 			_, err = g.Award(ctx, userID)
 		}
 	}

@@ -88,7 +88,7 @@ export function today() {
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
       user.peek() ? streak(t.streak, t.week) : null,
-      modes(["topics", "duel", "room"], "Още игри"),
+      modes(["topics", "duel", "royal", "room"], "Още игри"),
     );
   };
 
@@ -116,7 +116,7 @@ function finished(t: Today, s: State): Child {
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
       },
       countdown(),
-      modes(["topics", "duel", "room"], "Още игри"),
+      modes(["topics", "duel", "royal", "room"], "Още игри"),
       () => {
         const f = fresh().friends;
         return f?.length ? board("Приятели днес", f) : null;

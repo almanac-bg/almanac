@@ -166,6 +166,35 @@ func TestTagsKeepPlayers(t *testing.T) {
 	db.Close()
 }
 
+// Роял (0011) rebuilds runs: their answers and the duels that point to them stay.
+func TestRoyalKeepsRuns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 10)
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Аз', 'az', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, questions, at, points, started_at, finished_at) VALUES (7, 1, 'duel', '[]', 1, 100, 1, 2)`,
+		`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at) VALUES (7, 0, 'his-001', 1, 100, 1, 900, 2)`,
+		`INSERT INTO duels (kind, questions, a_id, a_run, created_at, expires_at) VALUES ('open', '[]', 1, 7, 1, 9)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var answers, duels int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM answers WHERE run_id = 7`).Scan(&answers)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM duels WHERE a_run = 7`).Scan(&duels)
+	if answers != 1 || duels != 1 {
+		t.Fatalf("after the rebuild: %d answers, %d duels", answers, duels)
+	}
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (1, 'royal', '[]', 3)`); err != nil {
+		t.Fatalf("a Роял run: %v", err)
+	}
+	db.Close()
+}
+
 // openAt opens a new database migrated only up to migration n.
 func openAt(t *testing.T, path string, n int) *DB {
 	t.Helper()

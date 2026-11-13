@@ -2,11 +2,24 @@
 
 import { type Child, h } from "../lib/dom.ts";
 
-type Mode = "topics" | "duel" | "room";
+type Mode = "topics" | "duel" | "royal" | "room";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string; icon: string }> = {
   topics: { href: "/play", name: "Теми", about: "Десет въпроса от една тема.", tone: "tone-sky", icon: "play" },
-  duel: { href: "/duel", name: "Дуел", about: "Ти срещу друг играч.", tone: "tone-rose", icon: "bolt" },
+  duel: {
+    href: "/duel",
+    name: "Дуел",
+    about: "Ти срещу друг играч, всеки когато може.",
+    tone: "tone-rose",
+    icon: "bolt",
+  },
+  royal: {
+    href: "/royal",
+    name: "Роял",
+    about: "До двадесет играчи. Грешката те изважда.",
+    tone: "tone-gold",
+    icon: "crown",
+  },
   room: { href: "/room", name: "Стая", about: "Всички на един въпрос, на живо.", tone: "tone-lilac", icon: "users" },
 };
 

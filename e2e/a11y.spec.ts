@@ -9,6 +9,7 @@ for (const scheme of ["light", "dark"] as const) {
       "/",
       "/play",
       "/duel",
+      "/royal",
       "/room",
       "/ranks",
       "/rewards",
