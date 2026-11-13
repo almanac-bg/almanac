@@ -131,7 +131,11 @@ func balance(b *bank.Bank) string {
 	}
 	s.WriteString("kinds       ")
 	for _, t := range bank.TypeOrder {
-		fmt.Fprintf(&s, " %s %d%% (aim %.1f)", t, pct(kinds[t], bal.Total), 100*bank.TypeMix[t])
+		share := 0.0
+		if bal.Total > 0 {
+			share = 100 * float64(kinds[t]) / float64(bal.Total)
+		}
+		fmt.Fprintf(&s, " %s %.1f%% (aim %.1f)", t, share, 100*bank.TypeMix[t])
 	}
 	s.WriteString("\n")
 	// Full balance: per category, kind and difficulty, what to write (+) or judge again or retire (−).
