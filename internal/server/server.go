@@ -172,6 +172,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/ranks", s.ranks)
 	api("POST /api/royal", s.joinRoyal)
 	api("GET /api/royal", s.royals)
+	api("GET /api/almanac", s.almanac)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)
 	api("POST /api/friends/requests", s.requestFriend)

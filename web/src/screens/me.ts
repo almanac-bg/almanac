@@ -54,6 +54,7 @@ export function me() {
           h(
             "nav",
             { class: "menu", "aria-label": "Профил" },
+            h("a", { href: "/almanac" }, "Моят Алманах"),
             h("a", { href: "/friends" }, "Приятели"),
             h("a", { href: "/settings" }, "Настройки"),
           ),

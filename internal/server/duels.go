@@ -161,3 +161,16 @@ func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
 	}
 	go s.notify(context.WithoutCancel(ctx), m, n.To)
 }
+
+// almanac is the player's collection of learned facts.
+func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	a, err := s.game.AlmanacOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, a)
+}

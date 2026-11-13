@@ -853,3 +853,24 @@ func TestRoyal(t *testing.T) {
 		t.Fatal("joined an ended tournament")
 	}
 }
+
+func TestAlmanac(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	a, err := w.g.AlmanacOf(ctx, ana)
+	if err != nil || len(a.Facts) != 0 || len(a.Of) == 0 {
+		t.Fatalf("an empty almanac: %+v %v", a, err)
+	}
+	s, _ := w.g.StartTopic(ctx, ana, "general")
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	a, _ = w.g.AlmanacOf(ctx, ana)
+	for _, f := range a.Facts {
+		if f.Fact == "" || f.Answer == "" || f.Category == "" {
+			t.Fatalf("a learned fact: %+v", f)
+		}
+	}
+	if len(a.Facts) == 0 {
+		t.Fatal("ten right answers, and nothing learned")
+	}
+}

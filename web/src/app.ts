@@ -5,6 +5,7 @@ import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { almanac } from "./screens/almanac.ts";
 import { duel, duelOne } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
@@ -26,7 +27,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
   ["/play", "Играй", "play", (p) => /^\/(play|duel|royal|room|r\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/rewards", "Награди", "award", (p) => p === "/rewards"],
-  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|f\/)/.test(p) || p === "/together"],
+  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
 ];
 
 reportErrors();
@@ -83,6 +84,7 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: royal },
+      { path: /^\/almanac$/, view: almanac },
       { path: /^\/room$/, view: () => together("room") },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },

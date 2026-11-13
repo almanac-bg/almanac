@@ -440,6 +440,42 @@
     --i: var(--i-crown);
   }
 
+  /* Моят Алманах: the count, and each fact as a card in its topic's colour. */
+  .almanac-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .almanac-n {
+    font: 900 2.75rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .almanac-list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .almanac-item {
+    display: grid;
+    gap: var(--space-2);
+    border-left: 4px solid var(--tone);
+  }
+
+  .almanac-q {
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+  }
+
+  .almanac-a {
+    font: 800 1.125rem / 1.4 var(--font-sans);
+  }
+
   /* Роял's table: those out are dimmer; how far each got on the right. */
   .royal-table .row.out {
     opacity: 0.62;
@@ -2405,6 +2441,9 @@
 
   .standing .meter-fill {
     background: var(--div);
+  }
+  .almanac-head .meter {
+    grid-column: 1 / -1;
   }
 
   .chips {
