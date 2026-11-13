@@ -44,6 +44,9 @@ var playerErrors = map[error]*apiError{
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
 	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: до 200."},
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
+	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такъв таг."},
+	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
+	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Чакат отговор твърде много покани: до 50."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
 	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави домакинът."},
@@ -55,8 +58,9 @@ var playerErrors = map[error]*apiError{
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти изпратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
-	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 20 букви, цифри или интервали."},
-	account.ErrNameTaken:   {http.StatusConflict, "name_taken", "Това име е заето."},
+	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
+	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Тагът е от 3 до 20 латински букви, цифри или _ и започва с буква."},
+	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Този таг е зает. Опитай друг."},
 }
 
 // apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged.
@@ -240,8 +244,10 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	// Either or both: a new name, a new tag.
 	var in struct {
-		Name string `json:"name"`
+		Name *string `json:"name"`
+		Tag  *string `json:"tag"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -249,8 +255,15 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("rename:"+s.clientIP(r), 20, time.Hour) {
 		return errTooMany
 	}
-	if u.Name, err = s.accounts.Rename(r.Context(), u.ID, in.Name); err != nil {
-		return err
+	if in.Name != nil {
+		if u.Name, err = s.accounts.Rename(r.Context(), u.ID, *in.Name); err != nil {
+			return err
+		}
+	}
+	if in.Tag != nil {
+		if u.Tag, err = s.accounts.Retag(r.Context(), u.ID, *in.Tag); err != nil {
+			return err
+		}
 	}
 	return ok(w, map[string]any{"user": u})
 }

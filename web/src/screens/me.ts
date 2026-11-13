@@ -83,6 +83,7 @@ function head(progress: () => Progress | null): Child {
       "div",
       { class: "me-head-text" },
       h("h1", null, () => user()?.name ?? "Профил"),
+      () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
       () => {
         const p = progress();
         const t = p?.achievements.find((a) => a.id === p.title);
@@ -251,8 +252,10 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
   };
 }
 
+/** Your name (anyone's: names may repeat) and your tag (yours alone: how friends find you). */
 function nameForm(): Child {
   const name = signal(user.peek()?.name ?? "");
+  const tag = signal(user.peek()?.tag ?? "");
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   return h(
@@ -264,9 +267,10 @@ function nameForm(): Child {
         busy.set(true);
         note.set(null);
         try {
-          const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek() });
+          const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek(), tag: tag.peek() });
           user.set(r.user);
           name.set(r.user.name);
+          tag.set(r.user.tag);
           note.set({ text: "Запазено." });
         } catch (err) {
           note.set({ text: (err as ApiError).message, bad: true });
@@ -281,13 +285,45 @@ function nameForm(): Child {
       h("span", null, "Име"),
       h("input", {
         name: "name",
-        autocomplete: "nickname",
+        "aria-label": "Име",
+        "aria-describedby": "name-how",
+        autocomplete: "name",
         minlength: 2,
-        maxlength: 20,
+        maxlength: 30,
         required: true,
         value: name,
         oninput: (e: Event) => name.set((e.target as HTMLInputElement).value),
       }),
+      h("small", { class: "muted", id: "name-how" }, "Както искаш да те виждат — може и истинското ти име."),
+    ),
+    h(
+      "label",
+      { class: "field" },
+      h("span", null, "Таг"),
+      h(
+        "span",
+        { class: "tag-input" },
+        h("span", { "aria-hidden": "true" }, "@"),
+        h("input", {
+          name: "tag",
+          "aria-label": "Таг",
+          "aria-describedby": "tag-how",
+          autocomplete: "username",
+          autocapitalize: "none",
+          spellcheck: false,
+          minlength: 3,
+          maxlength: 20,
+          pattern: "@?[A-Za-z][A-Za-z0-9_]{2,19}",
+          required: true,
+          value: tag,
+          oninput: (e: Event) => tag.set((e.target as HTMLInputElement).value),
+        }),
+      ),
+      h(
+        "small",
+        { class: "muted", id: "tag-how" },
+        "Само твой: по него приятелите те намират. Латински букви, цифри и _.",
+      ),
     ),
     h("button", { class: "btn", disabled: busy }, "Запази"),
     () => {
@@ -336,7 +372,7 @@ function sounds(): Child {
     h(
       "p",
       { class: "muted" },
-      "Кратки звуци при отговор, в последните секунди и при ново ниво. Важи за това устройство.",
+      "Кратки звуци: часовникът, отговорите, новото ниво. Важи за това устройство.",
     ),
     h("button", { class: "btn", type: "button", onclick: () => setSound(!soundOn.peek()) }, () =>
       soundOn() ? "Изключи звуците" : "Включи звуците",

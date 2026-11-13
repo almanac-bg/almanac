@@ -41,6 +41,8 @@ interface RoomView {
 }
 
 interface Player {
+  /** Tells players apart in the room (names may repeat). */
+  key: number;
   name: string;
   points: number;
   rights: number;
@@ -67,7 +69,7 @@ export function room([code = ""]: string[]) {
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full" | "declined" | "expired">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
-  const places = new Map<string, number>();
+  const places = new Map<number, number>();
 
   let es: EventSource | null = null;
   player()
@@ -329,7 +331,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   );
 }
 
-function reveal(view: () => RoomView, first: RoomView, places: Map<string, number>): Child {
+function reveal(view: () => RoomView, first: RoomView, places: Map<number, number>): Child {
   const q = first.question;
   const r = q?.reveal;
   if (!q || !r) return null;
@@ -347,7 +349,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<string, numbe
   // The rank change since the last answer (none in a duel: there are only two places).
   const before = first.duel ? undefined : new Map(places);
   first.players.forEach((p, i) => {
-    places.set(p.name, i + 1);
+    places.set(p.key, i + 1);
   });
   return h(
     "article",
@@ -363,7 +365,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<string, numbe
 }
 
 /** The players by points; after an answer, what it brought each of them and how far they moved. */
-function standings(view: () => RoomView, gains: boolean, before?: Map<string, number>): Child {
+function standings(view: () => RoomView, gains: boolean, before?: Map<number, number>): Child {
   return h("section", { class: "board" }, h("h2", null, "Класиране"), () =>
     h(
       "ol",
@@ -378,7 +380,7 @@ function standings(view: () => RoomView, gains: boolean, before?: Map<string, nu
         if (!p.online) row.classList.add("away");
         if (before?.size) {
           row.classList.add("moves");
-          row.append(move(before.get(p.name), i + 1));
+          row.append(move(before.get(p.key), i + 1));
         }
         return row;
       }),
