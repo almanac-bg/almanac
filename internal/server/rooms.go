@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/room"
 )
 
@@ -20,6 +22,15 @@ func (s *Server) roomOf(r *http.Request) (*room.Room, error) {
 		return nil, room.ErrNoRoom
 	}
 	return s.rooms.Get(code)
+}
+
+// roomPlayer is a player as a room shows them: their name and their look (avatar, title, level).
+func (s *Server) roomPlayer(ctx context.Context, id int64, name string) room.Player {
+	look, err := s.game.LookOf(ctx, id)
+	if err != nil {
+		look = play.Look{Avatar: play.DefaultAvatar(id), Level: 1}
+	}
+	return room.Player{ID: id, Name: name, Look: look}
 }
 
 func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
@@ -36,7 +47,7 @@ func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("room:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
 		return errTooMany
 	}
-	rm, err := s.rooms.Open(room.Player{ID: u.ID, Name: u.Name}, in.Category)
+	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), in.Category)
 	if err != nil {
 		return err
 	}
@@ -53,7 +64,7 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	rm, err := s.roomOf(r)
 	if err == nil {
-		err = rm.Join(room.Player{ID: u.ID, Name: u.Name})
+		err = rm.Join(s.roomPlayer(r.Context(), u.ID, u.Name))
 	}
 	var sub *room.Sub
 	if err == nil {
@@ -179,7 +190,7 @@ func (s *Server) duel(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &struct{}{}); err != nil {
 		return err
 	}
-	code, err := s.rooms.Match(r.Context(), room.Player{ID: u.ID, Name: u.Name}, s.duelWait)
+	code, err := s.rooms.Match(r.Context(), s.roomPlayer(r.Context(), u.ID, u.Name), s.duelWait)
 	if err != nil {
 		return err
 	}

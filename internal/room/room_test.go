@@ -68,7 +68,7 @@ func answer(r *Room, right bool) json.RawMessage {
 func TestAGamePlayedTogether(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		ana, bo := Player{1, "Ана"}, Player{2, "Бо"}
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, err := hub.Open(ana, "")
 		if err != nil {
 			t.Fatal(err)
@@ -151,10 +151,10 @@ func TestAGamePlayedTogether(t *testing.T) {
 func TestScreensHearOfChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		r, _ := hub.Open(Player{1, "Ана"}, "history")
+		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "history")
 		s, _ := r.Follow(1)
 		<-s.C // following is a change
-		_ = r.Join(Player{2, "Бо"})
+		_ = r.Join(Player{ID: 2, Name: "Бо"})
 		select {
 		case <-s.C:
 		default:
@@ -172,16 +172,16 @@ func TestScreensHearOfChanges(t *testing.T) {
 
 func TestRoomsLimits(t *testing.T) {
 	hub := NewHub(sample(t))
-	if _, err := hub.Open(Player{1, "Ана"}, "astrology"); !errors.Is(err, play.ErrNoTopic) {
+	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, "astrology"); !errors.Is(err, play.ErrNoTopic) {
 		t.Fatalf("an unknown topic: %v", err)
 	}
-	r, _ := hub.Open(Player{1, "Ана"}, "")
+	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "")
 	for i := range MaxPlayers - 1 {
-		if err := r.Join(Player{int64(i + 2), "Играч"}); err != nil {
+		if err := r.Join(Player{ID: int64(i + 2), Name: "Играч"}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := r.Join(Player{999, "Още един"}); !errors.Is(err, ErrFull) {
+	if err := r.Join(Player{ID: 999, Name: "Още един"}); !errors.Is(err, ErrFull) {
 		t.Fatalf("player %d: %v", MaxPlayers+1, err)
 	}
 	if err := r.Answer(1, 0, json.RawMessage(`{"pick":0}`)); !errors.Is(err, ErrNotNow) {
@@ -196,7 +196,7 @@ func TestTwoPeopleDuel(t *testing.T) {
 		var kept []play.Duel
 		hub.Kept = func(d play.Duel) { mu.Lock(); kept = append(kept, d); mu.Unlock() }
 		codes := make(chan string, 2)
-		for _, p := range []Player{{1, "Ана"}, {2, "Бо"}} {
+		for _, p := range []Player{{ID: 1, Name: "Ана"}, {ID: 2, Name: "Бо"}} {
 			go func() {
 				code, err := hub.Match(t.Context(), p, 15*time.Second)
 				if err != nil {
@@ -210,7 +210,7 @@ func TestTwoPeopleDuel(t *testing.T) {
 			t.Fatalf("matched into %q and %q", a, b)
 		}
 		r, _ := hub.Get(a)
-		if err := r.Join(Player{3, "Трети"}); !errors.Is(err, ErrFull) {
+		if err := r.Join(Player{ID: 3, Name: "Трети"}); !errors.Is(err, ErrFull) {
 			t.Fatalf("a third joined a duel: %v", err)
 		}
 		sa, _ := r.Follow(1)
@@ -272,7 +272,7 @@ func TestADuelAgainstARecording(t *testing.T) {
 		var kept []play.Duel
 		hub.Kept = func(d play.Duel) { kept = append(kept, d) }
 
-		code, err := hub.Match(t.Context(), Player{1, "Ана"}, 15*time.Second)
+		code, err := hub.Match(t.Context(), Player{ID: 1, Name: "Ана"}, 15*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -308,7 +308,7 @@ func TestNobodyToDuel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		hub.Recording = func(context.Context, int64) (*play.Recording, error) { return nil, nil }
-		if _, err := hub.Match(t.Context(), Player{1, "Ана"}, 15*time.Second); !errors.Is(err, ErrNobody) {
+		if _, err := hub.Match(t.Context(), Player{ID: 1, Name: "Ана"}, 15*time.Second); !errors.Is(err, ErrNobody) {
 			t.Fatalf("with nobody about: %v", err)
 		}
 	})
@@ -320,7 +320,7 @@ func TestADuelBetweenFriends(t *testing.T) {
 		var mu sync.Mutex
 		var kept []play.Duel
 		hub.Kept = func(d play.Duel) { mu.Lock(); kept = append(kept, d); mu.Unlock() }
-		ana, bo := Player{1, "Ана"}, Player{2, "Бо"}
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, err := hub.Invite(ana, bo)
 		if err != nil {
 			t.Fatal(err)
@@ -336,7 +336,7 @@ func TestADuelBetweenFriends(t *testing.T) {
 		if again, _ := hub.Invite(ana, bo); again != r {
 			t.Fatal("asking again opened a second duel")
 		}
-		if err := r.Join(Player{3, "Трети"}); !errors.Is(err, ErrFull) {
+		if err := r.Join(Player{ID: 3, Name: "Трети"}); !errors.Is(err, ErrFull) {
 			t.Fatalf("a third joined a friends' duel: %v", err)
 		}
 		if v := r.View(1); v.Phase != Lobby || !v.Invite || !v.Duel {

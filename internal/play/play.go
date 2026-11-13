@@ -61,8 +61,6 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
-	// Finished, if set, hears of every run that ends (after it's kept).
-	Finished func(runID int64)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -331,8 +329,9 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		res.State, err = g.state(tx, r)
 		return err
 	})
-	if err == nil && finished && g.Finished != nil {
-		go g.Finished(runID)
+	if err == nil && finished {
+		// Before the answer goes back, so that the screen with the result can tell of what it earned.
+		_, err = g.Award(ctx, userID)
 	}
 	return res, err
 }

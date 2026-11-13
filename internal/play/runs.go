@@ -164,6 +164,7 @@ type Score struct {
 	Rights int    `json:"rights"`
 	Ms     int64  `json:"ms"`
 	Me     bool   `json:"me,omitempty"`
+	Look
 }
 
 // Board is a day's results: the best, and the viewer's place among everyone.
@@ -184,7 +185,8 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	if err != nil {
 		return b, err
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, r.points, r.rights, r.ms FROM runs r JOIN users u ON u.id = r.user_id
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, r.points, r.rights, r.ms, `+lookColumns+`
+		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL ORDER BY r.points DESC, r.ms, r.id LIMIT 20`, day)
 	if err != nil {
 		return b, err
@@ -193,10 +195,13 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	for rows.Next() {
 		var id int64
 		var s Score
-		if err := rows.Scan(&id, &s.Name, &s.Points, &s.Rights, &s.Ms); err != nil {
+		var avatar, title string
+		var points int
+		if err := rows.Scan(&id, &s.Name, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &points); err != nil {
 			return b, err
 		}
 		s.Me = id == viewer
+		s.Look = lookOf(id, avatar, title, points)
 		b.Top = append(b.Top, s)
 	}
 	if err := rows.Err(); err != nil || viewer == 0 {
@@ -204,9 +209,13 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	}
 	var mine Score
 	var runID int64
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, r.points, r.rights, r.ms FROM runs r JOIN users u ON u.id = r.user_id
+	var avatar, title string
+	var points int
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, r.points, r.rights, r.ms, `+lookColumns+`
+		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&runID, &mine.Name, &mine.Points, &mine.Rights, &mine.Ms)
+		Scan(&runID, &mine.Name, &mine.Points, &mine.Rights, &mine.Ms, &avatar, &title, &points)
+	mine.Look = lookOf(viewer, avatar, title, points)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}
@@ -282,8 +291,8 @@ func Merge(tx *sql.Tx, from, to int64) error {
 	if err != nil {
 		return err
 	}
-	// The guest's friends become the account's (the two aren't friends with themselves), and duels against the guest
-	// count against the account.
+	// The guest's friends become the account's (the two aren't friends with themselves), duels against the guest
+	// count against the account, and the guest's achievements and look come along.
 	for _, q := range []struct {
 		sql  string
 		args []any
@@ -294,6 +303,11 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
+		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
+		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen) SELECT ?, id, at, seen FROM achievements WHERE user_id = ?`,
+			[]any{to, from}},
+		{`UPDATE users SET avatar = coalesce(avatar, (SELECT avatar FROM users WHERE id = ?)),
+			title = coalesce(title, (SELECT title FROM users WHERE id = ?)) WHERE id = ?`, []any{from, from, to}},
 	} {
 		if _, err := tx.Exec(q.sql, q.args...); err != nil {
 			return err

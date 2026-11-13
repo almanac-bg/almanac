@@ -1,5 +1,6 @@
 // Игра: questions by topic, as many as you like, shaped by how well you know the topic.
 
+import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
@@ -82,6 +83,7 @@ export function topic([id = ""]: string[]) {
       summary(
         s,
         null,
+        news(),
         h(
           "div",
           { class: "actions" },

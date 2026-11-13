@@ -95,6 +95,13 @@ func (g *Game) Befriend(ctx context.Context, userID int64, code string) (id int6
 			userID, id, now, id, userID, now)
 		return err
 	})
+	if err == nil {
+		for _, who := range []int64{userID, id} {
+			if _, err := g.Award(ctx, who); err != nil {
+				return id, name, err
+			}
+		}
+	}
 	return id, name, err
 }
 
@@ -121,6 +128,7 @@ type Friend struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Since int64  `json:"since"`
+	Look
 	Today *Score `json:"today,omitempty"` // their day's questions, once finished
 	// The duels between the two, from the player's side.
 	Won   int `json:"won"`
@@ -131,7 +139,7 @@ type Friend struct {
 // FriendsOf lists a player's friends: those who've played today first, best first, then the rest by name.
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, f.since, r.points, r.rights, r.ms
+	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, f.since, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
 		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL
 		WHERE f.user_id = ?`, g.Today(), userID)
@@ -143,10 +151,13 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	for rows.Next() {
 		var f Friend
 		var points, rights, ms sql.NullInt64
-		if err := rows.Scan(&f.ID, &f.Name, &f.Since, &points, &rights, &ms); err != nil {
+		var avatar, title string
+		var total int
+		if err := rows.Scan(&f.ID, &f.Name, &f.Since, &points, &rights, &ms, &avatar, &title, &total); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		f.Look = lookOf(f.ID, avatar, title, total)
 		if points.Valid {
 			f.Today = &Score{Name: f.Name, Points: int(points.Int64), Rights: int(rights.Int64), Ms: ms.Int64}
 		}
@@ -200,11 +211,11 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
 // Empty while none of their friends has.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.name, r.points, r.rights, r.ms, u.id = ? FROM runs r
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, r.points, r.rights, r.ms, `+lookColumns+` FROM runs r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL
 		AND (r.user_id = ? OR r.user_id IN (SELECT friend_id FROM friends WHERE user_id = ?))
-		ORDER BY r.points DESC, r.ms, r.id`, userID, day, userID, userID)
+		ORDER BY r.points DESC, r.ms, r.id`, day, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,9 +224,13 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 	others := false
 	for rows.Next() {
 		var s Score
-		if err := rows.Scan(&s.Name, &s.Points, &s.Rights, &s.Ms, &s.Me); err != nil {
+		var id int64
+		var avatar, title string
+		var total int
+		if err := rows.Scan(&id, &s.Name, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
+		s.Me, s.Look = id == userID, lookOf(id, avatar, title, total)
 		others = others || !s.Me
 		board = append(board, s)
 	}

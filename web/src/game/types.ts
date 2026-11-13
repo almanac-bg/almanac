@@ -112,6 +112,9 @@ export interface Score {
   rights: number;
   ms: number;
   me?: boolean;
+  avatar?: string;
+  title?: string;
+  level?: number;
 }
 
 export interface Board {

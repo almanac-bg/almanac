@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -490,3 +491,82 @@ func TestFriends(t *testing.T) {
 		t.Fatalf("still friends: %+v", list)
 	}
 }
+
+func TestProgress(t *testing.T) {
+	for _, c := range []struct{ points, level, from, to int }{
+		{0, 1, 0, 1000}, {999, 1, 0, 1000}, {1000, 2, 1000, 2500}, {2499, 2, 1000, 2500}, {2500, 3, 2500, 4500},
+	} {
+		if l, f, to := LevelOf(c.points); l != c.level || f != c.from || to != c.to {
+			t.Fatalf("LevelOf(%d) = %d %d %d", c.points, l, f, to)
+		}
+	}
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	p, err := w.g.ProgressOf(ctx, ana)
+	if err != nil || p.Level != 1 || p.Avatar != DefaultAvatar(ana) || len(p.Achievements) != len(Achievements) ||
+		p.Achievements[0].At != 0 {
+		t.Fatalf("a new player's progress: %+v %v", p, err)
+	}
+	for _, s := range p.Shapes {
+		if locked := slices.Contains(Unlockable, s.Shape); s.Locked != locked || (locked && s.How == "") {
+			t.Fatalf("a new player's shape %+v", s)
+		}
+	}
+	if err := w.g.SetLook(ctx, ana, ptr("star-gold"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a locked shape: %v", err)
+	}
+
+	// A perfect day: the achievements come with the last answer, and a level with the points.
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	n, err := w.g.NewsOf(ctx, ana)
+	ids := []string{}
+	for _, a := range n.Achievements {
+		ids = append(ids, a.ID)
+	}
+	if err != nil || !slices.Contains(ids, "perfect") || !n.LevelUp || n.Level != 2 || n.From != 1000 {
+		t.Fatalf("news after a perfect day: %+v %v", n, err)
+	}
+	if again, _ := w.g.NewsOf(ctx, ana); len(again.Achievements) != 0 || again.LevelUp {
+		t.Fatalf("the same news twice: %+v", again)
+	}
+
+	// What's earned may be worn; what isn't, can't.
+	for _, c := range []struct {
+		avatar, title *string
+		ok            bool
+	}{
+		{ptr("star-gold"), ptr("perfect"), true},
+		{ptr("crown-gold"), nil, false},
+		{ptr("star-black"), nil, false},
+		{ptr("bogus"), nil, false},
+		{nil, ptr("duel1"), false},
+		{nil, ptr("nosuch"), false},
+	} {
+		if err := w.g.SetLook(ctx, ana, c.avatar, c.title); (err == nil) != c.ok {
+			t.Fatalf("SetLook(%v, %v): %v", c.avatar, c.title, err)
+		}
+	}
+	b, _ := w.g.BoardOf(ctx, w.g.Today(), ana)
+	if top := b.Top[0]; top.Avatar != "star-gold" || top.Title != "Десет от десет" || top.Level < 2 {
+		t.Fatalf("the board shows %+v", top)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("")); err != nil {
+		t.Fatal(err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" || look.Avatar != "star-gold" {
+		t.Fatalf("after taking the title off: %+v", look)
+	}
+
+	// A guest who signs in brings what they earned.
+	vi := w.user()
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, ana, vi) }); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := w.g.ProgressOf(ctx, vi); p.Avatar != "star-gold" || !slices.ContainsFunc(p.Achievements, func(e Earned) bool { return e.ID == "perfect" && e.At > 0 }) {
+		t.Fatalf("after the merge: %+v", p)
+	}
+}
+
+func ptr(s string) *string { return &s }
