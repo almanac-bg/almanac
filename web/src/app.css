@@ -132,6 +132,13 @@
     --i-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5l7 10H5z'/%3E%3C/svg%3E");
     --i-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19L5 9h14z'/%3E%3C/svg%3E");
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
+    --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z'/%3E%3C/svg%3E");
+    --i-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5.5v13l10.5-6.5z'/%3E%3C/svg%3E");
+    --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 20h18'/%3E%3Cpath d='M5 20v-6h4.5v6'/%3E%3Cpath d='M9.5 20V8.5h5V20'/%3E%3Cpath d='M14.5 20v-4H19v4'/%3E%3C/svg%3E");
+    --i-award: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z'/%3E%3Cpath d='M8.7 13.5 7 20.5l5-2.6 5 2.6-1.7-7'/%3E%3C/svg%3E");
+    --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'/%3E%3Cpath d='M4.5 20.5a7.5 7.5 0 0 1 15 0'/%3E%3C/svg%3E");
+    --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5'/%3E%3Cpath d='M18.5 14.5a6.5 6.5 0 0 1 3 5.5'/%3E%3C/svg%3E");
+    --i-bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 2.5 5 13.5h6.5l-1 8L19 10.5h-6.5z'/%3E%3C/svg%3E");
 
     /* Avatar shapes: masks, drawn in the ink that sits on a tone. */
     --s-petal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c4.4 4.3 6.5 8 6.5 11a6.5 6.5 0 0 1-13 0c0-3 2.1-6.7 6.5-11z'/%3E%3C/svg%3E");
@@ -207,7 +214,7 @@
     max-width: 40rem;
     margin: 0 auto;
     padding: max(var(--space-2), env(safe-area-inset-top)) max(var(--space-4), env(safe-area-inset-right))
-      calc(var(--space-7) + env(safe-area-inset-bottom)) max(var(--space-4), env(safe-area-inset-left));
+      calc(var(--space-7) + 4rem + env(safe-area-inset-bottom)) max(var(--space-4), env(safe-area-inset-left));
   }
 
   h1,
@@ -323,6 +330,198 @@
     text-decoration: none;
   }
 
+  /* The five main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
+  .tabs {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
+      max(var(--space-2), env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .tabs a {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    padding: 6px 0 4px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font: 700 0.6875rem / 1rem var(--font-sans);
+    text-decoration: none;
+  }
+
+  .tabs .i {
+    font-size: 1.375rem;
+  }
+
+  .tabs a:hover,
+  .tabs a[aria-current="page"] {
+    color: var(--text);
+  }
+
+  .tabs a[aria-current="page"] .i {
+    color: var(--gold);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gold) 60%, transparent));
+  }
+
+  .tabs a:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  /* Something waits there: a friend calls to a duel, someone asks to be friends. */
+  .tabs a.news::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: calc(50% + 8px);
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--rose);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  .i-home {
+    --i: var(--i-home);
+  }
+
+  .i-play {
+    --i: var(--i-play);
+  }
+
+  .i-podium {
+    --i: var(--i-podium);
+  }
+
+  .i-award {
+    --i: var(--i-award);
+  }
+
+  .i-user {
+    --i: var(--i-user);
+  }
+
+  .i-users {
+    --i: var(--i-users);
+  }
+
+  .i-bolt {
+    --i: var(--i-bolt);
+  }
+
+  /* The ways to play: a card each, in its colour. */
+  .modes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mode {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    height: 100%;
+    padding: var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 60%),
+      var(--surface);
+    box-shadow: var(--elev-1);
+    color: var(--text);
+    text-decoration: none;
+    transition:
+      transform 120ms ease,
+      border-color 160ms ease;
+  }
+
+  .mode:hover {
+    border-color: var(--tone);
+    transform: translateY(-1px);
+  }
+
+  .mode:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .mode-icon {
+    margin-bottom: var(--space-2);
+    color: var(--tone);
+    font-size: 1.5rem;
+  }
+
+  .mode-name {
+    font: 900 1.25rem / 1.5rem var(--font-sans);
+  }
+
+  .mode-about {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  /* A card that is a link to a place: words on the left, a peek on the right. */
+  .link-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .link-card:hover {
+    border-color: var(--line-strong);
+  }
+
+  .link-card-text {
+    display: grid;
+    gap: 2px;
+  }
+
+  /* A list of places to go, as rows. */
+  .menu {
+    display: grid;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--line);
+  }
+
+  .menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 3.25rem;
+    padding: 0 var(--space-4);
+    color: var(--text);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .menu a + a {
+    border-top: 1px solid var(--line);
+  }
+
+  .menu a::after {
+    content: "›";
+    color: var(--text-muted);
+    font-size: 1.25rem;
+  }
+
   .mark {
     display: block;
     flex: none;
@@ -330,44 +529,6 @@
     height: 32px;
     border-radius: 8px;
     box-shadow: 0 0 0 1px var(--line);
-  }
-
-  .top nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin: 0 calc(-1 * var(--space-2));
-  }
-
-  .top nav a {
-    position: relative;
-    padding: var(--space-2) 10px;
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-    font-size: 0.9375rem;
-    line-height: 1.25rem;
-    font-weight: 700;
-    text-decoration: none;
-  }
-
-  .top nav a:hover {
-    color: var(--text);
-  }
-
-  .top nav a[aria-current="page"] {
-    color: var(--text);
-  }
-
-  .top nav a[aria-current="page"]::after {
-    content: "";
-    position: absolute;
-    right: 10px;
-    bottom: 1px;
-    left: 10px;
-    height: 3px;
-    border-radius: 3px;
-    background: var(--gold);
-    box-shadow: 0 0 10px -1px var(--gold);
   }
 
   .screen,
@@ -2237,6 +2398,16 @@
     color: var(--line-strong);
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tier, var(--line)) 55%, transparent);
   }
+  .badges-peek {
+    display: flex;
+  }
+
+  .badges-peek .badge-mark {
+    width: 32px;
+    height: 32px;
+    margin-left: -8px;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
 
   .tier {
     display: grid;
@@ -2620,19 +2791,6 @@
     white-space: nowrap;
   }
 
-  /* Something waits on that screen (a friend calls to a duel). */
-  .top nav a.news::before {
-    content: "";
-    position: absolute;
-    top: 6px;
-    right: 2px;
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
-    background: var(--rose);
-    box-shadow: 0 0 0 2px var(--bg);
-  }
-
   /* ---- Rooms ---- */
 
   .code-big {
@@ -2868,6 +3026,57 @@
 
     .top {
       margin-bottom: var(--space-6);
+    }
+  }
+
+  /* A big screen: the five places sit in the header, beside the name. */
+  @media (min-width: 48rem) {
+    #app {
+      padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+    }
+
+    .tabs {
+      position: static;
+      display: flex;
+      gap: var(--space-1);
+      margin: 0 calc(-1 * var(--space-2));
+      padding: 0;
+      border: 0;
+      background: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .tabs a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: var(--space-2) 10px;
+      font-size: 0.9375rem;
+      line-height: 1.25rem;
+    }
+
+    .tabs .i {
+      font-size: 1.125rem;
+    }
+
+    .tabs a[aria-current="page"]::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      bottom: 1px;
+      left: 10px;
+      height: 3px;
+      border-radius: 3px;
+      background: var(--gold);
+      box-shadow: 0 0 10px -1px var(--gold);
+    }
+
+    .tabs a.news::before {
+      top: 6px;
+      left: auto;
+      right: 2px;
+      box-shadow: 0 0 0 2px var(--bg);
     }
   }
 }

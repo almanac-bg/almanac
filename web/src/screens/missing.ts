@@ -29,6 +29,6 @@ export function challengeGone() {
         "Сега се играе с приятели: добави ги и се канете на дуел, на живо. А днешните въпроси сравнявате всеки ден.",
       ),
     ),
-    h("a", { class: "btn primary", href: "/together" }, "Към Заедно"),
+    h("a", { class: "btn primary", href: "/duel" }, "Към дуелите"),
   );
 }

@@ -9,10 +9,11 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
 import { level, levelBadge, meter, questions, toneOf } from "../ui.ts";
+import { modes } from "./modes.ts";
 import { loadStats, type Stats, type TopicStats } from "./stats.ts";
 
 export function topics() {
-  title("Игра");
+  title("Играй");
   const stats = signal<Stats | null>(null);
   if (user.peek()) loadStats().then(stats.set, () => {});
   return h(
@@ -24,11 +25,13 @@ export function topics() {
       h(
         "div",
         { class: "title-row" },
-        h("h1", null, "Игра"),
+        h("h1", null, "Играй"),
         h("a", { class: "btn primary inline", href: "/play/all" }, "Всички теми"),
       ),
       h("p", { class: "lead" }, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
     ),
+    modes(["duel", "room"], "С други"),
+    h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.topics ?? [];
       return categories.map((c) =>

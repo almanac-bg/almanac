@@ -1,4 +1,5 @@
-// Заедно: playing at the same time, in one room — on everyone's phone, around a table or across a classroom.
+// Playing with others: Дуел (one against one) and Стая (a room for many at once — on everyone's phone, around a
+// table or across a classroom).
 
 import { findDuel } from "../game/duel.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -9,8 +10,8 @@ import { toneOf } from "../ui.ts";
 import { friendsCard } from "./friends.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-export function together() {
-  title("Заедно");
+export function together(screen: "duel" | "room") {
+  title(screen === "duel" ? "Дуел" : "Стая");
   const error = signal("");
   const code = signal("");
   const record = signal<Stats | null>(null);
@@ -37,25 +38,31 @@ export function together() {
         name,
       ),
     );
+  if (screen === "duel")
+    return h(
+      "section",
+      { class: "screen" },
+      h("h1", null, "Дуел"),
+      h(
+        "section",
+        { class: "card hero" },
+        h("div", { class: "card-head" }, h("h2", null, "Дуел"), () => {
+          const s = record();
+          return s && s.duels > 0 ? h("span", { class: "tag rose" }, `Победи: ${s.won} от ${s.duels}`) : null;
+        }),
+        h(
+          "p",
+          { class: "muted" },
+          "Ти срещу някого, сега: десет въпроса от всички теми. Ако в момента никой друг не търси, играеш срещу запис на истинска игра.",
+        ),
+        findDuel(),
+      ),
+      friendsCard(),
+    );
   return h(
     "section",
     { class: "screen" },
-    h("h1", null, "Заедно"),
-    h(
-      "section",
-      { class: "card hero" },
-      h("div", { class: "card-head" }, h("h2", null, "Дуел"), () => {
-        const s = record();
-        return s && s.duels > 0 ? h("span", { class: "tag rose" }, `Победи: ${s.won} от ${s.duels}`) : null;
-      }),
-      h(
-        "p",
-        { class: "muted" },
-        "Ти срещу някого, сега: десет въпроса от всички теми. Ако в момента никой друг не търси, играеш срещу запис на истинска игра.",
-      ),
-      findDuel(),
-    ),
-    friendsCard(),
+    h("h1", null, "Стая"),
     h(
       "section",
       { class: "card" },

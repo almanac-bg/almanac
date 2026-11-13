@@ -6,11 +6,11 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   test.setTimeout(180_000);
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
-  await host.goto("/together");
+  await host.goto("/room");
   await host.getByRole("button", { name: "История" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
-  await guest.goto("/together");
+  await guest.goto("/room");
   await guest.getByLabel("Код на стаята").fill(code);
   await guest.getByRole("button", { name: "Влез" }).click();
   await expect(host.locator(".players li")).toHaveCount(2);
@@ -38,7 +38,7 @@ test("two people asking for a duel play each other", async ({ browser }, info) =
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   const find = async (p: Page) => {
-    await p.goto("/together");
+    await p.goto("/duel");
     await p.getByRole("button", { name: "Намери съперник" }).click();
   };
   await Promise.all([find(a), find(b)]);

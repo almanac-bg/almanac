@@ -47,7 +47,7 @@ export function invite([code = ""]: string[]) {
           )
         : null,
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
-      h("a", { class: "btn", href: "/together" }, "Към Заедно"),
+      h("a", { class: "btn", href: "/friends" }, "Към приятелите"),
     );
 
   const accept = async () => {
@@ -110,7 +110,7 @@ export function invite([code = ""]: string[]) {
           { class: "screen" },
           h("h1", null, "Тази покана я няма"),
           h("p", { class: "lead" }, err.message),
-          h("a", { class: "btn primary", href: "/together" }, "Към Заедно"),
+          h("a", { class: "btn primary", href: "/friends" }, "Към приятелите"),
         ),
       ),
   );

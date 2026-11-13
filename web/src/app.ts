@@ -1,23 +1,30 @@
-// АЛМАНАХ's web client: the mark and the name, four links, and the screen the router puts under them.
+// АЛМАНАХ's web client: the mark and the name, the five main places (in the header on a big screen, a bar at the
+// bottom of a phone's), and the screen the router puts under them.
 
 import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { topic, topics } from "./screens/play.ts";
+import { ranks } from "./screens/ranks.ts";
+import { rewards } from "./screens/rewards.ts";
 import { room } from "./screens/room.ts";
+import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { together } from "./screens/together.ts";
 import { friendRequests, invitations, watchInvitations } from "./state.ts";
 
-const links: [href: string, label: string, here: (p: string) => boolean][] = [
-  ["/", "Днес", (p) => p === "/"],
-  ["/play", "Игра", (p) => p.startsWith("/play")],
-  ["/together", "Заедно", (p) => p === "/together" || p.startsWith("/r/") || p.startsWith("/f/")],
-  ["/me", "Профил", (p) => p === "/me"],
+/** The five main places: where each goes, its name and icon, and which paths are part of it. */
+const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
+  ["/", "Начало", "home", (p) => p === "/"],
+  ["/play", "Играй", "play", (p) => /^\/(play|duel|room|r\/)/.test(p)],
+  ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
+  ["/rewards", "Награди", "award", (p) => p === "/rewards"],
+  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|f\/)/.test(p) || p === "/together"],
 ];
 
 reportErrors();
@@ -37,25 +44,25 @@ if (root) {
       ),
       h(
         "nav",
-        { "aria-label": "Основно" },
-        links.map(([href, label, here]) =>
+        { class: "tabs", "aria-label": "Основно" },
+        links.map(([href, label, icon, here]) =>
           h(
             "a",
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // A friend calls to a duel, or someone asks to be friends: a dot on Заедно, where they wait.
-              class: href === "/together" ? () => (invitations().length || friendRequests() ? "news" : "") : undefined,
+              // A friend calls to a duel: a dot on Играй; someone asks to be friends: a dot on Профил.
+              class: () =>
+                (href === "/play" && invitations().length) || (href === "/me" && friendRequests()) ? "news" : "",
             },
-            label,
-            href === "/together"
-              ? () =>
-                  invitations().length
-                    ? h("span", { class: "sr" }, " (покана за дуел)")
-                    : friendRequests()
-                      ? h("span", { class: "sr" }, " (покана за приятелство)")
-                      : null
-              : null,
+            h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
+            h("span", { class: "tab-label" }, label),
+            () =>
+              href === "/play" && invitations().length
+                ? h("span", { class: "sr" }, " (покана за дуел)")
+                : href === "/me" && friendRequests()
+                  ? h("span", { class: "sr" }, " (покана за приятелство)")
+                  : null,
           ),
         ),
       ),
@@ -69,7 +76,14 @@ if (root) {
       { path: /^\/play$/, view: topics },
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
-      { path: /^\/together$/, view: together },
+      { path: /^\/duel$/, view: () => together("duel") },
+      { path: /^\/room$/, view: () => together("room") },
+      { path: /^\/ranks$/, view: ranks },
+      { path: /^\/rewards$/, view: rewards },
+      { path: /^\/friends$/, view: friends },
+      { path: /^\/settings$/, view: settings },
+      // Where friends were before: a link in an old notification still lands somewhere that makes sense.
+      { path: /^\/together$/, view: friends },
       { path: /^\/r\/([0-9]{6})$/, view: room },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/me$/, view: me },
