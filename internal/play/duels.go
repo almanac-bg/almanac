@@ -249,7 +249,7 @@ func (g *Game) drawFor(tx *sql.Tx, userID int64) ([]Pick, error) {
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), "", skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), "", skill, Settings{}, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
@@ -278,15 +278,17 @@ type recorded struct {
 	picks []Pick
 }
 
-// recordedRun is another player's finished run of ten questions, all still in the bank, among the latest: the one
-// with the fewest the player has seen. Nil if there's none.
+// recordedRun is another player's finished standard run of ten questions (none with settings of its own: not only
+// easy ones, or only true-or-not), all still in the bank, among the latest: the one with the fewest the player has
+// seen. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	seen, err := seenBy(tx, userID)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(`SELECT id, questions FROM runs WHERE kind IN ('topic', 'duel', 'day') AND finished_at IS NOT NULL
-		AND user_id <> ? AND json_array_length(questions) = ? ORDER BY finished_at DESC LIMIT 200`, userID, Length)
+		AND settings IS NULL AND user_id <> ? AND json_array_length(questions) = ? ORDER BY finished_at DESC LIMIT 200`,
+		userID, Length)
 	if err != nil {
 		return nil, err
 	}
