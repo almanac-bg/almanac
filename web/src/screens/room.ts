@@ -11,6 +11,7 @@ import type { Answer, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
+import { play } from "../lib/sound.ts";
 import { categories, player } from "../state.ts";
 import { avatar, fact, type VerdictKind, verdict } from "../ui.ts";
 
@@ -280,6 +281,7 @@ function head(v: RoomView): Child {
 function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
+  if (first.n === 0) play("ping"); // the game (or the duel) starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const left = signal(Math.ceil(q.leftMs / 1000));
@@ -339,6 +341,7 @@ function reveal(view: () => RoomView, code: string, first: RoomView, places: Map
         : r.points > 0
           ? "partial"
           : "wrong";
+  play(kind);
   // The rank change since the last answer (none in a duel: there are only two places).
   const before = first.duel ? undefined : new Map(places);
   first.players.forEach((p, i) => {

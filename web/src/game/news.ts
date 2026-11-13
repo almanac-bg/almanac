@@ -3,6 +3,7 @@
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { play } from "../lib/sound.ts";
 import { type AchievementInfo, badge, meter } from "../ui.ts";
 
 interface News {
@@ -18,7 +19,18 @@ interface News {
  * moment after it ends). */
 export function news(delay = 0): Child {
   const data = signal<News | null>(null);
-  const t = setTimeout(() => api<News>("POST", "/api/me/news", {}).then(data.set, () => {}), delay);
+  const t = setTimeout(
+    () =>
+      api<News>("POST", "/api/me/news", {}).then(
+        (n) => {
+          data.set(n);
+          if (n.levelUp) play("level");
+          if (n.achievements.length) setTimeout(() => play("achievement"), n.levelUp ? 700 : 0);
+        },
+        () => {},
+      ),
+    delay,
+  );
   onCleanup(() => clearTimeout(t));
   return () => {
     const n = data();

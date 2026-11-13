@@ -12,4 +12,9 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.getByRole("button", { name: "Луна", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Корона, заключена" }).click();
   await expect(page.getByText("Короната се отключва на ниво 10.")).toBeVisible();
+
+  // Sounds are on until turned off, and stay off on this device.
+  await page.getByRole("button", { name: "Изключи звуците" }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Включи звуците" })).toBeVisible();
 });

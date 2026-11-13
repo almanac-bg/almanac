@@ -2,7 +2,8 @@
 // the score; this shows them.
 
 import { type ApiError, api } from "../lib/api.ts";
-import { append, type Child, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
 import { fact, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
@@ -103,6 +104,11 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
       bar.style.transform = "scaleX(0)";
     }),
   );
+  // The last five seconds tick (while the question waits for an answer).
+  effect(() => {
+    const n = left();
+    if (n > 0 && n <= 5 && !locked.peek()) play("tick");
+  });
   // Once answered, the bar stops where it is.
   const freeze = () => {
     const now = getComputedStyle(bar).transform;
@@ -154,15 +160,22 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     const now = trail(res.state.trail, s.total);
     progress.replaceWith(now);
     progress = now;
+    const kind = kindOf(res, answer);
+    play(kind);
     append(after, [
-      verdict(kindOf(res, answer), res.points),
+      verdict(kind, res.points),
       res.reveal.fact ? fact(res.reveal.fact) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
       h(
         "button",
         {
           class: "btn primary big next",
-          onclick: res.state.done ? reload : next,
+          onclick: res.state.done
+            ? () => {
+                play("end");
+                reload();
+              }
+            : next,
           ref: (el) =>
             requestAnimationFrame(() => {
               el.focus({ preventScroll: true });

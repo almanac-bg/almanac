@@ -2,6 +2,7 @@
 
 import { api } from "./lib/api.ts";
 import { signal } from "./lib/dom.ts";
+import { play } from "./lib/sound.ts";
 
 export interface User {
   id: number;
@@ -55,7 +56,9 @@ export function watchInvitations(): void {
   const check = async () => {
     if (!user.peek() || document.hidden) return;
     try {
-      invitations.set((await api<{ invites: Invitation[] }>("GET", "/api/friends/invites")).invites);
+      const now = (await api<{ invites: Invitation[] }>("GET", "/api/friends/invites")).invites;
+      if (now.some((i) => !invitations.peek().some((was) => was.code === i.code))) play("ping");
+      invitations.set(now);
     } catch {
       // Offline for a moment: the next look will tell.
     }

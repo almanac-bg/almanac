@@ -3,6 +3,7 @@
 import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
+import { prepareSound } from "./lib/sound.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
@@ -71,4 +72,5 @@ if (root) {
     missing,
   );
   watchInvitations();
+  prepareSound();
 }

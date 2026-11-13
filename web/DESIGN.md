@@ -154,6 +154,21 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Reduced motion:** under `prefers-reduced-motion` the pop, the shake, the rise and the transitions stop. The timer
   still moves, because it is information.
 
+## Sound
+
+- **Tones made in the browser** (`web/src/lib/sound.ts`): there are no files to load. Each sound is a few notes,
+  quiet, and over in under half a second.
+- **One sound per moment**, and only for game moments:
+  - `tap` when an answer is given;
+  - `right`, `exact`, `partial`, `wrong` or `time` with the verdict;
+  - `tick` in each of the last five seconds;
+  - `end` when a run's result opens;
+  - `level` and `achievement` with the news;
+  - `ping` when a game or a duel starts, or a friend calls to a duel.
+- **Nothing plays** for navigation, hovering or decoration.
+- **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
+  player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
+
 ## Icons and the logo
 
 - **Icons:** no icon font and no emoji. Icons are CSS masks drawn in `currentColor`: `--i-check`, `--i-cross`,
