@@ -308,6 +308,11 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			[]any{to, from}},
 		{`UPDATE users SET avatar = coalesce(avatar, (SELECT avatar FROM users WHERE id = ?)),
 			title = coalesce(title, (SELECT title FROM users WHERE id = ?)) WHERE id = ?`, []any{from, from, to}},
+		// Friend requests: the guest's become the account's (none to itself).
+		{`UPDATE OR IGNORE friend_requests SET from_id = ? WHERE from_id = ? AND (to_id IS NULL OR to_id <> ?)`,
+			[]any{to, from, to}},
+		{`UPDATE OR IGNORE friend_requests SET to_id = ? WHERE to_id = ? AND from_id <> ?`, []any{to, from, to}},
+		{`DELETE FROM friend_requests WHERE from_id = ? OR to_id = ?`, []any{from, from}},
 	} {
 		if _, err := tx.Exec(q.sql, q.args...); err != nil {
 			return err

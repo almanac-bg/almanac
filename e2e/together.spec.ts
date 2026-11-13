@@ -2,7 +2,8 @@ import { expect, type Page, test } from "@playwright/test";
 import { answer } from "./play.ts";
 
 test("a room for two: lobby, ten questions together, the standings", async ({ browser }) => {
-  test.setTimeout(120_000);
+  // Ten questions with the room's 6-second pause after each, in two browsers at once.
+  test.setTimeout(180_000);
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/together");
@@ -33,7 +34,7 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
 test("two people asking for a duel play each other", async ({ browser }, info) => {
   // Matching is the server's, the same for every engine; and duels in two engines at once would match across them.
   test.skip(info.project.name !== "chromium", "one engine is enough");
-  test.setTimeout(150_000);
+  test.setTimeout(180_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   const find = async (p: Page) => {

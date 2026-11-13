@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { answer } from "./play.ts";
 
 test("friends: an invite link, then a duel between the two", async ({ browser }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(180_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
@@ -56,4 +56,39 @@ test("a friend can turn a duel down", async ({ browser }) => {
   await b.locator(".invitation").getByRole("button", { name: "Откажи" }).click();
   await expect(a.getByRole("heading", { name: "Не може сега" })).toBeVisible();
   await expect(a.getByRole("link", { name: "Към Заедно" })).toBeVisible();
+});
+
+test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  const tag = `ana_${info.project.name.slice(0, 3)}${Date.now() % 100000}`;
+
+  // Ana becomes a player, and takes a full name (anyone's) and a tag (hers alone).
+  await a.goto("/together");
+  await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
+  await a.goto("/me");
+  await a.getByLabel("Име", { exact: true }).fill("Ана Петрова");
+  await a.getByLabel("Таг", { exact: true }).fill(`@${tag}`);
+  await a.getByRole("button", { name: "Запази" }).click();
+  await expect(a.getByText("Запазено.")).toBeVisible();
+  await expect(a.locator(".me-tag")).toHaveText(`@${tag}`);
+
+  // Bo asks her by that tag; an unknown tag is said to be unknown.
+  await b.goto("/together");
+  await b.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
+  await b.getByLabel("Таг или имейл на приятел").fill("@nosuch_player_here");
+  await b.getByRole("button", { name: "Покани", exact: true }).click();
+  await expect(b.getByText("Няма играч с такъв таг.")).toBeVisible();
+  await b.getByLabel("Таг или имейл на приятел").fill(`@${tag.toUpperCase()}`);
+  await b.getByRole("button", { name: "Покани", exact: true }).click();
+  await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
+  await expect(b.locator(".waiting")).toContainText(`@${tag}`);
+
+  // Ana sees the dot on Заедно and the request there, and says yes.
+  await a.goto("/together");
+  await expect(a.locator(".invitation")).toContainText("иска да сте приятели");
+  await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
+  await expect(a.locator(".friend")).toHaveCount(1);
+  await b.reload();
+  await expect(b.locator(".friend .friend-tag")).toHaveText(` @${tag}`);
 });

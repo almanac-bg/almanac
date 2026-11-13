@@ -2499,6 +2499,77 @@
     white-space: nowrap;
   }
 
+  .friend-tag,
+  .me-tag {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .me-tag {
+    font-size: 0.875rem;
+  }
+
+  /* A tag typed after its @. */
+  .tag-input {
+    position: relative;
+    display: block;
+  }
+
+  .tag-input > span {
+    position: absolute;
+    top: 50%;
+    left: var(--space-4);
+    color: var(--text-muted);
+    font: 700 1.125rem / 1 var(--font-sans);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .tag-input input {
+    padding-left: calc(var(--space-4) + 1.1rem);
+  }
+
+  .add-friend {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .add-friend-row {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .add-friend-row input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .waiting {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .waiting li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .waiting li > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .small-gap {
+    gap: var(--space-1);
+  }
+
   .friend-day {
     color: var(--text-muted);
     font-size: 0.875rem;

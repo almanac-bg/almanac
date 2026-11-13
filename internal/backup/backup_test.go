@@ -64,7 +64,7 @@ func TestBackUpAndRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.Write.Exec(`INSERT INTO users (name, name_key, created_at, seen_at) VALUES ('Аз', 'аз', 1, 1)`); err != nil {
+	if _, err := db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Аз', 'az', 1, 1)`); err != nil {
 		t.Fatal(err)
 	}
 	fake := &fakeStore{objs: map[string][]byte{}}

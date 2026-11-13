@@ -11,7 +11,7 @@ import { topic, topics } from "./screens/play.ts";
 import { room } from "./screens/room.ts";
 import { today } from "./screens/today.ts";
 import { together } from "./screens/together.ts";
-import { invitations, watchInvitations } from "./state.ts";
+import { friendRequests, invitations, watchInvitations } from "./state.ts";
 
 const links: [href: string, label: string, here: (p: string) => boolean][] = [
   ["/", "Днес", (p) => p === "/"],
@@ -44,12 +44,17 @@ if (root) {
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // A friend calls to a duel: a dot on Заедно, where the invitation is.
-              class: href === "/together" ? () => (invitations().length ? "news" : "") : undefined,
+              // A friend calls to a duel, or someone asks to be friends: a dot on Заедно, where they wait.
+              class: href === "/together" ? () => (invitations().length || friendRequests() ? "news" : "") : undefined,
             },
             label,
             href === "/together"
-              ? () => (invitations().length ? h("span", { class: "sr" }, " (покана за дуел)") : null)
+              ? () =>
+                  invitations().length
+                    ? h("span", { class: "sr" }, " (покана за дуел)")
+                    : friendRequests()
+                      ? h("span", { class: "sr" }, " (покана за приятелство)")
+                      : null
               : null,
           ),
         ),

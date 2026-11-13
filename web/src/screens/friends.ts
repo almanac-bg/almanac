@@ -1,16 +1,17 @@
-// Friends, in Заедно: the duels they ask you to now, each friend with their day and your record against them, and
-// your invite link to make more.
+// Friends, in Заедно: the duels they ask you to now, who asks to be friends, each friend with their day and your
+// record against them, and the ways to make more: by their tag or email, or your invite link.
 
 import { shareButton } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go } from "../lib/router.ts";
-import { type Invitation, invitations, player, user } from "../state.ts";
+import { friendRequests, type Invitation, invitations, player, user } from "../state.ts";
 import { avatar, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
   name: string;
+  tag: string;
   avatar?: string;
   title?: string;
   titleTier?: Tier;
@@ -21,10 +22,19 @@ interface Friend {
   drawn: number;
 }
 
+/** A friend request: from someone (to you), or to someone or an email address (from you). */
+interface Request {
+  id: number;
+  name?: string;
+  tag?: string;
+  email?: string;
+}
+
 interface Friends {
   invite: string;
   friends: Friend[];
   invites: Invitation[];
+  requests: { in: Request[]; out: Request[] };
 }
 
 export function friendsCard(): Child {
@@ -38,6 +48,7 @@ export function friendsCard(): Child {
       const f = await api<Friends>("GET", "/api/friends");
       data.set(f);
       invitations.set(f.invites);
+      friendRequests.set(f.requests.in.length);
     } catch (err) {
       error.set((err as ApiError).message);
     }
@@ -69,6 +80,18 @@ export function friendsCard(): Child {
       await api("DELETE", `/api/friends/${f.id}`);
       await load();
     });
+  const accept = (r: Request) =>
+    act(async () => {
+      await api("POST", `/api/friends/requests/${r.id}/accept`, {});
+      await load();
+    });
+  const drop = (r: Request) =>
+    act(async () => {
+      await api("DELETE", `/api/friends/requests/${r.id}`);
+      await load();
+    });
+  // Made once: what it says after a request stays while the list around it is drawn again.
+  const adder = addFriend(load);
 
   return h(
     "section",
@@ -80,6 +103,26 @@ export function friendsCard(): Child {
           )
         : null,
     ),
+    () =>
+      (data()?.requests.in ?? []).map((r) =>
+        h(
+          "div",
+          { class: "invitation" },
+          h(
+            "p",
+            null,
+            h("strong", null, r.name),
+            h("span", { class: "muted" }, ` @${r.tag}`),
+            " иска да сте приятели.",
+          ),
+          h(
+            "div",
+            { class: "invitation-actions" },
+            h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
+            h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+          ),
+        ),
+      ),
     () =>
       (data()?.invites ?? []).map((i) =>
         h(
@@ -135,12 +178,30 @@ export function friendsCard(): Child {
                 ),
               ),
             )
-          : h(
-              "p",
-              { class: "muted" },
-              "Още нямаш приятели тук. Прати им линка си: щом го отворят и приемат, ставате приятели.",
-            ),
-        shareButton("Покани приятел", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
+          : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по таг или имейл, или им прати линка си."),
+        adder,
+        d.requests.out.length
+          ? h(
+              "div",
+              { class: "stack small-gap" },
+              h("p", { class: "kicker" }, "Чакат отговор"),
+              h(
+                "ul",
+                { class: "waiting" },
+                d.requests.out.map((r) =>
+                  h(
+                    "li",
+                    null,
+                    r.email
+                      ? h("span", null, r.email)
+                      : h("span", null, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
+                    h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
+                  ),
+                ),
+              ),
+            )
+          : null,
+        shareButton("Покани с линк", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
         h(
           "p",
           { class: "muted small" },
@@ -150,6 +211,69 @@ export function friendsCard(): Child {
       ];
     },
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
+}
+
+/** Asking someone to be friends: by their tag (@tag) or their email. */
+function addFriend(reload: () => Promise<void>): Child {
+  const to = signal("");
+  const busy = signal(false);
+  const note = signal<{ text: string; bad?: boolean } | null>(null);
+  return h(
+    "form",
+    {
+      class: "add-friend",
+      onsubmit: async (e: SubmitEvent) => {
+        e.preventDefault();
+        const who = to.peek().trim();
+        if (!who) return;
+        busy.set(true);
+        note.set(null);
+        try {
+          const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: who });
+          const byEmail = who.includes("@") && !who.startsWith("@");
+          note.set({
+            text: r.friends
+              ? `Вече сте приятели с ${r.name}.`
+              : byEmail
+                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в Заедно."
+                : `Поканата до ${r.name} е изпратена.`,
+          });
+          to.set("");
+          await reload();
+        } catch (err) {
+          note.set({ text: (err as ApiError).message, bad: true });
+        } finally {
+          busy.set(false);
+        }
+      },
+    },
+    h(
+      "label",
+      { class: "field" },
+      h("span", null, "Добави приятел"),
+      h(
+        "span",
+        { class: "add-friend-row" },
+        h("input", {
+          name: "to",
+          "aria-label": "Таг или имейл на приятел",
+          placeholder: "@таг или имейл",
+          autocomplete: "off",
+          autocapitalize: "none",
+          spellcheck: false,
+          maxlength: 254,
+          required: true,
+          value: to,
+          oninput: (e: Event) => to.set((e.target as HTMLInputElement).value),
+        }),
+        h("button", { class: "btn inline", disabled: busy }, "Покани"),
+      ),
+    ),
+    () => {
+      const n = note();
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: "status" }, n.text);
+    },
   );
 }
 
@@ -163,7 +287,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
     h(
       "div",
       { class: "friend-text" },
-      h("strong", { class: "friend-name" }, f.name),
+      h("strong", { class: "friend-name" }, f.name, h("span", { class: "friend-tag" }, ` @${f.tag}`)),
       f.title ? h("span", { class: `who-title t-${f.titleTier ?? "common"}` }, f.title) : null,
       h(
         "span",

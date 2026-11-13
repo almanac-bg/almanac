@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -41,8 +42,8 @@ func setup(t *testing.T) *world {
 func (w *world) user() int64 {
 	w.t.Helper()
 	w.next++
-	res, err := w.db.Write.Exec(`INSERT INTO users (name, name_key, created_at, seen_at) VALUES (?, ?, 0, 0)`,
-		"Играч", "играч"+string(rune('0'+w.next)))
+	res, err := w.db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES (?, ?, 0, 0)`,
+		"Играч", fmt.Sprintf("player%d", w.next))
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -578,3 +579,70 @@ func TestProgress(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+func TestFriendRequests(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
+	tag := func(id int64) string { return fmt.Sprintf("player%d", id-ana+1) }
+	_, _ = w.db.Write.Exec(`UPDATE users SET email = 'vi@example.com' WHERE id = ?`, vi)
+	_, _ = w.db.Write.Exec(`UPDATE users SET email = 'ana@example.com' WHERE id = ?`, ana)
+
+	// By tag: Bo is asked by name, and answers yes.
+	if _, err := w.g.Request(ctx, ana, "nosuchplayer", false); !errors.Is(err, ErrNoPlayer) {
+		t.Fatalf("an unknown tag: %v", err)
+	}
+	if _, err := w.g.Request(ctx, ana, tag(ana), false); !errors.Is(err, ErrOwnInvite) {
+		t.Fatalf("asked oneself: %v", err)
+	}
+	if sent, err := w.g.Request(ctx, ana, tag(bo), false); err != nil || sent.Friends || sent.Name != "Играч" {
+		t.Fatalf("to Bo: %+v %v", sent, err)
+	}
+	in, _, _ := w.g.Requests(ctx, bo)
+	_, out, _ := w.g.Requests(ctx, ana)
+	if len(in) != 1 || in[0].Tag != tag(ana) || len(out) != 1 || out[0].Tag != tag(bo) {
+		t.Fatalf("Bo's in %+v, Ana's out %+v", in, out)
+	}
+	if _, err := w.g.Accept(ctx, ana, in[0].ID); !errors.Is(err, ErrNoRequest) {
+		t.Fatalf("the sender accepted her own request: %v", err)
+	}
+	if _, err := w.g.Accept(ctx, bo, in[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.g.Friend(ctx, ana, bo); err != nil {
+		t.Fatalf("not friends after yes: %v", err)
+	}
+	if n, _ := w.g.RequestsWaiting(ctx, bo); n != 0 {
+		t.Fatalf("%d still waiting", n)
+	}
+
+	// By email: the sender isn't told whether anyone has the address — the same answer either way.
+	known, err := w.g.Request(ctx, ana, "vi@example.com", true)
+	unknown, err2 := w.g.Request(ctx, ana, "nobody@example.com", true)
+	if err != nil || err2 != nil || known != unknown || known.Name != "" {
+		t.Fatalf("by email: %+v %v, %+v %v", known, err, unknown, err2)
+	}
+	if n, _ := w.g.RequestsWaiting(ctx, vi); n != 1 {
+		t.Fatalf("Vi has %d waiting", n)
+	}
+	// Vi asks Ana back by her email: Ana asked first, so they're friends at once.
+	if sent, err := w.g.Request(ctx, vi, "ana@example.com", true); err != nil || !sent.Friends {
+		t.Fatalf("asking back: %+v %v", sent, err)
+	}
+	if _, out, _ := w.g.Requests(ctx, ana); len(out) != 1 || out[0].Email != "nobody@example.com" {
+		t.Fatalf("Ana's requests left: %+v", out)
+	}
+
+	// Gal asks Bo; Bo says no, and Gal's request is simply gone.
+	_, _ = w.g.Request(ctx, gal, tag(bo), false)
+	in, _, _ = w.g.Requests(ctx, bo)
+	if err := w.g.Withdraw(ctx, bo, in[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, out, _ := w.g.Requests(ctx, gal); len(out) != 0 {
+		t.Fatalf("Gal's requests: %+v", out)
+	}
+	if err := w.g.Withdraw(ctx, vi, in[0].ID); !errors.Is(err, ErrNoRequest) {
+		t.Fatalf("withdrew someone else's request: %v", err)
+	}
+}
