@@ -7,7 +7,7 @@ test("a player's profile: from a board, asked to be friends, then a duel from it
   const b = await (await browser.newContext()).newPage();
 
   // Ana plays a topic: she's on this week's board.
-  await a.goto("/play");
+  await a.goto("/");
   await a.getByRole("link", { name: "История" }).click();
   await playRun(a);
   const ana = await a.evaluate(

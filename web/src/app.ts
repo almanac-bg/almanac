@@ -1,4 +1,4 @@
-// АЛМАНАХ's web client: the mark and the name, the five main places (in the header on a big screen, a bar at the
+// АЛМАНАХ's web client: the mark and the name, the four main places (in the header on a big screen, a bar at the
 // bottom of a phone's), and the screen the router puts under them.
 
 import { h, mount } from "./lib/dom.ts";
@@ -12,7 +12,7 @@ import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
-import { topic, topics } from "./screens/play.ts";
+import { topic } from "./screens/play.ts";
 import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
@@ -23,10 +23,9 @@ import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { duelTurns, friendRequests, watchWaiting } from "./state.ts";
 
-/** The five main places: where each goes, its name and icon, and which paths are part of it. */
+/** The four main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => p === "/"],
-  ["/play", "Играй", "play", (p) => /^\/((play|duel|royal|room)(\/|$)|r\/)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal|room|r\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/rewards", "Награди", "award", (p) => p === "/rewards"],
   ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
@@ -57,13 +56,13 @@ if (root) {
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // A duel waits for the player: a dot on Играй; someone asks to be friends: a dot on Профил.
-              class: () => ((href === "/play" && duelTurns()) || (href === "/me" && friendRequests()) ? "news" : ""),
+              // A duel waits for the player: a dot on Начало; someone asks to be friends: a dot on Профил.
+              class: () => ((href === "/" && duelTurns()) || (href === "/me" && friendRequests()) ? "news" : ""),
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
             h("span", { class: "tab-label" }, label),
             () =>
-              href === "/play" && duelTurns()
+              href === "/" && duelTurns()
                 ? h("span", { class: "sr" }, " (дуел те чака)")
                 : href === "/me" && friendRequests()
                   ? h("span", { class: "sr" }, " (покана за приятелство)")
@@ -78,7 +77,6 @@ if (root) {
     main,
     [
       { path: /^\/$/, view: today },
-      { path: /^\/play$/, view: topics },
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
       { path: /^\/duel$/, view: duel },

@@ -7,7 +7,6 @@ for (const scheme of ["light", "dark"] as const) {
     test.use({ colorScheme: scheme });
     for (const path of [
       "/",
-      "/play",
       "/duel",
       "/royal",
       "/room",

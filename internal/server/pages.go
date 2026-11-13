@@ -23,7 +23,7 @@ import (
 // app shows as such), with what it needs to start in it, so it draws at once without asking for anything.
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
-	regexp.MustCompile(`^/play(/[a-z]+)?$`),
+	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/duel/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
