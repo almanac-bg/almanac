@@ -1,21 +1,16 @@
-// Playing with others: Дуел (one against one) and Стая (a room for many at once — on everyone's phone, around a
-// table or across a classroom).
+// Стая: a room for many at once — on everyone's phone, around a table or across a classroom. Here one is opened, or
+// joined by its code.
 
-import { findDuel } from "../game/duel.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { categories, player, user } from "../state.ts";
+import { categories, player } from "../state.ts";
 import { toneOf } from "../ui.ts";
-import { friendsCard } from "./friends.ts";
-import { loadStats, type Stats } from "./stats.ts";
 
-export function together(screen: "duel" | "room") {
-  title(screen === "duel" ? "Дуел" : "Стая");
+export function rooms() {
+  title("Стая");
   const error = signal("");
   const code = signal("");
-  const record = signal<Stats | null>(null);
-  if (user.peek()) loadStats().then(record.set, () => {});
   const open = async (category: string) => {
     error.set("");
     try {
@@ -37,27 +32,6 @@ export function together(screen: "duel" | "room") {
         h("span", { class: "dot", "aria-hidden": "true" }),
         name,
       ),
-    );
-  if (screen === "duel")
-    return h(
-      "section",
-      { class: "screen" },
-      h("h1", null, "Дуел"),
-      h(
-        "section",
-        { class: "card hero" },
-        h("div", { class: "card-head" }, h("h2", null, "Дуел"), () => {
-          const s = record();
-          return s && s.duels > 0 ? h("span", { class: "tag rose" }, `Победи: ${s.won} от ${s.duels}`) : null;
-        }),
-        h(
-          "p",
-          { class: "muted" },
-          "Ти срещу някого, сега: десет въпроса от всички теми. Ако в момента никой друг не търси, играеш срещу запис на истинска игра.",
-        ),
-        findDuel(),
-      ),
-      friendsCard(),
     );
   return h(
     "section",

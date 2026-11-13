@@ -66,9 +66,7 @@ type Server struct {
 	rooms    *room.Hub
 	push     *push.Sender
 	// closing ends the streams (rooms) when the server stops, so that it needn't wait for them.
-	closing chan struct{}
-	// duelWait is how long a duel search waits for someone else (DuelWait; tests make it short).
-	duelWait time.Duration
+	closing  chan struct{}
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
@@ -109,17 +107,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.RoyalNews = s.royalNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
-	s.rooms.Recording = s.game.RecordingFor
-	s.rooms.Kept = func(d play.Duel) {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		if err := s.game.SaveDuel(ctx, d); err != nil {
-			slog.Error("keeping a duel", "err", err)
-			s.problems.add("keeping a duel: " + err.Error())
-		}
-	}
 	s.closing = make(chan struct{})
-	s.duelWait = DuelWait
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
 	return s, nil
@@ -160,11 +148,9 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/runs/{id}/review", s.review)
 	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
-	api("POST /api/duel", s.duel)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
-	api("POST /api/rooms/{code}/decline", s.roomDecline)
 	api("POST /api/duels", s.startDuel)
 	api("GET /api/duels", s.duels)
 	api("POST /api/duels/{id}/play", s.playDuel)
@@ -180,7 +166,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
-	api("POST /api/friends/{id}/duel", s.duelFriend)
 	api("GET /api/invites/{code}", s.inviteInfo)
 	api("POST /api/invites/{code}", s.acceptInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))

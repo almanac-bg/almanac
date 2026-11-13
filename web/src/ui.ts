@@ -230,7 +230,7 @@ export const toneNames: Record<string, string> = {
 
 const freeShapes = ["petal", "rosette", "circle", "diamond", "triangle", "moon", "leaf", "wave", "hex"];
 
-/** An avatar for someone without one of their own (a recording): picked from their name, the same every time. */
+/** An avatar for someone without one of their own: picked from their name, the same every time. */
 function fromName(name: string): string {
   let n = 0;
   for (const c of name) n = (n * 31 + (c.codePointAt(0) ?? 0)) >>> 0;

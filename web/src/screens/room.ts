@@ -1,24 +1,19 @@
 // A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
-import { findDuel } from "../game/duel.ts";
-import { news } from "../game/news.ts";
 import { answered, ask, picture } from "../game/questions.ts";
 import { boardRow, review, shareButton } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
+import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player } from "../state.ts";
 import { avatar, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
-  duel?: boolean;
-  /** A duel between friends: one asked the other to it. */
-  invite?: boolean;
   phase: "lobby" | "question" | "reveal" | "end";
   host: string;
   isHost: boolean;
@@ -49,7 +44,6 @@ interface Player {
   online: boolean;
   answered: boolean;
   me?: boolean;
-  recording?: boolean;
   gained?: number;
   right?: boolean;
   avatar?: string;
@@ -59,15 +53,12 @@ interface Player {
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
-const nameOf = (p: Player) => (p.recording ? `${p.name} (запис)` : p.name);
-/** In a duel: the other one. */
-const opponent = (v: RoomView) => v.players.find((p) => !p.me);
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
 export function room([code = ""]: string[]) {
   title("Игра");
   const view = signal<RoomView | null>(null);
-  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "declined" | "expired">("");
+  const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
 
@@ -88,13 +79,6 @@ export function room([code = ""]: string[]) {
         es?.close();
         trouble.set("full");
       });
-      // A duel between friends that won't happen: turned down, or not answered in time.
-      for (const why of ["declined", "expired"] as const) {
-        es.addEventListener(why, () => {
-          es?.close();
-          trouble.set(why);
-        });
-      }
       es.onerror = () => {
         if (es?.readyState === EventSource.CLOSED) trouble.set("gone");
         else trouble.set("reconnecting"); // the browser tries again by itself
@@ -130,10 +114,6 @@ export function room([code = ""]: string[]) {
             h("a", { class: "btn primary", href: "/room" }, "Отвори нова стая"),
           )
         : null,
-    () => {
-      const why = trouble();
-      return why === "declined" || why === "expired" ? notToBe(view.peek(), why) : null;
-    },
     () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
@@ -169,75 +149,12 @@ async function lead(code: string, action: "start", error: (s: string) => void) {
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
-    return v.canLead || v.duel ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
+    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
   };
-}
-
-/** A duel between friends that won't happen, said to whoever is still looking at it. */
-function notToBe(v: RoomView | null, why: "declined" | "expired"): Child {
-  const asked = v?.players[0]?.me; // the one who asked is the first in the duel
-  const them = v ? opponent(v)?.name : undefined;
-  const [heading, text] = !asked
-    ? ["Дуелът е отменен", "Може би друг път."]
-    : why === "declined"
-      ? ["Не може сега", `${them ?? "Приятелят ти"} отказа дуела. Покани отново по-късно.`]
-      : ["Поканата изтече", `${them ?? "Приятелят ти"} не дойде за 10 минути. Покани отново по-късно.`];
-  return h(
-    "div",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Дуел"),
-      h("h1", null, heading),
-      h("p", { class: "lead" }, text),
-    ),
-    h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
-  );
-}
-
-/** Waiting for a friend asked to a duel: who, how long it stays open, and a way to call it off. */
-function invited(view: () => RoomView, code: string): Child {
-  const error = signal("");
-  const them = () => opponent(view())?.name ?? "";
-  return h(
-    "div",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Дуел с приятел"),
-      h("h1", null, () => `Дуел с ${them()}`),
-      h("p", { class: "lead" }, "Чакаме да дойде. Поканата важи 10 минути. Щом влезе, започвате."),
-    ),
-    h("p", { class: "status", role: "status" }, () =>
-      opponent(view())?.online ? `${them()} е тук.` : `${them()} още не е в дуела.`,
-    ),
-    h(
-      "button",
-      {
-        class: "link",
-        type: "button",
-        onclick: async () => {
-          try {
-            await api("POST", `/api/rooms/${code}/decline`, {});
-            go("/duel");
-          } catch (err) {
-            error.set((err as ApiError).message);
-          }
-        },
-      },
-      "Откажи",
-    ),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
-  );
 }
 
 function lobby(view: () => RoomView, code: string): Child {
   const error = signal("");
-  if (view().duel && view().invite) return invited(view, code);
-  if (view().duel)
-    return h("div", { class: "stack" }, h("p", { class: "kicker" }, "Дуел"), h("h1", null, "Чакаме съперника…"));
   return h(
     "div",
     { class: "screen" },
@@ -275,17 +192,15 @@ function lobby(view: () => RoomView, code: string): Child {
   );
 }
 
-/** Which question, its topic, and in a duel, against whom. */
+/** Which question, and its topic. */
 function head(v: RoomView): Child {
-  const against = v.duel ? opponent(v) : undefined;
-  const topic = topicName(v.question?.category ?? "");
-  return questionHead(v.n, v.total, against ? `${topic} · срещу ${nameOf(against)}` : topic);
+  return questionHead(v.n, v.total, topicName(v.question?.category ?? ""));
 }
 
 function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
-  if (first.n === 0) play("ping"); // the game (or the duel) starts
+  if (first.n === 0) play("ping"); // the game starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const left = signal(Math.ceil(q.leftMs / 1000));
@@ -346,8 +261,8 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
           ? "partial"
           : "wrong";
   play(kind);
-  // The rank change since the last answer (none in a duel: there are only two places).
-  const before = first.duel ? undefined : new Map(places);
+  // The rank change since the last answer.
+  const before = new Map(places);
   first.players.forEach((p, i) => {
     places.set(p.key, i + 1);
   });
@@ -373,7 +288,7 @@ function standings(view: () => RoomView, gains: boolean, before?: Map<number, nu
       view().players.map((p, i) => {
         const row = boardRow(
           i + 1,
-          nameOf(p),
+          p.name,
           gains && p.gained ? [h("small", { class: "sub" }, `+${p.gained} · `), String(p.points)] : String(p.points),
           { me: p.me, look: p },
         );
@@ -402,27 +317,6 @@ function move(was: number | undefined, now: number): HTMLElement {
 
 function end(view: () => RoomView, code: string): Child {
   const error = signal("");
-  if (view().duel) {
-    const v = view();
-    const me = v.players.find((p) => p.me);
-    const them = opponent(v);
-    const result =
-      !me || !them || me.points === them.points ? "Равенство" : me.points > them.points ? "Победа!" : "Загуба";
-    return h(
-      "div",
-      { class: "screen" },
-      h(
-        "div",
-        { class: "intro" },
-        h("p", { class: "kicker" }, them ? `Дуел срещу ${nameOf(them)}` : "Дуел"),
-        h("h1", null, result),
-      ),
-      news(1500),
-      standings(view, false),
-      findDuel("Нов дуел"),
-      review(async () => view().review ?? []),
-    );
-  }
   return h(
     "div",
     { class: "screen" },

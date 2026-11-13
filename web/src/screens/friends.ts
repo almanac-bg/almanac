@@ -1,11 +1,11 @@
-// Friends (Приятели, and on Дуел): the duels they ask you to now, who asks to be friends, each friend with their day and your
-// record against them, and the ways to make more: by their tag or email, or your invite link.
+// Friends (Приятели): who asks to be friends, each friend with their day and your record against them, and the ways to
+// make more: by their tag or email, or your invite link.
 
 import { shareButton } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { friendRequests, type Invitation, invitations, player, user } from "../state.ts";
+import { friendRequests, player, user } from "../state.ts";
 import { avatar, type Tier } from "../ui.ts";
 
 interface Friend {
@@ -33,7 +33,6 @@ interface Request {
 interface Friends {
   invite: string;
   friends: Friend[];
-  invites: Invitation[];
   requests: { in: Request[]; out: Request[] };
 }
 
@@ -53,14 +52,13 @@ export function friendsCard(): Child {
     try {
       const f = await api<Friends>("GET", "/api/friends");
       data.set(f);
-      invitations.set(f.invites);
       friendRequests.set(f.requests.in.length);
     } catch (err) {
       error.set((err as ApiError).message);
     }
   };
   load();
-  // Invitations come and go (a friend asks, gives up, the time runs out): look again while the screen is open.
+  // Friend requests come and go (someone asks, or takes it back): look again while the screen is open.
   const every = setInterval(() => {
     if (!document.hidden) load();
   }, 15_000);
@@ -77,11 +75,6 @@ export function friendsCard(): Child {
   // A duel with a friend: played now, and they play theirs when they can.
   const duel = (f: Friend) =>
     act(async () => go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: f.id })).duel}`));
-  const decline = (i: Invitation) =>
-    act(async () => {
-      await api("POST", `/api/rooms/${i.code}/decline`, {}).catch(() => {}); // gone already: nothing to turn down
-      await load();
-    });
   const remove = (f: Friend) =>
     act(async () => {
       await api("DELETE", `/api/friends/${f.id}`);
@@ -130,20 +123,6 @@ export function friendsCard(): Child {
           ),
         ),
       ),
-    () =>
-      (data()?.invites ?? []).map((i) =>
-        h(
-          "div",
-          { class: "invitation" },
-          h("p", null, h("strong", null, i.from), " те кани на дуел."),
-          h(
-            "div",
-            { class: "invitation-actions" },
-            h("a", { class: "btn rose inline", href: `/r/${i.code}` }, "Приеми"),
-            h("button", { class: "link", type: "button", onclick: () => decline(i) }, "Откажи"),
-          ),
-        ),
-      ),
     () => {
       const d = data();
       if (!d) {
@@ -151,11 +130,7 @@ export function friendsCard(): Child {
         return user()
           ? null
           : [
-              h(
-                "p",
-                { class: "muted" },
-                "Покани приятели: виждате резултатите си за деня и се каните на дуел, на живо.",
-              ),
+              h("p", { class: "muted" }, "Покани приятели: виждате резултатите си за деня и се каните на дуел."),
               h(
                 "button",
                 {

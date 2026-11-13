@@ -1,7 +1,8 @@
 # АЛМАНАХ — almanac.bg
 
 Въпроси, от които научаваш нещо. Десет на ден, едни и същи за всички; игра по теми, която следва колко знаеш;
-дуели и стаи за игра заедно, на живо; приятели, които се канят на дуел. Играй на **[almanac.bg](https://almanac.bg)**.
+дуели, които всеки играе в свое време; стаи за игра заедно, на живо; приятели, които се канят на дуел. Играй на
+**[almanac.bg](https://almanac.bg)**.
 
 Свободен софтуер под [AGPL-3.0](LICENSE).
 
@@ -25,7 +26,7 @@ internal/store   SQLite и миграциите (internal/store/migrations)
 internal/account гости, вход с код по имейл, сесии, имена
 internal/mail    пощата: опашка в базата, SMTP
 internal/play    играта: денят, темите, дуелите, приятелите, класацията, серията, статистиката
-internal/room    игра на живо: стаите и дуелите (Server-Sent Events)
+internal/room    игра на живо: стаите (Server-Sent Events)
 internal/push    известията (Web Push)
 internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
@@ -80,6 +81,7 @@ go run ./cmd/almanac bank check      # банката: private/, ако я им�
 ## In English
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
-everyone; topic play that follows what you know; live duels and rooms; friends who call each other to a duel. One Go
-program (stdlib + SQLite) serves a plain TypeScript client of about 23 kB. Run it with `go run ./cmd/build && DEV=1 go run
-./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in English are welcome.
+everyone; topic play that follows what you know; duels in each one's own time; live rooms; friends who call each
+other to a duel. One Go program (stdlib + SQLite) serves a plain TypeScript client of about 23 kB. Run it with `go run
+./cmd/build && DEV=1 go run ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in
+English are welcome.

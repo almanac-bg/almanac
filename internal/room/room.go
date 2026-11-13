@@ -1,16 +1,12 @@
 // Package room is playing live: a room has a code, its players see the same question at the same moment, and a
 // scoreboard after each.
 //
-// A room is opened by a host, who sets the pace (anyone may while the host is away). A duel is a room of two that
-// runs itself: two people who asked for an opponent at the same time, or one and a recording of someone else's game
-// (a real game, said as such — never a made-up opponent).
+// A room is opened by a host, who sets the pace (anyone may while the host is away).
 //
-// Rooms live in memory: they're for playing now, and close on their own when nobody's left. Duels are kept once
-// they end (play.SaveDuel).
+// Rooms live in memory: they're for playing now, and close on their own when nobody's left.
 package room
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -35,16 +31,6 @@ const (
 	Pause = 6 * time.Second
 	// maxRooms caps the rooms open at once, so that nobody can fill the server's memory with them.
 	maxRooms = 2000
-	// recordingID is the recorded player's place in a duel (no account has it).
-	recordingID int64 = -1
-	// InviteTime is how long a friend has to come to a duel they're asked to.
-	InviteTime = 10 * time.Minute
-)
-
-// Why a room closed, when it's worth saying (Room.Ended).
-const (
-	Declined = "declined" // the friend asked to a duel said no (or the one asking called it off)
-	Expired  = "expired"  // the friend didn't come in time
 )
 
 type Phase string
@@ -64,27 +50,21 @@ var (
 	ErrNotNow   = errors.New("not now")
 	ErrAnswer   = errors.New("an answer the question can't take")
 	ErrTooMany  = errors.New("too many rooms")
-	ErrNobody   = errors.New("nobody to play against")
 )
 
 // Player is someone in a room.
 type Player struct {
 	ID   int64
 	Name string
-	// Look is how they show (avatar, title, level); none for a recording.
+	// Look is how they show (avatar, title, level).
 	Look play.Look
 }
 
-// Hub holds the rooms open now, and whoever is waiting for a duel.
+// Hub holds the rooms open now.
 type Hub struct {
-	mu      sync.Mutex
-	rooms   map[string]*Room
-	waiting *waiter
-	bank    func() *bank.Bank
-	// Recording finds a recording for a player to duel when nobody else is waiting (play.Game.RecordingFor).
-	Recording func(ctx context.Context, userID int64) (*play.Recording, error)
-	// Kept receives each player's duel when it ends (play.Game.SaveDuel), off the room's lock.
-	Kept func(play.Duel)
+	mu    sync.Mutex
+	rooms map[string]*Room
+	bank  func() *bank.Bank
 }
 
 func NewHub(b func() *bank.Bank) *Hub { return &Hub{rooms: map[string]*Room{}, bank: b} }
@@ -126,88 +106,6 @@ func (h *Hub) Open(host Player, category string) (*Room, error) {
 	return r, nil
 }
 
-type waiter struct {
-	p    Player
-	code chan string // the duel's code, once matched; "" if this wait was taken over
-}
-
-// Match finds a player an opponent for a duel: someone else asking at the same time, or after `wait` a recording.
-// It returns the duel's room code.
-func (h *Hub) Match(ctx context.Context, p Player, wait time.Duration) (string, error) {
-	h.mu.Lock()
-	if w := h.waiting; w != nil && w.p.ID != p.ID {
-		h.waiting = nil
-		r, err := h.newRoom("")
-		if err != nil {
-			h.mu.Unlock()
-			w.code <- ""
-			return "", err
-		}
-		r.duel = true
-		r.players = []*member{{Player: w.p}, {Player: p}}
-		h.mu.Unlock()
-		w.code <- r.code
-		return r.code, nil
-	}
-	if w := h.waiting; w != nil { // the same player again (another tab): this request takes over
-		w.code <- ""
-	}
-	w := &waiter{p: p, code: make(chan string, 1)}
-	h.waiting = w
-	h.mu.Unlock()
-
-	timer := time.NewTimer(wait)
-	defer timer.Stop()
-	select {
-	case code := <-w.code:
-		return matched(code)
-	case <-timer.C:
-	case <-ctx.Done():
-	}
-	h.mu.Lock()
-	if h.waiting != w { // matched (or taken over) just now
-		h.mu.Unlock()
-		return matched(<-w.code)
-	}
-	h.waiting = nil
-	h.mu.Unlock()
-	if ctx.Err() != nil {
-		return "", ctx.Err()
-	}
-	return h.recordedDuel(ctx, p)
-}
-
-func matched(code string) (string, error) {
-	if code == "" {
-		return "", ErrNotNow
-	}
-	return code, nil
-}
-
-// recordedDuel opens a duel against a recording of someone else's game.
-func (h *Hub) recordedDuel(ctx context.Context, p Player) (string, error) {
-	if h.Recording == nil {
-		return "", ErrNobody
-	}
-	rec, err := h.Recording(ctx, p.ID)
-	if err != nil {
-		return "", err
-	}
-	if rec == nil {
-		return "", ErrNobody
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	r, err := h.newRoom("")
-	if err != nil {
-		return "", err
-	}
-	r.duel, r.recording = true, rec
-	r.picks = rec.Picks
-	r.players = []*member{{Player: p}, {Player: Player{ID: recordingID, Name: rec.Name}, online: 1}}
-	return r.code, nil
-}
-
 // Get finds an open room.
 func (h *Hub) Get(code string) (*Room, error) {
 	h.mu.Lock()
@@ -219,60 +117,6 @@ func (h *Hub) Get(code string) (*Room, error) {
 	return r, nil
 }
 
-// Invite opens a duel between two friends: the one asking, who waits in it, and the friend asked, who has InviteTime
-// to come. Asking the same friend again while the first is still open gives the same duel.
-func (h *Hub) Invite(from, to Player) (*Room, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for _, r := range h.rooms {
-		r.mu.Lock()
-		same := r.invited == to.ID && !r.closed && r.phase == Lobby && r.players[0].ID == from.ID
-		r.mu.Unlock()
-		if same {
-			return r, nil
-		}
-	}
-	r, err := h.newRoom("")
-	if err != nil {
-		return nil, err
-	}
-	r.duel, r.invited = true, to.ID
-	r.players = []*member{{Player: from}, {Player: to}}
-	return r, nil
-}
-
-// Invitation is a duel a friend asks a player to, waiting for them.
-type Invitation struct {
-	Code   string `json:"code"`
-	From   string `json:"from"`
-	FromID int64  `json:"fromId"`
-	// LeftMs is how long it stays open.
-	LeftMs int64 `json:"leftMs"`
-}
-
-// InvitesFor lists the duels friends ask a player to now: still open, with whoever asked still waiting in them.
-func (h *Hub) InvitesFor(userID int64) []Invitation {
-	h.mu.Lock()
-	rooms := make([]*Room, 0, len(h.rooms))
-	for _, r := range h.rooms {
-		rooms = append(rooms, r)
-	}
-	h.mu.Unlock()
-	list := []Invitation{}
-	for _, r := range rooms {
-		r.mu.Lock()
-		if r.invited == userID && !r.closed && r.phase == Lobby && r.players[0].online > 0 {
-			if left := InviteTime - time.Since(r.opened); left > 0 {
-				from := r.players[0]
-				list = append(list, Invitation{Code: r.code, From: from.Name, FromID: from.ID, LeftMs: left.Milliseconds()})
-			}
-		}
-		r.mu.Unlock()
-	}
-	slices.SortFunc(list, func(a, b Invitation) int { return int(b.LeftMs - a.LeftMs) })
-	return list
-}
-
 // Sweep closes rooms nobody is in any more (for 15 minutes), and any open for 6 hours.
 func (h *Hub) Sweep() {
 	h.mu.Lock()
@@ -281,10 +125,6 @@ func (h *Hub) Sweep() {
 		r.mu.Lock()
 		idle := len(r.subs) == 0 && time.Since(r.active) > 15*time.Minute
 		old := time.Since(r.opened) > 6*time.Hour
-		if r.invited != 0 && r.phase == Lobby && !r.closed && time.Since(r.opened) > InviteTime {
-			r.ended = Expired
-			r.close()
-		}
 		if idle || old {
 			r.close()
 			delete(h.rooms, code)
@@ -295,29 +135,23 @@ func (h *Hub) Sweep() {
 
 // Room is one game played together.
 type Room struct {
-	mu        sync.Mutex
-	hub       *Hub
-	code      string
-	category  string
-	host      int64 // none in a duel
-	duel      bool
-	invited   int64 // a duel between friends: the one asked to it
-	ended     string
-	recording *play.Recording
-	// waitRecording is whether the recording answers the question now (else nobody waits for it).
-	waitRecording bool
-	players       []*member // in the order they joined
-	phase         Phase
-	picks         []play.Pick
-	dealt         []bank.Dealt
-	n             int // the question now
-	shownAt       time.Time
-	revealedAt    time.Time
-	timer         *time.Timer
-	subs          map[*Sub]struct{}
-	opened        time.Time
-	active        time.Time
-	closed        bool
+	mu         sync.Mutex
+	hub        *Hub
+	code       string
+	category   string
+	host       int64     // who opened it
+	players    []*member // in the order they joined
+	phase      Phase
+	picks      []play.Pick
+	dealt      []bank.Dealt
+	n          int // the question now
+	shownAt    time.Time
+	revealedAt time.Time
+	timer      *time.Timer
+	subs       map[*Sub]struct{}
+	opened     time.Time
+	active     time.Time
+	closed     bool
 }
 
 type member struct {
@@ -329,31 +163,19 @@ type member struct {
 	given    json.RawMessage
 	graded   bank.Graded
 	gained   int
-	// Every answer of this game, for keeping a duel.
-	log []play.DuelAnswer
+	// Every answer of this game, for the review at its end.
+	log []loggedAnswer
+}
+
+// loggedAnswer is one answer of a game, as its review shows it.
+type loggedAnswer struct {
+	questionID string
+	shown      json.RawMessage // nil: no answer (the time ran out)
+	points     int
+	right      bool
 }
 
 func (r *Room) Code() string { return r.code }
-
-// Decline turns down a duel between friends: the friend asked says no, or the one asking calls it off. The duel
-// closes, and both screens say why.
-func (r *Room) Decline(by int64) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.invited == 0 || r.closed || r.phase != Lobby || r.member(by) == nil {
-		return ErrNotNow
-	}
-	r.ended = Declined
-	r.close()
-	return nil
-}
-
-// Ended says why a room closed, when there's more to say than that it did: Declined or Expired ("" otherwise).
-func (r *Room) Ended() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.ended
-}
 
 func (r *Room) member(id int64) *member {
 	for _, m := range r.players {
@@ -365,7 +187,7 @@ func (r *Room) member(id int64) *member {
 }
 
 // Join puts a player in the room (once; again changes nothing). Joining a room mid-game is fine, from the next
-// answer on; a duel is for its two only.
+// answer on.
 func (r *Room) Join(p Player) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -376,7 +198,7 @@ func (r *Room) Join(p Player) error {
 		m.Player = p // a new name or look shows from now on
 		return nil
 	}
-	if r.duel || len(r.players) >= MaxPlayers {
+	if len(r.players) >= MaxPlayers {
 		return ErrFull
 	}
 	r.players = append(r.players, &member{Player: p})
@@ -391,7 +213,7 @@ type Sub struct {
 	viewer int64
 }
 
-// Follow is a player's screen following the room (Join first). A duel starts once both are there.
+// Follow is a player's screen following the room (Join first).
 func (r *Room) Follow(viewer int64) (*Sub, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -402,10 +224,6 @@ func (r *Room) Follow(viewer int64) (*Sub, error) {
 	s := &Sub{C: make(chan struct{}, 1), Done: make(chan struct{}), viewer: viewer}
 	r.subs[s] = struct{}{}
 	m.online++
-	if r.duel && r.phase == Lobby && !slices.ContainsFunc(r.players, func(m *member) bool { return m.online == 0 }) {
-		_ = r.start()
-		return s, nil
-	}
 	r.changed()
 	return s, nil
 }
@@ -446,12 +264,8 @@ func (r *Room) close() {
 	}
 }
 
-// mayLead says whether a player may start or move the game on: the host, or anyone while the host is away. Nobody
-// leads a duel: it runs itself.
+// mayLead says whether a player may start or move the game on: the host, or anyone while the host is away.
 func (r *Room) mayLead(id int64) bool {
-	if r.duel {
-		return false
-	}
 	if id == r.host {
 		return true
 	}
@@ -474,9 +288,7 @@ func (r *Room) Start(by int64) error {
 
 func (r *Room) start() error {
 	b := r.bank()
-	if r.recording == nil {
-		r.picks = play.Draw(b, r.category, 0.6, nil, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
-	}
+	r.picks = play.Draw(b, r.category, 0.6, nil, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
 	r.dealt = r.dealt[:0]
 	for _, p := range r.picks {
 		q, ok := b.Get(p.ID)
@@ -497,7 +309,7 @@ func (r *Room) start() error {
 
 func (r *Room) bank() *bank.Bank { return r.hub.bank() }
 
-// show puts question n on every screen and starts its time; a recording answers as it did, when it did.
+// show puts question n on every screen and starts its time.
 func (r *Room) show(n int) {
 	r.phase, r.n, r.shownAt = Question, n, time.Now()
 	for _, m := range r.players {
@@ -505,19 +317,6 @@ func (r *Room) show(n int) {
 	}
 	limit := play.Limit(r.dealt[n].Question())
 	r.after(limit+Grace, func() { r.reveal() })
-	r.waitRecording = false
-	if rec := r.recording; rec != nil {
-		if a, ok := rec.Answers[n]; ok && time.Duration(a.Ms)*time.Millisecond < limit {
-			r.waitRecording = true
-			time.AfterFunc(time.Duration(a.Ms)*time.Millisecond, func() {
-				r.mu.Lock()
-				defer r.mu.Unlock()
-				if r.phase == Question && r.n == n && !r.closed {
-					_ = r.answer(r.member(recordingID), n, a.Shown)
-				}
-			})
-		}
-	}
 	r.changed()
 }
 
@@ -541,7 +340,7 @@ func (r *Room) Answer(by int64, n int, raw json.RawMessage) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	m := r.member(by)
-	if m == nil || by == recordingID {
+	if m == nil {
 		return ErrNoRoom
 	}
 	return r.answer(m, n, raw)
@@ -569,13 +368,9 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if g.Right {
 		m.rights++
 	}
-	m.log = append(m.log, play.DuelAnswer{
-		QuestionID: d.Question().Base().ID, Given: g.Given, Shown: g.Shown,
-		Score: g.Score, Points: m.gained, Right: g.Right, Ms: min(took, limit).Milliseconds(),
-	})
+	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right})
 	for _, p := range r.players {
-		waits := p.online > 0 && (p.ID != recordingID || r.waitRecording)
-		if waits && !p.answered {
+		if p.online > 0 && !p.answered {
 			r.changed()
 			return nil
 		}
@@ -589,7 +384,7 @@ func (r *Room) reveal() {
 	d := r.dealt[r.n]
 	for _, m := range r.players {
 		if !m.answered { // the time ran out on them
-			m.log = append(m.log, play.DuelAnswer{QuestionID: d.Question().Base().ID, Ms: play.Limit(d.Question()).Milliseconds()})
+			m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID})
 		}
 	}
 	if r.timer != nil {
@@ -606,43 +401,12 @@ func (r *Room) next() {
 		return
 	}
 	r.phase = End
-	if r.duel {
-		r.keep()
-	}
 	r.changed()
-}
-
-// keep hands each person's duel to the hub to keep (off the lock: it writes to the database).
-func (r *Room) keep() {
-	if r.hub.Kept == nil || len(r.players) != 2 {
-		return
-	}
-	for i, m := range r.players {
-		if m.ID == recordingID || len(m.log) != len(r.picks) {
-			continue
-		}
-		other := r.players[1-i]
-		outcome := "draw"
-		if m.points > other.points {
-			outcome = "won"
-		} else if m.points < other.points {
-			outcome = "lost"
-		}
-		d := play.Duel{
-			UserID: m.ID, Picks: r.picks, Answers: slices.Clone(m.log),
-			Opponent: other.Name, Recorded: other.ID == recordingID, Outcome: outcome,
-			OpponentID: max(0, other.ID),
-		}
-		go r.hub.Kept(d)
-	}
 }
 
 // View is the room as one player sees it.
 type View struct {
-	Code string `json:"code"`
-	Duel bool   `json:"duel,omitempty"`
-	// Invite marks a duel between friends (one asked the other to it).
-	Invite   bool          `json:"invite,omitempty"`
+	Code     string        `json:"code"`
 	Phase    Phase         `json:"phase"`
 	Host     string        `json:"host"`
 	IsHost   bool          `json:"isHost"`
@@ -678,8 +442,6 @@ type PlayerView struct {
 	Online   bool   `json:"online"`
 	Answered bool   `json:"answered"`
 	Me       bool   `json:"me,omitempty"`
-	// Recording marks a recorded game played against.
-	Recording bool `json:"recording,omitempty"`
 	// Gained and Right are this question's, once its answer shows.
 	Gained int  `json:"gained,omitempty"`
 	Right  bool `json:"right,omitempty"`
@@ -711,17 +473,16 @@ func (r *Room) View(viewer int64) View {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	v := View{
-		Code: r.code, Duel: r.duel, Invite: r.invited != 0, Phase: r.phase, IsHost: !r.duel && viewer == r.host,
-		CanLead:  r.mayLead(viewer),
+		Code: r.code, Phase: r.phase, IsHost: viewer == r.host, CanLead: r.mayLead(viewer),
 		Category: r.category, N: r.n, Total: len(r.picks), Players: []PlayerView{},
 	}
-	if h := r.member(r.host); h != nil && !r.duel {
+	if h := r.member(r.host); h != nil {
 		v.Host = h.Name
 	}
 	for i, m := range r.players {
 		p := PlayerView{
 			Key: i, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
-			Me: m.ID == viewer, Recording: m.ID == recordingID,
+			Me: m.ID == viewer,
 		}
 		if r.phase == Reveal {
 			p.Gained, p.Right = m.gained, m.graded.Right
@@ -762,8 +523,8 @@ func (r *Room) review(m *member) []ReviewedView {
 	out := make([]ReviewedView, 0, len(r.dealt))
 	for i, d := range r.dealt {
 		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(), Given: json.RawMessage("null")}
-		if i < len(m.log) && m.log[i].QuestionID == d.Question().Base().ID && m.log[i].Shown != nil {
-			it.Given, it.Points, it.Right = m.log[i].Shown, m.log[i].Points, m.log[i].Right
+		if i < len(m.log) && m.log[i].questionID == d.Question().Base().ID && m.log[i].shown != nil {
+			it.Given, it.Points, it.Right = m.log[i].shown, m.log[i].points, m.log[i].right
 		}
 		out = append(out, it)
 	}
