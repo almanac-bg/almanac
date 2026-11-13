@@ -65,7 +65,7 @@ const opponent = (v: RoomView) => v.players.find((p) => !p.me);
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
 export function room([code = ""]: string[]) {
-  title("Заедно");
+  title("Игра");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full" | "declined" | "expired">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
@@ -127,7 +127,7 @@ export function room([code = ""]: string[]) {
             { class: "stack" },
             h("h1", null, "Няма такава стая"),
             h("p", { class: "lead" }, "Може кодът да е грешен или стаята да е затворена."),
-            h("a", { class: "btn primary", href: "/together" }, "Отвори нова стая"),
+            h("a", { class: "btn primary", href: "/room" }, "Отвори нова стая"),
           )
         : null,
     () => {
@@ -192,7 +192,7 @@ function notToBe(v: RoomView | null, why: "declined" | "expired"): Child {
       h("h1", null, heading),
       h("p", { class: "lead" }, text),
     ),
-    h("a", { class: "btn primary big", href: "/together" }, "Към Заедно"),
+    h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
   );
 }
 
@@ -221,7 +221,7 @@ function invited(view: () => RoomView, code: string): Child {
         onclick: async () => {
           try {
             await api("POST", `/api/rooms/${code}/decline`, {});
-            go("/together");
+            go("/duel");
           } catch (err) {
             error.set((err as ApiError).message);
           }

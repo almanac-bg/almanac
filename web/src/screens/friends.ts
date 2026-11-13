@@ -1,10 +1,10 @@
-// Friends, in Заедно: the duels they ask you to now, who asks to be friends, each friend with their day and your
+// Friends (Приятели, and on Дуел): the duels they ask you to now, who asks to be friends, each friend with their day and your
 // record against them, and the ways to make more: by their tag or email, or your invite link.
 
 import { shareButton } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
-import { go } from "../lib/router.ts";
+import { go, title } from "../lib/router.ts";
 import { friendRequests, type Invitation, invitations, player, user } from "../state.ts";
 import { avatar, type Tier } from "../ui.ts";
 
@@ -35,6 +35,12 @@ interface Friends {
   friends: Friend[];
   invites: Invitation[];
   requests: { in: Request[]; out: Request[] };
+}
+
+/** Приятели, as a page of its own (from the profile). */
+export function friends(): Child {
+  title("Приятели");
+  return h("section", { class: "screen" }, h("h1", null, "Приятели"), friendsCard());
 }
 
 export function friendsCard(): Child {
@@ -236,7 +242,7 @@ function addFriend(reload: () => Promise<void>): Child {
             text: r.friends
               ? `Вече сте приятели с ${r.name}.`
               : byEmail
-                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в Заедно."
+                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в приложението."
                 : `Поканата до ${r.name} е изпратена.`,
           });
           to.set("");

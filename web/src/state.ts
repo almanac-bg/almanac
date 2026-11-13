@@ -50,7 +50,7 @@ export interface Invitation {
   leftMs: number;
 }
 
-/** The duels friends ask the player to now: Заедно lists them, and the nav marks that there are some. */
+/** The duels friends ask the player to now: Дуел and Приятели list them, and the nav marks that there are some. */
 export const invitations = signal<Invitation[]>([]);
 
 /** How many friend requests wait for the player's answer. */

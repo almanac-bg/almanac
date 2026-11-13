@@ -7,7 +7,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await playRun(page);
   await expect(page.locator(".level-card")).toContainText("Ниво");
 
-  await page.goto("/me");
+  await page.goto("/rewards");
   await expect(page.getByRole("heading", { name: /Постижения · \d+ от 19/ })).toBeVisible();
   // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
@@ -21,6 +21,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.getByText("Короната се отключва на ниво 10.")).toBeVisible();
 
   // Sounds are on until turned off, and stay off on this device.
+  await page.goto("/settings");
   await page.getByRole("button", { name: "Изключи звуците" }).click();
   await page.reload();
   await expect(page.getByRole("button", { name: "Включи звуците" })).toBeVisible();

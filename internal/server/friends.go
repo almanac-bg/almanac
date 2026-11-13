@@ -161,7 +161,7 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) error {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
-		s.notify(ctx, push.Message{Title: u.Name + " прие поканата ти", Body: "Вече сте приятели в АЛМАНАХ.", URL: "/together"}, id)
+		s.notify(ctx, push.Message{Title: u.Name + " прие поканата ти", Body: "Вече сте приятели в АЛМАНАХ.", URL: "/friends"}, id)
 	}()
 	return ok(w, map[string]any{"id": id, "name": name})
 }
@@ -191,7 +191,7 @@ func (s *Server) unfriend(w http.ResponseWriter, r *http.Request) error {
 }
 
 // duelFriend asks a friend to a duel now: a duel for the two of them opens, and the friend hears of it (a
-// notification, and the invitation in their Заедно).
+// notification, and the invitation on their Дуел and Приятели).
 func (s *Server) duelFriend(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

@@ -8,7 +8,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Започни" }).click();
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  await expect(page.getByRole("link", { name: "Играй по теми" })).toBeVisible();
+  await expect(page.locator(".modes").getByRole("link", { name: /Теми/ })).toBeVisible();
   await page.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
@@ -45,6 +45,6 @@ test("a run left between two questions goes on at once", async ({ page }) => {
 test("an old challenge link says where playing with friends went", async ({ page }) => {
   await page.goto("/c/abc234");
   await expect(page.getByRole("heading", { name: "Предизвикателствата ги няма" })).toBeVisible();
-  await page.getByRole("link", { name: "Към Заедно" }).click();
-  await expect(page.getByRole("heading", { name: "Заедно" })).toBeVisible();
+  await page.getByRole("link", { name: "Към дуелите" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Дуел" })).toBeVisible();
 });

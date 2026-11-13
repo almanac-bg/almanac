@@ -1,4 +1,4 @@
-// Днес: the day's ten questions, the same for everyone, once.
+// Начало: the day's ten questions, the same for everyone, once; your streak; and the other ways to play.
 
 import { news } from "../game/news.ts";
 import { board, summary } from "../game/results.ts";
@@ -9,6 +9,7 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 import { figure, streak } from "../ui.ts";
+import { modes } from "./modes.ts";
 
 interface Today {
   day: string;
@@ -61,7 +62,7 @@ export function today() {
           "div",
           { class: "figures" },
           figure("10", "въпроса"),
-          figure("15 с", "за въпрос"),
+          figure("~3", "минути"),
           figure(String(players), players === 1 ? "човек днес" : "души днес"),
         ),
         trail([], 10),
@@ -87,6 +88,7 @@ export function today() {
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
       user.peek() ? streak(t.streak, t.week) : null,
+      modes(["topics", "duel", "room"], "Още игри"),
     );
   };
 
@@ -113,8 +115,8 @@ function finished(t: Today, s: State): Child {
         const f = fresh();
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
       },
-      h("a", { class: "btn primary big", href: "/play" }, "Играй по теми"),
       countdown(),
+      modes(["topics", "duel", "room"], "Още игри"),
       () => {
         const f = fresh().friends;
         return f?.length ? board("Приятели днес", f) : null;
