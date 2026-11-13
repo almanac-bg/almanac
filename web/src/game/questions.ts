@@ -393,7 +393,7 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
 }
 
 /** The tone each pair of a match is drawn in, by its left's place (with its number, for whoever can't tell colours). */
-const pairTones = ["tone-teal", "tone-sky", "tone-rose", "tone-lilac"];
+const pairTones = ["tone-gold", "tone-sky", "tone-rose", "tone-lilac"];
 
 /** „Свържи“: tap a thing on the left, then its pair on the right (or the other way round); a line joins them. A
  * joined one tapped again comes apart. */

@@ -37,9 +37,8 @@ takes a token.
   - `sky`: rooms.
   - `lilac`: levels.
   - `silver` and `bronze`: second and third place.
-- **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives lilac, sky, rose, teal or lime, in
-  the bank's order. These are identity colours: an outcome's colours (gold, `right`, `wrong`) never mark a topic,
-  and a match's pairs take teal, sky, rose and lilac. A room on every topic shows all five in one dot (`.tone-mixed`).
+- **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives gold, lilac, sky, rose or mint, in
+  the bank's order.
 - **Right, close and wrong never rest on hue alone.** Each also gets ✓, ∼ or ✕, the word, and a filled or hollow
   mark.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
