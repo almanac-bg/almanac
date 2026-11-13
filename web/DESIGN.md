@@ -106,6 +106,14 @@ takes a token.
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
 
+## Tiers
+
+- **Four tiers of achievement**, each with its colour: обикновено (silver, `--tier-common`), рядко (sky,
+  `--tier-rare`), епично (violet, `--tier-epic`) and легендарно (gold, `--tier-legendary`). Each has an `-ink`
+  token for words. A `.t-<tier>` class sets `--tier` and `--tier-ink` for anything inside it.
+- A badge is filled with its tier's colour once earned (epic and legendary glow), and ringed with it while locked.
+  A title shows in its tier's ink wherever it's worn.
+
 ## Flow
 
 - **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
@@ -123,19 +131,19 @@ takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element      | Measures                                                                                                                     | Where                   |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)            | Днес, Профил            |
-| Points       | Points per answer and per run, from the server                                                                               | Verdict, result, boards |
-| Place        | Place on the day's board („12-и от 318 днес.“)                                                                               | Result, Профил          |
-| Mastery      | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил            |
-| Rank change  | Places moved since the previous answer                                                                                       | Room boards             |
-| Duels        | Duels won of played; between two friends, their record („3 : 2“)                                                             | Заедно, Профил          |
-| Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                       | Result                  |
-| Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                             | Result, Профил, avatars |
-| Achievements | 19 facts of a player's games (streaks, a perfect day, an exact number, duels won, friends…), announced once when earned      | Result, Профил          |
-| Titles       | The names of a player's achievements; one chosen shows under their name                                                      | Boards, friends, rooms  |
-| Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                   | Everywhere a player is  |
+| Element      | Measures                                                                                                                        | Where                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)               | Днес, Профил            |
+| Points       | Points per answer and per run, from the server                                                                                  | Verdict, result, boards |
+| Place        | Place on the day's board („12-и от 318 днес.“)                                                                                  | Result, Профил          |
+| Mastery      | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up)    | Игра, Профил            |
+| Rank change  | Places moved since the previous answer                                                                                          | Room boards             |
+| Duels        | Duels won of played; between two friends, their record („3 : 2“)                                                                | Заедно, Профил          |
+| Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                          | Result                  |
+| Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                                | Result, Профил, avatars |
+| Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once | Result, Профил          |
+| Titles       | The names of a player's achievements, in their tier's colour; all listed, the locked ones with what unlocks them                | Boards, friends, rooms  |
+| Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                      | Everywhere a player is  |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 

@@ -6,7 +6,7 @@ import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.
 import { title } from "../lib/router.ts";
 import { setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
-import { type AchievementInfo, avatar, badge, shapeNames, toneNames } from "../ui.ts";
+import { type AchievementInfo, avatar, badge, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
 import { stats } from "./stats.ts";
 
 export function me() {
@@ -86,42 +86,56 @@ function head(progress: () => Progress | null): Child {
       () => {
         const p = progress();
         const t = p?.achievements.find((a) => a.id === p.title);
-        return t ? h("span", { class: "me-title" }, t.name) : null;
+        return t ? h("span", { class: `me-title t-${t.tier}` }, t.name) : null;
       },
     ),
   );
 }
 
+/** A sentence as a clause after a colon: its first letter small. */
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
 const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
-/** Every achievement: the earned ones bright, with the day; the rest with what earns them. */
+/** Every achievement, by tier: the earned ones bright, with the day; each with how it's earned. */
 function achievements(p: Progress): Child {
   const earned = p.achievements.filter((a) => a.at).length;
   return h(
     "section",
     { class: "stack" },
     h("h2", { class: "section-title" }, `Постижения · ${earned} от ${p.achievements.length}`),
-    h(
-      "ul",
-      { class: "achievements" },
-      // The earned ones first, newest on top; then what's still ahead, in order.
-      [
-        ...p.achievements.filter((a) => a.at).sort((x, y) => (y.at ?? 0) - (x.at ?? 0)),
-        ...p.achievements.filter((a) => !a.at),
-      ].map((a) =>
+    tiers.map((tier) => {
+      const list = p.achievements.filter((a) => a.tier === tier);
+      if (!list.length) return null;
+      return h(
+        "section",
+        { class: `tier t-${tier}` },
         h(
-          "li",
-          { class: a.at ? "achievement" : "achievement locked" },
-          badge(a, !!a.at),
-          h(
-            "div",
-            { class: "achievement-text" },
-            h("span", { class: "achievement-name" }, a.name),
-            h("span", { class: "achievement-about" }, a.at ? `${a.about} · ${day(a.at)}` : a.about),
+          "h3",
+          { class: "tier-head" },
+          tierWords[tier].group,
+          h("span", { class: "muted" }, ` · ${list.filter((a) => a.at).length} от ${list.length}`),
+        ),
+        h(
+          "ul",
+          { class: "achievements" },
+          list.map((a) =>
+            h(
+              "li",
+              { class: a.at ? "achievement" : "achievement locked" },
+              badge(a, !!a.at),
+              h(
+                "div",
+                { class: "achievement-text" },
+                h("span", { class: "achievement-name" }, a.name),
+                h("span", { class: "achievement-about" }, a.about),
+                h("span", { class: "achievement-when" }, a.at ? `Спечелено на ${day(a.at)}` : "Още не е спечелено"),
+              ),
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    }),
   );
 }
 
@@ -143,7 +157,8 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
     const p = progress();
     if (!p) return null;
     const [shape = "", tone = ""] = p.avatar.split("-");
-    const titles = p.achievements.filter((a) => a.at);
+    // Every title, by tier: the earned ones to wear, the rest with what unlocks them.
+    const titles = tiers.flatMap((t: Tier) => p.achievements.filter((a) => a.tier === t));
     return h(
       "section",
       null,
@@ -192,41 +207,45 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
         ),
       ),
       h("h3", null, "Титла"),
-      titles.length
-        ? h(
-            "ul",
-            { class: "chips" },
-            h(
-              "li",
-              null,
-              h(
-                "button",
-                { class: "chip", type: "button", "aria-pressed": !p.title, onclick: () => set({ title: "" }) },
-                "Без титла",
-              ),
-            ),
-            titles.map((a) =>
-              h(
-                "li",
-                null,
-                h(
+      h("p", { class: "muted" }, "Титлата се вижда под името ти. Всяко постижение отключва една."),
+      h(
+        "ul",
+        { class: "titles" },
+        h(
+          "li",
+          null,
+          h(
+            "button",
+            { class: "title-pick", type: "button", "aria-pressed": !p.title, onclick: () => set({ title: "" }) },
+            h("span", { class: "title-name" }, "Без титла"),
+          ),
+        ),
+        titles.map((a) =>
+          h(
+            "li",
+            null,
+            a.at
+              ? h(
                   "button",
                   {
-                    class: "chip",
+                    class: `title-pick t-${a.tier}`,
                     type: "button",
                     "aria-pressed": a.id === p.title,
                     onclick: () => set({ title: a.id }),
                   },
-                  a.name,
+                  h("span", { class: "title-name" }, a.name),
+                  h("span", { class: "title-tier" }, tierWords[a.tier].title),
+                )
+              : h(
+                  "div",
+                  { class: `title-pick locked t-${a.tier}` },
+                  h("span", { class: "title-name" }, a.name),
+                  h("span", { class: "title-tier" }, tierWords[a.tier].title),
+                  h("span", { class: "title-how" }, `Отключва се: ${lower(a.about)}`),
                 ),
-              ),
-            ),
-          )
-        : h(
-            "p",
-            { class: "muted" },
-            "Титлите са имената на постиженията ти. Щом спечелиш първото, ще можеш да го сложиш тук.",
           ),
+        ),
+      ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     );
   };

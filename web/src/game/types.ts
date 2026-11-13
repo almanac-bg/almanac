@@ -1,5 +1,7 @@
 // What the server sends while playing (internal/play and internal/bank, as JSON).
 
+import type { Tier } from "../ui.ts";
+
 export interface Picture {
   src: string;
   srcset: string;
@@ -114,6 +116,7 @@ export interface Score {
   me?: boolean;
   avatar?: string;
   title?: string;
+  titleTier?: Tier;
   level?: number;
 }
 

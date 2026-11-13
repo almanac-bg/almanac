@@ -6,13 +6,14 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go } from "../lib/router.ts";
 import { type Invitation, invitations, player, user } from "../state.ts";
-import { avatar } from "../ui.ts";
+import { avatar, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
   name: string;
   avatar?: string;
   title?: string;
+  titleTier?: Tier;
   level?: number;
   today?: { points: number; rights: number };
   won: number;
@@ -163,7 +164,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
       "div",
       { class: "friend-text" },
       h("strong", { class: "friend-name" }, f.name),
-      f.title ? h("span", { class: "who-title" }, f.title) : null,
+      f.title ? h("span", { class: `who-title t-${f.titleTier ?? "common"}` }, f.title) : null,
       h(
         "span",
         { class: "friend-day" },

@@ -4,7 +4,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
-import { type AchievementInfo, badge, meter } from "../ui.ts";
+import { type AchievementInfo, badge, meter, tierWords } from "../ui.ts";
 
 interface News {
   achievements: AchievementInfo[];
@@ -61,12 +61,12 @@ function unlocked(a: AchievementInfo): Child {
   const error = signal("");
   return h(
     "section",
-    { class: "card unlock" },
+    { class: `card unlock t-${a.tier}` },
     badge(a, true),
     h(
       "div",
       { class: "unlock-text" },
-      h("p", { class: "kicker" }, "Ново постижение"),
+      h("p", { class: "kicker" }, `Ново ${tierWords[a.tier].one} постижение`),
       h("strong", null, a.name),
       h("span", { class: "muted" }, a.about),
       () =>
