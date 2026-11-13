@@ -28,7 +28,7 @@ export function rooms() {
       null,
       h(
         "button",
-        { class: `chip ${id ? toneOf(id) : "tone-mixed"}`, type: "button", onclick: () => open(id) },
+        { class: `chip ${id ? toneOf(id) : "tone-gold"}`, type: "button", onclick: () => open(id) },
         h("span", { class: "dot", "aria-hidden": "true" }),
         name,
       ),
