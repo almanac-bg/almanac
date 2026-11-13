@@ -31,4 +31,10 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await page.getByRole("button", { name: "Изключи звуците" }).click();
   await page.reload();
   await expect(page.getByRole("button", { name: "Включи звуците" })).toBeVisible();
+
+  // Достъпност: bigger text and less motion stay on this device too.
+  await page.getByRole("switch", { name: "По-едър текст" }).click();
+  await expect(page.getByRole("switch", { name: "По-едър текст" })).toHaveAttribute("aria-checked", "true");
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/big-text/);
 });

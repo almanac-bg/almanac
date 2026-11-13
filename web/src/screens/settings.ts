@@ -3,6 +3,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
+import { bigText, calm, setBigText, setCalm, setTick, tickOn } from "../lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { setSound, soundOn } from "../lib/sound.ts";
@@ -22,6 +23,7 @@ export function settings() {
           { class: "settings" },
           nameForm(),
           sounds(),
+          access(),
           reminders(),
           account(),
           h(
@@ -157,6 +159,37 @@ function sounds(): Child {
     h("button", { class: "btn", type: "button", onclick: () => setSound(!soundOn.peek()) }, () =>
       soundOn() ? "Изключи звуците" : "Включи звуците",
     ),
+  );
+}
+
+/** Достъпност: less motion, bigger text, the clock's ticking — for this device. */
+function access(): Child {
+  const row = (label: string, about: string, on: () => boolean, set: (v: boolean) => void) =>
+    h(
+      "div",
+      { class: "switch-row" },
+      h("span", { class: "switch-text" }, h("b", null, label), h("span", { class: "muted" }, about)),
+      h(
+        "button",
+        {
+          class: "switch",
+          type: "button",
+          role: "switch",
+          "aria-checked": on,
+          "aria-label": label,
+          onclick: () => set(!on()),
+        },
+        h("span", { class: "switch-knob", "aria-hidden": "true" }),
+      ),
+    );
+  return h(
+    "section",
+    null,
+    h("h2", null, "Достъпност"),
+    h("p", { class: "muted" }, "Важи за това устройство."),
+    row("По-малко движение", "Без анимации; таймерът пак тече.", calm, setCalm),
+    row("По-едър текст", "Всичко малко по-голямо.", bigText, setBigText),
+    row("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
   );
 }
 
