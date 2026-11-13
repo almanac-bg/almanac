@@ -670,6 +670,8 @@ type ReviewedView struct {
 
 type PlayerView struct {
 	play.Look
+	// Key tells players apart in a room (names may repeat): the order they came in.
+	Key      int    `json:"key"`
 	Name     string `json:"name"`
 	Points   int    `json:"points"`
 	Rights   int    `json:"rights"`
@@ -716,9 +718,9 @@ func (r *Room) View(viewer int64) View {
 	if h := r.member(r.host); h != nil && !r.duel {
 		v.Host = h.Name
 	}
-	for _, m := range r.players {
+	for i, m := range r.players {
 		p := PlayerView{
-			Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
+			Key: i, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
 			Me: m.ID == viewer, Recording: m.ID == recordingID,
 		}
 		if r.phase == Reveal {

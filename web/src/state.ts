@@ -7,6 +7,8 @@ import { play } from "./lib/sound.ts";
 export interface User {
   id: number;
   name: string;
+  /** The player's tag, without the @: how friends find them. */
+  tag: string;
   email?: string;
   admin?: boolean;
 }
@@ -51,14 +53,21 @@ export interface Invitation {
 /** The duels friends ask the player to now: Заедно lists them, and the nav marks that there are some. */
 export const invitations = signal<Invitation[]>([]);
 
-/** Asks every half minute, while the page is in view, whether a friend calls the player to a duel. */
+/** How many friend requests wait for the player's answer. */
+export const friendRequests = signal(0);
+
+/** Asks every half minute, while the page is in view, whether a friend calls the player to a duel, or someone asks
+ * to be friends. */
 export function watchInvitations(): void {
   const check = async () => {
     if (!user.peek() || document.hidden) return;
     try {
-      const now = (await api<{ invites: Invitation[] }>("GET", "/api/friends/invites")).invites;
-      if (now.some((i) => !invitations.peek().some((was) => was.code === i.code))) play("ping");
+      const r = await api<{ invites: Invitation[]; requests: number }>("GET", "/api/friends/invites");
+      const now = r.invites;
+      if (now.some((i) => !invitations.peek().some((was) => was.code === i.code)) || r.requests > friendRequests.peek())
+        play("ping");
       invitations.set(now);
+      friendRequests.set(r.requests);
     } catch {
       // Offline for a moment: the next look will tell.
     }

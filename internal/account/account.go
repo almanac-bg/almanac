@@ -22,10 +22,12 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// User is a player.
+// User is a player: a name of their choosing (anyone's, since names may repeat) and a tag that is theirs alone
+// (@tag), by which friends find them.
 type User struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
+	Tag   string `json:"tag"`
 	Email string `json:"email,omitempty"`
 	Admin bool   `json:"admin,omitempty"`
 }
@@ -50,7 +52,8 @@ var (
 	ErrBadCode     = errors.New("wrong code")
 	ErrCodeExpired = errors.New("the code expired or ran out of tries")
 	ErrBadName     = errors.New("bad name")
-	ErrNameTaken   = errors.New("name taken")
+	ErrBadTag      = errors.New("bad tag")
+	ErrTagTaken    = errors.New("tag taken")
 )
 
 // Accounts does the work; Merge, if set, moves a guest's progress into the account they sign in to (each part of the
@@ -100,26 +103,27 @@ func (a *Accounts) Guest(ctx context.Context) (User, string, error) {
 	return u, token, err
 }
 
-// createUser makes a player with a name of their own (the first free one drawn).
+// createUser makes a player with a name and a tag drawn for them (the first free tag), until they choose their own.
 func createUser(tx *sql.Tx, email string) (User, error) {
 	now := store.Now()
 	var mail any
 	if email != "" {
 		mail = email
 	}
+	name := randomName()
 	for range 50 {
-		name := randomName()
-		res, err := tx.Exec(`INSERT INTO users (name, name_key, email, created_at, seen_at) VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT (name_key) DO NOTHING`, name, nameKey(name), mail, now, now)
+		tag := randomTag()
+		res, err := tx.Exec(`INSERT INTO users (name, tag, email, created_at, seen_at) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (tag) DO NOTHING`, name, tag, mail, now, now)
 		if err != nil {
 			return User{}, err
 		}
 		if n, _ := res.RowsAffected(); n == 1 {
 			id, _ := res.LastInsertId()
-			return User{ID: id, Name: name, Email: email}, nil
+			return User{ID: id, Name: name, Tag: tag, Email: email}, nil
 		}
 	}
-	return User{}, errors.New("no free name")
+	return User{}, errors.New("no free tag")
 }
 
 // Session finds who a token signs in, and keeps the session alive while it's used.
@@ -131,9 +135,9 @@ func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
 	var u User
 	var email sql.NullString
 	var seen, expires int64
-	err := a.DB.Read.QueryRowContext(ctx, `SELECT u.id, u.name, u.email, u.admin, s.seen_at, s.expires_at
+	err := a.DB.Read.QueryRowContext(ctx, `SELECT u.id, u.name, u.tag, u.email, u.admin, s.seen_at, s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, hash,
-	).Scan(&u.ID, &u.Name, &email, &u.Admin, &seen, &expires)
+	).Scan(&u.ID, &u.Name, &u.Tag, &email, &u.Admin, &seen, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -266,11 +270,11 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		}
 
 		var owner User
-		var name string
-		err = tx.QueryRow(`SELECT id, name, admin FROM users WHERE email = ?`, email).Scan(&owner.ID, &name, &owner.Admin)
+		err = tx.QueryRow(`SELECT id, name, tag, admin FROM users WHERE email = ?`, email).
+			Scan(&owner.ID, &owner.Name, &owner.Tag, &owner.Admin)
 		switch {
 		case err == nil:
-			owner.Name, owner.Email = name, email
+			owner.Email = email
 			if current != nil && current.Guest() && current.ID != owner.ID {
 				for _, merge := range a.Merge {
 					if err := merge(tx, current.ID, owner.ID); err != nil {
@@ -307,30 +311,52 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 	return u, token, nil
 }
 
-// Rename gives a player a new name.
+// Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).
 func (a *Accounts) Rename(ctx context.Context, userID int64, name string) (string, error) {
 	name, err := NormalName(name)
 	if err != nil {
 		return "", err
 	}
-	res, err := a.DB.Write.ExecContext(ctx, `UPDATE users SET name = ?, name_key = ? WHERE id = ?
-		AND NOT EXISTS (SELECT 1 FROM users WHERE name_key = ? AND id != ?)`,
-		name, nameKey(name), userID, nameKey(name), userID)
+	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, name, userID)
+	return name, err
+}
+
+// Retag gives a player a new tag, if it's free.
+func (a *Accounts) Retag(ctx context.Context, userID int64, tag string) (string, error) {
+	tag, err := NormalTag(tag)
 	if err != nil {
 		return "", err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return "", ErrNameTaken
+	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET tag = ? WHERE id = ?`, tag, userID)
+	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+		return "", ErrTagTaken
 	}
-	return name, nil
+	return tag, err
 }
 
 const (
 	NameMin = 2
-	NameMax = 20
+	NameMax = 30
+	TagMin  = 3
+	TagMax  = 20
 )
 
-// NormalName is a name as players see it — 2 to 20 letters, digits, single spaces, dots, dashes and underscores — or
+// NormalTag is a tag as it's kept — 3 to 20 latin letters, digits and underscores, starting with a letter,
+// lowercase, without the @ it's written with — or ErrBadTag.
+func NormalTag(s string) (string, error) {
+	s = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(s), "@"))
+	if len(s) < TagMin || len(s) > TagMax || s[0] < 'a' || s[0] > 'z' || reserved[s] {
+		return "", ErrBadTag
+	}
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			return "", ErrBadTag
+		}
+	}
+	return s, nil
+}
+
+// NormalName is a name as players see it — 2 to 30 letters, digits, single spaces, dots, dashes and underscores — or
 // ErrBadName.
 func NormalName(s string) (string, error) {
 	s = strings.Join(strings.Fields(s), " ")
@@ -348,15 +374,16 @@ func NormalName(s string) (string, error) {
 			return "", ErrBadName
 		}
 	}
-	if letters == 0 || reserved[nameKey(s)] {
+	if letters == 0 || reserved[strings.ToLower(s)] {
 		return "", ErrBadName
 	}
 	return s, nil
 }
 
-var reserved = map[string]bool{"алманах": true, "almanac": true, "admin": true, "админ": true, "администратор": true}
-
-func nameKey(name string) string { return strings.ToLower(name) }
+var reserved = map[string]bool{
+	"алманах": true, "almanac": true, "admin": true, "админ": true, "администратор": true, "administrator": true,
+	"support": true, "help": true, "root": true, "system": true,
+}
 
 // Names a new player starts with: an animal of Bulgaria and a number, until they choose their own.
 var animals = []string{
@@ -368,4 +395,16 @@ func randomName() string {
 	i, _ := rand.Int(rand.Reader, big.NewInt(int64(len(animals))))
 	n, _ := rand.Int(rand.Reader, big.NewInt(900))
 	return fmt.Sprintf("%s %d", animals[i.Int64()], 100+n.Int64())
+}
+
+// Tags a new player starts with: an animal's name and four digits, until they choose their own.
+var tagAnimals = []string{
+	"owl", "fox", "hedgehog", "otter", "badger", "deer", "blackbird", "stork", "dolphin", "lynx", "eagle", "falcon",
+	"wolf", "bear", "heron", "pelican", "turtle", "squirrel", "lark", "trout", "beaver", "swallow", "hare", "robin",
+}
+
+func randomTag() string {
+	i, _ := rand.Int(rand.Reader, big.NewInt(int64(len(tagAnimals))))
+	n, _ := rand.Int(rand.Reader, big.NewInt(9000))
+	return fmt.Sprintf("%s%d", tagAnimals[i.Int64()], 1000+n.Int64())
 }

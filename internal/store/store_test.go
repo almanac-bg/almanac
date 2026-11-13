@@ -14,7 +14,7 @@ func TestOpenMigratesAndReopens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Write.Exec(`INSERT INTO users (name, name_key, created_at, seen_at) VALUES ('Аз', 'аз', 1, 1)`); err != nil {
+	if _, err := db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Аз', 'az', 1, 1)`); err != nil {
 		t.Fatal(err)
 	}
 	var name, mode string
@@ -63,9 +63,9 @@ func TestTxRollsBack(t *testing.T) {
 	}
 	defer db.Close()
 	err = db.Tx(t.Context(), func(tx *sql.Tx) error {
-		_, _ = tx.Exec(`INSERT INTO users (name, name_key, created_at, seen_at) VALUES ('А', 'а', 1, 1)`)
-		_, err := tx.Exec(`INSERT INTO users (name, name_key, created_at, seen_at) VALUES ('а', 'а', 1, 1)`)
-		return err // the same name: refused, and the first insert goes too
+		_, _ = tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('А', 'abc', 1, 1)`)
+		_, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Б', 'abc', 1, 1)`)
+		return err // the same tag: refused, and the first insert goes too
 	})
 	var n int
 	_ = db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
@@ -126,6 +126,42 @@ func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
 	_ = db.Read.QueryRow(`SELECT count(*) FROM answers`).Scan(&answers)
 	if answers != 0 {
 		t.Fatal("the answers' reference to runs didn't survive the rebuild")
+	}
+	db.Close()
+}
+
+// Tags (0009) rebuild users: everyone gets a tag, names may repeat, and what points to users stays.
+func TestTagsKeepPlayers(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 8)
+	for _, q := range []string{
+		`INSERT INTO users (id, name, name_key, email, created_at, seen_at, avatar) VALUES (1, 'Аз', 'аз', 'a@b.bg', 1, 1, 'moon-gold')`,
+		`INSERT INTO users (id, name, name_key, created_at, seen_at) VALUES (2, 'Ти', 'ти', 1, 1)`,
+		`INSERT INTO friends (user_id, friend_id, since) VALUES (1, 2, 5), (2, 1, 5)`,
+		`INSERT INTO sessions (token_hash, user_id, created_at, seen_at, expires_at) VALUES (x'01', 1, 1, 1, 9)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var tag, avatar, email string
+	_ = db.Read.QueryRow(`SELECT tag, avatar, email FROM users WHERE id = 1`).Scan(&tag, &avatar, &email)
+	if tag != "player1" || avatar != "moon-gold" || email != "a@b.bg" {
+		t.Fatalf("after the rebuild: %q %q %q", tag, avatar, email)
+	}
+	if _, err := db.Write.Exec(`UPDATE users SET name = 'Аз' WHERE id = 2`); err != nil {
+		t.Fatalf("two players named alike: %v", err)
+	}
+	// Deleting a player still takes their friendships and sessions along.
+	_, _ = db.Write.Exec(`DELETE FROM users WHERE id = 1`)
+	var friends, sessions int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM friends`).Scan(&friends)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM sessions`).Scan(&sessions)
+	if friends != 0 || sessions != 0 {
+		t.Fatalf("after deleting a player: %d friendships, %d sessions", friends, sessions)
 	}
 	db.Close()
 }

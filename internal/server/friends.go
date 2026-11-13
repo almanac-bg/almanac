@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/room"
@@ -32,11 +34,73 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if list == nil {
 		list = []play.Friend{}
 	}
+	in, out, err := s.game.Requests(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
 	return ok(w, map[string]any{
-		"invite":  s.cfg.PublicURL + "/f/" + code,
-		"friends": list,
-		"invites": s.rooms.InvitesFor(u.ID),
+		"invite":   s.cfg.PublicURL + "/f/" + code,
+		"friends":  list,
+		"invites":  s.rooms.InvitesFor(u.ID),
+		"requests": map[string]any{"in": in, "out": out},
 	})
+}
+
+// requestFriend asks someone to be friends: by their tag (@tag) or an email address.
+func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		To string `json:"to"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	// Tags are public, but a stream of guesses isn't asking a friend.
+	if !s.limits.allow("request:"+s.clientIP(r), 30, time.Hour) {
+		return errTooMany
+	}
+	to, byEmail := strings.TrimSpace(in.To), strings.Contains(in.To, "@") && !strings.HasPrefix(strings.TrimSpace(in.To), "@")
+	if byEmail {
+		to, err = account.NormalEmail(to)
+	} else {
+		to, err = account.NormalTag(to)
+	}
+	if err != nil {
+		return err
+	}
+	sent, err := s.game.Request(r.Context(), u.ID, to, byEmail)
+	if err != nil {
+		return err
+	}
+	return ok(w, sent)
+}
+
+// answerRequest takes a friend request: accept it (the one asked), or drop it (either of the two).
+func (s *Server) answerRequest(accept bool) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		u, err := s.mustUser(r)
+		if err != nil {
+			return err
+		}
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			return play.ErrNoRequest
+		}
+		if !accept {
+			if err := s.game.Withdraw(r.Context(), u.ID, id); err != nil {
+				return err
+			}
+			return ok(w, map[string]bool{"ok": true})
+		}
+		name, err := s.game.Accept(r.Context(), u.ID, id)
+		if err != nil {
+			return err
+		}
+		return ok(w, map[string]any{"name": name})
+	}
 }
 
 // duelInvites lists the duels friends ask the player to now: light enough for a page to ask every half minute, to
@@ -47,9 +111,13 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]any{"invites": []room.Invitation{}})
+		return ok(w, map[string]any{"invites": []room.Invitation{}, "requests": 0})
 	}
-	return ok(w, map[string]any{"invites": s.rooms.InvitesFor(u.ID)})
+	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"invites": s.rooms.InvitesFor(u.ID), "requests": n})
 }
 
 // inviteInfo says whose an invite link is, for the page that asks whether to accept it (anyone may ask), and

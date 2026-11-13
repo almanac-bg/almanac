@@ -137,15 +137,40 @@ func TestNames(t *testing.T) {
 	if name, err := a.Rename(ctx, one.ID, "  Иван   Петров "); err != nil || name != "Иван Петров" {
 		t.Fatalf("%q %v", name, err)
 	}
-	if _, err := a.Rename(ctx, two.ID, "иван петров"); !errors.Is(err, ErrNameTaken) {
-		t.Fatalf("a taken name in other case: %v", err)
+	// Names may repeat: the tag tells players apart.
+	if _, err := a.Rename(ctx, two.ID, "Иван Петров"); err != nil {
+		t.Fatalf("a name someone else has: %v", err)
 	}
-	if _, err := a.Rename(ctx, one.ID, "ИВАН петров"); err != nil {
-		t.Fatalf("one's own name in other case: %v", err)
-	}
-	for _, bad := range []string{"А", "123", "Алманах", "<script>", "Иван!", "абвгдежзийклмнопрстуф"} {
+	for _, bad := range []string{"А", "123", "Алманах", "<script>", "Иван!", "абвгдежзийклмнопрстуфхцчшщъьюяю"} {
 		if _, err := NormalName(bad); !errors.Is(err, ErrBadName) {
 			t.Errorf("%q passed", bad)
 		}
+	}
+}
+
+func TestTags(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	one, token, _ := a.Guest(ctx)
+	two, _, _ := a.Guest(ctx)
+	if one.Tag == "" || one.Tag == two.Tag {
+		t.Fatalf("drawn tags: %q %q", one.Tag, two.Tag)
+	}
+	if tag, err := a.Retag(ctx, one.ID, " @Otsirh "); err != nil || tag != "otsirh" {
+		t.Fatalf("%q %v", tag, err)
+	}
+	if _, err := a.Retag(ctx, two.ID, "OTSIRH"); !errors.Is(err, ErrTagTaken) {
+		t.Fatalf("a taken tag in other case: %v", err)
+	}
+	if _, err := a.Retag(ctx, one.ID, "otsirh"); err != nil {
+		t.Fatalf("one's own tag again: %v", err)
+	}
+	for _, bad := range []string{"ab", "1abc", "иван", "a b c", "admin", "a.b.c", "abcdefghijklmnopqrstu"} {
+		if _, err := NormalTag(bad); !errors.Is(err, ErrBadTag) {
+			t.Errorf("%q passed", bad)
+		}
+	}
+	if u, _ := a.Session(ctx, token); u == nil || u.Tag != "otsirh" {
+		t.Fatalf("the session's user: %+v", u)
 	}
 }
