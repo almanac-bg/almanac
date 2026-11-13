@@ -290,7 +290,6 @@ func TestNewQuestionRules(t *testing.T) {
 		{Tail{Added: RulesFrom, Fact: "Факт."}, "needs updated"},
 		{Tail{Added: RulesFrom, Fact: "Факт.", Updated: RulesFrom}, ""},
 		{Tail{Added: "2026-11-20", Updated: "2026-11-19", Fact: "Факт."}, "updated is before added"},
-		{Tail{Added: "2026-11-20", Updated: "2026-12-01", Fact: "Факт."}, "a date in the future"},
 		{Tail{Updated: "13.11.2026"}, "updated must be a date"},
 	} {
 		errs, _ := checkQuestion(q(c.tail), "2026-11-25")

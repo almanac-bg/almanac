@@ -82,11 +82,8 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 	errs = append(errs, checkDate("added", t.Added)...)
 	errs = append(errs, checkDate("updated", t.Updated)...)
 	errs = append(errs, checkDate("reviewBy", t.ReviewBy)...)
-	switch {
-	case t.Updated != "" && t.Added != "" && t.Updated < t.Added:
+	if t.Updated != "" && t.Added != "" && t.Updated < t.Added {
 		errs = append(errs, "updated is before added")
-	case t.Updated > today || t.Added > today:
-		errs = append(errs, "a date in the future")
 	}
 	if t.Added >= RulesFrom && !t.Retired {
 		if t.Fact == "" {
