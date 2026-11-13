@@ -140,7 +140,6 @@
     --i-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19L5 9h14z'/%3E%3C/svg%3E");
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
     --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z'/%3E%3C/svg%3E");
-    --i-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5.5v13l10.5-6.5z'/%3E%3C/svg%3E");
     --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 20h18'/%3E%3Cpath d='M5 20v-6h4.5v6'/%3E%3Cpath d='M9.5 20V8.5h5V20'/%3E%3Cpath d='M14.5 20v-4H19v4'/%3E%3C/svg%3E");
     --i-award: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z'/%3E%3Cpath d='M8.7 13.5 7 20.5l5-2.6 5 2.6-1.7-7'/%3E%3C/svg%3E");
     --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'/%3E%3Cpath d='M4.5 20.5a7.5 7.5 0 0 1 15 0'/%3E%3C/svg%3E");
@@ -348,7 +347,7 @@
     text-decoration: none;
   }
 
-  /* The five main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
+  /* The four main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
   .tabs {
     position: fixed;
     right: 0;
@@ -356,7 +355,7 @@
     left: 0;
     z-index: 10;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
       max(var(--space-2), env(safe-area-inset-left));
     border-top: 1px solid var(--line);
@@ -410,10 +409,6 @@
 
   .i-home {
     --i: var(--i-home);
-  }
-
-  .i-play {
-    --i: var(--i-play);
   }
 
   .i-podium {

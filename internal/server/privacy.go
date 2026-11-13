@@ -22,7 +22,7 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">
-<header class="top"><a class="name" href="/"><img class="mark" src="/favicon.svg" alt="" width="32" height="32">АЛМАНАХ</a><nav class="tabs" aria-label="Основно"><a href="/">Начало</a><a href="/play">Играй</a><a href="/ranks">Класации</a><a href="/rewards">Награди</a><a href="/me">Профил</a></nav></header>
+<header class="top"><a class="name" href="/"><img class="mark" src="/favicon.svg" alt="" width="32" height="32">АЛМАНАХ</a><nav class="tabs" aria-label="Основно"><a href="/">Начало</a><a href="/ranks">Класации</a><a href="/rewards">Награди</a><a href="/me">Профил</a></nav></header>
 <main class="screen prose">
 <h1>{{.Title}}</h1>
 {{.Body}}

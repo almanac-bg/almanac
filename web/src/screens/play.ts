@@ -1,4 +1,5 @@
-// Игра: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same game.
+// Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
+// game. The tiles live on Начало; a run of one is /play/<topic>.
 
 import { type Mastery, masteryBadge, masteryLeft } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
@@ -10,29 +11,21 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
 import { meter, questions, toneOf } from "../ui.ts";
-import { modes } from "./modes.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-export function topics() {
-  title("Играй");
+/** The topics as tiles, each with how well the player knows it, and a run across all of them (on Начало). */
+export function topics(): Child {
   const stats = signal<Stats | null>(null);
   if (user.peek()) loadStats().then(stats.set, () => {});
   return h(
     "section",
-    { class: "screen" },
+    { class: "stack" },
     h(
       "div",
-      { class: "intro" },
-      h(
-        "div",
-        { class: "title-row" },
-        h("h1", null, "Играй"),
-        h("a", { class: "btn primary inline", href: "/play/all" }, "Всички теми"),
-      ),
-      h("p", { class: "lead" }, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
+      { class: "title-row" },
+      h("h2", { class: "section-title" }, "Теми"),
+      h("a", { class: "btn inline", href: "/play/all" }, "Всички теми"),
     ),
-    modes(["duel", "royal", "room"], "С други"),
-    h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.mastery ?? [];
       return categories.map((c) =>
@@ -80,7 +73,7 @@ export function topic([id = ""]: string[]) {
   const category = id === "all" ? "" : id;
   const name = category ? categories.find((c) => c.id === category)?.name : "Всички теми";
   if (name === undefined) {
-    go("/play", true);
+    go("/", true);
     return null;
   }
   title(name);
@@ -97,7 +90,7 @@ export function topic([id = ""]: string[]) {
           "div",
           { class: "actions" },
           h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-          h("a", { class: "btn", href: "/play" }, "Друга тема"),
+          h("a", { class: "btn", href: "/" }, "Друга тема"),
         ),
       ),
     ),

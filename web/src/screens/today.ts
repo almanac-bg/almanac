@@ -1,4 +1,5 @@
-// Начало: the day's ten questions, the same for everyone, once; your streak; and the other ways to play.
+// Начало: the day's ten questions, the same for everyone, once; your streak; the day's goals; and every other way
+// to play — with others, and by topic.
 
 import { news } from "../game/news.ts";
 import { board, summary } from "../game/results.ts";
@@ -11,6 +12,7 @@ import { player, user } from "../state.ts";
 import { figure, streak } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
+import { topics } from "./play.ts";
 
 interface Today {
   day: string;
@@ -90,7 +92,8 @@ export function today() {
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
       user.peek() ? streak(t.streak, t.week) : null,
       goalsCard(),
-      modes(["topics", "duel", "royal", "room"], "Още игри"),
+      modes(["duel", "royal", "room"], "С други"),
+      topics(),
     );
   };
 
@@ -119,7 +122,8 @@ function finished(t: Today, s: State): Child {
       },
       countdown(),
       goalsCard(),
-      modes(["topics", "duel", "royal", "room"], "Още игри"),
+      modes(["duel", "royal", "room"], "С други"),
+      topics(),
       () => {
         const f = fresh().friends;
         return f?.length ? board("Приятели днес", f) : null;

@@ -10,7 +10,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // The day's goal is done, said once with its XP.
   await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+100 XP");
-  await expect(page.locator(".modes").getByRole("link", { name: /Теми/ })).toBeVisible();
+  // After the day, the other ways to play are right there: with others, and by topic.
+  await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
+  await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
   await page.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
@@ -29,7 +31,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto("/play");
+  await page.goto("/");
   await page.getByRole("link", { name: "История" }).click();
   await playRun(page);
   // A word about a question waits for the end, in the review.
