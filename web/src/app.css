@@ -2509,6 +2509,131 @@
     mask: var(--shape, var(--s-petal)) center / contain no-repeat;
   }
 
+  /* The wardrobe on an avatar: a frame drawn around it (art/frame.ts), a pattern behind its shape. */
+  .avatar-frame {
+    position: absolute;
+    inset: -16.7%;
+    width: 133.4%;
+    height: 133.4%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .avatar.framed {
+    margin: calc(var(--size) * 0.12);
+  }
+
+  .frame-line {
+    fill: none;
+    stroke: var(--frame, var(--line-strong));
+    stroke-width: 2.5;
+  }
+
+  .frame-line.thin {
+    stroke-width: 1.5;
+  }
+
+  .frame-line.glow {
+    filter: drop-shadow(0 0 3px var(--frame));
+  }
+
+  .frame-dots {
+    fill: none;
+    stroke: var(--frame);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 0 6;
+  }
+
+  .frame-flame {
+    fill: var(--rose);
+    stroke: color-mix(in srgb, var(--rose) 60%, black);
+    stroke-width: 0.8;
+  }
+
+  .frame-leaf {
+    fill: var(--frame);
+    stroke: color-mix(in srgb, var(--frame) 60%, black);
+    stroke-width: 0.6;
+  }
+
+  .frame-gem {
+    fill: var(--frame);
+    stroke: color-mix(in srgb, var(--frame) 55%, black);
+    stroke-width: 0.8;
+  }
+
+  .frame-ray {
+    stroke: var(--frame);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .fr-ring {
+    --frame: var(--text-muted);
+  }
+
+  .fr-double,
+  .fr-laurel {
+    --frame: var(--gold);
+  }
+
+  .fr-dots {
+    --frame: var(--sky);
+  }
+
+  .fr-flames {
+    --frame: var(--gold);
+  }
+
+  .fr-gem {
+    --frame: var(--div-diamond);
+  }
+
+  .fr-halo {
+    --frame: var(--div-legend);
+  }
+
+  .bd-dots {
+    background-image: radial-gradient(color-mix(in srgb, var(--on-fill) 22%, transparent) 1.3px, transparent 1.7px);
+    background-size: calc(var(--size) / 6) calc(var(--size) / 6);
+  }
+
+  .bd-stripes {
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 3px,
+      transparent 3px 8px
+    );
+  }
+
+  .bd-grid {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px);
+    background-size: calc(var(--size) / 5) calc(var(--size) / 5);
+  }
+
+  .bd-rays {
+    background-image: repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 12deg,
+      transparent 12deg 24deg
+    );
+  }
+
+  .bd-stars {
+    background-image:
+      radial-gradient(color-mix(in srgb, white 70%, transparent) 1px, transparent 1.6px),
+      radial-gradient(color-mix(in srgb, white 45%, transparent) 0.8px, transparent 1.3px);
+    background-position:
+      0 0,
+      calc(var(--size) / 8) calc(var(--size) / 10);
+    background-size:
+      calc(var(--size) / 4) calc(var(--size) / 4),
+      calc(var(--size) / 3) calc(var(--size) / 3);
+  }
+
   .avatar.s {
     --size: 28px;
   }

@@ -75,7 +75,13 @@ function head(progress: () => Progress | null): Child {
     { class: "me-head" },
     () => {
       const p = progress();
-      return avatar(p?.avatar, { size: "l", level: p?.level, name: user.peek()?.name });
+      return avatar(p?.avatar, {
+        size: "l",
+        level: p?.level,
+        name: user.peek()?.name,
+        frame: p?.frame,
+        backdrop: p?.backdrop,
+      });
     },
     h(
       "div",

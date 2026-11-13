@@ -223,7 +223,7 @@ func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
 				return err
 			}
 			if len(list) >= 3 {
-				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?), rated = rated + 1 WHERE id = ?`,
+				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1 WHERE id = ?2`,
 					p.delta, p.user); err != nil {
 					return err
 				}

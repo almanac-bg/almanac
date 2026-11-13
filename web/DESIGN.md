@@ -120,7 +120,11 @@ takes a token.
 - **Division emblems are generated** (`web/src/art/emblem.ts`): a silhouette per division — Бронз a plain shield,
   Сребро a chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned star shield with rays — in
   `--div-*` colours.
-- New visuals of the systems (frames, season art) come from generators like these, in `web/src/art/`.
+- **Avatar frames are generated** (`web/src/art/frame.ts`) around the rounded tile: Пръстен, Двоен пръстен, Точки,
+  Пламъци, Лавров венец, Кристал, Ореол; **patterns** behind the shape are CSS (`.bd-dots`, `-stripes`, `-grid`,
+  `-rays`, `-stars`). Both unlock by level, achievement or the highest division reached, and show on every avatar
+  (the server sends a look's avatar as `shape-tone/frame/backdrop`).
+- New visuals of the systems (season art) come from generators like these, in `web/src/art/`.
 
 ## Flow
 

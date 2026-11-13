@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -872,5 +873,32 @@ func TestAlmanac(t *testing.T) {
 	}
 	if len(a.Facts) == 0 {
 		t.Fatal("ten right answers, and nothing learned")
+	}
+}
+
+func TestWardrobe(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	p, _ := w.g.ProgressOf(ctx, ana)
+	if len(p.Frames) != len(Frames) || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
+		t.Fatalf("a new player's frames: %+v", p.Frames)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a locked frame: %v", err)
+	}
+	// Two perfect runs make level 2: the ring is hers, and it shows wherever she does.
+	for range 2 {
+		s, _ := w.g.StartTopic(ctx, ana, "")
+		w.play(ana, s.ID, repeat(w.right, Length)...)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), ptr("")); err != nil {
+		t.Fatalf("an unlocked frame: %v", err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); !strings.HasSuffix(look.Avatar, "/ring/") {
+		t.Fatalf("the look worn: %q", look.Avatar)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("halo"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("Легенда's frame at the start: %v", err)
 	}
 }
