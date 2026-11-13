@@ -1,15 +1,17 @@
 // АЛМАНАХ's web client: the mark and the name, the five main places (in the header on a big screen, a bar at the
 // bottom of a phone's), and the screen the router puts under them.
 
-import { h, mount } from "./lib/dom.ts";
+import { type ApiError, api } from "./lib/api.ts";
+import { type Child, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
-import { duel, duelOne } from "./screens/duel.ts";
+import { duel, duelOne, playChallenge, until } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
+import { liveDuel } from "./screens/live.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { topic, topics } from "./screens/play.ts";
@@ -20,7 +22,7 @@ import { rooms } from "./screens/rooms.ts";
 import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
-import { duelTurns, friendRequests, watchWaiting } from "./state.ts";
+import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 
 /** The five main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
@@ -57,12 +59,13 @@ if (root) {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
               // A duel waits for the player: a dot on Играй; someone asks to be friends: a dot on Профил.
-              class: () => ((href === "/play" && duelTurns()) || (href === "/me" && friendRequests()) ? "news" : ""),
+              class: () =>
+                (href === "/play" && challenges().length) || (href === "/me" && friendRequests()) ? "news" : "",
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
             h("span", { class: "tab-label" }, label),
             () =>
-              href === "/play" && duelTurns()
+              href === "/play" && challenges().length
                 ? h("span", { class: "sr" }, " (дуел те чака)")
                 : href === "/me" && friendRequests()
                   ? h("span", { class: "sr" }, " (покана за приятелство)")
@@ -71,6 +74,11 @@ if (root) {
         ),
       ),
     ),
+    // A friend's challenge, wherever the player is (but in a game, or on the duels themselves).
+    () => {
+      const c = challenges()[0];
+      return c && !playing() && !path().startsWith("/duel") ? challengeNotice(c) : null;
+    },
     main,
   ]);
   start(
@@ -81,6 +89,7 @@ if (root) {
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
       { path: /^\/duel$/, view: duel },
+      { path: /^\/duel\/live$/, view: liveDuel },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: royal },
       { path: /^\/almanac$/, view: almanac },
@@ -99,4 +108,44 @@ if (root) {
   );
   watchWaiting();
   prepareSound();
+}
+
+/** A friend has challenged the player: who, until when, and play it or say no. */
+function challengeNotice(c: Challenge): Child {
+  const error = signal("");
+  return h(
+    "aside",
+    { class: "challenge-notice", "aria-label": "Предизвикателство" },
+    h(
+      "p",
+      { class: "challenge-text" },
+      h("strong", null, `${c.from} те предизвика на дуел`),
+      h("span", { class: "muted" }, c.started ? "Довърши играта си" : `Имаш време до ${until(c.expiresAt)}`),
+    ),
+    h(
+      "div",
+      { class: "challenge-actions" },
+      h("button", { class: "btn rose inline", type: "button", onclick: () => playChallenge(c.id) }, "Играй"),
+      c.started
+        ? null
+        : h(
+            "button",
+            {
+              class: "btn inline",
+              type: "button",
+              onclick: async () => {
+                try {
+                  await api("DELETE", `/api/duels/${c.id}`);
+                  challenges.update((list) => list.filter((x) => x.id !== c.id));
+                  checkWaiting();
+                } catch (err) {
+                  error.set((err as ApiError).message);
+                }
+              },
+            },
+            "Откажи",
+          ),
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
 }

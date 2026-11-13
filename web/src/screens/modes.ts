@@ -9,7 +9,7 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
   duel: {
     href: "/duel",
     name: "Дуел",
-    about: "Ти срещу друг играч, всеки когато може.",
+    about: "Ти срещу друг играч, на живо.",
     tone: "tone-rose",
     icon: "bolt",
   },

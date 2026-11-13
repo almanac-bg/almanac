@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -212,4 +213,45 @@ func openAt(t *testing.T, path string, n int) *DB {
 		t.Fatal(err)
 	}
 	return db
+}
+
+// Live duels (0017): open duels become live ones, those still waiting end without a result, and a recording stays
+// only on the duels settled against it.
+func TestLiveDuels(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 16)
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Аз', 'az', 1, 1), (2, 'Бо', 'bo', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, questions, started_at) VALUES (7, 1, 'duel', '[]', 1), (8, 2, 'duel', '[]', 1)`,
+		// waiting; taken and settled (it had a recording, unused); settled against its recording; a friend's
+		`INSERT INTO duels (id, kind, questions, a_id, a_run, ghost_run, created_at, expires_at) VALUES (1, 'open', '[]', 1, 7, 8, 1, 9)`,
+		`INSERT INTO duels (id, kind, questions, a_id, a_run, b_id, b_run, ghost_run, created_at, expires_at, ended_at, outcome)
+			VALUES (2, 'open', '[]', 1, 7, 2, 8, 8, 1, 9, 5, 'a')`,
+		`INSERT INTO duels (id, kind, questions, a_id, a_run, ghost_run, created_at, expires_at, ended_at, outcome)
+			VALUES (3, 'open', '[]', 1, 7, 8, 1, 9, 5, 'ghost_won')`,
+		`INSERT INTO duels (id, kind, questions, a_id, a_run, b_id, created_at, expires_at) VALUES (4, 'friend', '[]', 1, 7, 2, 1, 9)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int64]string{1: "live expired 0 1", 2: "live a 0 1", 3: "live ghost_won 1 1", 4: "friend  0 1"}
+	rows, err := db.Read.Query(`SELECT id, kind, coalesce(outcome, ''), ghost_run IS NOT NULL, rated FROM duels`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var kind, outcome string
+		var ghost, rated int
+		_ = rows.Scan(&id, &kind, &outcome, &ghost, &rated)
+		if got := fmt.Sprintf("%s %s %d %d", kind, outcome, ghost, rated); got != want[id] {
+			t.Fatalf("duel %d: %q, want %q", id, got, want[id])
+		}
+	}
+	db.Close()
 }

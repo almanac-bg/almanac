@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/room"
 )
@@ -46,7 +47,12 @@ var playerErrors = map[error]*apiError{
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
 	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такъв таг."},
 	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
-	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Имаш пет дуела, които чакат. Изчакай някой да свърши."},
+	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Пет твои предизвикателства чакат приятели. Изчакай някое да свърши."},
+	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
+	live.ErrNoMatch:        {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
+	live.ErrNotNow:         {http.StatusConflict, "not_now", "Не точно сега."},
+	live.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
+	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Чакат отговор твърде много покани: до 50."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},

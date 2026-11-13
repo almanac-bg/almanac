@@ -377,7 +377,13 @@ type stream struct {
 
 func (p *player) follow(code string) *stream {
 	p.g.t.Helper()
-	req, _ := http.NewRequest("GET", p.g.url+"/api/rooms/"+code+"/events", nil)
+	return p.stream("/api/rooms/" + code + "/events")
+}
+
+// stream opens an event stream at path.
+func (p *player) stream(path string) *stream {
+	p.g.t.Helper()
+	req, _ := http.NewRequest("GET", p.g.url+path, nil)
 	res, err := p.client.Do(req)
 	if err != nil {
 		p.g.t.Fatal(err)
@@ -471,6 +477,58 @@ func TestARoomOverHTTP(t *testing.T) {
 	res.Body.Close()
 	if !strings.HasPrefix(string(body), "event: closed") {
 		t.Fatalf("no such room: %q", body)
+	}
+}
+
+func TestALiveDuelOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+
+	// Ana waits, told for how long; Bo comes, and both see the duel.
+	as := ana.stream("/api/duels/live/events")
+	if line, _ := as.r.ReadString('\n'); line != "event: waiting\n" {
+		t.Fatalf("Ana isn't waiting: %q", line)
+	}
+	bs := bo.stream("/api/duels/live/events")
+	v := as.until(func(v map[string]any) bool { return v["phase"] == "intro" })
+	id := int64(v["id"].(float64))
+	if v["them"].(map[string]any)["name"] == nil || v["recorded"] != nil {
+		t.Fatalf("the start: %v", v)
+	}
+	path := fmt.Sprintf("/api/duels/live/%d/answer", id)
+	if status, _ := ana.call("POST", path, map[string]any{"n": 0, "answer": map[string]any{"pick": 0}}); status != 409 {
+		t.Fatalf("an answer before the question: %d", status)
+	}
+	v = bs.until(func(v map[string]any) bool { return v["phase"] == "question" })
+	answer := map[string]any{"pick": 0}
+	switch v["question"].(map[string]any)["view"].(map[string]any)["type"] {
+	case "number":
+		answer = map[string]any{"value": 1}
+	case "order":
+		answer = map[string]any{"order": []int{0, 1, 2, 3}}
+	case "truefalse":
+		answer = map[string]any{"truth": true}
+	case "match":
+		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
+	}
+	if status, out := ana.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 200 {
+		t.Fatalf("Ana's answer: %d %v", status, out)
+	}
+	v = bs.until(func(v map[string]any) bool { return v["them"].(map[string]any)["answered"] == true })
+	if v["phase"] != "question" || v["them"].(map[string]any)["given"] != nil {
+		t.Fatalf("Bo sees Ana's answer before his own: %v", v["them"])
+	}
+	stranger := g.player()
+	stranger.call("POST", "/api/guest", map[string]any{})
+	if status, _ := stranger.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 404 {
+		t.Fatalf("a stranger answered: %d", status)
+	}
+	bo.call("POST", path, map[string]any{"n": 0, "answer": answer})
+	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
+	if v["question"].(map[string]any)["reveal"] == nil || v["them"].(map[string]any)["given"] == nil {
+		t.Fatalf("no answers shown: %v", v)
 	}
 }
 
@@ -637,8 +695,14 @@ func TestNotifications(t *testing.T) {
 	_, mine = ana.call("GET", "/api/friends", nil)
 	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
 	_, duel := ana.call("POST", "/api/duels", map[string]any{"friend": boID})
+	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 0 {
+		t.Fatalf("Bo challenged before Ana played: %v", w)
+	}
 	playRun(ana, duel["state"].(map[string]any))
 	pushes("/bo", 2)
+	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 1 {
+		t.Fatalf("Bo's challenges: %v", w)
+	}
 }
 
 func TestLinkPreviews(t *testing.T) {

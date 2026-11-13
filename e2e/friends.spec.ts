@@ -20,15 +20,16 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
 
-  // Ana asks Bo to a duel and plays hers now; Bo finds it his turn, and plays when he can.
+  // Ana challenges Bo and plays hers now; once she has, Bo is told wherever he is, and plays from there.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
   await playRun(a);
   await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
-  await b.goto("/duel");
-  await b.locator(".duel-row.s-play").click();
-  await expect(b.getByRole("heading", { name: /те предизвика/ })).toBeVisible();
-  await b.getByRole("button", { name: "Играй" }).click();
+  await b.goto("/");
+  const notice = b.locator(".challenge-notice");
+  await expect(notice).toContainText("те предизвика на дуел");
+  await notice.getByRole("button", { name: "Играй" }).click();
   await playRun(b);
+  await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
@@ -51,10 +52,18 @@ test("a friend can turn a duel down", async ({ browser }) => {
   await a.reload();
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
   await playRun(a);
+  // From its own screen…
   await b.goto("/duel");
   await b.locator(".duel-row.s-play").click();
   await b.getByRole("button", { name: "Откажи" }).click();
   await expect(b.getByRole("heading", { name: "Дуелът е отказан" })).toBeVisible();
+  // …or from the notice, wherever Bo is.
+  await a.goto("/friends");
+  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await playRun(a);
+  await b.goto("/");
+  await b.locator(".challenge-notice").getByRole("button", { name: "Откажи" }).click();
+  await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText("Отказан");
 });

@@ -101,25 +101,25 @@ func (s *Server) answerRequest(accept bool) func(http.ResponseWriter, *http.Requ
 	}
 }
 
-// duelInvites says how many friend requests and duels wait for the player: light enough for a page to ask every
-// half minute, to show there's something waiting.
+// duelInvites says how many friend requests wait for the player, and which friends' challenges: light enough for a
+// page to ask every half minute, to show there's something waiting.
 func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]any{"requests": 0, "duels": 0})
+		return ok(w, map[string]any{"requests": 0, "challenges": []play.Challenge{}})
 	}
 	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	turns, err := s.game.DuelTurns(r.Context(), u.ID)
+	challenges, err := s.game.Challenges(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"requests": n, "duels": turns})
+	return ok(w, map[string]any{"requests": n, "challenges": challenges})
 }
 
 // inviteInfo says whose an invite link is, for the page that asks whether to accept it (anyone may ask), and
