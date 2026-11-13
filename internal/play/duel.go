@@ -127,7 +127,7 @@ func (g *Game) SaveDuel(ctx context.Context, d Duel) error {
 	if len(d.Answers) != len(d.Picks) || len(d.Picks) == 0 {
 		return errors.New("a duel to keep has an answer for each question")
 	}
-	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		points, rights, ms := 0, 0, int64(0)
 		for _, a := range d.Answers {
 			points += a.Points
@@ -162,4 +162,9 @@ func (g *Game) SaveDuel(ctx context.Context, d Duel) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	_, err = g.Award(ctx, d.UserID)
+	return err
 }

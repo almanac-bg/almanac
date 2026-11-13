@@ -1,5 +1,6 @@
 // Днес: the day's ten questions, the same for everyone, once.
 
+import { news } from "../game/news.ts";
 import { board, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
 import type { Board, Score, State } from "../game/types.ts";
@@ -107,6 +108,7 @@ function finished(t: Today, s: State): Child {
         const b = fresh().board;
         return b.place ? h("p", { class: "place-line" }, `${b.place}-и от ${b.players} днес.`) : null;
       },
+      news(),
       () => {
         const f = fresh();
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;

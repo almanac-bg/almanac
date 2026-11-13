@@ -2,6 +2,7 @@
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
 import { findDuel } from "../game/duel.ts";
+import { news } from "../game/news.ts";
 import { answered, ask, picture } from "../game/questions.ts";
 import { report } from "../game/report.ts";
 import { boardRow, shareButton } from "../game/results.ts";
@@ -11,7 +12,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
-import { fact, type VerdictKind, verdict } from "../ui.ts";
+import { avatar, fact, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
@@ -46,6 +47,9 @@ interface Player {
   recording?: boolean;
   gained?: number;
   right?: boolean;
+  avatar?: string;
+  title?: string;
+  level?: number;
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
@@ -249,6 +253,7 @@ function lobby(view: () => RoomView, code: string): Child {
           h(
             "li",
             { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
+            avatar(p.avatar, { size: "s", name: p.name }),
             p.name,
             p.me ? " (ти)" : "",
             p.online ? "" : " — извън стаята",
@@ -374,7 +379,7 @@ function standings(view: () => RoomView, gains: boolean, before?: Map<string, nu
           i + 1,
           nameOf(p),
           gains && p.gained ? [h("small", { class: "sub" }, `+${p.gained} · `), String(p.points)] : String(p.points),
-          { me: p.me },
+          { me: p.me, look: p },
         );
         if (!p.online) row.classList.add("away");
         if (before?.size) {
@@ -416,6 +421,7 @@ function end(view: () => RoomView, code: string): Child {
         h("p", { class: "kicker" }, them ? `Дуел срещу ${nameOf(them)}` : "Дуел"),
         h("h1", null, result),
       ),
+      news(1500),
       standings(view, false),
       findDuel("Нов дуел"),
     );

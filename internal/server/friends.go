@@ -140,7 +140,7 @@ func (s *Server) duelFriend(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("invite:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
 		return errTooMany
 	}
-	rm, err := s.rooms.Invite(room.Player{ID: u.ID, Name: u.Name}, room.Player{ID: id, Name: name})
+	rm, err := s.rooms.Invite(s.roomPlayer(r.Context(), u.ID, u.Name), s.roomPlayer(r.Context(), id, name))
 	if err != nil {
 		return err
 	}

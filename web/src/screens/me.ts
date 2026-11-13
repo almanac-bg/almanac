@@ -1,9 +1,11 @@
+import { levelCard } from "../game/news.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { type User, user } from "../state.ts";
+import { type AchievementInfo, avatar, badge, shapeNames, toneNames } from "../ui.ts";
 import { stats } from "./stats.ts";
 
 export function me() {
@@ -11,32 +13,221 @@ export function me() {
   return h(
     "section",
     { class: "screen" },
-    h("h1", null, () => user()?.name ?? "Профил"),
     when(
       () => user(),
-      () => [
-        stats(),
-        h(
-          "div",
-          { class: "settings" },
-          reminders(),
-          nameForm(),
-          account(),
+      () => {
+        const progress = signal<Progress | null>(null);
+        const load = () => api<Progress>("GET", "/api/me/progress").then(progress.set, () => {});
+        load();
+        return [
+          head(progress),
+          () => {
+            const p = progress();
+            return p ? levelCard(p.level, p.points, p.from, p.to) : null;
+          },
+          stats(),
+          () => {
+            const p = progress();
+            return p ? achievements(p) : null;
+          },
           h(
-            "section",
-            null,
-            h("h2", null, "Данните ти"),
-            h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
-            deleteAccount(),
+            "div",
+            { class: "settings" },
+            look(progress, load),
+            reminders(),
+            nameForm(),
+            account(),
+            h(
+              "section",
+              null,
+              h("h2", null, "Данните ти"),
+              h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
+              deleteAccount(),
+            ),
           ),
-        ),
-      ],
+        ];
+      },
       () => [
+        h("h1", null, "Профил"),
         h("p", { class: "lead" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
         signIn(),
       ],
     ),
   );
+}
+
+interface Progress {
+  level: number;
+  points: number;
+  from: number;
+  to: number;
+  achievements: AchievementInfo[];
+  avatar: string;
+  title: string;
+  shapes: { shape: string; locked?: boolean; how?: string }[];
+  tones: string[];
+}
+
+/** Who you are in the game: your avatar with your level, your name, your title. */
+function head(progress: () => Progress | null): Child {
+  return h(
+    "div",
+    { class: "me-head" },
+    () => {
+      const p = progress();
+      return avatar(p?.avatar, { size: "l", level: p?.level, name: user.peek()?.name });
+    },
+    h(
+      "div",
+      { class: "me-head-text" },
+      h("h1", null, () => user()?.name ?? "Профил"),
+      () => {
+        const p = progress();
+        const t = p?.achievements.find((a) => a.id === p.title);
+        return t ? h("span", { class: "me-title" }, t.name) : null;
+      },
+    ),
+  );
+}
+
+const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
+
+/** Every achievement: the earned ones bright, with the day; the rest with what earns them. */
+function achievements(p: Progress): Child {
+  const earned = p.achievements.filter((a) => a.at).length;
+  return h(
+    "section",
+    { class: "stack" },
+    h("h2", { class: "section-title" }, `Постижения · ${earned} от ${p.achievements.length}`),
+    h(
+      "ul",
+      { class: "achievements" },
+      // The earned ones first, newest on top; then what's still ahead, in order.
+      [
+        ...p.achievements.filter((a) => a.at).sort((x, y) => (y.at ?? 0) - (x.at ?? 0)),
+        ...p.achievements.filter((a) => !a.at),
+      ].map((a) =>
+        h(
+          "li",
+          { class: a.at ? "achievement" : "achievement locked" },
+          badge(a, !!a.at),
+          h(
+            "div",
+            { class: "achievement-text" },
+            h("span", { class: "achievement-name" }, a.name),
+            h("span", { class: "achievement-about" }, a.at ? `${a.about} · ${day(a.at)}` : a.about),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/** How you look to others: the avatar's shape and tone, and a title from your achievements. */
+function look(progress: () => Progress | null, reload: () => Promise<void>): Child {
+  const hint = signal("");
+  const error = signal("");
+  const set = async (body: { avatar?: string; title?: string }) => {
+    error.set("");
+    hint.set("");
+    try {
+      await api("PATCH", "/api/me/look", body);
+      await reload();
+    } catch (err) {
+      error.set((err as ApiError).message);
+    }
+  };
+  return () => {
+    const p = progress();
+    if (!p) return null;
+    const [shape = "", tone = ""] = p.avatar.split("-");
+    const titles = p.achievements.filter((a) => a.at);
+    return h(
+      "section",
+      null,
+      h("h2", null, "Вид"),
+      h("p", { class: "muted" }, "Аватарът ти е форма в цвят. Някои форми се отключват с постижения."),
+      h(
+        "ul",
+        { class: "picker" },
+        p.shapes.map((s) =>
+          h(
+            "li",
+            null,
+            h(
+              "button",
+              {
+                class: s.locked ? "pick locked" : "pick",
+                type: "button",
+                "aria-pressed": s.shape === shape,
+                "aria-label": s.locked ? `${shapeNames[s.shape]}, заключена` : shapeNames[s.shape],
+                onclick: () =>
+                  s.locked
+                    ? hint.set(
+                        s.shape === "crown"
+                          ? "Короната се отключва на ниво 10."
+                          : `${shapeNames[s.shape]}: отключва се с постижението „${s.how}“.`,
+                      )
+                    : set({ avatar: `${s.shape}-${tone}` }),
+              },
+              avatar(`${s.shape}-${tone}`),
+            ),
+          ),
+        ),
+      ),
+      () => hint() && h("p", { class: "muted", role: "status" }, hint()),
+      h(
+        "div",
+        { class: "tones" },
+        p.tones.map((t) =>
+          h("button", {
+            class: `tone-pick tone-${t}`,
+            type: "button",
+            "aria-pressed": t === tone,
+            "aria-label": `Цвят: ${toneNames[t]}`,
+            onclick: () => set({ avatar: `${shape}-${t}` }),
+          }),
+        ),
+      ),
+      h("h3", null, "Титла"),
+      titles.length
+        ? h(
+            "ul",
+            { class: "chips" },
+            h(
+              "li",
+              null,
+              h(
+                "button",
+                { class: "chip", type: "button", "aria-pressed": !p.title, onclick: () => set({ title: "" }) },
+                "Без титла",
+              ),
+            ),
+            titles.map((a) =>
+              h(
+                "li",
+                null,
+                h(
+                  "button",
+                  {
+                    class: "chip",
+                    type: "button",
+                    "aria-pressed": a.id === p.title,
+                    onclick: () => set({ title: a.id }),
+                  },
+                  a.name,
+                ),
+              ),
+            ),
+          )
+        : h(
+            "p",
+            { class: "muted" },
+            "Титлите са имената на постиженията ти. Щом спечелиш първото, ще можеш да го сложиш тук.",
+          ),
+      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    );
+  };
 }
 
 function nameForm(): Child {

@@ -3,7 +3,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
-import { fact } from "../ui.ts";
+import { fact, type Look, who } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
@@ -119,14 +119,20 @@ function review(id: number): Child {
   });
 }
 
-/** One row of a board: the place (gold, silver, bronze for the first three), the name, the score. */
-export function boardRow(place: number, name: Child, score: Child, opts: { me?: boolean; gap?: boolean } = {}) {
+/** One row of a board: the place (gold, silver, bronze for the first three), the player with their look, the
+ * score. */
+export function boardRow(
+  place: number,
+  name: string,
+  score: Child,
+  opts: { me?: boolean; gap?: boolean; look?: Look } = {},
+) {
   const cls = ["row", place <= 3 && `p${place}`, opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ");
   return h(
     "li",
     { class: cls },
     h("span", { class: "place" }, String(place)),
-    h("span", { class: "who" }, name, opts.me ? h("span", { class: "you" }, "ти") : null),
+    who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name),
     h("span", { class: "pts" }, score),
   );
 }
@@ -143,9 +149,9 @@ export function board(title: string, scores: Score[], place?: number, mine?: Sco
     h(
       "ol",
       null,
-      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me })),
+      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me, look: s })),
       place && mine && !rows.some((s) => s.me)
-        ? boardRow(place, mine.name, scoreOf(mine), { me: true, gap: place > rows.length + 1 })
+        ? boardRow(place, mine.name, scoreOf(mine), { me: true, gap: place > rows.length + 1, look: mine })
         : null,
     ),
   );

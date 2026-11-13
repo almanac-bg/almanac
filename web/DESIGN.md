@@ -13,8 +13,8 @@ three when you add or change a screen.
   the streak) and reward (points, first place). Nothing is gold for decoration.
 - **Numbers are the heroes.** Scores, places, the streak, the timer and room codes use the numeral face, with
   tabular figures.
-- **Game feel comes only from data the game has** (see Game feel below). No currencies, XP, shops or made-up
-  numbers.
+- **Game feel comes only from data the game has** (see Game feel below). No currencies, shops or made-up numbers:
+  the level is the sum of the points a player has really scored, and every achievement is a fact of their games.
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
   without scrolling sideways.
 
@@ -85,6 +85,11 @@ takes a token.
   - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
   - `.verdict` and `.fact`.
+- **Progress:**
+  - `.avatar` (a shape `av-…` on a tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
+  - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
+  - `.level-card` (with `up` for a new level), `.unlock` (a new achievement), `.badge-mark`.
+  - `.achievements`/`.achievement` (and `locked`), `.picker`/`.pick` and `.tone-pick` for choosing a look.
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`.
 - **Friends:** `.card.friends`, `.invitation` (a call to a duel, accepted with `.btn.rose`), `.friend-list`/`.friend`
@@ -105,15 +110,19 @@ takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element     | Measures                                                                                                                     | Where                   |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Streak      | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)            | Днес, Профил            |
-| Points      | Points per answer and per run, from the server                                                                               | Verdict, result, boards |
-| Place       | Place on the day's board („12-и от 318 днес.“)                                                                               | Result, Профил          |
-| Mastery     | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил            |
-| Rank change | Places moved since the previous answer                                                                                       | Room boards             |
-| Duels       | Duels won of played; between two friends, their record („3 : 2“)                                                             | Заедно, Профил          |
-| Friends     | The day's board among you and your friends („Приятели днес“), once a friend has played                                       | Result                  |
+| Element      | Measures                                                                                                                     | Where                   |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)            | Днес, Профил            |
+| Points       | Points per answer and per run, from the server                                                                               | Verdict, result, boards |
+| Place        | Place on the day's board („12-и от 318 днес.“)                                                                               | Result, Профил          |
+| Mastery      | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up) | Игра, Профил            |
+| Rank change  | Places moved since the previous answer                                                                                       | Room boards             |
+| Duels        | Duels won of played; between two friends, their record („3 : 2“)                                                             | Заедно, Профил          |
+| Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                       | Result                  |
+| Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                             | Result, Профил, avatars |
+| Achievements | 19 facts of a player's games (streaks, a perfect day, an exact number, duels won, friends…), announced once when earned      | Result, Профил          |
+| Titles       | The names of a player's achievements; one chosen shows under their name                                                      | Boards, friends, rooms  |
+| Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                   | Everywhere a player is  |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 

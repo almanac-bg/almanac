@@ -169,3 +169,90 @@ export function streak(days: number, week?: boolean[]): Child {
 export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;
 /** A count of questions: 1 въпрос, 2 въпроса. */
 export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въпроса"}`;
+
+/** How a player shows to others: their avatar (shape-tone), title and level. */
+export interface Look {
+  avatar?: string;
+  title?: string;
+  level?: number;
+}
+
+export const shapeNames: Record<string, string> = {
+  petal: "Венчелистче",
+  rosette: "Розетка",
+  circle: "Кръг",
+  diamond: "Ромб",
+  triangle: "Триъгълник",
+  moon: "Луна",
+  leaf: "Лист",
+  wave: "Вълна",
+  hex: "Шестоъгълник",
+  flame: "Пламък",
+  star: "Звезда",
+  target: "Мишена",
+  bolt: "Мълния",
+  book: "Книга",
+  trophy: "Купа",
+  shield: "Щит",
+  heart: "Сърце",
+  crown: "Корона",
+};
+
+export const toneNames: Record<string, string> = {
+  gold: "злато",
+  lilac: "люляк",
+  sky: "небе",
+  rose: "роза",
+  mint: "мента",
+};
+
+const freeShapes = ["petal", "rosette", "circle", "diamond", "triangle", "moon", "leaf", "wave", "hex"];
+
+/** An avatar for someone without one of their own (a recording): picked from their name, the same every time. */
+function fromName(name: string): string {
+  let n = 0;
+  for (const c of name) n = (n * 31 + (c.codePointAt(0) ?? 0)) >>> 0;
+  return `${freeShapes[n % freeShapes.length]}-${tones[Math.floor(n / freeShapes.length) % tones.length]}`;
+}
+
+/** An avatar: a shape on a tone, with the level beside it when given. For the eye: the name and level are said in
+ * words nearby. */
+export function avatar(id: string | undefined, opts: { size?: "s" | "l"; level?: number; name?: string } = {}) {
+  const [shape, tone] = (id || fromName(opts.name ?? "")).split("-");
+  return h(
+    "span",
+    { class: ["avatar", opts.size, `av-${shape}`, `tone-${tone}`].filter(Boolean).join(" "), "aria-hidden": "true" },
+    opts.level ? h("b", { class: "lv" }, String(opts.level)) : null,
+  );
+}
+
+/** A player on a board or a list: their avatar, name and title. */
+export function who(name: Child, look: Look = {}, extra: Child = null, plainName = ""): Child {
+  return h(
+    "span",
+    { class: "who" },
+    avatar(look.avatar, { size: "s", level: look.level, name: plainName }),
+    h(
+      "span",
+      { class: "who-text" },
+      h("span", { class: "who-name" }, name, extra),
+      look.title ? h("span", { class: "who-title" }, look.title) : null,
+    ),
+  );
+}
+
+/** An achievement: drawn with its shape, bright once earned. */
+export interface AchievementInfo {
+  id: string;
+  name: string;
+  about: string;
+  icon: string;
+  at?: number;
+}
+
+export function badge(a: AchievementInfo, earned: boolean): HTMLElement {
+  return h("span", {
+    class: earned ? `badge-mark av-${a.icon}` : `badge-mark locked av-${a.icon}`,
+    "aria-hidden": "true",
+  });
+}

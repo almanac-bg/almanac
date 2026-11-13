@@ -71,6 +71,8 @@ var (
 type Player struct {
 	ID   int64
 	Name string
+	// Look is how they show (avatar, title, level); none for a recording.
+	Look play.Look
 }
 
 // Hub holds the rooms open now, and whoever is waiting for a duel.
@@ -370,7 +372,7 @@ func (r *Room) Join(p Player) error {
 		return ErrNoRoom
 	}
 	if m := r.member(p.ID); m != nil {
-		m.Name = p.Name
+		m.Player = p // a new name or look shows from now on
 		return nil
 	}
 	if r.duel || len(r.players) >= MaxPlayers {
@@ -667,6 +669,7 @@ type View struct {
 }
 
 type PlayerView struct {
+	play.Look
 	Name     string `json:"name"`
 	Points   int    `json:"points"`
 	Rights   int    `json:"rights"`
@@ -713,7 +716,7 @@ func (r *Room) View(viewer int64) View {
 	}
 	for _, m := range r.players {
 		p := PlayerView{
-			Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
+			Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
 			Me: m.ID == viewer, Recording: m.ID == recordingID,
 		}
 		if r.phase == Reveal {

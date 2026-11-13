@@ -58,48 +58,10 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ?`, userID)
-	if err != nil {
+	if s.Topics, s.Answers, s.Right, err = g.topicStats(ctx, userID); err != nil {
 		return s, err
 	}
-	b := g.Bank()
-	byTopic := map[string]*TopicStats{}
-	for rows.Next() {
-		var id string
-		var right bool
-		if err := rows.Scan(&id, &right); err != nil {
-			rows.Close()
-			return s, err
-		}
-		s.Answers++
-		if right {
-			s.Right++
-		}
-		q, ok := b.Get(id)
-		if !ok {
-			continue
-		}
-		c := q.Base().Category
-		if byTopic[c] == nil {
-			byTopic[c] = &TopicStats{Category: c}
-		}
-		byTopic[c].Answers++
-		if right {
-			byTopic[c].Right++
-		}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return s, err
-	}
-	s.Topics = []TopicStats{}
-	for _, c := range b.Categories { // in the bank's order
-		if t := byTopic[c.ID]; t != nil {
-			s.Topics = append(s.Topics, *t)
-		}
-	}
-	rows, err = db.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights, points,
+	rows, err := db.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights, points,
 		json_array_length(questions), finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
 		FROM runs WHERE user_id = ? AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 20`, userID)
 	if err != nil {
@@ -116,4 +78,50 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	}
 	slices.SortStableFunc(s.Topics, func(a, b TopicStats) int { return b.Answers - a.Answers })
 	return s, rows.Err()
+}
+
+// topicStats is how a player has done in each topic (in the bank's order, those they've played), and over all their
+// answers.
+func (g *Game) topicStats(ctx context.Context, userID int64) (topics []TopicStats, answers, right int, err error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ?`, userID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rows.Close()
+	b := g.Bank()
+	byTopic := map[string]*TopicStats{}
+	for rows.Next() {
+		var id string
+		var ok bool
+		if err := rows.Scan(&id, &ok); err != nil {
+			return nil, 0, 0, err
+		}
+		answers++
+		if ok {
+			right++
+		}
+		q, found := b.Get(id)
+		if !found {
+			continue
+		}
+		c := q.Base().Category
+		if byTopic[c] == nil {
+			byTopic[c] = &TopicStats{Category: c}
+		}
+		byTopic[c].Answers++
+		if ok {
+			byTopic[c].Right++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, 0, err
+	}
+	topics = []TopicStats{}
+	for _, c := range b.Categories { // in the bank's order
+		if t := byTopic[c.ID]; t != nil {
+			topics = append(topics, *t)
+		}
+	}
+	return topics, answers, right, nil
 }

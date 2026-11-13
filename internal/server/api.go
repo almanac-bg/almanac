@@ -43,6 +43,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrOwnInvite:      {http.StatusConflict, "own_invite", "Това е твоят линк. Прати го на приятел."},
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
 	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: до 200."},
+	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
 	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави домакинът."},
