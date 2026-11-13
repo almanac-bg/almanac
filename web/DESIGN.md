@@ -77,7 +77,7 @@ takes a token.
 - **Layout:** `.screen`, `.stack`, `.intro`, `.title-row`, `.card` and `.card.hero`.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.bad` (errors) and `.status`.
 - **Controls:**
-  - `.btn`, with `primary`, `big`, `rose` (accepting a duel), `danger` and `inline`; and `.link`.
+  - `.btn`, with `primary`, `big`, `rose` (accepting a friend request), `danger` and `inline`; and `.link`.
   - `.field` and `input.code`; `.join` for an input with its button.
   - `.tag` and `.chip`.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.rings`/`.ring`, `.games`/`.game`.
@@ -92,7 +92,7 @@ takes a token.
   - `.achievements`/`.achievement` (and `locked`), `.picker`/`.pick` and `.tone-pick` for choosing a look.
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`.
-- **Friends:** `.card.friends`, `.invitation` (a call to a duel, accepted with `.btn.rose`), `.friend-list`/`.friend`
+- **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
   - `ui.ts` has `verdict`, `fact`, `streak`, `stat`, `figure`, `ring`, `level`, `levelBadge`, `meter` and

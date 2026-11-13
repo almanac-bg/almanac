@@ -13,7 +13,7 @@ import (
 
 // Friends are two players who joined up: through one's invite link, or a request by tag or email that the other
 // accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
-// call the other to a duel now.
+// call the other to a duel.
 
 var (
 	ErrNoInvite     = errors.New("no such invite")

@@ -27,7 +27,7 @@ export function invite([code = ""]: string[]) {
         { class: "intro" },
         h("p", { class: "kicker" }, "Приятели"),
         h("h1", null, `Вече сте приятели с ${name}`),
-        h("p", { class: "lead" }, "Виждате резултатите си за деня и се каните на дуел, на живо."),
+        h("p", { class: "lead" }, "Виждате резултатите си за деня и се каните на дуел."),
       ),
       id
         ? h(
@@ -36,8 +36,8 @@ export function invite([code = ""]: string[]) {
               class: "btn primary big",
               onclick: async () => {
                 try {
-                  const r = await api<{ code: string }>("POST", `/api/friends/${id}/duel`, {});
-                  go(`/r/${r.code}`);
+                  const r = await api<{ duel: number }>("POST", "/api/duels", { friend: id });
+                  go(`/duel/${r.duel}`);
                 } catch (err) {
                   error.set((err as ApiError).message);
                 }
@@ -93,7 +93,7 @@ export function invite([code = ""]: string[]) {
               h(
                 "p",
                 { class: "lead" },
-                "Приятелите виждат резултатите си за деня и се канят на дуел, на живо: десет въпроса, един срещу друг.",
+                "Приятелите виждат резултатите си за деня и се канят на дуел: десет въпроса, един срещу друг.",
               ),
             ),
             h("button", { class: "btn primary big", onclick: accept }, "Приеми"),

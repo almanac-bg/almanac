@@ -42,38 +42,20 @@ export async function player(): Promise<User> {
   return r.user;
 }
 
-/** A duel a friend asks the player to, waiting for them. */
-export interface Invitation {
-  code: string;
-  from: string;
-  fromId: number;
-  leftMs: number;
-}
-
-/** The duels friends ask the player to now: Дуел and Приятели list them, and the nav marks that there are some. */
-export const invitations = signal<Invitation[]>([]);
-
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 
 /** How many duels wait for the player to play. */
 export const duelTurns = signal(0);
 
-/** Asks every half minute, while the page is in view, whether a friend calls the player to a duel, or someone asks
- * to be friends. */
-export function watchInvitations(): void {
+/** Asks every half minute, while the page is in view, whether a duel waits for the player, or someone asks to be
+ * friends. */
+export function watchWaiting(): void {
   const check = async () => {
     if (!user.peek() || document.hidden) return;
     try {
-      const r = await api<{ invites: Invitation[]; requests: number; duels: number }>("GET", "/api/friends/invites");
-      const now = r.invites;
-      if (
-        now.some((i) => !invitations.peek().some((was) => was.code === i.code)) ||
-        r.requests > friendRequests.peek() ||
-        r.duels > duelTurns.peek()
-      )
-        play("ping");
-      invitations.set(now);
+      const r = await api<{ requests: number; duels: number }>("GET", "/api/friends/invites");
+      if (r.requests > friendRequests.peek() || r.duels > duelTurns.peek()) play("ping");
       friendRequests.set(r.requests);
       duelTurns.set(r.duels);
     } catch {

@@ -16,11 +16,11 @@ import { topic, topics } from "./screens/play.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
 import { room } from "./screens/room.ts";
+import { rooms } from "./screens/rooms.ts";
 import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
-import { together } from "./screens/together.ts";
-import { duelTurns, friendRequests, invitations, watchInvitations } from "./state.ts";
+import { duelTurns, friendRequests, watchWaiting } from "./state.ts";
 
 /** The five main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
@@ -56,16 +56,13 @@ if (root) {
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // A friend calls to a duel: a dot on Играй; someone asks to be friends: a dot on Профил.
-              class: () =>
-                (href === "/play" && (invitations().length || duelTurns())) || (href === "/me" && friendRequests())
-                  ? "news"
-                  : "",
+              // A duel waits for the player: a dot on Играй; someone asks to be friends: a dot on Профил.
+              class: () => ((href === "/play" && duelTurns()) || (href === "/me" && friendRequests()) ? "news" : ""),
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
             h("span", { class: "tab-label" }, label),
             () =>
-              href === "/play" && (invitations().length || duelTurns())
+              href === "/play" && duelTurns()
                 ? h("span", { class: "sr" }, " (дуел те чака)")
                 : href === "/me" && friendRequests()
                   ? h("span", { class: "sr" }, " (покана за приятелство)")
@@ -87,7 +84,7 @@ if (root) {
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: royal },
       { path: /^\/almanac$/, view: almanac },
-      { path: /^\/room$/, view: () => together("room") },
+      { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },
       { path: /^\/friends$/, view: friends },
@@ -100,6 +97,6 @@ if (root) {
     ],
     missing,
   );
-  watchInvitations();
+  watchWaiting();
   prepareSound();
 }

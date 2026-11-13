@@ -517,32 +517,6 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	}
 }
 
-func TestTwoPeopleAskForADuel(t *testing.T) {
-	g := start(t)
-	ana, bo := g.player(), g.player()
-	ana.call("POST", "/api/guest", map[string]any{})
-	bo.call("POST", "/api/guest", map[string]any{})
-	codes := make(chan string, 2)
-	for _, p := range []*player{ana, bo} {
-		go func() {
-			_, out := p.call("POST", "/api/duel", map[string]any{})
-			code, _ := out["code"].(string)
-			codes <- code
-		}()
-	}
-	a, b := <-codes, <-codes
-	if a == "" || a != b {
-		t.Fatalf("matched into %q and %q", a, b)
-	}
-	as, bs := ana.follow(a), bo.follow(a)
-	for _, s := range []*stream{as, bs} {
-		v := s.until(func(v map[string]any) bool { return v["phase"] == "question" })
-		if v["duel"] != true || v["canLead"] == true {
-			t.Fatalf("a duel: %v", v)
-		}
-	}
-}
-
 // fakePushService takes pushes and counts them.
 type fakePushService struct {
 	mu   sync.Mutex
@@ -611,24 +585,29 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("a bad subscription: %d", status)
 	}
 
+	// playRun answers each question of a run (any answer will do).
+	playRun := func(p *player, run map[string]any) {
+		id := strconv.Itoa(int(run["id"].(float64)))
+		for n := range 10 {
+			_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+			view := st["question"].(map[string]any)["view"].(map[string]any)
+			a := map[string]any{"pick": 0}
+			if view["type"] == "number" {
+				a = map[string]any{"value": 1}
+			} else if view["type"] == "order" {
+				a = map[string]any{"order": []int{0, 1, 2, 3}}
+			} else if view["type"] == "truefalse" {
+				a = map[string]any{"truth": true}
+			} else if view["type"] == "match" {
+				a = map[string]any{"pairs": []int{0, 1, 2, 3}}
+			}
+			p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
+		}
+	}
+
 	// Ana plays the day; at 19:05 only Bo is reminded, and only once.
 	_, run := ana.call("POST", "/api/day", map[string]any{})
-	id := strconv.Itoa(int(run["id"].(float64)))
-	for n := range 10 {
-		_, st := ana.call("POST", "/api/runs/"+id+"/show", map[string]any{})
-		view := st["question"].(map[string]any)["view"].(map[string]any)
-		a := map[string]any{"pick": 0}
-		if view["type"] == "number" {
-			a = map[string]any{"value": 1}
-		} else if view["type"] == "order" {
-			a = map[string]any{"order": []int{0, 1, 2, 3}}
-		} else if view["type"] == "truefalse" {
-			a = map[string]any{"truth": true}
-		} else if view["type"] == "match" {
-			a = map[string]any{"pairs": []int{0, 1, 2, 3}}
-		}
-		ana.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
-	}
+	playRun(ana, run)
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	_, _ = db.Write.Exec(`UPDATE runs SET day = ?`, evening.Format(time.DateOnly))
 	if n := s.remind(t.Context(), evening); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 0 {
@@ -641,7 +620,7 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("reminded before the hour")
 	}
 
-	// Bo accepts Ana's invite link: Ana hears of it. Ana asks Bo to a duel: Bo hears of it.
+	// Bo accepts Ana's invite link: Ana hears of it. Ana asks Bo to a duel and plays hers: Bo hears of it.
 	pushes := func(path string, want int) {
 		t.Helper()
 		for deadline := time.Now().Add(5 * time.Second); fake.count(path) < want && time.Now().Before(deadline); {
@@ -657,7 +636,8 @@ func TestNotifications(t *testing.T) {
 	pushes("/ana", 1)
 	_, mine = ana.call("GET", "/api/friends", nil)
 	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
-	ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
+	_, duel := ana.call("POST", "/api/duels", map[string]any{"friend": boID})
+	playRun(ana, duel["state"].(map[string]any))
 	pushes("/bo", 2)
 }
 
@@ -697,35 +677,19 @@ func TestLinkPreviews(t *testing.T) {
 	}
 }
 
-// A player who leaves while asking (a duel search cancelled) isn't a server error nor a problem to mail, and their
-// place in the queue is free at once: the next player isn't matched with someone gone.
+// A player who leaves mid-request (closes the page) isn't a server error nor a problem to mail.
 func TestALeftRequestIsNoProblem(t *testing.T) {
 	g := start(t)
-	g.srv.duelWait = 2 * time.Second // before any request reads it
-	ana, bo := g.player(), g.player()
-	ana.call("POST", "/api/guest", map[string]any{})
-	bo.call("POST", "/api/guest", map[string]any{})
 	ctx, cancel := context.WithCancel(t.Context())
-	req, _ := http.NewRequestWithContext(ctx, "POST", g.url+"/api/duel", strings.NewReader("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	done := make(chan struct{})
-	go func() {
-		if res, err := ana.client.Do(req); err == nil {
-			res.Body.Close()
-		}
-		close(done)
-	}()
-	time.Sleep(300 * time.Millisecond)
 	cancel()
-	<-done
-	time.Sleep(300 * time.Millisecond)
-	if news := g.srv.problems.take(); len(news) != 0 {
-		t.Fatalf("a cancelled search became a problem: %v", news)
+	left := g.srv.apiHandler(func(_ http.ResponseWriter, r *http.Request) error { return r.Context().Err() })
+	w := httptest.NewRecorder()
+	left.ServeHTTP(w, httptest.NewRequestWithContext(ctx, "GET", "/api/me", nil))
+	if w.Code != 499 {
+		t.Fatalf("a left request: %d", w.Code)
 	}
-	// Bo asks now: Ana is gone, so he isn't matched with her (with nobody about and no recordings: nobody).
-	if status, out := bo.call("POST", "/api/duel", map[string]any{}); status != 404 || out["error"] != "nobody" {
-		t.Fatalf("Bo was matched with someone gone: %d %v", status, out)
+	if news := g.srv.problems.take(); len(news) != 0 {
+		t.Fatalf("a left request became a problem: %v", news)
 	}
 }
 
@@ -759,51 +723,16 @@ func TestFriendsOverHTTP(t *testing.T) {
 	}
 	boID := int64(friends[0].(map[string]any)["id"].(float64))
 
-	// A duel: Ana asks, Bo sees the invitation, comes, and it starts.
-	_, out := ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
-	room, _ := out["code"].(string)
-	as := ana.follow(room)
-	as.until(func(v map[string]any) bool { return v["phase"] == "lobby" && v["invite"] == true })
-	_, his := bo.call("GET", "/api/friends", nil)
-	if inv, _ := his["invites"].([]any); len(inv) != 1 || inv[0].(map[string]any)["code"] != room {
-		t.Fatalf("Bo's invitations: %v", his)
-	}
-	bs := bo.follow(room)
-	for _, s := range []*stream{as, bs} {
-		s.until(func(v map[string]any) bool { return v["phase"] == "question" && v["duel"] == true })
-	}
-
-	// Another, turned down: Ana's screen hears it was.
-	_, out = ana.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil)
-	second, _ := out["code"].(string)
-	if second == room {
-		t.Fatal("a started duel was offered again")
-	}
-	as2 := ana.follow(second)
-	as2.until(func(v map[string]any) bool { return v["phase"] == "lobby" })
-	if status, _ := bo.call("POST", "/api/rooms/"+second+"/decline", nil); status != http.StatusOK {
-		t.Fatalf("Bo declines: %d", status)
-	}
-	for deadline := time.Now().Add(5 * time.Second); ; {
-		line, err := as2.r.ReadString('\n')
-		if err != nil || time.Now().After(deadline) {
-			t.Fatalf("no word of the decline: %v", err)
-		}
-		if strings.TrimSpace(line) == "event: declined" {
-			break
-		}
-	}
-
 	// Strangers can't ask each other.
 	vi := g.player()
 	vi.call("POST", "/api/guest", map[string]any{})
-	if status, _ := vi.call("POST", fmt.Sprintf("/api/friends/%d/duel", boID), nil); status != http.StatusNotFound {
+	if status, _ := vi.call("POST", "/api/duels", map[string]any{"friend": boID}); status != http.StatusNotFound {
 		t.Fatalf("a stranger asked Bo to a duel: %d", status)
 	}
 	if status, _ := bo.call("DELETE", fmt.Sprintf("/api/friends/%d", int64(a["user"].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
 		t.Fatalf("unfriending: %d", status)
 	}
-	if _, his = bo.call("GET", "/api/friends", nil); len(his["friends"].([]any)) != 0 {
+	if _, his := bo.call("GET", "/api/friends", nil); len(his["friends"].([]any)) != 0 {
 		t.Fatalf("still friends: %v", his)
 	}
 }

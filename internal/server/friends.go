@@ -11,13 +11,12 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
-	"github.com/almanac-bg/almanac/internal/room"
 )
 
 var inviteCode = regexp.MustCompile(`^[a-z0-9]{8}$`)
 
-// friends is the player's side of being friends: their own invite link, their friends, and the duels friends ask
-// them to now.
+// friends is the player's side of being friends: their own invite link, their friends, and the friend requests to
+// and from them.
 func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -41,7 +40,6 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{
 		"invite":   s.cfg.PublicURL + "/f/" + code,
 		"friends":  list,
-		"invites":  s.rooms.InvitesFor(u.ID),
 		"requests": map[string]any{"in": in, "out": out},
 	})
 }
@@ -103,15 +101,15 @@ func (s *Server) answerRequest(accept bool) func(http.ResponseWriter, *http.Requ
 	}
 }
 
-// duelInvites lists the duels friends ask the player to now: light enough for a page to ask every half minute, to
-// show there's one waiting (no database, only the rooms in memory).
+// duelInvites says how many friend requests and duels wait for the player: light enough for a page to ask every
+// half minute, to show there's something waiting.
 func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]any{"invites": []room.Invitation{}, "requests": 0, "duels": 0})
+		return ok(w, map[string]any{"requests": 0, "duels": 0})
 	}
 	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
 	if err != nil {
@@ -121,7 +119,7 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"invites": s.rooms.InvitesFor(u.ID), "requests": n, "duels": turns})
+	return ok(w, map[string]any{"requests": n, "duels": turns})
 }
 
 // inviteInfo says whose an invite link is, for the page that asks whether to accept it (anyone may ask), and
@@ -189,56 +187,6 @@ func (s *Server) unfriend(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := s.game.Unfriend(r.Context(), u.ID, id); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
-}
-
-// duelFriend asks a friend to a duel now: a duel for the two of them opens, and the friend hears of it (a
-// notification, and the invitation on their Дуел and Приятели).
-func (s *Server) duelFriend(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	id, err := s.friendOf(r)
-	if err != nil {
-		return err
-	}
-	name, err := s.game.Friend(r.Context(), u.ID, id)
-	if err != nil {
-		return err
-	}
-	if !s.limits.allow("invite:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
-		return errTooMany
-	}
-	rm, err := s.rooms.Invite(s.roomPlayer(r.Context(), u.ID, u.Name), s.roomPlayer(r.Context(), id, name))
-	if err != nil {
-		return err
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		s.notify(ctx, push.Message{
-			Title: u.Name + " те кани на дуел",
-			Body:  "Десет въпроса, сега. Поканата важи 10 минути.",
-			URL:   "/r/" + rm.Code(),
-		}, id)
-	}()
-	return ok(w, map[string]string{"code": rm.Code()})
-}
-
-// roomDecline turns down a duel between friends (or calls it off).
-func (s *Server) roomDecline(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	rm, err := s.roomOf(r)
-	if err != nil {
-		return err
-	}
-	if err := rm.Decline(u.ID); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})

@@ -107,11 +107,7 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-sub.Done:
-			event := "closed" // or why: a duel turned down, an invitation not answered in time
-			if why := rm.Ended(); why != "" {
-				event = why
-			}
-			send("event: " + event + "\ndata: {}\n\n")
+			send("event: closed\ndata: {}\n\n")
 			return
 		case <-s.closing:
 			return
@@ -156,28 +152,4 @@ func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})
-}
-
-// DuelWait is how long a player waits for someone else before playing a recording.
-const DuelWait = 12 * time.Second
-
-// duel finds the player an opponent: someone asking now, or a recording of someone's game. It answers with the
-// duel's room.
-func (s *Server) duel(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	if !s.limits.allow("duel:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
-		return errTooMany
-	}
-	// Read the (empty) body first: only then does the server notice a player who leaves, and free their place.
-	if err := readJSON(r, &struct{}{}); err != nil {
-		return err
-	}
-	code, err := s.rooms.Match(r.Context(), s.roomPlayer(r.Context(), u.ID, u.Name), s.duelWait)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]string{"code": code})
 }
