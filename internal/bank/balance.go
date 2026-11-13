@@ -12,6 +12,14 @@ var Mix = map[Difficulty]float64{Easy: 0.50, Medium: 0.35, Hard: 0.15}
 // Difficulties in order, easy first.
 var Difficulties = []Difficulty{Easy, Medium, Hard}
 
+// TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13),
+// close to what the game draws: a run of ten has six choices and one of each other kind, and Роял adds true-or-not.
+// So that no kind runs out long before the others.
+var TypeMix = map[string]float64{"choice": 0.60, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075}
+
+// TypeOrder is the kinds in the order a report shows them.
+var TypeOrder = []string{"choice", "truefalse", "number", "order", "match"}
+
 // Balance is how a bank stands against its aims: what it has, and what it takes to reach them by adding questions
 // (never by dropping any).
 type Balance struct {
@@ -23,15 +31,23 @@ type Balance struct {
 	Add map[string]map[Difficulty]int
 	// Facts, Added and Updated count the live questions that have one.
 	Facts, Added, Updated, Total int
+	// Types counts the live questions by category and kind; AddTypes is how many of each kind each category needs
+	// to reach TypeSize in the TypeMix.
+	Types    map[string]map[string]int
+	TypeSize int
+	AddTypes map[string]map[string]int
 }
 
 // BalanceOf works out where the bank stands against Mix and equal categories.
 func (b *Bank) BalanceOf() Balance {
-	bal := Balance{Live: map[string]map[Difficulty]int{}, Add: map[string]map[Difficulty]int{}}
+	bal := Balance{Live: map[string]map[Difficulty]int{}, Add: map[string]map[Difficulty]int{},
+		Types: map[string]map[string]int{}, AddTypes: map[string]map[string]int{}}
 	for _, c := range b.Categories {
 		n := map[Difficulty]int{}
+		types := map[string]int{}
 		for _, q := range b.Live(c.ID, "") {
 			n[q.Base().Difficulty]++
+			types[q.Base().Type]++
 			t := q.Extra()
 			bal.Total++
 			bal.Facts += b2i(t.Fact != "")
@@ -39,9 +55,20 @@ func (b *Bank) BalanceOf() Balance {
 			bal.Updated += b2i(t.Updated != "")
 		}
 		bal.Live[c.ID] = n
+		bal.Types[c.ID] = types
 		for _, d := range Difficulties {
 			bal.Size = max(bal.Size, int(math.Ceil(float64(n[d])/Mix[d]-1e-9)))
 		}
+		for t, share := range TypeMix {
+			bal.TypeSize = max(bal.TypeSize, int(math.Ceil(float64(types[t])/share-1e-9)))
+		}
+	}
+	for _, c := range b.Categories {
+		add := map[string]int{}
+		for t, share := range TypeMix {
+			add[t] = max(0, int(math.Round(float64(bal.TypeSize)*share))-bal.Types[c.ID][t])
+		}
+		bal.AddTypes[c.ID] = add
 	}
 	// Split the size by the mix, rounding so the parts add up to it (the largest remainders get the spare ones).
 	want := map[Difficulty]int{}

@@ -24,6 +24,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 
 - **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`). Easy means most adults in
   Bulgaria know it; medium, a well-read person; hard, an enthusiast. Judge difficulty for Bulgarian players.
+- **Kinds: 60% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match**, in every category (`bank.TypeMix`),
+  close to what the game draws (a run of ten has six choices and one of each other kind), so that no kind runs out
+  long before the others. `bank check` reports what each category needs.
 - **Every category the same size.** No topic outweighs another, so a batch adds to every category, or closes the
   gaps that `bank check` reports, biggest first. Never add to a category that is ahead while another is behind.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**

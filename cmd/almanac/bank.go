@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -113,6 +114,25 @@ func balance(b *bank.Bank) string {
 	for _, c := range b.Categories {
 		a := bal.Add[c.ID]
 		fmt.Fprintf(&s, "  %-10s %d/%d/%d\n", c.ID, a[bank.Easy], a[bank.Medium], a[bank.Hard])
+	}
+	kinds := map[string]int{}
+	for _, n := range bal.Types {
+		for t, k := range n {
+			kinds[t] += k
+		}
+	}
+	s.WriteString("kinds       ")
+	for _, t := range bank.TypeOrder {
+		fmt.Fprintf(&s, " %s %d%% (aim %.1f)", t, pct(kinds[t], bal.Total), 100*bank.TypeMix[t])
+	}
+	fmt.Fprintf(&s, "\nto the kinds every category at %d, adding (%s):\n", bal.TypeSize, strings.Join(bank.TypeOrder, "/"))
+	for _, c := range b.Categories {
+		a := bal.AddTypes[c.ID]
+		parts := make([]string, len(bank.TypeOrder))
+		for i, t := range bank.TypeOrder {
+			parts[i] = strconv.Itoa(a[t])
+		}
+		fmt.Fprintf(&s, "  %-10s %s\n", c.ID, strings.Join(parts, "/"))
 	}
 	return s.String()
 }

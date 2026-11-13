@@ -321,6 +321,19 @@ func TestBalance(t *testing.T) {
 		if got != bal.Size {
 			t.Errorf("%s grows to %d, not %d", c.ID, got, bal.Size)
 		}
+		for typ, share := range TypeMix {
+			after := bal.Types[c.ID][typ] + bal.AddTypes[c.ID][typ]
+			if bal.AddTypes[c.ID][typ] < 0 || math.Abs(float64(after)-float64(bal.TypeSize)*share) >= 1 {
+				t.Errorf("%s: %s would be %d of %d, aim %.1f", c.ID, typ, after, bal.TypeSize, float64(bal.TypeSize)*share)
+			}
+		}
+	}
+	sum := 0.0
+	for _, share := range TypeMix {
+		sum += share
+	}
+	if math.Abs(sum-1) > 1e-9 || len(TypeMix) != len(Types()) {
+		t.Fatalf("the kinds' aim adds up to %v over %d kinds (of %d)", sum, len(TypeMix), len(Types()))
 	}
 }
 
