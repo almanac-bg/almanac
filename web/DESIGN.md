@@ -121,7 +121,8 @@ takes a token.
   answer with its standings for 6 seconds. A question never opens in a tab that's out of sight.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
-- **Time:** 20 seconds a question, 25 to put things in order. When the time runs out, whatever has been put in (a
+- **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
+  („Свържи“). When the time runs out, whatever has been put in (a
   typed number, things moved into an order) is the answer.
 - **Input without the phone's keyboard:** a number is typed on the game's own pad (a comma only where the answer may
   have decimals, a minus only for temperatures); things to order are dragged into place, or moved with the arrow

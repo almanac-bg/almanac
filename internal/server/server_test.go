@@ -278,6 +278,10 @@ func TestPlayingOverHTTP(t *testing.T) {
 			answer = map[string]float64{"value": 1}
 		case "order":
 			answer = map[string][]int{"order": {0, 1, 2, 3}}
+		case "truefalse":
+			answer = map[string]bool{"truth": true}
+		case "match":
+			answer = map[string][]int{"pairs": {0, 1, 2, 3}}
 		}
 		status, res := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": answer})
 		if status != 200 || res["reveal"] == nil {
@@ -442,6 +446,10 @@ func TestARoomOverHTTP(t *testing.T) {
 		answer = map[string]any{"value": 1}
 	} else if q["type"] == "order" {
 		answer = map[string]any{"order": []int{0, 1, 2, 3}}
+	} else if q["type"] == "truefalse" {
+		answer = map[string]any{"truth": true}
+	} else if q["type"] == "match" {
+		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
 	}
 	ana.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
 	bo.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
@@ -614,6 +622,10 @@ func TestNotifications(t *testing.T) {
 			a = map[string]any{"value": 1}
 		} else if view["type"] == "order" {
 			a = map[string]any{"order": []int{0, 1, 2, 3}}
+		} else if view["type"] == "truefalse" {
+			a = map[string]any{"truth": true}
+		} else if view["type"] == "match" {
+			a = map[string]any{"pairs": []int{0, 1, 2, 3}}
 		}
 		ana.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
 	}

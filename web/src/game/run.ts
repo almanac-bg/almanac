@@ -135,7 +135,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
 
 /** How long an answer shows before the game moves on: longer where there's more to read. */
 export function pauseFor(view: View): number {
-  return view.type === "choice" ? 3000 : 4500;
+  return view.type === "choice" || view.type === "truefalse" ? 3000 : 4500;
 }
 
 /** The game moving on by itself: a line that fills while the answer shows. */

@@ -1467,6 +1467,130 @@
     mask: var(--i-grip) center / contain no-repeat;
   }
 
+  /* „Вярно или невярно“: two answers side by side. */
+  .tf-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .option.tf {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 5.5rem;
+    padding: var(--space-3);
+    font-size: 1.25rem;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .option.tf > span:nth-child(2) {
+    flex: none;
+  }
+
+  .tf-mark {
+    width: 28px;
+    height: 28px;
+    background: var(--text-muted);
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+
+  .tf-yes {
+    --i: var(--i-check);
+  }
+
+  .tf-no {
+    --i: var(--i-cross);
+  }
+
+  .option.tf .sign {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+  }
+
+  /* „Свържи“: two columns, and a line for each pair joined. */
+  .match {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 2.25rem;
+  }
+
+  .match-col {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+  }
+
+  .match-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .match-lines line {
+    stroke: var(--tone);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+
+  .option.match-item {
+    gap: var(--space-2);
+    min-height: 3.5rem;
+    padding: 8px;
+    font-size: 1rem;
+    line-height: 1.25rem;
+  }
+
+  .option.match-item > span:nth-child(2) {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  .option.match-item .letter {
+    width: 26px;
+    height: 26px;
+    font-size: 0.8125rem;
+  }
+
+  .option.match-item.chosen {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .option.match-item.joined {
+    border-color: var(--tone);
+  }
+
+  .option.match-item.joined .letter {
+    background: var(--tone);
+    color: var(--on-fill);
+  }
+
+  .match-result {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .match-pair {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .match-gave {
+    display: block;
+    color: var(--wrong-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
   /* The game moving on by itself: a line filling while the answer shows. */
   .up-next {
     display: grid;

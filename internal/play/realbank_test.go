@@ -30,7 +30,8 @@ func TestAYearOfDays(t *testing.T) {
 			used[p.ID] = true
 			q, _ := b.Get(p.ID)
 			s := daySlots[i]
-			if day < 50 && !matches(q, s, true, true) {
+			// While the bank has none of a slot's type, the slot takes a choice (choose).
+			if day < 50 && len(b.Live("", s.typ)) > 0 && !matches(q, s, true, true) {
 				t.Fatalf("day %d, place %d: %s is a %s %s (picture %v), not as planned", day, i, p.ID,
 					q.Base().Difficulty, q.Base().Type, q.Extra().Image != nil)
 			}

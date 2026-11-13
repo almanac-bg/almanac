@@ -43,7 +43,19 @@ export interface OrderView extends ViewBase {
   unit?: string;
 }
 
-export type View = ChoiceView | NumberView | OrderView;
+/** „Вярно или невярно“: the text is the statement. */
+export interface TrueFalseView extends ViewBase {
+  type: "truefalse";
+}
+
+/** „Свържи“: two columns, each in an order of its own. */
+export interface MatchView extends ViewBase {
+  type: "match";
+  left: string[];
+  right: string[];
+}
+
+export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView;
 
 /** The answer, as the deal showed it, with the fact behind it. */
 export interface Reveal {
@@ -53,12 +65,22 @@ export interface Reveal {
   value?: number;
   order?: number[];
   values?: number[];
+  /** Whether a true/false statement is true. */
+  truth?: boolean;
+  /** A match's pairs: for each left (as shown), the right that is its pair. */
+  pairs?: number[];
   unit?: string;
   fact?: string;
   credit?: Credit;
 }
 
-export type Answer = { pick: number } | { value: number } | { order: number[] };
+export type Answer =
+  | { pick: number }
+  | { value: number }
+  | { order: number[] }
+  | { truth: boolean }
+  /** For each left (as shown), the right joined to it, or -1. */
+  | { pairs: number[] };
 
 export interface Mark {
   points: number;

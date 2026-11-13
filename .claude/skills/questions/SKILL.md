@@ -38,7 +38,7 @@ Every question is one JSON object in its category's file:
 | Field                | What                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `id`                 | The category's prefix and a number (`his-412`). Next free number; never reuse or change one |
-| `type`               | `choice`, `number` or `order`                                                            |
+| `type`               | `choice`, `number`, `order`, `truefalse` or `match`                                      |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 200 characters (see below)                                 |
@@ -55,6 +55,10 @@ By type:
   factor above 1). It's typed on a pad, and the player isn't told a range. Only a temperature (°C) may be below 0.
 - **`order`:** four `items` (`text` at most 45 characters and an exact `value`), `direction` (`asc` or `desc`) and
   `unit`. The text says the direction.
+- **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
+  many false ones as true, each false by one clear fact, not by a trick of wording. 10 seconds to answer.
+- **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), and four `pairs` of `left` and
+  `right`, each at most 30 characters. Every left has exactly one right that fits, under every source. 30 seconds.
 
 ## Writing a question
 
