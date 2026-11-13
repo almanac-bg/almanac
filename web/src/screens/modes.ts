@@ -1,11 +1,10 @@
-// The ways to play, as cards: each with its name, a line about it, and its colour.
+// The ways to play with others, as cards: each with its name, a line about it, and its colour.
 
 import { type Child, h } from "../lib/dom.ts";
 
-type Mode = "topics" | "duel" | "royal" | "room";
+type Mode = "duel" | "royal" | "room";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string; icon: string }> = {
-  topics: { href: "/play", name: "Теми", about: "Десет въпроса от една тема.", tone: "tone-sky", icon: "play" },
   duel: {
     href: "/duel",
     name: "Дуел",
