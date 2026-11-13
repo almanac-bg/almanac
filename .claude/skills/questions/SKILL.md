@@ -18,18 +18,21 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format; run it after every edit;
   - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
-    with the balance report: the difficulty mix against the aim, facts and dates, and what each category needs.
+    with the balance report: the difficulty and kind mix, facts and dates, and the full-balance grid. It **fails**
+    while the bank isn't fully balanced (`-unbalanced` lets the small public sample pass).
 
 ## The aims (the owner's rules)
 
 - **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`), judged by the rubric below.
 - **Kinds: 60% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match**, in every category (`bank.TypeMix`),
   close to what the game draws (a run of ten has six choices and one of each other kind), so that no kind runs out
-  long before the others. `bank check` reports what each category needs.
-- **The bank must be fully balanced** (the owner's rule): every category the same size; in it, the kinds in their
-  mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15% hard,
-  like its choices). `bank check` ends with the full grid — per category, kind and difficulty: `+n` to write, `−n`
-  too many — and how many questions are out of place in all; 0 is the goal. Close a `+` by writing for that cell;
+  long before the others.
+- **The bank must be fully balanced, always** (the owner's rule): every category the same size; in it, the kinds in
+  their mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15%
+  hard, like its choices). So every category has exactly the same count in every cell: as many hard number
+  questions in music as in geography. `bank check` ends with the full grid — per category, kind and difficulty: `+n` to write, `−n`
+  too many — and how many questions are out of place in all; it must be 0 before every commit, so a batch fills the
+  same cells in every category, and a retired question is replaced in its cell in the same commit. Close a `+` by writing for that cell;
   a `−` by judging the questions again (move one to a neighbouring difficulty only where that's honest for
   Bulgarian players; what players get right shows how hard a question really is) or retiring the weakest.
 - **Every category the same size.** No topic outweighs another, so a batch adds to every category, or closes the
@@ -153,7 +156,7 @@ By type:
    one against reliable sources: the marked answer is right, no other option is also right, nothing is outdated,
    the wording has one reading, the fact is true, and the difficulty fits the definitions. It reports OK, FIX or
    DROP, with evidence. Apply the fixes, and drop what it can't confirm.
-4. **Check:** `bank fmt`, then `bank check`, with no errors. Look at the balance report again.
+4. **Check:** `bank fmt`, then `bank check`, with no errors and full balance (it fails otherwise).
 5. **Commit in `private/`** (`git -C private …`), one commit per batch, its message listing the ids. On the server,
    `almanac-bank` takes the new questions without a restart.
 6. **Tell the owner** what went in: a short list of question → answer, with the fact, so they can read it.

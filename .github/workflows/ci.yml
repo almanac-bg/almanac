@@ -38,7 +38,7 @@ jobs:
       - name: The program
         run: CGO_ENABLED=0 go build -trimpath -o almanac ./cmd/almanac
       - name: The sample bank passes its checks
-        run: ./almanac bank check bank/sample
+        run: ./almanac bank check -unbalanced bank/sample
 
   web:
     name: Client

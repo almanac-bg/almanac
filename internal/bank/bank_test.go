@@ -306,28 +306,6 @@ func TestBalance(t *testing.T) {
 	if bal.Total != len(b.Live("", "")) {
 		t.Fatalf("counted %d of %d", bal.Total, len(b.Live("", "")))
 	}
-	for _, c := range b.Categories {
-		got := 0
-		for _, d := range Difficulties {
-			if bal.Add[c.ID][d] < 0 {
-				t.Errorf("%s: %d %s to add", c.ID, bal.Add[c.ID][d], d)
-			}
-			after := bal.Live[c.ID][d] + bal.Add[c.ID][d]
-			if aim := float64(bal.Size) * Mix[d]; math.Abs(float64(after)-aim) >= 1 {
-				t.Errorf("%s: %s would be %d of %d, aim %.1f", c.ID, d, after, bal.Size, aim)
-			}
-			got += after
-		}
-		if got != bal.Size {
-			t.Errorf("%s grows to %d, not %d", c.ID, got, bal.Size)
-		}
-		for typ, share := range TypeMix {
-			after := bal.Types[c.ID][typ] + bal.AddTypes[c.ID][typ]
-			if bal.AddTypes[c.ID][typ] < 0 || math.Abs(float64(after)-float64(bal.TypeSize)*share) >= 1 {
-				t.Errorf("%s: %s would be %d of %d, aim %.1f", c.ID, typ, after, bal.TypeSize, float64(bal.TypeSize)*share)
-			}
-		}
-	}
 	// The full balance: each cell's gap brings it to the aim, and Off counts every question out of place.
 	off := 0
 	for _, c := range b.Categories {
