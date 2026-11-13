@@ -222,11 +222,14 @@ export function avatar(
   );
 }
 
-/** A player on a board or a list: their avatar, name and title. */
-export function who(name: Child, look: Look = {}, extra: Child = null, plainName = ""): Child {
+/** Where a player's profile is: by their tag. */
+export const profileHref = (tag: string) => `/players/${tag}`;
+
+/** A player on a board or a list: their avatar, name and title; with their tag, a link to their profile. */
+export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
-    "span",
-    { class: "who" },
+    tag ? "a" : "span",
+    tag ? { class: "who", href: profileHref(tag) } : { class: "who" },
     avatar(look.avatar, { size: "s", level: look.level, name: plainName }),
     h(
       "span",

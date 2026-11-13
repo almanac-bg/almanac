@@ -13,6 +13,7 @@ import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { topic, topics } from "./screens/play.ts";
+import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
 import { room } from "./screens/room.ts";
@@ -25,7 +26,7 @@ import { duelTurns, friendRequests, watchWaiting } from "./state.ts";
 /** The five main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
   ["/", "Начало", "home", (p) => p === "/"],
-  ["/play", "Играй", "play", (p) => /^\/(play|duel|royal|room|r\/)/.test(p)],
+  ["/play", "Играй", "play", (p) => /^\/((play|duel|royal|room)(\/|$)|r\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/rewards", "Награди", "award", (p) => p === "/rewards"],
   ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
@@ -94,6 +95,7 @@ if (root) {
       { path: /^\/r\/([0-9]{6})$/, view: room },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/me$/, view: me },
+      { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
     ],
     missing,
   );
