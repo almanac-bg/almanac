@@ -154,7 +154,7 @@ Every element that looks like a game measures something the game already counts:
 | Points       | One game's score, per answer and per run, from the server (with the part for speed); never added up across games                                                                                                                           | Verdict, result, day board   |
 | XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's, 100 a daily goal; adds up                                                                                                         | Level, level board, goals    |
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                                                                                                                             | Result, Профил               |
-| Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Знаток (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
+| Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                     | Room boards                  |
 | Duels        | Played in each one's own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                  | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                    | Дуел, Роял, Профил, Класации |
@@ -177,7 +177,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 ## Copy
 
-- **Language:** Bulgarian, to one player with „ти“, in short plain sentences. Text must be gender-neutral.
+- **Language:** standard Bulgarian (Bulgarian words, never Russian ones: see `CLAUDE.md`), to one player with „ти“,
+  in short plain sentences. Text must be gender-neutral.
 - **Buttons** are verbs: „Започни“, „Отговори“, „Още десет“.
 - **Verdicts** are a fixed set: „Точно!“, „Вярно!“, „Близо.“, „Не е това.“ and „Времето изтече.“
 - **Numbers the Bulgarian way:**
