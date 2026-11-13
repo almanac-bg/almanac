@@ -114,8 +114,12 @@ By type:
   - text that speaks to the player is gender-neutral.
 - **Numbers:** something worth estimating with one accepted value. Pin the source where sources differ
   („според измерването от 2020 г.“). The tolerance is set so that a well-read guess still scores about half.
-- **Orders:** exact, sourced values, at least 10% apart, in the same order under every source. The reveal shows
-  every value, so none of them may be another question's answer.
+- **Orders:** exact, sourced values in the same order under every source. Measurements that sources give
+  differently (areas, lengths, populations, heights) need at least 10% between neighbours; exact values (years,
+  dates) only need to be distinct and undisputed. The reveal shows every value, so none of them may be another
+  question's answer, and no other question's text, options or fact may show a value an order or number question
+  asks next to its subject („„Титаник“ (1997)“ when an order asks it); drop the year unless it is needed to tell
+  the thing apart (a remake, a namesake).
 
 ## Writing the fact
 
