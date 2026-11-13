@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -25,6 +26,8 @@ func bankCommand(args []string) error {
 		return bankCheck(dir())
 	case "fmt":
 		return bankFmt(dir())
+	case "calibrate":
+		return bankCalibrate(dir())
 	}
 	return usage()
 }
@@ -113,6 +116,45 @@ func balance(b *bank.Bank) string {
 	for _, c := range b.Categories {
 		a := bal.Add[c.ID]
 		fmt.Fprintf(&s, "  %-10s %d/%d/%d\n", c.ID, a[bank.Easy], a[bank.Medium], a[bank.Hard])
+	}
+	kinds := map[string]int{}
+	for _, n := range bal.Types {
+		for t, k := range n {
+			kinds[t] += k
+		}
+	}
+	s.WriteString("kinds       ")
+	for _, t := range bank.TypeOrder {
+		fmt.Fprintf(&s, " %s %d%% (aim %.1f)", t, pct(kinds[t], bal.Total), 100*bank.TypeMix[t])
+	}
+	fmt.Fprintf(&s, "\nto the kinds every category at %d, adding (%s):\n", bal.TypeSize, strings.Join(bank.TypeOrder, "/"))
+	for _, c := range b.Categories {
+		a := bal.AddTypes[c.ID]
+		parts := make([]string, len(bank.TypeOrder))
+		for i, t := range bank.TypeOrder {
+			parts[i] = strconv.Itoa(a[t])
+		}
+		fmt.Fprintf(&s, "  %-10s %s\n", c.ID, strings.Join(parts, "/"))
+	}
+	// Full balance: per category, kind and difficulty, what to write (+) or judge again or retire (−).
+	if bal.Off == 0 {
+		s.WriteString("balance      full: every category, kind and difficulty on its aim\n")
+		return s.String()
+	}
+	fmt.Fprintf(&s, "balance      %d questions out of place; every category at %d, each kind easy/medium/hard (+ write, − judge again or retire):\n",
+		bal.Off, bal.Target)
+	fmt.Fprintf(&s, "  %-10s", "")
+	for _, t := range bank.TypeOrder {
+		fmt.Fprintf(&s, "%16s", t)
+	}
+	s.WriteString("\n")
+	for _, c := range b.Categories {
+		fmt.Fprintf(&s, "  %-10s", c.ID)
+		for _, t := range bank.TypeOrder {
+			g := bal.Gaps[c.ID][t]
+			fmt.Fprintf(&s, "%16s", fmt.Sprintf("%+d/%+d/%+d", g[bank.Easy], g[bank.Medium], g[bank.Hard]))
+		}
+		s.WriteString("\n")
 	}
 	return s.String()
 }

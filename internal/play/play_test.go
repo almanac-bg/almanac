@@ -900,3 +900,28 @@ func TestGoalsAndSeason(t *testing.T) {
 		t.Fatalf("a season's frame with its gold: %v", err)
 	}
 }
+
+func TestCalibrate(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	if KnownToDifficulty(0.9) != bank.Easy || KnownToDifficulty(0.5) != bank.Medium || KnownToDifficulty(0.1) != bank.Hard {
+		t.Fatal("the knowledge bands")
+	}
+	// Thirty players get the first question of a day right: it shows as easy, whatever it's labelled.
+	var first string
+	for range CalibrateFrom {
+		p := w.user()
+		s, _ := w.g.StartDay(ctx, p)
+		first = w.picks(s.ID)[0].ID
+		w.play(p, s.ID, w.right)
+	}
+	list, err := w.g.Calibrate(ctx)
+	if err != nil || len(list) == 0 {
+		t.Fatalf("calibrated: %+v %v", list, err)
+	}
+	for _, c := range list {
+		if c.ID == first && (c.Answers != CalibrateFrom || c.Known < 0.99 || c.Observed != bank.Easy) {
+			t.Fatalf("a question all got right: %+v", c)
+		}
+	}
+}
