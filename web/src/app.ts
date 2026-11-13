@@ -3,6 +3,7 @@
 
 import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
+import { applyPrefs } from "./lib/prefs.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
@@ -31,6 +32,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
 ];
 
 reportErrors();
+applyPrefs();
 
 const root = document.getElementById("app");
 if (root) {

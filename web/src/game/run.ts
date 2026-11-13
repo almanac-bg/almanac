@@ -4,6 +4,7 @@
 
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { tickOn } from "../lib/prefs.ts";
 import { play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
 import { type VerdictKind, verdict } from "../ui.ts";
@@ -107,7 +108,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
   );
   effect(() => {
     const n = left();
-    if (n <= 0 || locked.peek()) return;
+    if (n <= 0 || locked.peek() || !tickOn.peek()) return;
     play(n <= 5 ? "hurry" : n % 2 ? "tick" : "tock");
   });
   // Once answered, the bar stops where it is.
