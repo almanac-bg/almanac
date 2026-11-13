@@ -341,8 +341,8 @@ func TestBalance(t *testing.T) {
 			}
 		}
 	}
-	if off != bal.Off || bal.Target < bal.Size || bal.Target < bal.TypeSize {
-		t.Errorf("off %d (counted %d), target %d (sizes %d, %d)", bal.Off, off, bal.Target, bal.Size, bal.TypeSize)
+	if off != bal.Off || bal.Target != steady(bal.Cells) {
+		t.Errorf("off %d (counted %d), target %d", bal.Off, off, bal.Target)
 	}
 	sum := 0.0
 	for _, share := range TypeMix {
@@ -350,6 +350,37 @@ func TestBalance(t *testing.T) {
 	}
 	if math.Abs(sum-1) > 1e-9 || len(TypeMix) != len(Types()) {
 		t.Fatalf("the kinds' aim adds up to %v over %d kinds (of %d)", sum, len(TypeMix), len(Types()))
+	}
+}
+
+// The target is the smallest size whose aims cover every kind and every difficulty, and it's steady: a bank filled
+// exactly to its aims keeps that size (the aims, rounded per cell, don't ask for a bigger one).
+func TestSteadyTarget(t *testing.T) {
+	filled := func(size int) map[string]map[string]map[Difficulty]int {
+		kinds := map[string]map[Difficulty]int{}
+		for _, k := range TypeOrder {
+			kinds[k] = map[Difficulty]int{}
+			for _, d := range Difficulties {
+				kinds[k][d] = Want(size, k, d)
+			}
+		}
+		return map[string]map[string]map[Difficulty]int{"a": kinds}
+	}
+	for _, size := range []int{25, 100, 600, 657, 660, 667, 680, 1000} {
+		if got := steady(filled(size)); got > size {
+			t.Errorf("filled to the aims of %d, the target is %d", size, got)
+		}
+		// One more of the largest cell needs a bigger size.
+		cells := filled(size)
+		cells["a"]["choice"][Easy]++
+		if got := steady(cells); got <= size {
+			t.Errorf("one more than the aims of %d still fits in %d", size, got)
+		}
+	}
+	// The minimum: one size less doesn't fit.
+	cells := filled(657)
+	if got := steady(cells); got > 657 || got < 640 {
+		t.Errorf("the aims of 657 make a target of %d", got)
 	}
 }
 

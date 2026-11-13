@@ -36,8 +36,8 @@ type Balance struct {
 	Types    map[string]map[string]int
 	TypeSize int
 	AddTypes map[string]map[string]int
-	// Full balance: every category at Target questions, its kinds in the TypeMix and each kind's difficulties in the
-	// Mix. Cells counts the live questions by category, kind and difficulty; Gaps is what each cell lacks (above 0:
+	// Full balance: every category at Target questions (the steady size), its kinds in the TypeMix and each kind's
+	// difficulties in the Mix. Cells counts the live questions by category, kind and difficulty; Gaps is what each cell lacks (above 0:
 	// to write) or has too many of (below 0: to judge again into a neighbouring difficulty where that's honest, or
 	// retire). Off is how many questions are out of place in all; 0 is a fully balanced bank.
 	Target int
@@ -46,9 +46,48 @@ type Balance struct {
 	Off    int
 }
 
-// Want is how many questions of a kind and a difficulty a category of size questions aims for.
+// Want is how many questions of a kind and a difficulty a category of size questions aims for (the share rounded,
+// halves up: the tiny nudge keeps a share like 660 × 0.075 = 49.5 from rounding down by a float's last bit).
 func Want(size int, kind string, d Difficulty) int {
-	return int(math.Round(float64(size) * TypeMix[kind] * Mix[d]))
+	return int(math.Round(float64(size)*TypeMix[kind]*Mix[d] + 1e-9))
+}
+
+// steady is the smallest size at which, in every category, each kind's aims and each difficulty's aims (rounded as
+// Want rounds them) add up to at least what the category has of it. Reachable by adding questions, and steady: a
+// bank filled to its aims has that same size, so the aims don't run ahead of the questions written for them (the
+// unrounded sizes did: aims rounded up per cell add up to more than a kind's share, which then asked for a bigger
+// size). A single cell may still be above its aim: that's a question to judge again or retire, not more to write.
+func steady(cells map[string]map[string]map[Difficulty]int) int {
+	fits := func(size int) bool {
+		for _, kinds := range cells {
+			for _, t := range TypeOrder {
+				has, aim := 0, 0
+				for _, d := range Difficulties {
+					has += kinds[t][d]
+					aim += Want(size, t, d)
+				}
+				if has > aim {
+					return false
+				}
+			}
+			for _, d := range Difficulties {
+				has, aim := 0, 0
+				for _, t := range TypeOrder {
+					has += kinds[t][d]
+					aim += Want(size, t, d)
+				}
+				if has > aim {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	size := 1
+	for !fits(size) {
+		size++
+	}
+	return size
 }
 
 // BalanceOf works out where the bank stands against Mix and equal categories.
@@ -83,12 +122,14 @@ func (b *Bank) BalanceOf() Balance {
 		}
 		bal.AddTypes[c.ID] = add
 	}
-	// The full balance aims at the larger of the two sizes (reachable for the kinds and for the difficulties by
-	// adding), and says per cell what's missing or too much.
-	bal.Target = max(bal.Size, bal.TypeSize)
+	// The full balance aims at the steady size (every kind and every difficulty reachable by adding), and says per
+	// cell what's missing or too much.
 	bal.Cells, bal.Gaps = map[string]map[string]map[Difficulty]int{}, map[string]map[string]map[Difficulty]int{}
 	for _, c := range b.Categories {
 		cells := map[string]map[Difficulty]int{}
+		for _, t := range TypeOrder {
+			cells[t] = map[Difficulty]int{}
+		}
 		for _, q := range b.Live(c.ID, "") {
 			t := q.Base().Type
 			if cells[t] == nil {
@@ -96,6 +137,11 @@ func (b *Bank) BalanceOf() Balance {
 			}
 			cells[t][q.Base().Difficulty]++
 		}
+		bal.Cells[c.ID] = cells
+	}
+	bal.Target = steady(bal.Cells)
+	for _, c := range b.Categories {
+		cells := bal.Cells[c.ID]
 		gaps := map[string]map[Difficulty]int{}
 		for _, t := range TypeOrder {
 			gaps[t] = map[Difficulty]int{}
@@ -105,7 +151,7 @@ func (b *Bank) BalanceOf() Balance {
 				bal.Off += max(g, -g)
 			}
 		}
-		bal.Cells[c.ID], bal.Gaps[c.ID] = cells, gaps
+		bal.Gaps[c.ID] = gaps
 	}
 	// Split the size by the mix, rounding so the parts add up to it (the largest remainders get the spare ones).
 	want := map[Difficulty]int{}
