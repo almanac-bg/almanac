@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -98,11 +99,24 @@ func achievementByID(id string) (Achievement, bool) {
 	return Achievements[i], true
 }
 
-// TitleOf is the name an achievement's id is shown by as a title, and its tier ("" for none).
+// TitleOf is the name a title is shown by, and its tier ("" for none): an achievement's id, or a place on a season's
+// podium as lookColumns read it ("podium2:3": second, three times).
 func TitleOf(id string) (string, Tier) {
+	if rest, ok := strings.CutPrefix(id, "podium"); ok {
+		p, n, _ := strings.Cut(rest, ":")
+		place, _ := strconv.Atoi(p)
+		times, _ := strconv.Atoi(n)
+		if place < 1 || place > len(podiumTitles) || times < 1 {
+			return "", ""
+		}
+		return PodiumTitle(place, times)
+	}
 	a, _ := achievementByID(id)
 	return a.Name, a.Tier
 }
+
+// podiumTitleID is the title of a place on a season's podium (1–3), as a player wears it.
+func podiumTitleID(place int) string { return "podium" + strconv.Itoa(place) }
 
 // Avatars are a shape in a tone. Some shapes are everyone's from the start; the rest unlock: with an achievement
 // drawn with that shape, or (the crown) at a level.
@@ -192,10 +206,19 @@ func lookOf(userID int64, avatar, title string, total int) Look {
 	return Look{Avatar: avatar, Title: name, TitleTier: tier, Level: level}
 }
 
-// lookColumns read a player's look in a query over users u: their avatar, title and XP.
-const lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
-	coalesce(u.title, ''),
-	(SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = u.id)`
+// lookColumns read a player's look in a query over users u: their avatar, title (a podium's with how many times) and
+// XP.
+var lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
+	CASE WHEN u.title LIKE 'podium_' THEN u.title || ':' || (SELECT count(*) FROM season_results
+		WHERE user_id = u.id AND place = CAST(substr(u.title, 7) AS INTEGER)) ELSE coalesce(u.title, '') END,
+	` + xpOf("u.id")
+
+// xpOf is a SQL expression for all the XP a player (a column or a parameter) has earned: their games', and their
+// goals'.
+func xpOf(user string) string {
+	return `((SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ` + user + `) +
+		(SELECT coalesce(sum(xp), 0) FROM goals_done WHERE user_id = ` + user + `))`
+}
 
 // LookOf is how a player shows to others.
 func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
@@ -228,11 +251,14 @@ type Progress struct {
 	To           int      `json:"to"`   // and where the next one does
 	Achievements []Earned `json:"achievements"`
 	Avatar       string   `json:"avatar"`
-	Title        string   `json:"title"` // the chosen achievement's id ("" for none)
+	Title        string   `json:"title"` // the chosen title's id: an achievement's, or podium1–3 ("" for none)
 	Shapes       []Shape  `json:"shapes"`
 	Tones        []string `json:"tones"`
 	// Standing is the player's rating and division.
 	Standing Standing `json:"standing"`
+	// Podium are the titles of a season's podium, first to third: each the player's once they've ended a season in
+	// its place, and named by how many times.
+	Podium []PodiumTitleView `json:"podium"`
 	// The wardrobe: the frame and pattern worn ("" for none), and all there are.
 	Frame     string     `json:"frame"`
 	Backdrop  string     `json:"backdrop"`
@@ -243,7 +269,7 @@ type Progress struct {
 // totalXP is all the XP a player has earned.
 func (g *Game) totalXP(ctx context.Context, userID int64) (int, error) {
 	var total int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ?`, userID).Scan(&total)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT `+xpOf("?1"), userID).Scan(&total)
 	return total, err
 }
 
@@ -263,6 +289,14 @@ func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, erro
 		earned[id] = at
 	}
 	return earned, rows.Err()
+}
+
+// PodiumTitleView is a podium's title as a player may wear it: won some times, or not yet (0).
+type PodiumTitleView struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Tier Tier   `json:"tier"`
+	Won  int    `json:"won"`
 }
 
 // ProgressOf reads a player's progress.
@@ -307,8 +341,13 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
+	for i, won := range w.podium {
+		v := PodiumTitleView{ID: podiumTitleID(i + 1), Won: won}
+		v.Name, v.Tier = PodiumTitle(i+1, won)
+		p.Podium = append(p.Podium, v)
+	}
 	p.Frame, p.Backdrop = frame.String, backdrop.String
-	p.Frames, p.Backdrops = append(w.list(Frames), w.seasonFrames(g.Now().In(Bulgaria).Format("2006-01"))...), w.list(Backdrops)
+	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
 	return p, nil
 }
 
@@ -468,10 +507,11 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 	return false, rows.Err()
 }
 
-// News is what's new for a player since they last looked: achievements earned, and their level (and whether it's
-// gone up).
+// News is what's new for a player since they last looked: achievements earned, the day's goals done (with their
+// XP), and their level (and whether it's gone up).
 type News struct {
 	Achievements []Achievement `json:"achievements"`
+	Goals        []DoneGoal    `json:"goals"`
 	Level        int           `json:"level"`
 	XP           int           `json:"xp"`
 	From         int           `json:"from"`
@@ -479,9 +519,15 @@ type News struct {
 	LevelUp      bool          `json:"levelUp,omitempty"`
 }
 
-// NewsOf tells a player what's new, once: the achievements and the level are marked as told.
+// DoneGoal is one of the day's goals, done: what it was, and the XP it earned.
+type DoneGoal struct {
+	Name string `json:"name"`
+	XP   int    `json:"xp"`
+}
+
+// NewsOf tells a player what's new, once: the achievements, the goals and the level are marked as told.
 func (g *Game) NewsOf(ctx context.Context, userID int64) (News, error) {
-	n := News{Achievements: []Achievement{}}
+	n := News{Achievements: []Achievement{}, Goals: []DoneGoal{}}
 	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return n, err
@@ -508,6 +554,29 @@ func (g *Game) NewsOf(ctx context.Context, userID int64) (News, error) {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE achievements SET seen = 1 WHERE user_id = ? AND NOT seen`, userID); err != nil {
+			return err
+		}
+		goals, err := tx.Query(`SELECT goal, xp FROM goals_done WHERE user_id = ? AND NOT seen ORDER BY at`, userID)
+		if err != nil {
+			return err
+		}
+		for goals.Next() {
+			var id string
+			var d DoneGoal
+			if err := goals.Scan(&id, &d.XP); err != nil {
+				goals.Close()
+				return err
+			}
+			if goal, ok := goalByID(id); ok {
+				d.Name = goal.Name
+				n.Goals = append(n.Goals, d)
+			}
+		}
+		goals.Close()
+		if err := goals.Err(); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE goals_done SET seen = 1 WHERE user_id = ? AND NOT seen`, userID); err != nil {
 			return err
 		}
 		res, err := tx.Exec(`UPDATE users SET level_seen = ? WHERE id = ? AND level_seen < ?`, n.Level, userID, n.Level)
@@ -542,7 +611,17 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 	}
 	if title != nil && *title != "" {
 		if _, ok := earned[*title]; !ok {
-			return ErrNotYours
+			podium, err := g.podiumOf(ctx, userID)
+			if err != nil {
+				return err
+			}
+			won := false
+			for place, n := range podium {
+				won = won || (n > 0 && *title == podiumTitleID(place+1))
+			}
+			if !won {
+				return ErrNotYours
+			}
 		}
 	}
 	// The wardrobe: a frame and a pattern ("" takes them off), if the player has unlocked them.
@@ -558,7 +637,7 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 		if err != nil {
 			return err
 		}
-		if (frame != nil && *frame != "" && !w.ownsFrame(*frame)) ||
+		if (frame != nil && *frame != "" && !w.owns(Frames, *frame)) ||
 			(backdrop != nil && *backdrop != "" && !w.owns(Backdrops, *backdrop)) {
 			return ErrNotYours
 		}

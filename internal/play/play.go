@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand/v2"
+	"sync"
 	"time"
 	_ "time/tzdata" // Bulgaria's days, wherever the server runs
 
@@ -67,6 +68,11 @@ type Game struct {
 	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
+	// SeasonNews, if set, is told of each place when a season ends.
+	SeasonNews func(context.Context, SeasonNews)
+
+	seasonMu sync.Mutex
+	season   string // the season being played, once ensureSeason has seen it
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -351,7 +357,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 			_, err = g.Award(ctx, userID)
 		}
 		if err == nil {
-			_, err = g.GoalsOf(ctx, userID) // a goal done is kept: a star, whether or not the player looks
+			_, err = g.GoalsOf(ctx, userID) // a goal done is kept, with its XP, whether or not the player looks
 		}
 	}
 	return res, err

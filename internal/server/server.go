@@ -105,6 +105,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game = play.New(d.DB, s.bank.Load)
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
+	s.game.SeasonNews = s.seasonNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
 	s.closing = make(chan struct{})
@@ -160,6 +161,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/royal", s.royals)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/season", s.season)
+	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)
 	api("POST /api/friends/requests", s.requestFriend)

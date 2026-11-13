@@ -166,6 +166,9 @@ type royalist struct {
 // settleRoyal ends a tournament: places by how far each got (then how quick), and ratings moved by each place
 // against everyone else's (with three or more in it).
 func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
+	if err := g.ensureSeason(ctx); err != nil { // a new month's game counts for the new season
+		return err
+	}
 	var list []royalist
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.Query(`SELECT p.user_id, u.name, coalesce(r.rights, 0), coalesce(r.ms, 0), u.rating, u.rated
@@ -223,7 +226,7 @@ func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
 				return err
 			}
 			if len(list) >= 3 {
-				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1 WHERE id = ?2`,
+				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1, season_games = season_games + 1 WHERE id = ?2`,
 					p.delta, p.user); err != nil {
 					return err
 				}
