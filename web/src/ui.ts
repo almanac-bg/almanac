@@ -16,14 +16,21 @@ const verdictWords: Record<VerdictKind, string> = {
   time: "Времето изтече.",
 };
 
-/** How an answer went: its sign, the word, and the points it brought. */
-export function verdict(kind: VerdictKind, points: number, words = verdictWords[kind]): Child {
+/** How an answer went: its sign, the word, and the points it brought (and how many of them for being quick). */
+export function verdict(kind: VerdictKind, points: number, words = verdictWords[kind], speed = 0): Child {
   return h(
     "p",
     { class: `verdict ${kind}`, role: "status" },
     h("span", { class: "verdict-sign", "aria-hidden": "true" }),
     h("strong", { class: "verdict-word" }, words),
-    points > 0 ? h("span", { class: "verdict-pts" }, `+${points}`) : null,
+    points > 0
+      ? h(
+          "span",
+          { class: "verdict-pts" },
+          `+${points}`,
+          speed > 0 ? h("small", { class: "verdict-speed" }, `${speed} за бързина`) : null,
+        )
+      : null,
   );
 }
 

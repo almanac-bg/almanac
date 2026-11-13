@@ -140,15 +140,9 @@ func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 		seen[shown] = true
 		bank[i] = d.order[shown]
 	}
-	placed := 0
-	for i, b := range d.q.right() {
-		if bank[i] == b {
-			placed++
-		}
-	}
 	return Graded{
-		Score: float64(placed) / float64(n),
-		Right: placed == n,
+		Score: orderScore(bank, d.q.right()),
+		Right: slices.Equal(bank, d.q.right()),
 		Given: mustJSON(OrderAnswer{Order: bank}),
 		Shown: mustJSON(OrderAnswer{Order: a.Order}),
 	}, nil
@@ -174,4 +168,29 @@ func (d *dealtOrder) Reveal() any {
 		Unit   string    `json:"unit,omitempty"`
 		reveal
 	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail)}
+}
+
+// orderScore is what an order is worth: how many of its pairs stand the right way round, less how many stand the
+// wrong way, out of all of them (Kendall's tau), and nothing below 0. One pair of neighbours swapped is worth 2/3 of
+// a right order, where counting the places that are exactly right would give it half; and an order put down at
+// random is worth almost nothing (0.19 on average, against 0.25 for the places), so luck earns little.
+func orderScore(given, right []int) float64 {
+	rank := make(map[int]int, len(right))
+	for i, b := range right {
+		rank[b] = i
+	}
+	n, sum := len(given), 0
+	for i := range n {
+		for j := i + 1; j < n; j++ {
+			if rank[given[i]] < rank[given[j]] {
+				sum++
+			} else {
+				sum--
+			}
+		}
+	}
+	if n < 2 {
+		return 1
+	}
+	return max(0, float64(sum)/float64(n*(n-1)/2))
 }

@@ -196,6 +196,13 @@ func TestOrderGrading(t *testing.T) {
 				t.Fatalf("%s shown with %v", it.Text, v)
 			}
 		}
+		// Two neighbours swapped: five pairs of six the right way, one the wrong way.
+		swapped := slices.Clone(order)
+		swapped[1], swapped[2] = swapped[2], swapped[1]
+		answer, _ = json.Marshal(OrderAnswer{Order: swapped})
+		if g := grade(t, d, string(answer)); g.Right || math.Abs(g.Score-2.0/3) > 1e-9 {
+			t.Fatalf("two neighbours swapped graded %+v", g)
+		}
 		slices.Reverse(order)
 		answer, _ = json.Marshal(OrderAnswer{Order: order})
 		if g := grade(t, d, string(answer)); g.Right || g.Score != 0 {
@@ -403,10 +410,10 @@ func TestMatchGrading(t *testing.T) {
 		if !slices.Equal(rev.Pairs, right) {
 			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Pairs, right)
 		}
-		// Two swapped: half right; one left out: three of four at most.
+		// Two swapped: two right, less two wrong at a third each; one left out: three of four, nothing taken.
 		swapped := slices.Clone(right)
 		swapped[0], swapped[1] = swapped[1], swapped[0]
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || g.Score != 0.5 {
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || math.Abs(g.Score-1.0/3) > 1e-9 {
 			t.Fatalf("seed %d: two swapped graded %+v", seed, g)
 		}
 		partial := slices.Clone(right)
@@ -420,5 +427,38 @@ func TestMatchGrading(t *testing.T) {
 		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
 			t.Errorf("%s was graded", bad)
 		}
+	}
+}
+
+// Luck earns little: an order or a match put down at random is worth next to nothing on average.
+func TestLuckTakenOut(t *testing.T) {
+	perms := [][]int{}
+	var permute func([]int, int)
+	permute = func(a []int, k int) {
+		if k == len(a) {
+			perms = append(perms, slices.Clone(a))
+			return
+		}
+		for i := k; i < len(a); i++ {
+			a[k], a[i] = a[i], a[k]
+			permute(a, k+1)
+			a[k], a[i] = a[i], a[k]
+		}
+	}
+	permute([]int{0, 1, 2, 3}, 0)
+	var order, match float64
+	for _, p := range perms {
+		order += orderScore(p, []int{0, 1, 2, 3})
+		right := 0
+		for i, v := range p {
+			if i == v {
+				right++
+			}
+		}
+		match += matchScore(right, 4-right, 4)
+	}
+	order, match = order/float64(len(perms)), match/float64(len(perms))
+	if math.Abs(order-7.0/36) > 1e-9 || math.Abs(match-0.125) > 1e-9 {
+		t.Errorf("at random: an order is worth %v, a match %v", order, match)
 	}
 }

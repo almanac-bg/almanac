@@ -116,7 +116,7 @@ func (d *dealtMatch) Grade(answer json.RawMessage) (Graded, error) {
 	for i := range bank {
 		bank[i] = -1
 	}
-	right := 0
+	right, wrong := 0, 0
 	for i, shown := range a.Pairs {
 		if shown == -1 {
 			continue
@@ -129,10 +129,12 @@ func (d *dealtMatch) Grade(answer json.RawMessage) (Graded, error) {
 		bank[l] = r
 		if l == r {
 			right++
+		} else {
+			wrong++
 		}
 	}
 	return Graded{
-		Score: float64(right) / float64(n),
+		Score: matchScore(right, wrong, n),
 		Right: right == n,
 		Given: mustJSON(MatchAnswer{Pairs: bank}),
 		Shown: mustJSON(MatchAnswer{Pairs: a.Pairs}),
@@ -152,4 +154,15 @@ func (d *dealtMatch) Reveal() any {
 		Pairs []int `json:"pairs"`
 		reveal
 	}{pairs, revealOf(&d.q.Head, &d.q.Tail)}
+}
+
+// matchScore is what a match is worth: a share for each pair joined right, less a third of one for each joined wrong
+// (with four pairs; 1/(n-1) of one in general), and nothing below 0. A pair left out costs nothing, so a player who
+// joins only what they know keeps it all; pairs joined at random are worth nothing on average (one of four comes out
+// right by luck, the other three take it back).
+func matchScore(right, wrong, n int) float64 {
+	if n < 2 {
+		return float64(right)
+	}
+	return max(0, (float64(right)-float64(wrong)/float64(n-1))/float64(n))
 }

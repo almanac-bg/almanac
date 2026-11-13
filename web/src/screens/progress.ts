@@ -6,7 +6,7 @@ import type { Standing } from "./duel.ts";
 
 export interface Progress {
   level: number;
-  points: number;
+  xp: number;
   from: number;
   to: number;
   achievements: AchievementInfo[];

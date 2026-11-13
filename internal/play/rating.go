@@ -75,7 +75,7 @@ func (g *Game) StandingOf(ctx context.Context, userID int64) (Standing, error) {
 	return s, err
 }
 
-// Ranked is a player on a board: who they are, and the number the board is by (a rating, a week's points).
+// Ranked is a player on a board: who they are, and the number the board is by (a rating, a week's XP).
 type Ranked struct {
 	Name     string    `json:"name"`
 	Tag      string    `json:"tag"`
@@ -101,14 +101,16 @@ func (g *Game) RatingBoard(ctx context.Context, viewer int64) (Ranking, error) {
 		FROM users u WHERE u.rated > 0 ORDER BY u.rating DESC, u.rated DESC, u.id`, true)
 }
 
-// WeekBoard is the most points this week (from Monday, in Bulgaria), every game counted.
+// WeekBoard is the most XP earned this week (from Monday, in Bulgaria), every game counted: who's played the most,
+// and the most knowingly. It isn't a board of points: those are each game's own, to compare players on the same
+// questions.
 func (g *Game) WeekBoard(ctx context.Context, viewer int64) (Ranking, error) {
 	now := g.Now().In(Bulgaria)
 	monday := time.Date(now.Year(), now.Month(), now.Day()-(int(now.Weekday())+6)%7, 0, 0, 0, 0, Bulgaria)
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, w.points, `+lookColumns+`
-		FROM (SELECT user_id, sum(points) AS points FROM runs WHERE finished_at >= `+strconv.FormatInt(monday.UnixMilli(), 10)+`
+	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, w.xp, `+lookColumns+`
+		FROM (SELECT user_id, sum(xp) AS xp FROM runs WHERE finished_at >= `+strconv.FormatInt(monday.UnixMilli(), 10)+`
 			GROUP BY user_id) w JOIN users u ON u.id = w.user_id
-		WHERE w.points > 0 ORDER BY w.points DESC, u.id`, false)
+		WHERE w.xp > 0 ORDER BY w.xp DESC, u.id`, false)
 }
 
 // ranking reads a board from a query of (id, name, tag, value, look columns), best first.

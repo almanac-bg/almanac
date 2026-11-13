@@ -142,11 +142,11 @@ func (w wardrobe) seasonFrames(now string) []Cosmetic {
 
 func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	var w wardrobe
-	points, err := g.points(ctx, userID)
+	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return w, err
 	}
-	w.level, _, _ = LevelOf(points)
+	w.level, _, _ = LevelOf(total)
 	if w.earned, err = g.earned(ctx, userID); err != nil {
 		return w, err
 	}

@@ -112,6 +112,8 @@ export interface State {
 
 export interface Result {
   points: number;
+  /** How many of the points were for being quick. */
+  speed?: number;
   score: number;
   right: boolean;
   exact?: boolean;

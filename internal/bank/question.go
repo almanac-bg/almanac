@@ -79,7 +79,8 @@ type Dealt interface {
 // Graded is what an answer was worth.
 type Graded struct {
 	// Score runs from 0 (wrong) to 1 (perfect). Types with partial credit (a close number, an order half right) land in
-	// between; the game turns it into points.
+	// between, with what luck alone would get taken out (an order or a match put down at random is worth next to
+	// nothing); the game turns it into points.
 	Score float64
 	// Right is whether it counts as a right answer (for streaks and stats).
 	Right bool

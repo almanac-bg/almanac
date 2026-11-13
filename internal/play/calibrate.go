@@ -13,7 +13,7 @@ import (
 // worth judging again.
 //
 // A score is compared after taking away what guessing alone would get (a quarter on a choice, half on a true-or-not,
-// a quarter of an order's places or a match's pairs, nothing on a number): what's left is how much players knew.
+// what an order or a match put down at random is worth, nothing on a number): what's left is how much players knew.
 
 // CalibrateFrom is how many answers a question needs before its answers say how hard it is.
 const CalibrateFrom = 30
@@ -25,7 +25,9 @@ const (
 )
 
 // chance is the score a guess gets on average, by kind of question.
-var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 0.25, "match": 0.25, "number": 0}
+// An order's and a match's grading already takes most of the luck out (bank.orderScore, bank.matchScore): at random,
+// four items in order are worth 7/36 on average, four pairs 1/8.
+var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 7.0 / 36, "match": 0.125, "number": 0}
 
 // KnownToDifficulty is the difficulty a share of knowledge (above chance) points to.
 func KnownToDifficulty(known float64) bank.Difficulty {

@@ -190,7 +190,7 @@ func TestTheDay(t *testing.T) {
 	}
 }
 
-// The first level comes with the run that passes 1000 points, in the news once.
+// The first level comes with the run that passes 300 XP, in the news once.
 func TestLevelUpNews(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -203,15 +203,15 @@ func TestLevelUpNews(t *testing.T) {
 		if n, err = w.g.NewsOf(ctx, bo); err != nil {
 			t.Fatal(err)
 		}
-		if n.Points >= 1000 {
+		if n.XP >= 300 {
 			break
 		}
 		if n.LevelUp {
-			t.Fatalf("a level at %d points", n.Points)
+			t.Fatalf("a level at %d XP", n.XP)
 		}
 	}
-	if lvl, from, _ := LevelOf(n.Points); !n.LevelUp || n.Level != lvl || lvl < 2 || n.From != from {
-		t.Fatalf("news at %d points: %+v", n.Points, n)
+	if lvl, from, _ := LevelOf(n.XP); !n.LevelUp || n.Level != lvl || lvl < 2 || n.From != from {
+		t.Fatalf("news at %d XP: %+v", n.XP, n)
 	}
 	if again, _ := w.g.NewsOf(ctx, bo); again.LevelUp {
 		t.Fatalf("the level twice: %+v", again)
@@ -246,7 +246,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != worth(w.question(s.ID, 0), 1) || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 
@@ -495,7 +495,7 @@ func TestFriends(t *testing.T) {
 
 func TestProgress(t *testing.T) {
 	for _, c := range []struct{ points, level, from, to int }{
-		{0, 1, 0, 1000}, {999, 1, 0, 1000}, {1000, 2, 1000, 2500}, {2499, 2, 1000, 2500}, {2500, 3, 2500, 4500},
+		{0, 1, 0, 300}, {299, 1, 0, 300}, {300, 2, 300, 750}, {749, 2, 300, 750}, {750, 3, 750, 1350},
 	} {
 		if l, f, to := LevelOf(c.points); l != c.level || f != c.from || to != c.to {
 			t.Fatalf("LevelOf(%d) = %d %d %d", c.points, l, f, to)
@@ -526,9 +526,9 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (What a day earns depends on its questions' difficulties: a level comes with it if it passes 1000.)
-	if lvl, from, _ := LevelOf(n.Points); err != nil || !slices.Contains(ids, "perfect") || n.Level != lvl ||
-		n.From != from || n.LevelUp != (lvl > 1) {
+	// (A perfect day earns 20 XP an answer and 100 for the day: 300, the first level.)
+	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300 || lvl != 2 ||
+		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
 	if again, _ := w.g.NewsOf(ctx, ana); len(again.Achievements) != 0 || again.LevelUp {
@@ -708,7 +708,7 @@ func TestAsyncDuels(t *testing.T) {
 	}
 	full := 0
 	for n := range Length {
-		full += worth(w.question(s.ID, n), 1)
+		full += WorthOf(w.question(s.ID, n), 1, 0).Points
 	}
 	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != full {
 		t.Fatalf("scores after the end: %+v / %+v", da[0].Opponent, db[0].Opponent)

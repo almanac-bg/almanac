@@ -31,7 +31,7 @@ interface RoomView {
     leftMs: number;
     nextMs?: number;
     given?: Answer;
-    reveal?: { answer: Reveal; points: number; right: boolean; exact?: boolean; missed?: boolean };
+    reveal?: { answer: Reveal; points: number; speed?: number; right: boolean; exact?: boolean; missed?: boolean };
   };
 }
 
@@ -273,7 +273,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Без отговор." : undefined),
+    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed),
     upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(view, true, before),
   );
