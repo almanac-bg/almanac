@@ -13,21 +13,22 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Progress is what a player earns by playing: a level from every point they've scored, achievements for things
+// Progress is what a player earns by playing: a level from all the XP they've earned, achievements for things
 // they've done, and with them titles and avatars to choose from. All of it comes from the game's own records:
 // nothing to buy, nothing made up.
 
 // ErrNotYours is a title or an avatar the player hasn't earned (or one there's no such thing as).
 var ErrNotYours = errors.New("not earned")
 
-// LevelOf is the level a number of points reaches, with the points where that level starts and the next one does.
-// The first level-up takes 1000 points (a game or two); each takes 500 more than the one before.
-func LevelOf(points int) (level, from, to int) {
-	level, from, step := 1, 0, 1000
-	for points >= from+step {
+// LevelOf is the level an amount of XP reaches, with the XP where that level starts and the next one does. The first
+// level-up takes 300 XP (a game or two: one earns about 150 to 250); each takes 150 more than the one before, so level
+// 10 takes about forty games.
+func LevelOf(total int) (level, from, to int) {
+	level, from, step := 1, 0, 300
+	for total >= from+step {
 		from += step
 		level++
-		step += 500
+		step += 150
 	}
 	return level, from, from + step
 }
@@ -177,7 +178,7 @@ type Look struct {
 
 // lookOf makes a look from what lookColumns read. The avatar comes as "shape-tone/frame/backdrop" (the wardrobe's
 // parts empty when none), and goes out the same way, so that every avatar drawn shows its frame and pattern.
-func lookOf(userID int64, avatar, title string, points int) Look {
+func lookOf(userID int64, avatar, title string, total int) Look {
 	base, rest, _ := strings.Cut(avatar, "/")
 	if base == "" {
 		base = DefaultAvatar(userID)
@@ -186,23 +187,23 @@ func lookOf(userID int64, avatar, title string, points int) Look {
 	if strings.Trim(rest, "/") != "" {
 		avatar += "/" + rest
 	}
-	level, _, _ := LevelOf(points)
+	level, _, _ := LevelOf(total)
 	name, tier := TitleOf(title)
 	return Look{Avatar: avatar, Title: name, TitleTier: tier, Level: level}
 }
 
-// lookColumns read a player's look in a query over users u: their avatar, title and points.
+// lookColumns read a player's look in a query over users u: their avatar, title and XP.
 const lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
 	coalesce(u.title, ''),
-	(SELECT coalesce(sum(points), 0) FROM runs WHERE user_id = u.id)`
+	(SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = u.id)`
 
 // LookOf is how a player shows to others.
 func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	var avatar, title string
-	var points int
+	var total int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT `+lookColumns+` FROM users u WHERE u.id = ?`, userID).
-		Scan(&avatar, &title, &points)
-	return lookOf(userID, avatar, title, points), err
+		Scan(&avatar, &title, &total)
+	return lookOf(userID, avatar, title, total), err
 }
 
 // Earned is an achievement as a player sees it: when they earned it (0: not yet), and how far they are towards its
@@ -222,8 +223,8 @@ func hiddenAchievement(a Achievement) Achievement {
 // Progress is a player's level, every achievement (earned or not), and what they may choose to look like.
 type Progress struct {
 	Level        int      `json:"level"`
-	Points       int      `json:"points"`
-	From         int      `json:"from"` // the points where this level starts
+	XP           int      `json:"xp"`
+	From         int      `json:"from"` // the XP where this level starts
 	To           int      `json:"to"`   // and where the next one does
 	Achievements []Earned `json:"achievements"`
 	Avatar       string   `json:"avatar"`
@@ -239,10 +240,11 @@ type Progress struct {
 	Backdrops []Cosmetic `json:"backdrops"`
 }
 
-func (g *Game) points(ctx context.Context, userID int64) (int, error) {
-	var points int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(sum(points), 0) FROM runs WHERE user_id = ?`, userID).Scan(&points)
-	return points, err
+// totalXP is all the XP a player has earned.
+func (g *Game) totalXP(ctx context.Context, userID int64) (int, error) {
+	var total int
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ?`, userID).Scan(&total)
+	return total, err
 }
 
 func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, error) {
@@ -272,10 +274,10 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
-	if p.Points, err = g.points(ctx, userID); err != nil {
+	if p.XP, err = g.totalXP(ctx, userID); err != nil {
 		return p, err
 	}
-	p.Level, p.From, p.To = LevelOf(p.Points)
+	p.Level, p.From, p.To = LevelOf(p.XP)
 	earned, err := g.earned(ctx, userID)
 	if err != nil {
 		return p, err
@@ -471,7 +473,7 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 type News struct {
 	Achievements []Achievement `json:"achievements"`
 	Level        int           `json:"level"`
-	Points       int           `json:"points"`
+	XP           int           `json:"xp"`
 	From         int           `json:"from"`
 	To           int           `json:"to"`
 	LevelUp      bool          `json:"levelUp,omitempty"`
@@ -480,12 +482,12 @@ type News struct {
 // NewsOf tells a player what's new, once: the achievements and the level are marked as told.
 func (g *Game) NewsOf(ctx context.Context, userID int64) (News, error) {
 	n := News{Achievements: []Achievement{}}
-	points, err := g.points(ctx, userID)
+	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return n, err
 	}
-	n.Points = points
-	n.Level, n.From, n.To = LevelOf(points)
+	n.XP = total
+	n.Level, n.From, n.To = LevelOf(total)
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.Query(`SELECT id FROM achievements WHERE user_id = ? AND NOT seen ORDER BY at`, userID)
 		if err != nil {
@@ -528,11 +530,11 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 	}
 	if avatar != nil {
 		shape, tone, _ := strings.Cut(*avatar, "-")
-		points, err := g.points(ctx, userID)
+		total, err := g.totalXP(ctx, userID)
 		if err != nil {
 			return err
 		}
-		level, _, _ := LevelOf(points)
+		level, _, _ := LevelOf(total)
 		i := slices.IndexFunc(shapes(earned, level), func(s Shape) bool { return s.Shape == shape && !s.Locked })
 		if i < 0 || !slices.Contains(Tones, tone) {
 			return ErrNotYours

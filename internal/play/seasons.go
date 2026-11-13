@@ -27,7 +27,7 @@ var Goals = []Goal{
 	{"topic", "Изиграй игра по тема", 1},
 	{"duel", "Изиграй дуел", 1},
 	{"royal", "Влез в Роял", 1},
-	{"points500", "Събери 500 точки", 500},
+	{"xp400", "Спечели 400 XP", 400},
 	{"fast3", "Три верни отговора за под 5 секунди", 3},
 }
 
@@ -75,23 +75,23 @@ func dayBounds(day string) (int64, int64) {
 func (g *Game) GoalsOf(ctx context.Context, userID int64) ([]DayGoal, error) {
 	day := g.Today()
 	from, to := dayBounds(day)
-	var dayDone, topics, duels, royals, points int
+	var dayDone, topics, duels, royals, earned int
 	var right, fast int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at BETWEEN ?2 AND ?3),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT coalesce(sum(points), 0) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3),
+		(SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3),
 		(SELECT count(*) FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.at BETWEEN ?2 AND ?3),
 		(SELECT count(*) FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.ms < 5000
 			AND a.at BETWEEN ?2 AND ?3)`, userID, from, to, day).
-		Scan(&dayDone, &topics, &duels, &royals, &points, &right, &fast)
+		Scan(&dayDone, &topics, &duels, &royals, &earned, &right, &fast)
 	if err != nil {
 		return nil, err
 	}
 	reached := map[string]int{"day": dayDone, "right15": right, "topic": topics, "duel": duels, "royal": royals,
-		"points500": points, "fast3": fast}
+		"xp400": earned, "fast3": fast}
 	now := store.Ms(g.Now())
 	var out []DayGoal
 	for _, goal := range goalsFor(userID, day) {

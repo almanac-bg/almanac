@@ -23,7 +23,8 @@ import (
 const (
 	// Length is how many questions a run has.
 	Length = 10
-	// MaxPoints is what a perfect answer to a medium question is worth (an easy one's less, a hard one's more: worth).
+	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more:
+	// worth).
 	MaxPoints = 100
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
 	Grace = 2 * time.Second
@@ -90,12 +91,13 @@ type run struct {
 	at             int
 	shownAt        sql.NullInt64
 	points, rights int
+	xp             int
 	ms             int64
 	finished       bool
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, ms, finished_at IS NOT NULL`
+	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL`
 
 type scanner interface{ Scan(...any) error }
 
@@ -103,7 +105,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -155,7 +157,9 @@ type Shown struct {
 
 // Result is what an answer earned, the answer itself, and the run after it.
 type Result struct {
-	Points   int     `json:"points"`
+	Points int `json:"points"`
+	// Speed is how many of the points were for being quick.
+	Speed    int     `json:"speed,omitempty"`
 	Score    float64 `json:"score"`
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
@@ -223,22 +227,23 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
 	}
-	return true, g.record(tx, r, bank.Graded{}, 0, ms)
+	return true, g.record(tx, r, bank.Graded{}, Worth{}, ms)
 }
 
-// record keeps an answer, and the points it earned, and moves the run to the next question (or its end).
-func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, points int, ms int64) error {
+// record keeps an answer, and the points and XP it earned, and moves the run to the next question (or its end).
+func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) error {
 	var given, shown any
 	if gr.Given != nil {
 		given, shown = string(gr.Given), string(gr.Shown)
 	}
 	now := store.Ms(g.Now())
 	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, r.picks[r.at].ID, given, shown, gr.Score, points, gr.Right, ms, now); err != nil {
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, r.picks[r.at].ID, given, shown, gr.Score, w.Points, gr.Right, ms, now); err != nil {
 		return err
 	}
 	r.at++
-	r.points += points
+	r.points += w.Points
+	r.xp += xp(gr)
 	if gr.Right {
 		r.rights++
 	}
@@ -249,9 +254,10 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, points int, ms int64) 
 	var finishedAt any
 	if r.finished {
 		finishedAt = now
+		r.xp += finishXP(r.kind)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, ms = ?, finished_at = ? WHERE id = ?`,
-		r.at, r.points, r.rights, r.ms, finishedAt, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
+		r.at, r.points, r.rights, r.xp, r.ms, finishedAt, r.id)
 	return err
 }
 
@@ -325,8 +331,9 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 				return ErrBadAnswer
 			}
 		}
-		res.Points = worth(d.Question(), gr.Score)
-		if err := g.record(tx, r, gr, res.Points, min(took, limit).Milliseconds()); err != nil {
+		w := WorthOf(d.Question(), gr.Score, took)
+		res.Points, res.Speed = w.Points, w.Speed
+		if err := g.record(tx, r, gr, w, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
 		res.Score, res.Right, res.Exact = gr.Score, gr.Right, gr.Exact

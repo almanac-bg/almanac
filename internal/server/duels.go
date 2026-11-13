@@ -102,7 +102,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	go s.notify(context.WithoutCancel(ctx), m, n.To)
 }
 
-// ranks are the boards: the best by rating, and this week's points.
+// ranks are the boards: the best by rating, and this week's XP.
 func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	viewer := int64(0)
 	if u, err := s.user(r); err == nil && u != nil {

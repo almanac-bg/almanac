@@ -9,7 +9,7 @@ import { type AchievementInfo, badge, meter, tierWords } from "../ui.ts";
 interface News {
   achievements: AchievementInfo[];
   level: number;
-  points: number;
+  xp: number;
   from: number;
   to: number;
   levelUp?: boolean;
@@ -35,13 +35,13 @@ export function news(delay = 0): Child {
   return () => {
     const n = data();
     if (!n) return null;
-    return [levelCard(n.level, n.points, n.from, n.to, n.levelUp), n.achievements.map(unlocked)];
+    return [levelCard(n.level, n.xp, n.from, n.to, n.levelUp), n.achievements.map(unlocked)];
   };
 }
 
-/** The level: its number, how far into it, and what's left to the next. */
-export function levelCard(level: number, points: number, from: number, to: number, up = false): Child {
-  const share = to > from ? Math.round((100 * (points - from)) / (to - from)) : 0;
+/** The level: its number, how far into it, and the XP left to the next. */
+export function levelCard(level: number, xp: number, from: number, to: number, up = false): Child {
+  const share = to > from ? Math.round((100 * (xp - from)) / (to - from)) : 0;
   return h(
     "section",
     { class: up ? "card level-card up" : "card level-card" },
@@ -50,7 +50,7 @@ export function levelCard(level: number, points: number, from: number, to: numbe
       { class: "level-head" },
       up ? h("p", { class: "kicker" }, "Ново ниво") : null,
       h("span", { class: "level-n" }, `Ниво ${level}`),
-      h("span", { class: "muted" }, `още ${to - points} т. до ниво ${level + 1}`),
+      h("span", { class: "muted" }, `още ${to - xp} XP до ниво ${level + 1}`),
     ),
     meter(share, `${share}% от ниво ${level}`),
   );

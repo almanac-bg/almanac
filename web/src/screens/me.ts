@@ -24,7 +24,7 @@ export function me() {
           head(progress),
           () => {
             const p = progress();
-            return p ? levelCard(p.level, p.points, p.from, p.to) : null;
+            return p ? levelCard(p.level, p.xp, p.from, p.to) : null;
           },
           () => {
             const p = progress();

@@ -14,7 +14,7 @@ three when you add or change a screen.
 - **Numbers are the heroes.** Scores, places, the streak, the timer and room codes use the numeral face, with
   tabular figures.
 - **Game feel comes only from data the game has** (see Game feel below). No currencies, shops or made-up numbers:
-  the level is the sum of the points a player has really scored, and every achievement is a fact of their games.
+  the level is the XP a player has really earned by playing, and every achievement is a fact of their games.
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
   without scrolling sideways.
 
@@ -149,7 +149,8 @@ Every element that looks like a game measures something the game already counts:
 | Element      | Measures                                                                                                                        | Where                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)               | Днес, Профил                 |
-| Points       | Points per answer and per run, from the server                                                                                  | Verdict, result, boards      |
+| Points       | One game's score, per answer and per run, from the server (with the part for speed); never added up across games                | Verdict, result, day board   |
+| XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's; adds up                | Level, week board, goals     |
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                  | Result, Профил               |
 | Mastery      | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up)    | Игра, Профил                 |
 | Rank change  | Places moved since the previous answer                                                                                          | Room boards                  |
@@ -159,7 +160,7 @@ Every element that looks like a game measures something the game already counts:
 | Goals        | Three a day (the day's questions, and two drawn), each a star                                                                   | Начало                       |
 | Season       | A calendar month's stars; 10/30/60 earn its bronze/silver/gold medal, gold its frame                                            | Награди, Класации            |
 | Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                          | Result                       |
-| Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                                | Result, Профил, avatars      |
+| Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                     | Result, Профил, avatars      |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once | Result, Профил               |
 | Titles       | The names of a player's achievements, in their tier's colour; all listed, the locked ones with what unlocks them                | Boards, friends, rooms       |
 | Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                      | Everywhere a player is       |

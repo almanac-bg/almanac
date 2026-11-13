@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	mrand "math/rand/v2"
 	"slices"
@@ -163,6 +162,7 @@ type member struct {
 	given    json.RawMessage
 	graded   bank.Graded
 	gained   int
+	speed    int // of gained, for being quick
 	// Every answer of this game, for the review at its end.
 	log []loggedAnswer
 }
@@ -313,7 +313,7 @@ func (r *Room) bank() *bank.Bank { return r.hub.bank() }
 func (r *Room) show(n int) {
 	r.phase, r.n, r.shownAt = Question, n, time.Now()
 	for _, m := range r.players {
-		m.answered, m.given, m.graded, m.gained = false, nil, bank.Graded{}, 0
+		m.answered, m.given, m.graded, m.gained, m.speed = false, nil, bank.Graded{}, 0, 0
 	}
 	limit := play.Limit(r.dealt[n].Question())
 	r.after(limit+Grace, func() { r.reveal() })
@@ -360,10 +360,10 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if err != nil {
 		return ErrAnswer
 	}
-	// Up to 100 for a right answer: half for being right, half for being quick.
-	left := max(0, 1-float64(took)/float64(limit))
+	// Points as in any game (play.WorthOf): for knowing, more for harder questions, and a part for being quick.
 	m.answered, m.given, m.graded = true, g.Shown, g
-	m.gained = int(math.Round(play.MaxPoints * g.Score * (0.5 + 0.5*left)))
+	w := play.WorthOf(d.Question(), g.Score, took)
+	m.gained, m.speed = w.Points, w.Speed
 	m.points += m.gained
 	if g.Right {
 		m.rights++
@@ -461,8 +461,10 @@ type QuestionView struct {
 }
 
 type RevealView struct {
-	Answer any  `json:"answer"`
-	Points int  `json:"points"`
+	Answer any `json:"answer"`
+	Points int `json:"points"`
+	// Speed is how many of the points were for being quick.
+	Speed  int  `json:"speed,omitempty"`
 	Right  bool `json:"right"`
 	Exact  bool `json:"exact,omitempty"`
 	Missed bool `json:"missed,omitempty"`
@@ -503,7 +505,7 @@ func (r *Room) View(viewer int64) View {
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given
 			if r.phase == Reveal {
-				q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
+				q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
 			}
 		}
 		if r.phase == Reveal {

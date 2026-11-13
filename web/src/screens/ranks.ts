@@ -1,4 +1,4 @@
-// Класации: where players stand — by rating (with their division), by this week's points, and on today's
+// Класации: where players stand — by rating (with their division), by this week's XP, and on today's
 // questions (everyone, and among friends).
 
 import { emblem } from "../art/emblem.ts";
@@ -95,7 +95,7 @@ export function ranks() {
             (r) => [r.division ? emblem(r.division.id, "s") : null, String(r.value)],
             "Още никой няма рейтинг: той идва с първия дуел.",
           )
-        : ranking("Тази седмица", b.week, (r) => `${r.value} т.`, "Тази седмица още никой не е играл.");
+        : ranking("Тази седмица", b.week, (r) => `${r.value} XP`, "Тази седмица още никой не е играл.");
     },
   );
 }

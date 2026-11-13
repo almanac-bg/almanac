@@ -110,7 +110,8 @@ func TestAGamePlayedTogether(t *testing.T) {
 		time.Sleep(5 * time.Second)
 		_ = r.Answer(bo.ID, 0, answer(r, false))
 		v = r.View(ana.ID)
-		if v.Phase != Reveal || v.Players[0].Name != "Ана" || !v.Players[0].Right || v.Question.Reveal.Points < 90 {
+		if v.Phase != Reveal || v.Players[0].Name != "Ана" || !v.Players[0].Right ||
+			v.Question.Reveal.Points != play.WorthOf(r.dealt[0].Question(), 1, time.Second).Points {
 			t.Fatalf("after both answered: %+v %+v", v.Players, v.Question.Reveal)
 		}
 		if r.View(bo.ID).Question.Reveal.Right {
