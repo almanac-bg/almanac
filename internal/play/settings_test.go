@@ -32,6 +32,9 @@ func TestSettingsNormal(t *testing.T) {
 			t.Errorf("%+v: %+v %v", c.in, got, err)
 		}
 	}
+	if (Settings{Length: 1 << 40}).Count() != Length || (Settings{Length: -3}).Count() != Length {
+		t.Error("a length a run can't have")
+	}
 	if !(Settings{}).Standard() || (Settings{Slow: true}).Standard() || (Settings{}).stored() != nil {
 		t.Error("the standard run")
 	}

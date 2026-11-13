@@ -25,7 +25,7 @@ type Settings struct {
 }
 
 // Lengths a run may have.
-var Lengths = []int{5, Length, 15}
+var Lengths = []int{5, Length, maxLength}
 
 // ErrBadSettings is settings a run can't be played by.
 var ErrBadSettings = errors.New("settings a run can't take")
@@ -63,13 +63,16 @@ func (s Settings) Standard() bool {
 	return s.Length == 0 && s.Difficulty == "" && len(s.Kinds) == 0 && !s.Slow
 }
 
-// Count is how many questions a run of these settings has.
+// Count is how many questions a run of these settings has (ten for a length it can't have: Normal refuses those).
 func (s Settings) Count() int {
-	if s.Length == 0 {
+	if s.Length <= 0 || s.Length > maxLength {
 		return Length
 	}
 	return s.Length
 }
+
+// maxLength is the longest run.
+const maxLength = 15
 
 // stored is the settings as a run keeps them: NULL for the standard run.
 func (s Settings) stored() any {
