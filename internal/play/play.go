@@ -92,30 +92,23 @@ type run struct {
 	points, rights int
 	ms             int64
 	finished       bool
-	// set is how the player wanted the run (the zero value: the standard run).
-	set Settings
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, ms, finished_at IS NOT NULL, coalesce(settings, '')`
+	at, shown_at, points, rights, ms, finished_at IS NOT NULL`
 
 type scanner interface{ Scan(...any) error }
 
 func scanRun(row scanner) (*run, error) {
 	var r run
-	var picks, set string
+	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished, &set)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
 	if err != nil {
 		return nil, err
-	}
-	if set != "" {
-		if err := json.Unmarshal([]byte(set), &r.set); err != nil {
-			return nil, err
-		}
 	}
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
 }
@@ -205,7 +198,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	if r.shownAt.Valid && !r.finished {
 		d, ok := g.deal(r.picks[r.at])
 		if ok {
-			limit := r.set.limit(d.Question())
+			limit := Limit(d.Question())
 			left := limit - g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
 				N: r.at, Category: d.Question().Base().Category, View: d.View(),
@@ -223,12 +216,12 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 		return false, nil
 	}
 	d, ok := g.deal(r.picks[r.at])
-	if ok && g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) <= r.set.limit(d.Question())+Grace {
+	if ok && g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) <= Limit(d.Question())+Grace {
 		return false, nil
 	}
 	ms := int64(0)
 	if ok {
-		ms = r.set.limit(d.Question()).Milliseconds()
+		ms = Limit(d.Question()).Milliseconds()
 	}
 	return true, g.record(tx, r, bank.Graded{}, 0, ms)
 }
@@ -321,7 +314,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 			return ErrOutOfStep
 		}
 		took := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
-		limit := r.set.limit(d.Question())
+		limit := Limit(d.Question())
 		var gr bank.Graded
 		switch {
 		case took > limit+Grace:
