@@ -33,16 +33,17 @@ type Head struct {
 	Category string `json:"-"`
 }
 
-// Tail is what every question may end with: a picture, the fact behind the answer, and when it was added or needs
-// a look again.
+// Tail is what every question may end with: a picture, the fact behind the answer, and when it was added, last
+// changed, or needs a look again.
 type Tail struct {
 	Image *Image `json:"image,omitempty"`
-	// Fact is "Знаеше ли?": something worth knowing behind the answer, shown once it's revealed.
+	// Fact is "Знаеше ли?": something worth knowing behind the answer, shown in the review after a game. Every
+	// question added since RulesFrom has one.
 	Fact string `json:"fact,omitempty"`
-	// Tags are topics across categories ("bg", "christmas"): themed sets draw on them.
-	Tags []string `json:"tags,omitempty"`
 	// Added is when the question joined the bank (YYYY-MM-DD).
 	Added string `json:"added,omitempty"`
+	// Updated is when the question last changed (YYYY-MM-DD): its wording, answer, options, fact or picture.
+	Updated string `json:"updated,omitempty"`
 	// ReviewBy is when its answer may stop being true (a record, an office holder): checked again by then.
 	ReviewBy string `json:"reviewBy,omitempty"`
 	// Retired questions are never dealt again, but stay so that history and stats keep their text.
