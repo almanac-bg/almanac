@@ -131,8 +131,8 @@ takes a token.
 ## Flow
 
 - **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
-  more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds. A question never opens in a tab that's out of sight.
+  more to read: a number, an order, a match), with a line filling under it, and the next question opens. A room shows
+  each answer with its standings for 6 seconds. A question never opens in a tab that's out of sight.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
 - **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
@@ -160,9 +160,9 @@ Every element that looks like a game measures something the game already counts:
 | Season       | A calendar month's stars; 10/30/60 earn its bronze/silver/gold medal, gold its frame                                            | Награди, Класации            |
 | Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                          | Result                       |
 | Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                                | Result, Профил, avatars      |
-| Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once | Result, Профил               |
+| Achievements | 24 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once | Result, Профил               |
 | Titles       | The names of a player's achievements, in their tier's colour; all listed, the locked ones with what unlocks them                | Boards, friends, rooms       |
-| Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                      | Everywhere a player is       |
+| Avatars      | A shape on a tone: nine shapes free, 13 unlocked by achievements, the crown at level 10                                         | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
