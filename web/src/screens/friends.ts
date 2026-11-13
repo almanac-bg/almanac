@@ -74,8 +74,9 @@ export function friendsCard(): Child {
       error.set((err as ApiError).message);
     }
   };
+  // A duel with a friend: played now, and they play theirs when they can.
   const duel = (f: Friend) =>
-    act(async () => go(`/r/${(await api<{ code: string }>("POST", `/api/friends/${f.id}/duel`, {})).code}`));
+    act(async () => go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: f.id })).duel}`));
   const decline = (i: Invitation) =>
     act(async () => {
       await api("POST", `/api/rooms/${i.code}/decline`, {}).catch(() => {}); // gone already: nothing to turn down

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer } from "./play.ts";
+import { playRun } from "./play.ts";
 
 test("friends: an invite link, then a duel between the two", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -20,20 +20,18 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
 
-  // Ana asks Bo to a duel; Bo finds the invitation on his Приятели, accepts, and they play.
+  // Ana asks Bo to a duel and plays hers now; Bo finds it his turn, and plays when he can.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
-  await expect(a.getByRole("heading", { name: /^Дуел с / })).toBeVisible();
-  await b.goto("/friends");
-  await b.locator(".invitation").getByRole("link", { name: "Приеми" }).click();
-  for (let n = 0; n < 10; n++) {
-    for (const p of [a, b])
-      await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 20_000 });
-    await answer(a);
-    await answer(b);
-    for (const p of [a, b]) await expect(p.locator(".verdict")).toBeVisible();
-  }
-  for (const p of [a, b])
-    await expect(p.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 20_000 });
+  await playRun(a);
+  await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
+  await b.goto("/duel");
+  await b.locator(".duel-row.s-play").click();
+  await expect(b.getByRole("heading", { name: /те предизвика/ })).toBeVisible();
+  await b.getByRole("button", { name: "Играй" }).click();
+  await playRun(b);
+  await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
+  await a.goto("/duel");
+  await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
 
   // The duel counts in their record.
   await a.goto("/friends");
@@ -41,6 +39,7 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
 });
 
 test("a friend can turn a duel down", async ({ browser }) => {
+  test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   await a.goto("/friends");
@@ -51,11 +50,13 @@ test("a friend can turn a duel down", async ({ browser }) => {
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
-  await expect(a.getByRole("heading", { name: /^Дуел с / })).toBeVisible();
-  await b.goto("/friends");
-  await b.locator(".invitation").getByRole("button", { name: "Откажи" }).click();
-  await expect(a.getByRole("heading", { name: "Не може сега" })).toBeVisible();
-  await expect(a.getByRole("link", { name: "Към дуелите" })).toBeVisible();
+  await playRun(a);
+  await b.goto("/duel");
+  await b.locator(".duel-row.s-play").click();
+  await b.getByRole("button", { name: "Откажи" }).click();
+  await expect(b.getByRole("heading", { name: "Дуелът е отказан" })).toBeVisible();
+  await a.goto("/duel");
+  await expect(a.locator(".duel-row").first()).toContainText("Отказан");
 });
 
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {

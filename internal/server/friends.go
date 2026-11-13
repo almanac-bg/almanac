@@ -111,13 +111,17 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]any{"invites": []room.Invitation{}, "requests": 0})
+		return ok(w, map[string]any{"invites": []room.Invitation{}, "requests": 0, "duels": 0})
 	}
 	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"invites": s.rooms.InvitesFor(u.ID), "requests": n})
+	turns, err := s.game.DuelTurns(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"invites": s.rooms.InvitesFor(u.ID), "requests": n, "duels": turns})
 }
 
 // inviteInfo says whose an invite link is, for the page that asks whether to accept it (anyone may ask), and

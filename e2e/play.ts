@@ -40,5 +40,5 @@ export async function playRun(page: Page): Promise<void> {
     await answer(page);
     await expect(page.locator(".verdict")).toBeVisible();
   }
-  await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".summary, .screen h1").first()).toBeVisible({ timeout: 10_000 });
 }

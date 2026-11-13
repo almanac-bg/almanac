@@ -1,6 +1,7 @@
 package play
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -644,5 +645,133 @@ func TestFriendRequests(t *testing.T) {
 	}
 	if err := w.g.Withdraw(ctx, vi, in[0].ID); !errors.Is(err, ErrNoRequest) {
 		t.Fatalf("withdrew someone else's request: %v", err)
+	}
+}
+
+func TestAsyncDuels(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
+	var told []DuelNews
+	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
+	rating := func(id int64) int {
+		s, _ := w.g.StandingOf(ctx, id)
+		return s.Rating
+	}
+
+	// Nothing recorded yet: Ana's duel is her own, open, on fresh questions; she plays it and it waits.
+	s, aDuel, err := w.g.FindDuel(ctx, ana)
+	if err != nil || len(w.picks(s.ID)) != Length {
+		t.Fatalf("Ana's duel: %+v %v", s, err)
+	}
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 1 || d[0].State != "wait" || d[0].Opponent != nil {
+		t.Fatalf("Ana's waiting duel: %+v", d)
+	}
+
+	// Bo asks for one: he takes Ana's, plays it worse, and both get the result.
+	s, bDuel, err := w.g.FindDuel(ctx, bo)
+	if err != nil || bDuel != aDuel {
+		t.Fatalf("Bo didn't take Ana's duel: %d %v", bDuel, err)
+	}
+	if d, _ := w.g.DuelsOf(ctx, bo); d[0].State != "play" || d[0].Opponent.Points != 0 {
+		t.Fatalf("Bo sees Ana's score before playing: %+v", d[0].Opponent)
+	}
+	w.play(bo, s.ID, repeat(w.wrong, Length)...)
+	da, _ := w.g.DuelsOf(ctx, ana)
+	db, _ := w.g.DuelsOf(ctx, bo)
+	if da[0].State != "won" || db[0].State != "lost" || da[0].Delta <= 0 || db[0].Delta >= 0 ||
+		rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
+		t.Fatalf("the result: %+v / %+v, ratings %d %d", da[0], db[0], rating(ana), rating(bo))
+	}
+	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != Length*MaxPoints {
+		t.Fatalf("scores after the end: %+v / %+v", da[0].Opponent, db[0].Opponent)
+	}
+	if len(told) != 2 || told[0].Kind != "result" {
+		t.Fatalf("told: %+v", told)
+	}
+
+	// A friend asked: Vi hears once Ana has played, and plays when she can.
+	w.befriend(ana, vi)
+	s, fDuel, err := w.g.ChallengeFriend(ctx, ana, vi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.g.PlayDuel(ctx, vi, fDuel); !errors.Is(err, ErrNoDuel) {
+		t.Fatalf("Vi played before Ana: %v", err)
+	}
+	told = nil
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
+		t.Fatalf("Vi wasn't asked: %+v", told)
+	}
+	vs, err := w.g.PlayDuel(ctx, vi, fDuel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(vi, vs.ID, repeat(w.right, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State == "play" || d[0].State == "wait" {
+		t.Fatalf("Vi's duel after both played: %+v", d[0])
+	}
+
+	// Gal: no open duel waits now, so hers is on a recorded run's questions; nobody takes it in time, and it's
+	// settled against the recording — only her rating moves.
+	s, gDuel, err := w.g.FindDuel(ctx, gal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(gal, s.ID, repeat(w.wrong, Length)...)
+	before := map[int64]int{ana: rating(ana), bo: rating(bo), vi: rating(vi)}
+	w.wait(OpenFor + time.Minute)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := w.g.DuelsOf(ctx, gal)
+	if d[0].ID != gDuel || !d[0].Recorded || d[0].State != "lost" || rating(gal) >= StartRating {
+		t.Fatalf("Gal's duel against a recording: %+v, rating %d", d[0], rating(gal))
+	}
+	for id, r := range before {
+		if rating(id) != r {
+			t.Fatalf("a recorded player's rating moved: %d %d→%d", id, r, rating(id))
+		}
+	}
+
+	// A friend may say no.
+	_, nDuel, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	if err := w.g.DeclineDuel(ctx, vi, nDuel); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := w.g.DuelsOf(ctx, ana); d[len(d)-1].State != "declined" && d[0].State != "declined" {
+		t.Fatalf("a declined duel: %+v", d)
+	}
+}
+
+// befriend makes two players friends, as accepting an invite link would.
+func (w *world) befriend(a, b int64) {
+	w.t.Helper()
+	code, err := w.g.InviteCode(w.t.Context(), a)
+	if err == nil {
+		_, _, err = w.g.Befriend(w.t.Context(), b, code)
+	}
+	if err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+func TestRatingAndDivisions(t *testing.T) {
+	if d := eloDelta(1000, 1000, 0, 1); d != 20 {
+		t.Fatalf("an even win moved %d", d)
+	}
+	if up, down := eloDelta(1000, 1400, 30, 1), eloDelta(1400, 1000, 30, 0); up <= 12 || up != -down {
+		t.Fatalf("an upset: %d / %d", up, down)
+	}
+	for _, c := range []struct {
+		rating int
+		id     string
+		next   int
+	}{{0, "bronze", 1050}, {1000, "bronze", 1050}, {1050, "silver", 1150}, {1599, "diamond", 1600}, {2400, "legend", 0}} {
+		if d, next := DivisionOf(c.rating); d.ID != c.id || next != c.next {
+			t.Errorf("DivisionOf(%d) = %s, next %d", c.rating, d.ID, next)
+		}
 	}
 }

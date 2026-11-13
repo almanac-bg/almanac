@@ -45,6 +45,8 @@ var playerErrors = map[error]*apiError{
 	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: до 200."},
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
 	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такъв таг."},
+	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
+	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Имаш пет дуела, които чакат. Изчакай някой да свърши."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Чакат отговор твърде много покани: до 50."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
