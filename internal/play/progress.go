@@ -81,13 +81,13 @@ var Achievements = []Achievement{
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
 	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
-	{"master", "Като на длан", "Отговаряй вярно на 80% от въпросите в една тема, след поне 30 въпроса в нея.", "trophy", Epic, 1, false},
+	{"master", "Като на длан", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
 	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
 	{"topicPerfect", "Отличник", "Познай и десетте въпроса на игра по тема.", "spark", Epic, 1, true},
 	{"allTypes", "Всестранен", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, вярно или не, свързване.", "clover", Epic, 5, true},
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
-	{"master5", "Ходеща енциклопедия", "Отговаряй вярно на 80% от въпросите в пет теми, след поне 30 въпроса във всяка.", "trophy", Legendary, 5, false},
+	{"master5", "Ходеща енциклопедия", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 }
 
@@ -424,13 +424,17 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	if err != nil {
 		return nil, err
 	}
-	topics, answers, _, err := g.topicStats(ctx, userID)
+	answers, _, err := g.answered(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	mastery, err := g.MasteryOf(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	masters := 0
-	for _, t := range topics {
-		if t.Answers >= 30 && t.Right*100 >= t.Answers*80 {
+	for _, m := range mastery {
+		if m.Sure && m.Tier >= MasterTier {
 			masters++
 		}
 	}
@@ -517,6 +521,8 @@ type News struct {
 	From         int           `json:"from"`
 	To           int           `json:"to"`
 	LevelUp      bool          `json:"levelUp,omitempty"`
+	// Mastery is how the game just played moved the player's mastery of its topics, when one is told of.
+	Mastery []MasteryMove `json:"mastery,omitempty"`
 }
 
 // DoneGoal is one of the day's goals, done: what it was, and the XP it earned.
@@ -525,12 +531,19 @@ type DoneGoal struct {
 	XP   int    `json:"xp"`
 }
 
-// NewsOf tells a player what's new, once: the achievements, the goals and the level are marked as told.
-func (g *Game) NewsOf(ctx context.Context, userID int64) (News, error) {
+// NewsOf tells a player what's new, once: the achievements, the goals and the level are marked as told. With the
+// game just played (runID; 0 for none), it also tells how that game moved their mastery.
+func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	n := News{Achievements: []Achievement{}, Goals: []DoneGoal{}}
 	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return n, err
+	}
+	if runID != 0 {
+		// A game that isn't the player's, or isn't over, has nothing to tell: the rest of the news still is.
+		if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil && !errors.Is(err, ErrNoRun) && !errors.Is(err, ErrOutOfStep) {
+			return n, err
+		}
 	}
 	n.XP = total
 	n.Level, n.From, n.To = LevelOf(total)

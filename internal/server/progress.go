@@ -15,13 +15,20 @@ func (s *Server) progress(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, p)
 }
 
-// news tells the player, once, what they've earned since they last looked: achievements, and a level gone up.
+// news tells the player, once, what they've earned since they last looked: achievements, and a level gone up; and,
+// for the game they just played (run), how it moved their mastery of its topics.
 func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
-	n, err := s.game.NewsOf(r.Context(), u.ID)
+	var in struct {
+		Run int64 `json:"run"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	n, err := s.game.NewsOf(r.Context(), u.ID, in.Run)
 	if err != nil {
 		return err
 	}

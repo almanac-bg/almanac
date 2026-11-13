@@ -1,5 +1,5 @@
-// The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, rings, and each
-// topic's colour and level. The stylesheet draws them; these only say what to draw.
+// The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, and each
+// topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { badgeArt } from "./art/badge.ts";
 import { frameArt } from "./art/frame.ts";
@@ -39,11 +39,7 @@ export function fact(text: string): Child {
   return h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, text));
 }
 
-/** An avatar's tones. */
 const tones = ["gold", "lilac", "sky", "rose", "mint"];
-
-/** Topics' tones: identity colours only. Gold (reward) and the right answer's green never mark a topic. */
-const topicTones = ["lilac", "sky", "rose", "teal", "lime"];
 
 /** A topic's colour, the same on every screen (by its place in the bank's list). */
 export function toneOf(category: string): string {
@@ -51,38 +47,7 @@ export function toneOf(category: string): string {
     0,
     categories.findIndex((c) => c.id === category),
   );
-  return `tone-${topicTones[i % topicTones.length]}`;
-}
-
-export interface Level {
-  /** Share right, 0–100. */
-  percent: number;
-  /** 1–4. */
-  n: number;
-  name: string;
-}
-
-/** How well a player knows a topic, once they've answered enough of it to tell (ten questions). */
-export function level(right: number, answers: number): Level | null {
-  if (answers < 10) return null;
-  const percent = Math.round((100 * right) / answers);
-  const [n, name] =
-    percent >= 80 ? [4, "Майстор"] : percent >= 60 ? [3, "Познавач"] : percent >= 40 ? [2, "Любител"] : [1, "Новак"];
-  return { percent, n, name };
-}
-
-/** A level as four rising bars and its name. */
-export function levelBadge(l: Level): Child {
-  return h(
-    "span",
-    { class: "level", title: `Ниво ${l.n} от 4` },
-    h(
-      "span",
-      { class: "bars", "aria-hidden": "true" },
-      [1, 2, 3, 4].map((n) => h("i", { class: n <= l.n ? "on" : undefined })),
-    ),
-    l.name,
-  );
+  return `tone-${tones[i % tones.length]}`;
 }
 
 /** A thin bar, filled to percent. */
@@ -111,22 +76,6 @@ export function figure(value: string, label: string): Child {
     { class: "figure" },
     h("b", { class: "figure-value" }, value),
     h("span", { class: "figure-label" }, label),
-  );
-}
-
-/** A share as a ring, with what it's of. */
-export function ring(percent: number, label: string, tone: string): Child {
-  const v = Math.max(0, Math.min(100, Math.round(percent)));
-  return h(
-    "figure",
-    { class: `ring ${tone}` },
-    h(
-      "div",
-      { class: "ring-box" },
-      h("span", { class: "dial", style: { "--v": String(v) }, "aria-hidden": "true" }),
-      h("b", { class: "ring-value" }, String(v), h("small", null, "%")),
-    ),
-    h("figcaption", null, label),
   );
 }
 

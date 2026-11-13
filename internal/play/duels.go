@@ -116,7 +116,7 @@ func (g *Game) FindDuel(ctx context.Context, userID int64) (State, int64, error)
 		} else if rec != nil {
 			picks, ghost = rec.picks, rec.id
 		} else {
-			picks, err = g.drawFor(tx, userID)
+			picks, err = g.drawFor(ctx, tx, userID)
 			if err != nil {
 				return err
 			}
@@ -149,7 +149,7 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 		if err := g.mayStart(tx, userID); err != nil {
 			return err
 		}
-		picks, err := g.drawFor(tx, userID)
+		picks, err := g.drawFor(ctx, tx, userID)
 		if err != nil {
 			return err
 		}
@@ -239,17 +239,17 @@ func (g *Game) mayStart(tx *sql.Tx, userID int64) error {
 	return nil
 }
 
-// drawFor draws a duel's ten questions for a player: all topics, at their level, unseen first.
-func (g *Game) drawFor(tx *sql.Tx, userID int64) ([]Pick, error) {
+// drawFor draws a duel's ten questions for a player: all topics, shaped by how well they know them, unseen first.
+func (g *Game) drawFor(ctx context.Context, tx *sql.Tx, userID int64) ([]Pick, error) {
 	seen, err := seenBy(tx, userID)
 	if err != nil {
 		return nil, err
 	}
-	skill, err := g.skill(tx, userID, "")
+	ability, err := g.ability(ctx, tx, userID, "")
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), "", skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), "", ability, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}

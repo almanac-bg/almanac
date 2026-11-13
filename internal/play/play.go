@@ -73,6 +73,8 @@ type Game struct {
 
 	seasonMu sync.Mutex
 	season   string // the season being played, once ensureSeason has seen it
+
+	hard hardnessCache // how hard each question is (mastery.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
