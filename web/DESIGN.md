@@ -117,8 +117,10 @@ takes a token.
   with a ring for its progress. Hidden and not found: a „?“, and nothing about how or what it gives.
 - Every achievement says how it's earned, how far along the player is, and its reward (the avatar shape, the
   title). A title shows in its tier's ink wherever it's worn.
-- New visuals of the systems (division emblems, frames, season art) come from generators like the medal's, in
-  `web/src/art/`.
+- **Division emblems are generated** (`web/src/art/emblem.ts`): a silhouette per division — Бронз a plain shield,
+  Сребро a chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned star shield with rays — in
+  `--div-*` colours.
+- New visuals of the systems (frames, season art) come from generators like these, in `web/src/art/`.
 
 ## Flow
 
@@ -145,7 +147,8 @@ Every element that looks like a game measures something the game already counts:
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                  | Result, Профил          |
 | Mastery      | Share right in a topic, shown after 10 answers: Новак (under 40%), Любител (40–59%), Познавач (60–79%), Майстор (80% and up)    | Игра, Профил            |
 | Rank change  | Places moved since the previous answer                                                                                          | Room boards             |
-| Duels        | Duels won of played; between two friends, their record („3 : 2“)                                                                | Заедно, Профил          |
+| Duels        | Played in each one's own time: won of played; between two friends, their record („3 : 2“)                                       | Дуел, Профил            |
+| Rating       | Elo from 1000, moved by duels; shown as a division (Бронз → Легенда) with its generated emblem                                  | Дуел, Профил, Класации  |
 | Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                          | Result                  |
 | Level        | All the points a player has scored; each level takes 500 more than the last (1000 for the first)                                | Result, Профил, avatars |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once | Result, Профил          |
