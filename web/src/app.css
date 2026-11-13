@@ -2528,7 +2528,7 @@
     gap: var(--space-2);
   }
 
-  .level {
+  .mastery {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -2538,6 +2538,7 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .bars {
@@ -2550,25 +2551,33 @@
   .bars i {
     display: block;
     width: 3px;
+    height: calc(1.6px * var(--n, 1) + 2.4px);
     border-radius: 2px;
     background: var(--line-strong);
   }
 
   .bars i:nth-child(1) {
-    height: 5px;
+    --n: 1;
   }
   .bars i:nth-child(2) {
-    height: 7px;
+    --n: 2;
   }
   .bars i:nth-child(3) {
-    height: 9px;
+    --n: 3;
   }
   .bars i:nth-child(4) {
+    --n: 4;
+  }
+  .bars i:nth-child(5) {
+    --n: 5;
+  }
+
+  .bars i:last-child {
     height: 12px;
   }
 
   .bars i.on {
-    background: var(--text);
+    background: var(--tone, var(--text));
   }
 
   .topic-name {
@@ -3590,54 +3599,60 @@
 
   /* ---- Profile ---- */
 
-  .rings {
+  .mastery-list {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mastery-row {
+    display: grid;
+    gap: 6px;
+  }
+
+  .mastery-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .mastery-topic {
+    display: inline-flex;
+    align-items: center;
     gap: var(--space-2);
-    justify-items: center;
+    font-weight: 800;
   }
 
-  .ring {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-2);
-    text-align: center;
-  }
-
-  .dial {
-    display: grid;
-    place-items: center;
-    width: 96px;
-    height: 96px;
-    border-radius: var(--radius-full);
-    background: conic-gradient(var(--tone, var(--gold)) calc(var(--v, 0) * 1%), var(--sunken) 0);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8.5px));
-    mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 8.5px));
-  }
-
-  .ring-box {
-    position: relative;
-    display: grid;
-    place-items: center;
-  }
-
-  .ring-value {
-    position: absolute;
-    font: 900 2rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .ring-value small {
-    color: var(--text-muted);
-    font-size: 1rem;
-  }
-
-  .ring figcaption {
-    max-width: 14ch;
+  .mastery-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1rem;
-    font-weight: 700;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mastery-known {
+    color: var(--text);
+    font: 900 1.25rem / 1 var(--font-numeral);
+  }
+
+  .mastery-card {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .mastery-card.up {
+    box-shadow:
+      var(--glow-gold),
+      inset 0 0 0 1px var(--gold);
   }
 
   .games {

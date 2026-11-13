@@ -1,10 +1,11 @@
-// What a game earned, said once, at its end: the level (and whether it went up), and any achievement that came
-// with it, which may be worn as a title at once.
+// What a game earned, said once, at its end: the level (and whether it went up), how it moved the mastery of its
+// topics, and any achievement that came with it, which may be worn as a title at once.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
 import { type AchievementInfo, badge, meter, tierWords } from "../ui.ts";
+import { type MasteryMove, masteryMoves } from "./mastery.ts";
 
 interface News {
   achievements: AchievementInfo[];
@@ -13,15 +14,16 @@ interface News {
   from: number;
   to: number;
   levelUp?: boolean;
+  mastery?: MasteryMove[];
 }
 
-/** The level, a step up and new achievements, asked for once the game is kept (after `delay`: a duel is kept a
- * moment after it ends). */
-export function news(delay = 0): Child {
+/** The level, a step up, the game's mastery and new achievements, asked for once the game (run) is kept (after
+ * `delay`: a duel is kept a moment after it ends). */
+export function news(run: number, delay = 0): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
     () =>
-      api<News>("POST", "/api/me/news", {}).then(
+      api<News>("POST", "/api/me/news", { run }).then(
         (n) => {
           data.set(n);
           if (n.levelUp) play("level");
@@ -35,7 +37,11 @@ export function news(delay = 0): Child {
   return () => {
     const n = data();
     if (!n) return null;
-    return [levelCard(n.level, n.xp, n.from, n.to, n.levelUp), n.achievements.map(unlocked)];
+    return [
+      levelCard(n.level, n.xp, n.from, n.to, n.levelUp),
+      masteryMoves(n.mastery ?? []),
+      n.achievements.map(unlocked),
+    ];
   };
 }
 

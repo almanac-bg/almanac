@@ -112,7 +112,7 @@ function finished(t: Today, s: State): Child {
         const b = fresh().board;
         return b.place ? h("p", { class: "place-line" }, `${b.place}-и от ${b.players} днес.`) : null;
       },
-      news(),
+      news(s.id),
       () => {
         const f = fresh();
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;

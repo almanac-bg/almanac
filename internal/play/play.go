@@ -67,6 +67,8 @@ type Game struct {
 	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
+
+	hard hardnessCache // how hard each question is (mastery.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {

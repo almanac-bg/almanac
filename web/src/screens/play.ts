@@ -1,5 +1,6 @@
 // Игра: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same game.
 
+import { type Mastery, masteryBadge, masteryLeft } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
@@ -8,9 +9,9 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
-import { level, levelBadge, meter, questions, toneOf } from "../ui.ts";
+import { meter, questions, toneOf } from "../ui.ts";
 import { modes } from "./modes.ts";
-import { loadStats, type Stats, type TopicStats } from "./stats.ts";
+import { loadStats, type Stats } from "./stats.ts";
 
 export function topics() {
   title("Играй");
@@ -33,14 +34,14 @@ export function topics() {
     modes(["duel", "royal", "room"], "С други"),
     h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
-      const mine = stats()?.topics ?? [];
+      const mine = stats()?.mastery ?? [];
       return categories.map((c) =>
         h(
           "li",
           null,
           tile(
             c,
-            mine.find((t) => t.category === c.id),
+            mine.find((m) => m.category === c.id),
           ),
         ),
       );
@@ -48,13 +49,18 @@ export function topics() {
   );
 }
 
-/** A topic: its colour, its name, and how well the player knows it (once they've played enough of it). */
-function tile(c: Category, t?: TopicStats): Child {
-  const l = t ? level(t.right, t.answers) : null;
+/** A topic: its colour, its name, and how well the player knows it (once they've played enough of it to tell). */
+function tile(c: Category, m?: Mastery): Child {
+  const sure = m?.sure ? m : null;
   return h(
     "a",
     { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
-    h("span", { class: "topic-head" }, h("span", { class: "dot", "aria-hidden": "true" }), l ? levelBadge(l) : null),
+    h(
+      "span",
+      { class: "topic-head" },
+      h("span", { class: "dot", "aria-hidden": "true" }),
+      sure ? masteryBadge(sure) : null,
+    ),
     h("span", { class: "topic-name" }, c.name),
     h(
       "span",
@@ -62,10 +68,10 @@ function tile(c: Category, t?: TopicStats): Child {
       h(
         "span",
         { class: "topic-meta" },
-        h("span", null, t?.answers ? questions(t.answers) : "Още не е играна"),
-        l ? h("span", null, `${l.percent}% верни`) : null,
+        h("span", null, m?.answers ? (sure ? `знаеш ${sure.known}%` : masteryLeft(m)) : "Още не е играна"),
+        m?.answers ? h("span", null, questions(m.answers)) : null,
       ),
-      l ? meter(l.percent, `${l.percent}% верни`) : null,
+      sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
     ),
   );
 }
@@ -86,7 +92,7 @@ export function topic([id = ""]: string[]) {
       summary(
         s,
         null,
-        news(),
+        news(s.id),
         h(
           "div",
           { class: "actions" },
