@@ -15,7 +15,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   // The day's goal is done (a star for the season), and the season counts it.
-  await expect(page.locator(".goal.done")).toContainText("Изиграй въпросите на деня");
+  // (The other two goals are drawn per day, and a run of the day can finish them too.)
+  await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
   await page.goto("/rewards");
   await expect(page.locator(".season-stars")).toContainText(/[1-9]\d* ★/);
 });
