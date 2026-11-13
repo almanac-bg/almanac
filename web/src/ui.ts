@@ -39,7 +39,11 @@ export function fact(text: string): Child {
   return h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, text));
 }
 
+/** An avatar's tones. */
 const tones = ["gold", "lilac", "sky", "rose", "mint"];
+
+/** Topics' tones: identity colours only. Gold (reward) and the right answer's green never mark a topic. */
+const topicTones = ["lilac", "sky", "rose", "teal", "lime"];
 
 /** A topic's colour, the same on every screen (by its place in the bank's list). */
 export function toneOf(category: string): string {
@@ -47,7 +51,7 @@ export function toneOf(category: string): string {
     0,
     categories.findIndex((c) => c.id === category),
   );
-  return `tone-${tones[i % tones.length]}`;
+  return `tone-${topicTones[i % topicTones.length]}`;
 }
 
 export interface Level {

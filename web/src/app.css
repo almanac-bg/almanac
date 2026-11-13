@@ -85,6 +85,9 @@
     --sky-ink: #8fcdff;
     --rose: #ff8fc8;
     --rose-ink: #ff9fd0;
+    /* Identity only, never an outcome: topics (with lilac, sky and rose) and a match's pairs. */
+    --teal: #43d5dc;
+    --lime: #bce669;
     --silver: #cfc8e3;
     --bronze: #e8a46c;
     /* Divisions: each emblem's colour (art/emblem.ts). */
@@ -1034,7 +1037,8 @@
     box-shadow: none;
   }
 
-  /* Topic tones: each topic keeps its colour everywhere. */
+  /* Tones: a topic's colour (lilac, sky, rose, teal, lime — never gold or the right answer's green), a mode's, an
+     avatar's. */
   .tone-gold {
     --tone: var(--gold);
   }
@@ -1049,6 +1053,12 @@
   }
   .tone-mint {
     --tone: var(--right);
+  }
+  .tone-teal {
+    --tone: var(--teal);
+  }
+  .tone-lime {
+    --tone: var(--lime);
   }
 
   .dot {
@@ -2653,6 +2663,17 @@
     width: 10px;
     height: 10px;
     border-radius: 4px;
+  }
+
+  /* Every topic at once (a room on all of them): the five topic tones in one dot. */
+  .chip.tone-mixed .dot {
+    background: conic-gradient(
+      var(--lilac) 0 20%,
+      var(--sky) 0 40%,
+      var(--rose) 0 60%,
+      var(--teal) 0 80%,
+      var(--lime) 0
+    );
   }
 
   /* ---- Avatars: a shape on a tone, with the level beside it ---- */
