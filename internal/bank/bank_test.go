@@ -134,7 +134,7 @@ func TestChoiceGrading(t *testing.T) {
 }
 
 func TestNumberGrading(t *testing.T) {
-	year := &Number{Head: Head{Type: "number"}, Answer: 1878, Min: 1000, Max: 2026, Step: 1, Scale: "linear", Tolerance: 20}
+	year := &Number{Head: Head{Type: "number"}, Answer: 1878, Step: 1, Scale: "linear", Tolerance: 20}
 	d := year.Deal(0)
 	for _, c := range []struct {
 		guess        string
@@ -146,26 +146,26 @@ func TestNumberGrading(t *testing.T) {
 		{"1868", 0.5, false, false},
 		{"1882", 0.8, true, false},
 		{"1700", 0, false, false},
-		{"99999", 0, false, false}, // into the range first
+		{"99999", 0, false, false},
 	} {
 		g := grade(t, d, `{"value":`+c.guess+`}`)
 		if abs := g.Score - c.score; abs > 1e-9 || abs < -1e-9 || g.Right != c.right || g.Exact != c.exact {
 			t.Errorf("%s graded %+v, want score %v right %v exact %v", c.guess, g, c.score, c.right, c.exact)
 		}
 	}
-	if g := grade(t, d, `{"value":99999}`); string(g.Given) != `{"value":2026}` {
-		t.Errorf("logged %s for a guess past the range", g.Given)
+	if g := grade(t, d, `{"value":1877.6}`); string(g.Given) != `{"value":1878}` {
+		t.Errorf("logged %s for a guess off the grid", g.Given)
 	}
 
 	// On a log scale a tolerance is a factor: twice too big with a tolerance of 4 is half off.
-	people := &Number{Head: Head{Type: "number"}, Answer: 1000, Min: 1, Max: 1e6, Step: 1, Scale: "log", Tolerance: 4}
+	people := &Number{Head: Head{Type: "number"}, Answer: 1000, Step: 1, Scale: "log", Tolerance: 4}
 	if g := grade(t, people.Deal(0), `{"value":2000}`); g.Score < 0.499 || g.Score > 0.501 {
 		t.Errorf("twice too big scored %v", g.Score)
 	}
 	if g := grade(t, people.Deal(0), `{"value":250}`); g.Score != 0 {
 		t.Errorf("four times too small scored %v", g.Score)
 	}
-	for _, bad := range []string{`{}`, `{"value":"5"}`, `{"value":1,"unit":"x"}`} {
+	for _, bad := range []string{`{}`, `{"value":"5"}`, `{"value":1,"unit":"x"}`, `{"value":1e300}`} {
 		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
 			t.Errorf("%s was graded", bad)
 		}
@@ -228,7 +228,7 @@ func TestLoadFindsProblems(t *testing.T) {
   {"id": "his-005", "type": "choice", "difficulty": "easy", "text": "Защо?", "answer": "А", "wrong": ["Б", "В", "Г"], "typo": 1},
   {"id": "his-006", "type": "choice", "difficulty": "easy", "text": "Как?", "answer": "А", "wrong": ["Б", "а"], "fact": "Факт.", "factSource": "https://bg.wikipedia.org/"},
   {"id": "his-009", "type": "choice", "difficulty": "easy", "text": "Как ли?", "answer": "А", "wrong": ["Б", "а"]},
-  {"id": "his-007", "type": "number", "difficulty": "hard", "text": "Колко?", "answer": 10.5, "min": 0, "max": 20, "step": 1, "scale": "linear", "tolerance": 5},
+  {"id": "his-007", "type": "number", "difficulty": "hard", "text": "Колко?", "answer": 10.5, "step": 1, "scale": "linear", "tolerance": 5},
   {"id": "his-008", "type": "choice", "difficulty": "easy", "text": "Чие?", "answer": "А", "wrong": ["Б", "В", "Г"],
    "image": {"file": "0123456789abcdef.webp", "w": 1200, "h": 800, "alt": "Знаме", "credit": "Някой", "license": "PD", "source": "https://commons.wikimedia.org/"}}
 ]

@@ -30,16 +30,13 @@ const (
 	Grace = 2 * time.Second
 )
 
-// Limit is how long a question is shown before its time runs out: typing a number or ordering four things takes
-// longer than a tap.
+// Limit is how long a question is shown before its time runs out: putting four things in order takes longer than a
+// tap or a typed number.
 func Limit(q bank.Question) time.Duration {
-	switch q.Base().Type {
-	case "number":
+	if q.Base().Type == "order" {
 		return 25 * time.Second
-	case "order":
-		return 30 * time.Second
 	}
-	return 15 * time.Second
+	return 20 * time.Second
 }
 
 // Bulgaria is where the game's days begin and end.

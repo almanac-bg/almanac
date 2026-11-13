@@ -102,9 +102,22 @@ takes a token.
 - **Selectors:** give a part its own class (`.streak-num`) rather than a tag under a class (`.streak b`). Biome's
   `noDescendingSpecificity` flags the second kind.
 - **Test hooks:** the browser tests depend on these classes; keep them:
-  - `.question-head`, `.options .option`, `.number` and `.number-input`
-  - `.after .next`, `.summary`, `.reviewed` and `.verdict`
+  - `.question-head`, `.options .option`, `.number`, `.keypad` and `.sortable-list`
+  - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
+
+## Flow
+
+- **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
+  more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
+  answer with its standings for 6 seconds. A question never opens in a tab that's out of sight.
+- **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
+  the last answer (of a run, a duel or a room), not between questions.
+- **Time:** 20 seconds a question, 25 to put things in order. When the time runs out, whatever has been put in (a
+  typed number, things moved into an order) is the answer.
+- **Input without the phone's keyboard:** a number is typed on the game's own pad (a comma only where the answer may
+  have decimals, a minus only for temperatures); things to order are dragged into place, or moved with the arrow
+  keys.
 
 ## Game feel
 
@@ -134,7 +147,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
 ## Copy
 
 - **Language:** Bulgarian, to one player with „ти“, in short plain sentences. Text must be gender-neutral.
-- **Buttons** are verbs: „Започни“, „Напред“, „Още десет“.
+- **Buttons** are verbs: „Започни“, „Отговори“, „Още десет“.
 - **Verdicts** are a fixed set: „Точно!“, „Вярно!“, „Близо.“, „Не е това.“ and „Времето изтече.“
 - **Numbers the Bulgarian way:**
   - a space between thousands from 10 000 up („1380“, „12 500“);
@@ -160,8 +173,9 @@ Feedback fires once, when it's earned, and then the screen is still again:
   quiet, and over in under half a second.
 - **One sound per moment**, and only for game moments:
   - `tap` when an answer is given;
+  - `key` for each key of the number pad and each move in an order;
   - `right`, `exact`, `partial`, `wrong` or `time` with the verdict;
-  - `tick` in each of the last five seconds;
+  - the clock while a question waits: `tick` and `tock` in turn each second, then `hurry` in each of the last five;
   - `end` when a run's result opens;
   - `level` and `achievement` with the news;
   - `ping` when a game or a duel starts, or a friend calls to a duel.

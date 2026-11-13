@@ -96,11 +96,7 @@ func (w *world) wrong(runID int64, n int) json.RawMessage {
 		p := w.picks(runID)[n]
 		q, _ := w.b.Get(p.ID)
 		num := q.(*bank.Number)
-		if num.Answer-num.Min > num.Max-num.Answer {
-			r["value"] = num.Min
-		} else {
-			r["value"] = num.Max
-		}
+		r["value"] = num.Answer + 10*num.Tolerance*num.Answer // far off on either scale
 	default:
 		o := r["order"].([]any)
 		for i, j := 0, len(o)-1; i < j; i, j = i+1, j-1 {

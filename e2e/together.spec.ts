@@ -16,14 +16,18 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
   for (let n = 0; n < 10; n++) {
-    for (const p of [host, guest]) await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`);
+    for (const p of [host, guest])
+      await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 15_000 });
     await answer(host);
     await answer(guest);
     for (const p of [host, guest]) await expect(p.locator(".verdict")).toBeVisible();
-    await host.getByRole("button", { name: n < 9 ? "Напред" : "Към класирането" }).click();
   }
-  for (const p of [host, guest]) await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible();
+  // The room moves on by itself, to the standings; the questions and their facts are there at the end.
+  for (const p of [host, guest])
+    await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
   await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
+  await guest.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
+  await expect(guest.locator(".reviewed")).toHaveCount(10);
 });
 
 test("two people asking for a duel play each other", async ({ browser }, info) => {

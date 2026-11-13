@@ -115,6 +115,8 @@
     /* Icons: 24px, 3px round strokes, drawn as masks in the text colour. */
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
+    --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
+    --i-grip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 8h14M5 12h14M5 16h14'/%3E%3C/svg%3E");
     --i-near: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 13.5c2.6-3.2 5.2-3.2 8 0s5.4 3.2 8 0'/%3E%3C/svg%3E");
     --i-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4.5l3 2'/%3E%3C/svg%3E");
     --i-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.2l2.7 5.5 6 .9-4.35 4.2 1.03 6L12 16.95 6.62 19.8l1.03-6L3.3 9.6l6-.9z'/%3E%3C/svg%3E");
@@ -1155,16 +1157,164 @@
     gap: var(--space-3);
   }
 
-  .number-input {
+  /* The number as typed: big, on its own line, the unit beside it. */
+  .number-out {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    min-height: 4.5rem;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--sunken);
   }
 
-  .number-input input {
-    min-height: 4rem;
-    font: 800 2.25rem / 1 var(--font-numeral);
+  .typed {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font: 800 2.5rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .typed.empty {
+    color: var(--text-muted);
+  }
+
+  .sign-key {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--raised);
+    color: var(--text-muted);
+    font: 800 1.5rem / 1 var(--font-numeral);
+    cursor: pointer;
+  }
+
+  .sign-key.on {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+
+  .key {
+    appearance: none;
+    display: grid;
+    place-items: center;
+    min-height: 3.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--raised);
+    box-shadow: var(--elev-1);
+    color: var(--text);
+    font: 800 1.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+      transform 80ms ease,
+      background-color 120ms ease;
+  }
+
+  .key:active:not(:disabled) {
+    transform: scale(0.96);
+    background: var(--surface);
+  }
+
+  .key:focus-visible,
+  .sign-key:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .key:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  .key.back::before {
+    content: "";
+    width: 26px;
+    height: 26px;
+    background: currentColor;
+    -webkit-mask: var(--i-back) center / contain no-repeat;
+    mask: var(--i-back) center / contain no-repeat;
+  }
+
+  /* Things to order: each row is dragged into place. */
+  .sortable-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .option.sortable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .sortable-list.sorting .option.sortable:not(.dragging) {
+    transition: transform 150ms ease;
+  }
+
+  .option.sortable.dragging {
+    z-index: 1;
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      var(--elev-2);
+    cursor: grabbing;
+    transition: none;
+  }
+
+  .option.sortable .letter {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .grip {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    background: var(--text-muted);
+    -webkit-mask: var(--i-grip) center / contain no-repeat;
+    mask: var(--i-grip) center / contain no-repeat;
+  }
+
+  /* The game moving on by itself: a line filling while the answer shows. */
+  .up-next {
+    display: grid;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .up-next .track {
+    flex: none;
+    height: 4px;
+  }
+
+  .up-next-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--text-muted);
+    transform: scaleX(0);
+    transform-origin: left;
   }
 
   .unit {
