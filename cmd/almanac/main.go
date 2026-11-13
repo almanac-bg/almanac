@@ -1,7 +1,7 @@
 // Command almanac is the whole game in one program: the server, and the tools that look after it.
 //
 //	almanac serve                       run the game
-//	almanac bank check [dir]            check a question bank (what a server would refuse, and what to look at)
+//	almanac bank check [-unbalanced] [dir]  check a question bank (what a server would refuse, and full balance)
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
 //	almanac backup now                  copy the database to the backups at once
@@ -58,5 +58,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [dir] | bank fmt [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | push keys | version")
 }

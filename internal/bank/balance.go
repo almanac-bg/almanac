@@ -1,9 +1,6 @@
 package bank
 
-import (
-	"math"
-	"slices"
-)
+import "math"
 
 // Mix is the share of each difficulty the bank aims for, in every category (the owner's call, 2026-11-13): half
 // easy, a third medium, the rest hard. Every category also aims for the same size: no topic outweighs another.
@@ -25,17 +22,10 @@ var TypeOrder = []string{"choice", "truefalse", "number", "order", "match"}
 type Balance struct {
 	// Live counts the questions played, by category and difficulty.
 	Live map[string]map[Difficulty]int
-	// Size is the size every category grows to: the smallest at which no category has too many of a difficulty.
-	Size int
-	// Add is how many questions of each difficulty each category needs to reach Size in the Mix.
-	Add map[string]map[Difficulty]int
 	// Facts, Added and Updated count the live questions that have one.
 	Facts, Added, Updated, Total int
-	// Types counts the live questions by category and kind; AddTypes is how many of each kind each category needs
-	// to reach TypeSize in the TypeMix.
-	Types    map[string]map[string]int
-	TypeSize int
-	AddTypes map[string]map[string]int
+	// Types counts the live questions by category and kind.
+	Types map[string]map[string]int
 	// Full balance: every category at Target questions (the steady size), its kinds in the TypeMix and each kind's
 	// difficulties in the Mix. Cells counts the live questions by category, kind and difficulty; Gaps is what each cell lacks (above 0:
 	// to write) or has too many of (below 0: to judge again into a neighbouring difficulty where that's honest, or
@@ -90,10 +80,10 @@ func steady(cells map[string]map[string]map[Difficulty]int) int {
 	return size
 }
 
-// BalanceOf works out where the bank stands against Mix and equal categories.
+// BalanceOf works out where the bank stands against full balance: every category the same size, with the same
+// number of questions in every kind and difficulty (as many hard number questions in music as in geography).
 func (b *Bank) BalanceOf() Balance {
-	bal := Balance{Live: map[string]map[Difficulty]int{}, Add: map[string]map[Difficulty]int{},
-		Types: map[string]map[string]int{}, AddTypes: map[string]map[string]int{}}
+	bal := Balance{Live: map[string]map[Difficulty]int{}, Types: map[string]map[string]int{}}
 	for _, c := range b.Categories {
 		n := map[Difficulty]int{}
 		types := map[string]int{}
@@ -108,19 +98,6 @@ func (b *Bank) BalanceOf() Balance {
 		}
 		bal.Live[c.ID] = n
 		bal.Types[c.ID] = types
-		for _, d := range Difficulties {
-			bal.Size = max(bal.Size, int(math.Ceil(float64(n[d])/Mix[d]-1e-9)))
-		}
-		for t, share := range TypeMix {
-			bal.TypeSize = max(bal.TypeSize, int(math.Ceil(float64(types[t])/share-1e-9)))
-		}
-	}
-	for _, c := range b.Categories {
-		add := map[string]int{}
-		for t, share := range TypeMix {
-			add[t] = max(0, int(math.Round(float64(bal.TypeSize)*share))-bal.Types[c.ID][t])
-		}
-		bal.AddTypes[c.ID] = add
 	}
 	// The full balance aims at the steady size (every kind and every difficulty reachable by adding), and says per
 	// cell what's missing or too much.
@@ -152,35 +129,6 @@ func (b *Bank) BalanceOf() Balance {
 			}
 		}
 		bal.Gaps[c.ID] = gaps
-	}
-	// Split the size by the mix, rounding so the parts add up to it (the largest remainders get the spare ones).
-	want := map[Difficulty]int{}
-	left := bal.Size
-	for _, d := range Difficulties {
-		want[d] = int(float64(bal.Size) * Mix[d])
-		left -= want[d]
-	}
-	byRest := slices.Clone(Difficulties)
-	slices.SortStableFunc(byRest, func(a, c Difficulty) int {
-		ra := float64(bal.Size)*Mix[a] - math.Floor(float64(bal.Size)*Mix[a])
-		rc := float64(bal.Size)*Mix[c] - math.Floor(float64(bal.Size)*Mix[c])
-		switch {
-		case ra > rc:
-			return -1
-		case ra < rc:
-			return 1
-		}
-		return 0
-	})
-	for i := 0; i < left; i++ {
-		want[byRest[i%len(byRest)]]++
-	}
-	for _, c := range b.Categories {
-		add := map[Difficulty]int{}
-		for _, d := range Difficulties {
-			add[d] = max(0, want[d]-bal.Live[c.ID][d])
-		}
-		bal.Add[c.ID] = add
 	}
 	return bal
 }

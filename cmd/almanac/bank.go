@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -15,15 +14,21 @@ func bankCommand(args []string) error {
 	if len(args) == 0 {
 		return usage()
 	}
+	// check takes -unbalanced: a bank that isn't fully balanced (the public sample) passes, with its gaps reported.
+	unbalanced := false
+	rest := args[1:]
+	if args[0] == "check" && len(rest) > 0 && rest[0] == "-unbalanced" {
+		unbalanced, rest = true, rest[1:]
+	}
 	dir := func() string {
-		if len(args) > 1 {
-			return args[1]
+		if len(rest) > 0 {
+			return rest[0]
 		}
 		return defaultBankDir()
 	}
 	switch args[0] {
 	case "check":
-		return bankCheck(dir())
+		return bankCheck(dir(), unbalanced)
 	case "fmt":
 		return bankFmt(dir())
 	case "calibrate":
@@ -43,7 +48,10 @@ func defaultBankDir() string {
 	return "bank/sample"
 }
 
-func bankCheck(dir string) error {
+// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that the bank is fully
+// balanced: every category the same size, with the same number of questions in every kind and difficulty. An
+// unbalanced bank still plays, but fails the check unless unbalanced is set, so a batch can't be committed half done.
+func bankCheck(dir string, unbalanced bool) error {
 	b, problems := bank.Load(dir)
 	errs := 0
 	for _, p := range problems {
@@ -56,6 +64,9 @@ func bankCheck(dir string) error {
 		return fmt.Errorf("%s: %d problems: the server would not play this bank", dir, errs)
 	}
 	fmt.Println(summary(b))
+	if off := b.BalanceOf().Off; off > 0 && !unbalanced {
+		return fmt.Errorf("%s: not fully balanced (%d questions out of place): write for the + cells, judge again or retire the − ones", dir, off)
+	}
 	return nil
 }
 
@@ -90,8 +101,8 @@ func summary(b *bank.Bank) string {
 	return strings.TrimRight(s.String(), "\n")
 }
 
-// balance says how the bank stands against its aims (bank.Mix, equal categories, a fact and dates on every
-// question), and what each category needs to get there by adding questions.
+// balance says how the bank stands against its aims (full balance, a fact and dates on every question), and per
+// category, kind and difficulty what to write or judge again to get there.
 func balance(b *bank.Bank) string {
 	var s strings.Builder
 	bal := b.BalanceOf()
@@ -112,11 +123,6 @@ func balance(b *bank.Bank) string {
 		100*bank.Mix[bank.Easy], 100*bank.Mix[bank.Medium], 100*bank.Mix[bank.Hard])
 	fmt.Fprintf(&s, "facts        %d of %d (%d without)\n", bal.Facts, bal.Total, bal.Total-bal.Facts)
 	fmt.Fprintf(&s, "dates        added on %d, updated on %d (of %d)\n", bal.Added, bal.Updated, bal.Total)
-	fmt.Fprintf(&s, "to the aim   every category at %d, adding (easy/medium/hard):\n", bal.Size)
-	for _, c := range b.Categories {
-		a := bal.Add[c.ID]
-		fmt.Fprintf(&s, "  %-10s %d/%d/%d\n", c.ID, a[bank.Easy], a[bank.Medium], a[bank.Hard])
-	}
 	kinds := map[string]int{}
 	for _, n := range bal.Types {
 		for t, k := range n {
@@ -125,17 +131,13 @@ func balance(b *bank.Bank) string {
 	}
 	s.WriteString("kinds       ")
 	for _, t := range bank.TypeOrder {
-		fmt.Fprintf(&s, " %s %d%% (aim %.1f)", t, pct(kinds[t], bal.Total), 100*bank.TypeMix[t])
-	}
-	fmt.Fprintf(&s, "\nto the kinds every category at %d, adding (%s):\n", bal.TypeSize, strings.Join(bank.TypeOrder, "/"))
-	for _, c := range b.Categories {
-		a := bal.AddTypes[c.ID]
-		parts := make([]string, len(bank.TypeOrder))
-		for i, t := range bank.TypeOrder {
-			parts[i] = strconv.Itoa(a[t])
+		share := 0.0
+		if bal.Total > 0 {
+			share = 100 * float64(kinds[t]) / float64(bal.Total)
 		}
-		fmt.Fprintf(&s, "  %-10s %s\n", c.ID, strings.Join(parts, "/"))
+		fmt.Fprintf(&s, " %s %.1f%% (aim %.1f)", t, share, 100*bank.TypeMix[t])
 	}
+	s.WriteString("\n")
 	// Full balance: per category, kind and difficulty, what to write (+) or judge again or retire (−).
 	if bal.Off == 0 {
 		s.WriteString("balance      full: every category, kind and difficulty on its aim\n")
