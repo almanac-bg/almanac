@@ -542,6 +542,35 @@ func TestProgress(t *testing.T) {
 		t.Fatalf("the same news twice: %+v", again)
 	}
 
+	// Progress towards each goal; a hidden achievement stays a secret until it's found.
+	p, _ = w.g.ProgressOf(ctx, ana)
+	byID := map[string]Earned{}
+	for _, a := range p.Achievements {
+		byID[a.ID] = a
+	}
+	if a := byID["answers100"]; a.At != 0 || a.Progress != Length || a.Goal != 100 {
+		t.Fatalf("answers100 after ten answers: %+v", a)
+	}
+	if a := byID["perfect"]; a.At == 0 || a.Progress != a.Goal {
+		t.Fatalf("perfect, earned: %+v", a)
+	}
+	if a := byID["topicPerfect"]; a.Name != "Скрито постижение" || !a.Hidden || a.Icon != "secret" || a.Progress != 0 {
+		t.Fatalf("a hidden achievement before it's found: %+v", a)
+	}
+	for _, s := range p.Shapes {
+		if s.Shape == "spark" && s.How != "скрито постижение" {
+			t.Fatalf("a hidden achievement's shape tells how: %+v", s)
+		}
+	}
+	run, _ := w.g.StartTopic(ctx, ana, "history")
+	w.play(ana, run.ID, repeat(w.right, Length)...)
+	p, _ = w.g.ProgressOf(ctx, ana)
+	for _, a := range p.Achievements {
+		if a.ID == "topicPerfect" && (a.At == 0 || a.Name != "Отличник") {
+			t.Fatalf("a hidden achievement once found: %+v", a)
+		}
+	}
+
 	// What's earned may be worn; what isn't, can't.
 	for _, c := range []struct {
 		avatar, title *string

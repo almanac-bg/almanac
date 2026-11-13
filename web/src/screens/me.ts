@@ -47,7 +47,7 @@ export function me() {
               h(
                 "span",
                 { class: "badges-peek", "aria-hidden": "true" },
-                earned.slice(-4).map((a) => badge(a, true)),
+                earned.slice(-4).map((a) => badge(a, true, "s")),
               ),
             );
           },

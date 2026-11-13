@@ -24,7 +24,9 @@ import (
 )
 
 // Budgets, gzipped: what a player downloads the first time.
-var budgets = map[string]int{"app.js": 30 << 10, "app.css": 10 << 10}
+// The budgets grew with the game, from one quiz to a platform (five places, medals and emblems drawn in code): still
+// small enough to arrive at once on a slow phone.
+var budgets = map[string]int{"app.js": 40 << 10, "app.css": 14 << 10}
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
