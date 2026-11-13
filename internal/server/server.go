@@ -161,7 +161,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/duel", s.duel)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
-	api("POST /api/rooms/{code}/next", s.roomNext)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	api("POST /api/rooms/{code}/decline", s.roomDecline)
 	api("GET /api/friends", s.friends)

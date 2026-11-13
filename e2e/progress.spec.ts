@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { playRun } from "./play.ts";
 
 test("progress: a game's level, the achievements, and a look of one's own", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto("/play/history");
   await playRun(page);
   await expect(page.locator(".level-card")).toContainText("Ниво");

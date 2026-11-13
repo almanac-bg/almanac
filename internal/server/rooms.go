@@ -136,21 +136,6 @@ func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-func (s *Server) roomNext(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	rm, err := s.roomOf(r)
-	if err != nil {
-		return err
-	}
-	if err := rm.Next(u.ID); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
-}
-
 func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

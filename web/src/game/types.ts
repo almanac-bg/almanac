@@ -28,10 +28,10 @@ export interface ChoiceView extends ViewBase {
 export interface NumberView extends ViewBase {
   type: "number";
   unit?: string;
-  min: number;
-  max: number;
+  /** The grid answers are taken on: below 1, the pad has a decimal comma. */
   step: number;
-  scale: "linear" | "log";
+  /** The answer may be below 0 (a temperature): the pad has a minus. */
+  signed?: boolean;
 }
 
 export interface OrderView extends ViewBase {

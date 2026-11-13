@@ -1,14 +1,14 @@
-// Playing a run: a question, its answer and fact, the next, and so on to the end. The server keeps the clock and
-// the score; this shows them.
+// Playing a run: a question, its answer, and on by itself to the next, to the end. The server keeps the clock and
+// the score; this shows them. What's behind each answer („Знаеше ли?“) and a word about a question wait for the
+// end, so that the game flows.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { fact, type VerdictKind, verdict } from "../ui.ts";
+import { type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
-import { report } from "./report.ts";
-import type { Answer, Credit, Mark, Result, Shown, State } from "./types.ts";
+import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. */
 export function playRun(initial: State, done: (s: State) => Child): Child {
@@ -16,28 +16,40 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
 
   const next = async () => {
     try {
-      at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}), true);
+      at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}));
     } catch (err) {
       screen.set(failed((err as ApiError).message, next));
     }
   };
   const reload = async () => {
     try {
-      at(await api<State>("GET", `/api/runs/${initial.id}`), false);
+      at(await api<State>("GET", `/api/runs/${initial.id}`));
     } catch (err) {
       screen.set(failed((err as ApiError).message, reload));
     }
   };
-  // Where the run stands: its end, a question showing, or between questions (the next one waits for the player
-  // unless they asked for it).
-  const at = (s: State, asked: boolean) => {
+  // A question opens only while the page is in view: its time would otherwise run unseen.
+  let seen: (() => void) | null = null;
+  const whenSeen = (fn: () => void) => {
+    if (!document.hidden) return fn();
+    seen = () => {
+      if (document.hidden || !seen) return;
+      document.removeEventListener("visibilitychange", seen);
+      seen = null;
+      fn();
+    };
+    document.addEventListener("visibilitychange", seen);
+  };
+  onCleanup(() => seen && document.removeEventListener("visibilitychange", seen));
+
+  // Where the run stands: its end, a question showing, or between questions (the next one opens at once).
+  const at = (s: State) => {
     if (s.done) screen.set(done(s));
     else if (s.question) screen.set(question(s, s.question, next, reload));
-    else if (asked || s.at === 0) next();
-    else screen.set(resume(s, next));
+    else whenSeen(next);
   };
 
-  at(initial, false);
+  at(initial);
   return h("div", { class: "run" }, () => screen());
 }
 
@@ -47,18 +59,6 @@ function failed(message: string, retry: () => void): Child {
     { class: "stack" },
     h("p", { role: "alert" }, message),
     h("button", { class: "btn primary", onclick: retry }, "Опитай пак"),
-  );
-}
-
-/** A run left between questions (a refresh, coming back later): the next question waits for the player. */
-function resume(s: State, next: () => void): Child {
-  return h(
-    "div",
-    { class: "stack" },
-    h("h1", null, `Въпрос ${s.at + 1} от ${s.total}`),
-    trail(s.trail, s.total, s.at),
-    h("p", { class: "muted" }, "Времето тръгва, щом го отвориш."),
-    h("button", { class: "btn primary big", onclick: next }, "Продължи"),
   );
 }
 
@@ -93,7 +93,8 @@ export function questionHead(n: number, total: number, aside: string): Child {
   );
 }
 
-/** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. */
+/** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. The
+ * clock ticks each second, and beeps for each of the last five. */
 export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
   const bar = h("div", { class: "time-bar" });
   bar.style.transform = `scaleX(${leftMs / limitMs})`;
@@ -104,10 +105,10 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
       bar.style.transform = "scaleX(0)";
     }),
   );
-  // The last five seconds tick (while the question waits for an answer).
   effect(() => {
     const n = left();
-    if (n > 0 && n <= 5 && !locked.peek()) play("tick");
+    if (n <= 0 || locked.peek()) return;
+    play(n <= 5 ? "hurry" : n % 2 ? "tick" : "tock");
   });
   // Once answered, the bar stops where it is.
   const freeze = () => {
@@ -132,12 +133,45 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
   );
 }
 
+/** How long an answer shows before the game moves on: longer where there's more to read. */
+export function pauseFor(view: View): number {
+  return view.type === "choice" ? 3000 : 4500;
+}
+
+/** The game moving on by itself: a line that fills while the answer shows. */
+export function upNext(ms: number, label: string): Child {
+  const fill = h("i", { class: "up-next-fill" });
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      fill.style.transition = `transform ${ms}ms linear`;
+      fill.style.transform = "scaleX(1)";
+    }),
+  );
+  return h("div", { class: "up-next", role: "status" }, h("span", null, label), h("span", { class: "track" }, fill));
+}
+
 function question(s: State, q: Shown, next: () => void, reload: () => void): Child {
   const locked = signal(false);
   const problem = signal<Child>(null);
   const after = h("div", { class: "after", hidden: true });
   let progress = trail(s.trail, s.total, q.n);
   let sent = false;
+
+  // Moving on, once the answer has shown for a while: never into a question nobody's looking at (a tab in the
+  // background), as its time would run unseen.
+  let due: (() => void) | null = null;
+  let advance = 0;
+  const moveOn = () => {
+    if (!due || document.hidden) return;
+    const go = due;
+    due = null;
+    go();
+  };
+  document.addEventListener("visibilitychange", moveOn);
+  onCleanup(() => {
+    clearTimeout(advance);
+    document.removeEventListener("visibilitychange", moveOn);
+  });
 
   // An answer goes once; after a failed send, only its retry goes again.
   const send = async (answer: Answer | null, retry = false) => {
@@ -162,37 +196,27 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     progress = now;
     const kind = kindOf(res, answer);
     play(kind);
+    const pause = pauseFor(q.view);
     append(after, [
       verdict(kind, res.points),
-      res.reveal.fact ? fact(res.reveal.fact) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
-      h(
-        "button",
-        {
-          class: "btn primary big next",
-          onclick: res.state.done
-            ? () => {
-                play("end");
-                reload();
-              }
-            : next,
-          ref: (el) =>
-            requestAnimationFrame(() => {
-              el.focus({ preventScroll: true });
-              el.scrollIntoView({ block: "nearest" });
-            }),
-        },
-        res.state.done ? "Към резултата" : "Напред",
-      ),
-      report(res.reveal.id),
+      upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
     ]);
     after.hidden = false;
+    requestAnimationFrame(() => after.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    due = res.state.done
+      ? () => {
+          play("end");
+          reload();
+        }
+      : next;
+    advance = window.setTimeout(moveOn, pause);
   };
 
   const asked = ask(q.view, (a) => send(a), locked);
 
-  // The time: the seconds left, and an empty answer when it's up.
-  const timeout = setTimeout(() => send(null), q.leftMs);
+  // The time: the seconds left, and when it's up, whatever has been put in (or nothing).
+  const timeout = setTimeout(() => send(asked.pending()), q.leftMs);
   const left = signal(Math.ceil(q.leftMs / 1000));
   const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
   onCleanup(() => {

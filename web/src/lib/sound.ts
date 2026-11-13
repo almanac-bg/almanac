@@ -1,12 +1,15 @@
 // Sounds: short tones made in the browser (no files), for a game's moments — a pick, a right or a wrong answer, the
-// last seconds, the end, a new level or achievement, a duel starting. On unless the player turns them off (kept on
+// clock ticking and its last seconds, the end, a new level or achievement, a duel starting. On unless the player turns them off (kept on
 // this device). Browsers allow sound only once the player has touched the page, so the audio starts then.
 
 import { signal } from "./dom.ts";
 
 export type SoundName =
   | "tap"
+  | "key"
   | "tick"
+  | "tock"
+  | "hurry"
   | "right"
   | "exact"
   | "partial"
@@ -23,7 +26,14 @@ type Note = [hz: number, at: number, length: number, wave?: OscillatorType, loud
 // Notes in Hz: C5 523, E5 659, G5 784, C6 1047, D6 1175, E6 1319, G6 1568, A6 1760, C7 2093.
 const sounds: Record<SoundName, Note[]> = {
   tap: [[660, 0, 0.05, "sine", 0.45]],
-  tick: [[1320, 0, 0.035, "square", 0.18]],
+  key: [[880, 0, 0.03, "sine", 0.3]],
+  // The clock: a soft tick-tock every second, then a sharper beep for each of the last five.
+  tick: [[2100, 0, 0.022, "triangle", 0.3]],
+  tock: [[1600, 0, 0.022, "triangle", 0.3]],
+  hurry: [
+    [1760, 0, 0.05, "square", 0.22],
+    [1760, 0.09, 0.05, "square", 0.16],
+  ],
   right: [
     [784, 0, 0.12],
     [1175, 0.09, 0.24],

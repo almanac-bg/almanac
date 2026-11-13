@@ -4,16 +4,15 @@
 import { findDuel } from "../game/duel.ts";
 import { news } from "../game/news.ts";
 import { answered, ask, picture } from "../game/questions.ts";
-import { report } from "../game/report.ts";
-import { boardRow, shareButton } from "../game/results.ts";
-import { questionHead, timer } from "../game/run.ts";
-import type { Answer, Reveal, View } from "../game/types.ts";
+import { boardRow, review, shareButton } from "../game/results.ts";
+import { questionHead, timer, upNext } from "../game/run.ts";
+import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player } from "../state.ts";
-import { avatar, fact, type VerdictKind, verdict } from "../ui.ts";
+import { avatar, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
@@ -28,11 +27,14 @@ interface RoomView {
   n: number;
   total: number;
   players: Player[];
+  /** Once the game is over: its questions with this player's answers. */
+  review?: Reviewed[];
   question?: {
     category: string;
     view: View;
     limitMs: number;
     leftMs: number;
+    nextMs?: number;
     given?: Answer;
     reveal?: { answer: Reveal; points: number; right: boolean; exact?: boolean; missed?: boolean };
   };
@@ -145,7 +147,7 @@ export function room([code = ""]: string[]) {
         case "question":
           return question(view as () => RoomView, code, v);
         case "reveal":
-          return reveal(view as () => RoomView, code, v, places);
+          return reveal(view as () => RoomView, v, places);
         case "end":
           return end(view as () => RoomView, code);
       }
@@ -153,7 +155,7 @@ export function room([code = ""]: string[]) {
   );
 }
 
-async function lead(code: string, action: "start" | "next", error: (s: string) => void) {
+async function lead(code: string, action: "start", error: (s: string) => void) {
   try {
     await api("POST", `/api/rooms/${code}/${action}`);
   } catch (err) {
@@ -164,8 +166,7 @@ async function lead(code: string, action: "start" | "next", error: (s: string) =
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
-    if (v.duel) return v.phase === "reveal" ? h("p", { class: "status" }, "Следващият въпрос идва след малко.") : null;
-    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
+    return v.canLead || v.duel ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
   };
 }
 
@@ -285,25 +286,26 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const left = signal(Math.ceil(q.leftMs / 1000));
+  const error = signal("");
+  const send = async (a: Answer) => {
+    locked.set(true);
+    try {
+      await api("POST", `/api/rooms/${code}/answer`, { n: first.n, answer: a });
+      sent.set(true);
+    } catch (err) {
+      error.set((err as ApiError).message);
+    }
+  };
+  const asked = ask(q.view, send, locked);
+  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
   const tick = setInterval(() => {
     left.update((n) => Math.max(0, n - 1));
-    if (left.peek() === 0) locked.set(true);
+    if (left.peek() > 0 || locked.peek()) return;
+    const pending = asked.pending();
+    if (pending) send(pending);
+    else locked.set(true);
   }, 1000);
   onCleanup(() => clearInterval(tick));
-  const error = signal("");
-  const asked = ask(
-    q.view,
-    async (a) => {
-      locked.set(true);
-      try {
-        await api("POST", `/api/rooms/${code}/answer`, { n: first.n, answer: a });
-        sent.set(true);
-      } catch (err) {
-        error.set((err as ApiError).message);
-      }
-    },
-    locked,
-  );
   return h(
     "article",
     { class: "question" },
@@ -326,11 +328,10 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   );
 }
 
-function reveal(view: () => RoomView, code: string, first: RoomView, places: Map<string, number>): Child {
+function reveal(view: () => RoomView, first: RoomView, places: Map<string, number>): Child {
   const q = first.question;
   const r = q?.reveal;
   if (!q || !r) return null;
-  const error = signal("");
   const last = first.n + 1 >= first.total;
   const kind: VerdictKind = r.missed
     ? "time"
@@ -355,19 +356,8 @@ function reveal(view: () => RoomView, code: string, first: RoomView, places: Map
     picture(q.view),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined),
-    r.answer.fact ? fact(r.answer.fact) : null,
+    upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(view, true, before),
-    () =>
-      view().canLead
-        ? h(
-            "button",
-            { class: "btn primary big", onclick: () => lead(code, "next", error.set) },
-            last ? "Към класирането" : "Напред",
-          )
-        : null,
-    waiting(view, last ? "покаже класирането" : "продължи"),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    report(r.answer.id),
   );
 }
 
@@ -427,6 +417,7 @@ function end(view: () => RoomView, code: string): Child {
       news(1500),
       standings(view, false),
       findDuel("Нов дуел"),
+      review(async () => view().review ?? []),
     );
   }
   return h(
@@ -448,5 +439,6 @@ function end(view: () => RoomView, code: string): Child {
         : null,
     waiting(view, "започне нова игра"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    review(async () => view().review ?? []),
   );
 }

@@ -38,7 +38,7 @@ export function summary(s: State, line: Child, ...more: Child[]): Child {
       trail(s.trail, s.total),
     ),
     more,
-    review(s.id),
+    review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions),
   );
 }
 
@@ -76,13 +76,14 @@ export function shareButton(label: string, text: () => string, url?: string, pri
   );
 }
 
-/** Going over the run: each question, the answer, and what was given. */
-function review(id: number): Child {
+/** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
+ * about the question if something's wrong with it. */
+export function review(load: () => Promise<Reviewed[]>): Child {
   const items = signal<Reviewed[] | null>(null);
   const error = signal("");
   const open = async () => {
     try {
-      items.set((await api<{ questions: Reviewed[] }>("GET", `/api/runs/${id}/review`)).questions);
+      items.set(await load());
     } catch (err) {
       error.set((err as ApiError).message);
     }
@@ -93,7 +94,7 @@ function review(id: number): Child {
       return h(
         "div",
         { class: "stack" },
-        h("button", { class: "link", onclick: open }, "Виж въпросите и отговорите"),
+        h("button", { class: "btn", onclick: open }, "Въпросите, отговорите и „Знаеше ли?“"),
         error() && h("p", { class: "bad" }, error()),
       );
     }

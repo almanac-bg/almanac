@@ -275,7 +275,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 		case "choice":
 			answer = map[string]int{"pick": 0}
 		case "number":
-			answer = map[string]float64{"value": view["min"].(float64)}
+			answer = map[string]float64{"value": 1}
 		case "order":
 			answer = map[string][]int{"order": {0, 1, 2, 3}}
 		}
@@ -439,7 +439,7 @@ func TestARoomOverHTTP(t *testing.T) {
 	}
 	answer := map[string]any{"pick": 0}
 	if q := v["question"].(map[string]any)["view"].(map[string]any); q["type"] == "number" {
-		answer = map[string]any{"value": q["min"]}
+		answer = map[string]any{"value": 1}
 	} else if q["type"] == "order" {
 		answer = map[string]any{"order": []int{0, 1, 2, 3}}
 	}
@@ -611,7 +611,7 @@ func TestNotifications(t *testing.T) {
 		view := st["question"].(map[string]any)["view"].(map[string]any)
 		a := map[string]any{"pick": 0}
 		if view["type"] == "number" {
-			a = map[string]any{"value": view["min"]}
+			a = map[string]any{"value": 1}
 		} else if view["type"] == "order" {
 			a = map[string]any{"order": []int{0, 1, 2, 3}}
 		}

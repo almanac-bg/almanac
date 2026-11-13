@@ -8,17 +8,15 @@ import (
 	"strings"
 )
 
-// Number is "Колко…?" or "През коя година…?": a number typed in, scored by how close it is. On a linear scale a guess
-// Tolerance away scores nothing; on a log scale (sizes across orders of magnitude) one Tolerance times too big or too
-// small does.
+// Number is "Колко…?" or "През коя година…?": a number typed in on a keypad, scored by how close it is. On a linear
+// scale a guess Tolerance away scores nothing; on a log scale (sizes across orders of magnitude) one Tolerance times
+// too big or too small does. The player isn't told a range: knowing roughly how big is part of the question.
 type Number struct {
 	Head
 	Answer float64 `json:"answer"`
 	// Unit is what the number counts ("км", "души"); empty for a year.
 	Unit string `json:"unit,omitempty"`
-	// Min, Max and Step are the range and grid the input allows.
-	Min       float64 `json:"min"`
-	Max       float64 `json:"max"`
+	// Step is the grid answers are taken on (1 for whole numbers, 0.1 for one decimal).
 	Step      float64 `json:"step"`
 	Scale     string  `json:"scale"`
 	Tolerance float64 `json:"tolerance"`
@@ -36,11 +34,11 @@ func (q *Number) Extra() *Tail { return &q.Tail }
 func (q *Number) check() []string {
 	var p []string
 	finite := func(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
-	if !finite(q.Answer) || !finite(q.Min) || !finite(q.Max) || !finite(q.Step) || !finite(q.Tolerance) {
+	if !finite(q.Answer) || !finite(q.Step) || !finite(q.Tolerance) {
 		return []string{"a number must be finite"}
 	}
-	if q.Min > q.Answer || q.Answer > q.Max {
-		p = append(p, "the answer is outside min–max")
+	if q.Answer < 0 && !q.Signed() {
+		p = append(p, "only a temperature (°C) may be below 0")
 	}
 	if q.Step <= 0 {
 		p = append(p, "step must be above 0")
@@ -53,8 +51,8 @@ func (q *Number) check() []string {
 			p = append(p, "tolerance must be above 0")
 		}
 	case "log":
-		if q.Min <= 0 || q.Tolerance <= 1 {
-			p = append(p, "a log scale needs min above 0 and a tolerance above 1 (a factor)")
+		if q.Answer <= 0 || q.Tolerance <= 1 {
+			p = append(p, "a log scale needs an answer above 0 and a tolerance above 1 (a factor)")
 		}
 	default:
 		p = append(p, `scale must be "linear" or "log"`)
@@ -81,12 +79,15 @@ func (q *Number) Closeness(guess float64) float64 {
 	return math.Max(0, 1-off)
 }
 
+// Signed is whether the answer may be below 0, so the keypad has a minus: for a temperature (whichever way it is, so
+// that the key gives nothing away).
+func (q *Number) Signed() bool { return q.Unit == "°C" }
+
 // Exact is whether a guess is the number itself: within half a step of it.
 func (q *Number) Exact(guess float64) bool { return math.Abs(guess-q.Answer) <= q.Step/2+1e-9 }
 
-// snap brings a typed number onto the question's grid: inside its range, in whole steps, without float noise.
+// snap brings a typed number onto the question's grid: in whole steps, without float noise.
 func (q *Number) snap(v float64) float64 {
-	v = math.Min(q.Max, math.Max(q.Min, v))
 	snapped := math.Round(v/q.Step) * q.Step
 	out, _ := strconv.ParseFloat(strconv.FormatFloat(snapped, 'f', decimals(q.Step), 64), 64)
 	return out
@@ -113,12 +114,10 @@ func (d *dealtNumber) View() any {
 	q := d.q
 	return struct {
 		view
-		Unit  string  `json:"unit,omitempty"`
-		Min   float64 `json:"min"`
-		Max   float64 `json:"max"`
-		Step  float64 `json:"step"`
-		Scale string  `json:"scale"`
-	}{viewOf(&q.Head, &q.Tail), q.Unit, q.Min, q.Max, q.Step, q.Scale}
+		Unit   string  `json:"unit,omitempty"`
+		Step   float64 `json:"step"`
+		Signed bool    `json:"signed,omitempty"`
+	}{viewOf(&q.Head, &q.Tail), q.Unit, q.Step, q.Signed()}
 }
 
 // NumberAnswer is a typed number.
@@ -133,7 +132,7 @@ func (d *dealtNumber) Grade(answer json.RawMessage) (Graded, error) {
 	if err := strictJSON(answer, &a); err != nil {
 		return Graded{}, err
 	}
-	if a.Value == nil || math.IsNaN(*a.Value) || math.IsInf(*a.Value, 0) {
+	if a.Value == nil || math.IsNaN(*a.Value) || math.IsInf(*a.Value, 0) || math.Abs(*a.Value) > 1e12 {
 		return Graded{}, errors.New("not a number")
 	}
 	guess := d.q.snap(*a.Value)

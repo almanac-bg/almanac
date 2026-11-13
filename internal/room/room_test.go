@@ -48,10 +48,7 @@ func answer(r *Room, right bool) json.RawMessage {
 		v := *rv.Value
 		if !right {
 			n := d.Question().(*bank.Number)
-			v = n.Min
-			if n.Answer-n.Min < n.Max-n.Answer {
-				v = n.Max
-			}
+			v = n.Answer + 10*n.Tolerance*n.Answer // far off on either scale
 		}
 		a = map[string]float64{"value": v}
 	default:
@@ -114,30 +111,34 @@ func TestAGamePlayedTogether(t *testing.T) {
 			t.Fatal("Bo's wrong answer counted")
 		}
 
-		// The next question: nobody answers, and its time runs out by itself.
-		if err := r.Next(bo.ID); !errors.Is(err, ErrNotYours) {
-			t.Fatalf("a guest moved on while the host is here: %v", err)
+		// The room moves on by itself; nobody answers the next question, and its time runs out.
+		time.Sleep(Pause + time.Millisecond)
+		synctest.Wait()
+		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
+			t.Fatalf("the room didn't move on by itself: %+v", v)
 		}
-		_ = r.Next(ana.ID)
 		time.Sleep(play.Limit(r.dealt[1].Question()) + Grace + time.Millisecond)
 		synctest.Wait()
 		if v := r.View(bo.ID); v.Phase != Reveal || !v.Question.Reveal.Missed {
 			t.Fatalf("after the time ran out: %+v", v)
 		}
 
-		// The host leaves: anyone may carry on, to the end.
+		// The host leaves: the game goes on, to the end.
 		r.Unfollow(sa)
-		for i := 2; r.View(bo.ID).Phase != End; i++ {
-			if err := r.Next(bo.ID); err != nil {
-				t.Fatalf("question %d: %v", i, err)
-			}
-			if r.View(bo.ID).Phase == Question {
-				_ = r.Answer(bo.ID, r.View(bo.ID).N, answer(r, true)) // the only one online: shows at once
+		for r.View(bo.ID).Phase != End {
+			time.Sleep(Pause + time.Millisecond)
+			synctest.Wait()
+			if v := r.View(bo.ID); v.Phase == Question {
+				_ = r.Answer(bo.ID, v.N, answer(r, true)) // the only one online: shows at once
 			}
 		}
 		end := r.View(bo.ID)
 		if end.Players[0].Name != "Бо" || end.Players[0].Rights != play.Length-2 {
 			t.Fatalf("the end: %+v", end.Players)
+		}
+		// Once it's over, each sees the questions with their own answers.
+		if rv := end.Review; len(rv) != play.Length || rv[0].Right || !rv[2].Right || string(rv[1].Given) != "null" {
+			t.Fatalf("Bo's review: %+v", rv)
 		}
 		// Again: new questions, everyone from nought.
 		if err := r.Start(bo.ID); err != nil || r.View(bo.ID).Players[0].Points != 0 {
@@ -220,9 +221,6 @@ func TestTwoPeopleDuel(t *testing.T) {
 		_, _ = r.Follow(2)
 		if v := r.View(1); v.Phase != Question || !v.Duel || v.CanLead {
 			t.Fatalf("the duel didn't start by itself: %+v", v)
-		}
-		if err := r.Next(1); !errors.Is(err, ErrNotYours) {
-			t.Fatalf("someone led a duel: %v", err)
 		}
 		for n := range play.Length {
 			_ = r.Answer(1, n, answer(r, true))

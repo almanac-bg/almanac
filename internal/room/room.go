@@ -31,7 +31,7 @@ const (
 	MaxPlayers = 50
 	// Grace is how late an answer may arrive and still count.
 	Grace = time.Second
-	// Pause is how long a duel shows an answer before the next question.
+	// Pause is how long a room shows an answer (and the standings) before it moves on by itself.
 	Pause = 6 * time.Second
 	// maxRooms caps the rooms open at once, so that nobody can fill the server's memory with them.
 	maxRooms = 2000
@@ -312,6 +312,7 @@ type Room struct {
 	dealt         []bank.Dealt
 	n             int // the question now
 	shownAt       time.Time
+	revealedAt    time.Time
 	timer         *time.Timer
 	subs          map[*Sub]struct{}
 	opened        time.Time
@@ -594,24 +595,9 @@ func (r *Room) reveal() {
 	if r.timer != nil {
 		r.timer.Stop()
 	}
-	if r.duel {
-		r.after(Pause, func() { r.next() })
-	}
+	r.revealedAt = time.Now()
+	r.after(Pause, func() { r.next() })
 	r.changed()
-}
-
-// Next moves on from an answer: to the next question, or to the end.
-func (r *Room) Next(by int64) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if !r.mayLead(by) {
-		return ErrNotYours
-	}
-	if r.phase != Reveal {
-		return ErrNotNow
-	}
-	r.next()
-	return nil
 }
 
 func (r *Room) next() {
@@ -666,6 +652,20 @@ type View struct {
 	Total    int           `json:"total"`
 	Players  []PlayerView  `json:"players"`
 	Question *QuestionView `json:"question,omitempty"`
+	// Review is every question of the game with the viewer's answer, once it's over: the facts behind the answers and
+	// a word about a question are kept for then, so that the game itself flows.
+	Review []ReviewedView `json:"review,omitempty"`
+}
+
+// ReviewedView is one question of a finished game, as the viewer answered it (as play.Reviewed is for a run).
+type ReviewedView struct {
+	N        int             `json:"n"`
+	Category string          `json:"category"`
+	View     any             `json:"view"`
+	Reveal   any             `json:"reveal"`
+	Given    json.RawMessage `json:"given"`
+	Points   int             `json:"points"`
+	Right    bool            `json:"right"`
 }
 
 type PlayerView struct {
@@ -688,6 +688,8 @@ type QuestionView struct {
 	View     any    `json:"view"`
 	LimitMs  int64  `json:"limitMs"`
 	LeftMs   int64  `json:"leftMs"`
+	// NextMs is how long until the room moves on, while an answer shows.
+	NextMs int64 `json:"nextMs,omitempty"`
 	// Given is the viewer's answer, as shown (once given).
 	Given json.RawMessage `json:"given,omitempty"`
 	// Reveal is the answer, once it shows, with how the viewer's went.
@@ -743,8 +745,25 @@ func (r *Room) View(viewer int64) View {
 		}
 		if r.phase == Reveal {
 			q.LeftMs = 0
+			q.NextMs = max(1, (Pause - time.Since(r.revealedAt)).Milliseconds())
 		}
 		v.Question = q
 	}
+	if me := r.member(viewer); me != nil && r.phase == End {
+		v.Review = r.review(me)
+	}
 	return v
+}
+
+// review is the game's questions with how m answered each (the answer log holds one entry per question, in order).
+func (r *Room) review(m *member) []ReviewedView {
+	out := make([]ReviewedView, 0, len(r.dealt))
+	for i, d := range r.dealt {
+		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(), Given: json.RawMessage("null")}
+		if i < len(m.log) && m.log[i].QuestionID == d.Question().Base().ID && m.log[i].Shown != nil {
+			it.Given, it.Points, it.Right = m.log[i].Shown, m.log[i].Points, m.log[i].Right
+		}
+		out = append(out, it)
+	}
+	return out
 }
