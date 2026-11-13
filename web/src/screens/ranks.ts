@@ -33,10 +33,11 @@ interface Day {
   friends?: Score[] | null;
 }
 
-type Tab = "rating" | "week" | "day";
+type Tab = "rating" | "season" | "week" | "day";
 
 const tabs: [Tab, string][] = [
   ["rating", "Рейтинг"],
+  ["season", "Сезон"],
   ["week", "Седмица"],
   ["day", "Днес"],
 ];
@@ -44,10 +45,10 @@ const tabs: [Tab, string][] = [
 export function ranks() {
   title("Класации");
   const tab = signal<Tab>("rating");
-  const boards = signal<{ rating: Ranking; week: Ranking } | null>(null);
+  const boards = signal<{ rating: Ranking; week: Ranking; season: Ranking } | null>(null);
   const day = signal<Day | null>(null);
   const error = signal("");
-  api<{ rating: Ranking; week: Ranking }>("GET", "/api/ranks").then(boards.set, (err) =>
+  api<{ rating: Ranking; week: Ranking; season: Ranking }>("GET", "/api/ranks").then(boards.set, (err) =>
     error.set((err as ApiError).message),
   );
   api<Day>("GET", "/api/day").then(day.set, () => {});
@@ -86,6 +87,7 @@ export function ranks() {
       }
       const b = boards();
       if (!b) return h("p", { class: "muted" }, "…");
+      if (t === "season") return ranking("Сезон", b.season, (r) => `${r.value} ★`, "Този сезон още никой няма звезди.");
       return t === "rating"
         ? ranking(
             "Рейтинг",

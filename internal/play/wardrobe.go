@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 // The wardrobe: besides the avatar's shape and tone and the title, a frame around the avatar and a pattern behind
@@ -52,11 +53,13 @@ var Backdrops = []cosmetic{
 	{"stars", "Звезди", unlock{division: "gold"}},
 }
 
-// wardrobe is what a player has done that unlocks things.
+// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, and the
+// seasons they earned gold in (each one's frame, "season-YYYY-MM", is theirs).
 type wardrobe struct {
 	level  int
 	earned map[string]int64
 	peak   int
+	golds  []string
 }
 
 func (w wardrobe) has(u unlock) bool {
@@ -116,6 +119,27 @@ func (w wardrobe) owns(all []cosmetic, id string) bool {
 	return i >= 0 && w.has(all[i].by)
 }
 
+// ownsFrame is whether a frame is the player's: one of Frames unlocked, or a season's they earned gold in.
+func (w wardrobe) ownsFrame(id string) bool {
+	if season, ok := strings.CutPrefix(id, "season-"); ok {
+		return slices.Contains(w.golds, season)
+	}
+	return w.owns(Frames, id)
+}
+
+// seasonFrames are the frames of the seasons a player earned gold in, and this season's, locked until they do.
+func (w wardrobe) seasonFrames(now string) []Cosmetic {
+	var out []Cosmetic
+	for _, s := range w.golds {
+		out = append(out, Cosmetic{ID: "season-" + s, Name: "Сезон " + s})
+	}
+	if !slices.Contains(w.golds, now) {
+		out = append(out, Cosmetic{ID: "season-" + now, Name: "Сезон " + now, Locked: true,
+			How: "златния медал на сезона (" + strconv.Itoa(SeasonTiers[len(SeasonTiers)-1].Stars) + " звезди)"})
+	}
+	return out
+}
+
 func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	var w wardrobe
 	points, err := g.points(ctx, userID)
@@ -126,6 +150,9 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if w.earned, err = g.earned(ctx, userID); err != nil {
 		return w, err
 	}
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT peak FROM users WHERE id = ?`, userID).Scan(&w.peak)
+	if err = g.DB.Read.QueryRowContext(ctx, `SELECT peak FROM users WHERE id = ?`, userID).Scan(&w.peak); err != nil {
+		return w, err
+	}
+	w.golds, err = g.goldSeasons(ctx, userID)
 	return w, err
 }

@@ -881,7 +881,7 @@ func TestWardrobe(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	p, _ := w.g.ProgressOf(ctx, ana)
-	if len(p.Frames) != len(Frames) || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
+	if len(p.Frames) != len(Frames)+1 || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
 		t.Fatalf("a new player's frames: %+v", p.Frames)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), nil); !errors.Is(err, ErrNotYours) {
@@ -900,5 +900,41 @@ func TestWardrobe(t *testing.T) {
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("halo"), nil); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("Легенда's frame at the start: %v", err)
+	}
+}
+
+func TestGoalsAndSeason(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	goals, err := w.g.GoalsOf(ctx, ana)
+	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done {
+		t.Fatalf("a new player's goals: %+v %v", goals, err)
+	}
+	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
+		t.Fatal("the day's goals changed within the day")
+	}
+	// The day's questions: that goal is done, and a star for the season, without looking.
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	season, _ := w.g.SeasonOf(ctx, ana)
+	if season.Stars < 1 || season.DaysLeft < 1 || season.Hue < 0 || season.Hue >= 360 {
+		t.Fatalf("the season after a goal: %+v", season)
+	}
+	b, _ := w.g.SeasonBoard(ctx, ana)
+	if b.Place != 1 || b.Mine == nil || b.Mine.Value != season.Stars {
+		t.Fatalf("the season's board: %+v", b)
+	}
+	// A season's gold makes its frame the player's.
+	month := w.g.Now().In(Bulgaria).Format("2006-01")
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a season's frame without its gold: %v", err)
+	}
+	for i := range SeasonTiers[len(SeasonTiers)-1].Stars {
+		_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at) VALUES (?, ?, ?, 0)`,
+			ana, month+"-01", fmt.Sprintf("g%d", i))
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); err != nil {
+		t.Fatalf("a season's frame with its gold: %v", err)
 	}
 }

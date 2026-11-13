@@ -116,7 +116,11 @@ func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"rating": rating, "week": week})
+	season, err := s.game.SeasonBoard(r.Context(), viewer)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"rating": rating, "week": week, "season": season})
 }
 
 // joinRoyal puts the player in a tournament and gives them their run.
@@ -173,4 +177,21 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, a)
+}
+
+// season is the player's goals for today and their season.
+func (s *Server) season(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	goals, err := s.game.GoalsOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	season, err := s.game.SeasonOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"goals": goals, "season": season})
 }

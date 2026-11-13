@@ -345,6 +345,9 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		if err == nil {
 			_, err = g.Award(ctx, userID)
 		}
+		if err == nil {
+			_, err = g.GoalsOf(ctx, userID) // a goal done is kept: a star, whether or not the player looks
+		}
 	}
 	return res, err
 }

@@ -306,7 +306,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 		return p, err
 	}
 	p.Frame, p.Backdrop = frame.String, backdrop.String
-	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
+	p.Frames, p.Backdrops = append(w.list(Frames), w.seasonFrames(g.Now().In(Bulgaria).Format("2006-01"))...), w.list(Backdrops)
 	return p, nil
 }
 
@@ -556,7 +556,7 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 		if err != nil {
 			return err
 		}
-		if (frame != nil && *frame != "" && !w.owns(Frames, *frame)) ||
+		if (frame != nil && *frame != "" && !w.ownsFrame(*frame)) ||
 			(backdrop != nil && *backdrop != "" && !w.owns(Backdrops, *backdrop)) {
 			return ErrNotYours
 		}

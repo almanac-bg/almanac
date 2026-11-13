@@ -476,6 +476,163 @@
     font: 800 1.125rem / 1.4 var(--font-sans);
   }
 
+  /* The day's goals: each with its mark (a star once done), and the season's strip under them. */
+  .goal-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .goal {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 4px var(--space-3);
+  }
+
+  .goal-mark {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--line-strong);
+    border-radius: var(--radius-full);
+  }
+
+  .goal.done .goal-mark {
+    border-color: var(--gold);
+    background: var(--gold);
+    -webkit-mask: var(--s-star) center / 80% no-repeat;
+    mask: var(--s-star) center / 80% no-repeat;
+  }
+
+  .goal.done .goal-name {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--line-strong);
+  }
+
+  .goal-n {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .season-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+    color: var(--text);
+    font-size: 0.875rem;
+    text-decoration: none;
+  }
+
+  /* A season: its banner in its colour (art/season.ts), the stars, the medals on the way. */
+  .season-card {
+    display: grid;
+    gap: var(--space-3);
+    overflow: hidden;
+  }
+
+  .season-banner {
+    height: 96px;
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--season) 35%, var(--surface)), var(--surface));
+  }
+
+  .season-banner svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .season-arc {
+    fill: none;
+    stroke: var(--season);
+    stroke-width: 2;
+    opacity: 0.35;
+  }
+
+  .season-star {
+    fill: var(--season);
+    opacity: 0.8;
+  }
+
+  .season-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .season-stars b {
+    font: 900 2.25rem / 1 var(--font-numeral);
+  }
+
+  .season-track,
+  .season-past {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .season-track li,
+  .season-past li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .season-track li:not(.reached) {
+    color: var(--text-muted);
+  }
+
+  .season-medal {
+    display: inline-grid;
+    flex: none;
+    width: 36px;
+    height: 36px;
+  }
+
+  .season-medal svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .medal-ribbon {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 4;
+  }
+
+  .season-medal-face {
+    fill: var(--sunken);
+    stroke: color-mix(in srgb, var(--div) 55%, transparent);
+    stroke-width: 2;
+  }
+
+  .season-medal-star {
+    fill: var(--line-strong);
+  }
+
+  .season-medal.earned .medal-ribbon {
+    stroke: var(--rose);
+  }
+
+  .season-medal.earned .season-medal-face {
+    fill: var(--div);
+    stroke: color-mix(in srgb, var(--div) 60%, black);
+  }
+
+  .season-medal.earned .season-medal-star {
+    fill: color-mix(in srgb, var(--div) 35%, white);
+  }
+
   /* Роял's table: those out are dimmer; how far each got on the right. */
   .royal-table .row.out {
     opacity: 0.62;
@@ -2444,6 +2601,10 @@
   }
   .almanac-head .meter {
     grid-column: 1 / -1;
+  }
+  .goal .meter {
+    grid-column: 2 / -1;
+    height: 5px;
   }
 
   .chips {

@@ -7,6 +7,7 @@ import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge, meter, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
 import { type Cosmetic, loadProgress, type Progress } from "./progress.ts";
+import { seasonSection } from "./season.ts";
 
 export function rewards() {
   title("Награди");
@@ -21,6 +22,7 @@ export function rewards() {
         const load = () => loadProgress().then(progress.set, () => {});
         load();
         return [
+          seasonSection(),
           () => {
             const p = progress();
             return p ? achievements(p) : null;
@@ -190,7 +192,6 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
         (id) => avatar(p.avatar, { frame: p.frame, backdrop: id }),
         (id) => set({ backdrop: id }),
       ),
-      () => hint() && h("p", { class: "muted", role: "status" }, hint()),
       h("h3", null, "Титла"),
       h("p", { class: "muted" }, "Титлата се вижда под името ти. Всяко постижение отключва една."),
       h(
