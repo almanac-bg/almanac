@@ -8,10 +8,16 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".level-card")).toContainText("Ниво");
 
   await page.goto("/rewards");
-  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 19/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 24/ })).toBeVisible();
   // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
   await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");
+  // Progress towards a goal, a reward in sight, and the hidden ones kept secret.
+  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(/\d+ \/ 100/);
+  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText("Награда: форма „Книга“");
+  await expect(page.locator(".achievement", { hasText: "Скрито постижение" }).first()).toContainText(
+    "Награда: ще разбереш",
+  );
   await expect(page.locator(".title-pick.locked", { hasText: "Сто дни" })).toContainText(
     "Отключва се: играй въпросите на деня сто дни поред.",
   );

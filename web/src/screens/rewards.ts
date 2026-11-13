@@ -5,7 +5,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { avatar, badge, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
+import { avatar, badge, meter, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 
 export function rewards() {
@@ -74,7 +74,30 @@ function achievements(p: Progress): Child {
                 { class: "achievement-text" },
                 h("span", { class: "achievement-name" }, a.name),
                 h("span", { class: "achievement-about" }, a.about),
-                h("span", { class: "achievement-when" }, a.at ? `Спечелено на ${day(a.at)}` : "Още не е спечелено"),
+                !a.at && (a.goal ?? 1) > 1
+                  ? h(
+                      "span",
+                      { class: "achievement-progress" },
+                      meter(Math.round((100 * (a.progress ?? 0)) / (a.goal ?? 1)), `${a.progress ?? 0} от ${a.goal}`),
+                      h("span", { class: "num" }, `${a.progress ?? 0} / ${a.goal}`),
+                    )
+                  : null,
+                h(
+                  "span",
+                  { class: "achievement-when" },
+                  a.at ? `Спечелено на ${day(a.at)}` : a.hidden ? "Скрито — открий го в игра" : "Още не е спечелено",
+                ),
+                h(
+                  "span",
+                  { class: "achievement-reward" },
+                  h("span", {
+                    class: `reward-mark av-${a.hidden && !a.at ? "secret" : a.icon}`,
+                    "aria-hidden": "true",
+                  }),
+                  a.hidden && !a.at
+                    ? "Награда: ще разбереш"
+                    : `Награда: форма „${shapeNames[a.icon] ?? a.icon}“ за аватара и титла „${a.name}“`,
+                ),
               ),
             ),
           ),

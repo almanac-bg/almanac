@@ -1,6 +1,7 @@
 // The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, rings, and each
 // topic's colour and level. The stylesheet draws them; these only say what to draw.
 
+import { badgeArt } from "./art/badge.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { categories } from "./state.ts";
 
@@ -210,6 +211,11 @@ export const shapeNames: Record<string, string> = {
   trophy: "Купа",
   shield: "Щит",
   heart: "Сърце",
+  eye: "Око",
+  sun: "Слънце",
+  hourglass: "Пясъчен часовник",
+  spark: "Искра",
+  clover: "Детелина",
   crown: "Корона",
 };
 
@@ -256,19 +262,26 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
   );
 }
 
-/** An achievement: drawn with its shape in its tier's colour, bright once earned. `about` says how it's earned. */
+/** An achievement: drawn as a medal of its tier with its shape, bright once earned. `about` says how it's earned;
+ * `goal` and `progress` how far along it is; a hidden one not found yet comes without its name or how. */
 export interface AchievementInfo {
   id: string;
   name: string;
   about: string;
   icon: string;
   tier: Tier;
+  goal?: number;
+  progress?: number;
+  hidden?: boolean;
   at?: number;
 }
 
-export function badge(a: AchievementInfo, earned: boolean): HTMLElement {
-  return h("span", {
-    class: `badge-mark t-${a.tier} av-${a.icon}${earned ? "" : " locked"}`,
-    "aria-hidden": "true",
+export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l" = "m"): HTMLElement {
+  return badgeArt({
+    tier: a.tier,
+    icon: a.icon,
+    earned,
+    progress: a.goal ? (a.progress ?? 0) / a.goal : 0,
+    size,
   });
 }

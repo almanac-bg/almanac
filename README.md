@@ -11,8 +11,8 @@
 
 - **Сървърът** (`cmd/almanac`, `internal/`) е един статичен файл: HTTP, HTTPS, базата данни (SQLite), пощата и
   клиентът са вътре. Зависи само от драйвера за SQLite.
-- **Клиентът** (`web/`) е около 16 kB скрипт и 6 kB стилове (gzip) и се строи с esbuild през `go run ./cmd/build`.
-  Бюджетите му (30 kB и 10 kB) са в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
+- **Клиентът** (`web/`) е около 23 kB скрипт и 10 kB стилове (gzip) и се строи с esbuild през `go run ./cmd/build`.
+  Бюджетите му (40 kB и 14 kB) са в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
   (Sofia Sans и Literata) са наши файлове: браузърът не пита никой друг за нищо.
 - **Въпросите** (`internal/bank`) са сърцето на играта: всеки вид въпрос (с избор, с число, за подреждане) сам се
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
@@ -81,5 +81,5 @@ go run ./cmd/almanac bank check      # банката: private/, ако я им�
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
 everyone; topic play that follows what you know; live duels and rooms; friends who call each other to a duel. One Go
-program (stdlib + SQLite) serves a plain TypeScript client of about 16 kB. Run it with `go run ./cmd/build && DEV=1 go run
+program (stdlib + SQLite) serves a plain TypeScript client of about 23 kB. Run it with `go run ./cmd/build && DEV=1 go run
 ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in English are welcome.
