@@ -323,3 +323,64 @@ func TestBalance(t *testing.T) {
 		}
 	}
 }
+
+func TestTrueFalseGrading(t *testing.T) {
+	q := &TrueFalse{Head: Head{Type: "truefalse", Text: "Китът е бозайник."}, Answer: true}
+	d := q.Deal(7)
+	if g := grade(t, d, `{"truth":true}`); !g.Right || g.Score != 1 {
+		t.Errorf("the truth graded %+v", g)
+	}
+	if g := grade(t, d, `{"truth":false}`); g.Right || g.Score != 0 || string(g.Given) != `{"truth":false}` {
+		t.Errorf("not the truth graded %+v", g)
+	}
+	for _, bad := range []string{`{}`, `{"truth":"да"}`, `{"truth":true,"x":1}`, `true`} {
+		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
+			t.Errorf("%s was graded", bad)
+		}
+	}
+	if p := (&TrueFalse{Head: Head{Text: "Китът е бозайник?"}}).check(); len(p) == 0 {
+		t.Error("a question passed as a statement")
+	}
+}
+
+func TestMatchGrading(t *testing.T) {
+	q := &Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{
+		{"Франция", "Париж"}, {"Италия", "Рим"}, {"Испания", "Мадрид"}, {"Гърция", "Атина"},
+	}}
+	for seed := range uint64(20) {
+		d := q.Deal(seed).(*dealtMatch)
+		var view struct{ Left, Right []string }
+		_ = json.Unmarshal(mustJSON(d.View()), &view)
+		// The right answer, worked out from the view the way a player would.
+		capital := map[string]string{"Франция": "Париж", "Италия": "Рим", "Испания": "Мадрид", "Гърция": "Атина"}
+		right := make([]int, 4)
+		for i, l := range view.Left {
+			right[i] = slices.Index(view.Right, capital[l])
+		}
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: right}))); !g.Right || g.Score != 1 {
+			t.Fatalf("seed %d: all right graded %+v", seed, g)
+		}
+		var rev struct{ Pairs []int }
+		_ = json.Unmarshal(mustJSON(d.Reveal()), &rev)
+		if !slices.Equal(rev.Pairs, right) {
+			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Pairs, right)
+		}
+		// Two swapped: half right; one left out: three of four at most.
+		swapped := slices.Clone(right)
+		swapped[0], swapped[1] = swapped[1], swapped[0]
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || g.Score != 0.5 {
+			t.Fatalf("seed %d: two swapped graded %+v", seed, g)
+		}
+		partial := slices.Clone(right)
+		partial[3] = -1
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: partial}))); g.Right || g.Score != 0.75 {
+			t.Fatalf("seed %d: one left out graded %+v", seed, g)
+		}
+	}
+	d := q.Deal(1)
+	for _, bad := range []string{`{"pairs":[0,0,1,2]}`, `{"pairs":[0,1,2]}`, `{"pairs":[0,1,2,4]}`, `{"pairs":[0,1,2,-2]}`, `{}`} {
+		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
+			t.Errorf("%s was graded", bad)
+		}
+	}
+}

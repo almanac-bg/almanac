@@ -70,6 +70,8 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		Pick  *int     `json:"pick"`
 		Value *float64 `json:"value"`
 		Order []int    `json:"order"`
+		Truth *bool    `json:"truth"`
+		Pairs []int    `json:"pairs"`
 	}
 	_ = json.Unmarshal(reveal, &r)
 	var a any
@@ -78,6 +80,10 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		a = map[string]int{"pick": *r.Pick}
 	case r.Value != nil:
 		a = map[string]float64{"value": *r.Value}
+	case r.Truth != nil:
+		a = map[string]bool{"truth": *r.Truth}
+	case r.Pairs != nil:
+		a = map[string][]int{"pairs": r.Pairs}
 	default:
 		a = map[string][]int{"order": r.Order}
 	}
@@ -85,7 +91,8 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 	return out
 }
 
-// wrong is a wrong answer to it (a choice's other option, a number far off, an order backwards).
+// wrong is a wrong answer to it (a choice's other option, a number far off, the other of true or not, every pair of
+// a match joined one along, an order backwards).
 func (w *world) wrong(runID int64, n int) json.RawMessage {
 	var r map[string]any
 	_ = json.Unmarshal(w.right(runID, n), &r)
@@ -97,6 +104,11 @@ func (w *world) wrong(runID int64, n int) json.RawMessage {
 		q, _ := w.b.Get(p.ID)
 		num := q.(*bank.Number)
 		r["value"] = num.Answer + 10*num.Tolerance*num.Answer // far off on either scale
+	case r["truth"] != nil:
+		r["truth"] = !r["truth"].(bool)
+	case r["pairs"] != nil:
+		p := r["pairs"].([]any)
+		r["pairs"] = append(p[1:], p[0])
 	default:
 		o := r["order"].([]any)
 		for i, j := 0, len(o)-1; i < j; i, j = i+1, j-1 {
