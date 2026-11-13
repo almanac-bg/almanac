@@ -15,6 +15,19 @@ export interface Progress {
   shapes: { shape: string; locked?: boolean; how?: string }[];
   tones: string[];
   standing: Standing;
+  /** The wardrobe: the frame and pattern worn ("" for none), and all there are. */
+  frame: string;
+  backdrop: string;
+  frames: Cosmetic[];
+  backdrops: Cosmetic[];
+}
+
+/** A frame or a pattern: free or unlocked, or locked with what unlocks it. */
+export interface Cosmetic {
+  id: string;
+  name: string;
+  locked?: boolean;
+  how?: string;
 }
 
 /** Who you are in the game: your avatar with your level, your name, your title. */

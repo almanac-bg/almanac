@@ -30,7 +30,7 @@ export function topics() {
       ),
       h("p", { class: "lead" }, "Десет въпроса по тема. Колкото повече знаеш, толкова по-трудни стават."),
     ),
-    modes(["duel", "room"], "С други"),
+    modes(["duel", "royal", "room"], "С други"),
     h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.topics ?? [];

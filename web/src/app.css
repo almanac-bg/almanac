@@ -146,6 +146,7 @@
     --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'/%3E%3Cpath d='M4.5 20.5a7.5 7.5 0 0 1 15 0'/%3E%3C/svg%3E");
     --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5'/%3E%3Cpath d='M18.5 14.5a6.5 6.5 0 0 1 3 5.5'/%3E%3C/svg%3E");
     --i-bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 2.5 5 13.5h6.5l-1 8L19 10.5h-6.5z'/%3E%3C/svg%3E");
+    --i-crown: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8l4.5 4 4-7 4 7 4.5-4-2 11h-13z'/%3E%3C/svg%3E");
 
     /* Avatar shapes: masks, drawn in the ink that sits on a tone. */
     --s-petal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c4.4 4.3 6.5 8 6.5 11a6.5 6.5 0 0 1-13 0c0-3 2.1-6.7 6.5-11z'/%3E%3C/svg%3E");
@@ -433,6 +434,217 @@
 
   .i-bolt {
     --i: var(--i-bolt);
+  }
+
+  .i-crown {
+    --i: var(--i-crown);
+  }
+
+  /* Моят Алманах: the count, and each fact as a card in its topic's colour. */
+  .almanac-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .almanac-n {
+    font: 900 2.75rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .almanac-list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .almanac-item {
+    display: grid;
+    gap: var(--space-2);
+    border-left: 4px solid var(--tone);
+  }
+
+  .almanac-q {
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+  }
+
+  .almanac-a {
+    font: 800 1.125rem / 1.4 var(--font-sans);
+  }
+
+  /* The day's goals: each with its mark (a star once done), and the season's strip under them. */
+  .goal-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .goal {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 4px var(--space-3);
+  }
+
+  .goal-mark {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--line-strong);
+    border-radius: var(--radius-full);
+  }
+
+  .goal.done .goal-mark {
+    border-color: var(--gold);
+    background: var(--gold);
+    -webkit-mask: var(--s-star) center / 80% no-repeat;
+    mask: var(--s-star) center / 80% no-repeat;
+  }
+
+  .goal.done .goal-name {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--line-strong);
+  }
+
+  .goal-n {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .season-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+    color: var(--text);
+    font-size: 0.875rem;
+    text-decoration: none;
+  }
+
+  /* A season: its banner in its colour (art/season.ts), the stars, the medals on the way. */
+  .season-card {
+    display: grid;
+    gap: var(--space-3);
+    overflow: hidden;
+  }
+
+  .season-banner {
+    height: 96px;
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--season) 35%, var(--surface)), var(--surface));
+  }
+
+  .season-banner svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .season-arc {
+    fill: none;
+    stroke: var(--season);
+    stroke-width: 2;
+    opacity: 0.35;
+  }
+
+  .season-star {
+    fill: var(--season);
+    opacity: 0.8;
+  }
+
+  .season-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .season-stars b {
+    font: 900 2.25rem / 1 var(--font-numeral);
+  }
+
+  .season-track,
+  .season-past {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .season-track li,
+  .season-past li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .season-track li:not(.reached) {
+    color: var(--text-muted);
+  }
+
+  .season-medal {
+    display: inline-grid;
+    flex: none;
+    width: 36px;
+    height: 36px;
+  }
+
+  .season-medal svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .medal-ribbon {
+    fill: none;
+    stroke: var(--line-strong);
+    stroke-width: 4;
+  }
+
+  .season-medal-face {
+    fill: var(--sunken);
+    stroke: color-mix(in srgb, var(--div) 55%, transparent);
+    stroke-width: 2;
+  }
+
+  .season-medal-star {
+    fill: var(--line-strong);
+  }
+
+  .season-medal.earned .medal-ribbon {
+    stroke: var(--rose);
+  }
+
+  .season-medal.earned .season-medal-face {
+    fill: var(--div);
+    stroke: color-mix(in srgb, var(--div) 60%, black);
+  }
+
+  .season-medal.earned .season-medal-star {
+    fill: color-mix(in srgb, var(--div) 35%, white);
+  }
+
+  /* Роял's table: those out are dimmer; how far each got on the right. */
+  .royal-table .row.out {
+    opacity: 0.62;
+  }
+
+  .royal-reach {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    margin-left: auto;
+    font-size: 0.8125rem;
+    text-align: right;
   }
 
   /* The ways to play: a card each, in its colour. */
@@ -2387,6 +2599,13 @@
   .standing .meter-fill {
     background: var(--div);
   }
+  .almanac-head .meter {
+    grid-column: 1 / -1;
+  }
+  .goal .meter {
+    grid-column: 2 / -1;
+    height: 5px;
+  }
 
   .chips {
     display: flex;
@@ -2449,6 +2668,131 @@
     background: currentColor;
     -webkit-mask: var(--shape, var(--s-petal)) center / contain no-repeat;
     mask: var(--shape, var(--s-petal)) center / contain no-repeat;
+  }
+
+  /* The wardrobe on an avatar: a frame drawn around it (art/frame.ts), a pattern behind its shape. */
+  .avatar-frame {
+    position: absolute;
+    inset: -16.7%;
+    width: 133.4%;
+    height: 133.4%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .avatar.framed {
+    margin: calc(var(--size) * 0.12);
+  }
+
+  .frame-line {
+    fill: none;
+    stroke: var(--frame, var(--line-strong));
+    stroke-width: 2.5;
+  }
+
+  .frame-line.thin {
+    stroke-width: 1.5;
+  }
+
+  .frame-line.glow {
+    filter: drop-shadow(0 0 3px var(--frame));
+  }
+
+  .frame-dots {
+    fill: none;
+    stroke: var(--frame);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 0 6;
+  }
+
+  .frame-flame {
+    fill: var(--rose);
+    stroke: color-mix(in srgb, var(--rose) 60%, black);
+    stroke-width: 0.8;
+  }
+
+  .frame-leaf {
+    fill: var(--frame);
+    stroke: color-mix(in srgb, var(--frame) 60%, black);
+    stroke-width: 0.6;
+  }
+
+  .frame-gem {
+    fill: var(--frame);
+    stroke: color-mix(in srgb, var(--frame) 55%, black);
+    stroke-width: 0.8;
+  }
+
+  .frame-ray {
+    stroke: var(--frame);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .fr-ring {
+    --frame: var(--text-muted);
+  }
+
+  .fr-double,
+  .fr-laurel {
+    --frame: var(--gold);
+  }
+
+  .fr-dots {
+    --frame: var(--sky);
+  }
+
+  .fr-flames {
+    --frame: var(--gold);
+  }
+
+  .fr-gem {
+    --frame: var(--div-diamond);
+  }
+
+  .fr-halo {
+    --frame: var(--div-legend);
+  }
+
+  .bd-dots {
+    background-image: radial-gradient(color-mix(in srgb, var(--on-fill) 22%, transparent) 1.3px, transparent 1.7px);
+    background-size: calc(var(--size) / 6) calc(var(--size) / 6);
+  }
+
+  .bd-stripes {
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 3px,
+      transparent 3px 8px
+    );
+  }
+
+  .bd-grid {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px);
+    background-size: calc(var(--size) / 5) calc(var(--size) / 5);
+  }
+
+  .bd-rays {
+    background-image: repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 12deg,
+      transparent 12deg 24deg
+    );
+  }
+
+  .bd-stars {
+    background-image:
+      radial-gradient(color-mix(in srgb, white 70%, transparent) 1px, transparent 1.6px),
+      radial-gradient(color-mix(in srgb, white 45%, transparent) 0.8px, transparent 1.3px);
+    background-position:
+      0 0,
+      calc(var(--size) / 8) calc(var(--size) / 10);
+    background-size:
+      calc(var(--size) / 4) calc(var(--size) / 4),
+      calc(var(--size) / 3) calc(var(--size) / 3);
   }
 
   .avatar.s {

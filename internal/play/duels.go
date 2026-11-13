@@ -394,7 +394,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			return "draw"
 		}
 		now := store.Ms(g.Now())
-		if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?), rated = rated + 1 WHERE id = ?`, da, a.id); err != nil {
+		if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1 WHERE id = ?2`, da, a.id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = ?, outcome = ? WHERE id = ?`,
@@ -408,7 +408,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			return err
 		}
 		db := eloDelta(b.rating, a.rating, b.rated, 1-score)
-		if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?), rated = rated + 1 WHERE id = ?`, db, b.id); err != nil {
+		if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1 WHERE id = ?2`, db, b.id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = 0, outcome = ? WHERE id = ?`,
@@ -438,9 +438,13 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 	return nil
 }
 
-// SettleDue settles duels whose time is up: an open one nobody took, against its recording (or, with none, no
-// game); a friend's that wasn't played, as expired. Run every few minutes.
+// SettleDue settles duels whose time is up — an open one nobody took, against its recording (or, with none, no
+// game); a friend's that wasn't played, as expired — and ends the tournaments whose time is up. Run every few
+// minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
+	if err := g.settleRoyalsDue(ctx); err != nil {
+		return err
+	}
 	now := store.Ms(g.Now())
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.b_id IS NULL, d.ghost_run IS NOT NULL,
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0),

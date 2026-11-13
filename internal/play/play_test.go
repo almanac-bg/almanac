@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -802,5 +803,138 @@ func TestRatingAndDivisions(t *testing.T) {
 		if d, next := DivisionOf(c.rating); d.ID != c.id || next != c.next {
 			t.Errorf("DivisionOf(%d) = %s, next %d", c.rating, d.ID, next)
 		}
+	}
+}
+
+func TestRoyal(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi := w.user(), w.user(), w.user()
+	var told []RoyalNews
+	w.g.RoyalNews = func(_ context.Context, n RoyalNews) { told = append(told, n) }
+
+	// Three join the same tournament, each in their own time.
+	s, id, err := w.g.JoinRoyal(ctx, ana)
+	if err != nil || s.Total != RoyalLength {
+		t.Fatalf("Ana in a tournament: %+v %v", s, err)
+	}
+	w.play(ana, s.ID, repeat(w.right, RoyalLength)...)
+	sb, idb, _ := w.g.JoinRoyal(ctx, bo)
+	sv, idv, _ := w.g.JoinRoyal(ctx, vi)
+	if idb != id || idv != id {
+		t.Fatalf("not the same tournament: %d %d %d", id, idb, idv)
+	}
+	// A wrong answer is the way out: Bo after four right, Vi at once.
+	end := w.play(bo, sb.ID, append(repeat(w.right, 4), w.wrong)...)
+	if !end.Done || end.Rights != 4 {
+		t.Fatalf("Bo's run didn't end at his first wrong answer: %+v", end)
+	}
+	w.play(vi, sv.ID, w.wrong)
+	r, _ := w.g.RoyalsOf(ctx, bo)
+	if len(r) != 1 || r[0].EndedAt != 0 || len(r[0].Players) != 3 || !r[0].Players[1].Out || r[0].Players[0].Out {
+		t.Fatalf("the tournament while open: %+v", r)
+	}
+
+	// Its time runs out: places, and ratings moved by them.
+	w.wait(RoyalOpen + time.Minute)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = w.g.RoyalsOf(ctx, vi)
+	p := r[0].Players
+	if r[0].EndedAt == 0 || p[0].Name != "Играч" || p[0].Place != 1 || p[1].Place != 2 || p[2].Place != 3 ||
+		p[0].Delta <= 0 || p[2].Delta >= 0 {
+		t.Fatalf("the tournament once ended: %+v", r[0])
+	}
+	if len(told) != 3 {
+		t.Fatalf("told %d of the ending", len(told))
+	}
+	// The next to join starts a new one.
+	if _, next, _ := w.g.JoinRoyal(ctx, ana); next == id {
+		t.Fatal("joined an ended tournament")
+	}
+}
+
+func TestAlmanac(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	a, err := w.g.AlmanacOf(ctx, ana)
+	if err != nil || len(a.Facts) != 0 || len(a.Of) == 0 {
+		t.Fatalf("an empty almanac: %+v %v", a, err)
+	}
+	s, _ := w.g.StartTopic(ctx, ana, "general")
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	a, _ = w.g.AlmanacOf(ctx, ana)
+	for _, f := range a.Facts {
+		if f.Fact == "" || f.Answer == "" || f.Category == "" {
+			t.Fatalf("a learned fact: %+v", f)
+		}
+	}
+	if len(a.Facts) == 0 {
+		t.Fatal("ten right answers, and nothing learned")
+	}
+}
+
+func TestWardrobe(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	p, _ := w.g.ProgressOf(ctx, ana)
+	if len(p.Frames) != len(Frames)+1 || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
+		t.Fatalf("a new player's frames: %+v", p.Frames)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a locked frame: %v", err)
+	}
+	// Two perfect runs make level 2: the ring is hers, and it shows wherever she does.
+	for range 2 {
+		s, _ := w.g.StartTopic(ctx, ana, "")
+		w.play(ana, s.ID, repeat(w.right, Length)...)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), ptr("")); err != nil {
+		t.Fatalf("an unlocked frame: %v", err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); !strings.HasSuffix(look.Avatar, "/ring/") {
+		t.Fatalf("the look worn: %q", look.Avatar)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("halo"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("Легенда's frame at the start: %v", err)
+	}
+}
+
+func TestGoalsAndSeason(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	goals, err := w.g.GoalsOf(ctx, ana)
+	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done {
+		t.Fatalf("a new player's goals: %+v %v", goals, err)
+	}
+	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
+		t.Fatal("the day's goals changed within the day")
+	}
+	// The day's questions: that goal is done, and a star for the season, without looking.
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	season, _ := w.g.SeasonOf(ctx, ana)
+	if season.Stars < 1 || season.DaysLeft < 1 || season.Hue < 0 || season.Hue >= 360 {
+		t.Fatalf("the season after a goal: %+v", season)
+	}
+	b, _ := w.g.SeasonBoard(ctx, ana)
+	if b.Place != 1 || b.Mine == nil || b.Mine.Value != season.Stars {
+		t.Fatalf("the season's board: %+v", b)
+	}
+	// A season's gold makes its frame the player's.
+	month := w.g.Now().In(Bulgaria).Format("2006-01")
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a season's frame without its gold: %v", err)
+	}
+	for i := range SeasonTiers[len(SeasonTiers)-1].Stars {
+		_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at) VALUES (?, ?, ?, 0)`,
+			ana, month+"-01", fmt.Sprintf("g%d", i))
+	}
+	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); err != nil {
+		t.Fatalf("a season's frame with its gold: %v", err)
 	}
 }

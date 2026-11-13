@@ -5,6 +5,7 @@ import { h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { almanac } from "./screens/almanac.ts";
 import { duel, duelOne } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
@@ -14,6 +15,7 @@ import { topic, topics } from "./screens/play.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
 import { room } from "./screens/room.ts";
+import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { together } from "./screens/together.ts";
@@ -22,10 +24,10 @@ import { duelTurns, friendRequests, invitations, watchInvitations } from "./stat
 /** The five main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
   ["/", "Начало", "home", (p) => p === "/"],
-  ["/play", "Играй", "play", (p) => /^\/(play|duel|room|r\/)/.test(p)],
+  ["/play", "Играй", "play", (p) => /^\/(play|duel|royal|room|r\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/rewards", "Награди", "award", (p) => p === "/rewards"],
-  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|f\/)/.test(p) || p === "/together"],
+  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
 ];
 
 reportErrors();
@@ -81,6 +83,8 @@ if (root) {
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
+      { path: /^\/royal$/, view: royal },
+      { path: /^\/almanac$/, view: almanac },
       { path: /^\/room$/, view: () => together("room") },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },

@@ -6,7 +6,8 @@ import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge, meter, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
-import { loadProgress, type Progress } from "./progress.ts";
+import { type Cosmetic, loadProgress, type Progress } from "./progress.ts";
+import { seasonSection } from "./season.ts";
 
 export function rewards() {
   title("Награди");
@@ -21,6 +22,7 @@ export function rewards() {
         const load = () => loadProgress().then(progress.set, () => {});
         load();
         return [
+          seasonSection(),
           () => {
             const p = progress();
             return p ? achievements(p) : null;
@@ -111,7 +113,7 @@ function achievements(p: Progress): Child {
 function look(progress: () => Progress | null, reload: () => Promise<void>): Child {
   const hint = signal("");
   const error = signal("");
-  const set = async (body: { avatar?: string; title?: string }) => {
+  const set = async (body: { avatar?: string; title?: string; frame?: string; backdrop?: string }) => {
     error.set("");
     hint.set("");
     try {
@@ -174,6 +176,22 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
           }),
         ),
       ),
+      wear(
+        "Рамка",
+        p.frames,
+        p.frame,
+        "Без рамка",
+        (id) => avatar(p.avatar, { frame: id, backdrop: p.backdrop }),
+        (id) => set({ frame: id }),
+      ),
+      wear(
+        "Фон",
+        p.backdrops,
+        p.backdrop,
+        "Едноцветен",
+        (id) => avatar(p.avatar, { frame: p.frame, backdrop: id }),
+        (id) => set({ backdrop: id }),
+      ),
       h("h3", null, "Титла"),
       h("p", { class: "muted" }, "Титлата се вижда под името ти. Всяко постижение отключва една."),
       h(
@@ -220,3 +238,41 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
 }
 
 /** Your name (anyone's: names may repeat) and your tag (yours alone: how friends find you). */
+
+/** A row of the wardrobe (frames, or patterns): each drawn on the player's avatar, the locked ones with what
+ * unlocks them. */
+function wear(
+  heading: string,
+  all: Cosmetic[],
+  worn: string,
+  none: string,
+  preview: (id: string) => Child,
+  put: (id: string) => void,
+): Child {
+  const told = signal("");
+  return [
+    h("h3", null, heading),
+    h(
+      "ul",
+      { class: "picker" },
+      [{ id: "", name: none } as Cosmetic, ...all].map((c) =>
+        h(
+          "li",
+          null,
+          h(
+            "button",
+            {
+              class: c.locked ? "pick locked" : "pick",
+              type: "button",
+              "aria-pressed": c.id === worn,
+              "aria-label": c.locked ? `${c.name}, заключена` : c.name,
+              onclick: () => (c.locked ? told.set(`${c.name}: отключва се с ${c.how}.`) : put(c.id)),
+            },
+            preview(c.id),
+          ),
+        ),
+      ),
+    ),
+    () => told() && h("p", { class: "muted", role: "status" }, told()),
+  ];
+}

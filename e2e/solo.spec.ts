@@ -14,6 +14,10 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.reload();
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
+  // The day's goal is done (a star for the season), and the season counts it.
+  await expect(page.locator(".goal.done")).toContainText("Изиграй въпросите на деня");
+  await page.goto("/rewards");
+  await expect(page.locator(".season-stars")).toContainText(/[1-9]\d* ★/);
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {

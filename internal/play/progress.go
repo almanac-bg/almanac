@@ -175,9 +175,16 @@ type Look struct {
 	Level     int  `json:"level"`
 }
 
+// lookOf makes a look from what lookColumns read. The avatar comes as "shape-tone/frame/backdrop" (the wardrobe's
+// parts empty when none), and goes out the same way, so that every avatar drawn shows its frame and pattern.
 func lookOf(userID int64, avatar, title string, points int) Look {
-	if avatar == "" {
-		avatar = DefaultAvatar(userID)
+	base, rest, _ := strings.Cut(avatar, "/")
+	if base == "" {
+		base = DefaultAvatar(userID)
+	}
+	avatar = base
+	if strings.Trim(rest, "/") != "" {
+		avatar += "/" + rest
 	}
 	level, _, _ := LevelOf(points)
 	name, tier := TitleOf(title)
@@ -185,7 +192,8 @@ func lookOf(userID int64, avatar, title string, points int) Look {
 }
 
 // lookColumns read a player's look in a query over users u: their avatar, title and points.
-const lookColumns = `coalesce(u.avatar, ''), coalesce(u.title, ''),
+const lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
+	coalesce(u.title, ''),
 	(SELECT coalesce(sum(points), 0) FROM runs WHERE user_id = u.id)`
 
 // LookOf is how a player shows to others.
@@ -224,6 +232,11 @@ type Progress struct {
 	Tones        []string `json:"tones"`
 	// Standing is the player's rating and division.
 	Standing Standing `json:"standing"`
+	// The wardrobe: the frame and pattern worn ("" for none), and all there are.
+	Frame     string     `json:"frame"`
+	Backdrop  string     `json:"backdrop"`
+	Frames    []Cosmetic `json:"frames"`
+	Backdrops []Cosmetic `json:"backdrops"`
 }
 
 func (g *Game) points(ctx context.Context, userID int64) (int, error) {
@@ -253,8 +266,9 @@ func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, erro
 // ProgressOf reads a player's progress.
 func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	var p Progress
-	var avatar, title sql.NullString
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT avatar, title FROM users WHERE id = ?`, userID).Scan(&avatar, &title)
+	var avatar, title, frame, backdrop sql.NullString
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT avatar, title, frame, backdrop FROM users WHERE id = ?`, userID).
+		Scan(&avatar, &title, &frame, &backdrop)
 	if err != nil {
 		return p, err
 	}
@@ -284,8 +298,16 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 		p.Avatar = DefaultAvatar(userID)
 	}
 	p.Shapes, p.Tones = shapes(earned, p.Level), Tones
-	p.Standing, err = g.StandingOf(ctx, userID)
-	return p, err
+	if p.Standing, err = g.StandingOf(ctx, userID); err != nil {
+		return p, err
+	}
+	w, err := g.wardrobeOf(ctx, userID)
+	if err != nil {
+		return p, err
+	}
+	p.Frame, p.Backdrop = frame.String, backdrop.String
+	p.Frames, p.Backdrops = append(w.list(Frames), w.seasonFrames(g.Now().In(Bulgaria).Format("2006-01"))...), w.list(Backdrops)
+	return p, nil
 }
 
 // Award gives a player every achievement their games have earned and they don't have yet, and returns those. It's
@@ -499,7 +521,7 @@ func (g *Game) NewsOf(ctx context.Context, userID int64) (News, error) {
 
 // SetLook changes how a player shows to others: an avatar (shape-tone, of what they may pick) and a title (an
 // achievement of theirs, or "" for none). Nil leaves either as it is.
-func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string) error {
+func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string, wear ...*string) error {
 	earned, err := g.earned(ctx, userID)
 	if err != nil {
 		return err
@@ -521,7 +543,37 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string)
 			return ErrNotYours
 		}
 	}
+	// The wardrobe: a frame and a pattern ("" takes them off), if the player has unlocked them.
+	var frame, backdrop *string
+	if len(wear) > 0 {
+		frame = wear[0]
+	}
+	if len(wear) > 1 {
+		backdrop = wear[1]
+	}
+	if frame != nil || backdrop != nil {
+		w, err := g.wardrobeOf(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if (frame != nil && *frame != "" && !w.ownsFrame(*frame)) ||
+			(backdrop != nil && *backdrop != "" && !w.owns(Backdrops, *backdrop)) {
+			return ErrNotYours
+		}
+	}
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		for column, v := range map[string]*string{"frame": frame, "backdrop": backdrop} {
+			if v == nil {
+				continue
+			}
+			var val any
+			if *v != "" {
+				val = *v
+			}
+			if _, err := tx.Exec(`UPDATE users SET `+column+` = ? WHERE id = ?`, val, userID); err != nil {
+				return err
+			}
+		}
 		if avatar != nil {
 			if _, err := tx.Exec(`UPDATE users SET avatar = ? WHERE id = ?`, *avatar, userID); err != nil {
 				return err

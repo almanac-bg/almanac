@@ -10,6 +10,7 @@ import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 import { figure, streak } from "../ui.ts";
 import { modes } from "./modes.ts";
+import { goalsCard } from "./season.ts";
 
 interface Today {
   day: string;
@@ -88,7 +89,8 @@ export function today() {
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
       user.peek() ? streak(t.streak, t.week) : null,
-      modes(["topics", "duel", "room"], "Още игри"),
+      goalsCard(),
+      modes(["topics", "duel", "royal", "room"], "Още игри"),
     );
   };
 
@@ -116,7 +118,8 @@ function finished(t: Today, s: State): Child {
         return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
       },
       countdown(),
-      modes(["topics", "duel", "room"], "Още игри"),
+      goalsCard(),
+      modes(["topics", "duel", "royal", "room"], "Още игри"),
       () => {
         const f = fresh().friends;
         return f?.length ? board("Приятели днес", f) : null;

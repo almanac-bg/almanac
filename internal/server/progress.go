@@ -35,13 +35,15 @@ func (s *Server) setLook(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var in struct {
-		Avatar *string `json:"avatar"`
-		Title  *string `json:"title"`
+		Avatar   *string `json:"avatar"`
+		Title    *string `json:"title"`
+		Frame    *string `json:"frame"`
+		Backdrop *string `json:"backdrop"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if err := s.game.SetLook(r.Context(), u.ID, in.Avatar, in.Title); err != nil {
+	if err := s.game.SetLook(r.Context(), u.ID, in.Avatar, in.Title, in.Frame, in.Backdrop); err != nil {
 		return err
 	}
 	look, err := s.game.LookOf(r.Context(), u.ID)

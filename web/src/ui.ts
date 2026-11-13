@@ -2,6 +2,7 @@
 // topic's colour and level. The stylesheet draws them; these only say what to draw.
 
 import { badgeArt } from "./art/badge.ts";
+import { frameArt } from "./art/frame.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { categories } from "./state.ts";
 
@@ -238,11 +239,25 @@ function fromName(name: string): string {
 
 /** An avatar: a shape on a tone, with the level beside it when given. For the eye: the name and level are said in
  * words nearby. */
-export function avatar(id: string | undefined, opts: { size?: "s" | "l"; level?: number; name?: string } = {}) {
-  const [shape, tone] = (id || fromName(opts.name ?? "")).split("-");
+/** An avatar: a shape on a tone, and from the wardrobe a pattern behind it and a frame around it. `id` is
+ * "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look. */
+export function avatar(
+  id: string | undefined,
+  opts: { size?: "s" | "l"; level?: number; name?: string; frame?: string; backdrop?: string } = {},
+) {
+  const [base = "", worn = "", pattern = ""] = (id || fromName(opts.name ?? "")).split("/");
+  const [shape, tone] = base.split("-");
+  const frame = opts.frame ?? worn;
+  const backdrop = opts.backdrop ?? pattern;
   return h(
     "span",
-    { class: ["avatar", opts.size, `av-${shape}`, `tone-${tone}`].filter(Boolean).join(" "), "aria-hidden": "true" },
+    {
+      class: ["avatar", opts.size, `av-${shape}`, `tone-${tone}`, backdrop && `bd-${backdrop}`, frame && "framed"]
+        .filter(Boolean)
+        .join(" "),
+      "aria-hidden": "true",
+    },
+    frameArt(frame),
     opts.level ? h("b", { class: "lv" }, String(opts.level)) : null,
   );
 }
