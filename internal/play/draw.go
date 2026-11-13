@@ -22,16 +22,17 @@ const (
 	noPicture
 )
 
-// daySlots is the day's shape: one question from each topic, easy to hard; a picture early, an order in the middle,
-// and a number to finish on (closest wins).
+// daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not early, an
+// order and a match in the middle, and a number to finish on (closest wins). A slot whose type a topic lacks takes a
+// choice instead (choose).
 var daySlots = []slot{
 	{bank.Easy, "choice", noPicture},
 	{bank.Easy, "choice", withPicture},
-	{bank.Easy, "choice", noPicture},
+	{bank.Easy, "truefalse", noPicture},
 	{bank.Medium, "choice", noPicture},
 	{bank.Medium, "order", noPicture},
 	{bank.Medium, "choice", noPicture},
-	{bank.Medium, "choice", noPicture},
+	{bank.Medium, "match", noPicture},
 	{bank.Hard, "choice", noPicture},
 	{bank.Hard, "choice", noPicture},
 	{bank.Hard, "number", noPicture},
@@ -127,7 +128,8 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 }
 
 // topicSlots is a topic run's shape for a player's skill there (how often they're right): easier questions for those
-// still learning it, harder ones as they get it right. One order and one number among them, the rest choices.
+// still learning it, harder ones as they get it right. One true-or-not, one order, one match and one number among
+// them, the rest choices.
 func topicSlots(skill float64) []slot {
 	var easy, medium int
 	switch {
@@ -150,7 +152,9 @@ func topicSlots(skill float64) []slot {
 		}
 		slots[i] = slot{difficulty: d, typ: "choice"}
 	}
+	slots[1].typ = "truefalse"
 	slots[easy+medium/2].typ = "order"
+	slots[easy+medium-1].typ = "match"
 	slots[Length-1].typ = "number"
 	return slots
 }

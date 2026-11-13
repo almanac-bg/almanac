@@ -1,9 +1,9 @@
 // Each question type's screen: how it's asked, how it's answered, and how its answer is shown. One renderer per type,
 // as the server has one Go file per type (internal/bank).
 
-import { append, type Child, h, listen, type Signal, signal } from "../lib/dom.ts";
+import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
-import type { Answer, ChoiceView, NumberView, OrderView, Reveal, View } from "./types.ts";
+import type { Answer, ChoiceView, MatchView, NumberView, OrderView, Reveal, TrueFalseView, View } from "./types.ts";
 
 export interface Asked {
   /** The answering part, under the question. */
@@ -23,6 +23,10 @@ export function ask(view: View, submit: (a: Answer) => void, locked: Signal<bool
       return number(view, submit, locked);
     case "order":
       return order(view, submit, locked);
+    case "truefalse":
+      return truefalse(view, submit, locked);
+    case "match":
+      return match(view, submit, locked);
   }
 }
 
@@ -338,6 +342,204 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
             sign(),
           ),
         ),
+      );
+    },
+  };
+}
+
+/** „Вярно или невярно“: two answers, side by side (keys 1 and 2 too). */
+function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+  const pick = (truth: boolean) => {
+    if (locked.peek()) return;
+    (truth ? yes : no).classList.add("picked");
+    play("tap");
+    submit({ truth });
+  };
+  const button = (truth: boolean) =>
+    h(
+      "button",
+      {
+        class: `option tf ${truth ? "tf-yes" : "tf-no"}`,
+        type: "button",
+        disabled: locked,
+        onclick: () => pick(truth),
+      },
+      h("span", { class: "tf-mark", "aria-hidden": "true" }),
+      h("span", null, truth ? "Вярно" : "Невярно"),
+    );
+  const yes = button(true);
+  const no = button(false);
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
+    if (e.key === "1") pick(true);
+    else if (e.key === "2") pick(false);
+  });
+  return {
+    node: h("div", { class: "tf-options" }, yes, no),
+    pending: () => null,
+    reveal(reveal, given) {
+      for (const [b, truth] of [
+        [yes, true],
+        [no, false],
+      ] as const) {
+        b.classList.remove("picked");
+        const how =
+          truth === reveal.truth ? "right" : given && "truth" in given && given.truth === truth ? "wrong" : "dim";
+        b.classList.add(how);
+        if (how !== "dim") b.append(sign());
+      }
+    },
+  };
+}
+
+/** The tone each pair of a match is drawn in, by its left's place (with its number, for whoever can't tell colours). */
+const pairTones = ["tone-gold", "tone-sky", "tone-rose", "tone-lilac"];
+
+/** „Свържи“: tap a thing on the left, then its pair on the right (or the other way round); a line joins them. A
+ * joined one tapped again comes apart. */
+function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+  const pairs = signal<number[]>(view.left.map(() => -1)); // for each left, its right (-1: none yet)
+  const chosen = signal<{ side: "left" | "right"; i: number } | null>(null);
+  const said = h("p", { class: "sr", "aria-live": "polite" });
+  const leftOf = (j: number) => pairs().indexOf(j);
+
+  const join = (i: number, j: number) => {
+    pairs.update((p) => p.map((r, k) => (k === i ? j : r === j ? -1 : r)));
+    chosen.set(null);
+    play("key");
+    said.textContent = `„${view.left[i]}“ — „${view.right[j]}“.`;
+  };
+  const tap = (side: "left" | "right", i: number) => {
+    if (locked.peek()) return;
+    const c = chosen.peek();
+    if (c && c.side === side && c.i === i) return chosen.set(null);
+    if (c && c.side !== side) return side === "left" ? join(i, c.i) : join(c.i, i);
+    // A joined one comes apart, and is chosen again.
+    const joined = side === "left" ? pairs.peek()[i] !== -1 : pairs.peek().includes(i);
+    if (joined) pairs.update((p) => p.map((r, k) => (side === "left" ? (k === i ? -1 : r) : r === i ? -1 : r)));
+    chosen.set({ side, i });
+    play("tap");
+  };
+
+  const cell = (side: "left" | "right", i: number, text: string) => {
+    const pairOf = () => (side === "left" ? (pairs()[i] === -1 ? -1 : i) : leftOf(i));
+    return h(
+      "button",
+      {
+        class: () => {
+          const k = pairOf();
+          const c = chosen();
+          return [
+            "option",
+            "match-item",
+            k >= 0 && `joined ${pairTones[k]}`,
+            c && c.side === side && c.i === i && "chosen",
+          ]
+            .filter(Boolean)
+            .join(" ");
+        },
+        type: "button",
+        disabled: locked,
+        "aria-pressed": () => {
+          const c = chosen();
+          return !!c && c.side === side && c.i === i;
+        },
+        "aria-label": () => {
+          const k = pairOf();
+          const other = side === "left" ? view.right[pairs()[i] ?? -1] : view.left[k];
+          return k >= 0 && other ? `${text}, свързано с ${other}` : text;
+        },
+        onclick: () => tap(side, i),
+      },
+      h("span", { class: "letter", "aria-hidden": "true" }, () => {
+        const k = pairOf();
+        return k >= 0 ? String(k + 1) : "";
+      }),
+      h("span", null, text),
+    );
+  };
+  const lefts = view.left.map((t, i) => cell("left", i, t));
+  const rights = view.right.map((t, j) => cell("right", j, t));
+  const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  lines.setAttribute("class", "match-lines");
+  lines.setAttribute("aria-hidden", "true");
+  const grid = h(
+    "div",
+    { class: "match" },
+    lines,
+    h("div", { class: "match-col" }, lefts),
+    h("div", { class: "match-col" }, rights),
+  );
+  // A line from each joined left to its right, redrawn as pairs change or the screen does.
+  const draw = () => {
+    const box = grid.getBoundingClientRect();
+    lines.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+    lines.replaceChildren(
+      ...pairs().flatMap((j, i) => {
+        const a = lefts[i]?.getBoundingClientRect();
+        const b = j >= 0 ? rights[j]?.getBoundingClientRect() : undefined;
+        if (!a || !b) return [];
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", String(a.right - box.left));
+        line.setAttribute("y1", String(a.top + a.height / 2 - box.top));
+        line.setAttribute("x2", String(b.left - box.left));
+        line.setAttribute("y2", String(b.top + b.height / 2 - box.top));
+        line.setAttribute("class", pairTones[i] ?? "");
+        return [line];
+      }),
+    );
+  };
+  effect(() => {
+    pairs();
+    requestAnimationFrame(draw);
+  });
+  const resized = new ResizeObserver(() => draw());
+  resized.observe(grid);
+  onCleanup(() => resized.disconnect());
+
+  const done = h(
+    "button",
+    {
+      class: "btn primary",
+      disabled: () => locked() || pairs().includes(-1),
+      onclick: () => {
+        if (locked.peek()) return;
+        play("tap");
+        submit({ pairs: [...pairs.peek()] });
+      },
+    },
+    "Готово",
+  );
+  const hint = h("p", { class: "hint" }, "Докосни нещо отляво, после двойката му отдясно.");
+  const result = h("ol", { class: "options match-result", hidden: true });
+  return {
+    node: h("div", { class: "stack" }, hint, grid, said, done, result),
+    pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
+    reveal(reveal, given) {
+      hint.hidden = true;
+      grid.hidden = true;
+      done.hidden = true;
+      result.hidden = false;
+      const mine = given && "pairs" in given ? given.pairs : [];
+      result.replaceChildren(
+        ...view.left.map((left, i) => {
+          const j = reveal.pairs?.[i] ?? -1;
+          const ok = mine[i] === j;
+          const gave = mine[i] ?? -1;
+          return h(
+            "li",
+            { class: ok ? "option right" : "option wrong" },
+            h(
+              "span",
+              { class: "match-pair" },
+              h("strong", null, left),
+              " — ",
+              view.right[j] ?? "",
+              ok ? null : h("small", { class: "match-gave" }, gave >= 0 ? `ти: ${view.right[gave]}` : "без връзка"),
+            ),
+            sign(),
+          );
+        }),
       );
     },
   };

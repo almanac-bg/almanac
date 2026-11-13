@@ -19,6 +19,7 @@ const (
 	imageTextMax = 60  // a question about a picture: the picture carries the rest
 	optionMax    = 60  // a choice's option
 	itemMax      = 45  // an order's item
+	pairMax      = 30  // a side of a match's pair: two columns on a phone
 	unitMax      = 12
 	factMax      = 200 // "Знаеше ли?": one or two sentences, read at a glance
 )

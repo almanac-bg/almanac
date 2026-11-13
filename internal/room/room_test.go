@@ -34,6 +34,8 @@ func answer(r *Room, right bool) json.RawMessage {
 		Pick  *int     `json:"pick"`
 		Value *float64 `json:"value"`
 		Order []int    `json:"order"`
+		Truth *bool    `json:"truth"`
+		Pairs []int    `json:"pairs"`
 	}
 	_ = json.Unmarshal(raw, &rv)
 	var a any
@@ -51,6 +53,14 @@ func answer(r *Room, right bool) json.RawMessage {
 			v = n.Answer + 10*n.Tolerance*n.Answer // far off on either scale
 		}
 		a = map[string]float64{"value": v}
+	case rv.Truth != nil:
+		a = map[string]bool{"truth": *rv.Truth == right}
+	case rv.Pairs != nil:
+		p := rv.Pairs
+		if !right {
+			p = append(p[1:], p[0])
+		}
+		a = map[string][]int{"pairs": p}
 	default:
 		o := rv.Order
 		if !right {
