@@ -86,9 +86,6 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	return s, err
 }
 
-// skillWindow is how many of a player's latest answers in a topic tell how well they know it.
-const skillWindow = 40
-
 // StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it.
 func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
 	b := g.Bank()
@@ -111,11 +108,11 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 			seen[id] = true
 		}
 		rows.Close()
-		skill, err := g.skill(tx, userID, category)
+		ability, err := g.ability(ctx, tx, userID, category)
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, skill, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, category, ability, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
@@ -127,34 +124,6 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		return err
 	})
 	return s, err
-}
-
-// skill is how often a player has been right lately in a topic (all topics for ""); a middling 0.6 before they've
-// played it.
-func (g *Game) skill(tx *sql.Tx, userID int64, category string) (float64, error) {
-	rows, err := tx.Query(`SELECT a.question_id, a.score FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? ORDER BY a.at DESC LIMIT 1000`, userID)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-	b := g.Bank()
-	total, n := 0.0, 0
-	for rows.Next() && n < skillWindow {
-		var id string
-		var score float64
-		if err := rows.Scan(&id, &score); err != nil {
-			return 0, err
-		}
-		if q, ok := b.Get(id); ok && (category == "" || q.Base().Category == category) {
-			total += score
-			n++
-		}
-	}
-	if n < 5 {
-		return 0.6, rows.Err()
-	}
-	return total / float64(n), rows.Err()
 }
 
 // Score is one player's result on a board.

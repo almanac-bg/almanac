@@ -1,16 +1,11 @@
-// How a player has done: the streak and this week, their numbers, their strongest topics, their latest games.
+// How a player has done: the streak and this week, their numbers, how well they know each topic, their latest games.
 
+import { type Mastery, masteryCard } from "../game/mastery.ts";
 import type { Board } from "../game/types.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
-import { games, level, questions, ring, stat, streak, toneOf } from "../ui.ts";
-
-export interface TopicStats {
-  category: string;
-  answers: number;
-  right: number;
-}
+import { games, questions, stat, streak } from "../ui.ts";
 
 export interface Stats {
   streak: number;
@@ -21,7 +16,7 @@ export interface Stats {
   right: number;
   duels: number;
   won: number;
-  topics: TopicStats[];
+  mastery: Mastery[];
   recent: {
     id: number;
     kind: "day" | "topic" | "challenge" | "duel"; // challenge: an all-topics game from when there were challenges
@@ -68,12 +63,6 @@ export function stats(): Child {
     if (!s) return null;
     if (s.games === 0) return [streak(s.streak, s.week), h("p", { class: "muted" }, "Още няма изиграни игри.")];
     const place = day()?.place;
-    // The strongest topics: those played enough to tell, best first.
-    const strongest = s.topics
-      .map((t) => ({ t, l: level(t.right, t.answers) }))
-      .filter((x) => x.l)
-      .sort((a, b) => (b.l?.percent ?? 0) - (a.l?.percent ?? 0))
-      .slice(0, 3);
     return [
       h("p", { class: "muted" }, `${games(s.games)} · ${questions(s.answers)}`),
       streak(s.streak, s.week),
@@ -85,18 +74,7 @@ export function stats(): Child {
         s.duels > 0 ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose") : stat(String(s.answers), "отговора"),
         stat(String(s.games), "изиграни игри"),
       ),
-      strongest.length
-        ? h(
-            "section",
-            { class: "card" },
-            h("h2", { class: "section-title" }, "Най-силни теми"),
-            h(
-              "div",
-              { class: "rings" },
-              strongest.map(({ t, l }) => ring(l?.percent ?? 0, topicName(t.category), toneOf(t.category))),
-            ),
-          )
-        : null,
+      masteryCard(s.mastery),
       h(
         "section",
         { class: "stack" },

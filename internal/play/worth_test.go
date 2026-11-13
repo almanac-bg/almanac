@@ -2,31 +2,11 @@ package play
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
-
-// A topic run's shape: a true-or-not second, an order and a match in the middle, a number last; easy to hard by
-// skill.
-func TestTopicShape(t *testing.T) {
-	for skill, want := range map[float64]string{
-		0.3:  "c:e t:e c:e c:e c:e c:m c:m o:m m:m n:h",
-		0.6:  "c:e t:e c:e c:m c:m o:m c:m m:m c:h n:h",
-		0.8:  "c:e t:e c:m c:m o:m m:m c:h c:h c:h n:h",
-		0.95: "c:e t:m c:m o:m m:m c:h c:h c:h c:h n:h",
-	} {
-		var got []string
-		for _, s := range topicSlots(skill) {
-			got = append(got, s.typ[:1]+":"+string(s.difficulty[:1]))
-		}
-		if strings.Join(got, " ") != want {
-			t.Errorf("skill %v: %s, want %s", skill, strings.Join(got, " "), want)
-		}
-	}
-}
 
 func TestWorth(t *testing.T) {
 	q := func(typ string, d bank.Difficulty) bank.Question {

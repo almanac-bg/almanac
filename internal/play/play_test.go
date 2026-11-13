@@ -200,7 +200,7 @@ func TestLevelUpNews(t *testing.T) {
 		s, _ := w.g.StartTopic(ctx, bo, "")
 		w.play(bo, s.ID, repeat(w.right, Length)...)
 		var err error
-		if n, err = w.g.NewsOf(ctx, bo); err != nil {
+		if n, err = w.g.NewsOf(ctx, bo, 0); err != nil {
 			t.Fatal(err)
 		}
 		if n.XP >= 300 {
@@ -213,7 +213,7 @@ func TestLevelUpNews(t *testing.T) {
 	if lvl, from, _ := LevelOf(n.XP); !n.LevelUp || n.Level != lvl || lvl < 2 || n.From != from {
 		t.Fatalf("news at %d XP: %+v", n.XP, n)
 	}
-	if again, _ := w.g.NewsOf(ctx, bo); again.LevelUp {
+	if again, _ := w.g.NewsOf(ctx, bo, 0); again.LevelUp {
 		t.Fatalf("the level twice: %+v", again)
 	}
 }
@@ -390,7 +390,7 @@ func TestStats(t *testing.T) {
 	ctx := t.Context()
 	u := w.user()
 	empty, err := w.g.StatsOf(ctx, u)
-	if err != nil || empty.Games != 0 || len(empty.Topics) != 0 || empty.Recent == nil {
+	if err != nil || empty.Games != 0 || len(empty.Mastery) != len(w.b.Categories) || empty.Mastery[0].Answers != 0 || empty.Recent == nil {
 		t.Fatalf("a newcomer's stats: %+v %v", empty, err)
 	}
 	day, _ := w.g.StartDay(ctx, u)
@@ -404,8 +404,9 @@ func TestStats(t *testing.T) {
 	if s.Streak != 1 || s.Days != 1 || s.Games != 2 || s.Answers != 20 || s.Right != 16 || len(s.Recent) != 2 {
 		t.Fatalf("stats %+v", s)
 	}
-	if s.Topics[0].Category != "music" || s.Topics[0].Answers < 10 || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
-		t.Fatalf("topics %+v, recent %+v", s.Topics, s.Recent)
+	music := s.Mastery[slices.IndexFunc(s.Mastery, func(m Mastery) bool { return m.Category == "music" })]
+	if !music.Sure || music.Answers < Length || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
+		t.Fatalf("music %+v, recent %+v", music, s.Recent)
 	}
 }
 
@@ -521,7 +522,7 @@ func TestProgress(t *testing.T) {
 	// A perfect day: the achievements come with the last answer, and a level with the points.
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	n, err := w.g.NewsOf(ctx, ana)
+	n, err := w.g.NewsOf(ctx, ana, 0)
 	ids := []string{}
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
@@ -531,7 +532,7 @@ func TestProgress(t *testing.T) {
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
-	if again, _ := w.g.NewsOf(ctx, ana); len(again.Achievements) != 0 || again.LevelUp {
+	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Achievements) != 0 || again.LevelUp {
 		t.Fatalf("the same news twice: %+v", again)
 	}
 

@@ -127,48 +127,16 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 
-// topicSlots is a topic run's shape for a player's skill there (how often they're right): easier questions for those
-// still learning it, harder ones as they get it right. One true-or-not, one order, one match and one number among
-// them, the rest choices.
-func topicSlots(skill float64) []slot {
-	var easy, medium int
-	switch {
-	case skill < 0.45:
-		easy, medium = 5, 4
-	case skill < 0.7:
-		easy, medium = 3, 5
-	case skill < 0.85:
-		easy, medium = 2, 4
-	default:
-		easy, medium = 1, 4
-	}
-	slots := make([]slot, Length)
-	for i := range slots {
-		d := bank.Hard
-		if i < easy {
-			d = bank.Easy
-		} else if i < easy+medium {
-			d = bank.Medium
-		}
-		slots[i] = slot{difficulty: d, typ: "choice"}
-	}
-	slots[1].typ = "truefalse"
-	slots[easy+medium/2].typ = "order"
-	slots[easy+medium-1].typ = "match"
-	slots[Length-1].typ = "number"
-	return slots
-}
-
-// Draw draws ten questions of a topic ("" for all topics) for a player of a skill (how often they're right, 0…1),
-// questions they haven't seen (seen) before those they have. Choices come with a picture or without, whichever is
+// Draw draws ten questions of a topic ("" for all topics) for a player of an ability there (mastery.go; 0 for one
+// who knows as much as most), questions they haven't seen (seen) before those they have. Choices come with a picture or without, whichever is
 // drawn. Everyone's run has the same shape. Topic runs, duels and rooms draw this way.
-func Draw(b *bank.Bank, category string, skill float64, seen map[string]bool, r *rand.Rand) []Pick {
+func Draw(b *bank.Bank, category string, ability float64, seen map[string]bool, r *rand.Rand) []Pick {
 	pool := b.Live(category, "")
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
-	for _, s := range topicSlots(skill) {
+	for _, s := range topicSlots(ability) {
 		if q := choose(pool, s, allowed, fresh, r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
