@@ -39,7 +39,7 @@ var MasteryTiers = []MasteryTier{
 	{"novice", "Новак", 0},
 	{"amateur", "Любител", 35},
 	{"connoisseur", "Познавач", 50},
-	{"expert", "Знаток", 65},
+	{"expert", "Експерт", 65},
 	{"master", "Майстор", 78},
 	{"luminary", "Светило", 90},
 }
