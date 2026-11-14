@@ -4230,6 +4230,24 @@
     text-align: left;
   }
 
+  /* It comes out of the word: from just by it, growing to its size, in 160ms; gone at once. */
+  .explain-pop:popover-open {
+    animation: explain-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-origin: top center;
+  }
+
+  .explain-pop.above:popover-open {
+    --from: 6px;
+    transform-origin: bottom center;
+  }
+
+  @keyframes explain-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--from, -6px)) scale(0.96);
+    }
+  }
+
   /* Under a result, after its gold button: „Прегледай въпросите“ and the other ways on, plain and the same size, side
      by side where they fit (one above the other on a narrow phone). */
   /* The other ways on, of one size: side by side in equal columns where they fit, else one under another. */
@@ -5307,6 +5325,7 @@
     .option.wrong,
     .verdict-pts,
     .in-row,
+    .explain-pop:popover-open,
     .number-out.live .typed::after {
       animation: none;
     }

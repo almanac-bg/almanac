@@ -135,16 +135,16 @@ export const xpWords = (open?: Open) => meaning.xp + (open?.league ? meaning.lea
 
 let explained = 0;
 
-/** A number's name (`label`) and what it means (`words`), in a small card by the word: shown while a mouse is over the
- * word or the keyboard is on it, and kept by a click or a tap until the next one anywhere. */
+/** A number's name (`label`) and what it means (`words`), in a small card by the word that comes out of it: shown
+ * while a mouse is over the word (gone the moment it leaves) or the keyboard is on it; a tap keeps it until the next
+ * one anywhere. */
 export function explain(label: Child, words: string): Child {
   const id = `explain-${++explained}`;
   const pop = h("span", { class: "explain-pop", id, popover: "", role: "note" }, words) as HTMLElement;
   let kept = false;
-  let leaving = 0;
+  let mouse = false; // the last press was a mouse's: hovering already shows the card, a click only keeps it shown
   const shown = () => pop.matches(":popover-open");
   const show = () => {
-    clearTimeout(leaving);
     if (!shown()) pop.showPopover();
     // Under the word (over it if there's no room below), inside the screen's gutters, moving with the page.
     const at = word.getBoundingClientRect();
@@ -154,7 +154,9 @@ export function explain(label: Child, words: string): Child {
       innerWidth - pop.offsetWidth - gutter,
     );
     const below = at.bottom + 8;
-    const top = below + pop.offsetHeight > innerHeight - gutter ? at.top - 8 - pop.offsetHeight : below;
+    const above = below + pop.offsetHeight > innerHeight - gutter;
+    const top = above ? at.top - 8 - pop.offsetHeight : below;
+    pop.classList.toggle("above", above); // it comes out of the word: down from under it, up from over it
     pop.style.left = `${Math.max(gutter, left) + scrollX}px`;
     pop.style.top = `${Math.max(gutter, top) + scrollY}px`;
   };
@@ -172,12 +174,18 @@ export function explain(label: Child, words: string): Child {
       "aria-describedby": id,
       onpointerenter: (e: PointerEvent) => e.pointerType === "mouse" && show(),
       onpointerleave: (e: PointerEvent) => {
-        if (e.pointerType === "mouse") leaving = window.setTimeout(hide, 150);
+        if (e.pointerType !== "mouse") return;
+        kept = false;
+        hide();
+      },
+      onpointerdown: (e: PointerEvent) => {
+        mouse = e.pointerType === "mouse";
       },
       onfocus: () => word.matches(":focus-visible") && show(),
       onblur: hide,
       onclick: () => {
-        // Shown by the mouse: the click keeps it. Kept already: the click puts it away.
+        if (mouse) return show();
+        // A tap or a key: the first keeps it, the next puts it away.
         if (shown() && kept) {
           kept = false;
           hide();
