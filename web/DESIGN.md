@@ -122,6 +122,8 @@ takes a token.
   - „Раздели“: `.split` with `.split-deck` (the thing now on a `.split-card`, the next one `under` it; dragged, it
     names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
     `.split-back`; afterwards `.split-result`.
+  - A choice of pictures: `.options.pic-options` (two by two), each `.option.pic-option` a picture with its letter
+    (`.pic-letter`) and, once answered, its name (`.pic-name`); the pictures' credits in `.pic-credits`.
   - „Подсказки“: `.clues`, a `.clue` per clue with what a right answer is worth then (`.clue-worth`); the last one
     out is `now` (a gold edge: progress), the ones before it `past`, the ones to come `locked` (counting down).
   - How everyone else answered, once a question has enough answers: `.option.crowd` (a bar behind an answer as long

@@ -195,3 +195,18 @@ func webpSize(path string) (w, h int, err error) {
 	}
 	return 0, 0, errors.New("an unknown WebP format")
 }
+
+// picturesOf is every picture a question shows: the one over it, and its options' (a choice of pictures).
+func picturesOf(q Question) []*Image {
+	var out []*Image
+	if im := q.Extra().Image; im != nil {
+		out = append(out, im)
+	}
+	if c, ok := q.(*Choice); ok {
+		out = append(out, c.pictures()...)
+	}
+	return out
+}
+
+// HasPictures says whether a question shows a picture: over it, or as its options.
+func HasPictures(q Question) bool { return len(picturesOf(q)) > 0 }

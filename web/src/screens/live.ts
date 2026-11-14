@@ -370,7 +370,7 @@ function theirs(s: Side, v: View): Child {
   const words = { missed: "без отговор", right: "вярно", partial: "близо", wrong: "грешно" }[how];
   let gave = "";
   const g = s.given as Record<string, unknown> | undefined;
-  if (g && v.type === "choice" && typeof g.pick === "number") gave = `„${v.choices[g.pick]}“`;
+  if (g && v.type === "choice" && typeof g.pick === "number" && v.choices) gave = `„${v.choices[g.pick]}“`;
   else if (g && v.type === "truefalse" && typeof g.truth === "boolean") gave = g.truth ? "„Вярно“" : "„Невярно“";
   else if (g && v.type === "number" && typeof g.value === "number")
     gave = `${formatNumber(g.value, v.step)}${v.unit ? ` ${v.unit}` : ""}`;

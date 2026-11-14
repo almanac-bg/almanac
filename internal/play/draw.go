@@ -145,7 +145,7 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	if h.Difficulty != s.difficulty || (typ && h.Type != s.typ) {
 		return false
 	}
-	has := q.Extra().Image != nil
+	has := bank.HasPictures(q)
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 

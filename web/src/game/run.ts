@@ -346,7 +346,8 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     )
       return;
     const i = Number(e.key) - 1;
-    if (i >= 0 && i < q.view.choices.length) send({ pick: i });
+    if (i >= 0 && i < (q.view.type === "choice" ? (q.view.choices ?? q.view.pictures ?? []) : q.view.choices).length)
+      send({ pick: i });
   });
 
   return h(
