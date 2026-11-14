@@ -1,6 +1,6 @@
 // Command build turns the web client (web/) into the files the server serves (internal/assets/dist): one script and
-// one stylesheet, minified, and the fonts, all named by their content, plus web/public as it is. It fails if either outgrows its budget:
-// the game must stay light.
+// one stylesheet, minified, the illustrations as a script of their own (loaded after the game starts), and the fonts,
+// all named by their content, plus web/public as it is. It fails if any outgrows its budget: the game must stay light.
 //
 //	go run ./cmd/build           a release build
 //	go run ./cmd/build -watch    rebuild on every change (with DEV=1 on the server)
@@ -25,8 +25,9 @@ import (
 
 // Budgets, gzipped: what a player downloads the first time.
 // The budgets grew with the game, from one quiz to a platform (five places, medals and emblems drawn in code): still
-// small enough to arrive at once on a slow phone.
-var budgets = map[string]int{"app.js": 40 << 10, "app.css": 14 << 10}
+// small enough to arrive at once on a slow phone. The illustrations (avatars, topics, modes, frames) come after the
+// first screen, on their own.
+var budgets = map[string]int{"app.js": 40 << 10, "app.css": 14 << 10, "pictures.js": 24 << 10}
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
@@ -52,6 +53,7 @@ func build(watch bool) error {
 		Write:         true,
 		Metafile:      true,
 		Format:        api.FormatESModule,
+		Splitting:     true, // the illustrations (web/src/art/pictures.ts) load as a file of their own
 		Target:        api.ES2022,
 		Engines:       []api.Engine{{Name: api.EngineChrome, Version: "111"}, {Name: api.EngineFirefox, Version: "115"}, {Name: api.EngineSafari, Version: "16.4"}},
 		Charset:       api.CharsetUTF8,

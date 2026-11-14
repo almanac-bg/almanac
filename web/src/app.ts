@@ -1,6 +1,7 @@
 // АЛМАНАХ's web client: the mark and the name, the six main places (in the header on a big screen, a bar at the
 // bottom of a phone's), and the screen the router puts under them.
 
+import { loadPictures } from "./art/picture.ts";
 import { type ApiError, api } from "./lib/api.ts";
 import { type Child, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
@@ -41,6 +42,7 @@ const links: [href: string, label: string, wide: string, icon: string, here: (p:
 
 reportErrors();
 applyPrefs();
+loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 const root = document.getElementById("app");
 if (root) {

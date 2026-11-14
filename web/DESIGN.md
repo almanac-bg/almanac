@@ -38,7 +38,7 @@ takes a token.
   - `lilac`: levels.
   - `silver` and `bronze`: second and third place.
 - **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives gold, lilac, sky, rose or mint, in
-  the bank's order.
+  the bank's order. Each also has its picture (see Pictures).
 - **Right, close and wrong never rest on hue alone.** Each also gets ✓, ∼ or ✕, the word, and a filled or hollow
   mark.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
@@ -88,7 +88,7 @@ takes a token.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
   - `.verdict` and `.fact`.
 - **Progress:**
-  - `.avatar` (a shape `av-…` on a tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
+  - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
   - `.level-card` (with `up` for a new level), `.unlock` (a new achievement), `.badge-mark`.
   - `.achievements`/`.achievement` (and `locked`), `.picker`/`.pick` and `.tone-pick` for choosing a look.
@@ -113,22 +113,23 @@ takes a token.
 - **Four tiers of achievement**, each with its colour: обикновено (silver, `--tier-common`), рядко (sky,
   `--tier-rare`), епично (violet, `--tier-epic`) and легендарно (gold, `--tier-legendary`). Each has an `-ink`
   token for words. A `.t-<tier>` class sets `--tier` and `--tier-ink` for anything inside it.
-- **Medals are generated** (`web/src/art/badge.ts`), never drawn by hand: the tier gives the form — common round,
-  rare a hexagon, epic an eight-pointed star, legendary a sunburst with laurels — and the achievement's shape sits in
-  the middle. Earned: filled in the tier's colour with a rim and a light (epic and legendary glow). Locked: hollow,
-  with a ring for its progress. Hidden and not found: a „?“, and nothing about how or what it gives.
-- Every achievement says how it's earned, how far along the player is, and its reward (the avatar shape, the
+- **Medals are generated** (`web/src/art/badge.ts`): the tier gives the form — common round, rare a hexagon, epic an
+  eight-pointed star, legendary a sunburst with laurels — and the achievement's picture (the avatar it unlocks) sits
+  in the middle on a deep, enamel-like centre, in the tier's colours. Earned: filled in the tier's colour with a rim
+  and a light (epic and legendary glow). Locked: hollow, with a ring for its progress, its picture greyed. Hidden and
+  not found: a „?“, and nothing about how or what it gives.
+- Every achievement says how it's earned, how far along the player is, and its reward (the avatar, the
   title, when it gives one). A title shows in its tier's ink wherever it's worn.
-- **Division emblems are generated** (`web/src/art/emblem.ts`): a silhouette per division — Бронз a plain shield,
-  Сребро a chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned star shield with rays — in
-  `--div-*` colours.
-- **Avatar frames are generated** (`web/src/art/frame.ts`) around the rounded tile: Пръстен, Двоен пръстен, Точки,
-  Пламъци, Лавров венец, Кристал, Ореол, and a season's podium (Шампионска, Сребърна, Бронзова: stars at the corners
-  in the place's metal); **patterns** behind the shape are CSS (`.bd-dots`, `-stripes`, `-grid`,
+- **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
+  chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
+  colours (`art/emblem.ts` places them).
+- **Avatar frames** are pictures (`frame-<id>`) drawn around the rounded tile: Пръстен, Двоен пръстен (with gems),
+  Точки (beads), Пламъци (a crest of flames), Лавров венец, Кристал (cut gems at the corners), Ореол (a sunburst), and
+  a season's podium (Шампионска, Сребърна, Бронзова: a faceted star on top and laurel below, in the place's metal);
+  each frame's colour is its `.fr-*` tone. **Patterns** behind the picture are CSS (`.bd-dots`, `-stripes`, `-grid`,
   `-rays`, `-stars`). Both unlock by level, achievement or the highest division reached, and show on every avatar
   (the server sends a look's avatar as `shape-tone/frame/backdrop`).
-- **Season art is generated** (`web/src/art/season.ts`): the podium's medals — gold, silver, bronze — in the
-  divisions' metals.
+- **Season medals** are a picture (`medal`, placed by `art/season.ts`) in the place's metal: gold, silver, bronze.
 
 ## Flow
 
@@ -168,7 +169,7 @@ Every element that looks like a game measures something the game already counts:
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                               | Result, Профил, avatars      |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                           | Result, Профил               |
 | Titles       | Words for the player and their knowledge, worn under their name, never only a deed: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50), some achievements („Демон на скоростта“), a topic's mastery („Майстор · История“, „Светило · История“), and the rating (divisions, a Роял won, the podium counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
-| Avatars      | A shape on a tone: nine shapes free, nine unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                                | Everywhere a player is       |
+| Avatars      | A picture on a tone: nine animals free, fifteen emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                  | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
@@ -225,11 +226,34 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
   player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
 
+## Pictures
+
+The game's illustrations — the avatars, the topics, the ways to play, the frames, the division emblems and the
+season's medal — are drawn by hand as paths in `web/src/art/pictures.ts`, and placed with `picture(id)` from
+`art/picture.ts`. They load as a file of their own once the game starts, so the first screen never waits for them.
+
+- **One style:** flat shapes with depth, no outlines, lit from the top left. Depth comes from a lit half and a shaded
+  half, a soft shadow set down and right (`lift`), and a light on the top-left edge, never from gradients.
+- **One ramp:** a picture is painted from one tone — the topic's, the avatar's, the mode's, the frame's, the tier's —
+  in its inks: `k0` night ink, `k1` deep, `k2` shade, `k3` the tone, `k4` light, `k5` pale, `kw` white; `ks` a shadow
+  and `kh` a light laid over, `kt` a tint of the tone for a ground; `l0`–`l5` the same inks as strokes. `.pic` in
+  `app.css` mixes them from `--tone`, so a picture follows its tone and the theme with no colour of its own.
+- **On a tile or on a card:** an avatar is painted over a tile in its tone (`k3`), so it uses the darker and lighter
+  inks; a topic or a mode stands on a soft disc of its tone (`kt`) over the card, so the tone itself is its main
+  colour.
+- **What there is:** nine animals everyone has (лисица, мечка, котка, заек, таралеж, куче, елен, щъркел, жаба),
+  portraits cut at the tile's bottom; fifteen emblems that achievements unlock; a picture per topic (a bulb, a flask,
+  an amphora, a globe, a clapperboard, a record, a ball, a gamepad, a quill in its inkwell, a butterfly); one per way
+  to play (crossed swords, an arena, a crown in laurel, an open door).
+- **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest
+  size (an avatar at 28px) and in both themes, before it ships.
+
 ## Icons and the logo
 
 - **Icons:** no icon font and no emoji. Icons are CSS masks drawn in `currentColor`: `--i-check`, `--i-cross`,
   `--i-near`, `--i-clock`, `--i-star`, `--i-up`, `--i-down` and `--i-flame`. A new icon is a 24px drawing with 3px
-  round strokes, added the same way.
+  round strokes, added the same way. The four places' icons (`--i-home`, `--i-podium`, `--i-award`, `--i-user`) also
+  have a soft fill inside (the mask at a third of its strength), and Профил's is an avatar's tile.
 - **The logo** is the rosette (`web/public/favicon.svg`): four petals on the ink tile, one gold. Use it as it is.
   The header shows it at 32px with a 1px `--line` ring, beside „АЛМАНАХ“ at 900 weight with 0.12em tracking.
 - **Share images:** `web/public/og.png` and `.github/social-preview.png` are drawn in the same style.
@@ -239,4 +263,5 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Look at it** in both themes, at 320px and 390px wide. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 14 kB of CSS and 40 kB of JS, gzipped. `go run ./cmd/build` fails over them.
+- **Keep to the budgets:** 14 kB of CSS, 40 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+  over them.

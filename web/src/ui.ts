@@ -2,7 +2,7 @@
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { badgeArt } from "./art/badge.ts";
-import { frameArt } from "./art/frame.ts";
+import { picture } from "./art/picture.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
 import { categories } from "./state.ts";
@@ -201,16 +201,17 @@ export const tierWords: Record<Tier, { group: string; one: string; title: string
   legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
 };
 
+/** Every avatar's name: the animals everyone has, then the emblems achievements unlock. */
 export const shapeNames: Record<string, string> = {
-  petal: "Венчелистче",
-  rosette: "Розетка",
-  circle: "Кръг",
-  diamond: "Ромб",
-  triangle: "Триъгълник",
-  moon: "Луна",
-  leaf: "Лист",
-  wave: "Вълна",
-  hex: "Шестоъгълник",
+  fox: "Лисица",
+  bear: "Мечка",
+  cat: "Котка",
+  hare: "Заек",
+  hedgehog: "Таралеж",
+  dog: "Куче",
+  deer: "Елен",
+  stork: "Щъркел",
+  frog: "Жаба",
   flame: "Пламък",
   star: "Звезда",
   target: "Мишена",
@@ -219,7 +220,8 @@ export const shapeNames: Record<string, string> = {
   trophy: "Купа",
   shield: "Щит",
   heart: "Сърце",
-  eye: "Око",
+  owl: "Бухал",
+  compass: "Компас",
   sun: "Слънце",
   hourglass: "Пясъчен часовник",
   spark: "Искра",
@@ -235,7 +237,7 @@ export const toneNames: Record<string, string> = {
   mint: "мента",
 };
 
-const freeShapes = ["petal", "rosette", "circle", "diamond", "triangle", "moon", "leaf", "wave", "hex"];
+const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
 /** An avatar for someone without one of their own: picked from their name, the same every time. */
 function fromName(name: string): string {
@@ -244,27 +246,27 @@ function fromName(name: string): string {
   return `${freeShapes[n % freeShapes.length]}-${tones[Math.floor(n / freeShapes.length) % tones.length]}`;
 }
 
-/** An avatar: a shape on a tone, with the level beside it when given. For the eye: the name and level are said in
- * words nearby. */
-/** An avatar: a shape on a tone, and from the wardrobe a pattern behind it and a frame around it. `id` is
- * "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look. */
+/** An avatar: a picture on a tile of its tone, and from the wardrobe a pattern behind it and a frame around it, with
+ * the level beside it when given. `id` is "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look.
+ * For the eye: the name and level are said in words nearby. */
 export function avatar(
   id: string | undefined,
   opts: { size?: "s" | "l"; level?: number; name?: string; frame?: string; backdrop?: string } = {},
 ) {
   const [base = "", worn = "", pattern = ""] = (id || fromName(opts.name ?? "")).split("/");
-  const [shape, tone] = base.split("-");
+  const [shape = "", tone] = base.split("-");
   const frame = opts.frame ?? worn;
   const backdrop = opts.backdrop ?? pattern;
   return h(
     "span",
     {
-      class: ["avatar", opts.size, `av-${shape}`, `tone-${tone}`, backdrop && `bd-${backdrop}`, frame && "framed"]
+      class: ["avatar", opts.size, `tone-${tone}`, backdrop && `bd-${backdrop}`, frame && "framed"]
         .filter(Boolean)
         .join(" "),
       "aria-hidden": "true",
     },
-    frameArt(frame),
+    picture(shape, "avatar-pic"),
+    frame ? picture(`frame-${frame}`, `avatar-frame fr-${frame}`) : null,
     opts.level ? h("b", { class: "lv" }, String(opts.level)) : null,
   );
 }

@@ -216,7 +216,7 @@ func TestTagsKeepPlayers(t *testing.T) {
 	}
 	var tag, avatar, email string
 	_ = db.Read.QueryRow(`SELECT tag, avatar, email FROM users WHERE id = 1`).Scan(&tag, &avatar, &email)
-	if tag != "player1" || avatar != "moon-gold" || email != "a@b.bg" {
+	if tag != "player1" || avatar != "dog-gold" || email != "a@b.bg" { // the moon is drawn as a dog since 0023
 		t.Fatalf("after the rebuild: %q %q %q", tag, avatar, email)
 	}
 	if _, err := db.Write.Exec(`UPDATE users SET name = 'Аз' WHERE id = 2`); err != nil {
@@ -258,6 +258,31 @@ func TestRoyalKeepsRuns(t *testing.T) {
 	}
 	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (1, 'royal', '[]', 3)`); err != nil {
 		t.Fatalf("a Роял run: %v", err)
+	}
+	db.Close()
+}
+
+// The avatars drawn anew (0023): the old free shapes become animals and the eye an owl, in the same tone; the rest
+// stay as they were.
+func TestAvatarsDrawnAnew(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 22)
+	_, err := db.Write.Exec(`INSERT INTO users (id, name, tag, created_at, seen_at, avatar) VALUES
+		(1, 'А', 'a', 1, 1, 'petal-gold'), (2, 'Б', 'b', 1, 1, 'eye-rose'), (3, 'В', 'c', 1, 1, 'star-sky'),
+		(4, 'Г', 'd', 1, 1, NULL), (5, 'Д', 'e', 1, 1, 'hex-mint')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]string{1: "fox-gold", 2: "owl-rose", 3: "star-sky", 4: "", 5: "frog-mint"}
+	for id, w := range want {
+		var got sql.NullString
+		_ = db.Read.QueryRow(`SELECT avatar FROM users WHERE id = ?`, id).Scan(&got)
+		if got.String != w {
+			t.Errorf("player %d: %q, want %q", id, got.String, w)
+		}
 	}
 	db.Close()
 }

@@ -87,7 +87,7 @@
     --rose-ink: #ff9fd0;
     --silver: #cfc8e3;
     --bronze: #e8a46c;
-    /* Divisions: each emblem's colour (art/emblem.ts). */
+    /* Divisions: each emblem's colour (art/pictures.ts). */
     --div-bronze: #d08f5b;
     --div-silver: #c9d1df;
     --div-gold: var(--gold);
@@ -128,7 +128,7 @@
     --font-numeral: "Sofia Sans Extra Condensed", "Arial Narrow", "Sofia Sans", sans-serif;
     --font-serif: "Literata", Georgia, "Times New Roman", serif;
 
-    /* Icons: 24px, 3px round strokes, drawn as masks in the text colour. */
+    /* Icons: 24px, 3px round strokes (the places' icons with a soft fill inside), drawn as masks in the text colour. */
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
     --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
@@ -139,40 +139,12 @@
     --i-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5l7 10H5z'/%3E%3C/svg%3E");
     --i-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19L5 9h14z'/%3E%3C/svg%3E");
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
-    --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z'/%3E%3C/svg%3E");
-    --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 20h18'/%3E%3Cpath d='M5 20v-6h4.5v6'/%3E%3Cpath d='M9.5 20V8.5h5V20'/%3E%3Cpath d='M14.5 20v-4H19v4'/%3E%3C/svg%3E");
-    --i-award: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z'/%3E%3Cpath d='M8.7 13.5 7 20.5l5-2.6 5 2.6-1.7-7'/%3E%3C/svg%3E");
-    --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'/%3E%3Cpath d='M4.5 20.5a7.5 7.5 0 0 1 15 0'/%3E%3C/svg%3E");
-    --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5'/%3E%3Cpath d='M18.5 14.5a6.5 6.5 0 0 1 3 5.5'/%3E%3C/svg%3E");
-    --i-bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.5 2.5 5 13.5h6.5l-1 8L19 10.5h-6.5z'/%3E%3C/svg%3E");
-    --i-crown: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8l4.5 4 4-7 4 7 4.5-4-2 11h-13z'/%3E%3C/svg%3E");
-    --i-swords: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4l11 11'/%3E%3Cpath d='M20 4 9 15'/%3E%3Cpath d='M12.5 17.5l5-5'/%3E%3Cpath d='M6.5 12.5l5 5'/%3E%3Cpath d='M16 16l4 4'/%3E%3Cpath d='M8 16l-4 4'/%3E%3C/svg%3E");
-    --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6.5C9.8 5 7 4.6 3.5 5v13.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5z'/%3E%3Cpath d='M12 6.5V20'/%3E%3C/svg%3E");
-
-    /* Avatar shapes: masks, drawn in the ink that sits on a tone. */
-    --s-petal: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c4.4 4.3 6.5 8 6.5 11a6.5 6.5 0 0 1-13 0c0-3 2.1-6.7 6.5-11z'/%3E%3C/svg%3E");
-    --s-rosette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath transform='rotate(-45 32 32)' d='M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z'/%3E%3Cpath transform='rotate(45 32 32)' d='M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z'/%3E%3Cpath transform='rotate(135 32 32)' d='M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z'/%3E%3Cpath transform='rotate(225 32 32)' d='M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z'/%3E%3C/svg%3E");
-    --s-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8.5'/%3E%3C/svg%3E");
-    --s-diamond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5l9.5 9.5-9.5 9.5L2.5 12z'/%3E%3C/svg%3E");
-    --s-triangle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.5l9.5 16.5h-19z'/%3E%3C/svg%3E");
-    --s-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 3a9 9 0 1 0 5.5 15.6A8 8 0 0 1 15.5 3z'/%3E%3C/svg%3E");
-    --s-leaf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4.5 19.5C4.5 10 10 4.5 20 4c-.5 10-6 15.5-15.5 15.5z'/%3E%3C/svg%3E");
-    --s-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 9.5c3.3-4 6.7-4 10 0s6.7 4 10 0v5.5c-3.3 4-6.7 4-10 0s-6.7-4-10 0z'/%3E%3C/svg%3E");
-    --s-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l8.7 5v10L12 22l-8.7-5V7z'/%3E%3C/svg%3E");
-    --s-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
-    --s-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.3l-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9z'/%3E%3C/svg%3E");
-    --s-target: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z'/%3E%3C/svg%3E");
-    --s-bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.5 2L4 13.5h6.5L9.5 22 20 9.5h-6.5z'/%3E%3C/svg%3E");
-    --s-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2.5 5c3-1.5 6.2-1.5 8.8.6V21c-2.6-1.9-5.8-1.9-8.8-.4zM21.5 5c-3-1.5-6.2-1.5-8.8.6V21c2.6-1.9 5.8-1.9 8.8-.4z'/%3E%3C/svg%3E");
-    --s-trophy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3h12v5a6 6 0 0 1-5 5.9V17h3v4H8v-4h3v-3.1A6 6 0 0 1 6 8z'/%3E%3C/svg%3E");
-    --s-shield: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l8.5 3.2v6c0 5.2-3.6 9.3-8.5 10.8-4.9-1.5-8.5-5.6-8.5-10.8v-6z'/%3E%3C/svg%3E");
-    --s-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-8.5-5.1-9.6-10.3C1.6 6.8 4.3 4 7.4 4c1.9 0 3.4 1 4.6 2.6C13.2 5 14.7 4 16.6 4c3.1 0 5.8 2.8 5 6.7C20.5 15.9 12 21 12 21z'/%3E%3C/svg%3E");
-    --s-crown: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 7.5l4.8 4.2L12 4l4.2 7.7L21 7.5 19 19H5z'/%3E%3C/svg%3E");
-    --s-eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 5C6.5 5 2.5 12 2.5 12s4 7 9.5 7 9.5-7 9.5-7-4-7-9.5-7zm0 3.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z'/%3E%3C/svg%3E");
-    --s-sun: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM11 1h2v4h-2zM11 19h2v4h-2zM1 11h4v2H1zM19 11h4v2h-4zM4.2 5.6l1.4-1.4 2.8 2.8-1.4 1.4zM15.6 17l1.4-1.4 2.8 2.8-1.4 1.4zM4.2 18.4l2.8-2.8 1.4 1.4-2.8 2.8zM15.6 7l2.8-2.8 1.4 1.4-2.8 2.8z'/%3E%3C/svg%3E");
-    --s-hourglass: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 2h12v2.5c0 3.2-2.1 5.5-4.4 7.5 2.3 2 4.4 4.3 4.4 7.5V22H6v-2.5c0-3.2 2.1-5.5 4.4-7.5C8.1 10 6 7.7 6 4.5z'/%3E%3C/svg%3E");
-    --s-spark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5c.9 5.6 4.9 9.6 10.5 10.5-5.6.9-9.6 4.9-10.5 10.5-.9-5.6-4.9-9.6-10.5-10.5 5.6-.9 9.6-4.9 10.5-10.5z'/%3E%3C/svg%3E");
-    --s-clover: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5a4.5 4.5 0 0 1 4.3 5.8A4.5 4.5 0 1 1 15.7 16.3 4.5 4.5 0 1 1 8.3 15.7 4.5 4.5 0 1 1 7.7 8.3 4.5 4.5 0 0 1 12 2.5z'/%3E%3C/svg%3E");
+    --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20H4z' fill-opacity='.32'/%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 14h4.5v6H5zM14.5 16H19v4h-4.5z' fill-opacity='.32'/%3E%3Cpath d='M9.5 11h5v9h-5z'/%3E%3Cpath d='M3 20h18M5 20v-6h4.5M9.5 20v-9h5v9M14.5 16H19v4' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 1.6l1.3 2.6 2.9.4-2.1 2 .5 2.9L12 8.1l-2.6 1.4.5-2.9-2.1-2 2.9-.4z'/%3E%3C/svg%3E");
+    --i-award: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='9.5' r='5.5' fill-opacity='.32'/%3E%3Cpath d='M8.7 14 7 21l5-2.6 5 2.6-1.7-7' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='12' cy='9.5' r='5.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 6.6l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 8.7l2-.3z'/%3E%3C/svg%3E");
+    --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='18' rx='6' fill-opacity='.32'/%3E%3Ccircle cx='12' cy='10' r='3.8'/%3E%3Cpath d='M5.2 19.3C6.4 16 9 14.6 12 14.6s5.6 1.4 6.8 4.7A6 6 0 0 1 15 21H9a6 6 0 0 1-3.8-1.7z'/%3E%3C/svg%3E");
+    --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='7.5' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0z' fill-opacity='.32'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5M18.5 14.5a6.5 6.5 0 0 1 3 5.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 6.5C9.8 5 7 4.6 3.5 5v13.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5z' fill-opacity='.32'/%3E%3Cpath d='M12 6.5C9.8 5 7 4.6 3.5 5v13.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5zM12 6.5V20' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   @media (prefers-color-scheme: light) {
@@ -449,18 +421,6 @@
     --i: var(--i-users);
   }
 
-  .i-bolt {
-    --i: var(--i-bolt);
-  }
-
-  .i-crown {
-    --i: var(--i-crown);
-  }
-
-  .i-swords {
-    --i: var(--i-swords);
-  }
-
   .i-book {
     --i: var(--i-book);
   }
@@ -527,8 +487,8 @@
   .goal.done .goal-mark {
     border-color: var(--gold);
     background: var(--gold);
-    -webkit-mask: var(--s-star) center / 80% no-repeat;
-    mask: var(--s-star) center / 80% no-repeat;
+    -webkit-mask: var(--i-star) center / 80% no-repeat;
+    mask: var(--i-star) center / 80% no-repeat;
   }
 
   .goal.done .goal-name {
@@ -603,6 +563,7 @@
   }
 
   .season-medal {
+    --tone: var(--div);
     display: inline-grid;
     flex: none;
     width: 36px;
@@ -614,38 +575,9 @@
     height: 26px;
   }
 
-  .season-medal svg {
-    width: 100%;
-    height: 100%;
-  }
-
-  .medal-ribbon {
-    fill: none;
-    stroke: var(--line-strong);
-    stroke-width: 4;
-  }
-
-  .season-medal-face {
-    fill: var(--sunken);
-    stroke: color-mix(in srgb, var(--div) 55%, transparent);
-    stroke-width: 2;
-  }
-
-  .season-medal-star {
-    fill: var(--line-strong);
-  }
-
-  .season-medal.earned .medal-ribbon {
-    stroke: var(--rose);
-  }
-
-  .season-medal.earned .season-medal-face {
-    fill: var(--div);
-    stroke: color-mix(in srgb, var(--div) 60%, black);
-  }
-
-  .season-medal.earned .season-medal-star {
-    fill: color-mix(in srgb, var(--div) 35%, white);
+  .season-medal:not(.earned) {
+    --tone: var(--line-strong);
+    opacity: 0.55;
   }
 
   /* Класации: who the board is of (everyone, friends) and, for knowledge, which topic. */
@@ -733,10 +665,10 @@
     box-shadow: var(--focus);
   }
 
-  .mode-icon {
-    margin-bottom: var(--space-2);
-    color: var(--tone);
-    font-size: 1.5rem;
+  .mode-pic {
+    width: 64px;
+    height: 64px;
+    margin: -4px 0 var(--space-1) -4px;
   }
 
   .mode-name {
@@ -1935,6 +1867,7 @@
   }
 
   .emblem {
+    --tone: var(--div);
     display: inline-grid;
     flex: none;
     width: 40px;
@@ -1952,53 +1885,8 @@
     height: 72px;
   }
 
-  .emblem svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-
-  .emblem-face {
-    fill: var(--div);
-    stroke: color-mix(in srgb, var(--div) 60%, black);
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-  }
-
-  .emblem-line {
-    fill: none;
-    stroke: color-mix(in srgb, var(--div) 45%, black);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .emblem-wing {
-    fill: color-mix(in srgb, var(--div) 75%, white);
-    stroke: color-mix(in srgb, var(--div) 60%, black);
-    stroke-width: 2;
-  }
-
-  .emblem-mark,
-  .emblem-crown {
-    fill: color-mix(in srgb, var(--div) 35%, white);
-    stroke: color-mix(in srgb, var(--div) 55%, black);
-    stroke-width: 2;
-    stroke-linejoin: round;
-  }
-
-  .emblem-crown {
-    fill: var(--gold);
-  }
-
-  .emblem-rays {
-    fill: color-mix(in srgb, var(--div) 30%, transparent);
-  }
-
-  .d-diamond .emblem svg,
-  .d-legend .emblem svg,
-  .emblem.d-diamond svg,
-  .emblem.d-legend svg {
+  .emblem.d-diamond,
+  .emblem.d-legend {
     filter: drop-shadow(0 0 8px color-mix(in srgb, var(--div) 55%, transparent));
   }
 
@@ -2930,9 +2818,15 @@
 
   .topic-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-2);
+  }
+
+  .topic-pic {
+    width: 64px;
+    height: 64px;
+    margin: -6px 0 -4px -6px;
   }
 
   .mastery {
@@ -3081,7 +2975,90 @@
     border-radius: 4px;
   }
 
-  /* ---- Avatars: a shape on a tone, with the level beside it ---- */
+  /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
+
+  .pic {
+    --ink: #140f26;
+    --k1: color-mix(in srgb, var(--tone, var(--gold)) 42%, var(--ink));
+    --k2: color-mix(in srgb, var(--tone, var(--gold)) 70%, var(--ink));
+    --k3: var(--tone, var(--gold));
+    --k4: color-mix(in srgb, var(--tone, var(--gold)) 55%, #fff);
+    --k5: color-mix(in srgb, var(--tone, var(--gold)) 18%, #fff);
+  }
+
+  /* A picture fills its box unless its own class sizes it (no weight here, so that one always wins). */
+  :where(.pic) {
+    display: block;
+    flex: none;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .k0 {
+    fill: var(--ink);
+  }
+  .k1 {
+    fill: var(--k1);
+  }
+  .k2 {
+    fill: var(--k2);
+  }
+  .k3 {
+    fill: var(--k3);
+  }
+  .k4 {
+    fill: var(--k4);
+  }
+  .k5 {
+    fill: var(--k5);
+  }
+  .kw {
+    fill: #fff;
+  }
+  .ks {
+    fill: var(--ink);
+    opacity: 0.2;
+  }
+  .kh {
+    fill: #fff;
+    opacity: 0.32;
+  }
+  .kt {
+    fill: var(--k3);
+    opacity: 0.16;
+  }
+  .l0,
+  .l1,
+  .l2,
+  .l3,
+  .l4,
+  .l5 {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .l0 {
+    stroke: var(--ink);
+  }
+  .l1 {
+    stroke: var(--k1);
+  }
+  .l2 {
+    stroke: var(--k2);
+  }
+  .l3 {
+    stroke: var(--k3);
+  }
+  .l4 {
+    stroke: var(--k4);
+  }
+  .l5 {
+    stroke: var(--k5);
+  }
+
+  /* ---- Avatars: a picture on a tile of its tone, with the level beside it ---- */
 
   .avatar {
     --size: 40px;
@@ -3096,13 +3073,10 @@
     color: var(--on-fill);
   }
 
-  .avatar::before {
-    content: "";
-    width: 60%;
-    height: 60%;
-    background: currentColor;
-    -webkit-mask: var(--shape, var(--s-petal)) center / contain no-repeat;
-    mask: var(--shape, var(--s-petal)) center / contain no-repeat;
+  .avatar-pic {
+    position: absolute;
+    inset: 0;
+    clip-path: inset(0 round calc(var(--size) * 0.3));
   }
 
   /* The wardrobe on an avatar: a frame drawn around it (art/frame.ts), a pattern behind its shape. */
@@ -3119,87 +3093,40 @@
     margin: calc(var(--size) * 0.12);
   }
 
-  .frame-line {
-    fill: none;
-    stroke: var(--frame, var(--line-strong));
-    stroke-width: 2.5;
-  }
-
-  .frame-line.thin {
-    stroke-width: 1.5;
-  }
-
-  .frame-line.glow {
-    filter: drop-shadow(0 0 3px var(--frame));
-  }
-
-  .frame-dots {
-    fill: none;
-    stroke: var(--frame);
-    stroke-width: 3;
-    stroke-linecap: round;
-    stroke-dasharray: 0 6;
-  }
-
-  .frame-flame {
-    fill: var(--rose);
-    stroke: color-mix(in srgb, var(--rose) 60%, black);
-    stroke-width: 0.8;
-  }
-
-  .frame-leaf {
-    fill: var(--frame);
-    stroke: color-mix(in srgb, var(--frame) 60%, black);
-    stroke-width: 0.6;
-  }
-
-  .frame-gem {
-    fill: var(--frame);
-    stroke: color-mix(in srgb, var(--frame) 55%, black);
-    stroke-width: 0.8;
-  }
-
-  .frame-ray {
-    stroke: var(--frame);
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
-
   .fr-ring {
-    --frame: var(--text-muted);
+    --tone: var(--silver);
   }
 
   .fr-double,
-  .fr-laurel {
-    --frame: var(--gold);
+  .fr-flames,
+  .fr-laurel,
+  .fr-podium1 {
+    --tone: var(--div-gold);
   }
 
   .fr-dots {
-    --frame: var(--sky);
-  }
-
-  .fr-flames {
-    --frame: var(--gold);
+    --tone: var(--sky);
   }
 
   .fr-gem {
-    --frame: var(--div-diamond);
+    --tone: var(--div-diamond);
   }
 
   .fr-halo {
-    --frame: var(--div-legend);
-  }
-
-  .fr-podium1 {
-    --frame: var(--div-gold);
+    --tone: var(--div-legend);
   }
 
   .fr-podium2 {
-    --frame: var(--div-silver);
+    --tone: var(--div-silver);
   }
 
   .fr-podium3 {
-    --frame: var(--div-bronze);
+    --tone: var(--div-bronze);
+  }
+
+  .fr-halo,
+  .fr-podium1 {
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 60%, transparent));
   }
 
   .bd-dots {
@@ -3281,76 +3208,6 @@
     height: 28px;
     font-size: 1rem;
     line-height: 28px;
-  }
-
-  .av-petal {
-    --shape: var(--s-petal);
-  }
-  .av-rosette {
-    --shape: var(--s-rosette);
-  }
-  .av-circle {
-    --shape: var(--s-circle);
-  }
-  .av-diamond {
-    --shape: var(--s-diamond);
-  }
-  .av-triangle {
-    --shape: var(--s-triangle);
-  }
-  .av-moon {
-    --shape: var(--s-moon);
-  }
-  .av-leaf {
-    --shape: var(--s-leaf);
-  }
-  .av-wave {
-    --shape: var(--s-wave);
-  }
-  .av-hex {
-    --shape: var(--s-hex);
-  }
-  .av-flame {
-    --shape: var(--s-flame);
-  }
-  .av-star {
-    --shape: var(--s-star);
-  }
-  .av-target {
-    --shape: var(--s-target);
-  }
-  .av-bolt {
-    --shape: var(--s-bolt);
-  }
-  .av-book {
-    --shape: var(--s-book);
-  }
-  .av-trophy {
-    --shape: var(--s-trophy);
-  }
-  .av-shield {
-    --shape: var(--s-shield);
-  }
-  .av-heart {
-    --shape: var(--s-heart);
-  }
-  .av-crown {
-    --shape: var(--s-crown);
-  }
-  .av-eye {
-    --shape: var(--s-eye);
-  }
-  .av-sun {
-    --shape: var(--s-sun);
-  }
-  .av-hourglass {
-    --shape: var(--s-hourglass);
-  }
-  .av-spark {
-    --shape: var(--s-spark);
-  }
-  .av-clover {
-    --shape: var(--s-clover);
   }
 
   /* ---- Progress: the level, achievements, how a player looks ---- */
@@ -3466,11 +3323,11 @@
     stroke-linejoin: round;
   }
 
+  /* The middle, deep like enamel, so the picture in it stands out. */
   .medal-rim {
-    fill: color-mix(in srgb, var(--tier) 85%, white);
-    stroke: color-mix(in srgb, var(--tier) 70%, black);
+    fill: color-mix(in srgb, var(--tier) 38%, #140f26);
+    stroke: color-mix(in srgb, var(--tier) 70%, white);
     stroke-width: 1.5;
-    opacity: 0.9;
   }
 
   .medal-shine {
@@ -3505,16 +3362,15 @@
   }
 
   .badge-glyph {
+    --tone: var(--tier);
     position: relative;
-    width: 40%;
-    height: 40%;
-    background: var(--badge-ink);
-    -webkit-mask: var(--shape) center / contain no-repeat;
-    mask: var(--shape) center / contain no-repeat;
+    width: 58%;
+    height: 58%;
   }
 
   .badge.locked .badge-glyph {
-    background: var(--line-strong);
+    --tone: var(--line-strong);
+    opacity: 0.7;
   }
 
   .badge .badge-glyph.secret {
@@ -3523,8 +3379,6 @@
     background: none;
     color: var(--text-muted);
     font: 900 1.25rem / 1 var(--font-numeral);
-    -webkit-mask: none;
-    mask: none;
   }
 
   .badges-peek {
@@ -3584,15 +3438,15 @@
   }
 
   .reward-mark {
+    --tone: var(--tier);
     flex: none;
-    width: 14px;
-    height: 14px;
-    background: var(--tier-ink);
-    -webkit-mask: var(--shape) center / contain no-repeat;
-    mask: var(--shape) center / contain no-repeat;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: var(--tier);
   }
 
-  .reward-mark.av-secret {
+  .reward-mark.secret {
     display: none;
   }
 
@@ -3793,8 +3647,8 @@
   }
 
   .pick.locked .avatar {
-    background: var(--sunken);
-    color: var(--line-strong);
+    --tone: var(--line-strong);
+    opacity: 0.6;
   }
 
   .tones {

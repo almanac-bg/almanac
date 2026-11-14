@@ -1,11 +1,12 @@
 // Badges: an achievement drawn as a medal, generated from its tier and its shape, in the game's colours.
 //
 // The tier gives the medal its form, so it reads even without colour: common is round, rare a hexagon, epic an
-// eight-pointed star, legendary a sunburst with laurels. The shape of the achievement (the avatar it unlocks) sits in
-// the middle. A locked one is drawn hollow, with a ring for how far along it is; a hidden one shows only a question
+// eight-pointed star, legendary a sunburst with laurels. The picture of the achievement (the avatar it unlocks, from
+// art/pictures.ts) sits in the middle, in the tier's colours. A locked one is drawn hollow, with a ring for how far along it is; a hidden one shows only a question
 // mark.
 
 import type { Tier } from "../ui.ts";
+import { picture } from "./picture.ts";
 
 const svgNS = "http://www.w3.org/2000/svg";
 
@@ -85,9 +86,12 @@ export function badgeArt(o: BadgeOptions): HTMLElement {
       );
     }
   }
-  const glyph = document.createElement("span");
-  glyph.className = o.icon === "secret" ? "badge-glyph secret" : `badge-glyph av-${o.icon}`;
-  if (o.icon === "secret") glyph.textContent = "?";
+  // The middle: the avatar it unlocks, drawn in the tier's colours; or, for one still hidden, a question mark.
+  const glyph = o.icon === "secret" ? document.createElement("span") : picture(o.icon, "badge-glyph");
+  if (o.icon === "secret") {
+    glyph.setAttribute("class", "badge-glyph secret");
+    glyph.textContent = "?";
+  }
   const wrap = document.createElement("span");
   wrap.className = `badge t-${o.tier} ${o.earned ? "earned" : "locked"} badge-${o.size ?? "m"}`;
   wrap.setAttribute("aria-hidden", "true");
