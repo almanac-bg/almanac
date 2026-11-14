@@ -2,6 +2,11 @@
 // moment. The first wrong answer (or the time running out) is the way out, once the answer shows — unless nobody
 // still in got that question right, when those who answered stay in. Those out watch the rest to the end.
 //
+// The end comes when it has stakes: after the last question, once nobody is left in, or once one is left of two or
+// more — the last one in has won, and plays no question alone. Whoever plays a tournament alone (nobody else came,
+// or the last tournament of a full evening took one) plays against the questions: out at the first wrong answer, as
+// "nobody got it right" is no news with nobody else in (play.RevealRoyal).
+//
 // The lobby opens a quarter of an hour before the start; whoever is there at the start plays. A tournament takes up
 // to play.RoyalSize players: when one is full, the next to come start another, on the same questions. Each moves on
 // at its own pace: a question's answer shows once everyone still in has answered, or when its time is up.
@@ -372,7 +377,7 @@ func (h *Hub) begin(ctx context.Context, t *table, now time.Time) error {
 		}
 	}
 	if len(there) == 0 {
-		if _, err := h.game.SettleRoyal(ctx, t.id); err != nil {
+		if _, err := h.game.SettleRoyal(ctx, t.id, nil); err != nil {
 			return err
 		}
 		t.members, t.phase = nil, play.RoyalEnd
@@ -458,10 +463,21 @@ func (h *Hub) reveal(ctx context.Context, t *table, now time.Time) error {
 	return nil
 }
 
-// next shows the next question, or ends the game: after the last question, or once nobody's left in it.
+// last says whether t's game ends once the answer showing has shown: after the last question, once nobody's left in
+// it, or once one is left of two or more (who has won).
+func (h *Hub) last(t *table) bool {
+	left := 0
+	for _, m := range t.members {
+		if m.in {
+			left++
+		}
+	}
+	return left == 0 || (left == 1 && t.entered > 1) || t.n+1 >= len(h.night.picks) || h.night.dealt[t.n+1] == nil
+}
+
+// next shows the next question, or ends the game (last).
 func (h *Hub) next(ctx context.Context, t *table, now time.Time) error {
-	left := slices.ContainsFunc(t.members, func(m *member) bool { return m.in })
-	if left && t.n+1 < len(h.night.picks) && h.night.dealt[t.n+1] != nil {
+	if !h.last(t) {
 		if err := h.game.ShowRoyal(ctx, t.id, t.n+1); err != nil {
 			return err
 		}
@@ -469,7 +485,13 @@ func (h *Hub) next(ctx context.Context, t *table, now time.Time) error {
 		h.changed(t)
 		return nil
 	}
-	places, err := h.game.SettleRoyal(ctx, t.id)
+	var in []int64
+	for _, m := range t.members {
+		if m.in {
+			in = append(in, m.ID)
+		}
+	}
+	places, err := h.game.SettleRoyal(ctx, t.id, in)
 	if err != nil {
 		return err
 	}
@@ -618,9 +640,11 @@ type View struct {
 	Entered int `json:"entered"`
 	// Left is how many are still in; WentOut, how many went out on the question whose answer shows; Spared, that
 	// nobody got it right, so those who answered stay in.
-	Left     int           `json:"left"`
-	WentOut  int           `json:"wentOut"`
-	Spared   bool          `json:"spared,omitempty"`
+	Left    int  `json:"left"`
+	WentOut int  `json:"wentOut"`
+	Spared  bool `json:"spared,omitempty"`
+	// Last says the game ends once the answer showing has shown: the standings come next.
+	Last     bool          `json:"last,omitempty"`
 	Players  []PlayerView  `json:"players"`
 	Question *QuestionView `json:"question,omitempty"`
 	// RunID is the viewer's run, once it's over: to go over its questions.
@@ -693,6 +717,7 @@ func (h *Hub) View(viewer int64) View {
 	}
 	v.Phase, v.N, v.Entered, v.WentOut = t.phase, t.n, t.entered, t.wentOut
 	v.Spared = t.phase == play.RoyalReveal && t.spared
+	v.Last = t.phase == play.RoyalReveal && h.last(t)
 	if me != nil {
 		v.In, v.Out = true, t.phase != play.RoyalLobby && !me.in
 		if t.phase == play.RoyalEnd || (v.Out && t.phase != play.RoyalQuestion) {

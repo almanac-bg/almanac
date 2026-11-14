@@ -95,6 +95,26 @@ func (w *world) answer(p Player, right bool) json.RawMessage {
 	return out
 }
 
+// has says whether a player has an achievement.
+func (w *world) has(p Player, id string) bool {
+	var n int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM achievements WHERE user_id = ? AND id = ?`, p.ID, id).Scan(&n)
+	return n > 0
+}
+
+// start puts players in the evening's lobby, and starts the evening.
+func (w *world) start(ps ...Player) {
+	w.t.Helper()
+	w.at(20, 50, 0)
+	for _, p := range ps {
+		w.h.Follow(p.ID)
+		if err := w.h.Join(w.t.Context(), p); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+	w.at(21, 0, 0)
+}
+
 func (w *world) give(p Player, right bool) {
 	w.t.Helper()
 	v := w.h.View(p.ID)
@@ -189,7 +209,12 @@ func TestEvening(t *testing.T) {
 		t.Fatalf("Bo's way out: %+v %+v", v, v.Question)
 	}
 
-	// Question 2: Vi lets the time run out.
+	if v := w.h.View(ana.ID); v.Last {
+		t.Fatalf("the end told with two still in: %+v", v)
+	}
+
+	// Question 2: Vi lets the time run out, and Ana is the last one in: she has won, the end comes once the answer
+	// has shown.
 	w.wait(Pause)
 	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.N != 1 {
 		t.Fatalf("the next question: %+v", v)
@@ -199,24 +224,12 @@ func TestEvening(t *testing.T) {
 	}
 	w.give(ana, true)
 	w.wait(20*time.Second + play.Grace)
-	if v := w.h.View(vi.ID); v.Phase != play.RoyalReveal || !v.Out || !v.Question.Reveal.Missed {
+	if v := w.h.View(vi.ID); v.Phase != play.RoyalReveal || !v.Out || !v.Question.Reveal.Missed || !v.Last || v.Left != 1 {
 		t.Fatalf("Vi's time ran out: %+v", v)
 	}
-
-	// Ana alone goes on. A question nobody gets right puts nobody out: her wrong answer spares her.
-	w.wait(Pause)
-	w.give(ana, true)
-	w.wait(Pause)
-	w.give(ana, false)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || !v.Spared || v.WentOut != 0 || v.Left != 1 || v.Out {
-		t.Fatalf("a question nobody got right: %+v", v)
-	}
-	// The time running out is the way out all the same: the end.
-	w.wait(Pause)
-	w.wait(20*time.Second + play.Grace)
 	w.wait(Pause)
 	v = w.h.View(ana.ID)
-	if v.Phase != play.RoyalEnd || v.Place != 1 || v.Delta <= 0 || v.RunID == 0 || len(v.Players) != 3 {
+	if v.Phase != play.RoyalEnd || v.N != 1 || v.Place != 1 || v.Delta <= 0 || v.RunID == 0 || len(v.Players) != 3 {
 		t.Fatalf("the end: %+v", v)
 	}
 	if p := v.Players; p[0].Name != ana.Name || p[1].Name != vi.Name || p[2].Name != bo.Name || p[2].Delta >= 0 {
@@ -226,16 +239,21 @@ func TestEvening(t *testing.T) {
 		t.Fatalf("told those watching of the end: %+v", told)
 	}
 	r, err := w.g.RoyalsOf(ctx, ana.ID)
-	if err != nil || len(r) != 1 || r[0].Players[0].Reached != 3 || r[0].Players[0].Place != 1 {
+	if err != nil || len(r) != 1 || r[0].Players[0].Reached != 2 || r[0].Players[0].Place != 1 {
 		t.Fatalf("Ana's tournaments: %+v %v", r, err)
 	}
-	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 5 {
+	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 2 {
 		t.Fatalf("Ana's game gone over: %d %v", len(rv), err)
 	}
+	// Her game was played to its end: two right of two, all of a game's end XP.
 	var xp int
-	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, v.RunID).Scan(&xp)
-	if xp == 0 {
-		t.Fatal("no XP for a Роял")
+	var finished bool
+	_ = w.db.Read.QueryRow(`SELECT xp, finished_at IS NOT NULL FROM runs WHERE id = ?`, v.RunID).Scan(&xp, &finished)
+	if want := 2*(play.XPAnswer+play.XPKnown) + play.XPFinish; xp != want || !finished {
+		t.Fatalf("Ana's run: %d XP (want %d), finished %v", xp, want, finished)
+	}
+	if !w.has(ana, "royalWin") || w.has(vi, "royalWin") {
+		t.Fatal("„Вечерта е твоя“ not Ana's alone")
 	}
 
 	// The results show until the next evening's lobby opens.
@@ -328,19 +346,96 @@ func TestRestart(t *testing.T) {
 	}
 	w.h.Follow(bo.ID)
 	w.give(bo, false)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || !v.Out || v.Left != 1 {
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || !v.Out || v.Left != 1 || !v.Last {
 		t.Fatalf("after the restart, Bo's answer: %+v", v)
 	}
-	// The night goes on to its end: Ana is placed first.
-	for range play.RoyalLength {
-		w.wait(Pause)
-		if w.h.View(ana.ID).Phase != play.RoyalQuestion {
-			break
-		}
-		w.give(ana, true)
+	// Another restart while the answer that decided it shows: Ana is still the last one in, and wins.
+	w.h = NewHub(w.g, Evening)
+	if err := w.h.Load(ctx); err != nil {
+		t.Fatal(err)
 	}
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 {
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Left != 1 || !v.Last {
+		t.Fatalf("the answer that decided it, after a restart: %+v", v)
+	}
+	w.wait(Pause)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 || v.N != 1 {
 		t.Fatalf("the end after a restart: %+v", v)
+	}
+}
+
+// The last one in wins, even with no more right than the one who went out on the same question: Bo, quicker on the
+// first, lets the second's time run out while Ana's wrong answer to it is spared (nobody got it right).
+func TestLastOneIn(t *testing.T) {
+	w := setup(t)
+	ana, bo := w.player(), w.player()
+	w.start(ana, bo)
+	w.wait(time.Second)
+	w.give(bo, true)
+	w.wait(6 * time.Second)
+	w.give(ana, true)
+	w.wait(Pause)
+	w.give(ana, false)
+	w.wait(20*time.Second + play.Grace)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || !v.Spared || v.Out || v.WentOut != 1 || v.Left != 1 || !v.Last {
+		t.Fatalf("Ana spared, Bo out: %+v", v)
+	}
+	w.wait(Pause)
+	v := w.h.View(ana.ID)
+	if v.Phase != play.RoyalEnd || v.Place != 1 || v.Players[0].Reached != 1 || v.Players[1].Reached != 1 ||
+		v.Players[1].Place != 2 || v.Delta != 0 {
+		t.Fatalf("the end: %+v", v)
+	}
+	var xp int
+	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, v.RunID).Scan(&xp)
+	if want := (play.XPAnswer + play.XPKnown) + play.XPAnswer + play.XPFinish/2; xp != want {
+		t.Fatalf("Ana's XP: %d, want %d", xp, want)
+	}
+	if !w.has(ana, "royalWin") || w.has(bo, "royalWin") {
+		t.Fatal("„Вечерта е твоя“ not Ana's alone")
+	}
+}
+
+// Everyone still in out on the same question: nobody is the last one in, and the places go by the answers.
+func TestAllOut(t *testing.T) {
+	w := setup(t)
+	ana, bo, vi := w.player(), w.player(), w.player()
+	w.start(ana, bo, vi)
+	w.give(ana, true)
+	w.give(bo, true)
+	w.give(vi, false)
+	w.wait(Pause)
+	// Neither answers the second.
+	w.wait(20*time.Second + play.Grace)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.WentOut != 2 || v.Left != 0 || !v.Last {
+		t.Fatalf("both out: %+v", v)
+	}
+	w.wait(Pause)
+	v := w.h.View(ana.ID)
+	if v.Phase != play.RoyalEnd || v.Players[0].Place != 1 || v.Players[1].Place > 2 || v.Players[2].Name != vi.Name {
+		t.Fatalf("the end: %+v", v)
+	}
+}
+
+// Alone in a tournament, there's nobody to be beaten with: the first wrong answer is the way out.
+func TestAlone(t *testing.T) {
+	w := setup(t)
+	ana := w.player()
+	w.start(ana)
+	w.give(ana, true)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Out || v.Last || v.Left != 1 {
+		t.Fatalf("right, alone: %+v", v)
+	}
+	w.wait(Pause)
+	w.give(ana, false)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.WentOut != 1 || !v.Last {
+		t.Fatalf("wrong, alone: %+v", v)
+	}
+	w.wait(Pause)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 || v.Entered != 1 {
+		t.Fatalf("the end, alone: %+v", v)
+	}
+	if w.has(ana, "royalWin") {
+		t.Fatal("a Роял won alone")
 	}
 }
 
@@ -423,7 +518,7 @@ func TestOpenedAndGlance(t *testing.T) {
 	}
 }
 
-// A question nobody gets right puts nobody out; the next one gets right by one puts the other out.
+// A question nobody gets right puts nobody out; the next one gets right by one puts the other out, and ends the game.
 func TestSpared(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -445,7 +540,11 @@ func TestSpared(t *testing.T) {
 	w.wait(Pause)
 	w.give(ana, true)
 	w.give(bo, false)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.Left != 1 || v.WentOut != 1 {
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.Left != 1 || v.WentOut != 1 || !v.Last {
 		t.Fatalf("Ana right, Bo wrong: %+v", v)
+	}
+	w.wait(Pause)
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalEnd || v.Place != 2 || v.Players[0].Name != ana.Name {
+		t.Fatalf("the end: %+v", v)
 	}
 }

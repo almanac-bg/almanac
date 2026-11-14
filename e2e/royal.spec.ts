@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 import { answer, playRun } from "./play.ts";
 
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
-// meet in the same one, as players do.
-test("Роял: in from the lobby, live to the first wrong answer (or through all fifteen), then the standings", async ({
+// meet in the same one, as players do; alone, a player is out at their first wrong answer, and with others, the game
+// ends once one is left.
+test("Роял: in from the lobby, live to the first wrong answer (or the last one in), then the standings", async ({
   page,
 }) => {
   test.setTimeout(360_000);
@@ -18,6 +19,9 @@ test("Роял: in from the lobby, live to the first wrong answer (or through al
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
     await expect(asked.or(standings).first()).toBeVisible({ timeout: 60_000 });
     if (await standings.isVisible()) break;
+    if (n === 0) {
+      await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
+    }
     await answer(page);
     // The answer shows once everyone still in has answered.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
