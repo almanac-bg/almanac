@@ -1,8 +1,8 @@
-// Награди: what playing earns — the achievements nearest to done, then every one by tier as a grid of medals, each a
-// tap from how it's earned, how far along it is and what it gives. What they give is worn in Гардероб.
+// Награди: what playing earns — the achievements nearest to done, then every one by tier, each in full: how it's
+// earned, how far along it is and what it gives. What they give is worn in Гардероб.
 
 import { picture } from "../art/picture.ts";
-import { type Child, h, type Signal, signal, when } from "../lib/dom.ts";
+import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { type AchievementInfo, badge, meter, profileNav, rewardWords, tiers, tierWords, unlockWords } from "../ui.ts";
@@ -38,12 +38,10 @@ export function rewards() {
 
 const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
-/** Every achievement, made to scan: the three nearest to done first, in full; then each tier as a grid of medals,
- * the earned ones first and bright, where a tap opens a medal's card (how it's earned, how far along, what it
- * gives) under its row. */
+/** Every achievement, in full and in sight, nothing a tap away: the three nearest to done first; then each tier, the
+ * earned ones first and bright, the hidden ones not found yet together in one. */
 function achievements(p: Progress): Child {
   const earned = p.achievements.filter((a) => a.at).length;
-  const open = signal("");
   const near = nearest(p.achievements, 3);
   return h(
     "section",
@@ -83,51 +81,15 @@ function achievements(p: Progress): Child {
           : null,
         h(
           "ul",
-          { class: "medals" },
-          // The earned first; the hidden ones not found yet, together in one.
+          { class: "achievements" },
           [...list.filter((a) => a.at), ...list.filter((a) => !a.at && !a.hidden)].map((a) =>
-            medal(a, a.id, open, a.name, card(a)),
+            h("li", { class: a.at ? "achievement" : "achievement locked" }, card(a)),
           ),
-          hidden[0]
-            ? medal(
-                hidden[0],
-                `secret-${tier}`,
-                open,
-                hidden.length === 1 ? "Скрито" : `${hidden.length} скрити`,
-                secret(hidden),
-              )
-            : null,
+          hidden[0] ? h("li", { class: "achievement locked" }, secret(hidden)) : null,
         ),
       );
     }),
   );
-}
-
-/** A medal in a tier's grid, and its card once tapped: the card takes the whole width of the row after it (the
- * grid fills the rest of the row with the medals that follow). */
-function medal(a: AchievementInfo, id: string, open: Signal<string>, name: string, body: Child): Child {
-  const got = !!a.at;
-  const progress = !a.at && !a.hidden && (a.goal ?? 1) > 1 ? `${a.progress ?? 0}/${a.goal}` : "";
-  return [
-    h(
-      "li",
-      { class: got ? "medal" : "medal locked" },
-      h(
-        "button",
-        {
-          class: "medal-btn",
-          type: "button",
-          "aria-expanded": () => open() === id,
-          onclick: () => open.set(open.peek() === id ? "" : id),
-        },
-        badge(a, got),
-        h("span", { class: "medal-name" }, name, got ? h("span", { class: "sr" }, ", спечелено") : null),
-        progress ? h("span", { class: "medal-progress num" }, progress) : null,
-      ),
-    ),
-    () =>
-      open() === id ? h("li", { class: got ? "achievement medal-card" : "achievement medal-card locked" }, body) : null,
-  ];
 }
 
 /** An achievement in full: its medal, how it's earned, how far along it is (or the day it was earned), and what it

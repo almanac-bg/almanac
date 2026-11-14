@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { fact, pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
+import { pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
 import { loadMistakes } from "./play.ts";
 
 interface Learned {
@@ -109,10 +109,20 @@ export function almanac() {
                 h(
                   "li",
                   { class: `card almanac-item ${toneOf(f.category)}` },
-                  h("p", { class: "kicker" }, categories.find((c) => c.id === f.category)?.name ?? ""),
-                  h("p", { class: "almanac-q" }, f.question),
-                  h("p", { class: "almanac-a" }, f.answer),
-                  fact(f.fact),
+                  // The topic, then the question and its answer as one pair, then what was learned: a page of its own.
+                  h(
+                    "p",
+                    { class: "kicker almanac-topic" },
+                    topicMark(f.category),
+                    categories.find((c) => c.id === f.category)?.name ?? "",
+                  ),
+                  h(
+                    "div",
+                    { class: "almanac-qa" },
+                    h("p", { class: "almanac-q" }, f.question),
+                    h("p", { class: "almanac-a" }, f.answer),
+                  ),
+                  h("p", { class: "almanac-fact" }, f.fact),
                 ),
               ),
             )

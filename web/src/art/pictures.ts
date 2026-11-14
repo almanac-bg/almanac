@@ -117,6 +117,45 @@ const laurel = (
   }
   return [[inks[2], stems, 'stroke-width="1.4"'], ...leaves];
 };
+/** Laurel branches up both sides of the avatar's tile (grown by `inset`), following its rounded square, not a circle:
+ * from the bottom middle round the lower corner and up the side, past the upper corner; leaves alternating outside
+ * and inside the stem, in two inks; the right branch mirrors the left. */
+const tileLaurel = (
+  inset: number,
+  count: number,
+  leaf: number,
+  inks: [string, string, string] = ["k3", "k4", "l2"],
+) => {
+  // 96 points round the outline, clockwise from the top middle: 48 is the bottom middle, 72 the left side's middle.
+  const path = around(inset, 96);
+  const [first, last] = [50, 88];
+  const pt = (i: number) => path[i] ?? [32, 32];
+  let stems = "";
+  const leaves: Layer[] = [];
+  for (const s of [-1, 1]) {
+    const x = (v: number) => (s < 0 ? v : n(64 - v));
+    stems += `M${x(pt(first)[0])} ${pt(first)[1]}`;
+    for (let i = first + 1; i <= last; i++) stems += `L${x(pt(i)[0])} ${pt(i)[1]}`;
+    for (let k = 0; k < count; k++) {
+      const i = Math.round(first + ((last - first) * (k + 0.6)) / count);
+      const [px, py] = pt(i);
+      const [qx, qy] = pt(i + 1);
+      const [dx, dy] = [qx - px, qy - py]; // the way the left branch grows, clockwise
+      const len = Math.hypot(dx, dy) || 1;
+      const out = k % 2 ? 1 : -1; // outside, then inside the stem
+      const [ox, oy] = [(dy / len) * out * leaf * 0.45, (-dx / len) * out * leaf * 0.45];
+      const [lx, ly] = [n(x(px + ox)), n(py + oy)];
+      const along = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const turn = n((s < 0 ? along : 180 - along) + s * out * 26);
+      leaves.push([
+        k % 2 ? inks[1] : inks[0],
+        `M${n(lx - leaf)} ${ly}Q${lx} ${n(ly - leaf * 0.62)} ${n(lx + leaf)} ${ly}Q${lx} ${n(ly + leaf * 0.62)} ${n(lx - leaf)} ${ly}Z`,
+        `transform="rotate(${turn} ${lx} ${ly})"`,
+      ]);
+    }
+  }
+  return [[inks[2], stems, 'stroke-width="1.4"'] as Layer, ...leaves];
+};
 /** The avatar's tile (8–56 in a frame's box), grown by `inset`, as a path: its corners round at 30%. */
 const tile = (inset: number) => {
   const x = 8 - inset;
@@ -1019,11 +1058,8 @@ const frames: Record<string, Layer[]> = {
       ["k5", flame(x, 7, h * 0.38, h * 0.13, lean * 0.4)],
     ]),
   ],
-  laurel: [
-    ...laurel(32, 32, 30.5, 98, 236, 7, 5.4),
-    ["k1", "M26.5 61.5Q32 58.5 37.5 61.5L36 64.5Q32 62.6 28 64.5Z"],
-    ["k4", C(32, 61, 2.2)],
-  ],
+  // Round the tile like every other frame: a circle of laurel round a square avatar looked like it didn't belong.
+  laurel: [...tileLaurel(4, 8, 4.8), ["k1", "M26.5 60Q32 57 37.5 60L36 63Q32 61.1 28 63Z"], ["k4", C(32, 59.5, 2.2)]],
   gem: [
     ...band(3, 2.6),
     ...around(3, 4, 0.5).flatMap(([x, y]) => gem(x, y, 5)),

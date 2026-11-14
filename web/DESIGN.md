@@ -43,8 +43,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   from the icon beside the name.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
-  achievements nearest to done, in full; then each tier is a grid of medals (`.medals`/`.medal`), the earned first,
-  and a tap opens a medal's card (`.medal-card`) across the row under it, one at a time.
+  achievements nearest to done; then each tier, every achievement in full (`.achievements`/`.achievement`: how it's
+  earned, how far along, what it gives), the earned first: nothing is a tap away.
 
 ## First days
 
@@ -167,7 +167,8 @@ takes a token.
   - Like things are one size: a field is a button's height (48), an answer row 60 whatever the question's kind, a
     meter 6, a row card 12 by 16 inside; every number of a size is from the scale.
   - `.field` and `input.code`; `.join` for an input with its button.
-  - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways (the page itself never does).
+  - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways on a phone (the page itself never does);
+    with a mouse or on a tablet and up it wraps, every chip in sight.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.
 - **Mastery:** `.mastery` (the tier's bars, lit in the topic's tone, and its name), `.mastery-list`/`.mastery-row`, and
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
@@ -197,7 +198,7 @@ takes a token.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
   - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a week of the league ended),
     `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
-  - `.achievements`/`.achievement` (and `locked`), `.medals`/`.medal` with `.medal-card` (Награди's grid), `.worn`
+  - `.achievements`/`.achievement` (and `locked`), `.worn`
     (what's worn), `.picker`/`.pick` and `.tone-pick` for choosing a look.
   - `.league-link` (Профил's line of the league, a tap from the group).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
@@ -231,7 +232,7 @@ takes a token.
 - **Medals are pictures** (`badge-<tier>`, placed by `art/badge.ts`): the tier gives the form — common a round coin,
   rare a hexagon, epic an eight-pointed star, legendary a sunburst with ribbons — with a raised rim around a face in
   the tier's colour, where the achievement's own picture is drawn large (`medalPictures`, one per achievement). Epic
-  and legendary glow. Locked: grey, with a ring for its progress. Hidden and not found: a „?“, and nothing about how
+  and legendary glow. Locked: grey; its progress is the bar beside it, never a ring around the medal. Hidden and not found: a „?“, and nothing about how
   or what it gives.
 - Every achievement says how it's earned, how far along the player is, and its reward: its tier's XP, and only
   what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first

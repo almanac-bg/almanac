@@ -135,14 +135,61 @@ export const xpWords = (open?: Open) => meaning.xp + (open?.league ? meaning.lea
 
 let explained = 0;
 
-/** A number's name (`label`) a tap from what it means (`words`): a small card over the page, gone with the next tap
- * anywhere. */
+/** A number's name (`label`) and what it means (`words`), in a small card by the word: shown while a mouse is over the
+ * word or the keyboard is on it, and kept by a click or a tap until the next one anywhere. */
 export function explain(label: Child, words: string): Child {
   const id = `explain-${++explained}`;
-  return [
-    h("button", { class: "explain", type: "button", popovertarget: id }, label),
-    h("span", { class: "explain-pop", id, popover: "", role: "note" }, words),
-  ];
+  const pop = h("span", { class: "explain-pop", id, popover: "", role: "note" }, words) as HTMLElement;
+  let kept = false;
+  let leaving = 0;
+  const shown = () => pop.matches(":popover-open");
+  const show = () => {
+    clearTimeout(leaving);
+    if (!shown()) pop.showPopover();
+    // Under the word (over it if there's no room below), inside the screen's gutters, moving with the page.
+    const at = word.getBoundingClientRect();
+    const gutter = 16;
+    const left = Math.min(
+      Math.max(gutter, at.left + at.width / 2 - pop.offsetWidth / 2),
+      innerWidth - pop.offsetWidth - gutter,
+    );
+    const below = at.bottom + 8;
+    const top = below + pop.offsetHeight > innerHeight - gutter ? at.top - 8 - pop.offsetHeight : below;
+    pop.style.left = `${Math.max(gutter, left) + scrollX}px`;
+    pop.style.top = `${Math.max(gutter, top) + scrollY}px`;
+  };
+  const hide = () => {
+    if (shown() && !kept) pop.hidePopover();
+  };
+  pop.addEventListener("toggle", () => {
+    if (!shown()) kept = false;
+  });
+  const word = h(
+    "button",
+    {
+      class: "explain",
+      type: "button",
+      "aria-describedby": id,
+      onpointerenter: (e: PointerEvent) => e.pointerType === "mouse" && show(),
+      onpointerleave: (e: PointerEvent) => {
+        if (e.pointerType === "mouse") leaving = window.setTimeout(hide, 150);
+      },
+      onfocus: () => word.matches(":focus-visible") && show(),
+      onblur: hide,
+      onclick: () => {
+        // Shown by the mouse: the click keeps it. Kept already: the click puts it away.
+        if (shown() && kept) {
+          kept = false;
+          hide();
+        } else {
+          kept = true;
+          show();
+        }
+      },
+    },
+    label,
+  ) as HTMLElement;
+  return [word, pop];
 }
 
 /** A thin bar, filled to percent. */
@@ -437,7 +484,6 @@ export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l"
     tier: a.tier,
     icon: a.icon,
     earned,
-    progress: a.goal ? (a.progress ?? 0) / a.goal : 0,
     size,
   });
 }

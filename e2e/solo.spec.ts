@@ -250,6 +250,20 @@ test.describe("on a computer", () => {
     }
     expect(keyed).toBe(true);
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
+    // A number's name shows what it means while the mouse is on it, in a card under it, and a click keeps it.
+    const points = page.locator(".points").getByRole("button", { name: "точки" });
+    const card = page.locator(".points .explain-pop");
+    await points.hover();
+    await expect(card).toBeVisible();
+    const [word, under] = [await points.boundingBox(), await card.boundingBox()];
+    expect(word && under && under.y >= word.y + word.height).toBe(true);
+    await page.mouse.move(0, 0);
+    await expect(card).toBeHidden();
+    await points.click();
+    await page.mouse.move(0, 0);
+    await expect(card).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
     // After a first game, Начало is two columns: the day and the topics, and beside them the ways to play.
     await page.goto("/");
     const day = await page.locator(".home-main").boundingBox();
