@@ -127,7 +127,7 @@ func checkLine(field, s string, max int) []string {
 }
 
 // foreignLetters are Cyrillic letters Bulgarian doesn't use: they come in with Russian words, names and quotes.
-const foreignLetters = "ёыэЁЫЭ"
+const foreignLetters = "\u0451\u044b\u044d\u0401\u042b\u042d" // io, yeru and e, small and capital
 
 // checkLetters: a player reads only Bulgarian letters (a Russian name is written the Bulgarian way: Грозни).
 func checkLetters(field, s string) []string {
