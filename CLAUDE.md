@@ -1,7 +1,56 @@
 # АЛМАНАХ
 
-A quiz game for Bulgarian players at almanac.bg: a Go server (`cmd/`, `internal/`) and a plain TypeScript client
-(`web/`). How it's built and checked is in `README.md`; how it looks and speaks is in `web/DESIGN.md`.
+A quiz game for Bulgarian players, live at [almanac.bg](https://almanac.bg). It's built almost entirely by AI
+sessions, several at once: the owner gives a purpose ("duels should be live", "points should feel bigger"), and the
+session designs it, builds it, tests it and ships it, all the way to production, without asking for go-aheads it
+doesn't need. Decide; say why in a line; act. Ask only when the answer changes the product in a way the owner would
+want to choose.
+
+This file is the way in. Read it first; it says where everything else is.
+
+## The game, in a paragraph
+
+Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
+whoever comes (a recording of a real game if nobody does) and friends challenged in their own time; Роял every
+evening at 21:00, up to 50 live, out at the first wrong answer; rooms with a code for playing together; friends,
+levels (XP), achievements, titles, avatars, a rating with divisions and monthly seasons. Points are a game's score,
+XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`).
+
+## Where things are
+
+| Path | What |
+| --- | --- |
+| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/restore` |
+| `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; size budgets) |
+| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, seasons, goals, progress |
+| `internal/live` | Live duels: matchmaking, the shared clock, recordings |
+| `internal/royal` | Роял, live every evening |
+| `internal/room` | Rooms with a code |
+| `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: every client route must be listed there, or a reload is a 404) |
+| `internal/store` | SQLite; migrations in `internal/store/migrations`, numbered without gaps |
+| `internal/bank` | Question types, the bank on disk, its checks |
+| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, hourly backups to R2 |
+| `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
+| `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
+| `e2e` | The game in real browsers (Playwright) |
+| `bank/sample` | A public sample of the questions; the real bank is private (`private/`, the `questions` skill) |
+| `deploy` | The server's service and scripts (`deploy.sh` = `almanac-deploy`) |
+
+Each Go package starts with a doc comment that says what it is and how it works: read it before changing the
+package, and keep it true after.
+
+## Run and check
+
+```bash
+go run ./cmd/build -watch & DEV=1 go run ./cmd/almanac serve   # http://localhost:8080, mail in the log
+go vet ./... && go test -race ./...                            # the server
+npm run check && npm test                                      # the client: types, lint, unit tests, language
+npx playwright test -c e2e --project chromium e2e/<spec>       # the browser specs your change touches
+```
+
+Node lives under `~/.nvm` (put its `bin` on PATH in tool shells). Locally, Playwright's Chromium may be missing:
+`BROWSER_PATH="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"`. Test what you change; a new rule or
+screen gets a test. Look at a UI change at phone width (320–390 px) before shipping it.
 
 ## The game is in Bulgarian
 
@@ -21,6 +70,13 @@ and facts — is in **standard literary Bulgarian**. Code, comments, commit mess
 `web/src/language.test.ts` (part of `npm test`) fails on a non-Bulgarian letter or a known Russian word in the
 client, the server or the sample bank. It catches only what it knows: reading the words is still the check.
 
+## Other rules
+
+- **Free hand.** The game was rebuilt from zero in November 2026: no legacy to keep, nothing kept for compatibility.
+  Rename completely (URLs, API, files, types, stored ids with a migration), delete what's unused.
+- **The bank** (questions, facts) is changed only through the `questions` skill.
+- **Secrets** never go into the repo, a commit or a chat.
+
 ## Shipping: a merge is a deploy
 
 Fast is the rule: several sessions work at once, and every wait multiplies across them.
@@ -37,3 +93,10 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   don't stop each other's test servers.
 - **A migration takes the next free number on `main`** when you open the PR. If another lands first, renumber yours
   and push: the Server check fails within a minute on two migrations with one number.
+
+## Production
+
+One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
+SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI (above). By hand, as root:
+`almanac-deploy vX.Y.Z` (also how to go back: an older version), `almanac-bank` (pull and reload the questions),
+`journalctl -u almanac` (logs). Health: `https://almanac.bg/api/health` shows the live version.

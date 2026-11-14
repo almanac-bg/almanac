@@ -1,5 +1,6 @@
-# Weekly update pull requests (and immediate ones for security advisories); CI runs on each. A release is proposed
-# once it's five days old: a hijacked one is usually found and pulled within that.
+# Update pull requests: the program's modules weekly (what ships), the tools and actions monthly, all grouped so they
+# come as few pull requests as possible; security advisories at once. A release is proposed once it's five days old:
+# a hijacked one is usually found and pulled within that. A merged fix(deps) is deployed like any other fix.
 version: 2
 updates:
   # The program's few modules (SQLite) and the build's (esbuild): what ships is a fix.
@@ -9,11 +10,14 @@ updates:
     commit-message: { prefix: "fix(deps)" }
     cooldown:
       default-days: 5
+    groups:
+      modules:
+        patterns: ["*"]
 
   # Development tools only: nothing from npm reaches players.
   - package-ecosystem: npm
     directory: /
-    schedule: { interval: weekly, day: monday }
+    schedule: { interval: monthly }
     commit-message: { prefix: "build(deps)" }
     open-pull-requests-limit: 5
     cooldown:
@@ -24,11 +28,12 @@ updates:
         update-types: ["version-update:semver-major"]
     groups:
       tools:
+        patterns: ["*"]
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly, day: monday }
+    schedule: { interval: monthly }
     commit-message: { prefix: "ci(deps)" }
     cooldown:
       default-days: 5
