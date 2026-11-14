@@ -110,6 +110,8 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   playCount(seconds);
   listen(document, "keydown", (e) => {
     if (e.key === "Escape") leave(cancel);
+    // Enter starts, unless it's pressing a button of its own.
+    else if (e.key === "Enter" && !(e.target as Element).closest?.("button:enabled, a")) begin();
   });
 
   // The ring: a full circle that runs down with the clock (in CSS, over the same seconds), like a question's time bar.
@@ -132,8 +134,18 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     h(
       "div",
       { class: "actions" },
-      h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
-      h("button", { class: "btn", onclick: () => leave(cancel) }, "Откажи"),
+      h(
+        "button",
+        { class: "btn primary big", onclick: begin },
+        "Започни сега",
+        h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Enter"),
+      ),
+      h(
+        "button",
+        { class: "btn", onclick: () => leave(cancel) },
+        "Откажи",
+        h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Esc"),
+      ),
     ),
   );
 }
@@ -275,8 +287,9 @@ export function readingTime(text?: string): number {
   return text ? Math.min(9000, 1200 + 45 * text.length) : 0;
 }
 
-/** The game moving on by itself: a line that fills while the answer shows. */
-export function upNext(ms: number, label: string): Child {
+/** The game moving on by itself: a line that fills while the answer shows (`enter`: and on a computer, that Enter goes
+ * on at once). */
+export function upNext(ms: number, label: string, enter = false): Child {
   const fill = h("i", { class: "up-next-fill" });
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
@@ -284,7 +297,12 @@ export function upNext(ms: number, label: string): Child {
       fill.style.transform = "scaleX(1)";
     }),
   );
-  return h("div", { class: "up-next", role: "status" }, h("span", null, label), h("span", { class: "track" }, fill));
+  return h(
+    "div",
+    { class: "up-next", role: "status" },
+    h("span", { class: "up-next-label" }, label, enter ? h("kbd", { class: "key-hint" }, "Enter") : null),
+    h("span", { class: "track" }, fill),
+  );
 }
 
 function question(s: State, q: Shown, next: () => void, reload: () => void, versus: string): Child {
@@ -344,7 +362,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
       res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
       said ? fact(said) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
-      upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
+      upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
       said
         ? h(
             "button",
@@ -400,18 +418,12 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     clearInterval(tick);
   });
 
-  // Keys 1–4 answer a choice (or clues).
+  // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts).
   listen(document, "keydown", (e: KeyboardEvent) => {
-    if (
-      (q.view.type !== "choice" && q.view.type !== "clues") ||
-      e.target instanceof HTMLInputElement ||
-      e.metaKey ||
-      e.ctrlKey
-    )
-      return;
-    const i = Number(e.key) - 1;
-    if (i >= 0 && i < (q.view.type === "choice" ? (q.view.choices ?? q.view.pictures ?? []) : q.view.choices).length)
-      send({ pick: i });
+    if (e.key !== "Enter" || !due || e.repeat || (e.target as Element).closest?.("button:enabled, a, input")) return;
+    e.preventDefault();
+    clearTimeout(advance);
+    moveOn();
   });
 
   return h(

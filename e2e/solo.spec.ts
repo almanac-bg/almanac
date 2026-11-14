@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, playRun } from "./play.ts";
+import { answer, moveOn, playRun } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -111,4 +111,47 @@ test("an old challenge link says where playing with friends went", async ({ page
   await expect(page.getByRole("heading", { name: "Тази връзка вече не работи" })).toBeVisible();
   await page.getByRole("link", { name: "Към дуелите" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Дуел" })).toBeVisible();
+});
+
+test.describe("on a computer", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
+
+  test("the keys play a topic, and Начало takes the width", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto("/play/history");
+    // The count says its keys: Enter starts at once.
+    await expect(page.getByRole("button", { name: "Започни сега" }).locator(".key-hint")).toHaveText("Enter");
+    await page.keyboard.press("Enter");
+    // An answer's mark is the key that gives it; the key answers, and Enter goes on at once.
+    let keyed = false;
+    for (let n = 0; n < 10; n++) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+      const options = page.locator("article.question .options:not(.pic-options) .option");
+      if (!keyed && (await options.count()) === 4) {
+        await expect(options.locator(".letter")).toHaveText(["1", "2", "3", "4"]);
+        await page.keyboard.press("2");
+        await expect(options.nth(1)).toHaveClass(/right|wrong/);
+        await expect(page.locator(".up-next .key-hint")).toHaveText("Enter");
+        await page.keyboard.press("Enter");
+        keyed = true;
+        continue;
+      }
+      await answer(page);
+      await moveOn(page);
+    }
+    expect(keyed).toBe(true);
+    await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
+    // After a first game, Начало is two columns: the day and the topics, and beside them the ways to play.
+    await page.goto("/");
+    const day = await page.locator(".home-main").boundingBox();
+    const side = await page.locator(".home-side .modes").boundingBox();
+    const topics = await page.locator(".topics").boundingBox();
+    expect(side && day && side.x > day.x + day.width).toBe(true);
+    expect(topics && day && topics.y > day.y + day.height && Math.abs(topics.x - day.x) < 1).toBe(true);
+    // Ten topics, five to a row: none alone in a row.
+    const rows = await page
+      .locator(".topics li:not(.topic-all)")
+      .evaluateAll((li) => new Set(li.map((e) => Math.round(e.getBoundingClientRect().top))).size);
+    expect(rows).toBe(2);
+  });
 });
