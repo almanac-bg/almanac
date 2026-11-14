@@ -57,21 +57,44 @@ func TestWorth(t *testing.T) {
 
 func TestXP(t *testing.T) {
 	given := json.RawMessage(`{}`)
+	xp_ := func(score float64) int { return xp(bank.Graded{Given: given, Score: score, Right: score == 1}) }
 	for _, c := range []struct {
 		gr   bank.Graded
 		want int
 	}{
-		{bank.Graded{}, 0}, // the time ran out, or given up on
-		{bank.Graded{Given: given}, 10},
-		{bank.Graded{Given: given, Score: 0.5}, 15},
+		{bank.Graded{}, 0},             // the time ran out, or given up on
+		{bank.Graded{Given: given}, 2}, // wrong: a little for playing
+		{bank.Graded{Given: given, Score: 0.5}, 11},
 		{bank.Graded{Given: given, Score: 1, Right: true}, 20},
 	} {
 		if got := xp(c.gr); got != c.want {
 			t.Errorf("%+v earned %d XP, want %d", c.gr, got, c.want)
 		}
 	}
-	if finishXP("topic") != 50 || finishXP("day") != 100 {
-		t.Error("a game's end")
+	for _, c := range []struct {
+		kind          string
+		rights, total int
+		want          int
+	}{{"topic", 10, 10, 50}, {"topic", 3, 10, 15}, {"topic", 0, 10, 0}, {"day", 10, 10, 100}, {"day", 0, 10, 50},
+		{"mistakes", 5, 5, 50}, {"royal", 0, 15, 0}} {
+		if got := finishXP(c.kind, c.rights, c.total); got != c.want {
+			t.Errorf("a %s game's end, %d of %d right: %d XP, want %d", c.kind, c.rights, c.total, got, c.want)
+		}
+	}
+	// Knowing pays: a game answered at random (a quarter right) earns well under half what one mostly known does.
+	game := func(right int) int {
+		xp := finishXP("topic", right, 10)
+		for i := range 10 {
+			if i < right {
+				xp += xp_(1)
+			} else {
+				xp += xp_(0)
+			}
+		}
+		return xp
+	}
+	if random, known := game(3), game(7); 2*random >= known {
+		t.Errorf("a random game earns %d XP, a known one %d", random, known)
 	}
 }
 
