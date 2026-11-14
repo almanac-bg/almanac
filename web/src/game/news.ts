@@ -1,7 +1,8 @@
 // What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
 // one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
-// worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound.
+// worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound. Only what the player has met
+// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line.
 
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
@@ -14,11 +15,15 @@ import {
   type AchievementInfo,
   badge,
   type Division,
+  explain,
+  meaning,
   meter,
+  type Open,
   tierWords,
   type Unlock,
   unlockPicture,
   unlockWords,
+  xpWords,
 } from "../ui.ts";
 import { type MasteryMove, masteryLine } from "./mastery.ts";
 
@@ -42,6 +47,9 @@ interface News {
   avatar: string;
   /** How a topic's game moved its mastery. */
   mastery?: MasteryMove[];
+  /** Which of the game's systems the player has met, and those met with this game (told once). */
+  open: Open;
+  opened?: (keyof Open)[];
 }
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends). */
@@ -65,7 +73,8 @@ export function news(run: number, delay = 0): Child {
     if (!n) return null;
     const top = headline(n);
     return [
-      top === "level" ? null : xpLine(n),
+      (n.opened ?? []).map(opened),
+      top === "level" || !n.open.xp ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals) : null,
       top === "league" && n.league ? leagueEnded(n.league) : null,
       top === "division" && n.division ? divisionReached(n.division) : null,
@@ -93,6 +102,25 @@ function loudest(n: News): SoundName | null {
   return null;
 }
 
+/** A system met with this game, said once, in a line: what it is, in a few words. */
+function opened(system: keyof Open): Child {
+  const line = (lead: string, ...rest: Child[]) => h("p", { class: "news-open" }, lead && h("b", null, lead), rest);
+  switch (system) {
+    case "points":
+      return line("", meaning.points);
+    case "xp":
+      return line("Ново: XP и цели за деня. ", meaning.xp);
+    case "league":
+      return line(
+        "Ново: лигата. ",
+        "Всяка седмица се състезаваш по XP с група играчи. ",
+        h("a", { href: "/ranks#league" }, "Виж групата си"),
+      );
+    default:
+      return line("Ново: рейтинг. ", meaning.rating);
+  }
+}
+
 /** The XP a game brought and the level it leaves, in a line (when no new level has a card of its own). */
 function xpLine(n: News): Child {
   const level = `${n.levelUp ? "ново ниво" : "ниво"} ${n.level}`;
@@ -100,7 +128,7 @@ function xpLine(n: News): Child {
     "p",
     { class: "news-xp" },
     n.earned > 0
-      ? [h("b", { class: "num" }, `+${n.earned} XP`), ` · ${level}`]
+      ? [explain(h("b", { class: "num" }, `+${n.earned} XP`), xpWords(n.open)), ` · ${level}`]
       : level.charAt(0).toUpperCase() + level.slice(1),
   );
 }
@@ -192,7 +220,7 @@ function fresh(n: News): Child {
       ? h(
           "ul",
           { class: "unlock-list" },
-          n.achievements.map(earned),
+          n.achievements.map((a) => earned(a, n.open.xp)),
           n.unlocks.slice(0, shownUnlocks).map((u) =>
             // What an achievement just told here unlocks needs no „С постижението …“: it's right above.
             unlockRow(
@@ -213,8 +241,8 @@ function fresh(n: News): Child {
   );
 }
 
-/** An achievement just earned: its medal, its name, its tier and its XP. */
-function earned(a: AchievementInfo): Child {
+/** An achievement just earned: its medal, its name, its tier and (once XP is open) its XP. */
+function earned(a: AchievementInfo, xp: boolean): Child {
   return h(
     "li",
     { class: `unlock-row achievement-row t-${a.tier}` },
@@ -224,7 +252,11 @@ function earned(a: AchievementInfo): Child {
       { class: "unlock-text" },
       h("strong", null, a.name),
       h("span", { class: "unlock-about" }, a.about),
-      h("span", { class: "unlock-reward" }, `${cap(tierWords[a.tier].one)} постижение · +${a.xp ?? 0} XP`),
+      h(
+        "span",
+        { class: "unlock-reward" },
+        `${cap(tierWords[a.tier].one)} постижение${xp ? ` · +${a.xp ?? 0} XP` : ""}`,
+      ),
     ),
   );
 }

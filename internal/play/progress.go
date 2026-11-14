@@ -28,7 +28,9 @@ import (
 // something, the next division, the achievements nearest. The day's goals, done all three, also keep the streak
 // through a missed day (runs.go: reserve days), and the streak makes achievements of its own.
 //
-// All of it comes from the game's own records: nothing to buy, nothing made up.
+// All of it comes from the game's own records: nothing to buy, nothing made up. A new player meets it a part at a
+// time (unfold.go): all of it counts from the first game, but XP, the league and the rating show as each starts to
+// matter, and what waited is told then.
 
 // ErrNotYours is a title or an avatar the player hasn't earned (or one there's no such thing as).
 var ErrNotYours = errors.New("not earned")
@@ -274,6 +276,8 @@ type Progress struct {
 	Next Next `json:"next"`
 	// TierUnlocks are what the first achievement of a tier unlocks, of what the player doesn't have yet.
 	TierUnlocks map[Tier][]Unlock `json:"tierUnlocks"`
+	// Open is which of the game's systems the player has met (unfold.go): what Профил shows.
+	Open Open `json:"open"`
 }
 
 // totalXP is all the XP a player has earned.
@@ -368,7 +372,8 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	p.Frame, p.Backdrop = frame.String, backdrop.String
 	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
 	p.Next, p.TierUnlocks = w.next(p.Standing.Rating), w.tierUnlocks()
-	return p, nil
+	p.Open, err = g.OpenOf(ctx, userID)
+	return p, err
 }
 
 // Award gives a player every achievement their games have earned and they don't have yet, and returns those. It's
@@ -398,12 +403,20 @@ func (g *Game) Award(ctx context.Context, userID int64) ([]string, error) {
 	return news, nil
 }
 
-// bulgarianHour is a SQL expression for the hour in Bulgaria of a time in milliseconds: UTC+3 from April to October
-// (summer time, near enough for an achievement), UTC+2 the rest of the year.
-func bulgarianHour(ms string) string {
-	return `CAST(strftime('%H', ` + ms + `/1000 + CASE WHEN CAST(strftime('%m', ` + ms + `/1000, 'unixepoch') AS INT)
-		BETWEEN 4 AND 10 THEN 10800 ELSE 7200 END, 'unixepoch') AS INT)`
+// bulgarian is a SQL expression for a time in milliseconds as seconds in Bulgaria: UTC+3 from April to October
+// (summer time, near enough for an achievement or a day played), UTC+2 the rest of the year.
+func bulgarian(ms string) string {
+	return ms + `/1000 + CASE WHEN CAST(strftime('%m', ` + ms + `/1000, 'unixepoch') AS INT) BETWEEN 4 AND 10
+		THEN 10800 ELSE 7200 END`
 }
+
+// bulgarianHour is a SQL expression for the hour in Bulgaria of a time in milliseconds.
+func bulgarianHour(ms string) string {
+	return `CAST(strftime('%H', ` + bulgarian(ms) + `, 'unixepoch') AS INT)`
+}
+
+// bulgarianDate is a SQL expression for the day in Bulgaria (YYYY-MM-DD) of a time in milliseconds.
+func bulgarianDate(ms string) string { return `date(` + bulgarian(ms) + `, 'unixepoch')` }
 
 // measure is how far a player has come by each achievement's measure (days in a row, answers, duels won…), from
 // their records: what Award awards and a profile shows the progress of.
@@ -543,6 +556,7 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 // the day's goals done (with their XP), a week of the leagues ended (with what it paid), their level (whether it's gone up), a
 // division reached for the first time, and everything they've unlocked to wear, whatever unlocked it. The client
 // tells it in three cards at most (web/src/game/news.ts): the goals, the one biggest event, and what's new to wear.
+// Only what's open to the player is told (unfold.go): the rest waits for its system to open.
 type News struct {
 	Achievements []Earned   `json:"achievements"`
 	Goals        []DoneGoal `json:"goals"`
@@ -562,6 +576,9 @@ type News struct {
 	Avatar string `json:"avatar"`
 	// Mastery is how the game just played moved the player's mastery of its topics, told after a topic's game only.
 	Mastery []MasteryMove `json:"mastery,omitempty"`
+	// Open is which of the game's systems the player has met; Opened, those just met, told once (Systems' names).
+	Open   Open     `json:"open"`
+	Opened []string `json:"opened,omitempty"`
 }
 
 // DoneGoal is one of the day's goals, done: what it was, and the XP it earned.
@@ -572,7 +589,9 @@ type DoneGoal struct {
 
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
 // for none), it also counts that game's XP and, for a topic's game, tells how it moved their mastery. It awards first,
-// so that whatever ended meanwhile (a friend's duel, a Роял, a week of the leagues) is in it.
+// so that whatever ended meanwhile (a friend's duel, a Роял, a week of the leagues) is in it. What belongs to a system
+// the player hasn't met yet (unfold.go) waits for it: a new level, what a level unlocks, an achievement of the goals or
+// of the league; what can't wait (a day's goals, a week ended) is let go untold, its XP kept.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}, Unlocks: []Unlock{}}
 	if err := g.ensureWeek(ctx); err != nil {
@@ -604,6 +623,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	if err != nil {
 		return n, err
 	}
+	open, err := g.OpenOf(ctx, userID)
+	if err != nil {
+		return n, err
+	}
+	n.Open = open
 	have := w.unlocks()
 	n.XP = total
 	n.Level, n.From, n.To = LevelOf(total)
@@ -612,8 +636,9 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		var avatar sql.NullString
 		var seen, peak, peakSeen int
 		var known bool
-		if err := tx.QueryRow(`SELECT avatar, level_seen, peak, peak_seen, unlocks_known FROM users WHERE id = ?`, userID).
-			Scan(&avatar, &seen, &peak, &peakSeen, &known); err != nil {
+		var systems string
+		if err := tx.QueryRow(`SELECT avatar, level_seen, peak, peak_seen, unlocks_known, systems_told FROM users WHERE id = ?`,
+			userID).Scan(&avatar, &seen, &peak, &peakSeen, &known, &systems); err != nil {
 			return err
 		}
 		n.Avatar = cmp.Or(avatar.String, DefaultAvatar(userID))
@@ -627,6 +652,9 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				rows.Close()
 				return err
 			}
+			if sys := systemOf(id); sys != "" && !open.has(sys) {
+				continue // its system isn't open: it waits
+			}
 			if a, ok := achievementByID(id); ok {
 				n.Achievements = append(n.Achievements, Earned{Achievement: a, Progress: a.Goal, XP: AchievementXP[a.Tier],
 					At: w.earned[id], Rewards: w.rewardsOf(a)})
@@ -635,6 +663,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
+		}
+		for _, a := range n.Achievements {
+			if _, err := tx.Exec(`UPDATE achievements SET seen = 1 WHERE user_id = ? AND id = ?`, userID, a.ID); err != nil {
+				return err
+			}
 		}
 		goals, err := tx.Query(`SELECT goal, xp FROM goals_done WHERE user_id = ? AND NOT seen ORDER BY at`, userID)
 		if err != nil {
@@ -647,7 +680,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				goals.Close()
 				return err
 			}
-			if goal, _, _, ok := goalOf(b, id); ok {
+			if goal, _, _, ok := goalOf(b, id); ok && open.XP {
 				d.Name = goal.Name
 				n.Goals = append(n.Goals, d)
 			}
@@ -658,6 +691,9 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		}
 		if n.League, err = g.lastWeek(ctx, tx, userID, `NOT r.seen`); err != nil {
 			return err
+		}
+		if !open.League {
+			n.League = nil
 		}
 		// The unlocks not told yet; a player from before they were kept starts from what they have, untold.
 		told := map[string]bool{}
@@ -680,7 +716,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			}
 		}
 		for _, u := range have {
-			if told[u.key()] {
+			if told[u.key()] || (known && u.byLevel && !open.XP) {
 				continue
 			}
 			if known {
@@ -696,25 +732,32 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		for _, d := range n.Goals {
 			n.Earned += d.XP
 		}
-		// Every week not told yet pays (one is told: the latest).
+		// Every week not told yet pays (one is told: the latest), once the league is open.
 		var weeks int
 		if err := tx.QueryRow(`SELECT coalesce(sum(xp), 0) FROM league_results WHERE user_id = ? AND NOT seen`, userID).
 			Scan(&weeks); err != nil {
 			return err
 		}
-		n.Earned += weeks
-		if d, _ := DivisionOf(peak); d.From > peakSeen {
+		if open.League {
+			n.Earned += weeks
+		}
+		if d, _ := DivisionOf(peak); d.From > peakSeen && open.Rating {
 			n.Division = &d
 		}
-		n.LevelUp = seen < n.Level
+		// A level is told once XP is: one reached before waits for it.
+		level := 0
+		if open.XP {
+			level = n.Level
+		}
+		n.LevelUp = seen < level
+		n.Opened = opened(open, systems)
 		for _, q := range []string{
-			`UPDATE achievements SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE goals_done SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE league_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
-			`UPDATE users SET level_seen = max(level_seen, ?2), peak_seen = max(peak_seen, peak), unlocks_known = 1
-				WHERE id = ?1`,
+			`UPDATE users SET level_seen = max(level_seen, ?2), peak_seen = max(peak_seen, peak), unlocks_known = 1,
+				systems_told = trim(systems_told || ' ' || ?3) WHERE id = ?1`,
 		} {
-			if _, err := tx.Exec(q, userID, n.Level); err != nil {
+			if _, err := tx.Exec(q, userID, level, strings.Join(n.Opened, " ")); err != nil {
 				return err
 			}
 		}

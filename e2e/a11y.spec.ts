@@ -49,7 +49,8 @@ for (const scheme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Започни" }).click();
     await playRun(page);
     await expect(page.getByRole("button", { name: "Сподели" })).toBeVisible();
-    await expect(page.locator(".news-xp, .level-card").first()).toBeVisible();
+    // A first day's news: what points are, in a line (play/unfold.go).
+    await expect(page.locator(".news-open")).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   });

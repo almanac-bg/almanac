@@ -58,17 +58,20 @@ function what(p: Stats["recent"][number]): string {
 }
 
 /** Профил's numbers: the streak and this week; how well and how much they've played, in one card (the day's place
- * is Начало's and Класации'); how well they know each topic; their latest games. */
-export function stats(): Child {
+ * is Начало's and Класации'); how well they know each topic (once one has a mark); their latest games. */
+export function stats(goals: () => boolean): Child {
   const data = signal<Stats | null>(null);
   loadStats().then(data.set, () => {});
   return () => {
     const s = data();
     if (!s) return null;
     if (s.games === 0)
-      return [streak(s.streak, s.week, s.saved, s.reserve), h("p", { class: "muted" }, "Още няма изиграни игри.")];
+      return [
+        streak(s.streak, s.week, s.saved, s.reserve, goals()),
+        h("p", { class: "muted" }, "Още няма изиграни игри."),
+      ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve),
+      streak(s.streak, s.week, s.saved, s.reserve, goals()),
       h(
         "section",
         { class: "card figures" },
@@ -81,7 +84,8 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
           : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
       ),
-      masteryCard(s.mastery),
+      // „Колко знаеш“ once a topic has a mark: a first day's one answer a topic tells nothing.
+      s.mastery.some((m) => m.sure) ? masteryCard(s.mastery) : null,
       h(
         "section",
         { class: "stack" },

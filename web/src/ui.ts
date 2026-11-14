@@ -109,6 +109,42 @@ export function topicMark(category: string): Child {
   return category ? picture(`topic-${category}`, "topic-mark") : h("span", { class: "dot", "aria-hidden": "true" });
 }
 
+/** Which of the game's systems a player has met (play/unfold.go): the rest waits, untold, until it matters. */
+export interface Open {
+  points: boolean;
+  /** XP, the level and the day's goals: from the second day played. */
+  xp: boolean;
+  /** The week's league: from the third. */
+  league: boolean;
+  /** The rating and its division: from the first duel or Роял that moved it. */
+  rating: boolean;
+}
+
+/** The game's three numbers, each in a few words: what one game scored, what playing earns, how strong a player is.
+ * Kept apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
+export const meaning = {
+  points:
+    "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред. По тях е класацията на деня.",
+  xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
+  league: " С XP за седмицата се състезаваш и в лигата.",
+  rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. По него е дивизията ти.",
+};
+
+/** XP's words, with the league once it's open. */
+export const xpWords = (open?: Open) => meaning.xp + (open?.league ? meaning.league : "");
+
+let explained = 0;
+
+/** A number's name (`label`) a tap from what it means (`words`): a small card over the page, gone with the next tap
+ * anywhere. */
+export function explain(label: Child, words: string): Child {
+  const id = `explain-${++explained}`;
+  return [
+    h("button", { class: "explain", type: "button", popovertarget: id }, label),
+    h("span", { class: "explain-pop", id, popover: "", role: "note" }, words),
+  ];
+}
+
 /** A thin bar, filled to percent. */
 export function meter(percent: number, label: string): Child {
   return h(
@@ -149,7 +185,7 @@ function today(): number {
 
 /** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), and the reserve
  * days in hand. */
-export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0): Child {
+export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, goals = true): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
@@ -166,13 +202,16 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         h("span", { class: "streak-unit" }, unit),
       ),
       h("p", null, days ? "поред с въпросите на деня" : "Изиграй днешните и започни серия."),
-      h(
-        "p",
-        { class: "streak-reserve" },
-        reserve
-          ? `${reserveWords(reserve)}: ако пропуснеш ден, серията остава.`
-          : "Изпълни и трите цели за деня и печелиш резервен ден за серията.",
-      ),
+      // The way to a reserve day is the goals': said once they show (`goals`, play/unfold.go).
+      reserve || goals
+        ? h(
+            "p",
+            { class: "streak-reserve" },
+            reserve
+              ? `${reserveWords(reserve)}: ако пропуснеш ден, серията остава.`
+              : "Изпълни и трите цели за деня и печелиш резервен ден за серията.",
+          )
+        : null,
     ),
     week?.length === 7
       ? h(

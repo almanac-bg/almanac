@@ -32,18 +32,45 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   and „Прегледай въпросите“ below; the day's goals; the ways to play with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name), and all of them at once. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
-  streak, the goals and the ways to play with others come after the first game.
+  streak and the ways to play with others come after the first game, the level and the goals from the second day
+  played (see First days).
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
-  Рейтинг and Знания; of everyone or of friends (not the league: a group is its own).
+  Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
-  league (once in one), streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  league (once open and in one), streak, numbers, mastery (once a topic has a mark), latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
   achievements nearest to done, in full; then each tier is a grid of medals (`.medals`/`.medal`), the earned first,
   and a tap opens a medal's card (`.medal-card`) across the row under it, one at a time.
+
+## First days
+
+The game unfolds: a new player meets its systems one at a time, as each starts to matter, by what they've done (days
+played, a rated game), never by the date. The server says which are open (`open`, from `play/unfold.go`, in
+`/api/day`, `/api/me/progress` and a game's news); a screen shows nothing of a system that isn't, and doesn't name it.
+
+- **The first day:** the day's result and its points, the streak, the topics, the ways to play with others, and the
+  achievements the day earned with what they unlock (but what a level unlocks). No XP, level, goals, league or
+  rating anywhere.
+- **The second day played:** XP, the level (Начало's chip, Профил's card, the avatar's number) and the day's goals.
+- **The third:** the week's league (Профил's line, Класации' „Лига“). A week that ended before is let go untold.
+- **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
+- **A topic's first mark:** „Колко знаеш“ on Профил.
+
+Nothing earned waits, only what's shown: XP, achievements and unlocks count from the first game, and what was held
+(a level reached, its unlocks, an achievement of the goals or the league) is told when its system opens. Each system
+is said once, as it opens, in one quiet line at the top of that game's news (`.news-open`), never a tour.
+
+**The three numbers** are kept apart (`play/worth.go`) and each says what it is where it first shows, and a tap from
+wherever it does (`explain()`: the word dotted under, its meaning in a small card over the page; the words are
+`meaning` in `ui.ts`):
+
+- **точки:** one game's score (right answers, speed, right in a row); the day's board is by them;
+- **XP:** what playing earns (games, goals, achievements); it adds up to the level, and the week's to the league;
+- **рейтинг:** strength in duels and Роял, up with a win, down with a loss; the division is by it.
 
 ## Space and size
 
@@ -130,7 +157,8 @@ takes a token.
   folds what's rarely needed).
 - **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day`; `.modes .mode` and `.topics .topic`
   (`.topic-all` across the row).
-- **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`.
+- **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
+  (a number's name, a tap from its meaning: `explain()`).
 - **Controls:**
   - `.btn`, with `primary`, `big`, `rose` (accepting a friend request), `danger` and `inline`; and `.link`.
   - `.field` and `input.code`; `.join` for an input with its button.
@@ -188,7 +216,7 @@ takes a token.
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
   - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.league-card`
-  - `.unlocks .unlock-row`
+  - `.unlocks .unlock-row`, `.news-open` and `.explain`
 
 ## Tiers
 
@@ -205,7 +233,8 @@ takes a token.
   of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
 - **One system.** XP comes from answers, the day's goals, achievements and a week's first three places in the league;
   the rating from duels and Роял. Level, achievements, mastery, division, Роял and first place in a high league
-  unlock the wardrobe. After a game, its news is three cards at most: the goals it finished; the one biggest event (a
+  unlock the wardrobe. After a game, its news is three cards at most, of what the player has met (First days), under a
+  line for a system met with it (`.news-open`): the goals it finished; the one biggest event (a
   week of the league ended, a division
   reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
   (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. Профил shows
@@ -377,5 +406,5 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 - **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 16 kB of CSS, 47 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+- **Keep to the budgets:** 16 kB of CSS, 48 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
   over them.

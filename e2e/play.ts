@@ -1,4 +1,6 @@
 // Playing, as a player would: answer whatever question is showing.
+import { resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { expect, type Page } from "@playwright/test";
 
 /** Answers the question showing: the first option; „Вярно“; a number on the game's pad; an order, dragging the first
@@ -63,4 +65,30 @@ export async function moveOn(page: Page): Promise<void> {
   await expect(page.locator(".verdict")).toBeVisible();
   const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
   if (await go.isVisible()) await go.click().catch(() => {}); // gone already: the game moved on
+}
+
+/** Makes the player (a guest, made now if there's none) one who finished a game on each of the `days` days before
+ * today, straight in the test server's database: a player on their next days, who has met what those open
+ * (play/unfold.go). The games are of nothing, and earn nothing. */
+export async function playedBefore(page: Page, days: number): Promise<void> {
+  const id = await page.evaluate(async () => {
+    const r = await fetch("/api/guest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    return ((await r.json()) as { user: { id: number } }).user.id;
+  });
+  const db = new DatabaseSync(resolve(import.meta.dirname, "..", process.env.E2E_DB || "test-results/e2e.db"));
+  try {
+    db.exec("PRAGMA busy_timeout = 5000");
+    const add = db.prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
+      VALUES (?, 'topic', '', '[{"id":""}]', ?, ?)`);
+    for (let d = 1; d <= days; d++) {
+      const at = Date.now() - d * 24 * 60 * 60 * 1000;
+      add.run(id, at, at);
+    }
+  } finally {
+    db.close();
+  }
 }

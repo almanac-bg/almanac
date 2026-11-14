@@ -1,7 +1,7 @@
 // A player's progress as the server keeps it: the level, every achievement, and what they may look like.
 
 import { api } from "../lib/api.ts";
-import type { AchievementInfo, Division, Tier, TitleRef, Unlock } from "../ui.ts";
+import type { AchievementInfo, Division, Open, Tier, TitleRef, Unlock } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 
 export interface Progress {
@@ -32,6 +32,8 @@ export interface Progress {
   };
   /** What the first achievement of a tier unlocks, of what the player doesn't have yet. */
   tierUnlocks: Partial<Record<Tier, Unlock[]>>;
+  /** Which of the game's systems the player has met (play/unfold.go): what Профил shows. */
+  open: Open;
 }
 
 /** A frame or a pattern: free or unlocked, or locked with what unlocks it. */

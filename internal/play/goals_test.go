@@ -84,6 +84,7 @@ func TestGoals(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
+	w.played(ana, XPFromDay-1) // the goals are told from the second day played
 	goals, err := w.g.GoalsOf(ctx, ana)
 	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done {
 		t.Fatalf("a new player's goals: %+v %v", goals, err)
@@ -212,6 +213,7 @@ func TestGoalsOfOthers(t *testing.T) {
 	ctx := t.Context()
 	ana, vi := w.user(), w.user()
 	w.befriend(ana, vi)
+	w.played(vi, XPFromDay-1)
 
 	w.setGoals(vi, "day", "friendDuel", "duelWin")
 

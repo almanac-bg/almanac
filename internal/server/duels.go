@@ -342,8 +342,11 @@ func (s *Server) year(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, y)
 }
 
-// leagueNews tells a player how their week in the league ended.
+// leagueNews tells a player how their week in the league ended, once the league is theirs to see (play/unfold.go).
 func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
+	if open, err := s.game.OpenOf(ctx, n.To); err != nil || !open.League {
+		return
+	}
 	body := fmt.Sprintf("%s в %s.", place(n.Place, n.Of), n.From.Name)
 	switch {
 	case n.Now.Tier > n.From.Tier:

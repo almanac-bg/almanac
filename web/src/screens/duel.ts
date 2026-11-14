@@ -10,7 +10,18 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { back, type Division, formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
+import {
+  back,
+  type Division,
+  explain,
+  formatNumber,
+  meaning,
+  meter,
+  pageArt,
+  profileHref,
+  type Tier,
+  who,
+} from "../ui.ts";
 
 interface Side {
   name: string;
@@ -51,8 +62,8 @@ interface Friend {
   tag: string;
 }
 
-/** Your division: its emblem and name, your rating, and how far to the next. */
-export function standingCard(s: Standing): Child {
+/** A division: its emblem and name, the rating (yours: `own`, a tap from what it means), and how far to the next. */
+export function standingCard(s: Standing, own = false): Child {
   const span = s.next ? s.next - s.division.from : 0;
   const share = span ? Math.round((100 * (s.rating - s.division.from)) / span) : 100;
   return h(
@@ -64,7 +75,12 @@ export function standingCard(s: Standing): Child {
       { class: "standing-text" },
       h("p", { class: "kicker" }, "Дивизия"),
       h("strong", { class: "standing-name" }, s.division.name),
-      h("span", { class: "muted" }, `Рейтинг ${s.rating}${s.next ? ` · ${s.next - s.rating} до следващата` : ""}`),
+      h(
+        "span",
+        { class: "muted" },
+        own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
+        ` ${s.rating}${s.next ? ` · ${s.next - s.rating} до следващата` : ""}`,
+      ),
       s.next ? meter(share, `${share}% до следващата дивизия`) : null,
     ),
   );
@@ -156,7 +172,7 @@ export function duel() {
       h(
         "p",
         { class: "muted" },
-        "Ти и друг играч, на живо: едни и същи десет въпроса, в един и същи миг. Ако до 10 секунди не дойде никой, играеш срещу запис на истинска игра на играч с рейтинг като твоя.",
+        "Ти и друг играч, на живо: едни и същи десет въпроса, в един и същи миг. Ако до 10 секунди не дойде никой, играеш срещу запис на истинска игра на играч като теб.",
       ),
     ),
     h(
@@ -172,9 +188,10 @@ export function duel() {
       "Намери съперник",
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    // The division once a duel has moved the rating (play/unfold.go): before that it says nothing.
     () => {
       const d = data();
-      return d ? standingCard(d.standing) : null;
+      return d?.standing.rated ? standingCard(d.standing, true) : null;
     },
     () => {
       const list = data()?.duels ?? [];
@@ -387,7 +404,8 @@ export function ended(d: DuelView, again: Child = null, more: Child = null): Chi
             ? h(
                 "p",
                 { class: d.delta > 0 ? "duel-delta up" : "duel-delta down" },
-                `Рейтинг ${d.delta > 0 ? "+" : ""}${d.delta}`,
+                explain("Рейтинг", meaning.rating),
+                ` ${d.delta > 0 ? "+" : ""}${d.delta}`,
               )
             : null,
         )
