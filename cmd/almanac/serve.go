@@ -18,6 +18,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/push"
+	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/server"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -41,6 +42,8 @@ import (
 //	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
 //	OPERATOR_NAME       who runs the game, for the privacy page
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
+//	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
+//	                    every evening at 21:00
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
 //	                    MTA_STS_MODE testing (the default) or enforce
 //
@@ -70,6 +73,17 @@ func serve([]string) error {
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		Dev:             dev,
 		Version:         version,
+	}
+	if every := os.Getenv("ROYAL_EVERY"); every != "" && dev {
+		e, err := time.ParseDuration(every)
+		if err != nil || e <= 0 {
+			return errors.New("ROYAL_EVERY must be like 2m")
+		}
+		lobby, err := time.ParseDuration(env("ROYAL_LOBBY", "1m"))
+		if err != nil || lobby <= 0 || lobby > e {
+			return errors.New("ROYAL_LOBBY must be like 1m, and no longer than ROYAL_EVERY")
+		}
+		cfg.Royal = royal.Schedule{Every: e, Lobby: lobby}
 	}
 	secret := os.Getenv("SECRET")
 	switch {

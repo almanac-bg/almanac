@@ -635,6 +635,27 @@
     opacity: 0.62;
   }
 
+  /* Роял's next evening, and the countdown to its start. */
+  .royal-when {
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .royal-count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .royal-left {
+    margin: 0;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .royal-past {
+    display: grid;
+    gap: 2px;
+  }
+
   .royal-reach {
     display: grid;
     justify-items: end;

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"math"
 	mrand "math/rand/v2"
 	"slices"
@@ -14,20 +13,31 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Роял is a tournament played in each one's own time: up to RoyalSize players on the same RoyalLength questions,
-// easy to hard, in three rounds; the first wrong answer is the way out. Players place by how far they got, then by
-// how quick; the places move their ratings against everyone else in it. A tournament ends when everyone in a full
-// one has played, or RoyalOpen after it began.
+// Роял is played live, every evening: up to RoyalSize players on the same RoyalLength questions at the same moment,
+// easy to hard in three rounds, and the first wrong answer (or the time running out) is the way out. Players place
+// by how far they got, then by how quick; the places move their ratings against everyone else in it.
+//
+// The game itself is run by package royal, which keeps the clock; this is what it keeps in the database: the
+// tournaments and where each is, who's in them, and each player's run of answers (so that what a Роял earns is
+// earned as in any game, and a restart of the server picks the game up where it was).
 
 const (
-	RoyalSize   = 20
+	RoyalSize   = 50
 	RoyalLength = 15
 	// RoyalRound is how many questions a round has (three rounds: easy, medium, hard).
 	RoyalRound = 5
-	RoyalOpen  = 24 * time.Hour
+	// royalBackstop is how long after its start a tournament is ended whatever happened (the server down all
+	// evening): far longer than any game takes.
+	royalBackstop = time.Hour
 )
 
-var ErrNoRoyal = errors.New("no such royal")
+// A tournament is in one of these phases.
+const (
+	RoyalLobby    = "lobby"
+	RoyalQuestion = "question"
+	RoyalReveal   = "reveal"
+	RoyalEnd      = "end"
+)
 
 // royalSlots are a tournament's questions: quick ones (a choice, or true or not), five easy, five medium, five hard.
 func royalSlots() []slot {
@@ -68,118 +78,211 @@ func drawRoyal(b *bank.Bank, seen map[string]bool, r *mrand.Rand) []Pick {
 	return picks
 }
 
-// JoinRoyal puts the player in a tournament and gives them their run: back into one they haven't finished, else
-// into the fullest open one they aren't in yet, else a new one.
-func (g *Game) JoinRoyal(ctx context.Context, userID int64) (State, int64, error) {
-	var s State
-	var royalID int64
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		now := store.Ms(g.Now())
-		var runID int64
-		err := tx.QueryRow(`SELECT p.royal_id, p.run_id FROM royal_players p JOIN royals t ON t.id = p.royal_id
-			JOIN runs r ON r.id = p.run_id WHERE p.user_id = ? AND t.ended_at IS NULL AND r.finished_at IS NULL`, userID).
-			Scan(&royalID, &runID)
-		if err == nil {
-			r, err := load(tx, userID, runID)
-			if err != nil {
-				return err
-			}
-			s, err = g.state(tx, r)
-			return err
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		var questions string
-		err = tx.QueryRow(`SELECT t.id, t.questions FROM royals t WHERE t.ended_at IS NULL AND t.closes_at > ?
-			AND (SELECT count(*) FROM royal_players WHERE royal_id = t.id) < ?
-			AND NOT EXISTS (SELECT 1 FROM royal_players WHERE royal_id = t.id AND user_id = ?)
-			ORDER BY (SELECT count(*) FROM royal_players WHERE royal_id = t.id) DESC, t.created_at LIMIT 1`,
-			now, RoyalSize, userID).Scan(&royalID, &questions)
+// DrawRoyal draws an evening's questions, leaving out (while there are others) those of the last month's evenings.
+func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
+	seen := map[string]bool{}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT DISTINCT questions FROM royals WHERE created_at > ?`,
+		store.Ms(g.Now().Add(-31*24*time.Hour)))
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var s string
 		var picks []Pick
-		switch {
-		case err == nil:
-			if err := json.Unmarshal([]byte(questions), &picks); err != nil {
-				return err
-			}
-		case errors.Is(err, sql.ErrNoRows):
-			seen, err := seenBy(tx, userID)
-			if err != nil {
-				return err
-			}
-			picks = drawRoyal(g.Bank(), seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
-			if len(picks) < RoyalLength {
-				return ErrNoQuestion
-			}
-			data, _ := json.Marshal(picks)
-			res, err := tx.Exec(`INSERT INTO royals (questions, created_at, closes_at) VALUES (?, ?, ?)`,
-				string(data), now, now+RoyalOpen.Milliseconds())
-			if err != nil {
-				return err
-			}
-			royalID, _ = res.LastInsertId()
-		default:
+		if err := rows.Scan(&s); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(s), &picks)
+		for _, p := range picks {
+			seen[p.ID] = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	picks := drawRoyal(g.Bank(), seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	if len(picks) < RoyalLength {
+		return nil, ErrNoQuestion
+	}
+	return picks, nil
+}
+
+// NewRoyal opens a tournament of the evening that starts at startsAt, on its questions.
+func (g *Game) NewRoyal(ctx context.Context, startsAt time.Time, picks []Pick) (int64, error) {
+	data, _ := json.Marshal(picks)
+	now := store.Ms(g.Now())
+	res, err := g.DB.Write.ExecContext(ctx, `INSERT INTO royals (questions, day, starts_at, phase, created_at, closes_at)
+		VALUES (?, ?, ?, 'lobby', ?, ?)`, string(data), startsAt.In(Bulgaria).Format(time.DateOnly),
+		store.Ms(startsAt), now, store.Ms(startsAt.Add(royalBackstop)))
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// JoinRoyal puts a player in a tournament's lobby (again changes nothing).
+func (g *Game) JoinRoyal(ctx context.Context, royalID, userID int64) error {
+	_, err := g.DB.Write.ExecContext(ctx, `INSERT INTO royal_players (royal_id, user_id, joined_at) VALUES (?, ?, ?)
+		ON CONFLICT DO NOTHING`, royalID, userID, store.Ms(g.Now()))
+	return err
+}
+
+// LeaveRoyal takes a player out of a tournament's lobby.
+func (g *Game) LeaveRoyal(ctx context.Context, royalID, userID int64) error {
+	_, err := g.DB.Write.ExecContext(ctx, `DELETE FROM royal_players WHERE royal_id = ? AND user_id = ? AND run_id IS NULL`,
+		royalID, userID)
+	return err
+}
+
+// StartRoyal begins a tournament with those of its lobby who are there (the others are left out of it): each is given
+// a run of its questions, and the first question shows. It returns each player's run.
+func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (map[int64]int64, error) {
+	runs := map[int64]int64{}
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var questions string
+		if err := tx.QueryRow(`SELECT questions FROM royals WHERE id = ?`, royalID).Scan(&questions); err != nil {
 			return err
 		}
-		r, err := g.insertRun(tx, userID, "royal", nil, nil, picks)
+		var picks []Pick
+		if err := json.Unmarshal([]byte(questions), &picks); err != nil {
+			return err
+		}
+		ids, _ := json.Marshal(players)
+		if _, err := tx.Exec(`DELETE FROM royal_players WHERE royal_id = ? AND user_id NOT IN (SELECT value FROM json_each(?))`,
+			royalID, string(ids)); err != nil {
+			return err
+		}
+		for _, u := range players {
+			r, err := g.insertRun(tx, u, "royal", nil, nil, picks)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`UPDATE royal_players SET run_id = ? WHERE royal_id = ? AND user_id = ?`, r.id, royalID, u); err != nil {
+				return err
+			}
+			runs[u] = r.id
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return runs, g.ShowRoyal(ctx, royalID, 0)
+}
+
+// ShowRoyal puts question n on the screens of everyone still in the tournament, and starts its time (again, for
+// those who haven't answered it, when the server picks up a game it was running).
+func (g *Game) ShowRoyal(ctx context.Context, royalID int64, n int) error {
+	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		now := store.Ms(g.Now())
+		if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE finished_at IS NULL AND at = ?
+			AND id IN (SELECT run_id FROM royal_players WHERE royal_id = ?)`, now, n, royalID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE royals SET n = ?, phase = 'question', phase_at = ? WHERE id = ?`, n, now, royalID)
+		return err
+	})
+}
+
+// RevealRoyal shows the answer to the question now: whoever hasn't answered it is out (the time ran out on them, or
+// they're gone).
+func (g *Game) RevealRoyal(ctx context.Context, royalID int64) error {
+	var late []struct{ user, run int64 }
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.Query(`SELECT r.user_id, r.id FROM runs r JOIN royal_players p ON p.run_id = r.id
+			JOIN royals t ON t.id = p.royal_id WHERE t.id = ? AND r.finished_at IS NULL AND r.at = t.n`, royalID)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO royal_players (royal_id, user_id, run_id, joined_at) VALUES (?, ?, ?, ?)`,
-			royalID, userID, r.id, now); err != nil {
+		for rows.Next() {
+			var l struct{ user, run int64 }
+			if err := rows.Scan(&l.user, &l.run); err != nil {
+				rows.Close()
+				return err
+			}
+			late = append(late, l)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
 			return err
 		}
-		s, err = g.state(tx, r)
+		for _, l := range late {
+			r, err := load(tx, l.user, l.run)
+			if err != nil {
+				return err
+			}
+			ms := int64(0)
+			if d, ok := g.deal(r.picks[r.at]); ok {
+				ms = Limit(d.Question()).Milliseconds()
+			}
+			if err := g.record(tx, r, bank.Graded{}, Worth{}, ms); err != nil {
+				return err
+			}
+		}
+		_, err = tx.Exec(`UPDATE royals SET phase = 'reveal', phase_at = ? WHERE id = ?`, store.Ms(g.Now()), royalID)
 		return err
 	})
-	return s, royalID, err
-}
-
-// royalRunDone ends a tournament once a just-finished run makes it full and played by all.
-func (g *Game) royalRunDone(ctx context.Context, runID int64) error {
-	var royalID int64
-	var players, done int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT p.royal_id,
-			(SELECT count(*) FROM royal_players WHERE royal_id = p.royal_id),
-			(SELECT count(*) FROM royal_players q JOIN runs r ON r.id = q.run_id WHERE q.royal_id = p.royal_id
-				AND r.finished_at IS NOT NULL)
-		FROM royal_players p JOIN royals t ON t.id = p.royal_id WHERE p.run_id = ? AND t.ended_at IS NULL`, runID).
-		Scan(&royalID, &players, &done)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
-	}
-	if err != nil || players < RoyalSize || done < players {
+	if err != nil {
 		return err
 	}
-	return g.settleRoyal(ctx, royalID)
+	for _, l := range late {
+		if err := g.afterRun(ctx, l.user); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-type royalist struct {
-	user          int64
-	name          string
-	rights        int
-	ms            int64
-	rating, rated int
-	place, delta  int
+// AnswerRoyal grades a player's answer to a tournament's question n, the one showing. A wrong one ends their run.
+func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, true)
 }
 
-// settleRoyal ends a tournament: places by how far each got (then how quick), and ratings moved by each place
-// against everyone else's (with three or more in it).
-func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
+// RoyalStanding is where a player came in a tournament, once it's ended.
+type RoyalStanding struct {
+	User  int64
+	Place int
+	Delta int
+}
+
+// SettleRoyal ends a tournament: places by how far each got (then how quick), and ratings moved by each place
+// against everyone else's (with three or more in it). An ended one is left as it is.
+func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding, error) {
+	type royalist struct {
+		user          int64
+		rights        int
+		ms            int64
+		rating, rated int
+		place, delta  int
+	}
 	if err := g.ensureSeason(ctx); err != nil { // a new month's game counts for the new season
-		return err
+		return nil, err
 	}
 	var list []royalist
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.Query(`SELECT p.user_id, u.name, coalesce(r.rights, 0), coalesce(r.ms, 0), u.rating, u.rated
-			FROM royal_players p JOIN users u ON u.id = p.user_id LEFT JOIN runs r ON r.id = p.run_id
-			WHERE p.royal_id = ? AND r.at > 0`, royalID)
+		var ended bool
+		if err := tx.QueryRow(`SELECT ended_at IS NOT NULL FROM royals WHERE id = ?`, royalID).Scan(&ended); err != nil {
+			return err
+		}
+		if ended {
+			return nil
+		}
+		// Anyone still mid-question (the server was down when the game should have gone on) is out where they are.
+		if _, err := tx.Exec(`UPDATE runs SET shown_at = NULL, finished_at = ? WHERE finished_at IS NULL
+			AND id IN (SELECT run_id FROM royal_players WHERE royal_id = ?)`, store.Ms(g.Now()), royalID); err != nil {
+			return err
+		}
+		rows, err := tx.Query(`SELECT p.user_id, r.rights, r.ms, u.rating, u.rated
+			FROM royal_players p JOIN users u ON u.id = p.user_id JOIN runs r ON r.id = p.run_id
+			WHERE p.royal_id = ?`, royalID)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var p royalist
-			if err := rows.Scan(&p.user, &p.name, &p.rights, &p.ms, &p.rating, &p.rated); err != nil {
+			if err := rows.Scan(&p.user, &p.rights, &p.ms, &p.rating, &p.rated); err != nil {
 				rows.Close()
 				return err
 			}
@@ -220,6 +323,10 @@ func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
 				list[i].delta = int(math.Round(sum / float64(len(list)-1)))
 			}
 		}
+		// Those in the lobby when it never started (the server down at the start) were in no game.
+		if _, err := tx.Exec(`DELETE FROM royal_players WHERE royal_id = ? AND run_id IS NULL`, royalID); err != nil {
+			return err
+		}
 		for _, p := range list {
 			if _, err := tx.Exec(`UPDATE royal_players SET place = ?, delta = ? WHERE royal_id = ? AND user_id = ?`,
 				p.place, p.delta, royalID, p.user); err != nil {
@@ -232,31 +339,30 @@ func (g *Game) settleRoyal(ctx context.Context, royalID int64) error {
 				}
 			}
 		}
-		_, err = tx.Exec(`UPDATE royals SET ended_at = ? WHERE id = ?`, store.Ms(g.Now()), royalID)
+		_, err = tx.Exec(`UPDATE royals SET phase = 'end', ended_at = ?1, phase_at = ?1 WHERE id = ?2`, store.Ms(g.Now()), royalID)
 		return err
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
+	out := make([]RoyalStanding, 0, len(list))
 	for _, p := range list {
 		if _, err := g.Award(ctx, p.user); err != nil {
-			return err
+			return nil, err
 		}
-		if g.RoyalNews != nil {
-			g.RoyalNews(ctx, RoyalNews{To: p.user, Place: p.place, Of: len(list), Delta: p.delta})
-		}
+		out = append(out, RoyalStanding{User: p.user, Place: p.place, Delta: p.delta})
 	}
-	return nil
+	return out, nil
 }
 
-// RoyalNews is told to each player in a tournament when it ends.
+// RoyalNews is told to a player when a tournament they were in ends while they're away from it.
 type RoyalNews struct {
 	To        int64
 	Place, Of int
 	Delta     int
 }
 
-// settleRoyalsDue ends the tournaments whose time is up.
+// settleRoyalsDue ends the tournaments the server wasn't there to end (and tells their players).
 func (g *Game) settleRoyalsDue(ctx context.Context) error {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id FROM royals WHERE ended_at IS NULL AND closes_at <= ?`,
 		store.Ms(g.Now()))
@@ -273,51 +379,129 @@ func (g *Game) settleRoyalsDue(ctx context.Context) error {
 		ids = append(ids, id)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	for _, id := range ids {
-		if err := g.settleRoyal(ctx, id); err != nil {
+		list, err := g.SettleRoyal(ctx, id)
+		if err != nil {
 			return err
 		}
+		if g.RoyalNews != nil {
+			for _, p := range list {
+				g.RoyalNews(ctx, RoyalNews{To: p.User, Place: p.Place, Of: len(list), Delta: p.Delta})
+			}
+		}
 	}
-	return rows.Err()
+	return nil
 }
 
-// RoyalPlayer is a player in a tournament as others see them: how far they got, and whether they're out.
+// LiveRoyal is a tournament not yet ended, as the database has it: for the server to pick the game up again.
+type LiveRoyal struct {
+	ID       int64
+	StartsAt time.Time
+	Picks    []Pick
+	N        int
+	Phase    string
+	Players  []LiveRoyalist
+}
+
+// LiveRoyalist is a player in a tournament not yet ended.
+type LiveRoyalist struct {
+	User  int64
+	Name  string
+	Tag   string
+	Run   int64 // 0: in the lobby
+	At    int   // questions answered
+	Right int
+	Ms    int64
+	Out   bool
+}
+
+// LiveRoyals are the tournaments under way or about to be (not those of before: SettleDue ends those).
+func (g *Game) LiveRoyals(ctx context.Context) ([]LiveRoyal, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id, starts_at, questions, n, phase FROM royals
+		WHERE ended_at IS NULL AND starts_at IS NOT NULL AND closes_at > ? ORDER BY id`, store.Ms(g.Now()))
+	if err != nil {
+		return nil, err
+	}
+	var out []LiveRoyal
+	for rows.Next() {
+		var t LiveRoyal
+		var starts int64
+		var questions string
+		if err := rows.Scan(&t.ID, &starts, &questions, &t.N, &t.Phase); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		t.StartsAt = time.UnixMilli(starts)
+		if err := json.Unmarshal([]byte(questions), &t.Picks); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		rows, err := g.DB.Read.QueryContext(ctx, `SELECT p.user_id, u.name, u.tag, coalesce(p.run_id, 0), coalesce(r.at, 0),
+				coalesce(r.rights, 0), coalesce(r.ms, 0), coalesce(r.finished_at IS NOT NULL, 0)
+			FROM royal_players p JOIN users u ON u.id = p.user_id LEFT JOIN runs r ON r.id = p.run_id
+			WHERE p.royal_id = ? ORDER BY p.joined_at, p.user_id`, out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var p LiveRoyalist
+			if err := rows.Scan(&p.User, &p.Name, &p.Tag, &p.Run, &p.At, &p.Right, &p.Ms, &p.Out); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[i].Players = append(out[i].Players, p)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// RoyalPlayer is a player in an ended tournament as others see them: how far they got, and where they came.
 type RoyalPlayer struct {
 	Name    string `json:"name"`
 	Tag     string `json:"tag"`
 	Reached int    `json:"reached"` // questions answered right
-	Out     bool   `json:"out"`     // a wrong answer (or the time) ended their run before the last question
-	Done    bool   `json:"done"`
-	Place   int    `json:"place,omitempty"`
+	Place   int    `json:"place"`
 	Delta   int    `json:"delta,omitempty"`
 	Me      bool   `json:"me,omitempty"`
 	Look
 }
 
-// Royal is a tournament as one of its players sees it.
+// Royal is an ended tournament as one of its players sees it.
 type Royal struct {
 	ID       int64         `json:"id"`
 	Length   int           `json:"length"`
 	Round    int           `json:"round"`
-	Size     int           `json:"size"`
-	ClosesAt int64         `json:"closesAt"`
-	EndedAt  int64         `json:"endedAt,omitempty"`
+	StartsAt int64         `json:"startsAt"`
 	Players  []RoyalPlayer `json:"players"`
 	RunID    int64         `json:"runId,omitempty"`
 }
 
-// RoyalsOf are the tournaments a player is in: open ones first, then the latest ended.
+// RoyalsOf are the latest tournaments a player was in, once ended.
 func (g *Game) RoyalsOf(ctx context.Context, userID int64) ([]Royal, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT t.id, t.closes_at, coalesce(t.ended_at, 0), coalesce(p.run_id, 0)
-		FROM royal_players p JOIN royals t ON t.id = p.royal_id WHERE p.user_id = ?
-		ORDER BY t.ended_at IS NOT NULL, coalesce(t.ended_at, t.created_at) DESC LIMIT 20`, userID)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT t.id, coalesce(t.starts_at, t.created_at), p.run_id
+		FROM royal_players p JOIN royals t ON t.id = p.royal_id WHERE p.user_id = ? AND t.ended_at IS NOT NULL
+		AND p.run_id IS NOT NULL ORDER BY t.ended_at DESC LIMIT 10`, userID)
 	if err != nil {
 		return nil, err
 	}
-	var out []Royal
+	out := []Royal{}
 	for rows.Next() {
-		v := Royal{Length: RoyalLength, Round: RoyalRound, Size: RoyalSize, Players: []RoyalPlayer{}}
-		if err := rows.Scan(&v.ID, &v.ClosesAt, &v.EndedAt, &v.RunID); err != nil {
+		v := Royal{Length: RoyalLength, Round: RoyalRound, Players: []RoyalPlayer{}}
+		if err := rows.Scan(&v.ID, &v.StartsAt, &v.RunID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -329,9 +513,9 @@ func (g *Game) RoyalsOf(ctx context.Context, userID int64) ([]Royal, error) {
 	}
 	for i := range out {
 		players, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, coalesce(r.rights, 0),
-				coalesce(r.finished_at IS NOT NULL, 0), coalesce(p.place, 0), coalesce(p.delta, 0), `+lookColumns+`
+				coalesce(p.place, 0), coalesce(p.delta, 0), `+lookColumns+`
 			FROM royal_players p JOIN users u ON u.id = p.user_id LEFT JOIN runs r ON r.id = p.run_id
-			WHERE p.royal_id = ? ORDER BY p.place IS NULL, p.place, coalesce(r.rights, 0) DESC, coalesce(r.ms, 0)`, out[i].ID)
+			WHERE p.royal_id = ? ORDER BY p.place, coalesce(r.rights, 0) DESC, coalesce(r.ms, 0)`, out[i].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -340,16 +524,17 @@ func (g *Game) RoyalsOf(ctx context.Context, userID int64) ([]Royal, error) {
 			var id int64
 			var avatar, title string
 			var points int
-			if err := players.Scan(&id, &p.Name, &p.Tag, &p.Reached, &p.Done, &p.Place, &p.Delta,
-				&avatar, &title, &points); err != nil {
+			if err := players.Scan(&id, &p.Name, &p.Tag, &p.Reached, &p.Place, &p.Delta, &avatar, &title, &points); err != nil {
 				players.Close()
 				return nil, err
 			}
 			p.Look, p.Me = lookOf(id, avatar, title, points), id == userID
-			p.Out = p.Done && p.Reached < RoyalLength
 			out[i].Players = append(out[i].Players, p)
 		}
 		players.Close()
+		if err := players.Err(); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
