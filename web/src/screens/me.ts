@@ -1,4 +1,4 @@
-// Профил: who you are in the game — your avatar, name, tag and title, your level, division, season and stats — with
+// Профил: who you are in the game — your avatar, name, tag and title, your level, division, league and stats — with
 // its own places a tap away at the top (Награди, Гардероб, Алманах) and the settings beside your name.
 
 import { emblem } from "../art/emblem.ts";
@@ -19,8 +19,8 @@ import {
   unlockWords,
 } from "../ui.ts";
 import { standingCard } from "./duel.ts";
+import { leagueCard } from "./league.ts";
 import { loadProgress, type Progress } from "./progress.ts";
-import { seasonCard } from "./season.ts";
 import { stats } from "./stats.ts";
 
 export function me() {
@@ -49,7 +49,7 @@ export function me() {
             const p = progress();
             return p ? nextCard(p) : null;
           },
-          seasonCard(),
+          leagueCard(),
           stats(),
           () =>
             user()?.tag
@@ -147,7 +147,7 @@ function nextCard(p: Progress): Child {
               h(
                 "span",
                 { class: "muted" },
-                `от ${next.division.from} рейтинг (още ${next.division.from - p.standing.rating}) · сезон в нея: +${next.division.xp} XP`,
+                `от ${next.division.from} рейтинг (още ${next.division.from - p.standing.rating})`,
               ),
               items(next.divisionUnlocks),
             ),

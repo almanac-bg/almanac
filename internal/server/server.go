@@ -113,7 +113,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game = play.New(d.DB, s.bank.Load)
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
-	s.game.SeasonNews = s.seasonNews
+	s.game.LeagueNews = s.leagueNews
 	s.game.MistakesAfter = cfg.MistakesAfter
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
@@ -196,7 +196,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/royal/plan", s.planRoyal)
 	api("DELETE /api/royal/plan", s.planRoyal)
 	api("GET /api/almanac", s.almanac)
-	api("GET /api/season", s.season)
+	api("GET /api/league", s.league)
 	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)

@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { playRun } from "./play.ts";
 
-test("a player's profile: from a board, asked to be friends, then a duel from it", async ({ browser }) => {
+test("a player's profile: asked to be friends, then a duel from it", async ({ browser }) => {
   test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
-  // Ana plays a topic: she's on the board of levels.
+  // Ana plays a topic.
   await a.goto("/");
   await a.locator(".topics").getByRole("link", { name: "История" }).click();
   await playRun(a);
@@ -14,10 +14,8 @@ test("a player's profile: from a board, asked to be friends, then a duel from it
     async () => (await (await fetch("/api/me")).json()).user as { name: string; tag: string },
   );
 
-  // Bo finds her there and opens her profile.
-  await b.goto("/ranks");
-  await b.getByRole("tab", { name: "Ниво" }).click();
-  await b.locator(`.board a.who[href="/players/${ana.tag}"]`).first().click();
+  // Bo opens her profile (a board's name is a link to it, as the league's group shows in the solo spec).
+  await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
   await expect(b.locator(".stats")).toContainText("изиграна игра");

@@ -40,16 +40,20 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Начало's top tells the streak and the level the day made.
   await expect(page.locator(".streak-chip")).toContainText("1");
   await expect(page.locator(".level-chip")).toContainText("Ниво");
-  // Класации opens on the day's board, the player on it; the XP shows on the board of levels; the season's board
-  // waits for ten rated games.
+  // Класации opens on the day's board, the player on it; the game put them in the week's league, racing on its XP;
+  // the rating's board waits for ten rated games.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText("/10");
+  await page.getByRole("tab", { name: "Лига" }).click();
+  await expect(page.locator(".league-card")).toContainText("Странджа");
+  await expect(page.locator(".league-board .row.me")).toContainText("XP");
   await page.getByRole("tab", { name: "Рейтинг" }).click();
-  await expect(page.locator(".season-card")).toContainText("0 от 10");
-  await page.getByRole("tab", { name: "Ниво" }).click();
-  await expect(page.locator(".board .row.me")).toContainText("ниво");
-  await page.getByRole("tab", { name: "Приятели" }).click();
-  await expect(page.locator(".board .row.me")).toBeVisible();
+  await expect(page.locator(".board-empty")).toContainText("Още никой няма 10 игри за рейтинг.");
+  // Профил shows the league too, a tap from the group.
+  await page.goto("/me");
+  await expect(page.locator(".league-card")).toContainText("място от");
+  await page.locator(".league-card").getByRole("link", { name: "Към групата" }).click();
+  await expect(page.locator(".league-board .row.me")).toBeVisible();
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {

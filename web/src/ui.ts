@@ -336,12 +336,11 @@ export interface AchievementInfo {
   rewards?: Unlock[];
 }
 
-/** A band of rating: where it starts, and the XP a season ended in it pays. */
+/** A band of rating, and where it starts. */
 export interface Division {
   id: DivisionID;
   name: string;
   from: number;
-  xp: number;
 }
 
 /** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */

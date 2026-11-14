@@ -66,14 +66,14 @@ type Game struct {
 	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
-	// SeasonNews, if set, is told of each place when a season ends.
-	SeasonNews func(context.Context, SeasonNews)
+	// LeagueNews, if set, is told of each place when a week of the leagues ends.
+	LeagueNews func(context.Context, LeagueNews)
 	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
 	// tests make it seconds).
 	MistakesAfter time.Duration
 
-	seasonMu sync.Mutex
-	season   string // the season being played, once ensureSeason has seen it
+	weekMu sync.Mutex
+	week   string // the leagues' week being played, once ensureWeek has seen it
 
 	hard   hardnessCache // how hard each question is (mastery.go)
 	crowds crowdCache    // how players have answered each question (crowd.go)
@@ -413,13 +413,16 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	return res, err
 }
 
-// afterRun keeps what a player's game, just finished, earned them: achievements, and the day's goals.
+// afterRun keeps what a player's game, just finished, earned them: achievements, the day's goals, and a place in
+// the week's league.
 func (g *Game) afterRun(ctx context.Context, userID int64) error {
 	if _, err := g.Award(ctx, userID); err != nil {
 		return err
 	}
-	_, err := g.GoalsOf(ctx, userID) // a goal done is kept, with its XP, whether or not the player looks
-	return err
+	if _, err := g.GoalsOf(ctx, userID); err != nil { // a goal done is kept, with its XP, whether or not the player looks
+		return err
+	}
+	return g.joinLeague(ctx, userID)
 }
 
 // newSeed is a deal's seed.

@@ -67,7 +67,7 @@ const (
 	// pushDay is the evening reminder of the day's questions.
 	pushDay pushKind = "day"
 	// pushFriends is word from people and of games played: a friend accepts a link or calls to a duel, how a duel
-	// or a Роял played in one's own absence ended, the season's end.
+	// or a Роял played in one's own absence ended, how a week in the league ended.
 	pushFriends pushKind = "friends"
 	// pushRoyal is the call to every evening's Роял as its lobby opens. Off by default: saying „Ще дойда“ calls a
 	// player to that one evening anyway.

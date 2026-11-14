@@ -1,5 +1,5 @@
 // Pictures: the game's illustrations — the avatars, the topics, the ways to play, the avatars' frames, the divisions'
-// emblems and the season's medal — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
+// emblems, the leagues' mountains and a medal — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
 // together (web/DESIGN.md, Pictures).
 //
 // The style: flat shapes with depth, no outlines, lit from the top left. Every picture is painted from one ramp of
@@ -1016,9 +1016,9 @@ const frames: Record<string, Layer[]> = {
   ],
 };
 
-/** A season's podium: a band in the place's metal, a faceted star on top and a sprig of laurel below; the champion's
- * star shines. */
-const podium = (place: number): Layer[] => {
+/** First place in a week of a high league: a band in its metal (Стара планина bronze, Пирин silver, Рила gold), a
+ * faceted star on top and a sprig of laurel below; Рила's star shines. */
+const summit = (place: number): Layer[] => {
   const [lit, shade] = facets(32, 4, 7.4, 3.2);
   return [
     ...(place === 1 ? [["k4", rays(32, 4, 6, 12.5, 8, 9, -90 + 22.5)] as Layer] : []),
@@ -1032,7 +1032,9 @@ const podium = (place: number): Layer[] => {
       .map(([x, y]): Layer => ["k5", C(x, y, 2)]),
   ];
 };
-for (const p of [1, 2, 3]) frames[`podium${p}`] = podium(p);
+frames.peak5 = summit(1);
+frames.peak4 = summit(2);
+frames.peak3 = summit(3);
 
 // ---- Divisions: a crest for each band of rating, in the division's colour (app.css: .d-*). Each has its own
 // silhouette, so they read apart without colour: Бронз a plain shield; Сребро a chevron on it; Злато wings; Платина a
@@ -1155,7 +1157,7 @@ const badges: Record<string, Layer[]> = {
   ],
 };
 
-/** A season's medal, in the place's metal: a ribbon, a disc with a rim, a faceted star. */
+/** A medal: a ribbon, a disc with a rim, a faceted star (an achievement's picture). */
 const medal: Layer[] = (() => {
   const [lit, shade] = facets(32, 40, 10, 4.3);
   return [
@@ -1170,6 +1172,74 @@ const medal: Layer[] = (() => {
   ];
 })();
 
+// ---- Leagues: a mountain on a round of sky for each week's league, from Странджа's low hills to Рила's snow, in the
+// league's colour (app.css: .lg-*). The higher the league, the higher and sharper the range; from Стара планина up
+// the peaks keep snow, and over Рила there's a star. Lit from the left: a peak's right face is in shade.
+
+/** A peak on the line y = 50: its lit face, then its face in shade. */
+const peak = (cx: number, h: number, w: number, lit = "k3", shade = "k2"): Layer[] => [
+  [lit, `M${n(cx - w)} 50L${cx} ${n(50 - h)}L${cx} 50Z`],
+  [shade, `M${cx} ${n(50 - h)}L${n(cx + w)} 50L${cx} 50Z`],
+];
+/** Snow on a peak, `s` down from its top, with a ragged edge: white on the lit face, pale in the shade. */
+const snow = (cx: number, h: number, w: number, s: number): Layer[] => {
+  const top = 50 - h;
+  const x = (w * s) / h;
+  return [
+    ["kw", `M${cx} ${n(top)}L${n(cx - x)} ${n(top + s)}L${n(cx - x * 0.45)} ${n(top + s * 0.72)}L${cx} ${n(top + s)}Z`],
+    ["k5", `M${cx} ${n(top)}L${cx} ${n(top + s)}L${n(cx + x * 0.4)} ${n(top + s * 0.7)}L${n(cx + x)} ${n(top + s)}Z`],
+  ];
+};
+/** A rounded hill on the line y = 50. */
+const hill = (cx: number, h: number, w: number, ink = "k3"): Layer => [
+  ink,
+  `M${n(cx - w)} 50Q${cx} ${n(50 - 2 * h)} ${n(cx + w)} 50Z`,
+];
+/** The round every league is drawn on: its sky, the range, then the ground below the line. */
+const mountain = (...range: Layer[]): Layer[] => [
+  lift(C(32, 32, 28)),
+  ["k5", C(32, 32, 28)],
+  ["kh", "M9 25A24 24 0 0 1 25 8.2L26 11.6A20.5 20.5 0 0 0 12.4 26Z"],
+  ...range,
+  ["k1", "M10.55 50A28 28 0 0 0 53.45 50Z"],
+];
+
+const leagues: Layer[][] = [
+  // Странджа: low wooded hills.
+  mountain(hill(37, 12, 16.4, "k2"), hill(22, 8, 11.4), hill(47, 5, 6.4, "k4")),
+  // Средна гора: a rounder, higher ridge between two hills.
+  mountain(hill(32, 16, 21.4, "k2"), hill(19, 8, 8.4), hill(45, 9, 8.4)),
+  // Родопи: a long soft ridge with a first peak.
+  mountain(hill(41, 13, 12.4, "k2"), ...peak(25, 22, 14.4)),
+  // Стара планина: a long range, its highest peak in snow.
+  mountain(
+    ...peak(18, 15, 7.4, "k2", "k1"),
+    ...peak(46, 17, 7.4, "k2", "k1"),
+    ...peak(32, 27, 19),
+    ...snow(32, 27, 19, 6),
+  ),
+  // Пирин: sharp peaks, all in snow.
+  mountain(
+    ...peak(19, 21, 8.4, "k2", "k1"),
+    ...snow(19, 21, 8.4, 5),
+    ...peak(45, 23, 8.4, "k2", "k1"),
+    ...snow(45, 23, 8.4, 5),
+    ...peak(32, 32, 15.5),
+    ...snow(32, 32, 15.5, 9),
+  ),
+  // Рила: the highest, deep in snow, a star over it.
+  mountain(
+    ...peak(19, 23, 8.4, "k2", "k1"),
+    ...snow(19, 23, 8.4, 6),
+    ...peak(45, 25, 8.4, "k2", "k1"),
+    ...snow(45, 25, 8.4, 6),
+    ...peak(32, 37, 18),
+    ...snow(32, 37, 18, 12),
+    ["kw", sparkle(17, 18, 3.8)],
+    ["k4", sparkle(47.5, 14, 2.4)],
+  ),
+];
+
 const draw = (layers: Layer[]) =>
   layers.map(([ink, d, attrs]) => `<path class="${ink}" d="${d}"${attrs ? ` ${attrs}` : ""}/>`).join("");
 
@@ -1180,6 +1250,7 @@ export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(frames).map(([id, l]) => [`frame-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(divisions).map(([id, l]) => [`division-${id}`, draw(l)])),
+  ...Object.fromEntries(leagues.map((l, tier) => [`league-${tier}`, draw(l)])),
   medal: draw(medal),
   ...Object.fromEntries(Object.entries(badges).map(([id, l]) => [`badge-${id}`, draw(l)])),
 };

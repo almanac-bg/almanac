@@ -23,7 +23,7 @@ const titleGroups: [TitleView["group"], string][] = [
   ["level", "С нивата"],
   ["achievement", "С постиженията"],
   ["topic", "С майсторството в темите"],
-  ["rank", "С рейтинга, Роял и сезоните"],
+  ["rank", "С рейтинга, Роял и лигата"],
 ];
 
 export function wardrobe() {

@@ -102,6 +102,13 @@
     --div-platinum: #7fe0cf;
     --div-diamond: #79c7ff;
     --div-legend: #c4a3ff;
+    /* Leagues: each mountain's colour (art/pictures.ts), from Странджа's green to Рила's ice. */
+    --lg-0: #7ccf8a;
+    --lg-1: #5cc7b4;
+    --lg-2: #6fb8ff;
+    --lg-3: #9d93ff;
+    --lg-4: #c9b8ff;
+    --lg-5: #bfe6ff;
     /* Achievement tiers: the fill of a badge, and the ink of its words. */
     --tier-common: var(--silver);
     --tier-rare: var(--sky);
@@ -177,6 +184,12 @@
       --div-platinum: #3fb5a0;
       --div-diamond: #3c9be0;
       --div-legend: #8b5cf6;
+      --lg-0: #2f9a4a;
+      --lg-1: #13917c;
+      --lg-2: #2d7fd0;
+      --lg-3: #5b4fd6;
+      --lg-4: #7d5ad8;
+      --lg-5: #2f8fc4;
       --tier-common: #b8b0cf;
       --tier-common-ink: #5d5677;
       --tier-epic-ink: #6a35d6;
@@ -533,65 +546,78 @@
     font-weight: 700;
   }
 
-  /* The season (the rating's month): where the player stands, their podium medals, the seasons before. */
-  .season-card {
+  /* The week's league (screens/league.ts): its mountain and name, the player's place, the zones of the group. */
+  .league-card {
     display: grid;
     gap: var(--space-3);
   }
 
-  .season-head {
+  .league-head {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
+    align-items: center;
+    gap: var(--space-3);
   }
 
-  .season-place b {
+  .league-name {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .league-name .kicker {
+    margin: 0;
+  }
+
+  .league-name strong {
+    color: color-mix(in srgb, var(--lg) 75%, var(--text));
+    font: 900 1.5rem / 1.75rem var(--font-sans);
+  }
+
+  .league-place {
+    margin: 0;
+  }
+
+  .league-place b {
     font: 900 2rem / 1 var(--font-numeral);
   }
 
-  .podium,
-  .season-past {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
+  .league-zone {
     margin: 0;
-    padding: 0;
+    font-weight: 700;
+  }
+
+  .league-zone.up {
+    color: var(--right-ink);
+  }
+
+  .league-zone.down {
+    color: var(--wrong-ink);
+  }
+
+  /* The group: the ones going up and down marked at the edge, and a line where each zone ends. */
+  .league-board .row.up {
+    box-shadow: inset 3px 0 0 var(--right);
+  }
+
+  .league-board .row.down {
+    box-shadow: inset 3px 0 0 var(--wrong);
+  }
+
+  .league-line {
+    padding: var(--space-1) var(--space-3);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     list-style: none;
   }
 
-  .season-past {
-    display: grid;
+  .league-line.up {
+    color: var(--right-ink);
   }
 
-  .podium li,
-  .season-past li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  .podium li.none {
-    color: var(--text-muted);
-  }
-
-  .season-medal {
-    --tone: var(--div);
-    display: inline-grid;
-    flex: none;
-    width: 36px;
-    height: 36px;
-  }
-
-  .season-medal.s {
-    width: 26px;
-    height: 26px;
-  }
-
-  .season-medal:not(.earned) {
-    --tone: var(--line-strong);
-    opacity: 0.55;
+  .league-line.down {
+    color: var(--wrong-ink);
   }
 
   /* Класации: who the board is of (everyone, friends) and, for knowledge, which topic. */
@@ -2390,6 +2416,34 @@
     --div: var(--div-legend);
   }
 
+  /* League emblems (art/league.ts): a mountain in the league's colour. */
+  .lg-0 {
+    --lg: var(--lg-0);
+  }
+  .lg-1 {
+    --lg: var(--lg-1);
+  }
+  .lg-2 {
+    --lg: var(--lg-2);
+  }
+  .lg-3 {
+    --lg: var(--lg-3);
+  }
+  .lg-4 {
+    --lg: var(--lg-4);
+  }
+  .lg-5 {
+    --lg: var(--lg-5);
+  }
+
+  .emblem[class*="lg-"] {
+    --tone: var(--lg);
+  }
+
+  .emblem.lg-5 {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--lg) 55%, transparent));
+  }
+
   .emblem {
     --tone: var(--div);
     display: inline-grid;
@@ -3672,7 +3726,7 @@
   .fr-double,
   .fr-flames,
   .fr-laurel,
-  .fr-podium1 {
+  .fr-peak5 {
     --tone: var(--div-gold);
   }
 
@@ -3688,16 +3742,16 @@
     --tone: var(--div-legend);
   }
 
-  .fr-podium2 {
+  .fr-peak4 {
     --tone: var(--div-silver);
   }
 
-  .fr-podium3 {
+  .fr-peak3 {
     --tone: var(--div-bronze);
   }
 
   .fr-halo,
-  .fr-podium1 {
+  .fr-peak5 {
     filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 60%, transparent));
   }
 
@@ -4452,15 +4506,6 @@
     color: var(--tier-ink, var(--text-muted));
     font-size: 0.8125rem;
     font-weight: 700;
-  }
-
-  .season-pay {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.3rem;
   }
 
   .picker {

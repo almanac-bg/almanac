@@ -41,7 +41,9 @@ export const medalPictures: Record<string, string> = {
   fullDays30: "medal",
   arenaWin: "mode-arena",
   royalWin: "crown",
-  placed: "division-gold",
+  leagueUp: "league-1",
+  leagueFirst: "league-3",
+  rila: "league-5",
 };
 
 export interface BadgeOptions {

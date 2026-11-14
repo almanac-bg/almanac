@@ -256,9 +256,6 @@ func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding,
 		rating, rated int
 		place, delta  int
 	}
-	if err := g.ensureSeason(ctx); err != nil { // a new month's game counts for the new season
-		return nil, err
-	}
 	var list []royalist
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var ended bool
@@ -323,7 +320,7 @@ func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding,
 				return err
 			}
 			if len(list) >= 3 {
-				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1, season_games = season_games + 1 WHERE id = ?2`,
+				if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1 WHERE id = ?2`,
 					p.delta, p.user); err != nil {
 					return err
 				}

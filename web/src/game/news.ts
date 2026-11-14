@@ -1,14 +1,15 @@
 // What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
-// one biggest thing that happened (a season ended, a division reached, a new level), or else a line of the XP it
+// one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
 // worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound.
 
 import { emblem } from "../art/emblem.ts";
-import { seasonName } from "../art/season.ts";
+import { leagueEmblem } from "../art/league.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
 import { play, type SoundName } from "../lib/sound.ts";
+import { type LeagueEnd, moveWords } from "../screens/league.ts";
 import {
   type AchievementInfo,
   badge,
@@ -24,13 +25,14 @@ import { type MasteryMove, masteryLine } from "./mastery.ts";
 interface News {
   achievements: AchievementInfo[];
   goals: { name: string; xp: number }[];
-  season?: { id: string; place: number; of: number; division: Division; xp: number };
+  /** How the player's last week in the league ended, not told yet. */
+  league?: LeagueEnd;
   level: number;
   xp: number;
   from: number;
   to: number;
   levelUp?: boolean;
-  /** The XP all this brought: the game just played, and the goals, achievements and season told with it. */
+  /** The XP all this brought: the game just played, and the goals, achievements and week told with it. */
   earned: number;
   /** A division the rating has reached for the first time. */
   division?: Division;
@@ -65,7 +67,7 @@ export function news(run: number, delay = 0): Child {
     return [
       top === "level" ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals) : null,
-      top === "season" && n.season ? seasonEnded(n.season) : null,
+      top === "league" && n.league ? leagueEnded(n.league) : null,
       top === "division" && n.division ? divisionReached(n.division) : null,
       top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
       fresh(n),
@@ -73,9 +75,10 @@ export function news(run: number, delay = 0): Child {
   };
 }
 
-/** The one biggest thing a game's news holds, if any: a season ended, then a division reached, then a new level. */
-function headline(n: News): "season" | "division" | "level" | null {
-  if (n.season) return "season";
+/** The one biggest thing a game's news holds, if any: a week of the league ended, then a division reached, then a
+ * new level. */
+function headline(n: News): "league" | "division" | "level" | null {
+  if (n.league) return "league";
   if (n.division) return "division";
   if (n.levelUp) return "level";
   return null;
@@ -141,18 +144,18 @@ function goalsDone(goals: News["goals"]): Child {
   );
 }
 
-/** A season ended: the place, the division it ended in, and the XP that paid. */
-function seasonEnded(s: NonNullable<News["season"]>): Child {
+/** A week of the league ended: the place in the group, where it takes the player, and the XP the place paid. */
+function leagueEnded(e: LeagueEnd): Child {
   return h(
     "section",
-    { class: "card unlock season-end" },
-    emblem(s.division.id, "m"),
+    { class: `card unlock league-end lg-${e.now.tier}` },
+    leagueEmblem(e.now.tier, "m"),
     h(
       "div",
       { class: "unlock-text" },
-      h("p", { class: "kicker" }, `Сезон ${seasonName(s.id)} свърши`),
-      h("strong", null, `${place(s.place, s.of)} · ${s.division.name}`),
-      h("span", { class: "unlock-reward" }, `+${s.xp} XP за дивизия ${s.division.name}`),
+      h("p", { class: "kicker" }, "Седмицата в лигата свърши"),
+      h("strong", null, `${place(e.place, e.of)} в ${e.from.name}`),
+      h("span", { class: "unlock-reward" }, `${moveWords(e)}${e.xp ? ` · +${e.xp} XP` : ""}`),
     ),
   );
 }
@@ -168,7 +171,7 @@ function divisionReached(d: Division): Child {
       { class: "unlock-text" },
       h("p", { class: "kicker" }, "Нова дивизия"),
       h("strong", null, d.name),
-      h("span", { class: "muted" }, `Сезон, завършен в нея, носи +${d.xp} XP.`),
+      h("span", { class: "muted" }, `Рейтинг ${d.from} и нагоре.`),
     ),
   );
 }

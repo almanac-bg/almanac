@@ -9,29 +9,29 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division.
+// Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division. It
+// has no seasons: the weekly race is the leagues' (leagues.go), on playing, not on strength.
 
 // StartRating is where every player starts.
 const StartRating = 1000
 
-// Division is a band of rating with a name: Бронз to Легенда. A season ended in it pays XP: the rating's one way into
-// the level, once a month, so that playing to win counts for progress too.
+// Division is a band of rating with a name: Бронз to Легенда. Reaching one first unlocks a title, a frame or a
+// pattern (wardrobe.go).
 type Division struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	From int    `json:"from"`
-	XP   int    `json:"xp"`
 }
 
 // Divisions from the lowest up; each begins at From. Everyone starts in Бронз; a few wins make Сребро, and each
 // division after takes more (Elo keeps the average near the start, so the top ones stay rare).
 var Divisions = []Division{
-	{"bronze", "Бронз", 0, 100},
-	{"silver", "Сребро", 1050, 200},
-	{"gold", "Злато", 1150, 400},
-	{"platinum", "Платина", 1300, 700},
-	{"diamond", "Диамант", 1450, 1000},
-	{"legend", "Легенда", 1600, 1500},
+	{"bronze", "Бронз", 0},
+	{"silver", "Сребро", 1050},
+	{"gold", "Злато", 1150},
+	{"platinum", "Платина", 1300},
+	{"diamond", "Диамант", 1450},
+	{"legend", "Легенда", 1600},
 }
 
 // DivisionOf is the division a rating is in, and where the next one starts (0 at the top).
@@ -116,22 +116,14 @@ func among(friends bool) string {
 	return ` AND (u.id = ?9 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?9))`
 }
 
-// RatingBoard is the season's board: everyone (or the viewer's friends) with MinSeasonGames rated games in it, by
-// rating. As it stands when the month ends, it's the season's result.
-func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
-	if err := g.ensureSeason(ctx); err != nil {
-		return Ranking{}, err
-	}
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, u.rating, 0, `+lookColumns+`
-		FROM users u WHERE u.season_games >= ?1`+among(friends)+`
-		ORDER BY u.rating DESC, u.season_games DESC, u.id`, true, MinSeasonGames)
-}
+// MinRatedGames is how many rated games put a player on the rating's board: a win or two isn't a rating yet.
+const MinRatedGames = 10
 
-// LevelBoard is the most XP ever earned (the highest levels): who has played the most, and the most knowingly.
-func (g *Game) LevelBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, x.xp, 0, `+lookColumns+`
-		FROM (SELECT user_id, sum(xp) AS xp FROM xp_earned GROUP BY user_id) x JOIN users u ON u.id = x.user_id
-		WHERE x.xp > 0`+among(friends)+` ORDER BY x.xp DESC, u.id`, false)
+// RatingBoard is the rating's board: everyone (or the viewer's friends) with MinRatedGames rated games, by rating.
+func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
+	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, u.rating, 0, `+lookColumns+`
+		FROM users u WHERE u.rated >= ?1`+among(friends)+`
+		ORDER BY u.rating DESC, u.rated DESC, u.id`, true, MinRatedGames)
 }
 
 // KnowledgeBoard is the best share of right answers, over every topic ("") or in one, among those with enough
