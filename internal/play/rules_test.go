@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -280,12 +281,19 @@ func TestFairRecordings(t *testing.T) {
 	topic(far, 7)            // a real game, by a player far below
 	w.wait(time.Minute)
 	topic(weak, 0) // the latest, and still not real
+	// A script's game, later still, all right, by a player of Ana's very rating: but every answer in 50 ms.
+	bot := w.user()
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1350 WHERE id = ?`, bot)
+	w.pace = func(int) time.Duration { return 50 * time.Millisecond }
+	scripted := topic(bot, Length)
+	w.pace = nil
 	l, err := w.g.StartRecorded(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if l.Runs[1] != real {
-		t.Fatalf("Ana got recording %d, not the real game in her band %d (the tapped one is %d)", l.Runs[1], real, tapped)
+		t.Fatalf("Ana got recording %d, not the real game in her band %d (the tapped one is %d, the script's %d)",
+			l.Runs[1], real, tapped, scripted)
 	}
 	// Rated against recordings: half a duel's move, five a day; the sixth is a friendly.
 	var moved []int
@@ -312,5 +320,61 @@ func TestFairRecordings(t *testing.T) {
 	}
 	if d, _ := w.g.DuelsOf(ctx, ana); !d[0].Friendly || !d[0].Recorded {
 		t.Fatalf("the sixth duel against a recording: %+v", d[0])
+	}
+}
+
+// A quick person's game is still a recording; a game with more quick answers than a person gives is not, even when
+// it's the only other one.
+func TestRecordingsArePeoples(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	quick := func(n int) func(int) time.Duration { // the first n answers in 300 ms, the rest in 2.5 s each
+		return func(i int) time.Duration {
+			if i < n {
+				return 300 * time.Millisecond
+			}
+			return 2500 * time.Millisecond
+		}
+	}
+	game := func(pace func(int) time.Duration) int64 {
+		user := w.user()
+		s, err := w.g.StartTopic(ctx, user, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.pace = pace
+		w.play(user, s.ID, repeat(w.right, Length)...)
+		w.pace = nil
+		w.wait(time.Minute)
+		return s.ID
+	}
+	ana := w.user()
+	scripted := game(quick(RecordingQuick + 1)) // one quick answer too many
+	if _, err := w.g.StartRecorded(ctx, ana); !errors.Is(err, ErrNobody) {
+		t.Fatalf("with only a script's game to play against: %v, want nobody", err)
+	}
+	person := game(quick(RecordingQuick)) // knew two at once
+	l, err := w.g.StartRecorded(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Runs[1] != person {
+		t.Fatalf("got recording %d, not the quick person's %d (the script's is %d)", l.Runs[1], person, scripted)
+	}
+	// Each question has its own floor: three orders put down in a second each are no person's; three statements
+	// judged in a second each are.
+	of := func(typ string) []Pick {
+		qs := w.b.Live("", typ)
+		if len(qs) == 0 {
+			t.Fatalf("no %s question in the sample bank", typ)
+		}
+		return slices.Repeat([]Pick{{ID: qs[0].Base().ID}}, RecordingQuick+1)
+	}
+	second := map[int]int64{0: 1000, 1: 1000, 2: 1000}
+	if !fastRun(w.b, of("order"), second) {
+		t.Fatal("three orders put down in a second each count as a person's")
+	}
+	if fastRun(w.b, of("truefalse"), second) {
+		t.Fatal("three statements judged in a second each count as a script's")
 	}
 }

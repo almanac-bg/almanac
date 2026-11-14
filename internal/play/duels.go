@@ -8,6 +8,7 @@ import (
 	mrand "math/rand/v2"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -16,9 +17,9 @@ import (
 // A duel with whoever comes is played live, both on each question at the same moment (internal/live runs it; here
 // it's made, and settled once both runs are done). If nobody comes in time, it's played against a recording of a
 // real player's earlier game on the same questions (a topic's or a duel's, never the day's, and none with today's
-// questions in it), a real one by a player of about their rating (recordedRun): only the player's rating moves, and
-// half as far, as the recorded one didn't ask to play nor plays to win; and only RecordedRatedPerDay such duels a day
-// move it.
+// questions in it), a real one by a player of about their rating, played at a person's speed and not a script's
+// (recordedRun, fastRun): only the player's rating moves, and half as far, as the recorded one didn't ask to play nor
+// plays to win; and only RecordedRatedPerDay such duels a day move it.
 //
 // A friend is challenged in their own time: the challenger plays at once, and the friend hears of it when they've
 // finished; from then they have FriendFor to play the same questions or say no.
@@ -373,16 +374,18 @@ type recorded struct {
 }
 
 // RecordingBand is how far a recording's player's rating may be from the player's to be their match, while there's
-// one that close; RecordingRights how many right answers make a game worth playing against.
+// one that close; RecordingRights how many right answers make a game worth playing against; RecordingQuick how many
+// answers quicker than a person (under their Floor) a game may have and still be a person's.
 const (
 	RecordingBand   = 150
 	RecordingRights = 3
+	RecordingQuick  = 2
 )
 
 // recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
-// run never), to play against: a real game (RecordingRights right or more), by a player whose rating is within
-// RecordingBand of the player's, the one with the fewest questions the player has seen, the latest first. Short of
-// such, the nearest it gets: any real game, then any game. Nil if there's none.
+// run never), played at a person's speed (fastRun), to play against: a real game (RecordingRights right or more), by
+// a player whose rating is within RecordingBand of the player's, the one with the fewest questions the player has
+// seen, the latest first. Short of such, the nearest it gets: any real game, then any game. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	seen, err := seenBy(tx, userID)
 	if err != nil {
@@ -396,10 +399,16 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	if err := tx.QueryRow(`SELECT rating FROM users WHERE id = ?`, userID).Scan(&mine); err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating FROM runs r JOIN users u ON u.id = r.user_id
+	// A game with more than RecordingQuick answers under the lowest Floor is a script's, whatever its questions: left
+	// out here, before the limit, so that a script's many games can't push the people's out of it; the Floor of each
+	// question is checked below.
+	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating,
+			(SELECT json_group_object(CAST(a.n AS TEXT), a.ms) FROM answers a WHERE a.run_id = r.id AND a.given IS NOT NULL)
+		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND r.user_id <> ? AND json_array_length(r.questions) = ?
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL AND (d.a_run = r.id OR d.b_run = r.id))
-		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
+			AND (SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NOT NULL AND a.ms < ?) <= ?
+		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length, floorLeast.Milliseconds(), RecordingQuick)
 	if err != nil {
 		return nil, err
 	}
@@ -413,13 +422,14 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	}
 	for rows.Next() {
 		var id int64
-		var raw string
+		var raw, timesRaw string
 		var rights, rating int
-		if err := rows.Scan(&id, &raw, &rights, &rating); err != nil {
+		if err := rows.Scan(&id, &raw, &rights, &rating, &timesRaw); err != nil {
 			return nil, err
 		}
 		var picks []Pick
-		if json.Unmarshal([]byte(raw), &picks) != nil {
+		var times map[int]int64 // how long each answer took, by its place: the answered ones
+		if json.Unmarshal([]byte(raw), &picks) != nil || json.Unmarshal([]byte(timesRaw), &times) != nil {
 			continue
 		}
 		n, whole := 0, true
@@ -431,7 +441,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 				n++
 			}
 		}
-		if !whole {
+		if !whole || fastRun(b, picks, times) {
 			continue
 		}
 		real := rights >= RecordingRights
@@ -450,6 +460,22 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 		}
 	}
 	return nil, nil
+}
+
+// fastRun is a game played quicker than a person plays: more than RecordingQuick of its answers came under their
+// question's Floor. A bot's game, or a cheat's, is no recording of a real game: against it a player can't win on speed,
+// and its answers „за 0,1 с“ give it away. One or two quick answers are a person who knew at once, and stay.
+func fastRun(b *bank.Bank, picks []Pick, times map[int]int64) bool {
+	quick := 0
+	for n, ms := range times {
+		if n < 0 || n >= len(picks) {
+			continue
+		}
+		if q, ok := b.Get(picks[n].ID); ok && time.Duration(ms)*time.Millisecond < Floor(q) {
+			quick++
+		}
+	}
+	return quick > RecordingQuick
 }
 
 func abs(n int) int {
