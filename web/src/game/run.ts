@@ -6,13 +6,15 @@ import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { tickOn } from "../lib/prefs.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
+import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture, picturesIn } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
-/** Plays a run from where it stands; `done` draws what comes after its last answer. */
-export function playRun(initial: State, done: (s: State) => Child): Child {
+/** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
+ * (`opponent`) over each question. */
+export function playRun(initial: State, done: (s: State) => Child, opponent = ""): Child {
   const screen = slot();
 
   const next = async () => {
@@ -60,16 +62,21 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
   });
 
   // Where the run stands: its end, a question waiting for its pictures, a question showing, or between questions
-  // (the next one opens at once).
+  // (the next one opens at once). A question and the end open at the top of the page, not where the answer before
+  // them (its fact, „Напред“) was scrolled to.
+  const versus = opponent ? `Дуел ${withName(opponent)}` : "";
   const at = (s: State) => {
     playing.set(!s.done);
-    if (s.done) screen.show(() => done(s));
-    else if (s.question?.startsMs) {
+    if (s.done) {
+      screen.show(() => done(s));
+      scrollTo(0, 0);
+    } else if (s.question?.startsMs) {
       const q = s.question;
       whenSeen(() => start(q));
     } else if (s.question) {
       const q = s.question;
-      screen.show(() => question(s, q, next, reload));
+      screen.show(() => question(s, q, next, reload, versus));
+      scrollTo(0, 0);
     } else whenSeen(next);
   };
 
@@ -162,19 +169,33 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
-/** The top of a question: which one of how many, and its topic (and, in a duel, against whom), with the game's
- * tally under it, if it has one. */
-export function questionHead(n: number, total: number, aside: string, tally: Child = null): Child {
+/** The top of a question: which one of how many, and its topic (and, in a duel with a friend, with whom: `versus`),
+ * with the game's tally under it, if it has one. On a phone a game has the whole screen, the header with it, so the
+ * way out is here: an arrow to Начало (but on Начало itself, where the day's ten are played). */
+export function questionHead(n: number, total: number, aside: string, tally: Child = null, versus = ""): Child {
   return h(
     "header",
     { class: "question-head" },
+    location.pathname === "/"
+      ? null
+      : h(
+          "a",
+          { class: "game-leave", href: "/", "aria-label": "Към Начало", title: "Към Начало" },
+          h("span", { class: "i i-left", "aria-hidden": "true" }),
+        ),
     h(
       "p",
       { class: "count" },
       h("b", { class: "count-n" }, String(n + 1)),
       h("span", { class: "count-of" }, ` от ${total}`),
     ),
-    h("div", { class: "head-side" }, h("p", { class: "kicker" }, aside), tally),
+    h(
+      "div",
+      { class: "head-side" },
+      versus ? h("p", { class: "kicker versus" }, versus) : null,
+      h("p", { class: "kicker" }, aside),
+      tally,
+    ),
   );
 }
 
@@ -266,7 +287,7 @@ export function upNext(ms: number, label: string): Child {
   return h("div", { class: "up-next", role: "status" }, h("span", null, label), h("span", { class: "track" }, fill));
 }
 
-function question(s: State, q: Shown, next: () => void, reload: () => void): Child {
+function question(s: State, q: Shown, next: () => void, reload: () => void, versus: string): Child {
   const locked = signal(false);
   const problem = signal<Child>(null);
   const after = h("div", { class: "after", hidden: true });
@@ -396,7 +417,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
   return h(
     "article",
     { class: "question" },
-    questionHead(q.n, s.total, topicName(q.category), score),
+    questionHead(q.n, s.total, topicName(q.category), score, versus),
     progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),

@@ -1542,12 +1542,15 @@
     gap: var(--space-4);
   }
 
+  /* The count never breaks („1 от / 10“): a long topic beside it wraps instead. */
   .count {
     display: flex;
+    flex: none;
     align-items: baseline;
     gap: var(--space-2);
     font-family: var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .count-n {
@@ -1565,13 +1568,44 @@
 
   .question-head .kicker {
     text-align: right;
+    text-wrap: balance;
   }
 
   .head-side {
     display: grid;
     justify-items: end;
     gap: var(--space-2);
+    min-width: 0;
     margin-bottom: 6px;
+    margin-left: auto;
+  }
+
+  /* A duel with a friend: with whom, over the topic, in the duels' colour. */
+  .question-head .versus {
+    margin-bottom: -4px;
+    color: var(--rose-ink);
+  }
+
+  /* The way out of a game on a phone, where the header steps aside (below): an arrow to Начало before the count. */
+  .game-leave {
+    display: none;
+    flex: none;
+    place-items: center;
+    align-self: flex-end;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: 0 calc(-1 * var(--space-3)) 4px -12px;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 1.5rem;
+  }
+
+  .game-leave:hover {
+    color: var(--text);
+  }
+
+  .game-leave:focus-visible {
+    box-shadow: var(--focus);
   }
 
   /* A run's tally while it's played: the right answers in a row, and the points so far. */
@@ -1801,6 +1835,23 @@
 
   .option.wrong .sign {
     --i: var(--i-cross);
+  }
+
+  /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer, so it
+     stays plain; a hollow ✕ and „ти: …“ say what the player gave instead. */
+  .option.missed {
+    box-shadow: none;
+  }
+
+  .option.missed .sign {
+    box-shadow: inset 0 0 0 2px currentColor;
+    color: var(--wrong-ink);
+    --i: var(--i-cross);
+  }
+
+  .option.missed .sign::before {
+    width: 12px;
+    height: 12px;
   }
 
   .option.right .value,
@@ -3114,13 +3165,14 @@
       inset 0 0 0 1px var(--line);
   }
 
+  /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. */
   .fact::before {
     content: "?";
     position: absolute;
-    top: -44px;
-    right: -16px;
-    color: var(--sunken);
-    font: 900 150px / 1 var(--font-numeral);
+    top: var(--space-4);
+    right: var(--space-4);
+    color: color-mix(in srgb, var(--accent) 30%, transparent);
+    font: 900 4.5rem / 1 var(--font-numeral);
     pointer-events: none;
   }
 
@@ -5117,14 +5169,21 @@
     }
   }
 
-  /* A phone in a game: the question has the whole screen, and a stray tap can't leave it (the name still goes home). */
+  /* A phone in a game: the question has the whole screen, the header and the bar of places with it, and a stray tap
+     can't leave it. The way out is the arrow before the question's count. */
   @media (max-width: 47.99rem) {
-    .playing .tabs {
+    .playing .tabs,
+    .playing #app > .top {
       display: none;
     }
 
     .playing #app {
+      padding-top: max(var(--space-4), env(safe-area-inset-top));
       padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+    }
+
+    .playing .game-leave {
+      display: grid;
     }
   }
 

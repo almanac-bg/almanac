@@ -135,11 +135,11 @@ export function duel() {
       () => {},
     );
   }
-  const challenge = async (friend: number) => {
+  const challenge = async (friend: Friend) => {
     error.set("");
     try {
-      const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend });
-      screen.show(() => playRun(r.state, () => afterDuel(r.duel)));
+      const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend: friend.id });
+      screen.show(() => playRun(r.state, () => afterDuel(r.duel), friend.name));
     } catch (err) {
       error.set((err as ApiError).message);
     }
@@ -202,7 +202,7 @@ export function duel() {
                     "li",
                     null,
                     h("span", null, h("strong", null, f.name), h("span", { class: "muted" }, ` @${f.tag}`)),
-                    h("button", { class: "btn inline", type: "button", onclick: () => challenge(f.id) }, "Дуел"),
+                    h("button", { class: "btn inline", type: "button", onclick: () => challenge(f) }, "Дуел"),
                   ),
                 ),
               ),
@@ -255,7 +255,7 @@ export function duelOne(params: string[]) {
             ? await api<State>("GET", `/api/runs/${d.runId}`)
             : await api<State>("POST", `/api/duels/${id}/play`, {});
         checkWaiting(); // the notice goes
-        screen.show(() => playRun(s, () => afterDuel(id)));
+        screen.show(() => playRun(s, () => afterDuel(id), d.opponent?.name));
       };
       // Asked and not started: who asks, and the choice (unless said yes to already); started: straight back in.
       const yes = accepted === id;

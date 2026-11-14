@@ -531,22 +531,31 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   return {
     node: h("div", { class: "stack" }, hint, list, said, done),
     pending: () => (moved ? { order: [...arrangement] } : null),
+    // The right order, as the answer; on each thing, whether the player had it in its place, and if not, where.
+    // Nothing put in order (the time ran out first): the right order alone.
     reveal(reveal, given) {
       hint.hidden = true;
       done.hidden = true;
-      const mine = given && "order" in given ? given.order : [];
+      const mine = given && "order" in given ? given.order : null;
       const unit = reveal.unit ? ` ${reveal.unit}` : "";
       list.replaceChildren(
-        ...(reveal.order ?? []).map((item, place) =>
-          h(
+        ...(reveal.order ?? []).map((item, place) => {
+          const at = mine ? mine.indexOf(item) : -1;
+          const how = !mine ? "" : at === place ? " right" : " missed";
+          return h(
             "li",
-            { class: mine[place] === item ? "option right" : "option wrong" },
+            { class: `option${how}` },
             h("span", { class: "letter" }, String(place + 1)),
-            h("span", null, view.items[item] ?? ""),
+            h(
+              "span",
+              null,
+              view.items[item] ?? "",
+              how === " missed" && at >= 0 ? h("small", { class: "match-gave" }, `ти: ${ordinal(at + 1, "n")}`) : null,
+            ),
             h("span", { class: "value" }, `${formatNumber(reveal.values?.[item] ?? 0, 0.01)}${unit}`),
-            sign(),
-          ),
-        ),
+            how ? sign() : null,
+          );
+        }),
       );
     },
   };
@@ -742,7 +751,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
           const gave = mine[i] ?? -1;
           return h(
             "li",
-            { class: ok ? "option right" : "option wrong" },
+            { class: ok ? "option right" : "option missed" },
             h(
               "span",
               { class: "match-pair" },
@@ -909,7 +918,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
           const ok = gave === group;
           return h(
             "li",
-            { class: ok ? "option right" : "option wrong" },
+            { class: ok ? "option right" : "option missed" },
             h(
               "span",
               { class: "split-pair" },
