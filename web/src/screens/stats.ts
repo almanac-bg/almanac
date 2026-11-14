@@ -1,12 +1,10 @@
 // How a player has done: the streak and this week, their numbers, how well they know each topic, their latest games.
 
 import { type Mastery, masteryCard } from "../game/mastery.ts";
-import type { Board } from "../game/types.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
 import { categories } from "../state.ts";
-import { stat, streak } from "../ui.ts";
+import { figure, formatNumber, streak } from "../ui.ts";
 
 export interface Stats {
   streak: number;
@@ -59,33 +57,29 @@ function what(p: Stats["recent"][number]): string {
   }
 }
 
+/** Профил's numbers: the streak and this week; how well and how much they've played, in one card (the day's place
+ * is Начало's and Класации'); how well they know each topic; their latest games. */
 export function stats(): Child {
   const data = signal<Stats | null>(null);
-  const day = signal<Board | null>(null);
   loadStats().then(data.set, () => {});
-  api<{ board: Board }>("GET", "/api/day").then(
-    (t) => day.set(t.board),
-    () => {},
-  );
   return () => {
     const s = data();
     if (!s) return null;
     if (s.games === 0)
       return [streak(s.streak, s.week, s.saved, s.reserve), h("p", { class: "muted" }, "Още няма изиграни игри.")];
-    const place = day()?.place;
     return [
       streak(s.streak, s.week, s.saved, s.reserve),
       h(
-        "div",
-        { class: "stats" },
-        place
-          ? stat(ordinal(place, "n"), "място днес", "gold")
-          : stat(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня", "gold"),
-        stat(`${percent(s.right, s.answers)}%`, "верни отговори", "mint"),
+        "section",
+        { class: "card figures" },
+        figure(
+          `${percent(s.right, s.answers)}%`,
+          `верни от ${formatNumber(s.answers)} ${s.answers === 1 ? "отговор" : "отговора"}`,
+        ),
+        figure(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
         s.duels > 0
-          ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose")
-          : stat(String(s.answers), s.answers === 1 ? "отговор" : "отговора"),
-        stat(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
+          ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
+          : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
       ),
       masteryCard(s.mastery),
       h(

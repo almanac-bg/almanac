@@ -311,7 +311,8 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
     h(
       "span",
       { class: "who-text" },
-      h("span", { class: "who-name" }, name, extra),
+      // The name gives way (an ellipsis) so that what's beside it („ти“) always shows whole.
+      h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), extra),
       look.title ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title) : null,
     ),
   );

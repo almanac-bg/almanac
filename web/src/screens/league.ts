@@ -1,6 +1,6 @@
 // The week's league: every week, a race on the XP a player earns, in a group of up to twenty of their league — when
 // the week ends the first go up a league and the last go down, and the first three are paid XP. Класации has the
-// group („Лига“); Профил a card with where the player stands, once they've been in a league.
+// group („Лига“); Профил a line with where the player stands, once they've been in a league.
 
 import { leagueEmblem } from "../art/league.ts";
 import { boardRow } from "../game/results.ts";
@@ -126,8 +126,9 @@ function lastWeek(e: LeagueEnd): Child {
   return h("p", { class: "muted" }, `Миналата седмица: ${place(e.place, e.of)} в ${e.from.name}.`);
 }
 
-/** Профил's card: the league, the place in the group and its zone; shown once the player has been in a league. */
-export function leagueCard(): Child {
+/** Профил's line: the league, the place in the group (and its zone) and the days left, a tap from the group (the
+ * whole of it is Класации' „Лига“); shown once the player has been in a league. */
+export function leagueLine(): Child {
   const data = signal<LeagueView | null>(null);
   loadLeague().then(data.set, () => {});
   return () => {
@@ -138,25 +139,28 @@ export function leagueCard(): Child {
     const zone = !v.in
       ? null
       : at <= v.up
-        ? h("p", { class: "league-zone up" }, "В зоната за качване.")
+        ? h("span", { class: "league-zone up" }, "зона за качване")
         : at > n - v.down
-          ? h("p", { class: "league-zone down" }, "В зоната за слизане.")
+          ? h("span", { class: "league-zone down" }, "зона за слизане")
           : null;
     return h(
-      "section",
-      { class: "card league-card" },
-      head(v),
-      v.in
-        ? h(
-            "p",
-            { class: "league-place" },
-            h("b", null, ordinal(at, "n")),
-            h("span", { class: "muted" }, ` място от ${n} в групата`),
-          )
-        : h("p", null, "Още не си в група тази седмица: една игра те вкарва."),
-      zone,
-      v.last && !v.in ? lastWeek(v.last) : null,
-      h("a", { class: "link", href: "/ranks#league" }, "Към групата"),
+      "a",
+      { class: "league-link", href: "/ranks#league" },
+      leagueEmblem(v.league.tier, "m"),
+      h(
+        "span",
+        { class: "league-link-text" },
+        h("strong", { class: "league-link-name" }, h("span", { class: "sr" }, "Лига "), v.league.name),
+        h(
+          "span",
+          { class: "league-link-more" },
+          v.in ? `${ordinal(at, "n")} място от ${n} · ` : "Още не си в група тази седмица · ",
+          zone,
+          zone ? " · " : null,
+          daysLeft(v.daysLeft),
+        ),
+      ),
+      h("span", { class: "i i-left league-link-i", "aria-hidden": "true" }),
     );
   };
 }

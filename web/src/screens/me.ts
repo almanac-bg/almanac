@@ -1,14 +1,13 @@
-// Профил: who you are in the game — your avatar, name, tag and title, your level, league and stats (the rating's
-// division is the duels' and Роял's, on their screens) — with
-// its own places a tap away at the top (Награди, Гардероб, Алманах) and the settings beside your name.
+// Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your league in a
+// line (its group is Класации'); your streak, numbers, mastery and latest games (the rating's division is the duels'
+// and Роял's, on their screens) — with its own places a tap away at the top (Награди, Гардероб, Алманах) and the
+// settings beside your name. A hub: each thing once, the whole of it a tap away.
 
 import { emblem } from "../art/emblem.ts";
-import { levelCard } from "../game/news.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import {
-  type AchievementInfo,
   avatar,
   badge,
   meter,
@@ -19,8 +18,8 @@ import {
   unlockPicture,
   unlockWords,
 } from "../ui.ts";
-import { leagueCard } from "./league.ts";
-import { loadProgress, type Progress } from "./progress.ts";
+import { leagueLine } from "./league.ts";
+import { loadProgress, nearest, type Progress } from "./progress.ts";
 import { stats } from "./stats.ts";
 import { yearLink } from "./year.ts";
 
@@ -39,13 +38,9 @@ export function me() {
           head(progress),
           () => {
             const p = progress();
-            return p ? levelCard(p.level, p.xp, p.from, p.to) : null;
+            return p ? levelCard(p) : null;
           },
-          () => {
-            const p = progress();
-            return p ? nextCard(p) : null;
-          },
-          leagueCard(),
+          leagueLine(),
           stats(),
           yearLink(),
           () =>
@@ -97,77 +92,89 @@ function head(progress: () => Progress | null): Child {
   );
 }
 
-/** What comes next, and what it brings: the next level that unlocks something, the division above, and the
- * achievements nearest — so that every way of playing shows where it leads. */
-function nextCard(p: Progress): Child {
+/** The level, and what comes next: the XP to the next level and what the next that unlocks something brings, the
+ * division above, and the two achievements nearest — so that every way of playing shows where it leads. */
+function levelCard(p: Progress): Child {
   const { next } = p;
-  const near = nearest(p.achievements);
-  if (!next.level && !next.division && !near.length) return null;
+  const near = nearest(p.achievements, 2);
+  const share = p.to > p.from ? Math.round((100 * (p.xp - p.from)) / (p.to - p.from)) : 0;
+  const division = next.division && p.standing.rated ? next.division : undefined;
   const items = (list: Unlock[]) =>
-    list.length
-      ? h(
-          "span",
-          { class: "next-unlocks" },
-          list.map((u) => h("span", { class: "next-unlock" }, unlockPicture(u, p.avatar), unlockWords(u))),
-        )
-      : null;
+    list.map((u) => h("span", { class: "next-unlock" }, unlockPicture(u, p.avatar), unlockWords(u)));
   return h(
     "section",
-    { class: "card next" },
-    h("h2", { class: "card-title" }, "Следва"),
+    { class: "card me-level" },
     h(
-      "ul",
-      { class: "next-list" },
-      next.level
-        ? h(
-            "li",
-            { class: "next-row" },
-            h("span", { class: "next-mark lv-mark num", "aria-hidden": "true" }, String(next.level)),
-            h(
-              "span",
-              { class: "next-text" },
-              h("strong", null, `Ниво ${next.level}`),
-              h("span", { class: "muted" }, `още ${levelXP(next.level) - p.xp} XP`),
-              items(next.levelUnlocks),
-            ),
-          )
-        : null,
-      next.division && p.standing.rated
-        ? h(
-            "li",
-            { class: "next-row" },
-            emblem(next.division.id, "m"),
-            h(
-              "span",
-              { class: "next-text" },
-              h("strong", null, `Дивизия ${next.division.name}`),
-              h(
-                "span",
-                { class: "muted" },
-                `при рейтинг ${next.division.from} (още ${next.division.from - p.standing.rating})`,
-              ),
-              items(next.divisionUnlocks),
-            ),
-          )
-        : null,
-      near.map((a) =>
-        h(
-          "li",
-          { class: `next-row t-${a.tier}` },
-          badge(a, false, "s"),
+      "div",
+      { class: "me-level-bar" },
+      h(
+        "div",
+        { class: "level-head" },
+        h("span", { class: "level-n" }, `Ниво ${p.level}`),
+        h("span", { class: "muted" }, `още ${p.to - p.xp} XP до ниво ${p.level + 1}`),
+      ),
+      meter(share, `${share}% от ниво ${p.level}`),
+    ),
+    next.level && next.levelUnlocks.length
+      ? h(
+          "p",
+          { class: "next-level" },
           h(
             "span",
-            { class: "next-text" },
-            h("strong", null, a.name),
-            h("span", { class: "muted" }, a.about),
-            (a.goal ?? 1) > 1
-              ? meter(Math.round((100 * (a.progress ?? 0)) / (a.goal ?? 1)), `${a.progress ?? 0} от ${a.goal}`)
-              : null,
-            h("span", { class: "next-reward" }, rewardWords(a)),
+            { class: "muted" },
+            next.level === p.level + 1
+              ? `На ниво ${next.level}:`
+              : `На ниво ${next.level} (още ${levelXP(next.level) - p.xp} XP):`,
           ),
-        ),
-      ),
-    ),
+          items(next.levelUnlocks),
+        )
+      : null,
+    division || near.length
+      ? [
+          h("h2", { class: "kicker" }, "Следва"),
+          h(
+            "ul",
+            { class: "next-list" },
+            division
+              ? h(
+                  "li",
+                  { class: "next-row" },
+                  emblem(division.id, "m"),
+                  h(
+                    "span",
+                    { class: "next-text" },
+                    h("strong", null, `Дивизия ${division.name}`),
+                    h(
+                      "span",
+                      { class: "muted" },
+                      `при рейтинг ${division.from} (още ${division.from - p.standing.rating})`,
+                    ),
+                    next.divisionUnlocks.length
+                      ? h("span", { class: "next-unlocks" }, items(next.divisionUnlocks))
+                      : null,
+                  ),
+                )
+              : null,
+            near.map((a) =>
+              h(
+                "li",
+                { class: `next-row t-${a.tier}` },
+                badge(a, false, "s"),
+                h(
+                  "span",
+                  { class: "next-text" },
+                  h("strong", null, a.name),
+                  h("span", { class: "muted" }, a.about),
+                  (a.goal ?? 1) > 1
+                    ? meter(Math.round((100 * (a.progress ?? 0)) / (a.goal ?? 1)), `${a.progress ?? 0} от ${a.goal}`)
+                    : null,
+                  h("span", { class: "next-reward" }, rewardWords(a)),
+                ),
+              ),
+            ),
+          ),
+        ]
+      : null,
     h("a", { class: "link", href: "/rewards" }, "Всички постижения"),
   );
 }
@@ -177,13 +184,4 @@ function levelXP(level: number): number {
   let from = 0;
   for (let l = 1, step = 300; l < level; l++, step += 150) from += step;
   return from;
-}
-
-/** The two achievements not yet earned nearest to done (of those that tell how far along they are first). */
-function nearest(list: AchievementInfo[]): AchievementInfo[] {
-  const share = (a: AchievementInfo) => (a.progress ?? 0) / (a.goal ?? 1);
-  return list
-    .filter((a) => !a.at && !a.hidden)
-    .sort((a, b) => share(b) - share(a) || (a.goal ?? 1) - (b.goal ?? 1))
-    .slice(0, 2);
 }

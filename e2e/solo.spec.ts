@@ -49,10 +49,10 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".league-board .row.me")).toContainText("XP");
   await page.getByRole("tab", { name: "Рейтинг" }).click();
   await expect(page.locator(".board-empty")).toContainText("Още никой няма 10 игри за рейтинг.");
-  // Профил shows the league too, a tap from the group.
+  // Профил shows the league too, in a line that is a tap from the group.
   await page.goto("/me");
-  await expect(page.locator(".league-card")).toContainText("място от");
-  await page.locator(".league-card").getByRole("link", { name: "Към групата" }).click();
+  await expect(page.locator(".league-link")).toContainText("място от");
+  await page.locator(".league-link").click();
   await expect(page.locator(".league-board .row.me")).toBeVisible();
 });
 

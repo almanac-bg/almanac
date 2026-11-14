@@ -100,7 +100,7 @@ function head(p: Profile): Child {
 }
 
 /** What the viewer can do with them: as friends, a duel (and the duels between the two so far); else ask to be
- * friends, or answer their asking. */
+ * friends, or answer their asking. The one thing to do is the gold button; accepting is rose, as everywhere. */
 function actions(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -129,7 +129,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         "Приятели сте.",
         played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
       ),
-      button("Дуел", "rose", async () =>
+      button("Дуел", "primary", async () =>
         go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: p.id })).duel}`),
       ),
     ];
@@ -162,7 +162,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         { class: "player-relation muted" },
         "Като приятели виждате резултатите си за деня и се предизвиквате на дуел.",
       ),
-      button("Добави приятел", "rose", async () => {
+      button("Добави приятел", "primary", async () => {
         await player(); // not a player yet: a guest first, as on the first game
         const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });
         await reload();
