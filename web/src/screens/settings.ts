@@ -4,7 +4,17 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { bigText, calm, setBigText, setCalm, setTick, tickOn } from "../lib/prefs.ts";
-import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.ts";
+import {
+  needsHomeScreen,
+  type PushKind,
+  type PushPrefs,
+  pushable,
+  pushOn,
+  pushPrefs,
+  setPushPref,
+  turnOff,
+  turnOn,
+} from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
@@ -195,13 +205,13 @@ function access(): Child {
   );
 }
 
-/** Notifications: the evening reminder, and word when a friend accepts your link or calls you to a duel. */
+/** Notifications: on or off on this device, and which kinds the player gets (on every device they have them on). */
 function reminders(): Child {
   if (needsHomeScreen()) {
     return h(
       "section",
       { class: "stack" },
-      h("h2", null, "Напомняния"),
+      h("h2", null, "Известия"),
       h(
         "p",
         { class: "muted" },
@@ -211,8 +221,16 @@ function reminders(): Child {
   }
   if (!pushable()) return null;
   const on = signal<boolean | null>(null);
+  const prefs = signal<PushPrefs | null>(null);
   const error = signal("");
-  pushOn().then(on.set, () => on.set(false));
+  const load = () => pushPrefs().then(prefs.set, () => {});
+  pushOn().then(
+    (v) => {
+      on.set(v);
+      if (v) load();
+    },
+    () => on.set(false),
+  );
   const toggle = async () => {
     error.set("");
     try {
@@ -222,26 +240,60 @@ function reminders(): Child {
       } else {
         const why = await turnOn();
         if (why) error.set(why);
-        else on.set(true);
+        else {
+          on.set(true);
+          load();
+        }
       }
     } catch (err) {
       reportProblem(`reminders: ${(err as Error).name}: ${(err as Error).message}`);
       error.set("Не успяхме. Опитай пак.");
     }
   };
+  const kind = (k: PushKind, label: string, about: string) =>
+    switchRow(
+      label,
+      about,
+      () => prefs()?.[k] ?? false,
+      async (v) => {
+        const was = prefs.peek();
+        if (!was) return;
+        error.set("");
+        prefs.set({ ...was, [k]: v });
+        try {
+          prefs.set(await setPushPref(k, v));
+        } catch (err) {
+          prefs.set(was);
+          error.set((err as ApiError).message);
+        }
+      },
+    );
   return h(
     "section",
     { class: "stack" },
-    h("h2", null, "Напомняния"),
-    h(
-      "p",
-      { class: "muted" },
-      "Вечер в 19:00, ако въпросите на деня още те чакат. И когато приятел те покани на дуел, изиграе дуела ви или приеме поканата ти, и когато свърши сезонът.",
-    ),
+    h("h2", null, "Известия"),
     () =>
       on() === null
         ? null
-        : h("button", { class: on() ? "link" : "btn", onclick: toggle }, on() ? "Спри напомнянията" : "Напомняй ми"),
+        : on()
+          ? [
+              h("p", { class: "muted" }, "Включени на това устройство. Избери за какво:"),
+              () =>
+                prefs()
+                  ? h(
+                      "div",
+                      null,
+                      kind("day", "Въпросите на деня", "В 19:00, ако още те чакат."),
+                      kind("friends", "Приятели и дуели", "Покани, дуели, как са свършили игрите ти, краят на сезона."),
+                      kind("royal", "Роял", "Всяка вечер в 20:45, когато входът се отвори."),
+                    )
+                  : null,
+              h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
+            ]
+          : [
+              h("p", { class: "muted" }, "Въпросите на деня, приятели, дуели, Роял: ти избираш за какво."),
+              h("button", { class: "btn", onclick: toggle }, "Включи известията"),
+            ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }

@@ -528,3 +528,22 @@ func (g *Game) RoyalsOf(ctx context.Context, userID int64) ([]Royal, error) {
 	}
 	return out, nil
 }
+
+// PlanRoyal says that a player will come to the evening of day (Bulgaria's date of its start), or, coming false, that
+// they won't after all.
+func (g *Game) PlanRoyal(ctx context.Context, day string, userID int64, coming bool) error {
+	q := `INSERT INTO royal_plans (day, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING`
+	if !coming {
+		q = `DELETE FROM royal_plans WHERE day = ? AND user_id = ?`
+	}
+	_, err := g.DB.Write.ExecContext(ctx, q, day, userID)
+	return err
+}
+
+// RoyalPlans is how many said they'd come to the evening of day, and whether the player (0: nobody signed in) is one
+// of them.
+func (g *Game) RoyalPlans(ctx context.Context, day string, userID int64) (n int, mine bool, err error) {
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(max(user_id = ?), 0) FROM royal_plans WHERE day = ?`,
+		userID, day).Scan(&n, &mine)
+	return n, mine, err
+}

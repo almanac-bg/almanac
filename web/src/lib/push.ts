@@ -1,5 +1,5 @@
-// Notifications: the evening reminder and word from friends (a link accepted, a call to a duel). The browser asks the player first; the
-// service worker (/sw.js) shows them.
+// Notifications: the evening reminder, word from friends (a link accepted, a call to a duel) and Роял's call, each kind
+// on or off as the player chooses. The browser asks the player first; the service worker (/sw.js) shows them.
 
 import { pushKey } from "../state.ts";
 import { api } from "./api.ts";
@@ -63,3 +63,14 @@ function key(base64url: string): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
   return out;
 }
+
+/** The kinds of notification a player chooses: the day's reminder, word from friends and of games, Роял's call. */
+export type PushKind = "day" | "friends" | "royal";
+export type PushPrefs = Record<PushKind, boolean>;
+
+/** Which kinds of notification the player gets. */
+export const pushPrefs = () => api<{ prefs: PushPrefs }>("GET", "/api/push/prefs").then((r) => r.prefs);
+
+/** Turns one kind on or off; the kinds as they are now. */
+export const setPushPref = (kind: PushKind, on: boolean) =>
+  api<{ prefs: PushPrefs }>("PATCH", "/api/push/prefs", { kind, on }).then((r) => r.prefs);

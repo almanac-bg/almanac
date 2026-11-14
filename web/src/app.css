@@ -632,6 +632,20 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* „Ще дойда“, under the next evening, with how many said so. */
+  .royal-plan {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .royal-plan p {
+    margin: 0;
+  }
+
+  .royal-coming {
+    font-weight: 700;
+  }
+
   .royal-left {
     margin: 0;
     font-weight: 700;

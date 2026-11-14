@@ -31,3 +31,27 @@ test("Роял: in from the lobby, live to the first wrong answer (or through al
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
 });
+
+test("Роял: „Ще дойда“ before the lobby, and Начало's card while it's open", async ({ page }) => {
+  test.setTimeout(360_000);
+  await page.goto("/royal");
+  // „Ще дойда“ shows until the next lobby opens: before it, and under the standings of an evening over (which show a
+  // while, here into the next evenings).
+  await expect(async () => {
+    await page.reload();
+    const come = page.getByRole("button", { name: "Ще дойда" });
+    const said = page.getByText(/^Ще дойдеш\./);
+    await expect(come.or(said)).toBeVisible({ timeout: 30_000 });
+    if (await come.isVisible()) await come.click();
+    await expect(said).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText(/^Тази вечер ще дойд(е|ат) \d+\.$/)).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 240_000 });
+
+  // While the lobby is open, Начало's Роял card says how soon it starts and how many are in.
+  await page.goto("/");
+  const royal = page.locator(".mode.tone-gold .mode-about");
+  await expect(async () => {
+    await page.reload();
+    await expect(royal).toHaveText(/^Започва след \d+\sмин( · \d+\sвътре)?$/, { timeout: 3_000 });
+  }).toPass({ timeout: 60_000 });
+});

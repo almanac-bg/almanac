@@ -25,6 +25,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -638,15 +639,18 @@ func (f *fakePushService) count(path string) int {
 	return f.hits[path]
 }
 
-func TestNotifications(t *testing.T) {
+// pushWorld is a game whose notifications go to a fake push service, with a way for a player to subscribe to them
+// there (at path: what the fake counts the pushes by).
+func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, path string)) {
+	t.Helper()
 	fake := &fakePushService{hits: map[string]int{}}
 	ps := httptest.NewTLSServer(fake)
-	defer ps.Close()
+	t.Cleanup(ps.Close)
 	pub, priv, _ := push.NewKeys()
 	keys, _ := push.ParseKeys(pub, priv)
 
 	db, _ := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	b, _ := bank.Load("../../bank/sample")
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	ts := httptest.NewUnstartedServer(nil)
@@ -657,8 +661,8 @@ func TestNotifications(t *testing.T) {
 	}
 	ts.Config.Handler = s.Handler()
 	ts.Start()
-	defer ts.Close()
-	g := &game{t: t, db: db, url: ts.URL}
+	t.Cleanup(ts.Close)
+	g := &game{t: t, srv: s, db: db, url: ts.URL}
 
 	// The page offers notifications, with the key to subscribe with.
 	if res, _ := http.Get(ts.URL + "/"); res != nil {
@@ -669,6 +673,7 @@ func TestNotifications(t *testing.T) {
 		}
 	}
 	subscribe := func(p *player, path string) {
+		t.Helper()
 		browser, _ := ecdh.P256().GenerateKey(rand.Reader)
 		sub := map[string]any{"endpoint": ps.URL + path, "keys": map[string]string{
 			"p256dh": base64.RawURLEncoding.EncodeToString(browser.PublicKey().Bytes()),
@@ -678,6 +683,51 @@ func TestNotifications(t *testing.T) {
 			t.Fatalf("subscribe: %d", status)
 		}
 	}
+	return s, g, fake, subscribe
+}
+
+// playRun answers each question of a run (any answer will do).
+func playRun(p *player, run map[string]any) {
+	id := strconv.Itoa(int(run["id"].(float64)))
+	for n := range 10 {
+		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		view := st["question"].(map[string]any)["view"].(map[string]any)
+		a := map[string]any{"pick": 0}
+		switch view["type"] {
+		case "number":
+			a = map[string]any{"value": 1}
+		case "order":
+			a = map[string]any{"order": []int{0, 1, 2, 3}}
+		case "truefalse":
+			a = map[string]any{"truth": true}
+		case "match":
+			a = map[string]any{"pairs": []int{0, 1, 2, 3}}
+		case "split":
+			a = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
+		}
+		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
+	}
+}
+
+// guest is a new player, as a guest; with their id.
+func (g *game) guest() (*player, int64) {
+	p := g.player()
+	_, out := p.call("POST", "/api/guest", map[string]any{})
+	u, _ := out["user"].(map[string]any)
+	id, _ := u["id"].(float64)
+	return p, int64(id)
+}
+
+// befriend makes two players friends, by a's invite link.
+func befriend(a, b *player) {
+	_, mine := a.call("GET", "/api/friends", nil)
+	link := mine["invite"].(string)
+	b.call("POST", "/api/invites/"+link[strings.LastIndex(link, "/")+1:], nil)
+}
+
+func TestNotifications(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	db := g.db
 	ana, bo := g.player(), g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
@@ -685,28 +735,6 @@ func TestNotifications(t *testing.T) {
 	subscribe(bo, "/bo")
 	if status, _ := ana.call("POST", "/api/push", map[string]any{"endpoint": "http://plain.example/x"}); status != 400 {
 		t.Fatalf("a bad subscription: %d", status)
-	}
-
-	// playRun answers each question of a run (any answer will do).
-	playRun := func(p *player, run map[string]any) {
-		id := strconv.Itoa(int(run["id"].(float64)))
-		for n := range 10 {
-			_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
-			view := st["question"].(map[string]any)["view"].(map[string]any)
-			a := map[string]any{"pick": 0}
-			if view["type"] == "number" {
-				a = map[string]any{"value": 1}
-			} else if view["type"] == "order" {
-				a = map[string]any{"order": []int{0, 1, 2, 3}}
-			} else if view["type"] == "truefalse" {
-				a = map[string]any{"truth": true}
-			} else if view["type"] == "match" {
-				a = map[string]any{"pairs": []int{0, 1, 2, 3}}
-			} else if view["type"] == "split" {
-				a = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
-			}
-			p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
-		}
 	}
 
 	// Ana plays the day; at 19:05 only Bo is reminded, and only once.
@@ -748,6 +776,128 @@ func TestNotifications(t *testing.T) {
 	pushes("/bo", 2)
 	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 1 {
 		t.Fatalf("Bo's challenges: %v", w)
+	}
+}
+
+// Each player chooses the kinds of notification they get: the day's reminder, word from friends, Роял's call.
+func TestPushKinds(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	bo, _ := g.guest()
+	subscribe(ana, "/ana")
+	subscribe(bo, "/bo")
+
+	if _, out := ana.call("GET", "/api/push/prefs", nil); fmt.Sprint(out["prefs"]) != "map[day:true friends:true royal:false]" {
+		t.Fatalf("the defaults: %v", out)
+	}
+	if status, _ := ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "news", "on": true}); status != 400 {
+		t.Fatalf("an unknown kind: %d", status)
+	}
+	if _, out := ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "friends", "on": false}); fmt.Sprint(out["prefs"]) != "map[day:true friends:false royal:false]" {
+		t.Fatalf("friends off: %v", out)
+	}
+	bo.call("PATCH", "/api/push/prefs", map[string]any{"kind": "day", "on": false})
+
+	// Bo turned the day's reminder off: only Ana hears it.
+	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
+	if n := s.remind(t.Context(), evening); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
+		t.Fatalf("reminded %d; ana %d, bo %d", n, fake.count("/ana"), fake.count("/bo"))
+	}
+	// Ana turned word from friends off; the day's reminders she still gets.
+	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
+	s.notify(t.Context(), pushFriends, m, anaID)
+	s.notify(t.Context(), pushRoyal, m, anaID)
+	if got := fake.count("/ana"); got != 1 {
+		t.Fatalf("ana got %d pushes, want 1", got)
+	}
+	s.notify(t.Context(), pushDay, m, anaID)
+	s.notify(t.Context(), pushAsked, m, anaID)
+	if got := fake.count("/ana"); got != 3 {
+		t.Fatalf("ana got %d pushes, want 3", got)
+	}
+}
+
+// The evening's reminder names the best friend who has played the day's questions, with the player's streak.
+func TestReminderNamesAFriend(t *testing.T) {
+	s, g, _, _ := pushWorld(t)
+	ctx := t.Context()
+	ana, _ := g.guest()
+	bo, boID := g.guest()
+	_, cyID := g.guest()
+	_, me := ana.call("GET", "/api/me", nil)
+	anaName := name(me)
+	today := s.game.Today()
+
+	// Nobody has played: as before.
+	if m := s.reminder(ctx, today, boID); m.Body != "Десет въпроса, един опит. До полунощ." || m.URL != "/" {
+		t.Fatalf("without friends: %+v", m)
+	}
+	// Bo played yesterday: a streak of a day.
+	_, run := bo.call("POST", "/api/day", map[string]any{})
+	playRun(bo, run)
+	yesterday := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -1).Format(time.DateOnly)
+	if _, err := g.db.Write.Exec(`UPDATE runs SET day = ? WHERE user_id = ?`, yesterday, boID); err != nil {
+		t.Fatal(err)
+	}
+	if m := s.reminder(ctx, today, boID); m.Body != "Серията ти е 1 ден. Не я прекъсвай: десет въпроса, до полунощ." {
+		t.Fatalf("with a streak: %+v", m)
+	}
+	// Ana, Bo's friend, plays today: Bo hears how she did.
+	befriend(ana, bo)
+	_, run = ana.call("POST", "/api/day", map[string]any{})
+	playRun(ana, run)
+	_, board := ana.call("GET", "/api/day/"+today+"/board", nil)
+	rights := -1
+	for _, r := range board["top"].([]any) {
+		if r := r.(map[string]any); r["name"] == anaName {
+			rights = int(r["rights"].(float64))
+		}
+	}
+	if want := fmt.Sprintf("%s има %d от 10 днес. Серията ти е 1 ден.", anaName, rights); s.reminder(ctx, today, boID).Body != want {
+		t.Fatalf("with a friend: %q, want %q", s.reminder(ctx, today, boID).Body, want)
+	}
+	// Cy isn't Ana's friend, and has no streak.
+	if m := s.reminder(ctx, today, cyID); m.Body != "Десет въпроса, един опит. До полунощ." {
+		t.Fatalf("someone else's friend: %+v", m)
+	}
+}
+
+// Players say they'll come to the evening's Роял; when its lobby opens they're called, with those who want the call
+// every evening. Once an evening.
+func TestRoyalPlans(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, _ := g.guest()
+	bo, _ := g.guest()
+	cy, _ := g.guest()
+	for p, path := range map[*player]string{ana: "/ana", bo: "/bo", cy: "/cy"} {
+		subscribe(p, path)
+	}
+	// Ana turned Роял's notifications off; she still comes tonight.
+	ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "royal", "on": false})
+	cy.call("PATCH", "/api/push/prefs", map[string]any{"kind": "royal", "on": true})
+
+	if status, out := ana.call("POST", "/api/royal/plan", map[string]any{}); status != 200 || out["coming"] != 1.0 || out["planned"] != true {
+		t.Fatalf("Ana's plan: %d %v", status, out)
+	}
+	ana.call("POST", "/api/royal/plan", map[string]any{}) // again changes nothing
+	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false {
+		t.Fatalf("tonight, to Bo: %v", out)
+	}
+	if res, err := http.Get(g.url + "/api/royal/tonight"); err != nil || res.StatusCode != 200 {
+		t.Fatalf("tonight, to someone not signed in: %v %v", res, err)
+	}
+	bo.call("POST", "/api/royal/plan", map[string]any{})
+	if _, out := bo.call("DELETE", "/api/royal/plan", nil); out["coming"] != 1.0 || out["planned"] != false {
+		t.Fatalf("Bo changes his mind: %v", out)
+	}
+
+	_, out := ana.call("GET", "/api/royal/tonight", nil)
+	start := time.UnixMilli(int64(out["glance"].(map[string]any)["next"].(float64)))
+	if n := s.callRoyal(t.Context(), start); n != 2 || fake.count("/ana") != 1 || fake.count("/cy") != 1 || fake.count("/bo") != 0 {
+		t.Fatalf("called %d: ana %d, cy %d, bo %d", n, fake.count("/ana"), fake.count("/cy"), fake.count("/bo"))
+	}
+	if n := s.callRoyal(t.Context(), start); n != 0 {
+		t.Fatal("called twice")
 	}
 }
 

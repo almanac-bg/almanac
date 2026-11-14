@@ -11,11 +11,13 @@ import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
+import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing, user } from "../state.ts";
 import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
 import { type Standing, standingCard } from "./duel.ts";
+import { coming, type Tonight } from "./modes.ts";
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
 
@@ -218,11 +220,79 @@ function soon(view: () => Evening, now: Signal<number>): Child {
         { class: "muted" },
         () => `Входът се отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`,
       ),
+      plan(),
     ),
     () => {
       const d = past();
       return d ? [standingCard(d.standing), history(d.royals)] : null;
     },
+  );
+}
+
+/** „Ще дойда“: saying you'll come to the next evening, and how many have (before the lobby opens, and under an evening's
+ * standings). Those who said so are called as its lobby opens, if notifications are on here. */
+function plan(): Child {
+  const tonight = signal<Tonight | null>(null);
+  const notified = signal<boolean | null>(null);
+  const busy = signal(false);
+  const error = signal("");
+  // Again now and then: the screen may stay while the evening moves on (its standings show for a while).
+  const load = () => api<Tonight>("GET", "/api/royal/tonight").then(tonight.set, () => {});
+  load();
+  const again = setInterval(load, 20_000);
+  onCleanup(() => clearInterval(again));
+  pushOn().then(notified.set, () => notified.set(false));
+  const run = async (fn: () => Promise<void>) => {
+    error.set("");
+    busy.set(true);
+    try {
+      await fn();
+    } catch (err) {
+      error.set((err as ApiError).message);
+    } finally {
+      busy.set(false);
+    }
+  };
+  const say = (come: boolean) =>
+    run(async () => {
+      await player();
+      tonight.set(await api<Tonight>(come ? "POST" : "DELETE", "/api/royal/plan", come ? {} : undefined));
+    });
+  const call = () =>
+    run(async () => {
+      const why = await turnOn();
+      if (why) error.set(why);
+      else notified.set(true);
+    });
+  return h(
+    "div",
+    { class: "royal-plan" },
+    () => {
+      const t = tonight();
+      if (!t || t.glance.phase === "lobby") return null;
+      const opens = clock(t.glance.next - (t.glance.startsAt - t.glance.opensAt));
+      return [
+        t.coming > 0 ? h("p", { class: "royal-coming" }, `${coming(t)}.`) : null,
+        t.planned
+          ? [
+              h(
+                "p",
+                null,
+                notified() ? `Ще дойдеш. В ${opens} ще ти напомним.` : "Ще дойдеш. Ела тук, щом входът се отвори.",
+              ),
+              h(
+                "div",
+                { class: "actions" },
+                notified() === false && pushable()
+                  ? h("button", { class: "btn", disabled: busy, onclick: call }, `Напомни ми в ${opens}`)
+                  : null,
+                h("button", { class: "link", disabled: busy, onclick: () => say(false) }, "Няма да успея"),
+              ),
+            ]
+          : h("button", { class: "btn", disabled: busy, onclick: () => say(true) }, "Ще дойда"),
+      ];
+    },
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
@@ -511,6 +581,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
       ),
     ),
     h("p", { class: "muted" }, () => `Следващият Роял: ${when(view().next, now())}.`),
+    plan(),
     first.runId
       ? review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${first.runId}/review`)).questions)
       : null,
