@@ -64,9 +64,10 @@ go run ./cmd/almanac bank check -unbalanced bank/sample   # извадката
 Един сървър (Hetzner), зад Cloudflare. Програмата работи като systemd услуга (`deploy/almanac.service`) и сама
 говори HTTPS със сертификата на Cloudflare за сървъра. Всеки час копира базата си в Cloudflare R2.
 
-- Ново издание: `git tag vX.Y.Z && git push origin vX.Y.Z` — GitHub строи програмата и пуска изданието.
-- На сървъра: `almanac-deploy vX.Y.Z` го слага; ако не тръгне до 30 секунди, връща предишното. Същата команда с
-  по-стара версия връща назад.
+- Всяко сливане в `main` с feat, fix, perf или revert е ново издание: GitHub избира версията, строи програмата и
+  я слага на сървъра (`.github/workflows/deploy.yml`).
+- На сървъра `almanac-deploy vX.Y.Z` копира базата (`before-vX.Y.Z.db`), слага версията и ако тя не тръгне до 30
+  секунди, връща предишната. Същата команда с по-стара версия връща назад.
 - Нови въпроси: `almanac-bank` — дърпа банката, проверява я и я презарежда без рестарт.
 - Възстановяване: `almanac backup restore days/12.db.gz /var/lib/almanac/restored.db`, после смяна на файла при
   спряна услуга.

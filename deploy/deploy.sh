@@ -1,5 +1,7 @@
 #!/bin/sh
-# Installs a release of the game and starts it; back to the one before if it isn't healthy within 30 seconds. As root:
+# Installs a release of the game and starts it; back to the one before if it isn't healthy within 30 seconds. The
+# database is copied first (before-vX.Y.Z.db, the ten latest kept), so a release whose migrations went wrong can be
+# undone. As root, or from CI through deploy-ci.sh:
 #
 #   almanac-deploy v2.0.0
 set -eu
@@ -18,8 +20,12 @@ rm "almanac-$tag.sha256"
 "./almanac-$tag" version
 
 previous=$(readlink /usr/local/bin/almanac || true)
+data=/var/lib/almanac
+systemctl stop almanac
+cp -p "$data/almanac.db" "$data/before-$tag.db"
+ls -t "$data"/before-v*.db | tail -n +11 | xargs -r rm
 ln -sfn "$dir/almanac-$tag" /usr/local/bin/almanac
-systemctl restart almanac
+systemctl start almanac
 
 for _ in $(seq 30); do
   sleep 1

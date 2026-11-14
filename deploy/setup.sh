@@ -26,6 +26,8 @@ systemctl restart systemd-journald
 here=$(dirname "$0")
 install -m 644 "$here/almanac.service" /etc/systemd/system/almanac.service
 install -m 755 "$here/deploy.sh" /usr/local/sbin/almanac-deploy
+install -m 755 "$here/deploy-ci.sh" /usr/local/sbin/almanac-deploy-ci
+install -m 755 "$here/deploy-ci.sh" /usr/local/sbin/almanac-deploy-ci
 install -m 755 "$here/bank.sh" /usr/local/sbin/almanac-bank
 systemctl daemon-reload
 systemctl enable almanac
