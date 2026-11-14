@@ -22,6 +22,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/room"
+	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -40,6 +41,8 @@ type Config struct {
 	// MTASTSMode the policy's mode ("testing" until reports are clean, then "enforce").
 	MTASTS     []string
 	MTASTSMode string
+	// Royal is when Роял's evenings are (royal.Evening when unset).
+	Royal royal.Schedule
 	// Push sends notifications; nil: none.
 	Push *push.Sender
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
@@ -66,8 +69,9 @@ type Server struct {
 	game     *play.Game
 	rooms    *room.Hub
 	live     *live.Hub
+	royal    *royal.Hub
 	push     *push.Sender
-	// closing ends the streams (rooms) when the server stops, so that it needn't wait for them.
+	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
 	closing  chan struct{}
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
@@ -107,6 +111,11 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game = play.New(d.DB, s.bank.Load)
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
+	if cfg.Royal == (royal.Schedule{}) {
+		cfg.Royal = royal.Evening
+	}
+	s.royal = royal.NewHub(s.game, cfg.Royal)
+	s.royal.News = s.royalNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
 	s.live = live.NewHub(s.game, s.livePlayer)
@@ -162,7 +171,10 @@ func (s *Server) routes() http.Handler {
 	api("DELETE /api/duels/{id}", s.declineDuel)
 	api("GET /api/ranks", s.ranks)
 	api("GET /api/players/{tag}", s.profile)
+	mux.HandleFunc("GET /api/royal/events", s.royalEvents)
 	api("POST /api/royal", s.joinRoyal)
+	api("DELETE /api/royal", s.leaveRoyal)
+	api("POST /api/royal/answer", s.royalAnswer)
 	api("GET /api/royal", s.royals)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/season", s.season)
@@ -229,8 +241,25 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 	}
 	slog.Info("serving", "addr", ln.Addr().String(), "url", s.cfg.PublicURL, "version", s.cfg.Version, "tls", s.cfg.TLSCert != "")
 	srv.RegisterOnShutdown(func() { close(s.closing) })
+	// Роял's games under way before a restart go on.
+	if err := s.royal.Load(ctx); err != nil {
+		ln.Close()
+		return err
+	}
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }()
+	go func() {
+		t := time.NewTicker(200 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.royal.Step(ctx)
+			}
+		}
+	}()
 	go func() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()

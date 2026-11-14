@@ -15,7 +15,7 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
   royal: {
     href: "/royal",
     name: "Роял",
-    about: "До двадесет играчи. Грешката те изважда.",
+    about: "Всяка вечер в 21:00, на живо. Грешката те изважда.",
     tone: "tone-gold",
     icon: "crown",
   },
