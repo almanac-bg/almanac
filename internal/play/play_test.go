@@ -317,6 +317,7 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d the next morning, before playing", n)
 	}
+	w.setGoals(ana, "day", "duel", "duelWin") // goals the day's questions alone don't finish: no reserve day
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
