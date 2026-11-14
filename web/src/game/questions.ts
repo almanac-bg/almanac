@@ -3,6 +3,7 @@
 
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
+import { formatNumber } from "../ui.ts";
 import type { Answer, ChoiceView, MatchView, NumberView, OrderView, Reveal, TrueFalseView, View } from "./types.ts";
 
 export interface Asked {
@@ -88,12 +89,6 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
       });
     },
   };
-}
-
-/** A number as people write it in Bulgarian: a space between thousands, a decimal comma. */
-export function formatNumber(n: number, step = 1): string {
-  const decimals = Math.max(0, (String(step).split(".")[1] ?? "").length);
-  return new Intl.NumberFormat("bg", { maximumFractionDigits: decimals, useGrouping: Math.abs(n) >= 10000 }).format(n);
 }
 
 /** The keys of the number pad, row by row ("" is a gap, "," a decimal comma). */

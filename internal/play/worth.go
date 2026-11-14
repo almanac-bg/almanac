@@ -13,13 +13,17 @@ import (
 //
 // An answer earns
 //
-//	MaxPoints × difficulty × kind × score × (1 − SpeedShare + SpeedShare × speed)
+//	MaxPoints × difficulty × kind × score × (1 − SpeedShare + SpeedShare × speed) × row
 //
-// where score is what the answer was worth (0–1, luck taken out: bank.Graded), difficulty pays more for harder
-// questions, kind pays half for a true-or-not (half of guesses come out right: a guess at one is worth what a guess
-// at a choice of four is), and speed is how quick it came: full in the first QuickPart of the question's time, then
-// less, down to nothing at the end. Speed is at most SpeedShare of an answer, so that knowing counts the most and
-// looking an answer up costs.
+// rounded to tens, where score is what the answer was worth (0–1, luck taken out: bank.Graded), difficulty pays more
+// for harder questions, kind pays half for a true-or-not (half of guesses come out right: a guess at one is worth
+// what a guess at a choice of four is), and speed is how quick it came: full in the first QuickPart of the
+// question's time, then less, down to nothing at the end. Speed is at most SpeedShare of an answer, so that knowing
+// counts the most and looking an answer up costs. Row is for right answers in a row: from the second, each earns
+// RowStep more, up to RowMax more. A game whose every answer was right earns AllRight more at its end.
+//
+// The numbers are big on purpose: a right answer is worth a thousand, a good game ten thousand. It's the same game
+// whatever the scale, and earning a lot feels better.
 
 const (
 	// SpeedShare is the part of an answer's points that's for speed.
@@ -27,31 +31,47 @@ const (
 	// QuickPart is the part of a question's time an answer may take and still earn all of its speed: time to read,
 	// and to get through a slow line.
 	QuickPart = 0.25
+	// RowStep is how much more each right answer in a row earns, from the second; RowMax is the most it comes to.
+	RowStep = 0.1
+	RowMax  = 0.5
+	// AllRight is what a game earns at its end when every answer was right.
+	AllRight = 2000
 )
 
 var (
-	weight = map[bank.Difficulty]float64{bank.Easy: 0.6, bank.Medium: 1, bank.Hard: 1.4}
+	weight = map[bank.Difficulty]float64{bank.Easy: 0.8, bank.Medium: 1, bank.Hard: 1.2}
 	kinds  = map[string]float64{"truefalse": 0.5}
 )
 
-// Worth is what an answer earned: its points, and how many of them are for speed.
+// Worth is what an answer earned: its points, how many of them are for speed, and how many for the row it's in.
 type Worth struct {
 	Points int
 	Speed  int
+	Row    int
 }
 
-// WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room.
-func WorthOf(q bank.Question, score float64, took time.Duration) Worth {
+// WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room. inRow is
+// how many right answers in a row it makes, itself counted (0 for one that isn't right).
+func WorthOf(q bank.Question, score float64, took time.Duration, inRow int) Worth {
 	h := q.Base()
 	k, ok := kinds[h.Type]
 	if !ok {
 		k = 1
 	}
 	full := score * MaxPoints * weight[h.Difficulty] * k
-	base := int(math.Round(full * (1 - SpeedShare)))
-	points := int(math.Round(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q)))))
-	return Worth{Points: points, Speed: points - base}
+	base := tens(full * (1 - SpeedShare))
+	quick := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))))
+	points := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))) * (1 + rowBonus(inRow)))
+	return Worth{Points: points, Speed: quick - base, Row: points - quick}
 }
+
+// rowBonus is how much more an answer earns for the right answers in a row it makes.
+func rowBonus(inRow int) float64 {
+	return min(RowMax, RowStep*float64(max(0, inRow-1)))
+}
+
+// tens rounds points to tens.
+func tens(x float64) int { return 10 * int(math.Round(x/10)) }
 
 // speed is how quick an answer was, 0–1: 1 in the first QuickPart of the time, then less, to 0 at its end.
 func speed(took, limit time.Duration) float64 {
