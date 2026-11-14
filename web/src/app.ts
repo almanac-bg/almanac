@@ -2,7 +2,7 @@
 // bottom of a phone's), and the screen the router puts under them.
 
 import { type ApiError, api } from "./lib/api.ts";
-import { type Child, h, mount, signal } from "./lib/dom.ts";
+import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { path, start } from "./lib/router.ts";
@@ -114,6 +114,8 @@ if (root) {
     ],
     missing,
   );
+  // In a game, a phone's bar of places steps aside (app.css): the question gets the screen.
+  effect(() => document.documentElement.classList.toggle("playing", playing()));
   watchWaiting();
   prepareSound();
 }

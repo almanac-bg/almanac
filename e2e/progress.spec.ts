@@ -29,9 +29,10 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
 
   // Sounds are on until turned off, and stay off on this device.
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Изключи звуците" }).click();
+  await expect(page.getByRole("switch", { name: "Звуци" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("switch", { name: "Звуци" }).click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Включи звуците" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Звуци" })).toHaveAttribute("aria-checked", "false");
 
   // Достъпност: bigger text and less motion stay on this device too.
   await page.getByRole("switch", { name: "По-едър текст" }).click();

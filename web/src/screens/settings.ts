@@ -149,47 +149,48 @@ function account(): Child {
   );
 }
 
-/** Sounds: on or off, on this device. */
-function sounds(): Child {
+/** A setting kept on this device: its name, what it does, and a switch. */
+function switchRow(label: string, about: string, on: () => boolean, set: (v: boolean) => void): Child {
   return h(
-    "section",
-    null,
-    h("h2", null, "Звуци"),
-    h("p", { class: "muted" }, "Кратки звуци: часовникът, отговорите, новото ниво. Важи за това устройство."),
-    h("button", { class: "btn", type: "button", onclick: () => setSound(!soundOn.peek()) }, () =>
-      soundOn() ? "Изключи звуците" : "Включи звуците",
+    "div",
+    { class: "switch-row" },
+    h("span", { class: "switch-text" }, h("b", null, label), h("span", { class: "muted" }, about)),
+    h(
+      "button",
+      {
+        class: "switch",
+        type: "button",
+        role: "switch",
+        "aria-checked": on,
+        "aria-label": label,
+        onclick: () => set(!on()),
+      },
+      h("span", { class: "switch-knob", "aria-hidden": "true" }),
     ),
   );
 }
 
-/** Достъпност: less motion, bigger text, the clock's ticking — for this device. */
+/** Sounds, and the clock's ticking among them: on or off, on this device. */
+function sounds(): Child {
+  return h(
+    "section",
+    null,
+    h("h2", null, "Звук"),
+    h("p", { class: "muted" }, "Важи за това устройство."),
+    switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
+    switchRow("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
+  );
+}
+
+/** Достъпност: less motion and bigger text, for this device. */
 function access(): Child {
-  const row = (label: string, about: string, on: () => boolean, set: (v: boolean) => void) =>
-    h(
-      "div",
-      { class: "switch-row" },
-      h("span", { class: "switch-text" }, h("b", null, label), h("span", { class: "muted" }, about)),
-      h(
-        "button",
-        {
-          class: "switch",
-          type: "button",
-          role: "switch",
-          "aria-checked": on,
-          "aria-label": label,
-          onclick: () => set(!on()),
-        },
-        h("span", { class: "switch-knob", "aria-hidden": "true" }),
-      ),
-    );
   return h(
     "section",
     null,
     h("h2", null, "Достъпност"),
     h("p", { class: "muted" }, "Важи за това устройство."),
-    row("По-малко движение", "Без анимации; часовникът пак тече.", calm, setCalm),
-    row("По-едър текст", "Всичко малко по-голямо.", bigText, setBigText),
-    row("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
+    switchRow("По-малко движение", "Без анимации; часовникът пак тече.", calm, setCalm),
+    switchRow("По-едър текст", "Всичко малко по-голямо.", bigText, setBigText),
   );
 }
 

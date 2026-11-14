@@ -62,7 +62,7 @@ function tile(c: Category, m?: Mastery): Child {
         "span",
         { class: "topic-meta" },
         h("span", null, m?.answers ? (sure ? `знаеш ${sure.known}%` : masteryLeft(m)) : "Още не е играна"),
-        m?.answers ? h("span", null, questions(m.answers)) : null,
+        sure ? h("span", null, questions(sure.answers)) : null,
       ),
       sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
     ),

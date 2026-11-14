@@ -39,10 +39,11 @@ interface Friends {
 /** Приятели, one of the main places. */
 export function friends(): Child {
   title("Приятели");
-  return h("section", { class: "screen" }, h("h1", null, "Приятели"), friendsCard());
+  return h("section", { class: "screen" }, friendsCard());
 }
 
-export function friendsCard(): Child {
+/** The page's title (with the way to change the list, once there are friends), then the friends card itself. */
+function friendsCard(): Child {
   const data = signal<Friends | null>(null);
   const error = signal("");
   const editing = signal(false);
@@ -93,111 +94,118 @@ export function friendsCard(): Child {
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
 
-  return h(
-    "section",
-    { class: "card friends" },
-    h("div", { class: "card-head" }, h("h2", null, "Приятели"), () =>
+  return [
+    h("div", { class: "title-row" }, h("h1", null, "Приятели"), () =>
       data()?.friends.length
         ? h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
             editing() ? "Готово" : "Промени",
           )
         : null,
     ),
-    () =>
-      (data()?.requests.in ?? []).map((r) =>
-        h(
-          "div",
-          { class: "invitation" },
-          h(
-            "p",
-            null,
-            r.tag ? h("a", { href: profileHref(r.tag) }, h("strong", null, r.name)) : h("strong", null, r.name),
-            h("span", { class: "muted" }, ` @${r.tag}`),
-            " иска да сте приятели.",
-          ),
+    h(
+      "section",
+      { class: "card friends" },
+      () =>
+        (data()?.requests.in ?? []).map((r) =>
           h(
             "div",
-            { class: "invitation-actions" },
-            h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
-            h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+            { class: "invitation" },
+            h(
+              "p",
+              null,
+              r.tag ? h("a", { href: profileHref(r.tag) }, h("strong", null, r.name)) : h("strong", null, r.name),
+              h("span", { class: "muted" }, ` @${r.tag}`),
+              " иска да сте приятели.",
+            ),
+            h(
+              "div",
+              { class: "invitation-actions" },
+              h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
+              h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+            ),
           ),
         ),
-      ),
-    () => {
-      const d = data();
-      if (!d) {
-        // Not a player yet: the link is made once they are.
-        return user()
-          ? null
-          : [
-              h("p", { class: "muted" }, "Покани приятели: виждате резултатите си за деня и се каните на дуел."),
-              h(
-                "button",
-                {
-                  class: "btn",
-                  type: "button",
-                  onclick: () =>
-                    act(async () => {
-                      await player();
-                      await load();
-                    }),
-                },
-                "Покани приятел",
-              ),
-            ];
-      }
-      return [
-        d.friends.length
-          ? h(
-              "ol",
-              { class: "friend-list" },
-              d.friends.map((f) =>
-                row(
-                  f,
-                  () => duel(f),
-                  () => remove(f),
-                  editing,
+      () => {
+        const d = data();
+        if (!d) {
+          // Not a player yet: the link is made once they are.
+          return user()
+            ? null
+            : [
+                h("p", { class: "muted" }, "Покани приятели: виждате резултатите си за деня и се каните на дуел."),
+                h(
+                  "button",
+                  {
+                    class: "btn",
+                    type: "button",
+                    onclick: () =>
+                      act(async () => {
+                        await player();
+                        await load();
+                      }),
+                  },
+                  "Покани приятел",
                 ),
-              ),
-            )
-          : h(
-              "p",
-              { class: "muted" },
-              "Още нямаш приятели тук. Добави ги по потребителско име или имейл, или им прати поканата си.",
-            ),
-        adder,
-        d.requests.out.length
-          ? h(
-              "div",
-              { class: "stack small-gap" },
-              h("p", { class: "kicker" }, "Чакат отговор"),
-              h(
-                "ul",
-                { class: "waiting" },
-                d.requests.out.map((r) =>
-                  h(
-                    "li",
-                    null,
-                    r.email
-                      ? h("span", null, r.email)
-                      : h("a", { href: profileHref(r.tag ?? "") }, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
-                    h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
+              ];
+        }
+        return [
+          d.friends.length
+            ? h(
+                "ol",
+                { class: "friend-list" },
+                d.friends.map((f) =>
+                  row(
+                    f,
+                    () => duel(f),
+                    () => remove(f),
+                    editing,
                   ),
                 ),
+              )
+            : h(
+                "p",
+                { class: "muted" },
+                "Още нямаш приятели тук. Добави ги по потребителско име или имейл, или им прати поканата си.",
               ),
-            )
-          : null,
-        shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
-        h(
-          "p",
-          { class: "muted small" },
-          "Твоята покана: ",
-          h("a", { href: new URL(d.invite).pathname, class: "invite-link" }, d.invite),
-        ),
-      ];
-    },
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
-  );
+          adder,
+          d.requests.out.length
+            ? h(
+                "div",
+                { class: "stack small-gap" },
+                h("p", { class: "kicker" }, "Чакат отговор"),
+                h(
+                  "ul",
+                  { class: "waiting" },
+                  d.requests.out.map((r) =>
+                    h(
+                      "li",
+                      null,
+                      r.email
+                        ? h("span", null, r.email)
+                        : h(
+                            "a",
+                            { href: profileHref(r.tag ?? "") },
+                            r.name,
+                            h("span", { class: "muted" }, ` @${r.tag}`),
+                          ),
+                      h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+          shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
+          h(
+            "p",
+            { class: "muted small" },
+            "Твоята покана: ",
+            h("a", { href: new URL(d.invite).pathname, class: "invite-link" }, d.invite),
+          ),
+        ];
+      },
+      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    ),
+  ];
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email. */
