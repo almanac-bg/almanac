@@ -59,7 +59,7 @@ func answer(m *Match, right bool) json.RawMessage {
 	m.mu.Lock()
 	d := m.dealt[m.n]
 	m.mu.Unlock()
-	raw, _ := json.Marshal(d.Reveal())
+	raw, _ := json.Marshal(d.Reveal(nil))
 	var rv struct {
 		Pick  *int     `json:"pick"`
 		Value *float64 `json:"value"`

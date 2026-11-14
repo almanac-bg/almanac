@@ -69,9 +69,33 @@ export interface Reveal {
   truth?: boolean;
   /** A match's pairs: for each left (as shown), the right that is its pair. */
   pairs?: number[];
+  /** Where a match's decoy is shown: the right that is no left's pair. */
+  decoy?: number;
   unit?: string;
   fact?: string;
   credit?: Credit;
+  /** How players have answered the question so far (none until it has enough answers). */
+  crowd?: Crowd;
+}
+
+/** How players have answered a question: how many answers, the share right, and per kind more. */
+export interface Crowd {
+  answers: number;
+  right: number;
+  /** A choice's share of picks for each option (as shown); a true-or-not's for true, then false. */
+  picks?: number[];
+  /** Where a number's typed guesses fell. */
+  guesses?: Spread;
+}
+
+/** Typed guesses around a number's answer: equal parts of lo–hi (on a log scale if log), and the shares beyond. */
+export interface Spread {
+  lo: number;
+  hi: number;
+  log?: boolean;
+  bins: number[];
+  below: number;
+  above: number;
 }
 
 export type Answer =

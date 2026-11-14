@@ -65,7 +65,7 @@ By kind:
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
 - **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
-  rights) alike.
+  rights) alike. The decoy sets the difficulty too: a far one for easy, a close one for hard.
 - **A picture** makes a question easier only if it shows the answer's look to people who'd recognise it.
 
 Check the label against the answers once a question has `play.CalibrateFrom` (30) of them:
@@ -99,8 +99,12 @@ By type:
   `unit`. The text says the direction.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. 10 seconds to answer.
-- **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), and four `pairs` of `left` and
-  `right`, each at most 30 characters. Every left has exactly one right that fits, under every source. 30 seconds.
+- **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), four `pairs` of `left` and
+  `right`, and a `decoy`: a fifth right that fits no left, each at most 30 characters. Every left has exactly one
+  right that fits, under every source, and the decoy fits none of them (check it as hard as an answer). The decoy is
+  of the same kind as the rights and tempting: the city people take for the capital („Сидни“), a neighbour of the
+  answer, a name from the same school. Without it, whoever knows three pairs gets the fourth for nothing. The
+  checker refuses a match added since `bank.DecoysFrom` (2026-11-15) without one. 30 seconds.
 
 ## Writing a question
 

@@ -72,7 +72,7 @@ func (w *world) answer(p Player, right bool) json.RawMessage {
 	if v.Question == nil {
 		w.t.Fatalf("no question showing: %+v", v)
 	}
-	raw, _ := json.Marshal(w.h.night.dealt[v.N].Reveal())
+	raw, _ := json.Marshal(w.h.night.dealt[v.N].Reveal(nil))
 	var rv struct {
 		Pick  *int  `json:"pick"`
 		Truth *bool `json:"truth"`

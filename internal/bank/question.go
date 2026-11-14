@@ -3,7 +3,8 @@
 //
 // Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
-// player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes.
+// player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
+// answer a deal also shows how players have answered the question so far (crowd.go), in its own order.
 package bank
 
 import (
@@ -72,8 +73,9 @@ type Dealt interface {
 	View() any
 	// Grade scores a player's answer (as JSON from the client) against this deal.
 	Grade(answer json.RawMessage) (Graded, error)
-	// Reveal is the answer as this deal shows it, with the fact and the picture's credit.
-	Reveal() any
+	// Reveal is the answer as this deal shows it, with the fact, the picture's credit, and how players have answered
+	// the question so far (nil when that isn't known yet).
+	Reveal(*Crowd) any
 }
 
 // Graded is what an answer was worth.
@@ -121,15 +123,16 @@ func viewOf(h *Head, t *Tail) view {
 }
 
 // reveal is what every type's reveal ends with: the question's id (for reporting it, once it's answered), the fact
-// behind the answer, and the picture's credit.
+// behind the answer, the picture's credit, and how players have answered it.
 type reveal struct {
 	ID     string       `json:"id"`
 	Fact   string       `json:"fact,omitempty"`
 	Credit *ImageCredit `json:"credit,omitempty"`
+	Crowd  *CrowdView   `json:"crowd,omitempty"`
 }
 
-func revealOf(h *Head, t *Tail) reveal {
-	return reveal{ID: h.ID, Fact: t.Fact, Credit: t.Image.credit()}
+func revealOf(h *Head, t *Tail, c *CrowdView) reveal {
+	return reveal{ID: h.ID, Fact: t.Fact, Credit: t.Image.credit(), Crowd: c}
 }
 
 func mustJSON(v any) json.RawMessage {
@@ -162,6 +165,9 @@ func AnswerText(q Question) string {
 		pairs := make([]string, 0, len(q.Pairs))
 		for _, p := range q.Pairs {
 			pairs = append(pairs, p.Left+" — "+p.Right)
+		}
+		if q.Decoy != "" {
+			pairs = append(pairs, "примамка: "+q.Decoy)
 		}
 		return strings.Join(pairs, "; ")
 	}

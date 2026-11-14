@@ -716,7 +716,7 @@ func (m *Match) View(viewer int64) View {
 		if shown {
 			q.LeftMs = 0
 			q.NextMs = max(1, (m.pause - time.Since(m.revealedAt)).Milliseconds())
-			q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
+			q.Reveal = &RevealView{Answer: d.Reveal(m.hub.game.Crowd(d.Question().Base().ID)), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
 				Right: me.right, Exact: me.exact, Missed: !me.answered}
 		}
 		v.Question = q

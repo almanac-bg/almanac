@@ -26,8 +26,16 @@ const (
 
 // chance is the score a guess gets on average, by kind of question.
 // An order's and a match's grading already takes most of the luck out (bank.orderScore, bank.matchScore): at random,
-// four items in order are worth 7/36 on average, four pairs 1/8.
+// four items in order are worth 7/36 on average, four pairs 1/8, and four pairs with a decoy 53/480.
 var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 7.0 / 36, "match": 0.125, "number": 0}
+
+// chanceOf is the score a guess at q gets on average.
+func chanceOf(q bank.Question) float64 {
+	if m, ok := q.(*bank.Match); ok && m.Decoy != "" {
+		return 53.0 / 480
+	}
+	return chance[q.Base().Type]
+}
 
 // KnownToDifficulty is the difficulty a share of knowledge (above chance) points to.
 func KnownToDifficulty(known float64) bank.Difficulty {
@@ -74,7 +82,7 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 		}
 		h := q.Base()
 		c.Category, c.Type, c.Labelled = h.Category, h.Type, h.Difficulty
-		guess := chance[h.Type]
+		guess := chanceOf(q)
 		c.Known = max(0, (c.Score-guess)/(1-guess))
 		c.Observed = KnownToDifficulty(c.Known)
 		out = append(out, c)

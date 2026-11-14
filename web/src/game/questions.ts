@@ -5,7 +5,18 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { formatNumber } from "../ui.ts";
-import type { Answer, ChoiceView, MatchView, NumberView, OrderView, Reveal, TrueFalseView, View } from "./types.ts";
+import type {
+  Answer,
+  ChoiceView,
+  Crowd,
+  MatchView,
+  NumberView,
+  OrderView,
+  Reveal,
+  Spread,
+  TrueFalseView,
+  View,
+} from "./types.ts";
 
 export interface Asked {
   /** The answering part, under the question. */
@@ -16,8 +27,52 @@ export interface Asked {
   pending(): Answer | null;
 }
 
-/** Draws a question's answering part; submit sends an answer once, and locked stops input. */
+/** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it tells
+ * how everyone else has answered (once the question has had enough answers to say). */
 export function ask(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+  const a = askType(view, submit, locked);
+  const says = h("p", { class: "crowd-says", hidden: true });
+  return {
+    node: h("div", { class: "stack" }, a.node, says),
+    pending: a.pending,
+    reveal(reveal, given) {
+      a.reveal(reveal, given);
+      const line = reveal.crowd ? crowdSays(view.type, reveal.crowd) : "";
+      says.textContent = line;
+      says.hidden = !line;
+    },
+  };
+}
+
+/** A share as the game writes it: „58%“, and „под 1%“ for what rounds to nothing but isn't. */
+export function share(x: number): string {
+  return x > 0 && x < 0.005 ? "под 1%" : `${Math.round(x * 100)}%`;
+}
+
+/** How everyone else did, in one sentence, as each kind of question counts right. */
+function crowdSays(type: View["type"], c: Crowd): string {
+  const s = share(c.right);
+  switch (type) {
+    case "choice":
+    case "truefalse":
+      return `Вярно отговарят ${s} от играчите.`;
+    case "number":
+      return `Достатъчно близо са ${s} от играчите.`;
+    case "order":
+      return `Изцяло вярно подреждат ${s} от играчите.`;
+    case "match":
+      return `Всички двойки свързват ${s} от играчите.`;
+  }
+}
+
+/** Shows on an answer what share of players gave it: a bar behind it, filling in, and the share beside it. */
+function crowdOn(button: HTMLElement, x: number): void {
+  button.classList.add("crowd");
+  button.append(h("span", { class: "value crowd-share" }, share(x)));
+  requestAnimationFrame(() => button.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
+}
+
+function askType(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
   switch (view.type) {
     case "choice":
       return choice(view, submit, locked);
@@ -86,6 +141,8 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         b.classList.remove("picked");
         const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
         b.classList.add(how);
+        const picked = reveal.crowd?.picks?.[i];
+        if (picked !== undefined) crowdOn(b, picked);
         if (how !== "dim") b.append(sign());
       });
     },
@@ -207,9 +264,67 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
         given && "value" in given
           ? h("p", { class: "muted" }, `Ти каза ${formatNumber(given.value, view.step)}${unit}.`)
           : h("p", { class: "muted" }, "Без отговор."),
+        reveal.crowd?.guesses
+          ? spread(reveal.crowd.guesses, reveal.value ?? 0, given && "value" in given ? given.value : null, view)
+          : null,
       ]);
     },
   };
+}
+
+/** Where everyone's guesses at a number fell: a bar for each part of the range a guess scores in, one at each end for
+ * the guesses beyond it, the answer's part in the colour of a right answer and the player's own in theirs. */
+function spread(s: Spread, answer: number, mine: number | null, view: NumberView): Child {
+  const n = s.bins.length;
+  const at = (v: number) =>
+    s.log ? (v <= 0 ? -1 : Math.log(v / s.lo) / Math.log(s.hi / s.lo)) : (v - s.lo) / (s.hi - s.lo);
+  // Columns: 0 is below the range, 1…n its parts, n+1 above it.
+  const column = (v: number) => {
+    const a = at(v);
+    return a < 0 ? 0 : a > 1 ? n + 1 : Math.min(n, Math.floor(a * n) + 1);
+  };
+  const shares = [s.below, ...s.bins, s.above];
+  const top = Math.max(...shares, 0.01);
+  const theAnswer = column(answer);
+  const theirs = mine === null ? -1 : column(mine);
+  const unit = view.unit ? ` ${view.unit}` : "";
+  const inRange = s.bins.reduce((a, b) => a + b, 0);
+  const bars = h(
+    "div",
+    {
+      class: "spread-bars",
+      role: "img",
+      "aria-label": `${share(inRange)} от догадките са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
+      style: { "grid-template-columns": `0.6fr repeat(${n}, 1fr) 0.6fr` },
+    },
+    shares.map((x, k) =>
+      h("span", {
+        class: ["spread-bar", (k === 0 || k === n + 1) && "edge", k === theirs && "mine", k === theAnswer && "answer"]
+          .filter(Boolean)
+          .join(" "),
+        style: { height: `${Math.max(3, (x / top) * 100)}%` },
+      }),
+    ),
+  );
+  return h(
+    "div",
+    { class: "spread" },
+    h("span", { class: "kicker" }, "Догадките на играчите"),
+    bars,
+    h(
+      "div",
+      { class: "spread-axis", "aria-hidden": "true" },
+      h("span", null, formatNumber(s.lo, view.step)),
+      h("span", null, `${formatNumber(s.hi, view.step)}${unit}`),
+    ),
+    h(
+      "div",
+      { class: "spread-key", "aria-hidden": "true" },
+      h("span", null, h("i", { class: "spread-swatch answer" }), "отговорът"),
+      mine === null ? null : h("span", null, h("i", { class: "spread-swatch mine" }), "твоята"),
+      h("span", null, h("i", { class: "spread-swatch edge" }), "извън целта"),
+    ),
+  );
 }
 
 let orders = 0; // for each order's hint its own id
@@ -379,6 +494,8 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
         const how =
           truth === reveal.truth ? "right" : given && "truth" in given && given.truth === truth ? "wrong" : "dim";
         b.classList.add(how);
+        const said = reveal.crowd?.picks?.[truth ? 0 : 1];
+        if (said !== undefined) crowdOn(b, said);
         if (how !== "dim") b.append(sign());
       }
     },
@@ -503,10 +620,17 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
     },
     "Готово",
   );
-  const hint = h("p", { class: "hint" }, "Докосни нещо отляво, после двойката му отдясно.");
+  const spare = view.right.length > view.left.length;
+  const hint = h(
+    "p",
+    { class: "hint" },
+    "Докосни нещо отляво, после двойката му отдясно.",
+    spare ? " Едно отдясно е без двойка." : null,
+  );
   const result = h("ol", { class: "options match-result", hidden: true });
+  const decoy = h("p", { class: "hint match-decoy", hidden: true });
   return {
-    node: h("div", { class: "stack" }, hint, grid, said, done, result),
+    node: h("div", { class: "stack" }, hint, grid, said, done, result, decoy),
     pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
     reveal(reveal, given) {
       hint.hidden = true;
@@ -534,6 +658,11 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
           );
         }),
       );
+      const spareText = reveal.decoy === undefined ? undefined : view.right[reveal.decoy];
+      if (spareText) {
+        decoy.hidden = false;
+        decoy.replaceChildren("Без двойка: ", h("strong", null, spareText));
+      }
     },
   };
 }

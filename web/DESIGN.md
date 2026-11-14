@@ -119,6 +119,9 @@ takes a token.
 - **Play:**
   - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
+  - How everyone else answered, once a question has enough answers: `.option.crowd` (a bar behind an answer as long
+    as the share of players who gave it, the share beside it), `.spread` (where a number's guesses fell, the answer's
+    part in `--right`, the player's in `--accent`) and `.crowd-says` (one sentence under the question).
   - `.verdict` and `.fact`.
 - **Progress:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.

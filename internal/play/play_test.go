@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -68,7 +69,7 @@ func (w *world) picks(runID int64) []Pick {
 func (w *world) right(runID int64, n int) json.RawMessage {
 	p := w.picks(runID)[n]
 	q, _ := w.b.Get(p.ID)
-	reveal, _ := json.Marshal(q.Deal(p.Seed).Reveal())
+	reveal, _ := json.Marshal(q.Deal(p.Seed).Reveal(nil))
 	var r struct {
 		Pick  *int     `json:"pick"`
 		Value *float64 `json:"value"`
@@ -1352,4 +1353,64 @@ func deref(s *string) string {
 		return "<nil>"
 	}
 	return *s
+}
+
+func TestCrowds(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	// Fifteen players get the day's first question right and five wrong.
+	var first string
+	for i := range CrowdFrom {
+		p := w.user()
+		s, _ := w.g.StartDay(ctx, p)
+		first = w.picks(s.ID)[0].ID
+		if i < 15 {
+			w.play(p, s.ID, w.right)
+		} else {
+			w.play(p, s.ID, w.wrong)
+		}
+	}
+	if err := w.g.CountCrowds(ctx); err != nil {
+		t.Fatal(err)
+	}
+	c := w.g.Crowd(first)
+	if c == nil || c.Answers != CrowdFrom || math.Abs(c.Right-0.75) > 1e-9 {
+		t.Fatalf("the first question's crowd: %+v", c)
+	}
+	// The next player sees it with the answer; a question with fewer answers shows none.
+	p := w.user()
+	s, _ := w.g.StartDay(ctx, p)
+	if _, err := w.g.Show(ctx, p, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	res, err := w.g.Answer(ctx, p, s.ID, 0, w.right(s.ID, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rev struct{ Crowd *bank.CrowdView }
+	_ = json.Unmarshal(mustJSON(t, res.Reveal), &rev)
+	if rev.Crowd == nil || rev.Crowd.Answers != CrowdFrom {
+		t.Fatalf("revealed %+v", rev.Crowd)
+	}
+	if second := w.picks(s.ID)[1].ID; w.g.Crowd(second) != nil {
+		t.Fatal("a question with one answer showed a crowd")
+	}
+	// Answers from before a question last changed were to another question: they don't count.
+	q, _ := w.b.Get(first)
+	q.Extra().Updated = "2026-11-13"
+	if err := w.g.CountCrowds(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if c := w.g.Crowd(first); c != nil {
+		t.Fatalf("a changed question kept its crowd: %+v", c)
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

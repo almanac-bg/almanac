@@ -64,6 +64,8 @@ type Hub struct {
 	mu    sync.Mutex
 	rooms map[string]*Room
 	bank  func() *bank.Bank
+	// Crowd, if set, is how players have answered a question (shown with its answer).
+	Crowd func(id string) *bank.Crowd
 	// OnArena, if set, is told how each arena ended (in a goroutine of its own); it may answer with Room.Settled.
 	OnArena func(*Room, []Placed)
 	// The arena's queue (arena.go): who waits, since when there have been enough of them, and the timer for then.
@@ -73,6 +75,14 @@ type Hub struct {
 }
 
 func NewHub(b func() *bank.Bank) *Hub { return &Hub{rooms: map[string]*Room{}, bank: b} }
+
+// crowd is how players have answered a question, if the hub knows.
+func (h *Hub) crowd(id string) *bank.Crowd {
+	if h.Crowd == nil {
+		return nil
+	}
+	return h.Crowd(id)
+}
 
 // newRoom makes a room under a free code. Called with the hub's lock held.
 func (h *Hub) newRoom(category string) (*Room, error) {
@@ -565,7 +575,7 @@ func (r *Room) View(viewer int64) View {
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given
 			if r.phase == Reveal {
-				q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Row: me.row,
+				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question().Base().ID)), Points: me.gained, Speed: me.speed, Row: me.row,
 					Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
 				if me.row > 0 {
 					q.Reveal.InRow = me.inRow
@@ -591,7 +601,7 @@ func (r *Room) View(viewer int64) View {
 func (r *Room) review(m *member) []ReviewedView {
 	out := make([]ReviewedView, 0, len(r.dealt))
 	for i, d := range r.dealt {
-		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(), Given: json.RawMessage("null")}
+		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(r.hub.crowd(d.Question().Base().ID)), Given: json.RawMessage("null")}
 		if i < len(m.log) && m.log[i].questionID == d.Question().Base().ID && m.log[i].shown != nil {
 			it.Given, it.Points, it.Right = m.log[i].shown, m.log[i].points, m.log[i].right
 		}

@@ -25,7 +25,7 @@ func answer(r *Room, right bool) json.RawMessage {
 	r.mu.Lock()
 	d := r.dealt[r.n]
 	r.mu.Unlock()
-	raw, _ := json.Marshal(d.Reveal())
+	raw, _ := json.Marshal(d.Reveal(nil))
 	var rv struct {
 		Pick  *int     `json:"pick"`
 		Value *float64 `json:"value"`

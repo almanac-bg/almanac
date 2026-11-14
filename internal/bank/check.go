@@ -94,6 +94,13 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 			errs = append(errs, "a question added since "+RulesFrom+" needs updated (the day it last changed)")
 		}
 	}
+	if m, ok := q.(*Match); ok && m.Decoy == "" && !t.Retired {
+		if t.Added >= DecoysFrom {
+			errs = append(errs, "a match added since "+DecoysFrom+" needs a decoy")
+		} else {
+			warnings = append(warnings, "a match without a decoy: whoever knows three pairs gets the fourth")
+		}
+	}
 	if t.ReviewBy != "" && t.ReviewBy <= today && !t.Retired {
 		warnings = append(warnings, "due for review since "+t.ReviewBy)
 	}
