@@ -34,6 +34,10 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await playRun(b);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
+  // Played: the notice doesn't come back on the way out (no reload), nor its dot on Начало.
+  await b.locator('nav.tabs a[href="/"]').click();
+  await expect(b.locator("nav.tabs a.news")).toHaveCount(0);
+  await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
 

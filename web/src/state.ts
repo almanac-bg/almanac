@@ -67,7 +67,7 @@ export const challenges = signal<Challenge[]>([]);
 export let checkWaiting: () => Promise<void> = async () => {};
 
 /** Asks every half minute, while the page is in view, whether a friend has challenged the player, or someone asks
- * to be friends. */
+ * to be friends; and again each time a game ends, so a challenge just played doesn't stay on the notice. */
 export function watchWaiting(): void {
   checkWaiting = async () => {
     if (!user.peek()) {
@@ -90,7 +90,7 @@ export function watchWaiting(): void {
   };
   effect(() => {
     user();
-    untracked(checkWaiting);
+    if (!playing()) untracked(checkWaiting);
   });
   setInterval(checkWaiting, 30_000);
   document.addEventListener("visibilitychange", () => checkWaiting());

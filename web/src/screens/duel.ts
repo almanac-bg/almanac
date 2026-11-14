@@ -280,6 +280,7 @@ export function duelOne(params: string[]) {
       if (d.state === "play" && !d.runId && !yes)
         return screen.show(() => asked(d, play, () => screen.show(() => ended({ ...d, state: "declined" }))));
       if (d.state === "play") return play();
+      checkWaiting(); // a notice that pointed here, to a duel already played, goes
       screen.show(() => ended(d));
     } catch (err) {
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
