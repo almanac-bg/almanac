@@ -41,6 +41,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>АЛМАНАХ</title>
 <meta name="description" content="{{.Description}}">
+{{if .Canonical}}<link rel="canonical" href="{{.Canonical}}">{{end}}
 <meta property="og:site_name" content="АЛМАНАХ">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{.Title}}">
@@ -93,10 +94,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	})
 	m := assets.Manifest(s.client)
 	title, description := s.preview(r)
+	canonical := ""
+	if r.URL.Path == "/" {
+		canonical = s.cfg.PublicURL + "/"
+	}
 	var out bytes.Buffer
 	if err := shell.Execute(&out, map[string]any{
 		"CSS": m["app.css"], "JS": m["app.js"], "Boot": template.JS(boot),
-		"Title": title, "Description": description,
+		"Title": title, "Description": description, "Canonical": canonical,
 		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + "/og.png",
 	}); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -105,6 +110,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-cache")
+	if r.URL.Path != "/" {
+		h.Set("X-Robots-Tag", "noindex") // see robots
+	}
 	w.WriteHeader(status)
 	_, _ = w.Write(out.Bytes())
 }
@@ -136,6 +144,30 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 	return title, description
 }
 
+// Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
+// the same empty page until it starts, or something of one player's or one game's (a room, an invite, a duel, a
+// profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
+// drawn here, not kept in web/public.
+var indexed = []string{"/", "/privacy"}
+
+func (s *Server) robots(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	_, _ = fmt.Fprintf(w, "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: %s/sitemap.xml\n", s.cfg.PublicURL)
+}
+
+func (s *Server) sitemap(w http.ResponseWriter, _ *http.Request) {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for _, p := range indexed {
+		b.WriteString("  <url><loc>" + template.HTMLEscapeString(s.cfg.PublicURL+p) + "</loc></url>\n")
+	}
+	b.WriteString("</urlset>\n")
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	_, _ = w.Write([]byte(b.String()))
+}
+
 // The client's fonts are its own files: say what they are, wherever the server runs (not every system's MIME table
 // knows woff2).
 func init() { _ = mime.AddExtensionType(".woff2", "font/woff2") }
@@ -152,7 +184,7 @@ func (s *Server) asset(w http.ResponseWriter, r *http.Request) {
 
 // publicFiles are served from the site's root as they are (web/public).
 var publicFiles = []string{
-	"favicon.svg", "bimi.svg", "robots.txt", "manifest.webmanifest", "sw.js", "og.png",
+	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js", "og.png",
 	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
 }
 
