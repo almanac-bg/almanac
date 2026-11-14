@@ -17,8 +17,8 @@ import (
 //     one in sight;
 //   - an achievement: only those that say how someone plays („Светкавица“, „Неугасим пламък“);
 //   - a topic: „Майстор · …“ and „Светило · …“ for reaching that mastery in it;
-//   - the rating: a division reached, a Роял won, and a place on a season's podium, which counts how many times
-//     („Двукратен шампион“).
+//   - the rating and the leagues: a division reached, a Роял won, and first place in a week of Рила, which counts
+//     how many times („Двукратен шампион на Рила“).
 //
 // Each has a tier, the colour it's worn in.
 
@@ -40,10 +40,10 @@ const (
 	TitleRank        = "rank"
 )
 
-// Titles are every title but the topics' (made from the bank's topics) and the podium's: the rating's, the level's
+// Titles are every title but the topics' (made from the bank's topics) and the champion's: the rating's, the level's
 // ladder, then the achievements', each group from the first a player is likely to earn.
 var Titles = []Title{
-	{"goldSeason", "Златен сезон", Rare, TitleRank, unlock{division: "gold"}, ""},
+	{"goldStandard", "Златен стандарт", Rare, TitleRank, unlock{division: "gold"}, ""},
 	{"diamondMind", "Диамантен ум", Epic, TitleRank, unlock{division: "diamond"}, ""},
 	{"livingLegend", "Жива легенда", Legendary, TitleRank, unlock{division: "legend"}, ""},
 	{"royalCrown", "Короната на Роял", Epic, TitleRank, unlock{royal: 1}, ""},
@@ -128,21 +128,20 @@ type TitleView struct {
 	How    string `json:"how,omitempty"`
 }
 
-// podiumHow says what wins a place's title.
-var podiumHow = [3]string{"първо място в сезон", "второ място в сезон", "трето място в сезон"}
+// championHow says what wins the champion's title.
+const championHow = "първо място за седмица в Рила"
 
-// titleViews are every title, as a player with this wardrobe may wear them: the podium's first (named by how many
-// times they're won), then the rest.
+// titleViews are every title, as a player with this wardrobe may wear them: the champion's first (named by how many
+// times it's won), then the rest.
 func (w wardrobe) titleViews(all []Title) []TitleView {
-	list := make([]TitleView, 0, len(w.podium)+len(all))
-	for i, won := range w.podium {
-		v := TitleView{TitleRef: TitleRef{ID: podiumTitleID(i + 1)}, Group: TitleRank}
-		v.Name, v.Tier = PodiumTitle(i+1, won)
-		if won == 0 {
-			v.Locked, v.How = true, podiumHow[i]
-		}
-		list = append(list, v)
+	list := make([]TitleView, 0, 1+len(all))
+	won := w.champion()
+	v := TitleView{TitleRef: TitleRef{ID: championID}, Group: TitleRank}
+	v.Name, v.Tier = ChampionTitle(won)
+	if won == 0 {
+		v.Locked, v.How = true, championHow
 	}
+	list = append(list, v)
 	for _, t := range all {
 		v := TitleView{TitleRef: t.ref(), Group: t.Group}
 		if !w.has(t.by) {
@@ -170,62 +169,48 @@ func (t Title) how() string {
 	return string(unicode.ToLower(first)) + a.About[n:]
 }
 
-// wears is whether a player with this wardrobe may wear a title: one they've unlocked, or a place on the podium
-// they've won.
+// wears is whether a player with this wardrobe may wear a title: one they've unlocked, or the champion's, won.
 func (w wardrobe) wears(all []Title, id string) bool {
 	if i := slices.IndexFunc(all, func(t Title) bool { return t.ID == id }); i >= 0 {
 		return w.has(all[i].by)
 	}
-	for place, n := range w.podium {
-		if n > 0 && id == podiumTitleID(place+1) {
-			return true
-		}
-	}
-	return false
+	return id == championID && w.champion() > 0
 }
 
-// titleOf is the name a title is shown by, and its tier ("" for none): a title's id, or a place on a season's
-// podium as lookColumns read it ("podium2:3": second, three times).
+// titleOf is the name a title is shown by, and its tier ("" for none): a title's id, or the champion's as lookColumns
+// read it ("champion:3": three times).
 func (g *Game) titleOf(id string) (string, Tier) {
 	if id == "" {
 		return "", ""
 	}
-	if rest, ok := strings.CutPrefix(id, "podium"); ok {
-		p, n, _ := strings.Cut(rest, ":")
-		place, _ := strconv.Atoi(p)
-		times, _ := strconv.Atoi(n)
-		if place < 1 || place > len(podiumTitles) || times < 1 {
+	if rest, ok := strings.CutPrefix(id, championID+":"); ok {
+		times, _ := strconv.Atoi(rest)
+		if times < 1 {
 			return "", ""
 		}
-		return PodiumTitle(place, times)
+		return ChampionTitle(times)
 	}
 	t, _ := g.titleByID(id)
 	return t.Name, t.Tier
 }
 
-// podiumTitleID is the title of a place on a season's podium (1–3), as a player wears it.
-func podiumTitleID(place int) string { return "podium" + strconv.Itoa(place) }
-
-// podiumTitles are the places of the podium as titles — won once, and before a count — and the tier each shows in.
-var podiumTitles = [3]struct {
-	once, name string
-	tier       Tier
-}{{"Шампион", "шампион", Legendary}, {"Вицешампион", "вицешампион", Epic}, {"Бронзов медалист", "бронзов медалист", Rare}}
+// championID is the champion's title, as a player wears it: first place in a week of the top league.
+const championID = "champion"
 
 // times say how many times, before a title („Двукратен“); past ten, in digits.
 var times = []string{"", "", "Двукратен", "Трикратен", "Четирикратен", "Петкратен", "Шесткратен", "Седемкратен",
 	"Осемкратен", "Деветкратен", "Десеткратен"}
 
-// PodiumTitle is the title of a place on the podium (1–3), won n times: „Шампион“, „Трикратен шампион“.
-func PodiumTitle(place, n int) (string, Tier) {
-	t := podiumTitles[place-1]
+// ChampionTitle is the champion's title, won n times: „Шампион на Рила“, „Трикратен шампион на Рила“.
+func ChampionTitle(n int) (string, Tier) {
+	top := " на " + Leagues[TopLeague].Name
 	switch {
 	case n <= 1:
-		return t.once, t.tier
+		return "Шампион" + top, Legendary
 	case n < len(times):
-		return times[n] + " " + t.name, t.tier
+		return times[n] + " шампион" + top, Legendary
 	}
-	return strconv.Itoa(n) + "-кратен " + t.name, t.tier
+	return strconv.Itoa(n) + "-кратен шампион" + top, Legendary
 }
 
 // royalWins is how many Роял tournaments a player has won (first place, with someone else in it).

@@ -1,17 +1,17 @@
-// Класации: where players stand — on the day's ten (first: it's what most play), by rating this season (with its
-// division), by level, and by knowledge (over every topic, or one) — among everyone, or among you and your friends.
+// Класации: where players stand — on the day's ten (first: it's what most play), in the week's league (the player's
+// own group), by rating (with its division), and by knowledge (over every topic, or one) — among everyone, or among
+// you and your friends.
 
 import { emblem } from "../art/emblem.ts";
-import { seasonName } from "../art/season.ts";
 import { board, boardRow } from "../game/results.ts";
 import type { Board, Score } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
-import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
 import { type Tier, toneOf, topicMark } from "../ui.ts";
 import type { Standing } from "./duel.ts";
+import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
 interface Ranked {
   name: string;
@@ -32,24 +32,8 @@ interface Ranking {
   mine?: Ranked;
 }
 
-/** The rating's season: a calendar month; placed with minGames rated games in it. */
-export interface Season {
-  id: string;
-  daysLeft: number;
-  minGames: number;
-  games: number;
-  place?: number;
-  of: number;
-  /** The division the player's rating is in now: ended there, the season pays its XP. */
-  division: Standing["division"];
-  /** Seasons ended first, second and third. */
-  podium: [number, number, number];
-  past: { id: string; place: number; of: number; rating: number; division: Standing["division"]; xp: number }[];
-}
-
 interface Answer {
   board: Ranking;
-  season?: Season;
   least?: number;
 }
 
@@ -59,27 +43,25 @@ interface Day {
   friends?: Score[] | null;
 }
 
-type By = "day" | "rating" | "level" | "knowledge";
+type By = "day" | "league" | "rating" | "knowledge";
 
 const tabs: [By, string][] = [
   ["day", "Днес"],
+  ["league", "Лига"],
   ["rating", "Рейтинг"],
-  ["level", "Ниво"],
   ["knowledge", "Знания"],
 ];
 
 const n = (x: number) => x.toLocaleString("bg");
 
-/** How long is left of a season. */
-export const daysLeft = (d: number) => `още ${d} ${d === 1 ? "ден" : "дни"}`;
-
 export function ranks() {
   title("Класации");
-  const by = signal<By>("day");
+  const by = signal<By>(location.hash === "#league" ? "league" : "day");
   const friends = signal(false);
   const topic = signal("");
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
+  const league = signal<LeagueView | null>(null);
   const error = signal("");
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
@@ -93,6 +75,10 @@ export function ranks() {
     error.set("");
     if (by() === "day") {
       if (!day.peek()) api<Day>("GET", "/api/day").then(day.set, (err) => error.set((err as ApiError).message));
+      return;
+    }
+    if (by() === "league") {
+      if (!league.peek()) loadLeague().then(league.set, (err) => error.set((err as ApiError).message));
       return;
     }
     const asked = current();
@@ -117,18 +103,19 @@ export function ranks() {
       "div",
       { class: "board-filters" },
       segmented("Класация", tabs, by, (v) => pick(by, v)),
-      user.peek()
-        ? segmented(
-            "Сред кого",
-            [
-              [false, "Всички"],
-              [true, "Приятели"],
-            ],
-            friends,
-            (v) => pick(friends, v),
-            true,
-          )
-        : null,
+      () =>
+        user.peek() && by() !== "league"
+          ? segmented(
+              "Сред кого",
+              [
+                [false, "Всички"],
+                [true, "Приятели"],
+              ],
+              friends,
+              (v) => pick(friends, v),
+              true,
+            )
+          : null,
       () =>
         by() === "knowledge"
           ? h(
@@ -181,18 +168,14 @@ export function ranks() {
             )
           : h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
       }
+      if (by() === "league") {
+        const v = league();
+        return v ? leagueBoard(v) : h("p", { class: "muted" }, "…");
+      }
       const d = data();
       if (!d) return h("p", { class: "muted" }, "…");
       const among = (name: string) => (friends() ? `${name} · приятели` : name);
       switch (by()) {
-        case "level":
-          return ranking(
-            among("Най-високо ниво"),
-            d.board,
-            (r) => [h("small", { class: "sub" }, `${n(r.value)} XP · `), `ниво ${r.level ?? 1}`],
-            "Още никой няма XP.",
-            "Цялото XP от игри и дневни цели, откакто играеш.",
-          );
         case "knowledge": {
           const name = categories.find((c) => c.id === topic())?.name;
           return ranking(
@@ -204,42 +187,15 @@ export function ranks() {
           );
         }
       }
-      const s = d.season;
-      return [
-        s ? seasonHead(s) : null,
-        ranking(
-          among("Рейтинг"),
-          d.board,
-          (r) => [r.division ? emblem(r.division.id, "s") : null, String(r.value)],
-          s ? `Още никой няма ${s.minGames} игри за рейтинг този сезон.` : "Още никой няма игри за рейтинг този сезон.",
-        ),
-      ];
+      const least = d.least ?? 10;
+      return ranking(
+        among("Рейтинг"),
+        d.board,
+        (r) => [r.division ? emblem(r.division.id, "s") : null, String(r.value)],
+        `Още никой няма ${least} игри за рейтинг.`,
+        `Играчите с поне ${least} игри за рейтинг: дуели, Арена и Роял.`,
+      );
     },
-  );
-}
-
-/** The season above its board: which month, the days left, the viewer's way onto it, and what the end brings. */
-function seasonHead(s: Season): Child {
-  const mine = user.peek()
-    ? s.place
-      ? `Ти си на ${place(s.place, s.of)}.`
-      : `Твоите игри този сезон: ${s.games} от ${s.minGames}.`
-    : "";
-  return h(
-    "section",
-    { class: "card season-card" },
-    h(
-      "div",
-      { class: "season-head" },
-      h("h2", null, `Сезон ${seasonName(s.id)}`),
-      h("span", { class: "muted" }, daysLeft(s.daysLeft)),
-    ),
-    mine ? h("p", { class: "season-mine" }, mine) : null,
-    h(
-      "p",
-      { class: "board-note" },
-      `Класират се играчите с поне ${s.minGames} игри за рейтинг (дуели, Арена и Роял). В края на месеца първите трима печелят медал, рамка и титла, а всеки рейтинг се връща наполовина към 1000.`,
-    ),
   );
 }
 

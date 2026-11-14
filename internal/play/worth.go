@@ -85,7 +85,7 @@ func speed(took, limit time.Duration) float64 {
 // XP is what a player earns by playing: it adds up across games, and makes their level. It's for playing and for
 // knowing, never for being quick or drawing harder questions, so that someone still learning a topic, or reading
 // slowly, goes up as surely as anyone. A game's answers and its end earn it here; the day's goals, achievements and
-// a season's end earn more (progress.go).
+// a week's first places in the league earn more (progress.go).
 const (
 	// XPAnswer is what any answer given earns (one left to run out of time, or given up on, earns nothing)…
 	XPAnswer = 10

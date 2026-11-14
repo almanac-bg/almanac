@@ -32,10 +32,10 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
   streak, the goals and the ways to play with others come after the first game.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
-- **Класации** (`/ranks`): Днес (the day's board, first), Рейтинг (with the season), Ниво and Знания; of everyone or
-  of friends.
+- **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
+  Рейтинг and Знания; of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level, division (after a first rated game),
-  season, streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  league (once in one), streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
 
@@ -135,7 +135,7 @@ takes a token.
 - **Progress:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
-  - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a season ended),
+  - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a week of the league ended),
     `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
   - `.achievements`/`.achievement` (and `locked`), `.worn` (what's worn), `.picker`/`.pick` and `.tone-pick` for
     choosing a look.
@@ -154,7 +154,7 @@ takes a token.
   - `.question-head`, `.options .option`, `.number`, `.keypad` and `.sortable-list`
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
-  - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.season-card`
+  - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.league-card`
   - `.unlocks .unlock-row`
 
 ## Tiers
@@ -170,9 +170,10 @@ takes a token.
 - Every achievement says how it's earned, how far along the player is, and its reward: its tier's XP, and only
   what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first
   of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
-- **One system.** XP comes from answers, the day's goals, achievements and a season's end (by division); the rating
-  from duels, Арена and Роял. Level, achievements, mastery, division, Роял and podium unlock the wardrobe. After a
-  game, its news is three cards at most: the goals it finished; the one biggest event (a season ended, a division
+- **One system.** XP comes from answers, the day's goals, achievements and a week's first three places in the league;
+  the rating from duels, Арена and Роял. Level, achievements, mastery, division, Роял and first place in a high league
+  unlock the wardrobe. After a game, its news is three cards at most: the goals it finished; the one biggest event (a
+  week of the league ended, a division
   reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
   (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. Профил shows
   what comes next (`.next`); the day's goals, all three done, earn a reserve day for the streak (`.goals-reserve`,
@@ -182,11 +183,15 @@ takes a token.
   colours (`art/emblem.ts` places them).
 - **Avatar frames** are pictures (`frame-<id>`) drawn around the rounded tile: Пръстен, Двоен пръстен (with gems),
   Точки (beads), Пламъци (a crest of flames), Лавров венец, Кристал (cut gems at the corners), Ореол (a sunburst), and
-  a season's podium (Шампионска, Сребърна, Бронзова: a faceted star on top and laurel below, in the place's metal);
+  the peaks for first place in a week of a high league (Връх Ботев, Връх Вихрен, Връх Мусала: Стара планина, Пирин,
+  Рила; a faceted star on top and laurel below, in bronze, silver and gold);
   each frame's colour is its `.fr-*` tone. **Patterns** behind the picture are CSS (`.bd-dots`, `-stripes`, `-grid`,
   `-rays`, `-stars`). Both unlock by level, achievement or the highest division reached, and show on every avatar
   (the server sends a look's avatar as `shape-tone/frame/backdrop`).
-- **Season medals** are a picture (`medal`, placed by `art/season.ts`) in the place's metal: gold, silver, bronze.
+- **League emblems** are pictures (`league-<tier>`): a mountain on a round of sky, rising with the league — Странджа's
+  low wooded hills, Средна гора's ridge, Родопи's first peak, then Стара планина, Пирин and Рила in snow, a star over
+  Рила — in `--lg-*` colours, green to ice (`art/league.ts` places them). In a group (`.league-board`) the ones going
+  up and down are marked at the row's edge (`.row.up`, `.row.down`), with a line where each zone ends (`.league-line`).
 
 ## Flow
 
@@ -209,26 +214,26 @@ takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element      | Measures                                                                                                                                                                                                                                                                                                                                                                                                  | Where                        |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                                                                                                                                                                                         | Начало, Профил               |
-| Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                                                                                                                                                                              | Verdict, result, day board   |
-| In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                                                                                                                                                                                    | Question head, verdict       |
-| XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's, 50 to 150 a daily goal; adds up                                                                                                                                                                                                                                                                  | Level, level board, goals    |
-| Place        | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                                                                                                                                                                                             | Начало, Класации, Профил     |
-| Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%)                                                                                                                                                               | Игра, Профил, result         |
-| Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                    | Room boards                  |
-| Duels        | Live with whoever comes (a recording of a real game if nobody does in 30 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                       | Дуел, Профил                 |
-| Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                   | Дуел, Роял, Профил, Класации |
-| Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; the first wrong answer is out, then watch                                                                                                                                                                                                                                                      | Роял, Класации               |
-| Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before; each a link to where it's done, told at the game's end                                                                                                                                                                                                          | Начало, result               |
-| Season       | The rating's calendar month: placed after 10 rated games; at its end the first three win a medal, a frame and a title that counts („Двукратен шампион“), and every rating goes halfway back to 1000                                                                                                                                                                                                       | Класации, Профил             |
-| Boards       | The day's ten, rating (the season's), level (all XP) and knowledge (share right after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                                                           | Класации                     |
-| Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                      | Класации                     |
-| Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                               | Начало, Профил, avatars      |
-| Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                           | Result, Профил               |
-| Titles       | Words for the player and their knowledge, worn under their name, never only a deed: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50), some achievements („Демон на скоростта“), a topic's mastery („Майстор · История“, „Светило · История“), and the rating (divisions, a Роял won, the podium counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
-| Avatars      | A picture on a tone: nine animals free, emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                          | Everywhere a player is       |
+| Element      | Measures                                                                                                                                                                                                                                                                                                                                                                                                                      | Where                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                                                                                                                                                                                                             | Начало, Профил               |
+| Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                                                                                                                                                                                                  | Verdict, result, day board   |
+| In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                                                                                                                                                                                                        | Question head, verdict       |
+| XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's, 50 to 150 a daily goal; adds up                                                                                                                                                                                                                                                                                      | Level, league, goals         |
+| Place        | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                                                                                                                                                                                                                 | Начало, Класации, Профил     |
+| Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%)                                                                                                                                                                                   | Игра, Профил, result         |
+| Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                                        | Room boards                  |
+| Duels        | Live with whoever comes (a recording of a real game if nobody does in 30 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                           | Дуел, Профил                 |
+| Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                       | Дуел, Роял, Профил, Класации |
+| Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; the first wrong answer is out, then watch                                                                                                                                                                                                                                                                          | Роял, Класации               |
+| Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before; each a link to where it's done, told at the game's end                                                                                                                                                                                                                              | Начало, result               |
+| League       | A race every week (Monday to Sunday) on the XP earned, in a group of up to 20 of the player's league: Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                              | Класации, Профил             |
+| Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (share right after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                                                            | Класации                     |
+| Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                                          | Класации                     |
+| Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                                                   | Начало, Профил, avatars      |
+| Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                               | Result, Профил               |
+| Titles       | Words for the player and their knowledge, worn under their name, never only a deed: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50), some achievements („Демон на скоростта“), a topic's mastery („Майстор · История“, „Светило · История“), and the rating and the league (divisions, a Роял won, Рила's champion counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
+| Avatars      | A picture on a tone: nine animals free, emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                                              | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
@@ -253,7 +258,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - a unit after a space („15 с“);
   - ordinals with the ending the dictionary gives (`lib/ordinal.ts`): „1-ви“, „2-ри“, „3-ти“, „4-ти“, „5-и“, „12-и“,
     „21-ви“, and „3-то място“;
-  - months in lower case, also after a word („Сезон ноември 2026“).
+  - months in lower case, also after a word („Алманах за ноември 2026“).
 - **No emoji in the interface.** The one place they appear is the text a player shares of the day's result
   (`game/share.ts`: 🟩 right, 🟨 close, 🟥 wrong), which never shows on a screen.
 
@@ -288,8 +293,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 ## Pictures
 
-The game's illustrations — the avatars, the topics, the ways to play, the frames, the division emblems and the
-season's medal — are drawn by hand as paths in `web/src/art/pictures.ts`, and placed with `picture(id)` from
+The game's illustrations — the avatars, the topics, the ways to play, the frames, the division emblems, the leagues'
+mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts`, and placed with `picture(id)` from
 `art/picture.ts`. They load as a file of their own once the game starts, so the first screen never waits for them.
 
 - **One style:** flat shapes with depth, no outlines, lit from the top left. Depth comes from a lit half and a shaded
@@ -312,7 +317,7 @@ season's medal — are drawn by hand as paths in `web/src/art/pictures.ts`, and 
   scholar's cap, a wreath); a picture per topic (a bulb, a flask, an amphora, a globe, a clapperboard, a record, a
   ball, a gamepad, a quill in its inkwell, a butterfly), on its tile and, small, on its chips; one per way to play
   (crossed swords, an arena, a crown in laurel, an open door) on its card and over its page, and over Приятели (three
-  hearts) and Моят Алманах (a book); the streak's flame; the frames, the divisions' crests, the season's medal and
+  hearts) and Моят Алманах (a book); the streak's flame; the frames, the divisions' crests, the leagues' mountains and
   the achievements' medals.
 - **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest
   size (an avatar at 28px) and in both themes, before it ships.
