@@ -7,6 +7,7 @@
 package room
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -24,8 +25,6 @@ import (
 const (
 	// MaxPlayers is how many fit in a room: a class, a party.
 	MaxPlayers = 50
-	// Grace is how late an answer may arrive and still count.
-	Grace = time.Second
 	// Pause is how long a room shows an answer (and the standings) before it moves on by itself.
 	Pause = 6 * time.Second
 	// maxRooms caps the rooms open at once, so that nobody can fill the server's memory with them.
@@ -66,6 +65,8 @@ type Hub struct {
 	bank  func() *bank.Bank
 	// Crowd, if set, is how players have answered a question (shown with its answer).
 	Crowd func(id string) *bank.Crowd
+	// Barred, if set, are the questions no room may deal now (the day's: play.Game.DayQuestions).
+	Barred func(context.Context) (map[string]bool, error)
 	// OnArena, if set, is told how each arena ended (in a goroutine of its own); it may answer with Room.Settled.
 	OnArena func(*Room, []Placed)
 	// The arena's queue (arena.go): who waits, since when there have been enough of them, and the timer for then.
@@ -322,7 +323,14 @@ func (r *Room) Start(by int64) error {
 
 func (r *Room) start() error {
 	b := r.bank()
-	r.picks = play.Draw(b, r.category, 0, nil, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
+	var barred map[string]bool
+	if r.hub.Barred != nil {
+		var err error
+		if barred, err = r.hub.Barred(context.Background()); err != nil {
+			return err
+		}
+	}
+	r.picks = play.Draw(b, r.category, 0, nil, barred, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
 	r.dealt = r.dealt[:0]
 	for _, p := range r.picks {
 		q, ok := b.Get(p.ID)
@@ -350,7 +358,7 @@ func (r *Room) show(n int) {
 		m.answered, m.given, m.graded, m.gained, m.speed, m.row = false, nil, bank.Graded{}, 0, 0, 0
 	}
 	limit := play.Limit(r.dealt[n].Question())
-	r.after(limit+Grace, func() { r.reveal() })
+	r.after(limit+play.Grace, func() { r.reveal() })
 	r.pace(n)
 	r.changed()
 }
@@ -407,7 +415,7 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	d := r.dealt[n]
 	limit := play.Limit(d.Question())
 	took := time.Since(r.shownAt)
-	if took > limit+Grace {
+	if took > limit+play.Grace {
 		return ErrNotNow
 	}
 	g, err := bank.GradeAt(d, raw, took)

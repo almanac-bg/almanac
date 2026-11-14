@@ -214,7 +214,7 @@ func (g *Game) lookOf(userID int64, avatar, title string, total int) Look {
 // and XP.
 var lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
 	CASE WHEN u.title = '` + championID + `' THEN u.title || ':' || (SELECT count(*) FROM league_results
-		WHERE user_id = u.id AND tier = ` + strconv.Itoa(TopLeague) + ` AND place = 1 AND of >= 2)
+		WHERE user_id = u.id AND tier = ` + strconv.Itoa(TopLeague) + ` AND place = 1 AND of >= ` + strconv.Itoa(RaceSize) + `)
 		ELSE coalesce(u.title, '') END,
 	` + xpOf("u.id")
 
@@ -445,7 +445,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND moved = 1),
-		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND place = 1 AND of >= 2),
+		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND place = 1 AND of >= ` + strconv.Itoa(RaceSize) + `),
 		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
 			&topicPerfect, &fullDays, &arenaWin, &royalWin, &leagueUp, &leagueFirst, &rila)

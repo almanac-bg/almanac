@@ -46,6 +46,8 @@ export interface LeagueView {
   up: number;
   down: number;
   pay: [number, number, number];
+  /** How many a group needs to be a race: fewer, and nobody goes up or is paid for a place. */
+  race: number;
   last?: LeagueEnd;
 }
 
@@ -79,7 +81,7 @@ function head(v: LeagueView): Child {
 
 /** What the week is: who races, how, and what the end brings. */
 function rules(v: LeagueView): string {
-  return `Всяка седмица играчите се състезават в групи до 20 души по XP, което печелят. В неделя в полунощ първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP.`;
+  return `Всяка седмица играчите се състезават в групи до 20 души по XP, което печелят. В неделя в полунощ първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма качване и награди.`;
 }
 
 /** Класации' „Лига“: the viewer's group this week, with who goes up and who goes down; or what puts them in one. */

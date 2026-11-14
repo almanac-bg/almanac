@@ -239,7 +239,8 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 }
 
 // settle counts a question whose time ran out as unanswered (or one gone from the bank as skipped), so the run can
-// go on. It reports whether it moved the run.
+// go on. It reports whether that ended the run: then, once the transaction is done, the caller follows it with
+// finished, as an answer that ends a run does.
 func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if r.finished || !r.shownAt.Valid {
 		return false, nil
@@ -252,7 +253,8 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
 	}
-	return true, g.record(tx, r, bank.Graded{}, Worth{}, ms)
+	err := g.record(tx, r, bank.Graded{}, Worth{}, ms)
+	return err == nil && r.finished, err
 }
 
 // record keeps an answer, and the points and XP it earned, and moves the run to the next question (or its end).
@@ -306,29 +308,34 @@ func rightsInRow(tx *sql.Tx, runID int64) (int, error) {
 // State is a player's run as it stands.
 func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
+	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, runID)
 		if err != nil {
 			return err
 		}
-		if _, err := g.settle(tx, r); err != nil {
+		if ended, err = g.settle(tx, r); err != nil {
 			return err
 		}
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended {
+		err = g.finished(ctx, userID, runID)
+	}
 	return s, err
 }
 
 // Show puts the next question on screen and starts its time (the one already showing keeps its time).
 func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
+	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, runID)
 		if err != nil {
 			return err
 		}
-		if _, err := g.settle(tx, r); err != nil {
+		if ended, err = g.settle(tx, r); err != nil {
 			return err
 		}
 		if r.kind == "royal" { // its questions show when the tournament shows them
@@ -345,6 +352,9 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended {
+		err = g.finished(ctx, userID, runID)
+	}
 	return s, err
 }
 
@@ -404,13 +414,19 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		return err
 	})
 	if err == nil && finished {
-		// A duel's run settles the duel once both have played (and awards both); then what the run earned, before
-		// the answer goes back, so that the screen with the result can tell of it.
-		if err = g.settleRun(ctx, runID); err == nil {
-			err = g.afterRun(ctx, userID)
-		}
+		err = g.finished(ctx, userID, runID)
 	}
 	return res, err
+}
+
+// finished follows a run that has just ended, by an answer or by its clock (settle), once: a duel's run settles the
+// duel once both have played (and awards both); then what the run earned is kept, before the answer or the run goes
+// back, so that the screen with the result can tell of it.
+func (g *Game) finished(ctx context.Context, userID, runID int64) error {
+	if err := g.settleRun(ctx, runID); err != nil {
+		return err
+	}
+	return g.afterRun(ctx, userID)
 }
 
 // afterRun keeps what a player's game, just finished, earned them: achievements, the day's goals, and a place in

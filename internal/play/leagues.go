@@ -13,7 +13,9 @@ import (
 // game of a week that earns XP puts them in a group of up to GroupSize players of their league, filled in the order
 // they come; the group races on the XP each earns that week (games finished, goals, achievements). When the week
 // ends the first of each group go up a league and the last go down (moves: how many, by the group's size); the first
-// three are paid XP (LeaguePay), and everyone is told how their week ended. A week not played changes nothing.
+// three are paid XP (LeaguePay), and everyone is told how their week ended. A group of fewer than RaceSize isn't a
+// race: nobody in it goes up or is paid for a place, and its first place unlocks nothing. A week not played changes
+// nothing.
 //
 // The leagues are six mountains, from the lowest highest peak to the highest: Странджа to Рила. They aren't metals,
 // so that they don't read as the rating's divisions: the rating is strength (rating.go), the league is playing.
@@ -45,16 +47,19 @@ func leagueOf(tier int) League { return Leagues[max(0, min(tier, TopLeague))] }
 // GroupSize is how many race in a group: enough for a race, few enough to know the names.
 const GroupSize = 20
 
-// LeaguePay is what the first three places of a week pay, in a group of two or more.
+// RaceSize is how many a group needs to be a race: fewer, and nobody goes up or is paid for a place.
+const RaceSize = 5
+
+// LeaguePay is what the first three places of a week pay, in a group of RaceSize or more.
 var LeaguePay = [3]int{300, 200, 100}
 
 // moves are how many of a group of n go up and down when the week ends: five each way in a full group; in a smaller
-// one the first quarter up (at least one, once there's someone to beat) and, from eight, the last quarter down.
+// one the first quarter up (none under RaceSize) and, from eight, the last quarter down.
 func moves(n int) (up, down int) {
 	switch {
 	case n >= 10:
 		up = 5
-	case n >= 2:
+	case n >= RaceSize:
 		up = (n + 3) / 4
 	}
 	switch {
@@ -186,7 +191,7 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 				case i >= n-down && gr.tier > 0:
 					moved = -1
 				}
-				if n >= 2 && i < len(LeaguePay) {
+				if n >= RaceSize && i < len(LeaguePay) {
 					pay = LeaguePay[i]
 				}
 				if _, err := tx.Exec(`INSERT INTO league_results (week, user_id, tier, place, of, points, moved, xp)
@@ -269,6 +274,8 @@ type LeagueView struct {
 	Up   int    `json:"up"`
 	Down int    `json:"down"`
 	Pay  [3]int `json:"pay"`
+	// Race is how many a group needs to be a race (RaceSize).
+	Race int `json:"race"`
 	// Last is how the player's last week ended, if they played one.
 	Last *LeagueEnd `json:"last,omitempty"`
 }
@@ -302,7 +309,7 @@ func (g *Game) LeagueOf(ctx context.Context, userID int64) (LeagueView, error) {
 	week := weekOf(now)
 	_, end := weekBounds(week)
 	v := LeagueView{Week: week, DaysLeft: int(end.Sub(now).Hours()/24) + 1, League: Leagues[0], Group: []LeagueRow{},
-		Pay: LeaguePay}
+		Pay: LeaguePay, Race: RaceSize}
 	if userID == 0 {
 		return v, nil
 	}
@@ -376,11 +383,11 @@ func (g *Game) lastWeek(ctx context.Context, q interface {
 	return &e, nil
 }
 
-// leagueFirsts is how many weeks a player has ended first in a group of two or more, by the league's tier.
+// leagueFirsts is how many weeks a player has ended first in a group that was a race (RaceSize), by the league's tier.
 func (g *Game) leagueFirsts(ctx context.Context, userID int64) ([]int, error) {
 	out := make([]int, len(Leagues))
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT tier, count(*) FROM league_results
-		WHERE user_id = ? AND place = 1 AND of >= 2 GROUP BY tier`, userID)
+		WHERE user_id = ? AND place = 1 AND of >= ? GROUP BY tier`, userID, RaceSize)
 	if err != nil {
 		return out, err
 	}
