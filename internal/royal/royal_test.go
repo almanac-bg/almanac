@@ -203,11 +203,17 @@ func TestEvening(t *testing.T) {
 		t.Fatalf("Vi's time ran out: %+v", v)
 	}
 
-	// Ana alone goes on, to her first wrong answer: the end.
+	// Ana alone goes on. A question nobody gets right puts nobody out: her wrong answer spares her.
 	w.wait(Pause)
 	w.give(ana, true)
 	w.wait(Pause)
 	w.give(ana, false)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || !v.Spared || v.WentOut != 0 || v.Left != 1 || v.Out {
+		t.Fatalf("a question nobody got right: %+v", v)
+	}
+	// The time running out is the way out all the same: the end.
+	w.wait(Pause)
+	w.wait(20*time.Second + play.Grace)
 	w.wait(Pause)
 	v = w.h.View(ana.ID)
 	if v.Phase != play.RoyalEnd || v.Place != 1 || v.Delta <= 0 || v.RunID == 0 || len(v.Players) != 3 {
@@ -223,7 +229,7 @@ func TestEvening(t *testing.T) {
 	if err != nil || len(r) != 1 || r[0].Players[0].Reached != 3 || r[0].Players[0].Place != 1 {
 		t.Fatalf("Ana's tournaments: %+v %v", r, err)
 	}
-	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 4 {
+	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 5 {
 		t.Fatalf("Ana's game gone over: %d %v", len(rv), err)
 	}
 	var xp int
@@ -414,5 +420,32 @@ func TestOpenedAndGlance(t *testing.T) {
 	case <-opened:
 		t.Fatal("told twice")
 	default:
+	}
+}
+
+// A question nobody gets right puts nobody out; the next one gets right by one puts the other out.
+func TestSpared(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.player(), w.player()
+	w.at(20, 50, 0)
+	for _, p := range []Player{ana, bo} {
+		w.h.Follow(p.ID)
+		if err := w.h.Join(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.at(21, 0, 0)
+	w.wait(2 * time.Second)
+	w.give(ana, false)
+	w.give(bo, false)
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || !v.Spared || v.Out || v.Left != 2 || v.WentOut != 0 {
+		t.Fatalf("both wrong: %+v", v)
+	}
+	w.wait(Pause)
+	w.give(ana, true)
+	w.give(bo, false)
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.Left != 1 || v.WentOut != 1 {
+		t.Fatalf("Ana right, Bo wrong: %+v", v)
 	}
 }

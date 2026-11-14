@@ -289,18 +289,25 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	}
 	r.ms += ms
 	r.shownAt = sql.NullInt64{}
-	// Роял: the first wrong answer (or the time running out) is the way out.
-	r.finished = r.at >= len(r.picks) || (r.kind == "royal" && !gr.Right)
-	var finishedAt any
-	if r.finished {
-		finishedAt = now
-		r.xp += finishXP(r.kind, r.rights, len(r.picks))
-		if r.allRight() {
-			r.points += AllRight
-		}
+	// A Роял run goes on after a wrong answer until the answer shows: whether it's the way out is the tournament's to
+	// say (RevealRoyal), once it knows how everyone answered.
+	if r.at >= len(r.picks) {
+		return g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
-		r.at, r.points, r.rights, r.xp, r.ms, finishedAt, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ? WHERE id = ?`,
+		r.at, r.points, r.rights, r.xp, r.ms, r.id)
+	return err
+}
+
+// finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus.
+func (g *Game) finish(tx *sql.Tx, r *run) error {
+	r.finished = true
+	r.xp += finishXP(r.kind, r.rights, len(r.picks))
+	if r.allRight() {
+		r.points += AllRight
+	}
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?
+		WHERE id = ?`, r.at, r.points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id)
 	return err
 }
 

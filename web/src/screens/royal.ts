@@ -39,6 +39,8 @@ interface Evening {
   entered: number;
   left: number;
   wentOut: number;
+  /** Nobody got the question whose answer shows right, so those who answered it stay in. */
+  spared?: boolean;
   players: Player[];
   question?: {
     category: string;
@@ -112,10 +114,10 @@ function left(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** How far a player got, in words. */
+/** How far a player got, in words: how many right. */
 function reach(p: Player | Past["players"][number], length: number): string {
   if (p.reached >= length) return `всичките ${length}!`;
-  return `отпадна на въпрос ${p.reached + 1}`;
+  return `${p.reached} ${p.reached === 1 ? "верен" : "верни"}`;
 }
 
 const signed = (d: number) => `${d > 0 ? "+" : ""}${d}`;
@@ -494,7 +496,7 @@ function reveal(view: () => Evening, first: Evening): Child {
   const r = q?.reveal;
   if (!q || !r) return null;
   const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
-  if (r.mine) playAnswer(kind, first.n + 1); // to be still in, every answer before was right
+  if (r.mine) playAnswer(kind, r.right ? first.n + 1 : 0);
   const last = first.n + 1 >= first.length || first.left === 0;
   return h(
     "article",
@@ -504,16 +506,29 @@ function reveal(view: () => Evening, first: Evening): Child {
     picture(q.view, true),
     answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
     r.mine
-      ? verdict(kind, r.points, r.missed ? "Без отговор. Отпадаш." : r.right ? undefined : "Отпадаш.", r.speed)
+      ? verdict(
+          kind,
+          r.points,
+          r.missed
+            ? "Без отговор. Отпадаш."
+            : r.right
+              ? undefined
+              : first.spared
+                ? "Никой не позна: оставаш."
+                : "Отпадаш.",
+          r.speed,
+        )
       : null,
     h(
       "p",
       { class: "royal-left" },
-      first.wentOut === 0
-        ? "Никой не отпадна. "
-        : first.wentOut === 1
-          ? "Отпадна един. "
-          : `Отпаднаха ${first.wentOut}. `,
+      first.spared
+        ? "Никой не позна, затова никой не отпада. "
+        : first.wentOut === 0
+          ? "Никой не отпадна. "
+          : first.wentOut === 1
+            ? "Отпадна един. "
+            : `Отпаднаха ${first.wentOut}. `,
       first.left === 0
         ? "Не остана никой."
         : first.left === 1
@@ -557,7 +572,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
         ? h(
             "p",
             { class: "lead" },
-            me.reached >= first.length ? `Всичките ${first.length} верни.` : `Отпадна на въпрос ${me.reached + 1}.`,
+            me.reached >= first.length ? `Всичките ${first.length} верни.` : `${me.reached} от ${first.length} верни.`,
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )
         : null,
