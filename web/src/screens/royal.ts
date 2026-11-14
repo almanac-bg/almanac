@@ -1,6 +1,7 @@
 // Роял: every evening at 21:00, live. Up to fifty players on the same question at the same moment, easy to hard in
-// three rounds; the first wrong answer is the way out, and those out watch the rest to the end. The lobby opens a
-// quarter of an hour before; whoever is on this screen at the start plays.
+// three rounds; the first wrong answer is the way out, and those out watch the rest to the end, which comes once one
+// is left of several (who has won). The lobby opens a quarter of an hour before; whoever is on this screen at the
+// start plays.
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
 
@@ -41,6 +42,8 @@ interface Evening {
   wentOut: number;
   /** Nobody got the question whose answer shows right, so those who answered it stay in. */
   spared?: boolean;
+  /** The game ends once the answer showing has shown: the standings come next. */
+  last?: boolean;
   players: Player[];
   question?: {
     category: string;
@@ -427,12 +430,47 @@ function head(v: Evening): Child {
   return questionHead(v.n, v.length, `Кръг ${round} · ${topicName(v.question?.category ?? "")}`);
 }
 
-/** How many are still in, of how many began. */
+/** How many are still in, of how many began; or, for a tournament of one, that it's against the questions. */
 function still(view: () => Evening): Child {
   return h("p", { class: "royal-left" }, () => {
     const v = view();
+    if (v.entered === 1) {
+      return v.in
+        ? "В турнира си само ти: играеш до първия грешен отговор."
+        : "В този турнир играе само един: до първия грешен отговор.";
+    }
     return `В играта: ${v.left} от ${v.entered}`;
   });
+}
+
+/** What the answer showing did to the game: who went out on it, and who's left (the winner, once one is left of
+ * several). Nothing for a tournament of one: the verdict says it all. */
+function outcome(v: Evening): string | null {
+  if (v.entered === 1) return null;
+  const out =
+    v.spared && v.wentOut === 1
+      ? "Никой не позна. Отпадна само един, без отговор."
+      : v.spared && v.wentOut > 1
+        ? `Никой не позна. Отпаднаха само ${v.wentOut}, без отговор.`
+        : v.spared
+          ? "Никой не позна, затова никой не отпада."
+          : v.wentOut === 0
+            ? "Никой не отпадна."
+            : v.wentOut === 1
+              ? "Отпадна един."
+              : `Отпаднаха ${v.wentOut}.`;
+  const winner = v.left === 1 && v.last ? v.players.find((p) => p.in) : undefined;
+  const left =
+    v.left === 0
+      ? "Не остана никой."
+      : winner?.me
+        ? "Остана само ти: печелиш Роял!"
+        : winner
+          ? `Остана само ${winner.name}: печели Роял.`
+          : v.left === 1
+            ? `Остава един от ${v.entered}.`
+            : `Остават ${v.left} от ${v.entered}.`;
+  return `${out} ${left}`;
 }
 
 function question(view: () => Evening, first: Evening): Child {
@@ -497,7 +535,7 @@ function reveal(view: () => Evening, first: Evening): Child {
   if (!q || !r) return null;
   const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
   if (r.mine) playAnswer(kind, r.right ? first.n + 1 : 0);
-  const last = first.n + 1 >= first.length || first.left === 0;
+  const said = outcome(first);
   return h(
     "article",
     { class: "question" },
@@ -519,23 +557,8 @@ function reveal(view: () => Evening, first: Evening): Child {
           r.speed,
         )
       : null,
-    h(
-      "p",
-      { class: "royal-left" },
-      first.spared
-        ? "Никой не позна, затова никой не отпада. "
-        : first.wentOut === 0
-          ? "Никой не отпадна. "
-          : first.wentOut === 1
-            ? "Отпадна един. "
-            : `Отпаднаха ${first.wentOut}. `,
-      first.left === 0
-        ? "Не остана никой."
-        : first.left === 1
-          ? `Остава един от ${first.entered}.`
-          : `Остават ${first.left} от ${first.entered}.`,
-    ),
-    upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
+    said ? h("p", { class: "royal-left" }, said) : null,
+    upNext(q.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     () => {
       const v = view();
       return chips(v.players, (p) => (p.in ? "" : ` · отпадна на ${p.outAt + 1}`));
@@ -572,7 +595,10 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
         ? h(
             "p",
             { class: "lead" },
-            me.reached >= first.length ? `Всичките ${first.length} верни.` : `${me.reached} от ${first.length} верни.`,
+            me.reached >= first.length
+              ? `Всичките ${first.length} верни.`
+              : // Of the questions they answered: the game may have ended before its last.
+                `${me.reached} от ${me.outAt >= 0 ? me.outAt + 1 : first.n + 1} верни.`,
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )
         : null,

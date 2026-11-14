@@ -300,9 +300,13 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 }
 
 // finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus.
-func (g *Game) finish(tx *sql.Tx, r *run) error {
+func (g *Game) finish(tx *sql.Tx, r *run) error { return g.finishOf(tx, r, len(r.picks)) }
+
+// finishOf ends a run as a game of total questions: what playing it to its end earns is in the share of those answered
+// right (a Роял won before its last question was a game of the questions it asked).
+func (g *Game) finishOf(tx *sql.Tx, r *run, total int) error {
 	r.finished = true
-	r.xp += finishXP(r.kind, r.rights, len(r.picks))
+	r.xp += finishXP(r.kind, r.rights, total)
 	if r.allRight() {
 		r.points += AllRight
 	}
