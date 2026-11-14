@@ -242,6 +242,6 @@ function ranking(heading: string, r: Ranking, score: (x: Ranked) => Child, empty
             ? boardRow(r.place, r.mine.name, score(r.mine), { me: true, gap: true, look: r.mine, tag: r.mine.tag })
             : null,
         )
-      : h("p", { class: "muted" }, empty),
+      : h("p", { class: "board-empty" }, empty),
   );
 }

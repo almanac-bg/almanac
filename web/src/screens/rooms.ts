@@ -10,6 +10,7 @@ import { toneOf } from "../ui.ts";
 export function rooms() {
   title("Стая");
   const error = signal("");
+  const codeError = signal("");
   const code = signal("");
   const open = async (category: string) => {
     error.set("");
@@ -36,16 +37,20 @@ export function rooms() {
   return h(
     "section",
     { class: "screen" },
-    h("h1", null, "Стая"),
+    h(
+      "div",
+      { class: "intro" },
+      h("h1", null, "Стая"),
+      h(
+        "p",
+        { class: "lead" },
+        "За приятели, семейство или клас: всички получават един и същ въпрос в един и същ момент, всеки на телефона си.",
+      ),
+    ),
     h(
       "section",
       { class: "card" },
-      h("h2", null, "Стая"),
-      h(
-        "p",
-        { class: "muted" },
-        "За приятели, семейство или клас: всички получават един и същ въпрос в един и същ момент, всеки на телефона си.",
-      ),
+      h("h2", null, "Влез с код"),
       h(
         "form",
         {
@@ -54,7 +59,7 @@ export function rooms() {
             e.preventDefault();
             const c = code.peek().replace(/\D/g, "");
             if (c.length === 6) go(`/r/${c}`);
-            else error.set("Кодът е от 6 цифри.");
+            else codeError.set("Кодът е от 6 цифри.");
           },
         },
         h("input", {
@@ -64,12 +69,19 @@ export function rooms() {
           maxlength: 7,
           placeholder: "123 456",
           "aria-label": "Код на стаята",
-          oninput: (e: Event) => code.set((e.target as HTMLInputElement).value),
+          oninput: (e: Event) => {
+            code.set((e.target as HTMLInputElement).value);
+            codeError.set("");
+          },
         }),
         h("button", { class: "btn" }, "Влез"),
       ),
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
-      h("h3", null, "Отвори нова стая"),
+      () => codeError() && h("p", { class: "bad", role: "alert" }, codeError()),
+    ),
+    h(
+      "section",
+      { class: "card" },
+      h("h2", null, "Отвори нова стая"),
       h("p", { class: "muted" }, "Избери тема. После дай кода на другите."),
       h(
         "ul",
@@ -78,5 +90,6 @@ export function rooms() {
         categories.map((c) => topic(c.id, c.name)),
       ),
     ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }

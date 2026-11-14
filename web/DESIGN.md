@@ -136,6 +136,8 @@ takes a token.
   more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
   answer with its standings for 6 seconds; a live duel shows both answers for 4 seconds (6 for a number, an order or
   a match). A question never opens in a tab that's out of sight.
+- **A game has the whole screen.** On a phone the bar of places steps aside while a question or its answer shows
+  (the name at the top still goes home), so the pad and the verdict fit and a stray tap can't leave the game.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
 - **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs

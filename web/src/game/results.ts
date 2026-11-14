@@ -95,7 +95,7 @@ export function review(load: () => Promise<Reviewed[]>): Child {
       return h(
         "div",
         { class: "stack" },
-        h("button", { class: "btn", onclick: open }, "Въпросите, отговорите и „Знаеше ли?“"),
+        h("button", { class: "btn", onclick: open }, "Прегледай въпросите"),
         error() && h("p", { class: "bad" }, error()),
       );
     }

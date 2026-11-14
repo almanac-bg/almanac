@@ -635,6 +635,17 @@
     font-size: 0.875rem;
   }
 
+  /* Under a board's heading, words line up with its rows. */
+  .board .board-note,
+  .board-empty {
+    margin: 0;
+    padding: 0 var(--space-4) var(--space-3);
+  }
+
+  .board-empty {
+    color: var(--text-muted);
+  }
+
   /* Роял's table: those out are dimmer; how far each got on the right. */
   .royal-table .row.out {
     opacity: 0.62;
@@ -852,7 +863,7 @@
     gap: var(--space-2);
     width: 100%;
     min-height: 3rem;
-    padding: 0 var(--space-5);
+    padding: var(--space-2) var(--space-5);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-md);
     background: var(--raised);
@@ -1502,7 +1513,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .option > span:nth-child(2) {
+  .option > span:nth-child(2):not(.sign) {
     flex: 1;
     min-width: 0;
   }
@@ -2979,8 +2990,9 @@
 
   .topic-meta {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: 2px var(--space-2);
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1rem;
@@ -4223,12 +4235,12 @@
   }
 
   .switch[aria-checked="true"] {
-    background: var(--gold);
+    background: var(--accent);
     box-shadow: none;
   }
 
   .switch[aria-checked="true"] .switch-knob {
-    background: var(--on-fill);
+    background: var(--on-accent);
     transform: translateX(22px);
   }
 
@@ -4246,7 +4258,26 @@
     }
   }
 
-  /* A big screen: the five places sit in the header, beside the name. */
+  /* A phone in a game: the question has the whole screen, and a stray tap can't leave it (the name still goes home). */
+  @media (max-width: 47.99rem) {
+    .playing .tabs {
+      display: none;
+    }
+
+    .playing #app {
+      padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* A narrow phone: a topic's longest word still fits its tile whole. */
+  @media (max-width: 22.5rem) {
+    .topic-name {
+      font-size: 1.125rem;
+      line-height: 1.375rem;
+    }
+  }
+
+  /* A big screen: the four places sit in the header, beside the name. */
   @media (min-width: 48rem) {
     #app {
       padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));

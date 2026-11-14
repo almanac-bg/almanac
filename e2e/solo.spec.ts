@@ -13,7 +13,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  await page.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
   await expect(page.locator(".summary")).toBeVisible();
@@ -38,7 +38,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
   await playRun(page);
   // A word about a question waits for the end, in the review.
-  await page.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await page.getByRole("button", { name: "Нещо не е наред с въпроса?" }).first().click();
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
   await page.getByRole("button", { name: "Изпрати" }).click();

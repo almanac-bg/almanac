@@ -27,7 +27,7 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   for (const p of [host, guest])
     await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
   await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
-  await guest.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
+  await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(guest.locator(".reviewed")).toHaveCount(10);
 });
 
