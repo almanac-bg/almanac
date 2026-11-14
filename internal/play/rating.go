@@ -2,9 +2,11 @@ package play
 
 import (
 	"context"
+	"encoding/json"
 	"math"
-	"strconv"
-	"time"
+	"slices"
+
+	"github.com/almanac-bg/almanac/internal/bank"
 )
 
 // Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division.
@@ -75,13 +77,15 @@ func (g *Game) StandingOf(ctx context.Context, userID int64) (Standing, error) {
 	return s, err
 }
 
-// Ranked is a player on a board: who they are, and the number the board is by (a rating, a week's XP).
+// Ranked is a player on a board: who they are, and the number the board is by (a rating, XP, a share right).
 type Ranked struct {
 	Name     string    `json:"name"`
 	Tag      string    `json:"tag"`
 	Value    int       `json:"value"`
 	Division *Division `json:"division,omitempty"`
-	Me       bool      `json:"me,omitempty"`
+	// Answers is what a board of knowledge counts a share of.
+	Answers int  `json:"answers,omitempty"`
+	Me      bool `json:"me,omitempty"`
 	Look
 }
 
@@ -92,31 +96,80 @@ type Ranking struct {
 	Mine  *Ranked  `json:"mine,omitempty"`
 }
 
-// BoardSize is how many a board shows.
-const BoardSize = 50
+const (
+	// BoardSize is how many a board shows.
+	BoardSize = 50
+	// KnowAll is how many answers a player needs to be on the board of knowledge, and KnowTopic in one topic: a
+	// share of a few is luck.
+	KnowAll   = 100
+	KnowTopic = 30
+)
 
-// RatingBoard is the best by rating, among those who have played a duel that counts.
-func (g *Game) RatingBoard(ctx context.Context, viewer int64) (Ranking, error) {
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, u.rating, `+lookColumns+`
-		FROM users u WHERE u.rated > 0 ORDER BY u.rating DESC, u.rated DESC, u.id`, true)
+// among limits a board's query over users u to the viewer and their friends (friends), or not at all; ?9 is the
+// viewer.
+func among(friends bool) string {
+	if !friends {
+		return ""
+	}
+	return ` AND (u.id = ?9 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?9))`
 }
 
-// WeekBoard is the most XP earned this week (from Monday, in Bulgaria), every game counted: who's played the most,
-// and the most knowingly. It isn't a board of points: those are each game's own, to compare players on the same
-// questions.
-func (g *Game) WeekBoard(ctx context.Context, viewer int64) (Ranking, error) {
-	now := g.Now().In(Bulgaria)
-	monday := time.Date(now.Year(), now.Month(), now.Day()-(int(now.Weekday())+6)%7, 0, 0, 0, 0, Bulgaria)
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, w.xp, `+lookColumns+`
-		FROM (SELECT user_id, sum(xp) AS xp FROM runs WHERE finished_at >= `+strconv.FormatInt(monday.UnixMilli(), 10)+`
-			GROUP BY user_id) w JOIN users u ON u.id = w.user_id
-		WHERE w.xp > 0 ORDER BY w.xp DESC, u.id`, false)
+// RatingBoard is the season's board: everyone (or the viewer's friends) with MinSeasonGames rated games in it, by
+// rating. As it stands when the month ends, it's the season's result.
+func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
+	if err := g.ensureSeason(ctx); err != nil {
+		return Ranking{}, err
+	}
+	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, u.rating, 0, `+lookColumns+`
+		FROM users u WHERE u.season_games >= ?1`+among(friends)+`
+		ORDER BY u.rating DESC, u.season_games DESC, u.id`, true, MinSeasonGames)
 }
 
-// ranking reads a board from a query of (id, name, tag, value, look columns), best first.
-func (g *Game) ranking(ctx context.Context, viewer int64, query string, divisions bool) (Ranking, error) {
+// LevelBoard is the most XP ever earned (the highest levels): who has played the most, and the most knowingly.
+func (g *Game) LevelBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
+	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, x.xp, 0, `+lookColumns+`
+		FROM (SELECT user_id, sum(xp) AS xp FROM (SELECT user_id, xp FROM runs UNION ALL SELECT user_id, xp FROM goals_done)
+			GROUP BY user_id) x JOIN users u ON u.id = x.user_id
+		WHERE x.xp > 0`+among(friends)+` ORDER BY x.xp DESC, u.id`, false)
+}
+
+// KnowledgeBoard is the best share of right answers, over every topic ("") or in one, among those with enough
+// answers there (KnowAll, KnowTopic): who knows the most, whatever the speed. A time-out counts as wrong.
+func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, topic string) (Ranking, error) {
+	b := g.Bank()
+	ids, least := "", KnowAll // no list: every answer
+	if topic != "" {
+		if !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == topic }) {
+			return Ranking{}, ErrNoTopic
+		}
+		var list []string
+		for _, q := range b.Questions {
+			if q.Base().Category == topic {
+				list = append(list, q.Base().ID)
+			}
+		}
+		raw, err := json.Marshal(list)
+		if err != nil {
+			return Ranking{}, err
+		}
+		ids, least = string(raw), KnowTopic
+	}
+	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, CAST(round(100.0 * k.ok / k.n) AS INTEGER), k.n, `+
+		lookColumns+`
+		FROM (SELECT r.user_id, count(*) AS n, sum(a.is_right) AS ok FROM answers a JOIN runs r ON r.id = a.run_id
+			WHERE ?2 = '' OR a.question_id IN (SELECT value FROM json_each(?2))
+			GROUP BY r.user_id HAVING count(*) >= ?1) k JOIN users u ON u.id = k.user_id
+		WHERE 1`+among(friends)+` ORDER BY 1.0 * k.ok / k.n DESC, k.n DESC, u.id`, false, least, ids)
+}
+
+// ranking reads a board from a query of (id, name, tag, value, answers, look columns), best first; its arguments
+// are ?1, ?2…, and ?9 is the viewer.
+func (g *Game) ranking(ctx context.Context, viewer int64, query string, divisions bool, args ...any) (Ranking, error) {
 	var out Ranking
-	rows, err := g.DB.Read.QueryContext(ctx, query)
+	params := make([]any, 9) // ?1…?8, then the viewer
+	copy(params, args)
+	params[8] = viewer
+	rows, err := g.DB.Read.QueryContext(ctx, query, params...)
 	if err != nil {
 		return out, err
 	}
@@ -126,11 +179,11 @@ func (g *Game) ranking(ctx context.Context, viewer int64, query string, division
 		var r Ranked
 		var id int64
 		var avatar, title string
-		var points int
-		if err := rows.Scan(&id, &r.Name, &r.Tag, &r.Value, &avatar, &title, &points); err != nil {
+		var xp int
+		if err := rows.Scan(&id, &r.Name, &r.Tag, &r.Value, &r.Answers, &avatar, &title, &xp); err != nil {
 			return out, err
 		}
-		r.Look, r.Me = lookOf(id, avatar, title, points), id == viewer
+		r.Look, r.Me = lookOf(id, avatar, title, xp), id == viewer
 		if divisions {
 			d, _ := DivisionOf(r.Value)
 			r.Division = &d

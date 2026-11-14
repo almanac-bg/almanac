@@ -215,11 +215,11 @@ func openAt(t *testing.T, path string, n int) *DB {
 	return db
 }
 
-// Live duels (0019): open duels become live ones, those still waiting end without a result, and a recording stays
+// Live duels (0020): open duels become live ones, those still waiting end without a result, and a recording stays
 // only on the duels settled against it.
 func TestLiveDuels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
-	db := openAt(t, path, 18)
+	db := openAt(t, path, 19)
 	for _, q := range []string{
 		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Аз', 'az', 1, 1), (2, 'Бо', 'bo', 1, 1)`,
 		`INSERT INTO runs (id, user_id, kind, questions, started_at) VALUES (7, 1, 'duel', '[]', 1), (8, 2, 'duel', '[]', 1)`,

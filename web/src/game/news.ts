@@ -1,5 +1,6 @@
-// What a game earned, said once, at its end: the level (and whether it went up), how it moved the mastery of its
-// topics, and any achievement that came with it, which may be worn as a title at once.
+// What a game earned, said once, at its end: the day's goals it finished (with their XP), the level (and whether it
+// went up), how it moved the mastery of its topics, and any achievement that came with it, which may be worn as a
+// title at once.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
@@ -9,6 +10,7 @@ import { type MasteryMove, masteryMoves } from "./mastery.ts";
 
 interface News {
   achievements: AchievementInfo[];
+  goals: { name: string; xp: number }[];
   level: number;
   xp: number;
   from: number;
@@ -38,6 +40,7 @@ export function news(run: number, delay = 0): Child {
     const n = data();
     if (!n) return null;
     return [
+      n.goals.length ? goalsDone(n.goals) : null,
       levelCard(n.level, n.xp, n.from, n.to, n.levelUp),
       masteryMoves(n.mastery ?? []),
       n.achievements.map(unlocked),
@@ -59,6 +62,28 @@ export function levelCard(level: number, xp: number, from: number, to: number, u
       h("span", { class: "muted" }, `още ${to - xp} XP до ниво ${level + 1}`),
     ),
     meter(share, `${share}% от ниво ${level}`),
+  );
+}
+
+/** The day's goals a game finished, and the XP they earned. */
+function goalsDone(goals: News["goals"]): Child {
+  return h(
+    "section",
+    { class: "card goals" },
+    h("p", { class: "kicker" }, goals.length === 1 ? "Изпълнена цел" : "Изпълнени цели"),
+    h(
+      "ul",
+      { class: "goal-list" },
+      goals.map((g) =>
+        h(
+          "li",
+          { class: "goal done fresh" },
+          h("span", { class: "goal-mark", "aria-hidden": "true" }),
+          h("span", { class: "goal-name" }, g.name),
+          h("span", { class: "goal-xp num" }, `+${g.xp} XP`),
+        ),
+      ),
+    ),
   );
 }
 

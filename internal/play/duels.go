@@ -463,6 +463,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 	}
 	var a, b side
 	var news []DuelNews
+	if err := g.ensureSeason(ctx); err != nil { // a new month's game counts for the new season
+		return err
+	}
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		other := "d.b_run"
 		if ghost {
@@ -503,14 +506,15 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			}
 			return "draw"
 		}
-		// rate moves a player's rating by a duel (if it counts), and says by how much.
+		// rate moves a player's rating by a duel (if it counts, and then it counts for the season too), and says by how
+		// much.
 		rate := func(s side, against int, score float64) (int, error) {
 			if !rated {
 				return 0, nil
 			}
 			d := eloDelta(s.rating, against, s.rated, score)
-			_, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1
-				WHERE id = ?2`, d, s.id)
+			_, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1,
+				season_games = season_games + 1 WHERE id = ?2`, d, s.id)
 			return d, err
 		}
 		now := store.Ms(g.Now())
@@ -559,8 +563,12 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 }
 
 // SettleDue ends the duels whose time is up — a friend's challenge not played in time, a live duel cut off — and
-// the tournaments whose time is up. Run every few minutes.
+// the tournaments whose time is up. Run every few minutes. A season whose month is over ends
+// first.
 func (g *Game) SettleDue(ctx context.Context) error {
+	if err := g.ensureSeason(ctx); err != nil {
+		return err
+	}
 	if err := g.settleRoyalsDue(ctx); err != nil {
 		return err
 	}
