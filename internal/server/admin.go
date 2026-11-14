@@ -217,7 +217,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <h2>Връщат ли се</h2>
 <p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.</p>
 <p class="muted">Новите играчи по деня на първата им игра и колко от тях са играли пак точно толкова дни по-късно.
-„Играл“ е отговорил на въпрос или изиграл Арена.</p>
+„Играл“ е отговорил на въпрос.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Нови</th>{{range .After}}<th class="num">След {{.}} {{if eq . 1}}ден{{else}}дни{{end}}</th>{{end}}</tr></thead><tbody>
 {{if .Cohorts}}<tr><td><strong>Общо</strong></td><td></td>{{range .Overall}}<td class="num">{{if .Due}}—{{else}}<strong>{{.Share}}%</strong>{{end}}</td>{{end}}</tr>{{end}}
 {{range .Cohorts}}<tr><td class="num">{{.Day}}</td><td class="num">{{.New}}</td>{{range .Cells}}<td class="num">{{if .Due}}—{{else}}{{.Back}} · {{.Share}}%{{end}}</td>{{end}}</tr>

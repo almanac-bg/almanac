@@ -16,7 +16,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(unlocked).toContainText("Сложено");
 
   await page.goto("/rewards");
-  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 31/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 30/ })).toBeVisible();
   // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
   await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");

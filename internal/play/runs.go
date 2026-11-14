@@ -330,8 +330,6 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
-		// The guest's arenas are the account's (unless both played the same one, which can't be: one person).
-		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// The days the guest played on were the account's player's: the same person, so not a player who left.
 		{`INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?, day FROM active_days WHERE user_id = ?`, []any{to, from}},
 		{`DELETE FROM active_days WHERE user_id = ?`, []any{from}},

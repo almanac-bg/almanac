@@ -1020,33 +1020,12 @@ func TestRatingAndDivisions(t *testing.T) {
 	}
 }
 
-func TestArena(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
-	// Ana wins, Bo and Vi share second, Gal is last.
-	deltas, err := w.g.SettleArena(ctx, []ArenaPlace{
-		{UserID: ana, Place: 1, Points: 900, Rights: 9},
-		{UserID: bo, Place: 2, Points: 500, Rights: 5},
-		{UserID: vi, Place: 2, Points: 500, Rights: 5},
-		{UserID: gal, Place: 4, Points: 100, Rights: 1},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if deltas[ana] <= 0 || deltas[gal] >= 0 || deltas[bo] != deltas[vi] || deltas[ana] <= deltas[bo] {
-		t.Fatalf("what the places did: %v", deltas)
-	}
-	for id, d := range deltas {
-		st, _ := w.g.StandingOf(ctx, id)
-		if st.Rating != StartRating+d || st.Rated != 1 {
-			t.Fatalf("player %d's rating: %+v, moved by %d", id, st, d)
-		}
-	}
-	var kept int
-	_ = w.db.Read.QueryRow(`SELECT count(*) FROM arena_players WHERE place = 2 AND points = 500`).Scan(&kept)
-	if kept != 2 {
-		t.Fatalf("kept %d of the shared second places", kept)
+// placeDeltas: each place against each other counts as a duel won, lost or drawn (Роял's places move ratings so).
+func TestPlaceDeltas(t *testing.T) {
+	// The first wins, the two second share it, the last loses; all from the start.
+	d := placeDeltas([]int{1, 2, 2, 4}, []int{StartRating, StartRating, StartRating, StartRating}, []int{0, 0, 0, 0})
+	if d[0] <= 0 || d[3] >= 0 || d[1] != d[2] || d[0] <= d[1] {
+		t.Fatalf("what the places did: %v", d)
 	}
 }
 
