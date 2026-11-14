@@ -43,10 +43,13 @@ package, and keep it true after.
 
 ```bash
 go run ./cmd/build -watch & DEV=1 go run ./cmd/almanac serve   # http://localhost:8080, mail in the log
-test -z "$(gofmt -l .)" && go vet ./... && go test -race ./...  # the server (CI fails on unformatted Go)
+go vet ./... && go test -race ./...                            # the server
 npm run check && npm test                                      # the client: types, lint, unit tests, language
 npx playwright test -c e2e --project chromium e2e/<spec>       # the browser specs your change touches
 ```
+
+Formatting is done for you: a hook (`.claude/hooks/format.sh`) runs gofmt or Biome on every file a session edits,
+and stops a `git commit` with an unformatted file in it (`git add` them and commit again).
 
 Node lives under `~/.nvm` (put its `bin` on PATH in tool shells). Locally, Playwright's Chromium may be missing:
 `BROWSER_PATH="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"`. Test what you change; a new rule or
