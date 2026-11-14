@@ -18,6 +18,7 @@ import { meter, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
+import { yearCard } from "./year.ts";
 
 interface Today {
   day: string;
@@ -83,6 +84,8 @@ export function today() {
             shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak), undefined, false),
           )
         : dayCard(t, start(t)),
+      // Mid-December into January: the year in the game, a tap away.
+      yearCard(),
       // Just played, the goals it finished are told with its news.
       just || !t.played ? null : goalsCard(),
       // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.

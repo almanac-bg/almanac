@@ -22,6 +22,7 @@ import { standingCard } from "./duel.ts";
 import { leagueCard } from "./league.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 import { stats } from "./stats.ts";
+import { yearLink } from "./year.ts";
 
 export function me() {
   title("Профил");
@@ -51,6 +52,7 @@ export function me() {
           },
           leagueCard(),
           stats(),
+          yearLink(),
           () =>
             user()?.tag
               ? h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")

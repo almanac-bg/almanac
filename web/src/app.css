@@ -546,6 +546,66 @@
     font-weight: 700;
   }
 
+  /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
+  .year-card {
+    display: grid;
+    gap: var(--space-1);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .year-card strong {
+    font: 900 1.5rem / 1.75rem var(--font-sans);
+  }
+
+  .year-pips {
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .year-pips li {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .year-pips li.on {
+    background: var(--gold);
+  }
+
+  .year-story {
+    display: grid;
+    min-height: 22rem;
+    align-content: center;
+  }
+
+  .year-slide {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .year-slide p {
+    margin: 0;
+  }
+
+  .year-big {
+    font: 900 3.5rem / 1 var(--font-numeral);
+    overflow-wrap: anywhere;
+  }
+
+  .year-league {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    font: 900 2rem / 1.1 var(--font-sans);
+  }
+
   /* The week's league (screens/league.ts): its mountain and name, the player's place, the zones of the group. */
   .league-card {
     display: grid;
