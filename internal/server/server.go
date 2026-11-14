@@ -107,6 +107,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.RoyalNews = s.royalNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
+	s.rooms.OnArena = s.arenaEnded
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
@@ -151,6 +152,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
+	mux.HandleFunc("GET /api/arena/events", s.arenaEvents)
 	api("POST /api/duels", s.startDuel)
 	api("GET /api/duels", s.duels)
 	api("POST /api/duels/{id}/play", s.playDuel)

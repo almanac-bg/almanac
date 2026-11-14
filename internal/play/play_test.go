@@ -852,6 +852,36 @@ func TestRoyal(t *testing.T) {
 	}
 }
 
+func TestArena(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
+	// Ana wins, Bo and Vi share second, Gal is last.
+	deltas, err := w.g.SettleArena(ctx, []ArenaPlace{
+		{UserID: ana, Place: 1, Points: 900, Rights: 9},
+		{UserID: bo, Place: 2, Points: 500, Rights: 5},
+		{UserID: vi, Place: 2, Points: 500, Rights: 5},
+		{UserID: gal, Place: 4, Points: 100, Rights: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deltas[ana] <= 0 || deltas[gal] >= 0 || deltas[bo] != deltas[vi] || deltas[ana] <= deltas[bo] {
+		t.Fatalf("what the places did: %v", deltas)
+	}
+	for id, d := range deltas {
+		st, _ := w.g.StandingOf(ctx, id)
+		if st.Rating != StartRating+d || st.Rated != 1 {
+			t.Fatalf("player %d's rating: %+v, moved by %d", id, st, d)
+		}
+	}
+	var kept int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM arena_players WHERE place = 2 AND points = 500`).Scan(&kept)
+	if kept != 2 {
+		t.Fatalf("kept %d of the shared second places", kept)
+	}
+}
+
 func TestAlmanac(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
