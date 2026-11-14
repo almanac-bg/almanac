@@ -183,7 +183,7 @@ export function duel() {
       const done = list.filter((d) => d.endedAt);
       return [
         turn.length ? section("Твой ред", turn) : null,
-        waiting.length ? section("Чакат приятел", waiting) : null,
+        waiting.length ? section("Чакат приятелите ти", waiting) : null,
         friends().length
           ? h(
               "section",

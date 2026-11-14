@@ -15,7 +15,7 @@ import (
 //
 //   - the level: a ladder from „Нова искра“ at the start to „Жив алманах“ at level 50, so that there's always a next
 //     one in sight;
-//   - an achievement: only those that say how someone plays („Демон на скоростта“, „Неугасим пламък“);
+//   - an achievement: only those that say how someone plays („Светкавица“, „Неугасим пламък“);
 //   - a topic: „Майстор · …“ and „Светило · …“ for reaching that mastery in it;
 //   - the rating: a division reached, a Роял won, and a place on a season's podium, which counts how many times
 //     („Двукратен шампион“).
@@ -54,7 +54,7 @@ var Titles = []Title{
 	{"erudition", "Ерудиция", Rare, TitleLevel, unlock{level: 8}, ""},
 	{"omniscience", "Всезнание", Rare, TitleLevel, unlock{level: 12}, ""},
 	{"genius", "Гениален ум", Rare, TitleLevel, unlock{level: 16}, ""},
-	{"well", "Кладенец от знания", Epic, TitleLevel, unlock{level: 20}, ""},
+	{"well", "Извор на знания", Epic, TitleLevel, unlock{level: 20}, ""},
 	{"oracle", "Оракул", Epic, TitleLevel, unlock{level: 25}, ""},
 	{"library", "Жива библиотека", Epic, TitleLevel, unlock{level: 30}, ""},
 	{"wisdom", "Вековна мъдрост", Epic, TitleLevel, unlock{level: 35}, ""},
@@ -62,14 +62,14 @@ var Titles = []Title{
 	{"chronicler", "Летописец", Legendary, TitleLevel, unlock{level: 45}, ""},
 	{"almanac", "Жив алманах", Legendary, TitleLevel, unlock{level: 50}, ""},
 
-	{"speedDemon", "Демон на скоростта", Common, TitleAchievement, unlock{achieved: "fast"}, ""},
+	{"speedDemon", "Светкавица", Common, TitleAchievement, unlock{achieved: "fast"}, ""},
 	{"everyDay", "Всеки ден по малко", Rare, TitleAchievement, unlock{achieved: "streak7"}, ""},
 	{"flawless", "Безупречност", Rare, TitleAchievement, unlock{achieved: "perfect"}, ""},
 	{"sharpEye", "Остър поглед", Rare, TitleAchievement, unlock{achieved: "exact"}, ""},
 	{"seeker", "Търсещ ум", Rare, TitleAchievement, unlock{achieved: "allTopics"}, ""},
 	{"heartOfGame", "Сърцето на играта", Rare, TitleAchievement, unlock{achieved: "friends5"}, ""},
 	{"nightOwl", "Нощна сова", Rare, TitleAchievement, unlock{achieved: "nightOwl"}, ""},
-	{"quietStrength", "Тиха сила", Rare, TitleAchievement, unlock{achieved: "lastSecond"}, ""},
+	{"quietStrength", "Хладнокръвие", Rare, TitleAchievement, unlock{achieved: "lastSecond"}, ""},
 	{"duelInstinct", "Дуелен инстинкт", Epic, TitleAchievement, unlock{achieved: "duel10"}, ""},
 	{"polymath", "Всестранен ум", Epic, TitleAchievement, unlock{achieved: "allTypes"}, ""},
 	{"unquenched", "Неугасим пламък", Epic, TitleAchievement, unlock{achieved: "streak30"}, ""},

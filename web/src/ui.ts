@@ -189,6 +189,10 @@ export function streak(days: number, week?: boolean[]): Child {
 export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;
 /** A count of questions: 1 въпрос, 2 въпроса. */
 export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въпроса"}`;
+/** Duels between two players, the way it's said: „2 победи, 1 загуба, 1 равенство“ (draws only when there are some). */
+export const record = (won: number, lost: number, drawn: number) =>
+  `${won} ${won === 1 ? "победа" : "победи"}, ${lost} ${lost === 1 ? "загуба" : "загуби"}` +
+  (drawn ? `, ${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "");
 
 /** How a player shows to others: their avatar (shape-tone), title and level. */
 export interface Look {

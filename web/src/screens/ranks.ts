@@ -7,7 +7,7 @@ import { board, boardRow } from "../game/results.ts";
 import type { Board, Score } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
+import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
 import { type Tier, toneOf, topicMark } from "../ui.ts";
@@ -220,7 +220,7 @@ export function ranks() {
 function seasonHead(s: Season): Child {
   const mine = user.peek()
     ? s.place
-      ? `Ти си ${ordinal(s.place)} от ${s.of}.`
+      ? `Ти си на ${place(s.place, s.of)}.`
       : `Твоите игри този сезон: ${s.games} от ${s.minGames}.`
     : "";
   return h(
@@ -236,7 +236,7 @@ function seasonHead(s: Season): Child {
     h(
       "p",
       { class: "board-note" },
-      `Класират се играчите с поне ${s.minGames} игри за рейтинг (дуели и Роял). В края на месеца първите трима печелят медал, рамка и титла, а всеки рейтинг се връща наполовина към 1000.`,
+      `Класират се играчите с поне ${s.minGames} игри за рейтинг (дуели, Арена и Роял). В края на месеца първите трима печелят медал, рамка и титла, а всеки рейтинг се връща наполовина към 1000.`,
     ),
   );
 }

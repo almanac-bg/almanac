@@ -7,7 +7,7 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
+import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
@@ -424,7 +424,7 @@ function arenaEnd(view: () => RoomView): Child {
         return !best ? "Край" : best.me ? "Ти печелиш!" : `${best.name} печели`;
       }),
       me?.place && me.place > 1
-        ? h("p", { class: "place-line" }, `Ти си ${ordinal(me.place)} от ${first.players.length}.`)
+        ? h("p", { class: "place-line" }, `Ти си на ${place(me.place, first.players.length)}.`)
         : null,
     ),
     h("section", { class: "board" }, h("h2", null, "Класиране"), () =>

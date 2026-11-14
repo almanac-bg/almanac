@@ -120,7 +120,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 // preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite says whose it
 // is; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игра по теми, дуели и стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и арена на живо, Роял всяка вечер и стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
 		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
@@ -131,7 +131,11 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.game.ProfileOf(r.Context(), tag, 0); err == nil {
 				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
-				description = fmt.Sprintf("Ниво %d · %s · %d изиграни игри.", p.Level, p.Standing.Division.Name, p.Games)
+				played := "изиграни игри"
+				if p.Games == 1 {
+					played = "изиграна игра"
+				}
+				description = fmt.Sprintf("Ниво %d · %s · %d %s.", p.Level, p.Standing.Division.Name, p.Games, played)
 			}
 		}
 	case strings.HasPrefix(path, "/r/"):

@@ -7,7 +7,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player } from "../state.ts";
-import { type AchievementInfo, avatar, badge, stat, type Tier, tierWords } from "../ui.ts";
+import { type AchievementInfo, avatar, badge, record, stat, type Tier, tierWords } from "../ui.ts";
 import { type Standing, standingCard } from "./duel.ts";
 
 interface Profile {
@@ -127,13 +127,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         "p",
         { class: "player-relation" },
         "Приятели сте.",
-        played
-          ? h(
-              "span",
-              { class: "muted" },
-              ` Дуели помежду ви: ${r.won} ${r.won === 1 ? "победа" : "победи"}, ${r.lost} ${r.lost === 1 ? "загуба" : "загуби"}${r.drawn ? `, ${r.drawn} равни` : ""}.`,
-            )
-          : null,
+        played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
       ),
       button("Дуел", "rose", async () =>
         go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: p.id })).duel}`),

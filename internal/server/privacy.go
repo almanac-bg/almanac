@@ -22,7 +22,7 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">
-<header class="top"><a class="name" href="/"><img class="mark" src="/favicon.svg" alt="" width="32" height="32">АЛМАНАХ</a><nav class="tabs" aria-label="Основно"><a href="/">Начало</a><a href="/ranks">Класации</a><a href="/rewards">Награди</a><a href="/me">Профил</a></nav></header>
+<header class="top"><a class="name" href="/"><img class="mark" src="/favicon.svg" alt="" width="32" height="32">АЛМАНАХ</a><nav class="tabs" aria-label="Основно"><a href="/">Начало</a><a href="/friends">Приятели</a><a href="/ranks">Класации</a><a href="/me">Профил</a></nav></header>
 <main class="screen prose">
 <h1>{{.Title}}</h1>
 {{.Body}}
@@ -53,6 +53,9 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 играч, а на него показваме само името и потребителското ти име. Не пращаме писма на никого.</li>
 <li><strong>Постиженията, аватарът и титлата ти</strong> — постигнатото в играта и видът ти в нея.
 Аватарът, титлата и нивото ти се виждат до името ти в класациите, в стаите и при приятелите ти.</li>
+<li><strong>Известията</strong>, ако ги включиш — адресът, на който браузърът ти ги получава. Пращаме ги шифровани през
+услугата за известия на браузъра (на Google, Apple или Mozilla): тя не вижда какво пише в тях. Спреш ли ги, адресът
+се изтрива.</li>
 <li><strong>Една бисквитка</strong> — тази, с която оставаш в профила си. Друга няма.</li>
 <li><strong>Технически записи</strong> (IP адрес, адрес на заявката, време) — до 14 дни, за да пазим играта от
 злоупотреби и да оправяме грешки.</li>
