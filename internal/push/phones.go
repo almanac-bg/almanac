@@ -50,7 +50,17 @@ var (
 	googleToken = regexp.MustCompile(`^[A-Za-z0-9_:\-]{20,1000}$`) // FCM's are about 160
 )
 
-// CheckPhone says whether a token is one the platform could have given, on a platform the game can notify.
+// PhoneToken is a phone's token as the game keeps it: an iPhone's in lower case (Capacitor's plugin gives it in upper
+// case, Apple takes either), so that one phone is one row.
+func PhoneToken(platform, token string) string {
+	if platform == "ios" {
+		return strings.ToLower(token)
+	}
+	return token
+}
+
+// CheckPhone says whether a token (as PhoneToken keeps it) is one the platform could have given, on a platform the
+// game can notify.
 func (p *Phones) CheckPhone(platform, token string) error {
 	switch {
 	case platform == "ios" && p.Apple != nil && appleToken.MatchString(token):

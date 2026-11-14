@@ -96,6 +96,7 @@ func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
+	in.Token = push.PhoneToken(in.Platform, in.Token)
 	if s.phones.CheckPhone(in.Platform, in.Token) != nil {
 		return errBadRequest
 	}
@@ -120,7 +121,8 @@ func (s *Server) removePhone(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `DELETE FROM phones WHERE token = ? AND user_id = ?`, in.Token, u.ID)
+	_, err = s.db.Write.ExecContext(r.Context(), `DELETE FROM phones WHERE token IN (?, ?) AND user_id = ?`,
+		in.Token, push.PhoneToken("ios", in.Token), u.ID)
 	if err != nil {
 		return err
 	}
