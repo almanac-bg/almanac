@@ -950,6 +950,12 @@
     text-align: center;
   }
 
+  /* Начало's two parts are one column on a phone (a big screen sets them side by side, below). */
+  .home-main,
+  .home-side {
+    display: contents;
+  }
+
   /* After: the date and the place on the day's board (a way to it). */
   .day-line {
     display: flex;
@@ -5416,8 +5422,23 @@
       font-size: 1.125rem;
     }
 
+    /* Ten topics, five to a row (no topic alone in a row), the picture over the name; all of them at once under. */
     .topics {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .topic {
+      grid-template-columns: minmax(0, 1fr);
+      align-content: start;
+      padding: 10px var(--space-3) var(--space-3);
+    }
+
+    .topic-all .topic {
+      align-content: center;
+    }
+
+    .topic-name {
+      font-size: 0.9375rem;
     }
 
     /* A way to play has room for its picture beside the name, like a topic. */
@@ -5445,6 +5466,199 @@
       left: auto;
       right: 2px;
       box-shadow: 0 0 0 2px var(--bg);
+    }
+
+    /* A tablet: the column a little wider than a phone's. */
+    #app {
+      max-width: 48rem;
+    }
+
+    /* In a game: the question and its answers bigger, read from further away; short answers two by two. */
+    .playing .ask {
+      font-size: 2rem;
+      line-height: 2.5rem;
+    }
+
+    .playing .options:not(.pic-options) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .playing .option {
+      min-height: 4.5rem;
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+  }
+
+  /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak,
+     the level, the goals and the ways to play with others); Профил's places at 64rem, with Профил's cards in two
+     columns; every other page a centred column of 48rem, so no line of text runs too long. */
+  @media (min-width: 64rem) {
+    #app {
+      max-width: 76rem;
+      padding-inline: max(var(--space-6), env(safe-area-inset-left)) max(var(--space-6), env(safe-area-inset-right));
+    }
+
+    main > *,
+    .challenge-notice {
+      max-width: 48rem;
+      margin-inline: auto;
+    }
+
+    main > :has(> .home) {
+      max-width: none;
+    }
+
+    main > :has(> .subnav) {
+      max-width: 64rem;
+    }
+
+    .playing main > * {
+      max-width: 54rem;
+    }
+
+    .playing .ask {
+      font-size: 2.25rem;
+      line-height: 2.75rem;
+    }
+
+    .playing .option {
+      min-height: 4.75rem;
+      font-size: 1.375rem;
+    }
+
+    .playing .top {
+      margin-bottom: var(--space-4);
+    }
+
+    /* Начало: floats, so each column stacks on its own, whatever the other's height. */
+    .home {
+      --side: min(22rem, 30%);
+      display: flow-root;
+    }
+
+    /* The day's result: „Сподели“ and „Прегледай въпросите“ side by side, the same height. */
+    .home-main .actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .home-main .result-actions .btn {
+      min-height: 3.75rem;
+    }
+
+    .home-main,
+    .home-side {
+      display: grid;
+      align-content: start;
+      gap: var(--space-5);
+    }
+
+    .home-main,
+    .home > .home-side + * {
+      float: left;
+      width: calc(100% - var(--side) - var(--space-6));
+    }
+
+    .home > .status-row,
+    .home-side {
+      float: right;
+      clear: right;
+      width: var(--side);
+    }
+
+    .home > .home-side + * {
+      clear: left;
+      margin-top: var(--space-6);
+    }
+
+    .home > .status-row ~ .home-side {
+      margin-top: var(--space-5);
+    }
+
+    .home-side .modes {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .almanac-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* A new player: the day and the topics, one centred column. */
+    .home:not(:has(> .home-side > *)) {
+      max-width: 48rem;
+      margin-inline: auto;
+    }
+
+    .home:not(:has(> .home-side > *)) > * {
+      float: none;
+      width: auto;
+    }
+
+    /* Профил: two columns of cards under the name, each read top to bottom. */
+    .screen:has(> .me-head) {
+      display: block;
+      columns: 2;
+      column-gap: var(--space-5);
+    }
+
+    .screen:has(> .me-head) > * {
+      margin: 0 0 var(--space-5);
+      break-inside: avoid;
+    }
+
+    .screen:has(> .me-head) > :is(.subnav, .me-head) {
+      column-span: all;
+    }
+
+    .screen:has(> .me-head) > .link {
+      display: block;
+      width: fit-content;
+    }
+
+    /* Гардероб: bigger looks to choose from, more to a row. */
+    .picker {
+      grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    }
+
+    .picker .avatar {
+      --size: 56px;
+    }
+
+    .worn .avatar.l {
+      --size: 96px;
+    }
+  }
+
+  /* A computer: the keys that play show on what they play (1–4 on the answers, Enter to go on). */
+  .key-hint {
+    display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .key-hint {
+      display: inline-grid;
+      place-items: center;
+      min-width: 1.5rem;
+      height: 1.5rem;
+      padding: 0 6px;
+      border-radius: var(--radius-xs);
+      background: var(--sunken);
+      box-shadow: inset 0 -1px 0 var(--line-strong);
+      color: var(--text-muted);
+      font: 800 0.75rem / 1 var(--font-sans);
+    }
+
+    .btn.primary .key-hint {
+      background: color-mix(in srgb, var(--on-fill) 12%, transparent);
+      box-shadow: none;
+      color: inherit;
+    }
+
+    .up-next-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
     }
   }
 }

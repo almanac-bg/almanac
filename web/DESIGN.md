@@ -20,6 +20,8 @@ three when you add or change a screen.
   achievements) instead of listing it.
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
   without scrolling sideways.
+- **A big screen uses its width** (see Wide screens), and never changes how a phone looks: its rules live in
+  `min-width` blocks.
 
 ## Places
 
@@ -28,7 +30,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten, or
   once played, how they went (the place a way to the day's board) with „Сподели“, the gold button, right under it
   and „Прегледай въпросите“ below; the day's goals; the ways to play with others, three in a row (the picture over
-  the name on a phone); the topics, two by two (three on a big screen), and all of them at once. Дуел, Роял and Стая open from here and
+  the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name), and all of them at once. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
   streak, the goals and the ways to play with others come after the first game.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
@@ -50,6 +52,20 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Cards** have 16 of padding (`.card`), the hero 20.
 - **Tiles** (a way to play, a topic) are a picture at 44–48px beside the name, at least 68px high, two to a row.
 - **Touch targets** are at least 44px high; the bar's are its full height.
+
+## Wide screens
+
+- **48rem (a tablet):** the column grows to 48rem; the places move into the header; in a game the question and its
+  answers are bigger, and a choice's answers sit two by two.
+- **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
+  „Сподели“ beside „Прегледай въпросите“), and under it the topics, five to a row; beside them, at most 22rem wide,
+  the streak and the level, the goals and the ways to play with others, one under another. A new player, with only
+  the day and the topics, gets one centred column. Профил's places are 64rem wide: Общо's cards in two columns, read
+  top to bottom; more achievements and bigger looks to a row. Every other page is a centred column of 48rem, so no
+  line of text runs too long; a game is 54rem, with bigger type still.
+- **A computer** (a fine pointer that hovers) is shown its keys: the answers are marked 1–4 instead of А–Г (the keys
+  that give them, the same on every keyboard layout), „Вярно“ and „Невярно“ 1 and 2, the count before a run Enter
+  („Започни сега“) and Esc („Откажи“), and an answer shown Enter (on at once). The marks are `.key-hint`.
 
 ## Colour
 
@@ -351,8 +367,8 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 
 ## Before a UI change ships
 
-- **Look at it** in both themes, at 320px and 390px wide. Nothing may scroll sideways, and keyboard focus must show.
+- **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 14 kB of CSS, 40 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+- **Keep to the budgets:** 16 kB of CSS, 46 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
   over them.

@@ -88,29 +88,39 @@ export function today() {
       { class: "screen home" },
       // A new player, before a first game finished, sees the day and the topics only.
       () => (user() && (just || t.played) ? status(fresh()) : null),
-      run?.done
-        ? summary(
-            run,
-            h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
-              const b = fresh().board;
-              return b.place
-                ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
-                : null;
-            }),
-            // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
-            { main: shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak)) },
-            [just ? news(run.id) : null, countdown()],
-          )
-        : dayCard(t, start(t)),
-      // Mid-December into January: the year in the game, a tap away.
-      yearCard(),
-      // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
-      // and not right after a game, which has its news.
-      just || !run?.done ? null : keepCard(t),
-      // Just played, the goals it finished are told with its news.
-      just || !t.played ? null : goalsCard(),
-      // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
-      just || t.played ? modes(["duel", "royal", "room"], "С други") : null,
+      // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
+      // (app.css); on a phone the two parts are one column, in this order.
+      h(
+        "div",
+        { class: "home-main" },
+        run?.done
+          ? summary(
+              run,
+              h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
+                const b = fresh().board;
+                return b.place
+                  ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
+                  : null;
+              }),
+              // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
+              { main: shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak)) },
+              [just ? news(run.id) : null, countdown()],
+            )
+          : dayCard(t, start(t)),
+        // Mid-December into January: the year in the game, a tap away.
+        yearCard(),
+        // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
+        // and not right after a game, which has its news.
+        just || !run?.done ? null : keepCard(t),
+      ),
+      h(
+        "div",
+        { class: "home-side" },
+        // Just played, the goals it finished are told with its news.
+        just || !t.played ? null : goalsCard(),
+        // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
+        just || t.played ? modes(["duel", "royal", "room"], "С други") : null,
+      ),
       topics(),
     );
   }

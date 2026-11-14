@@ -168,7 +168,17 @@ export function picturesIn(view: View, ms: number): Promise<void> {
   });
 }
 
-const letters = ["А", "Б", "В", "Г"];
+/** What marks each answer: on a computer the key that gives it (1–4, the same on every keyboard layout, Latin or
+ * Cyrillic), on a touch screen a letter. */
+const letters = matchMedia("(hover: hover) and (pointer: fine)").matches ? ["1", "2", "3", "4"] : ["А", "Б", "В", "Г"];
+
+/** Keys 1–4 press the answer they mark, while the question waits for one (never in a field, never with a modifier). */
+function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (locked.peek() || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.target instanceof HTMLInputElement) return;
+    buttons[Number(e.key) - 1]?.click();
+  });
+}
 
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
@@ -213,6 +223,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           ],
     ),
   );
+  answerKeys(buttons, locked);
   const credits = h("p", { class: "credit pic-credits", hidden: true });
   return {
     node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options" }, buttons), credits),
@@ -580,6 +591,7 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
       },
       h("span", { class: "tf-mark", "aria-hidden": "true" }),
       h("span", null, truth ? "Вярно" : "Невярно"),
+      h("kbd", { class: "key-hint", "aria-hidden": "true" }, truth ? "1" : "2"),
     );
   const yes = button(true);
   const no = button(false);
@@ -986,6 +998,7 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
       h("span", null, text),
     ),
   );
+  answerKeys(buttons, locked);
   return {
     node: h("div", { class: "stack" }, list, h("div", { class: "options" }, buttons)),
     pending: () => null,
