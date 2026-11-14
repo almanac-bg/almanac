@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 )
 
 // Progress is what a player earns by playing: a level from all the XP they've earned, achievements for things
-// they've done, and with them titles and avatars to choose from. All of it comes from the game's own records:
+// they've done, and with them avatars and titles (titles.go) to choose from. All of it comes from the game's own records:
 // nothing to buy, nothing made up.
 
 // ErrNotYours is a title or an avatar the player hasn't earned (or one there's no such thing as).
@@ -34,8 +33,8 @@ func LevelOf(total int) (level, from, to int) {
 	return level, from, from + step
 }
 
-// Achievement is something a player has done, once and for good. Its name is also a title they may show, and its
-// shape an avatar they may wear.
+// Achievement is something a player has done, once and for good, named for the deed („Десет от десет“). Its shape is
+// an avatar they may wear; some unlock a title too (titles.go).
 type Achievement struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -49,8 +48,8 @@ type Achievement struct {
 	Hidden bool `json:"hidden,omitempty"`
 }
 
-// Tier is how hard an achievement is to earn: common ones come in the first days, legendary ones take months. A
-// title shows in its achievement's tier.
+// Tier is how hard an achievement or a title is to earn: common ones come in the first days, legendary ones take
+// months. A title shows in its tier's colour.
 type Tier string
 
 const (
@@ -64,7 +63,7 @@ const (
 var Achievements = []Achievement{
 	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common, 3, false},
 	{"answers100", "Сто отговора", "Отговори на сто въпроса.", "book", Common, 100, false},
-	{"fast", "Светкавица", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
+	{"fast", "Под две секунди", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
 	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
 
@@ -74,8 +73,8 @@ var Achievements = []Achievement{
 	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "rosette", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
 	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
-	{"nightOwl", "Нощна птица", "Отговори на въпрос между полунощ и четири сутринта.", "eye", Rare, 1, true},
-	{"earlyBird", "Ранобудник", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
+	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "eye", Rare, 1, true},
+	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
 
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
@@ -83,11 +82,11 @@ var Achievements = []Achievement{
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
 	{"master", "Като на длан", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
 	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
-	{"topicPerfect", "Отличник", "Познай и десетте въпроса на игра по тема.", "spark", Epic, 1, true},
-	{"allTypes", "Всестранен", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, вярно или не, свързване.", "clover", Epic, 5, true},
+	{"topicPerfect", "Тема без грешка", "Познай и десетте въпроса на игра по тема.", "spark", Epic, 1, true},
+	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, вярно или не, свързване.", "clover", Epic, 5, true},
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
-	{"master5", "Ходеща енциклопедия", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
+	{"master5", "Пет теми като на длан", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 }
 
@@ -98,25 +97,6 @@ func achievementByID(id string) (Achievement, bool) {
 	}
 	return Achievements[i], true
 }
-
-// TitleOf is the name a title is shown by, and its tier ("" for none): an achievement's id, or a place on a season's
-// podium as lookColumns read it ("podium2:3": second, three times).
-func TitleOf(id string) (string, Tier) {
-	if rest, ok := strings.CutPrefix(id, "podium"); ok {
-		p, n, _ := strings.Cut(rest, ":")
-		place, _ := strconv.Atoi(p)
-		times, _ := strconv.Atoi(n)
-		if place < 1 || place > len(podiumTitles) || times < 1 {
-			return "", ""
-		}
-		return PodiumTitle(place, times)
-	}
-	a, _ := achievementByID(id)
-	return a.Name, a.Tier
-}
-
-// podiumTitleID is the title of a place on a season's podium (1–3), as a player wears it.
-func podiumTitleID(place int) string { return "podium" + strconv.Itoa(place) }
 
 // Avatars are a shape in a tone. Some shapes are everyone's from the start; the rest unlock: with an achievement
 // drawn with that shape, or (the crown) at a level.
@@ -185,7 +165,7 @@ func shapes(earned map[string]int64, level int) []Shape {
 type Look struct {
 	Avatar string `json:"avatar"`
 	Title  string `json:"title,omitempty"`
-	// TitleTier is the tier of the achievement the title comes from: it shows in that tier's colour.
+	// TitleTier is the title's tier: it shows in that tier's colour.
 	TitleTier Tier `json:"titleTier,omitempty"`
 	Level     int  `json:"level"`
 }
@@ -229,12 +209,14 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return lookOf(userID, avatar, title, total), err
 }
 
-// Earned is an achievement as a player sees it: when they earned it (0: not yet), and how far they are towards its
-// goal. A hidden one not yet earned is told only as hidden: no name, no how, no reward.
+// Earned is an achievement as a player sees it: when they earned it (0: not yet), how far they are towards its
+// goal, and the title it unlocks, if any. A hidden one not yet earned is told only as hidden: no name, no how, no
+// reward.
 type Earned struct {
 	Achievement
-	At       int64 `json:"at,omitempty"`
-	Progress int   `json:"progress"`
+	At       int64     `json:"at,omitempty"`
+	Progress int       `json:"progress"`
+	Title    *TitleRef `json:"title,omitempty"`
 }
 
 // hiddenAchievement is what a player sees of a hidden achievement they haven't found yet.
@@ -251,14 +233,14 @@ type Progress struct {
 	To           int      `json:"to"`   // and where the next one does
 	Achievements []Earned `json:"achievements"`
 	Avatar       string   `json:"avatar"`
-	Title        string   `json:"title"` // the chosen title's id: an achievement's, or podium1–3 ("" for none)
+	Title        string   `json:"title"` // the chosen title's id: one of Titles, or podium1–3 ("" for none)
 	Shapes       []Shape  `json:"shapes"`
 	Tones        []string `json:"tones"`
 	// Standing is the player's rating and division.
 	Standing Standing `json:"standing"`
-	// Podium are the titles of a season's podium, first to third: each the player's once they've ended a season in
-	// its place, and named by how many times.
-	Podium []PodiumTitleView `json:"podium"`
+	// Titles are every title, the podium's first (named by how many times they're won): the player's, or locked with
+	// what unlocks them.
+	Titles []TitleView `json:"titles"`
 	// The wardrobe: the frame and pattern worn ("" for none), and all there are.
 	Frame     string     `json:"frame"`
 	Backdrop  string     `json:"backdrop"`
@@ -291,14 +273,6 @@ func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, erro
 	return earned, rows.Err()
 }
 
-// PodiumTitleView is a podium's title as a player may wear it: won some times, or not yet (0).
-type PodiumTitleView struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Tier Tier   `json:"tier"`
-	Won  int    `json:"won"`
-}
-
 // ProgressOf reads a player's progress.
 func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	var p Progress
@@ -321,11 +295,11 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 		return p, err
 	}
 	for _, a := range Achievements {
-		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal)}
+		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), Title: titleFor(a.ID)}
 		if e.At != 0 {
 			e.Progress = a.Goal
 		} else if a.Hidden {
-			e.Achievement, e.Progress = hiddenAchievement(a), 0
+			e.Achievement, e.Progress, e.Title = hiddenAchievement(a), 0, nil
 		}
 		p.Achievements = append(p.Achievements, e)
 	}
@@ -341,11 +315,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
-	for i, won := range w.podium {
-		v := PodiumTitleView{ID: podiumTitleID(i + 1), Won: won}
-		v.Name, v.Tier = PodiumTitle(i+1, won)
-		p.Podium = append(p.Podium, v)
-	}
+	p.Titles = w.titles()
 	p.Frame, p.Backdrop = frame.String, backdrop.String
 	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
 	return p, nil
@@ -511,16 +481,19 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 	return false, rows.Err()
 }
 
-// News is what's new for a player since they last looked: achievements earned, the day's goals done (with their
-// XP), and their level (and whether it's gone up).
+// News is what's new for a player since they last looked: achievements earned (each with the title it unlocks, if
+// any), the day's goals done (with their XP), and their level (whether it's gone up, and the titles that came with
+// it).
 type News struct {
-	Achievements []Achievement `json:"achievements"`
-	Goals        []DoneGoal    `json:"goals"`
-	Level        int           `json:"level"`
-	XP           int           `json:"xp"`
-	From         int           `json:"from"`
-	To           int           `json:"to"`
-	LevelUp      bool          `json:"levelUp,omitempty"`
+	Achievements []Earned   `json:"achievements"`
+	Goals        []DoneGoal `json:"goals"`
+	Level        int        `json:"level"`
+	XP           int        `json:"xp"`
+	From         int        `json:"from"`
+	To           int        `json:"to"`
+	LevelUp      bool       `json:"levelUp,omitempty"`
+	// Titles are the titles the levels just reached unlock.
+	Titles []TitleRef `json:"titles,omitempty"`
 	// Mastery is how the game just played moved the player's mastery of its topics, when one is told of.
 	Mastery []MasteryMove `json:"mastery,omitempty"`
 }
@@ -534,7 +507,7 @@ type DoneGoal struct {
 // NewsOf tells a player what's new, once: the achievements, the goals and the level are marked as told. With the
 // game just played (runID; 0 for none), it also tells how that game moved their mastery.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
-	n := News{Achievements: []Achievement{}, Goals: []DoneGoal{}}
+	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}}
 	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return n, err
@@ -559,7 +532,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				return err
 			}
 			if a, ok := achievementByID(id); ok {
-				n.Achievements = append(n.Achievements, a)
+				n.Achievements = append(n.Achievements, Earned{Achievement: a, Progress: a.Goal, Title: titleFor(id)})
 			}
 		}
 		rows.Close()
@@ -592,19 +565,21 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		if _, err := tx.Exec(`UPDATE goals_done SET seen = 1 WHERE user_id = ? AND NOT seen`, userID); err != nil {
 			return err
 		}
-		res, err := tx.Exec(`UPDATE users SET level_seen = ? WHERE id = ? AND level_seen < ?`, n.Level, userID, n.Level)
-		if err != nil {
+		var seen int
+		if err := tx.QueryRow(`SELECT level_seen FROM users WHERE id = ?`, userID).Scan(&seen); err != nil {
 			return err
 		}
-		up, _ := res.RowsAffected()
-		n.LevelUp = up == 1
-		return nil
+		if n.LevelUp = seen < n.Level; n.LevelUp {
+			n.Titles = titlesAtLevel(seen, n.Level)
+			_, err = tx.Exec(`UPDATE users SET level_seen = ? WHERE id = ?`, n.Level, userID)
+		}
+		return err
 	})
 	return n, err
 }
 
-// SetLook changes how a player shows to others: an avatar (shape-tone, of what they may pick) and a title (an
-// achievement of theirs, or "" for none). Nil leaves either as it is.
+// SetLook changes how a player shows to others: an avatar (shape-tone, of what they may pick) and a title (one
+// they've unlocked, or "" for none). Nil leaves either as it is.
 func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string, wear ...*string) error {
 	earned, err := g.earned(ctx, userID)
 	if err != nil {
@@ -623,18 +598,12 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 		}
 	}
 	if title != nil && *title != "" {
-		if _, ok := earned[*title]; !ok {
-			podium, err := g.podiumOf(ctx, userID)
-			if err != nil {
-				return err
-			}
-			won := false
-			for place, n := range podium {
-				won = won || (n > 0 && *title == podiumTitleID(place+1))
-			}
-			if !won {
-				return ErrNotYours
-			}
+		w, err := g.wardrobeOf(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if !w.wears(*title) {
+			return ErrNotYours
 		}
 	}
 	// The wardrobe: a frame and a pattern ("" takes them off), if the player has unlocked them.

@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// The wardrobe: besides the avatar's shape and tone and the title, a frame around the avatar and a pattern behind
+// The wardrobe: besides the avatar's shape and tone and the title (titles.go), a frame around the avatar and a pattern behind
 // it. Each is unlocked by something the player has done — a level, an achievement, a division reached, a place on a
 // season's podium — and shows wherever they do. The art is drawn in the client (web/src/art/frame.ts, the .bd-* patterns).
 
@@ -18,14 +18,16 @@ type Cosmetic struct {
 	How    string `json:"how,omitempty"`
 }
 
-// unlock is what makes a cosmetic a player's: a level, an achievement of a tier (any one), one achievement, a
-// division reached (by the highest rating), or a season ended in a place (1–3) or better.
+// unlock is what makes a cosmetic or a title a player's: a level, an achievement of a tier (any one), one
+// achievement, a division reached (by the highest rating), a season ended in a place (1–3) or better, or Роял won
+// some times.
 type unlock struct {
 	level    int
 	tier     Tier
 	achieved string
 	division string
 	podium   int
+	royal    int
 }
 
 type cosmetic struct {
@@ -56,13 +58,14 @@ var Backdrops = []cosmetic{
 	{"stars", "Звезди", unlock{division: "gold"}},
 }
 
-// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, and their
-// places on seasons' podiums.
+// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, their places
+// on seasons' podiums, and the Роял tournaments they've won.
 type wardrobe struct {
 	level  int
 	earned map[string]int64
 	peak   int
 	podium Podium
+	royals int
 }
 
 func (w wardrobe) has(u unlock) bool {
@@ -83,6 +86,8 @@ func (w wardrobe) has(u unlock) bool {
 	case u.podium > 0:
 		best := w.podium.best()
 		return best > 0 && best <= u.podium
+	case u.royal > 0:
+		return w.royals >= u.royal
 	}
 	return true
 }
@@ -107,6 +112,10 @@ func (u unlock) how() string {
 	case u.podium > 0:
 		return map[int]string{1: "първо място в сезон", 2: "първо или второ място в сезон",
 			3: "място в първите трима на сезон"}[u.podium]
+	case u.royal == 1:
+		return "победа в Роял"
+	case u.royal > 1:
+		return strconv.Itoa(u.royal) + " победи в Роял"
 	}
 	return ""
 }
@@ -141,6 +150,9 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if err = g.DB.Read.QueryRowContext(ctx, `SELECT peak FROM users WHERE id = ?`, userID).Scan(&w.peak); err != nil {
 		return w, err
 	}
-	w.podium, err = g.podiumOf(ctx, userID)
+	if w.podium, err = g.podiumOf(ctx, userID); err != nil {
+		return w, err
+	}
+	w.royals, err = g.royalWins(ctx, userID)
 	return w, err
 }

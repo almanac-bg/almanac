@@ -183,12 +183,12 @@ export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въ
 export interface Look {
   avatar?: string;
   title?: string;
-  /** The tier of the achievement the title comes from: the title shows in its colour. */
+  /** The title's tier: it shows in that tier's colour. */
   titleTier?: Tier;
   level?: number;
 }
 
-/** How hard an achievement is to earn, and so how rare its title. */
+/** How hard an achievement or a title is to earn: a title shows in its tier's colour. */
 export type Tier = "common" | "rare" | "epic" | "legendary";
 
 export const tiers: Tier[] = ["common", "rare", "epic", "legendary"];
@@ -299,6 +299,15 @@ export interface AchievementInfo {
   progress?: number;
   hidden?: boolean;
   at?: number;
+  /** The title it unlocks, if any (not told of a hidden one not yet found). */
+  title?: TitleRef;
+}
+
+/** A title: its id (to wear it), its name, and its tier. */
+export interface TitleRef {
+  id: string;
+  name: string;
+  tier: Tier;
 }
 
 export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l" = "m"): HTMLElement {

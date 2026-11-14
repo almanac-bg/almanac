@@ -5,8 +5,8 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { avatar, badge, meter, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
-import { type Cosmetic, loadProgress, type Progress, titlesOf } from "./progress.ts";
+import { avatar, badge, meter, shapeNames, tiers, tierWords, toneNames } from "../ui.ts";
+import { type Cosmetic, loadProgress, type Progress } from "./progress.ts";
 
 export function rewards() {
   title("Награди");
@@ -94,7 +94,7 @@ function achievements(p: Progress): Child {
                   }),
                   a.hidden && !a.at
                     ? "Награда: ще разбереш"
-                    : `Награда: форма „${shapeNames[a.icon] ?? a.icon}“ за аватара и титла „${a.name}“`,
+                    : `Награда: форма „${shapeNames[a.icon] ?? a.icon}“ за аватара${a.title ? ` и титла „${a.title.name}“` : ""}`,
                 ),
               ),
             ),
@@ -105,7 +105,7 @@ function achievements(p: Progress): Child {
   );
 }
 
-/** How you look to others: the avatar's shape and tone, and a title from your achievements. */
+/** How you look to others: the avatar's shape and tone, its frame and pattern, and a title. */
 function look(progress: () => Progress | null, reload: () => Promise<void>): Child {
   const hint = signal("");
   const error = signal("");
@@ -123,13 +123,6 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
     const p = progress();
     if (!p) return null;
     const [shape = "", tone = ""] = p.avatar.split("-");
-    // Every title — a season's podium's, then the achievements' by tier: the earned ones to wear, the rest with what
-    // unlocks them.
-    const all = titlesOf(p);
-    const titles = [
-      ...all.slice(0, p.podium.length),
-      ...tiers.flatMap((t: Tier) => all.slice(p.podium.length).filter((a) => a.tier === t)),
-    ];
     return h(
       "section",
       null,
@@ -197,7 +190,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
       h(
         "p",
         { class: "muted" },
-        "Титлата се вижда под името ти. Всяко постижение отключва една, а място в първите трима на сезон — още една, която брои колко пъти.",
+        "Титлата се вижда под името ти и казва как играеш. Отключват се с някои постижения, с нивата, с победа в Роял и с място в първите трима на сезон.",
       ),
       h(
         "ul",
@@ -211,31 +204,42 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
             h("span", { class: "title-name" }, "Без титла"),
           ),
         ),
-        titles.map((a) =>
-          h(
-            "li",
-            null,
-            a.earned
-              ? h(
-                  "button",
-                  {
-                    class: `title-pick t-${a.tier}`,
-                    type: "button",
-                    "aria-pressed": a.id === p.title,
-                    onclick: () => set({ title: a.id }),
-                  },
-                  h("span", { class: "title-name" }, a.name),
-                  h("span", { class: "title-tier" }, tierWords[a.tier].title),
-                )
-              : h(
-                  "div",
-                  { class: `title-pick locked t-${a.tier}` },
-                  h("span", { class: "title-name" }, a.name),
-                  h("span", { class: "title-tier" }, tierWords[a.tier].title),
-                  h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
-                ),
+        p.titles
+          .filter((a) => !a.locked)
+          .map((a) =>
+            h(
+              "li",
+              null,
+              h(
+                "button",
+                {
+                  class: `title-pick t-${a.tier}`,
+                  type: "button",
+                  "aria-pressed": a.id === p.title,
+                  onclick: () => set({ title: a.id }),
+                },
+                h("span", { class: "title-name" }, a.name),
+                h("span", { class: "title-tier" }, tierWords[a.tier].title),
+              ),
+            ),
           ),
-        ),
+      ),
+      // The ones still locked, after: what each takes.
+      p.titles.some((a) => a.locked) ? h("h4", { class: "titles-more" }, "Още за отключване") : null,
+      h(
+        "ul",
+        { class: "titles" },
+        p.titles
+          .filter((a) => a.locked)
+          .map((a) =>
+            h(
+              "li",
+              { class: `title-pick locked t-${a.tier}` },
+              h("span", { class: "title-name" }, a.name),
+              h("span", { class: "title-tier" }, tierWords[a.tier].title),
+              h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
+            ),
+          ),
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     );

@@ -8,7 +8,7 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { meter } from "../ui.ts";
 import { daysLeft, type Season } from "./ranks.ts";
 
-const places = ["Шампион", "Вицешампион", "Бронзов медалист"];
+const places = ["Злато", "Сребро", "Бронз"];
 
 export function seasonCard(): Child {
   const data = signal<Season | null>(null);

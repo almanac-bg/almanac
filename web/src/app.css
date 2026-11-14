@@ -3648,6 +3648,13 @@
     color: var(--text-muted);
   }
 
+  .titles-more {
+    margin: var(--space-3) 0 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
   .title-how {
     flex-basis: 100%;
     color: var(--text-muted);
@@ -3724,6 +3731,15 @@
 
   .unlock-text .link {
     margin-top: var(--space-1);
+  }
+
+  .unlock-title {
+    color: var(--text-muted);
+  }
+
+  .unlock-title-name,
+  .unlock-title b {
+    color: var(--tier-ink, var(--text));
   }
 
   .picker {

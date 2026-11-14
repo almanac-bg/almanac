@@ -4,14 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strconv"
 	"time"
 )
 
 // Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Роял) count for the season they're
 // played in; a player with MinSeasonGames of them is placed on its board. When the month ends the board is kept —
 // its first three take the season's podium: a medal, a frame in its metal, and a title that counts how many times
-// („Трикратен шампион“, „Двукратен вицешампион“) — and every rating goes halfway back to the start: the strong stay
+// („Тройно злато“, „Двойно сребро“) — and every rating goes halfway back to the start: the strong stay
 // ahead, but each month is a race again.
 
 const (
@@ -196,26 +195,4 @@ func (p Podium) best() int {
 		}
 	}
 	return 0
-}
-
-// podiumTitles are the places of the podium as titles — won once, and before a count — and the tier each shows in.
-var podiumTitles = [3]struct {
-	once, name string
-	tier       Tier
-}{{"Шампион", "шампион", Legendary}, {"Вицешампион", "вицешампион", Epic}, {"Бронзов медалист", "бронзов медалист", Rare}}
-
-// times say how many times, before a title („Двукратен“); past ten, in digits.
-var times = []string{"", "", "Двукратен", "Трикратен", "Четирикратен", "Петкратен", "Шесткратен", "Седемкратен",
-	"Осемкратен", "Деветкратен", "Десеткратен"}
-
-// PodiumTitle is the title of a place on the podium (1–3), won n times: „Шампион“, „Трикратен шампион“.
-func PodiumTitle(place, n int) (string, Tier) {
-	t := podiumTitles[place-1]
-	switch {
-	case n <= 1:
-		return t.once, t.tier
-	case n < len(times):
-		return times[n] + " " + t.name, t.tier
-	}
-	return strconv.Itoa(n) + "-кратен " + t.name, t.tier
 }
