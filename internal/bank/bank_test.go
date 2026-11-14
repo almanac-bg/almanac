@@ -239,7 +239,8 @@ func TestLoadFindsProblems(t *testing.T) {
   {"id": "his-009", "type": "choice", "difficulty": "easy", "text": "Как ли?", "answer": "А", "wrong": ["Б", "а"]},
   {"id": "his-007", "type": "number", "difficulty": "hard", "text": "Колко?", "answer": 10.5, "step": 1, "scale": "linear", "tolerance": 5},
   {"id": "his-008", "type": "choice", "difficulty": "easy", "text": "Чие?", "answer": "А", "wrong": ["Б", "В", "Г"],
-   "image": {"file": "0123456789abcdef.webp", "w": 1200, "h": 800, "alt": "Знаме", "credit": "Някой", "license": "PD", "source": "https://commons.wikimedia.org/"}}
+   "image": {"file": "0123456789abcdef.webp", "w": 1200, "h": 800, "alt": "Знаме", "credit": "Някой", "license": "PD", "source": "https://commons.wikimedia.org/"}},
+  {"id": "his-010", "type": "choice", "difficulty": "easy", "text": "Кой цар?", "answer": "Иван Грозни", "wrong": ["Иван Грозн\u044bй", "Борис", "Петър"], "fact": "„Тел\u0451нок“ и „м\u044dр“."}
 ]
 `)
 	write("questions/sports.json", `[]`)
@@ -263,6 +264,8 @@ func TestLoadFindsProblems(t *testing.T) {
 		"questions/history.json:8: his-009: two options are the same: а",
 		"questions/history.json:9: his-007: the answer isn't on the step grid",
 		"questions/history.json:10: his-008: missing picture 0123456789abcdef.webp",
+		"questions/history.json:12: his-010: fact has \u0451, a letter Bulgarian doesn't use",
+		"questions/history.json:12: his-010: option has \u044b, a letter Bulgarian doesn't use",
 	} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in:\n%s", want, all)
