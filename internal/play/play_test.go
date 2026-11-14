@@ -803,55 +803,6 @@ func TestRatingAndDivisions(t *testing.T) {
 	}
 }
 
-func TestRoyal(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, vi := w.user(), w.user(), w.user()
-	var told []RoyalNews
-	w.g.RoyalNews = func(_ context.Context, n RoyalNews) { told = append(told, n) }
-
-	// Three join the same tournament, each in their own time.
-	s, id, err := w.g.JoinRoyal(ctx, ana)
-	if err != nil || s.Total != RoyalLength {
-		t.Fatalf("Ana in a tournament: %+v %v", s, err)
-	}
-	w.play(ana, s.ID, repeat(w.right, RoyalLength)...)
-	sb, idb, _ := w.g.JoinRoyal(ctx, bo)
-	sv, idv, _ := w.g.JoinRoyal(ctx, vi)
-	if idb != id || idv != id {
-		t.Fatalf("not the same tournament: %d %d %d", id, idb, idv)
-	}
-	// A wrong answer is the way out: Bo after four right, Vi at once.
-	end := w.play(bo, sb.ID, append(repeat(w.right, 4), w.wrong)...)
-	if !end.Done || end.Rights != 4 {
-		t.Fatalf("Bo's run didn't end at his first wrong answer: %+v", end)
-	}
-	w.play(vi, sv.ID, w.wrong)
-	r, _ := w.g.RoyalsOf(ctx, bo)
-	if len(r) != 1 || r[0].EndedAt != 0 || len(r[0].Players) != 3 || !r[0].Players[1].Out || r[0].Players[0].Out {
-		t.Fatalf("the tournament while open: %+v", r)
-	}
-
-	// Its time runs out: places, and ratings moved by them.
-	w.wait(RoyalOpen + time.Minute)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	r, _ = w.g.RoyalsOf(ctx, vi)
-	p := r[0].Players
-	if r[0].EndedAt == 0 || p[0].Name != "Играч" || p[0].Place != 1 || p[1].Place != 2 || p[2].Place != 3 ||
-		p[0].Delta <= 0 || p[2].Delta >= 0 {
-		t.Fatalf("the tournament once ended: %+v", r[0])
-	}
-	if len(told) != 3 {
-		t.Fatalf("told %d of the ending", len(told))
-	}
-	// The next to join starts a new one.
-	if _, next, _ := w.g.JoinRoyal(ctx, ana); next == id {
-		t.Fatal("joined an ended tournament")
-	}
-}
-
 func TestArena(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

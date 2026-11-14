@@ -1,24 +1,33 @@
 import { expect, test } from "@playwright/test";
 import { answer } from "./play.ts";
 
-test("Роял: in a tournament, out at the first wrong answer (or through all fifteen)", async ({ page }) => {
-  test.setTimeout(120_000);
+// The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
+// meet in the same one, as players do.
+test("Роял: in from the lobby, live to the first wrong answer (or through all fifteen), then the standings", async ({
+  page,
+}) => {
+  test.setTimeout(360_000);
   await page.goto("/royal");
-  await page.getByRole("button", { name: "Влез в турнир" }).click();
-  const result = page.getByRole("heading", { name: /Отпадна на въпрос \d+|Стигна до края!/ });
-  for (let n = 0; n < 15 && !(await result.isVisible()); n++) {
-    // A question, or the result; not the Роял page's own heading while the tournament is being joined.
-    await expect(page.locator("article.question").or(result).first()).toBeVisible({ timeout: 10_000 });
-    if (await result.isVisible()) break;
-    await expect(page.locator(".question-head")).toContainText("от 15");
+  // A game under way (another engine's) ends before the next lobby opens.
+  await page.getByRole("button", { name: "Влизам" }).click({ timeout: 240_000 });
+  await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
+  await expect(page.getByText("Вътре си.")).toBeVisible();
+
+  const standings = page.getByRole("heading", { name: "Класиране" });
+  for (let n = 0; n < 15; n++) {
+    const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
+    await expect(asked.or(standings).first()).toBeVisible({ timeout: 60_000 });
+    if (await standings.isVisible()) break;
     await answer(page);
-    await expect(page.locator(".verdict")).toBeVisible();
-    await expect(page.locator(".verdict, .intro").first()).toBeVisible();
-    await page.waitForTimeout(100);
-    await expect(result.or(page.locator(".question-head").filter({ hasText: `${n + 2} от 15` }))).toBeVisible({
-      timeout: 10_000,
-    });
+    // The answer shows once everyone still in has answered.
+    await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
+    if (await page.locator(".verdict").getByText("Отпадаш").isVisible()) {
+      // Out: the rest is watched to the end.
+      await expect(page.getByText("Гледаш.").or(standings).first()).toBeVisible({ timeout: 60_000 });
+      break;
+    }
   }
-  await expect(result).toBeVisible();
+  await expect(standings).toBeVisible({ timeout: 180_000 });
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
+  await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
 });

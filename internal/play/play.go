@@ -170,8 +170,10 @@ type Result struct {
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
 	TimedOut bool    `json:"timedOut,omitempty"`
-	Reveal   any     `json:"reveal"`
-	State    State   `json:"state"`
+	// Given is the answer as it shows (the player's screen has it already).
+	Given  json.RawMessage `json:"-"`
+	Reveal any             `json:"reveal"`
+	State  State           `json:"state"`
 }
 
 // deal finds a pick's question in the bank and deals it.
@@ -312,6 +314,10 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		if _, err := g.settle(tx, r); err != nil {
 			return err
 		}
+		if r.kind == "royal" { // its questions show when the tournament shows them
+			s, err = g.state(tx, r)
+			return err
+		}
 		if !r.finished && !r.shownAt.Valid {
 			now := store.Ms(g.Now())
 			if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`, now, r.id); err != nil {
@@ -327,6 +333,11 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, false)
+}
+
+// answer grades an answer; a Роял run's only as its tournament's (royal), so that it keeps the tournament's pace.
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, royal bool) (Result, error) {
 	var res Result
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -334,7 +345,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		if err != nil {
 			return err
 		}
-		if r.finished || n != r.at {
+		if r.finished || n != r.at || (r.kind == "royal") != royal {
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
@@ -369,7 +380,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		if err := g.record(tx, r, gr, w, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
-		res.Score, res.Right, res.Exact = gr.Score, gr.Right, gr.Exact
+		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
 		res.Reveal = d.Reveal()
 		res.State, err = g.state(tx, r)
 		return err
@@ -378,16 +389,19 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		// A duel's run settles the duel once both have played (and awards both); then what the run earned, before
 		// the answer goes back, so that the screen with the result can tell of it.
 		if err = g.settleRun(ctx, runID); err == nil {
-			err = g.royalRunDone(ctx, runID)
-		}
-		if err == nil {
-			_, err = g.Award(ctx, userID)
-		}
-		if err == nil {
-			_, err = g.GoalsOf(ctx, userID) // a goal done is kept: a star, whether or not the player looks
+			err = g.afterRun(ctx, userID)
 		}
 	}
 	return res, err
+}
+
+// afterRun keeps what a player's run, just finished, earned them: achievements, and the day's goals.
+func (g *Game) afterRun(ctx context.Context, userID int64) error {
+	if _, err := g.Award(ctx, userID); err != nil {
+		return err
+	}
+	_, err := g.GoalsOf(ctx, userID) // a goal done is kept, whether or not the player looks
+	return err
 }
 
 // newSeed is a deal's seed.
