@@ -30,8 +30,10 @@ export function news(run: number, delay = 0): Child {
       api<News>("POST", "/api/me/news", { run }).then(
         (n) => {
           data.set(n);
+          // In the order they show, each after the one before (and after the game's end).
+          if (n.goals.length) play("goal");
           if (n.levelUp) play("level");
-          if (n.achievements.length) setTimeout(() => play("achievement"), n.levelUp ? 700 : 0);
+          if (n.achievements.length) play("achievement");
         },
         () => {},
       ),

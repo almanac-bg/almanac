@@ -9,11 +9,11 @@ import { review } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, computed, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
+import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
-import { play } from "../lib/sound.ts";
-import { categories, player, user } from "../state.ts";
+import { play, playAnswer, playCount } from "../lib/sound.ts";
+import { categories, player, playing, user } from "../state.ts";
 import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
 import { type Standing, standingCard } from "./duel.ts";
 
@@ -155,6 +155,12 @@ export function royal() {
   connect();
   onCleanup(() => es?.close());
 
+  effect(() => {
+    const phase = view()?.phase;
+    playing.set(phase === "question" || phase === "reveal");
+  });
+  onCleanup(() => playing.set(false));
+
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
     const v = view();
@@ -292,6 +298,14 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     }
   };
   const v0 = view();
+  // Those in hear the last three seconds.
+  let heard = 0;
+  effect(() => {
+    const s = Math.ceil((view().startsAt - now()) / 1000);
+    if (s === heard || !untracked(view).in) return;
+    heard = s;
+    playCount(s);
+  });
   return h(
     "div",
     { class: "screen" },
@@ -352,9 +366,9 @@ function still(view: () => Evening): Child {
 function question(view: () => Evening, first: Evening): Child {
   const q = first.question;
   if (!q) return null;
-  if (first.n === 0) play("ping"); // the game starts
-  const playing = first.in && !first.out;
-  const locked = signal(!playing || !!q.given);
+  if (first.n === 0 && first.in) play("go"); // the game starts
+  const plays = first.in && !first.out;
+  const locked = signal(!plays || !!q.given);
   const sent = signal(!!q.given);
   const secs = signal(Math.ceil(q.leftMs / 1000));
   const error = signal("");
@@ -380,7 +394,7 @@ function question(view: () => Evening, first: Evening): Child {
     "article",
     { class: "question" },
     head(first),
-    timer(q.leftMs, q.limitMs, secs, playing ? locked : signal(false)), // a watcher's clock runs to the end
+    timer(q.leftMs, q.limitMs, secs, plays ? locked : signal(false)), // a watcher's clock runs to the end
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     asked.node,
@@ -391,7 +405,7 @@ function question(view: () => Evening, first: Evening): Child {
       return h(
         "p",
         { class: "status", role: "status" },
-        !playing ? "Гледаш. " : sent() ? "Отговорът ти е приет. " : "",
+        !plays ? "Гледаш. " : sent() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${waiting.length}.`,
       );
     },
@@ -405,7 +419,7 @@ function reveal(view: () => Evening, first: Evening): Child {
   const r = q?.reveal;
   if (!q || !r) return null;
   const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
-  if (r.mine) play(kind);
+  if (r.mine) playAnswer(kind, first.n + 1); // to be still in, every answer before was right
   const last = first.n + 1 >= first.length || first.left === 0;
   return h(
     "article",
@@ -443,7 +457,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
   const me = first.players.find((p) => p.me);
   const [best] = first.players;
   const won = me?.place === 1 && first.entered > 1;
-  play(won ? "achievement" : "end");
+  if (me) play(won ? "win" : "end");
   return h(
     "div",
     { class: "screen" },
