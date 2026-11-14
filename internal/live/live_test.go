@@ -254,7 +254,8 @@ func TestAgainstARecording(t *testing.T) {
 		fb, _ := m.Follow(bo.ID)
 		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
 			if v.Phase == PhaseQuestion {
-				time.Sleep(1500 * time.Millisecond)
+				// At a person's pace for every kind of question, or their games aren't recordings (play.Floor).
+				time.Sleep(2500 * time.Millisecond)
 				_ = m.Answer(ana.ID, v.N, answer(m, true))
 				_ = m.Answer(bo.ID, v.N, answer(m, true))
 			}
@@ -274,10 +275,10 @@ func TestAgainstARecording(t *testing.T) {
 		if !v.Recorded || v.Phase != PhaseQuestion || !v.Them.Online || v.Them.Answered {
 			t.Fatalf("against a recording: %+v", v)
 		}
-		// The recording answers when its player did (1.5 s in), right.
-		time.Sleep(1600 * time.Millisecond)
+		// The recording answers when its player did (2.5 s in), right.
+		time.Sleep(2600 * time.Millisecond)
 		synctest.Wait()
-		if v = m.View(gal.ID); !v.Them.Answered || v.Them.TookMs != 1500 {
+		if v = m.View(gal.ID); !v.Them.Answered || v.Them.TookMs != 2500 {
 			t.Fatalf("the recording's answer: %+v", v.Them)
 		}
 		_ = m.Answer(gal.ID, 0, answer(m, false))
