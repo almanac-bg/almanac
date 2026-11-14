@@ -326,7 +326,7 @@ func (s *Server) seasonNews(ctx context.Context, n play.SeasonNews) {
 	body := fmt.Sprintf("%d-и от %d в рейтинга. Новият сезон започна.", n.Place, n.Of)
 	if n.Place <= 3 {
 		title, _ := play.PodiumTitle(n.Place, 1)
-		body = fmt.Sprintf("%d-и от %d: %s в сезона! Новият сезон започна.", n.Place, n.Of, strings.ToLower(title))
+		body = fmt.Sprintf("%d-и от %d: %s на сезона! Новият сезон започна.", n.Place, n.Of, strings.ToLower(title))
 	}
 	go s.notify(context.WithoutCancel(ctx), push.Message{URL: "/me", Title: "Сезонът свърши", Body: body}, n.To)
 }

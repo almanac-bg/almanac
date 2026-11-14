@@ -183,7 +183,7 @@ func (g *Game) ranking(ctx context.Context, viewer int64, query string, division
 		if err := rows.Scan(&id, &r.Name, &r.Tag, &r.Value, &r.Answers, &avatar, &title, &xp); err != nil {
 			return out, err
 		}
-		r.Look, r.Me = lookOf(id, avatar, title, xp), id == viewer
+		r.Look, r.Me = g.lookOf(id, avatar, title, xp), id == viewer
 		if divisions {
 			d, _ := DivisionOf(r.Value)
 			r.Division = &d

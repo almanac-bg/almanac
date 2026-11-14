@@ -6,7 +6,7 @@ import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge, meter, shapeNames, tiers, tierWords, toneNames } from "../ui.ts";
-import { type Cosmetic, loadProgress, type Progress } from "./progress.ts";
+import { type Cosmetic, loadProgress, type Progress, type TitleView } from "./progress.ts";
 
 export function rewards() {
   title("Награди");
@@ -105,6 +105,14 @@ function achievements(p: Progress): Child {
   );
 }
 
+/** The groups of titles still locked, as headed. */
+const titleGroups: [TitleView["group"], string][] = [
+  ["level", "С нивата"],
+  ["achievement", "С постижения"],
+  ["topic", "С майсторство в тема"],
+  ["rank", "С рейтинга, Роял и сезона"],
+];
+
 /** How you look to others: the avatar's shape and tone, its frame and pattern, and a title. */
 function look(progress: () => Progress | null, reload: () => Promise<void>): Child {
   const hint = signal("");
@@ -190,7 +198,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
       h(
         "p",
         { class: "muted" },
-        "Титлата се вижда под името ти и казва как играеш. Отключват се с някои постижения, с нивата, с победа в Роял и с място в първите трима на сезон.",
+        "Титлата се вижда под името ти. Отключват се с нивата, с някои постижения, с майсторство в тема и с рейтинга.",
       ),
       h(
         "ul",
@@ -224,23 +232,27 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
             ),
           ),
       ),
-      // The ones still locked, after: what each takes.
-      p.titles.some((a) => a.locked) ? h("h4", { class: "titles-more" }, "Още за отключване") : null,
-      h(
-        "ul",
-        { class: "titles" },
-        p.titles
-          .filter((a) => a.locked)
-          .map((a) =>
-            h(
-              "li",
-              { class: `title-pick locked t-${a.tier}` },
-              h("span", { class: "title-name" }, a.name),
-              h("span", { class: "title-tier" }, tierWords[a.tier].title),
-              h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
+      // The ones still locked, after, by where they come from: what each takes.
+      titleGroups.map(([group, heading]) => {
+        const locked = p.titles.filter((a) => a.locked && a.group === group);
+        if (!locked.length) return null;
+        return [
+          h("h4", { class: "titles-more" }, heading),
+          h(
+            "ul",
+            { class: "titles" },
+            locked.map((a) =>
+              h(
+                "li",
+                { class: `title-pick locked t-${a.tier}` },
+                h("span", { class: "title-name" }, a.name),
+                h("span", { class: "title-tier" }, tierWords[a.tier].title),
+                h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
+              ),
             ),
           ),
-      ),
+        ];
+      }),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     );
   };

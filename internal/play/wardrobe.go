@@ -19,8 +19,8 @@ type Cosmetic struct {
 }
 
 // unlock is what makes a cosmetic or a title a player's: a level, an achievement of a tier (any one), one
-// achievement, a division reached (by the highest rating), a season ended in a place (1–3) or better, or Роял won
-// some times.
+// achievement, a division reached (by the highest rating), a season ended in a place (1–3) or better, Роял won some
+// times, or a mastery tier (or higher) in a topic.
 type unlock struct {
 	level    int
 	tier     Tier
@@ -28,6 +28,8 @@ type unlock struct {
 	division string
 	podium   int
 	royal    int
+	topic    string
+	mastery  int
 }
 
 type cosmetic struct {
@@ -59,13 +61,14 @@ var Backdrops = []cosmetic{
 }
 
 // wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, their places
-// on seasons' podiums, and the Роял tournaments they've won.
+// on seasons' podiums, the Роял tournaments they've won, and their mastery tier in each topic they're sure in.
 type wardrobe struct {
-	level  int
-	earned map[string]int64
-	peak   int
-	podium Podium
-	royals int
+	level   int
+	earned  map[string]int64
+	peak    int
+	podium  Podium
+	royals  int
+	mastery map[string]int
 }
 
 func (w wardrobe) has(u unlock) bool {
@@ -88,6 +91,9 @@ func (w wardrobe) has(u unlock) bool {
 		return best > 0 && best <= u.podium
 	case u.royal > 0:
 		return w.royals >= u.royal
+	case u.topic != "":
+		tier, ok := w.mastery[u.topic]
+		return ok && tier >= u.mastery
 	}
 	return true
 }
@@ -153,6 +159,15 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if w.podium, err = g.podiumOf(ctx, userID); err != nil {
 		return w, err
 	}
-	w.royals, err = g.royalWins(ctx, userID)
+	if w.royals, err = g.royalWins(ctx, userID); err != nil {
+		return w, err
+	}
+	mastery, err := g.MasteryOf(ctx, userID)
+	w.mastery = map[string]int{}
+	for _, m := range mastery {
+		if m.Sure {
+			w.mastery[m.Category] = m.Tier
+		}
+	}
 	return w, err
 }

@@ -172,7 +172,7 @@ type Look struct {
 
 // lookOf makes a look from what lookColumns read. The avatar comes as "shape-tone/frame/backdrop" (the wardrobe's
 // parts empty when none), and goes out the same way, so that every avatar drawn shows its frame and pattern.
-func lookOf(userID int64, avatar, title string, total int) Look {
+func (g *Game) lookOf(userID int64, avatar, title string, total int) Look {
 	base, rest, _ := strings.Cut(avatar, "/")
 	if base == "" {
 		base = DefaultAvatar(userID)
@@ -182,7 +182,7 @@ func lookOf(userID int64, avatar, title string, total int) Look {
 		avatar += "/" + rest
 	}
 	level, _, _ := LevelOf(total)
-	name, tier := TitleOf(title)
+	name, tier := g.titleOf(title)
 	return Look{Avatar: avatar, Title: name, TitleTier: tier, Level: level}
 }
 
@@ -206,7 +206,7 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	var total int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT `+lookColumns+` FROM users u WHERE u.id = ?`, userID).
 		Scan(&avatar, &title, &total)
-	return lookOf(userID, avatar, title, total), err
+	return g.lookOf(userID, avatar, title, total), err
 }
 
 // Earned is an achievement as a player sees it: when they earned it (0: not yet), how far they are towards its
@@ -315,7 +315,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
-	p.Titles = w.titles()
+	p.Titles = w.titleViews(g.titles())
 	p.Frame, p.Backdrop = frame.String, backdrop.String
 	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
 	return p, nil
@@ -492,7 +492,7 @@ type News struct {
 	From         int        `json:"from"`
 	To           int        `json:"to"`
 	LevelUp      bool       `json:"levelUp,omitempty"`
-	// Titles are the titles the levels just reached unlock.
+	// Titles are the titles the levels just reached unlock, and the game's mastery of its topics.
 	Titles []TitleRef `json:"titles,omitempty"`
 	// Mastery is how the game just played moved the player's mastery of its topics, when one is told of.
 	Mastery []MasteryMove `json:"mastery,omitempty"`
@@ -518,6 +518,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			return n, err
 		}
 	}
+	n.Titles = g.titlesOfMoves(n.Mastery)
 	n.XP = total
 	n.Level, n.From, n.To = LevelOf(total)
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -570,7 +571,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			return err
 		}
 		if n.LevelUp = seen < n.Level; n.LevelUp {
-			n.Titles = titlesAtLevel(seen, n.Level)
+			n.Titles = append(titlesAtLevel(seen, n.Level), n.Titles...)
 			_, err = tx.Exec(`UPDATE users SET level_seen = ? WHERE id = ?`, n.Level, userID)
 		}
 		return err
@@ -602,7 +603,7 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 		if err != nil {
 			return err
 		}
-		if !w.wears(*title) {
+		if !w.wears(g.titles(), *title) {
 			return ErrNotYours
 		}
 	}

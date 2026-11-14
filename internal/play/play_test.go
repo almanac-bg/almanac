@@ -575,14 +575,16 @@ func TestProgress(t *testing.T) {
 		avatar, title *string
 		ok            bool
 	}{
-		{ptr("star-gold"), ptr("straightA"), true},
+		{nil, ptr("master-history"), true}, // ten right in history: sure, and a master
+		{ptr("star-gold"), ptr("flawless"), true},
 		{ptr("crown-gold"), nil, false},
 		{ptr("star-black"), nil, false},
 		{ptr("bogus"), nil, false},
 		{nil, ptr("perfect"), false}, // an achievement isn't a title
-		{nil, ptr("toughNut"), false},
-		{nil, ptr("oneOfUs"), false}, // level 5
-		{nil, ptr("royalty"), false},
+		{nil, ptr("duelInstinct"), false},
+		{nil, ptr("passion"), false}, // level 5
+		{nil, ptr("royalCrown"), false},
+		{nil, ptr("master-science"), false},
 		{nil, ptr("podium3"), false},
 		{nil, ptr("nosuch"), false},
 	} {
@@ -591,7 +593,7 @@ func TestProgress(t *testing.T) {
 		}
 	}
 	b, _ := w.g.BoardOf(ctx, w.g.Today(), ana)
-	if top := b.Top[0]; top.Avatar != "star-gold" || top.Title != "Пълна шестица" || top.TitleTier != Rare || top.Level < 2 {
+	if top := b.Top[0]; top.Avatar != "star-gold" || top.Title != "Безупречност" || top.TitleTier != Rare || top.Level < 2 {
 		t.Fatalf("the board shows %+v", top)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("")); err != nil {
@@ -1067,17 +1069,17 @@ func TestSeasons(t *testing.T) {
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if look, _ := w.g.LookOf(ctx, ps[0]); look.Title != "Двойно злато" || look.TitleTier != Legendary {
+	if look, _ := w.g.LookOf(ctx, ps[0]); look.Title != "Двукратен шампион" || look.TitleTier != Legendary {
 		t.Fatalf("the champion's title: %+v", look)
 	}
-	if look, _ := w.g.LookOf(ctx, ps[1]); look.Title != "Сребро" || !strings.Contains(look.Avatar, "/podium2/") {
+	if look, _ := w.g.LookOf(ctx, ps[1]); look.Title != "Вицешампион" || !strings.Contains(look.Avatar, "/podium2/") {
 		t.Fatalf("second's look: %+v", look)
 	}
 	for _, c := range []struct {
 		place, n int
 		want     string
-	}{{1, 1, "Злато"}, {1, 5, "Петорно злато"}, {1, 6, "6 пъти злато"}, {2, 3, "Тройно сребро"}, {3, 1, "Бронз"},
-		{3, 2, "Двоен бронз"}, {3, 12, "12 пъти бронз"}} {
+	}{{1, 1, "Шампион"}, {1, 3, "Трикратен шампион"}, {2, 2, "Двукратен вицешампион"}, {3, 1, "Бронзов медалист"},
+		{3, 12, "12-кратен бронзов медалист"}} {
 		if name, _ := PodiumTitle(c.place, c.n); name != c.want {
 			t.Fatalf("place %d, %d times: %q", c.place, c.n, name)
 		}
@@ -1104,33 +1106,44 @@ func TestTitles(t *testing.T) {
 	ctx := t.Context()
 	ana, bo := w.user(), w.user()
 	p, _ := w.g.ProgressOf(ctx, ana)
-	if len(p.Titles) != 3+len(Titles) || p.Titles[0].ID != "podium1" || p.Titles[0].Name != "Злато" ||
+	topics := len(w.g.Bank().Categories) * len(topicTiers)
+	if len(p.Titles) != 3+len(Titles)+topics || p.Titles[0].ID != "podium1" || p.Titles[0].Name != "Шампион" ||
 		p.Titles[2].How != "трето място в сезон" {
 		t.Fatalf("a new player's titles: %+v", p.Titles)
 	}
+	byID := map[string]TitleView{}
 	for _, v := range p.Titles {
-		if !v.Locked || v.How == "" {
+		byID[v.ID] = v
+		if v.Locked == (v.ID == "spark") || (v.Locked && v.How == "") || v.Group == "" {
 			t.Fatalf("a new player's title %+v", v)
 		}
-		if v.ID == "nightOwl" && v.How != "скрито постижение" {
-			t.Fatalf("a hidden achievement's title tells how: %+v", v)
-		}
-		if v.ID == "ironWill" && v.How != "играй въпросите на деня тридесет дни поред." {
-			t.Fatalf("an achievement's title: %+v", v)
-		}
+	}
+	if v := byID["nightOwl"]; v.How != "скрито постижение" {
+		t.Fatalf("a hidden achievement's title tells how: %+v", v)
+	}
+	if v := byID["unquenched"]; v.How != "играй въпросите на деня тридесет дни поред." {
+		t.Fatalf("an achievement's title: %+v", v)
+	}
+	if v := byID["master-history"]; v.Name != "Майстор · История" || v.How != "стигни до „Майстор“ в „История“" ||
+		v.Group != TitleTopic {
+		t.Fatalf("a topic's title: %+v", v)
+	}
+	if v := byID["diamondMind"]; v.How != "дивизия Диамант" {
+		t.Fatalf("a division's title: %+v", v)
 	}
 
 	// A level's title, told when the level is.
 	if _, err := w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, '2026-11-01', 'x', 1, 2100, 1)`, ana); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := w.g.NewsOf(ctx, ana, 0); err != nil || n.Level != 5 || len(n.Titles) != 1 || n.Titles[0].ID != "oneOfUs" {
+	if n, err := w.g.NewsOf(ctx, ana, 0); err != nil || n.Level != 5 || len(n.Titles) != 2 || n.Titles[0].ID != "curious" ||
+		n.Titles[1].ID != "passion" {
 		t.Fatalf("level 5's news: %+v %v", n, err)
 	}
-	if err := w.g.SetLook(ctx, ana, nil, ptr("oneOfUs")); err != nil {
+	if err := w.g.SetLook(ctx, ana, nil, ptr("passion")); err != nil {
 		t.Fatalf("level 5's title: %v", err)
 	}
-	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Свой човек" || look.TitleTier != Common {
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Страст към викторините" || look.TitleTier != Common {
 		t.Fatalf("the look: %+v", look)
 	}
 
@@ -1149,14 +1162,14 @@ func TestTitles(t *testing.T) {
 		}
 	}
 	royal(bo)
-	if err := w.g.SetLook(ctx, bo, nil, ptr("royalty")); !errors.Is(err, ErrNotYours) {
+	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("a Роял alone: %v", err)
 	}
 	royal(bo, ana)
-	if err := w.g.SetLook(ctx, bo, nil, ptr("royalty")); err != nil {
+	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); err != nil {
 		t.Fatalf("a Роял won: %v", err)
 	}
-	if err := w.g.SetLook(ctx, ana, nil, ptr("royalty")); !errors.Is(err, ErrNotYours) {
+	if err := w.g.SetLook(ctx, ana, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("second in a Роял: %v", err)
 	}
 }

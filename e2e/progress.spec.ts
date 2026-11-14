@@ -15,11 +15,11 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   // Progress towards a goal, a reward in sight, and the hidden ones kept secret.
   await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(/\d+ \/ 100/);
   await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText("Награда: форма „Книга“");
-  await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText("и титла „Желязна воля“");
+  await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText("и титла „Неугасим пламък“");
   await expect(page.locator(".achievement", { hasText: "Скрито постижение" }).first()).toContainText(
     "Награда: ще разбереш",
   );
-  await expect(page.locator(".title-pick.locked", { hasText: "Неугасим пламък" })).toContainText(
+  await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
     "Отключва се: играй въпросите на деня сто дни поред.",
   );
   await page.getByRole("button", { name: "Луна", exact: true }).click();
