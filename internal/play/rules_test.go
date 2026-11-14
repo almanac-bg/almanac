@@ -239,3 +239,60 @@ func mustStart(t *testing.T, w *world, user int64) int64 {
 	}
 	return s.ID
 }
+
+// A recording to play against is a real game by a player of about one's rating; past the day's rated ones, duels
+// against recordings are friendlies, and each moves a rating half as far as a duel with a person.
+func TestFairRecordings(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	weak, strong, far, ana := w.user(), w.user(), w.user(), w.user()
+	topic := func(user int64, right int) int64 {
+		s, err := w.g.StartTopic(ctx, user, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(user, s.ID, append(repeat(w.right, right), repeat(w.wrong, Length-right)...)...)
+		return s.ID
+	}
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1400 WHERE id = ?`, strong)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900 WHERE id = ?`, far)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1350, rated = 30 WHERE id = ?`, ana)
+	tapped := topic(weak, 1) // a tapped-through game: not a real one
+	real := topic(strong, 7) // a real game by a player of about Ana's rating
+	topic(far, 7)            // a real game, by a player far below
+	w.wait(time.Minute)
+	topic(weak, 0) // the latest, and still not real
+	l, err := w.g.StartRecorded(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Runs[1] != real {
+		t.Fatalf("Ana got recording %d, not the real game in her band %d (the tapped one is %d)", l.Runs[1], real, tapped)
+	}
+	// Rated against recordings: half a duel's move, five a day; the sixth is a friendly.
+	var moved []int
+	for i := range RecordedRatedPerDay + 1 {
+		l, err := w.g.StartRecorded(ctx, ana)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := 0
+		_ = w.db.Read.QueryRow(`SELECT rating FROM users WHERE id = ?`, ana).Scan(&before)
+		w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+		after := 0
+		_ = w.db.Read.QueryRow(`SELECT rating FROM users WHERE id = ?`, ana).Scan(&after)
+		moved = append(moved, after-before)
+		if i == 0 {
+			full := eloDelta(before, 1400, 30, 1)
+			if after-before != full/2 {
+				t.Fatalf("a win against a recording moved %d, want half of %d", after-before, full)
+			}
+		}
+	}
+	if moved[RecordedRatedPerDay] != 0 {
+		t.Fatalf("rating moves against recordings in a day: %v", moved)
+	}
+	if d, _ := w.g.DuelsOf(ctx, ana); !d[0].Friendly || !d[0].Recorded {
+		t.Fatalf("the sixth duel against a recording: %+v", d[0])
+	}
+}

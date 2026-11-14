@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	// Wait is how long a player waits for someone to play before they play a recording.
-	Wait = 30 * time.Second
+	// Wait is how long a player waits for someone to play before they play a recording: long enough to meet whoever
+	// is looking at the same moment, short enough not to stand in front of an empty room.
+	Wait = 10 * time.Second
 	// Intro is how long the two are shown face to face before the first question.
 	Intro = 4 * time.Second
 	// Arrive is how long a duel waits for both players to come to it before it's called off.
