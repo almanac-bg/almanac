@@ -171,7 +171,7 @@ Every element that looks like a game measures something the game already counts:
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                               | Result, Профил, avatars      |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                           | Result, Профил               |
 | Titles       | Words for the player and their knowledge, worn under their name, never only a deed: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50), some achievements („Демон на скоростта“), a topic's mastery („Майстор · История“, „Светило · История“), and the rating (divisions, a Роял won, the podium counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
-| Avatars      | A picture on a tone: nine animals free, fifteen emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                  | Everywhere a player is       |
+| Avatars      | A picture on a tone: fifteen animals free, an emblem of its own for each achievement (the crown at level 10)                                                                                                                                                                                                                                                                                              | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 
@@ -243,8 +243,11 @@ season's medal — are drawn by hand as paths in `web/src/art/pictures.ts`, and 
 - **On a tile or on a card:** an avatar is painted over a tile in its tone (`k3`), so it uses the darker and lighter
   inks; a topic or a mode stands on a soft disc of its tone (`kt`) over the card, so the tone itself is its main
   colour.
-- **What there is:** nine animals everyone has (лисица, мечка, котка, заек, таралеж, куче, елен, щъркел, жаба),
-  portraits cut at the tile's bottom; fifteen emblems that achievements unlock; a picture per topic (a bulb, a flask,
+- **What there is:** fifteen animals everyone has (лисица, мечка, котка, заек, таралеж, куче, елен, щъркел, жаба,
+  катерица, рис, язовец, овца, костенурка, мишка), portraits cut at the tile's bottom; an emblem for every achievement,
+  which is also the avatar it unlocks, and a crown for level 10. Within a family the emblem grows with the deed: a
+  flame, a torch, a bonfire, a phoenix for the streaks; a book, then a pile of books; a shield, a shield with swords, a
+  Thracian helmet; a heart, three hearts, a chess knight; a trophy, a scholar's cap, a wreath; a picture per topic (a bulb, a flask,
   an amphora, a globe, a clapperboard, a record, a ball, a gamepad, a quill in its inkwell, a butterfly); one per way
   to play (crossed swords, an arena, a crown in laurel, an open door).
 - **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest
