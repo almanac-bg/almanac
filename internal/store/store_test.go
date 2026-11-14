@@ -287,6 +287,31 @@ func TestAvatarsDrawnAnew(t *testing.T) {
 	db.Close()
 }
 
+// The avatars as before (0024): the emblems and animals added by mistake go back to their family's emblem and to the
+// animal the game gives; the rest stay.
+func TestAvatarsAsBefore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 23)
+	_, err := db.Write.Exec(`INSERT INTO users (id, name, tag, created_at, seen_at, avatar) VALUES
+		(1, 'А', 'a', 1, 1, 'phoenix-gold'), (2, 'Б', 'b', 1, 1, 'knight-rose'), (3, 'В', 'c', 1, 1, 'squirrel-sky'),
+		(4, 'Г', 'd', 1, 1, 'fox-mint'), (5, 'Д', 'e', 1, 1, 'owl-lilac'), (6, 'Е', 'f', 1, 1, 'wreath-sky')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]string{1: "flame-gold", 2: "heart-rose", 3: "", 4: "fox-mint", 5: "owl-lilac", 6: "trophy-sky"}
+	for id, w := range want {
+		var got sql.NullString
+		_ = db.Read.QueryRow(`SELECT avatar FROM users WHERE id = ?`, id).Scan(&got)
+		if got.String != w {
+			t.Errorf("player %d: %q, want %q", id, got.String, w)
+		}
+	}
+	db.Close()
+}
+
 // openAt opens a new database migrated only up to migration n.
 func openAt(t *testing.T, path string, n int) *DB {
 	t.Helper()

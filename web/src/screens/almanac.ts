@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { fact, meter, toneOf } from "../ui.ts";
+import { fact, meter, pageArt, toneOf, topicMark } from "../ui.ts";
 
 interface Learned {
   id: string;
@@ -30,6 +30,7 @@ export function almanac() {
     h(
       "div",
       { class: "intro" },
+      pageArt("almanac", "tone-gold"),
       h("h1", null, "Моят Алманах"),
       h("p", { class: "lead" }, "Всичко, което научи: фактът зад всеки въпрос, на който отговори вярно."),
     ),
@@ -73,7 +74,7 @@ export function almanac() {
                   "aria-pressed": () => topic() === c.id,
                   onclick: () => topic.set(c.id),
                 },
-                h("span", { class: "dot", "aria-hidden": "true" }),
+                topicMark(c.id),
                 `${c.name} · ${n}/${d.of[c.id] ?? 0}`,
               ),
             );

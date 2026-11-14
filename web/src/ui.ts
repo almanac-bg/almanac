@@ -97,6 +97,16 @@ export function toneOf(category: string): string {
   return `tone-${tones[i % tones.length]}`;
 }
 
+/** A page's picture, over its heading (decoration): one of the ways to play, or "almanac", "friends". */
+export function pageArt(id: string, tone: string): Child {
+  return picture(`mode-${id}`, `page-art ${tone}`);
+}
+
+/** A topic's small picture, as on a chip (decoration); a plain dot for all of them. */
+export function topicMark(category: string): Child {
+  return category ? picture(`topic-${category}`, "topic-mark") : h("span", { class: "dot", "aria-hidden": "true" });
+}
+
 /** A thin bar, filled to percent. */
 export function meter(percent: number, label: string): Child {
   return h(
@@ -142,7 +152,7 @@ export function streak(days: number, week?: boolean[]): Child {
   return h(
     "section",
     { class: days ? "streak" : "streak cold", "aria-label": `Серия: ${days} ${unit}` },
-    h("span", { class: "i flame", "aria-hidden": "true" }),
+    picture("flame", "flame"),
     h(
       "div",
       null,
@@ -201,7 +211,7 @@ export const tierWords: Record<Tier, { group: string; one: string; title: string
   legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
 };
 
-/** Every avatar's name: the animals everyone has, then the emblems achievements unlock (one each). */
+/** Every avatar's name: the animals everyone has, then the emblems achievements unlock. */
 export const shapeNames: Record<string, string> = {
   fox: "Лисица",
   bear: "Мечка",
@@ -212,23 +222,7 @@ export const shapeNames: Record<string, string> = {
   deer: "Елен",
   stork: "Щъркел",
   frog: "Жаба",
-  squirrel: "Катерица",
-  lynx: "Рис",
-  badger: "Язовец",
-  sheep: "Овца",
-  turtle: "Костенурка",
-  mouse: "Мишка",
   flame: "Пламък",
-  torch: "Факла",
-  bonfire: "Клада",
-  phoenix: "Феникс",
-  books: "Купчина книги",
-  blades: "Щит и мечове",
-  helmet: "Тракийски шлем",
-  hearts: "Три сърца",
-  knight: "Шахматен кон",
-  cap: "Шапка на отличник",
-  wreath: "Венец",
   star: "Звезда",
   target: "Мишена",
   bolt: "Мълния",
@@ -253,7 +247,6 @@ export const toneNames: Record<string, string> = {
   mint: "мента",
 };
 
-/** The animals given to someone without an avatar of their own: the first nine (play.givenShapes). */
 const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
 /** An avatar for someone without one of their own: picked from their name, the same every time. */
@@ -331,6 +324,7 @@ export interface TitleRef {
 
 export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l" = "m"): HTMLElement {
   return badgeArt({
+    id: a.id,
     tier: a.tier,
     icon: a.icon,
     earned,

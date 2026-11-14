@@ -67,27 +67,27 @@ var Achievements = []Achievement{
 	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
 
-	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "torch", Rare, 7, false},
+	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
 	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare, 1, false},
 	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
 	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "compass", Rare, 10, false},
-	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "hearts", Rare, 5, false},
-	{"friendWin", "Между приятели", "Победи приятел в дуел.", "knight", Rare, 1, false},
+	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
+	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
 
-	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "bonfire", Epic, 30, false},
-	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "books", Epic, 1000, false},
+	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
+	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
-	{"master", "Като на длан", "Стигни до „Майстор“ в една тема.", "cap", Epic, 1, false},
-	{"duel10", "Десет победи", "Спечели десет дуела.", "blades", Epic, 10, false},
+	{"master", "Като на длан", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
+	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
 	{"topicPerfect", "Тема без грешка", "Познай и десетте въпроса на игра по тема.", "spark", Epic, 1, true},
 	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, вярно или не, свързване.", "clover", Epic, 5, true},
 
-	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "phoenix", Legendary, 100, false},
-	{"master5", "Пет теми като на длан", "Стигни до „Майстор“ в пет теми.", "wreath", Legendary, 5, false},
-	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "helmet", Legendary, 50, false},
+	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
+	{"master5", "Пет теми като на длан", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
+	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 }
 
 func achievementByID(id string) (Achievement, bool) {
@@ -99,32 +99,23 @@ func achievementByID(id string) (Achievement, bool) {
 }
 
 // Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). The animals are
-// everyone's from the start; each achievement unlocks an emblem of its own (the crown comes at a level). Within a
-// family the pictures grow with the deed: a flame, a torch, a bonfire, a phoenix.
+// everyone's from the start; the emblems unlock: with an achievement drawn with that emblem, or (the crown) at a level.
 var (
 	Tones      = []string{"gold", "lilac", "sky", "rose", "mint"}
-	FreeShapes = []string{
-		"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog",
-		"squirrel", "lynx", "badger", "sheep", "turtle", "mouse",
-	}
+	FreeShapes = []string{"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"}
 	Unlockable = []string{
-		"flame", "torch", "bonfire", "phoenix", "book", "books", "bolt", "hourglass", "shield", "blades", "helmet",
-		"heart", "hearts", "knight", "star", "spark", "target", "compass", "owl", "sun", "trophy", "cap", "wreath",
-		"clover", "crown",
+		"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "owl", "compass", "sun", "hourglass",
+		"spark", "clover", "crown",
 	}
 )
-
-// givenShapes are the animals the game gives a player until they choose: the first nine, so that a player who hasn't
-// chosen keeps the same one as the list grows.
-var givenShapes = FreeShapes[:9]
 
 // CrownLevel is the level that unlocks the crown.
 const CrownLevel = 10
 
 // DefaultAvatar is the avatar the game gives a player until they choose one: a free shape and a tone, from their id.
 func DefaultAvatar(userID int64) string {
-	n, shapes, tones := max(userID, 0), int64(len(givenShapes)), int64(len(Tones))
-	return givenShapes[n%shapes] + "-" + Tones[n/shapes%tones]
+	n, shapes, tones := max(userID, 0), int64(len(FreeShapes)), int64(len(Tones))
+	return FreeShapes[n%shapes] + "-" + Tones[n/shapes%tones]
 }
 
 // Shape is an avatar's shape as a player may pick it: free, unlocked, or still locked (and what unlocks it: the name
