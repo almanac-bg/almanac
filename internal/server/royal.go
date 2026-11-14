@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -24,17 +23,10 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
-	rc := http.NewResponseController(w)
 	sub := s.royal.Follow(viewer)
 	defer s.royal.Unfollow(sub)
 
-	send := func(line string) bool {
-		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		if _, err := fmt.Fprint(w, line); err != nil {
-			return false
-		}
-		return rc.Flush() == nil
-	}
+	send := sender(w)
 	ping := time.NewTicker(20 * time.Second) // keeps the line open through proxies (Cloudflare closes it after 100 s)
 	defer ping.Stop()
 	for {
