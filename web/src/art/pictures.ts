@@ -909,6 +909,8 @@ const topics: Record<string, Layer[]> = {
 // ---- Ways to play: the cards on Начало, each in its mode's tone, over the card.
 
 const modes: Record<string, Layer[]> = {
+  almanac: [ground, ...(avatars.book ?? [])],
+  friends: [ground, ...(avatars.hearts ?? [])],
   duel: [ground, ...sword(-42), ...sword(42), ["k5", sparkle(32, 14, 5)]],
   arena: [
     ground,
@@ -1097,6 +1099,62 @@ const divisions: Record<string, Layer[]> = {
   })(),
 };
 
+// ---- Achievements' medals, in the tier's colour: the form tells the tier even without colour (common a round coin,
+// rare a hexagon, epic an eight-pointed star, legendary a sunburst with ribbons). Each has a raised rim, lit on its
+// top-left half and shaded below, around a face in the tone itself, where the achievement's own picture is drawn
+// (art/badge.ts lays it over the face).
+
+/** A regular polygon of `count` corners, the first straight up. */
+const polygon = (cx: number, cy: number, r: number, count: number) => {
+  let d = "";
+  for (let i = 0; i < count; i++) d += `${i ? "L" : "M"}${at(cx, cy, r, -90 + (360 / count) * i)}`;
+  return `${d}Z`;
+};
+/** The half of a disc on the lit side (top left). */
+const litHalf = (r: number) => `M${at(32, 32, r, 135)}A${r} ${r} 0 0 1 ${at(32, 32, r, -45)}Z`;
+/** A raised round rim of radius r around a face of radius f. */
+const rim = (r: number, f: number): Layer[] => [
+  ["k2", C(32, 32, r)],
+  ["k4", litHalf(r)],
+  ["k3", C(32, 32, f)],
+  ["ks", `M${at(32, 32, f, -45)}A${f} ${f} 0 0 1 ${at(32, 32, f, 135)}A${f + 6} ${f + 6} 0 0 0 ${at(32, 32, f, -45)}Z`],
+];
+
+const badges: Record<string, Layer[]> = {
+  common: [lift(C(32, 32, 29)), ["k1", C(32, 32, 29)], ...rim(26.5, 22.5)],
+  rare: [
+    lift(polygon(32, 32, 31, 6)),
+    ["k1", polygon(32, 32, 31, 6)],
+    ["k2", polygon(32, 32, 28, 6)],
+    ["k4", `M${at(32, 32, 28, -30)}L${at(32, 32, 28, -90)}L${at(32, 32, 28, 210)}L${at(32, 32, 28, 150)}Z`],
+    ["k3", polygon(32, 32, 25, 6)],
+    [
+      "ks",
+      `M${at(32, 32, 25, -30)}L${at(32, 32, 25, 30)}L${at(32, 32, 25, 90)}L${at(32, 32, 25, 150)}Q32 40 ${at(32, 32, 25, -30)}Z`,
+    ],
+  ],
+  epic: [
+    lift(star(32, 32, 31.5, 25, 8)),
+    ["k1", star(32, 32, 31.5, 25, 8)],
+    ["k4", star(32, 32, 28.5, 23, 8)],
+    [
+      "k2",
+      `M${at(32, 32, 28.5, -45)}L${at(32, 32, 23, -22.5)}L${at(32, 32, 28.5, 0)}L${at(32, 32, 23, 22.5)}L${at(32, 32, 28.5, 45)}L${at(32, 32, 23, 67.5)}L${at(32, 32, 28.5, 90)}L${at(32, 32, 23, 112.5)}L${at(32, 32, 28.5, 135)}L32 32Z`,
+    ],
+    ...rim(24, 21),
+    ["k5", C(32, 3.4, 1.5) + C(60.6, 32, 1.5) + C(32, 60.6, 1.5) + C(3.4, 32, 1.5)],
+  ],
+  legendary: [
+    ["k1", "M21 47L13 63L19.6 60.4L22.4 66L29.6 51Z"],
+    ["k2", "M43 47L51 63L44.4 60.4L41.6 66L34.4 51Z"],
+    lift(star(32, 32, 31.5, 25.5, 16)),
+    ["k4", star(32, 32, 31.5, 25.5, 16)],
+    ["k5", rays(32, 32, 24, 31.5, 16, 2.4)],
+    ["k1", C(32, 32, 25.5)],
+    ...rim(23.5, 20.5),
+  ],
+};
+
 /** A season's medal, in the place's metal: a ribbon, a disc with a rim, a faceted star. */
 const medal: Layer[] = (() => {
   const [lit, shade] = facets(32, 40, 10, 4.3);
@@ -1123,4 +1181,5 @@ export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(frames).map(([id, l]) => [`frame-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(divisions).map(([id, l]) => [`division-${id}`, draw(l)])),
   medal: draw(medal),
+  ...Object.fromEntries(Object.entries(badges).map(([id, l]) => [`badge-${id}`, draw(l)])),
 };

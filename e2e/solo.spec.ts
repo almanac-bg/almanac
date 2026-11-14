@@ -9,7 +9,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // The day's goal is done, said once with its XP.
-  await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+100 XP");
+  await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+50 XP");
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
@@ -38,7 +38,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  await page.getByRole("link", { name: "История" }).click();
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
   // A short count first, then the game starts by itself.
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
@@ -64,12 +64,12 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.waitForTimeout(3500);
   await expect(page).toHaveURL(/\/$/);
 
-  await page.getByRole("link", { name: "История" }).click();
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/$/);
 
-  await page.getByRole("link", { name: "История" }).click();
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });

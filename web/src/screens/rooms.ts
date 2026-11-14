@@ -5,7 +5,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
-import { back, toneOf } from "../ui.ts";
+import { back, pageArt, toneOf, topicMark } from "../ui.ts";
 
 export function rooms() {
   title("Стая");
@@ -30,7 +30,7 @@ export function rooms() {
       h(
         "button",
         { class: `chip ${id ? toneOf(id) : "tone-gold"}`, type: "button", onclick: () => open(id) },
-        h("span", { class: "dot", "aria-hidden": "true" }),
+        topicMark(id),
         name,
       ),
     );
@@ -41,6 +41,7 @@ export function rooms() {
       "div",
       { class: "intro" },
       back("/", "Начало"),
+      pageArt("room", "tone-lilac"),
       h("h1", null, "Стая"),
       h(
         "p",

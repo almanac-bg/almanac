@@ -8,7 +8,7 @@ test("a player's profile: from a board, asked to be friends, then a duel from it
 
   // Ana plays a topic: she's on the board of levels.
   await a.goto("/");
-  await a.getByRole("link", { name: "История" }).click();
+  await a.locator(".topics").getByRole("link", { name: "История" }).click();
   await playRun(a);
   const ana = await a.evaluate(
     async () => (await (await fetch("/api/me")).json()).user as { name: string; tag: string },

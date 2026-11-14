@@ -48,6 +48,9 @@ npm run check && npm test                                      # the client: typ
 npx playwright test -c e2e --project chromium e2e/<spec>       # the browser specs your change touches
 ```
 
+Formatting is done for you: a hook (`.claude/hooks/format.sh`) runs gofmt or Biome on every file a session edits,
+and stops a `git commit` with an unformatted file in it (`git add` them and commit again).
+
 Node lives under `~/.nvm` (put its `bin` on PATH in tool shells). Locally, Playwright's Chromium may be missing:
 `BROWSER_PATH="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"`. Test what you change; a new rule or
 screen gets a test. Look at a UI change at phone width (320–390 px) before shipping it.

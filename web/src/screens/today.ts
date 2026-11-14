@@ -2,6 +2,7 @@
 // questions, the same for everyone, once (or, once played, how they went); the day's goals; and every other way to
 // play — with others, and by topic — a tap away. The day's boards are in Класации.
 
+import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
@@ -94,7 +95,7 @@ function status(t: Today): Child {
     h(
       "a",
       { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },
-      h("span", { class: "i flame status-flame", "aria-hidden": "true" }),
+      picture("flame", "flame status-flame"),
       h(
         "span",
         { class: "status-text" },

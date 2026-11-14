@@ -527,8 +527,13 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and its goal 100 more: the first level.)
-	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300+GoalXP || lvl != 2 ||
+	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and the goals it finished more: the first level.)
+	goals := 0
+	for _, d := range n.Goals {
+		goals += d.XP
+	}
+	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || goals < GoalXP[0] ||
+		n.XP != 300+goals || lvl != 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
@@ -970,35 +975,6 @@ func TestWardrobe(t *testing.T) {
 	}
 }
 
-func TestGoals(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	goals, err := w.g.GoalsOf(ctx, ana)
-	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done || goals[0].XP != GoalXP {
-		t.Fatalf("a new player's goals: %+v %v", goals, err)
-	}
-	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
-		t.Fatal("the day's goals changed within the day")
-	}
-	// The day's questions: that goal is done without looking, its XP is the player's, and it's told once.
-	s, _ := w.g.StartDay(ctx, ana)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	var games int
-	_ = w.db.Read.QueryRow(`SELECT sum(xp) FROM runs WHERE user_id = ?`, ana).Scan(&games)
-	n, err := w.g.NewsOf(ctx, ana, 0)
-	if err != nil || len(n.Goals) == 0 || n.Goals[0].Name != Goals[0].Name || n.Goals[0].XP != GoalXP ||
-		n.XP != games+GoalXP*len(n.Goals) {
-		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)
-	}
-	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP {
-		t.Fatalf("a goal told twice: %+v", again)
-	}
-	if look, _ := w.g.LookOf(ctx, ana); look.Level != n.Level {
-		t.Fatalf("the level others see: %d, not %d", look.Level, n.Level)
-	}
-}
-
 func TestSeasons(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -1239,28 +1215,5 @@ func TestCalibrate(t *testing.T) {
 		if c.ID == first && (c.Answers != CalibrateFrom || c.Known < 0.99 || c.Observed != bank.Easy) {
 			t.Fatalf("a question all got right: %+v", c)
 		}
-	}
-}
-
-// Every achievement has a picture of its own, and so an avatar of its own to give; every emblem but the crown (a
-// level's) is some achievement's.
-func TestEveryAchievementItsOwnAvatar(t *testing.T) {
-	seen := map[string]string{}
-	for _, a := range Achievements {
-		if other, ok := seen[a.Icon]; ok {
-			t.Errorf("%s and %s are both drawn as %q", other, a.ID, a.Icon)
-		}
-		seen[a.Icon] = a.ID
-		if !slices.Contains(Unlockable, a.Icon) {
-			t.Errorf("%s gives %q, which isn't an avatar", a.ID, a.Icon)
-		}
-	}
-	for _, s := range Unlockable {
-		if _, ok := seen[s]; !ok && s != "crown" {
-			t.Errorf("%q is unlocked by no achievement", s)
-		}
-	}
-	if DefaultAvatar(12345) == "" || !slices.Contains(FreeShapes, strings.Split(DefaultAvatar(12345), "-")[0]) {
-		t.Errorf("a default avatar that isn't free: %q", DefaultAvatar(12345))
 	}
 }

@@ -6,7 +6,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
-import { avatar, formatNumber, profileHref, type Tier } from "../ui.ts";
+import { avatar, formatNumber, pageArt, profileHref, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
@@ -95,6 +95,7 @@ function friendsCard(): Child {
   const adder = addFriend(load);
 
   return [
+    pageArt("friends", "tone-rose"),
     h("div", { class: "title-row" }, h("h1", null, "Приятели"), () =>
       data()?.friends.length
         ? h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>

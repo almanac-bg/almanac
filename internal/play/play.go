@@ -399,7 +399,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	return res, err
 }
 
-// afterRun keeps what a player's run, just finished, earned them: achievements, and the day's goals.
+// afterRun keeps what a player's game, just finished, earned them: achievements, and the day's goals.
 func (g *Game) afterRun(ctx context.Context, userID int64) error {
 	if _, err := g.Award(ctx, userID); err != nil {
 		return err
