@@ -538,6 +538,54 @@ func TestTopics(t *testing.T) {
 	}
 }
 
+func TestTopicLeftHalfWay(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	first, _ := w.g.StartTopic(ctx, u, "history")
+	w.play(u, first.ID, w.right, w.wrong, w.right)
+	// Left with the fourth showing, and back once its time is up: the same run, the fourth counted unanswered, the
+	// fifth next.
+	if _, err := w.g.Show(ctx, u, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	w.wait(time.Minute)
+	back, err := w.g.StartTopic(ctx, u, "history")
+	if err != nil || back.ID != first.ID || back.At != 4 || len(back.Trail) != 4 || back.Question != nil {
+		t.Fatalf("back to the topic: %+v %v", back, err)
+	}
+	if m := back.Trail[3]; m.Right || m.Points != 0 {
+		t.Fatalf("the question left showing: %+v", m)
+	}
+	// Another topic is a run of its own, and so is all of them.
+	if other, _ := w.g.StartTopic(ctx, u, "science"); other.ID == first.ID {
+		t.Fatal("another topic went on with history's run")
+	}
+	if all, _ := w.g.StartTopic(ctx, u, ""); all.ID == first.ID {
+		t.Fatal("all the topics went on with history's run")
+	}
+	// Finished, the next is new.
+	for n := 4; n < Length; n++ {
+		if _, err := w.g.Show(ctx, u, first.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.g.Start(ctx, u, first.ID, n); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.g.Answer(ctx, u, first.ID, n, w.right(first.ID, n)); err != nil {
+			t.Fatalf("answer %d: %v", n, err)
+		}
+	}
+	if again, _ := w.g.StartTopic(ctx, u, "history"); again.ID == first.ID || again.At != 0 {
+		t.Fatalf("after the end: %+v", again)
+	}
+	// Left on an earlier day, it isn't taken up again.
+	w.wait(24 * time.Hour)
+	if next, _ := w.g.StartTopic(ctx, u, "history"); next.At != 0 {
+		t.Fatalf("a run of yesterday went on: %+v", next)
+	}
+}
+
 func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

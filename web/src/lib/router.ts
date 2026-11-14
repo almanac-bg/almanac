@@ -37,15 +37,29 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
     )
       return;
     e.preventDefault();
-    go(a.pathname + a.search + a.hash);
+    const to = a.pathname + a.search + a.hash;
+    if (!leaving?.(() => go(to))) go(to);
   });
   render(false);
 }
 
-/** Opens a path in the app. */
+/** While leaving the screen would cost the player something (a question with its time running), a link first asks
+ * this: it takes the way on (`proceed`), and says whether it holds the link back until then. */
+let leaving: ((proceed: () => void) => boolean) | null = null;
+
+/** Asks `fn` before a link leaves the screen, until the returned function is called. */
+export function beforeLeaving(fn: (proceed: () => void) => boolean): () => void {
+  leaving = fn;
+  return () => {
+    if (leaving === fn) leaving = null;
+  };
+}
+
+/** Opens a path in the app; the one already open opens afresh (Начало, tapped in the middle of the day's ten, is
+ * Начало again, not the question). */
 export function go(to: string, replace = false): void {
-  if (to === location.pathname + location.search + location.hash && !replace) return;
-  history[replace ? "replaceState" : "pushState"](null, "", to);
+  const here = to === location.pathname + location.search + location.hash;
+  if (!here || replace) history[replace ? "replaceState" : "pushState"](null, "", to);
   render(true);
 }
 

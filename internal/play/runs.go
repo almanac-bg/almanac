@@ -119,14 +119,35 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	return s, err
 }
 
-// StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it.
+// StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it; or, if the player
+// left a run of the topic unfinished today, goes on with it where it stopped, as the day's ten do. One left on an
+// earlier day isn't taken up again: it was drawn before today's questions were kept from other games.
 func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
 	b := g.Bank()
 	if category != "" && !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
 		return State{}, ErrNoTopic
 	}
 	var s State
+	var ended int64 // the run left unfinished, if its clock has just ended it
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
+		left, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'topic'
+			AND category = ? AND finished_at IS NULL AND started_at >= ? ORDER BY id DESC LIMIT 1`,
+			userID, category, store.Ms(today)))
+		switch {
+		case err == nil:
+			done, err := g.settle(tx, left)
+			if err != nil {
+				return err
+			}
+			if !done {
+				s, err = g.state(tx, left)
+				return err
+			}
+			ended = left.id
+		case !errors.Is(err, ErrNoRun):
+			return err
+		}
 		seen := map[string]bool{}
 		rows, err := tx.Query(`SELECT a.question_id FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID)
 		if err != nil {
@@ -160,6 +181,9 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended != 0 {
+		err = g.finished(ctx, userID, ended)
+	}
 	return s, err
 }
 
