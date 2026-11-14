@@ -5,6 +5,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { tickOn } from "../lib/prefs.ts";
+import { beforeLeaving } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
@@ -183,18 +184,17 @@ const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "
 
 /** The top of a question: which one of how many, and its topic (and, in a duel with a friend, with whom: `versus`),
  * with the game's tally under it, if it has one. On a phone a game has the whole screen, the header with it, so the
- * way out is here: an arrow to Начало (but on Начало itself, where the day's ten are played). */
+ * way out is here: an arrow to Начало (on Начало itself too, where the day's ten are played: it opens afresh, the
+ * day waiting there as a card). */
 export function questionHead(n: number, total: number, aside: string, tally: Child = null, versus = ""): Child {
   return h(
     "header",
     { class: "question-head" },
-    location.pathname === "/"
-      ? null
-      : h(
-          "a",
-          { class: "game-leave", href: "/", "aria-label": "Към Начало", title: "Към Начало" },
-          h("span", { class: "i i-left", "aria-hidden": "true" }),
-        ),
+    h(
+      "a",
+      { class: "game-leave", href: "/", "aria-label": "Към Начало", title: "Към Начало" },
+      h("span", { class: "i i-left", "aria-hidden": "true" }),
+    ),
     h(
       "p",
       { class: "count" },
@@ -418,8 +418,57 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     clearInterval(tick);
   });
 
-  // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts).
+  // Leaving while the question's time runs would cost it, as the time runs on the server: a link out (the arrow, a
+  // place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where the
+  // player comes back to it („Продължи“). Once the answer is in, leaving costs nothing and asks nothing.
+  const asking = signal(false);
+  const going = signal(false);
+  let proceed: (() => void) | null = null;
+  onCleanup(
+    beforeLeaving((on) => {
+      if (sent) return false;
+      proceed = on;
+      asking.set(true);
+      stay.focus();
+      return true;
+    }),
+  );
+  const keep = () => {
+    proceed = null;
+    asking.set(false);
+  };
+  const leave = async () => {
+    const on = proceed;
+    if (!on) return;
+    if (!sent) {
+      sent = true;
+      going.set(true);
+      clearTimeout(timeout);
+      clearInterval(tick);
+      try {
+        await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
+      } catch {
+        // its time runs out on the server all the same
+      }
+    }
+    on();
+  };
+  const stay = h("button", { class: "btn", type: "button", onclick: keep }, "Остани");
+  const leaveAsk = h(
+    "div",
+    { class: "card leave-ask", hidden: () => !asking() || (locked() && !going()) },
+    h("p", { role: "alert" }, () => (asking() ? "Ако излезеш сега, въпросът остава без отговор." : "")),
+    h(
+      "div",
+      { class: "leave-actions" },
+      stay,
+      h("button", { class: "btn", type: "button", disabled: going, onclick: leave }, "Излез"),
+    ),
+  );
+
+  // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts); Esc keeps playing, asked to leave.
   listen(document, "keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape" && asking()) return keep();
     if (e.key !== "Enter" || !due || e.repeat || (e.target as Element).closest?.("button:enabled, a, input")) return;
     e.preventDefault();
     clearTimeout(advance);
@@ -430,6 +479,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     "article",
     { class: "question" },
     questionHead(q.n, s.total, topicName(q.category), score, versus),
+    leaveAsk,
     progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),

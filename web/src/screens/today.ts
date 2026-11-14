@@ -1,6 +1,6 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level; then the day's ten questions, the same for everyone, once (or, once played, how they went, and the result to
-// share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
+// level; then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
+// on; once played, how they went, and the result to share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации.
 
 import { picture } from "../art/picture.ts";
@@ -8,7 +8,7 @@ import { news } from "../game/news.ts";
 import { shareButton, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
 import { dayShareText } from "../game/share.ts";
-import type { Board, State } from "../game/types.ts";
+import type { Board, Mark, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { askToKeep } from "../lib/keep.ts";
@@ -51,7 +51,9 @@ export function today() {
       const t = await api<Today>("GET", "/api/day");
       day = t.day;
       const run = t.run;
-      if (run && !run.done) screen.show(() => playRun(run, (s) => home(t, s, true)));
+      // A question showing has its time running (a reload, a tab closed and opened again): straight back into it.
+      // Otherwise the day left half-way waits on Начало for „Продължи“: no question's time starts without a tap.
+      if (run && !run.done && run.question) screen.show(() => playRun(run, (s) => home(t, s, true)));
       else screen.show(() => home(t, t.run, false));
     } catch (err) {
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
@@ -106,7 +108,7 @@ export function today() {
               { main: shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak)) },
               [just ? news(run.id) : null, countdown()],
             )
-          : dayCard(t, start(t)),
+          : dayCard(t, start(t), run?.trail ?? []),
         // Mid-December into January: the year in the game, a tap away.
         yearCard(),
         // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
@@ -170,18 +172,26 @@ function status(t: Today): Child {
   );
 }
 
-/** The day's ten, not played yet: what they are, and the gold button. */
-function dayCard(t: Today, start: () => Promise<void>): Child {
+/** The day's ten, not played yet: what they are, and the gold button; or, left half-way (`marks`: how the questions
+ * answered went), where the player stopped, and the way on from there. */
+function dayCard(t: Today, start: () => Promise<void>, marks: Mark[]): Child {
   const busy = signal(false);
   const error = signal("");
   const players = t.board.players;
+  const at = marks.length;
   return h(
     "section",
     { class: "card hero day" },
     h("p", { class: "kicker" }, longDate(t.day)),
     h("h1", null, "Десет въпроса за днес"),
-    h("p", { class: "muted" }, "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит."),
-    trail([], 10),
+    h(
+      "p",
+      { class: "muted" },
+      at
+        ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
+        : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
+    ),
+    trail(marks, 10, at ? at : -1),
     h(
       "button",
       {
@@ -197,17 +207,19 @@ function dayCard(t: Today, start: () => Promise<void>): Child {
           }
         },
       },
-      "Започни",
+      at ? "Продължи" : "Започни",
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    h(
-      "p",
-      { class: "day-meta" },
-      // Who has played today, once someone has: a zero says only that the place is empty.
-      players
-        ? `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
-        : "Около 3 минути",
-    ),
+    at
+      ? null
+      : h(
+          "p",
+          { class: "day-meta" },
+          // Who has played today, once someone has: a zero says only that the place is empty.
+          players
+            ? `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
+            : "Около 3 минути",
+        ),
   );
 }
 

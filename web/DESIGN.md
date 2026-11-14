@@ -27,8 +27,8 @@ three when you add or change a screen.
 
 Four main places, in a bar at the bottom of a phone (in the header on a big screen). Nothing else goes in the bar.
 
-- **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten, or
-  once played, how they went (the place a way to the day's board) with „Сподели“, the gold button, right under it
+- **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten (left
+  half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, and „Продължи“), or once played, how they went (the place a way to the day's board) with „Сподели“, the gold button, right under it
   and „Прегледай въпросите“ below; the day's goals; the ways to play with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name), and all of them at once. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
@@ -140,7 +140,7 @@ takes a token.
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
   - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
-    the way out on a phone), `.trail`, `.timer` and `.ask`.
+    the way out on a phone), `.leave-ask` (asked to leave while the time runs), `.trail`, `.timer` and `.ask`.
   - `.picture` over a question: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
     its pictures are in.
@@ -233,6 +233,11 @@ takes a token.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
   answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
   game. Each question opens at the top of the page.
+- **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
+  a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
+  „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
+  „Продължи“, a topic's game for the next tap on that topic the same day. No question's time starts without a tap;
+  only a reload with one showing goes straight back into it.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
 - **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
@@ -370,5 +375,5 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 - **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 16 kB of CSS, 46 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+- **Keep to the budgets:** 16 kB of CSS, 47 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
   over them.

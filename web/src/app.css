@@ -1666,6 +1666,20 @@
     box-shadow: var(--focus);
   }
 
+  /* Asked to leave while a question's time runs: what it costs, and the choice, under the count. */
+  .leave-ask {
+    margin-top: var(--space-3);
+  }
+
+  .leave-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .leave-actions > .btn {
+    flex: 1;
+  }
+
   /* A run's tally while it's played: the right answers in a row, and the points so far. */
   .tally {
     display: flex;

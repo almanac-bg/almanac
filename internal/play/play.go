@@ -6,7 +6,8 @@
 // line doesn't eat the time, and the server still says when it runs. Between questions a player reads the
 // answer and its fact for as long as they like. A question left showing past its time counts as unanswered, whenever
 // the run is next looked at. Everything a run does goes through the database, so a refresh, a second tab or a
-// restart of the server changes nothing.
+// restart of the server changes nothing. A run left half-way goes on where it stopped: the day's when the player comes
+// back to it, a topic's when they start the same topic again that day (StartTopic).
 package play
 
 import (

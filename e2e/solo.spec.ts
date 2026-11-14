@@ -95,15 +95,70 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });
 
-test("a run left between two questions goes on at once", async ({ page }) => {
+test("the day left after its third question waits on Начало, and goes on from the fourth", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto("/");
   await page.getByRole("button", { name: "Започни" }).click();
-  await answer(page);
+  for (let n = 0; n < 3; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    await answer(page);
+    if (n < 2) await moveOn(page);
+  }
+  // The third's answer showing, the arrow goes at once: nothing is lost between two questions.
   await expect(page.locator(".verdict")).toBeVisible();
+  await page.getByRole("link", { name: "Към Начало", exact: true }).click();
+  const day = page.locator(".card.day");
+  await expect(day).toContainText("Следва въпрос 4 от 10.");
+  await expect(day.locator(".trail li:is(.right, .partial, .wrong)")).toHaveCount(3);
+  await expect(page.locator(".tabs")).toBeVisible();
+  await expect(page.locator(".topics")).toBeVisible();
+  // The card waits: no question's time starts behind it, a reload included.
+  await page.waitForTimeout(4000);
   await page.reload();
-  // Back, the next question opens by itself: nothing waits for a button.
+  await expect(page.locator(".card.day")).toContainText("Следва въпрос 4 от 10.");
+  await page.getByRole("button", { name: "Продължи" }).click();
+  for (let n = 3; n < 10; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    await answer(page);
+    await moveOn(page);
+  }
+  await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
+  // Ten answers, each given and counted: the score is the right ones of the ten.
+  await expect(page.locator(".summary .trail li:is(.right, .partial, .wrong)")).toHaveCount(10);
+  const rights = await page.locator(".summary .trail li.right").count();
+  await expect(page.locator(".summary .score-n")).toHaveText(String(rights));
+  const { run } = await (await page.request.get("/api/day")).json();
+  const { questions } = await (await page.request.get(`/api/runs/${run.id}/review`)).json();
+  expect(questions.map((q: { n: number }) => q.n)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  expect(questions.every((q: { given: unknown }) => q.given !== null)).toBe(true);
+});
+
+test("a question left while its time runs: asked first, given up, and the topic goes on after it", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("/play/history");
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await answer(page);
+  await moveOn(page);
+  await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
+  // Leaving would cost the question: the arrow asks first, and „Остани“ plays on.
+  const leave = page.getByRole("link", { name: "Към Начало", exact: true });
+  const asked = page.getByText("Ако излезеш сега, въпросът остава без отговор.");
+  await leave.click();
+  await expect(asked).toBeVisible();
+  await page.getByRole("button", { name: "Остани" }).click();
+  await expect(asked).toBeHidden();
   await expect(page.locator(".question-head")).toContainText("2 от 10");
-  await expect(page.getByRole("button", { name: /Напред|Продължи/ })).toHaveCount(0);
+  await leave.click();
+  await page.getByRole("button", { name: "Излез" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".card.day")).toBeVisible();
+  // Back to the topic: the same game, the question left counted unanswered, the third next.
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await expect(page.locator(".question-head")).toContainText("3 от 10");
+  await expect(page.locator("article.question .trail li:is(.right, .partial, .wrong)")).toHaveCount(2);
+  await expect(page.locator("article.question .trail li").nth(1)).toHaveClass("wrong");
 });
 
 test("an old challenge link says where playing with friends went", async ({ page }) => {
