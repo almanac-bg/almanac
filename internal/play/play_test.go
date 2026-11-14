@@ -246,7 +246,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0, 1).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 
@@ -707,12 +707,12 @@ func TestAsyncDuels(t *testing.T) {
 		rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
 		t.Fatalf("the result: %+v / %+v, ratings %d %d", da[0], db[0], rating(ana), rating(bo))
 	}
-	full := 0
+	full := AllRight
 	for n := range Length {
-		full += WorthOf(w.question(s.ID, n), 1, 0).Points
+		full += WorthOf(w.question(s.ID, n), 1, 3*time.Second, n+1).Points // w.play answers after 3 s
 	}
 	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != full {
-		t.Fatalf("scores after the end: %+v / %+v", da[0].Opponent, db[0].Opponent)
+		t.Fatalf("scores after the end: %+v / %+v, want %d", da[0].Opponent, db[0].Opponent, full)
 	}
 	if len(told) != 2 || told[0].Kind != "result" {
 		t.Fatalf("told: %+v", told)

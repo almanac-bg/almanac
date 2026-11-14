@@ -105,6 +105,8 @@ export interface State {
   at: number;
   points: number;
   rights: number;
+  /** What the game earned at its end for every answer right (in `points`), once it's done. */
+  allRight?: number;
   trail: Mark[];
   question?: Shown;
   done: boolean;
@@ -112,8 +114,10 @@ export interface State {
 
 export interface Result {
   points: number;
-  /** How many of the points were for being quick. */
+  /** How many of the points were for being quick, and how many for the right answers in a row (`inRow`, from 2). */
   speed?: number;
+  row?: number;
+  inRow?: number;
   score: number;
   right: boolean;
   exact?: boolean;

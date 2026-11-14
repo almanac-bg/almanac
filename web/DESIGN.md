@@ -151,7 +151,8 @@ Every element that looks like a game measures something the game already counts:
 | Element      | Measures                                                                                                                                                                                                                                    | Where                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                           | Днес, Профил                 |
-| Points       | One game's score, per answer and per run, from the server (with the part for speed); never added up across games                                                                                                                            | Verdict, result, day board   |
+| Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                | Verdict, result, day board   |
+| In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                      | Question head, verdict       |
 | XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's, 100 a daily goal; adds up                                                                                                          | Level, level board, goals    |
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                                                                                                                              | Result, Профил               |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
@@ -171,7 +172,7 @@ Every element that looks like a game measures something the game already counts:
 Feedback fires once, when it's earned, and then the screen is still again:
 
 - A right answer pops and glows.
-- Points rise in gold.
+- Points rise in gold, counting up to what was earned.
 - An exact number answer gets the star.
 - A wrong answer shakes once.
 
