@@ -5,7 +5,7 @@ import { levelCard } from "../game/news.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { avatar, badge } from "../ui.ts";
+import { avatar, badge, profileHref } from "../ui.ts";
 import { standingCard } from "./duel.ts";
 import { loadProgress, type Progress, titlesOf } from "./progress.ts";
 import { seasonCard } from "./season.ts";
@@ -58,6 +58,7 @@ export function me() {
             { class: "menu", "aria-label": "Профил" },
             h("a", { href: "/almanac" }, "Моят Алманах"),
             h("a", { href: "/friends" }, "Приятели"),
+            () => (user()?.tag ? h("a", { href: profileHref(user()?.tag ?? "") }, "Как те виждат другите") : null),
             h("a", { href: "/settings" }, "Настройки"),
           ),
         ];

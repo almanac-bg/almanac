@@ -13,6 +13,7 @@ import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
+import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
 import { room } from "./screens/room.ts";
@@ -92,6 +93,7 @@ if (root) {
       { path: /^\/r\/([0-9]{6})$/, view: room },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/me$/, view: me },
+      { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
     ],
     missing,
   );

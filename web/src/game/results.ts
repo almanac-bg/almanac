@@ -126,14 +126,14 @@ export function boardRow(
   place: number,
   name: string,
   score: Child,
-  opts: { me?: boolean; gap?: boolean; look?: Look } = {},
+  opts: { me?: boolean; gap?: boolean; look?: Look; tag?: string } = {},
 ) {
   const cls = ["row", place <= 3 && `p${place}`, opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ");
   return h(
     "li",
     { class: cls },
     h("span", { class: "place" }, String(place)),
-    who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name),
+    who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name, opts.tag),
     h("span", { class: "pts" }, score),
   );
 }
@@ -150,9 +150,14 @@ export function board(title: string, scores: Score[], place?: number, mine?: Sco
     h(
       "ol",
       null,
-      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me, look: s })),
+      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me, look: s, tag: s.tag })),
       place && mine && !rows.some((s) => s.me)
-        ? boardRow(place, mine.name, scoreOf(mine), { me: true, gap: place > rows.length + 1, look: mine })
+        ? boardRow(place, mine.name, scoreOf(mine), {
+            me: true,
+            gap: place > rows.length + 1,
+            look: mine,
+            tag: mine.tag,
+          })
         : null,
     ),
   );

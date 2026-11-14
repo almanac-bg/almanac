@@ -67,7 +67,7 @@ function table(t: Royal): Child {
           "li",
           { class: ["row", p.me && "me", p.out && "out"].filter(Boolean).join(" ") },
           h("span", { class: "place" }, String(p.place ?? i + 1)),
-          who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name),
+          who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
           h(
             "span",
             { class: "royal-reach" },
