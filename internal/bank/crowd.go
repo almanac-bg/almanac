@@ -13,7 +13,7 @@ type Crowd struct {
 	Answers int
 	// Right is the share of them that were right.
 	Right float64
-	// Picks is, for a choice, the share of the answers that picked each option, as the bank keeps them (the answer
+	// Picks is, for a choice (or clues), the share of the answers that picked each option, as the bank keeps them (the answer
 	// first); for a true-or-not, the share that said true, then false. Shares of all the answers, like Right, so that
 	// the answer's share is the share right (the ones that ran out of time picked nothing).
 	Picks []float64
@@ -57,7 +57,7 @@ func CrowdOf(q Question, tallies []Tally) *Crowd {
 	}
 	c.Right = float64(right) / float64(c.Answers)
 	switch q := q.(type) {
-	case *Choice:
+	case *Choice, *Clues:
 		c.Picks = shares(ChoiceOptions, c.Answers, tallies, func(given json.RawMessage) int {
 			var a ChoiceAnswer
 			if json.Unmarshal(given, &a) != nil {

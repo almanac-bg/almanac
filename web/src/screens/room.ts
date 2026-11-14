@@ -300,6 +300,11 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     }
   };
   const asked = ask(q.view, send, locked);
+  // More of the question shows as its time runs (the next clue): the server sends it when it's due.
+  effect(() => {
+    const v = view();
+    if (v.n === first.n && v.question) asked.update?.(v.question.view);
+  });
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
   const tick = setInterval(() => {
     left.update((n) => Math.max(0, n - 1));

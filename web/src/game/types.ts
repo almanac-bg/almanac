@@ -62,7 +62,19 @@ export interface SplitView extends ViewBase {
   items: string[];
 }
 
-export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView | SplitView;
+/** „Подсказки“: the clues out so far (the server sends each as its time comes), and four options from the start. */
+export interface CluesView extends ViewBase {
+  type: "clues";
+  clues: string[];
+  total: number;
+  /** When each clue shows, from when the question does. */
+  stepsMs: number[];
+  /** How long the question had shown when this view was made. */
+  sinceMs: number;
+  choices: string[];
+}
+
+export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView | SplitView | CluesView;
 
 /** The answer, as the deal showed it, with the fact behind it. */
 export interface Reveal {
@@ -80,6 +92,8 @@ export interface Reveal {
   decoy?: number;
   /** A split's groups: for each item (as shown), the group it belongs to. */
   sides?: number[];
+  /** All the clues of a clues question. */
+  clues?: string[];
   unit?: string;
   fact?: string;
   credit?: Credit;
@@ -129,6 +143,8 @@ export interface Shown {
   view: View;
   limitMs: number;
   leftMs: number;
+  /** How soon more of the question shows (its next clue): look again then. */
+  moreMs?: number;
 }
 
 export interface State {

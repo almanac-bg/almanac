@@ -1,7 +1,7 @@
 // Package bank holds the game's questions: the types a question can be, the bank on disk, and the checks a bank must
 // pass before a server plays it.
 //
-// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go) and plugs in through the
+// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go, clues.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
 // player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order.
@@ -148,6 +148,8 @@ func AnswerText(q Question) string {
 	switch q := q.(type) {
 	case *Choice:
 		return q.Answer
+	case *Clues:
+		return q.Answer
 	case *Number:
 		return strings.TrimSpace(formatNumber(q.Answer, q.Step) + " " + q.Unit)
 	case *Order:
@@ -184,8 +186,15 @@ func AnswerText(q Question) string {
 
 // Option is a choice's option by its place in the bank (0 is the answer), for reading the answer log.
 func Option(q Question, i int) string {
-	if c, ok := q.(*Choice); ok && i >= 0 && i < len(c.options()) {
-		return c.options()[i]
+	var options []string
+	switch q := q.(type) {
+	case *Choice:
+		options = q.options()
+	case *Clues:
+		options = q.options()
+	}
+	if i >= 0 && i < len(options) {
+		return options[i]
 	}
 	return ""
 }

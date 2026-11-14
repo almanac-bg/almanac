@@ -309,6 +309,24 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
 
   const asked = ask(q.view, (a) => send(a), locked);
 
+  // More of the question shows as its time runs (the next clue): the server sends it when it's due, not before.
+  let more = 0;
+  const lookAgain = (ms: number) => {
+    more = window.setTimeout(async () => {
+      if (sent) return;
+      try {
+        const now = await api<State>("GET", `/api/runs/${s.id}`);
+        if (sent || now.question?.n !== q.n) return;
+        asked.update?.(now.question.view);
+        if (now.question.moreMs) lookAgain(now.question.moreMs);
+      } catch {
+        lookAgain(1000); // a bad moment on the line: once more, soon
+      }
+    }, ms);
+  };
+  if (q.moreMs) lookAgain(q.moreMs);
+  onCleanup(() => clearTimeout(more));
+
   // The time: the seconds left, and when it's up, whatever has been put in (or nothing).
   const timeout = setTimeout(() => send(asked.pending()), q.leftMs);
   const left = signal(Math.ceil(q.leftMs / 1000));
@@ -318,9 +336,15 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     clearInterval(tick);
   });
 
-  // Keys 1–4 answer a choice.
+  // Keys 1–4 answer a choice (or clues).
   listen(document, "keydown", (e: KeyboardEvent) => {
-    if (q.view.type !== "choice" || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+    if (
+      (q.view.type !== "choice" && q.view.type !== "clues") ||
+      e.target instanceof HTMLInputElement ||
+      e.metaKey ||
+      e.ctrlKey
+    )
+      return;
     const i = Number(e.key) - 1;
     if (i >= 0 && i < q.view.choices.length) send({ pick: i });
   });

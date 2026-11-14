@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 const sample = "../../bank/sample"
@@ -611,5 +612,62 @@ func TestSplitGrading(t *testing.T) {
 	}
 	if math.Abs(sum/64-5.0/32) > 1e-9 {
 		t.Errorf("at random a split is worth %v", sum/64)
+	}
+}
+
+func TestClues(t *testing.T) {
+	q := &Clues{Head: Head{Type: "clues", Text: "Кой е този човек?"},
+		Clues:  []string{"Като млад става йеродякон.", "Създава мрежа от тайни комитети.", "Обесен е край София през 1873 г."},
+		Answer: "Васил Левски", Wrong: []string{"Христо Ботев", "Георги Раковски", "Любен Каравелов"}}
+	if p := q.check(); len(p) > 0 {
+		t.Fatal(p)
+	}
+	d := q.Deal(3)
+	var view struct {
+		Clues   []string
+		Choices []string
+	}
+	shown := func(since time.Duration) []string {
+		_ = json.Unmarshal(mustJSON(ViewAt(d, since)), &view)
+		return view.Clues
+	}
+	// A clue shows only once its time has come: never before, not even in what the server sends.
+	for since, want := range map[time.Duration]int{0: 1, ClueEvery - time.Millisecond: 1, ClueEvery: 2, 2*ClueEvery + time.Second: 3, time.Hour: 3} {
+		if got := shown(since); len(got) != want || got[0] != q.Clues[0] {
+			t.Errorf("after %v: %v", since, got)
+		}
+	}
+	if s := mustJSON(d.View()); strings.Contains(string(s), "1873") {
+		t.Error("the first view gave the last clue away")
+	}
+	if NextStep(d, 0) != ClueEvery || NextStep(d, ClueEvery+time.Second) != ClueEvery-time.Second || NextStep(d, time.Hour) != 0 {
+		t.Error("the next clue's time")
+	}
+	right := slices.Index(view.Choices, "Васил Левски")
+	pick := string(mustJSON(ChoiceAnswer{Pick: right}))
+	// A right answer is worth less with each clue it took (allowing a second for its trip); a wrong one nothing.
+	for took, want := range map[time.Duration]float64{
+		3 * time.Second: 1, ClueEvery + 500*time.Millisecond: 1, ClueEvery + 2*time.Second: 0.6, 25 * time.Second: 0.3, time.Hour: 0.3,
+	} {
+		g, err := GradeAt(d, json.RawMessage(pick), took)
+		if err != nil || !g.Right || g.Score != want {
+			t.Errorf("right after %v: %+v %v", took, g, err)
+		}
+	}
+	if g, _ := GradeAt(d, mustJSON(ChoiceAnswer{Pick: (right + 1) % 4}), time.Second); g.Right || g.Score != 0 {
+		t.Errorf("a wrong one: %+v", g)
+	}
+	var rev struct {
+		Pick  int
+		Clues []string
+	}
+	_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
+	if rev.Pick != right || len(rev.Clues) != 3 {
+		t.Errorf("revealed %+v", rev)
+	}
+	// Other kinds aren't paced: their view is the same whenever.
+	c := &Choice{Head: Head{Type: "choice", Text: "?"}, Answer: "а", Wrong: []string{"б", "в", "г"}}
+	if dc := c.Deal(1); NextStep(dc, 0) != 0 || string(mustJSON(ViewAt(dc, time.Hour))) != string(mustJSON(dc.View())) {
+		t.Error("a choice was paced")
 	}
 }

@@ -28,7 +28,7 @@ const (
 // An order's and a match's grading already takes most of the luck out (bank.orderScore, bank.matchScore): at random,
 // four items in order are worth 7/36 on average, four pairs 1/8, four pairs with a decoy 53/480, and six things split
 // into two groups 5/32.
-var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 7.0 / 36, "match": 0.125, "split": 5.0 / 32, "number": 0}
+var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 7.0 / 36, "match": 0.125, "split": 5.0 / 32, "clues": 0.25, "number": 0}
 
 // chanceOf is the score a guess at q gets on average.
 func chanceOf(q bank.Question) float64 {

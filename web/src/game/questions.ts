@@ -8,6 +8,7 @@ import { formatNumber } from "../ui.ts";
 import type {
   Answer,
   ChoiceView,
+  CluesView,
   Crowd,
   MatchView,
   NumberView,
@@ -26,6 +27,8 @@ export interface Asked {
   reveal(reveal: Reveal, given: Answer | null): void;
   /** What's been put in but not sent yet (a typed number, things moved into an order): it counts when time runs out. */
   pending(): Answer | null;
+  /** Takes a newer view of the same question, as more of it shows (the next clue). */
+  update?(view: View): void;
 }
 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it tells
@@ -36,6 +39,7 @@ export function ask(view: View, submit: (a: Answer) => void, locked: Signal<bool
   return {
     node: h("div", { class: "stack" }, a.node, says),
     pending: a.pending,
+    update: a.update,
     reveal(reveal, given) {
       a.reveal(reveal, given);
       const line = reveal.crowd ? crowdSays(view.type, reveal.crowd) : "";
@@ -56,6 +60,7 @@ function crowdSays(type: View["type"], c: Crowd): string {
   switch (type) {
     case "choice":
     case "truefalse":
+    case "clues":
       return `Вярно отговарят ${s} от играчите.`;
     case "number":
       return `Достатъчно близо са ${s} от играчите.`;
@@ -89,6 +94,8 @@ function askType(view: View, submit: (a: Answer) => void, locked: Signal<boolean
       return match(view, submit, locked);
     case "split":
       return split(view, submit, locked);
+    case "clues":
+      return clues(view, submit, locked);
   }
 }
 
@@ -830,6 +837,81 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
           );
         }),
       );
+    },
+  };
+}
+
+/** What a right answer to a clues question is worth after each number of clues (bank.ClueWorth). */
+const clueWorth = [1, 0.6, 0.3];
+
+/** „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out; the
+ * ones still to come count down. The four options are there from the start: answer as soon as you know. */
+function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+  let now = view;
+  const born = performance.now() - view.sinceMs; // when the question showed, on this screen's clock
+  const rows = Array.from({ length: view.total }, (_, i) =>
+    h(
+      "li",
+      { class: "clue" },
+      h("span", { class: "clue-worth" }, share(clueWorth[i] ?? 0)),
+      h("span", { class: "clue-text" }),
+    ),
+  );
+  const list = h("ol", { class: "clues", "aria-live": "polite" }, rows);
+  const paint = (all?: string[]) => {
+    const out = all ?? now.clues;
+    const elapsed = performance.now() - born;
+    rows.forEach((row, i) => {
+      const text = out[i];
+      row.className = `clue${text === undefined ? " locked" : !all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
+      const left = Math.ceil(((now.stepsMs[i] ?? 0) - elapsed) / 1000);
+      (row.lastChild as HTMLElement).textContent =
+        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left} с` : `Подсказка ${i + 1} идва…`);
+    });
+  };
+  paint();
+  const tick = setInterval(() => {
+    if (!locked.peek()) paint();
+  }, 1000);
+  onCleanup(() => clearInterval(tick));
+  const buttons = view.choices.map((text, i) =>
+    h(
+      "button",
+      {
+        class: "option",
+        type: "button",
+        disabled: locked,
+        onclick: () => {
+          if (locked.peek()) return;
+          buttons[i]?.classList.add("picked");
+          play("tap");
+          submit({ pick: i });
+        },
+      },
+      h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
+      h("span", null, text),
+    ),
+  );
+  return {
+    node: h("div", { class: "stack" }, list, h("div", { class: "options" }, buttons)),
+    pending: () => null,
+    update(next) {
+      if (next.type !== "clues" || next.clues.length <= now.clues.length || locked.peek()) return;
+      now = next;
+      paint();
+      play("key");
+    },
+    reveal(reveal, given) {
+      clearInterval(tick);
+      paint(reveal.clues ?? now.clues);
+      buttons.forEach((b, i) => {
+        b.classList.remove("picked");
+        const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
+        b.classList.add(how);
+        const picked = reveal.crowd?.picks?.[i];
+        if (picked !== undefined) crowdOn(b, picked);
+        if (how !== "dim") b.append(sign());
+      });
     },
   };
 }
