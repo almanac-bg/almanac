@@ -975,7 +975,6 @@ func TestWardrobe(t *testing.T) {
 	}
 }
 
-
 func TestSeasons(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
