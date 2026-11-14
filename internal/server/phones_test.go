@@ -101,10 +101,17 @@ func TestPhoneNotifications(t *testing.T) {
 			t.Fatalf("%v: %d", bad, status)
 		}
 	}
-	for p, token := range map[*player]string{ana: anaPhone, bo: boPhone} {
+	// An iPhone's token comes in upper case from the app's plugin; it's kept in lower case, once.
+	for p, token := range map[*player]string{ana: strings.ToUpper(anaPhone), bo: boPhone} {
 		if status, _ := p.call("POST", "/api/push/phone", map[string]any{"platform": "ios", "token": token}); status != 200 {
 			t.Fatalf("a phone's token: %d", status)
 		}
+	}
+	ana.call("POST", "/api/push/phone", map[string]any{"platform": "ios", "token": anaPhone})
+	var kept int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, anaPhone).Scan(&kept)
+	if kept != 1 {
+		t.Fatalf("Ana's phone kept %d times in lower case", kept)
 	}
 
 	// Ana plays the day; at 19:05 Bo's phone is reminded, Ana's isn't.
@@ -137,7 +144,7 @@ func TestPhoneNotifications(t *testing.T) {
 	if left != 1 {
 		t.Fatal("another player's phone forgotten")
 	}
-	ana.call("DELETE", "/api/push/phone", map[string]any{"token": anaPhone})
+	ana.call("DELETE", "/api/push/phone", map[string]any{"token": strings.ToUpper(anaPhone)}) // as the app keeps it
 	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, anaPhone).Scan(&left)
 	if left != 0 {
 		t.Fatal("a phone turned off, kept")
