@@ -10,7 +10,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { meter, type Tier, who } from "../ui.ts";
+import { meter, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -366,7 +366,7 @@ export function ended(d: DuelView, more: Child = null): Child {
           { class: "card duel-score" },
           side("Ти", d.you),
           h("span", { class: "duel-vs" }, ":"),
-          side(d.opponent.name, d.opponent),
+          side(d.opponent.name, d.opponent, d.opponent.tag),
           d.delta
             ? h(
                 "p",
@@ -384,11 +384,11 @@ export function ended(d: DuelView, more: Child = null): Child {
   );
 }
 
-function side(label: string, s: Side): Child {
+function side(label: string, s: Side, tag?: string): Child {
   return h(
     "div",
     { class: "duel-side" },
-    h("span", { class: "kicker" }, label),
+    tag ? h("a", { class: "kicker", href: profileHref(tag) }, label) : h("span", { class: "kicker" }, label),
     h("b", { class: "duel-points" }, String(s.points)),
     h("span", { class: "muted" }, `${s.rights} от 10`),
   );
