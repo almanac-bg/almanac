@@ -4,6 +4,7 @@ import { type Mastery, masteryCard } from "../game/mastery.ts";
 import type { Board } from "../game/types.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { categories } from "../state.ts";
 import { games, questions, stat, streak } from "../ui.ts";
 
@@ -69,8 +70,10 @@ export function stats(): Child {
       h(
         "div",
         { class: "stats" },
-        place ? stat(`${place}-и`, "място днес", "gold") : stat(String(s.days), "дни с въпросите на деня", "gold"),
-        stat(`${percent(s.right, s.answers)}%`, "верни отговора", "mint"),
+        place
+          ? stat(ordinal(place, "n"), "място днес", "gold")
+          : stat(String(s.days), "дни с въпросите на деня", "gold"),
+        stat(`${percent(s.right, s.answers)}%`, "верни отговори", "mint"),
         s.duels > 0 ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose") : stat(String(s.answers), "отговора"),
         stat(String(s.games), "изиграни игри"),
       ),

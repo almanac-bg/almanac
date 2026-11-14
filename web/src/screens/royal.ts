@@ -10,6 +10,7 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player, user } from "../state.ts";
@@ -202,7 +203,7 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       h(
         "p",
         { class: "muted" },
-        () => `Входът отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`,
+        () => `Входът се отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`,
       ),
     ),
     () => {
@@ -230,7 +231,7 @@ function history(list: Past[]): Child {
           h(
             "span",
             { class: "royal-past" },
-            h("strong", null, me ? `${me.place}-и от ${t.players.length}` : "—"),
+            h("strong", null, me ? `${ordinal(me.place)} от ${t.players.length}` : "—"),
             h(
               "span",
               { class: "muted" },
@@ -311,14 +312,14 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
     () => {
       const v = view();
-      if (!v.players.length) return h("p", { class: "muted" }, "Още няма никой. Бъди първият.");
+      if (!v.players.length) return h("p", { class: "muted" }, "Още никой не е влязъл.");
       return h(
         "section",
         { class: "card" },
         h(
           "h2",
           { class: "section-title" },
-          `Във входа: ${v.players.length} от ${v.size}`,
+          `Вътре: ${v.players.length} от ${v.size}`,
           v.tables > 1 ? h("span", { class: "muted" }, ` · тази вечер ${v.tables} турнира`) : null,
         ),
         chips(v.players.map((p) => ({ ...p, in: p.online || !!p.me }))),
@@ -449,8 +450,8 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
         won
           ? "Печелиш Роял!"
           : me
-            ? first.entered > 1
-              ? `${me.place}-и от ${first.entered}`
+            ? first.entered > 1 && me.place
+              ? `${ordinal(me.place)} от ${first.entered}`
               : "Роял свърши"
             : best
               ? `${best.name} печели`

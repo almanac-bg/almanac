@@ -82,7 +82,7 @@ func (s *Server) MailProblems(ctx context.Context, to string, period time.Durati
 		for _, k := range kinds {
 			fmt.Fprintf(&b, "%s ×%d (от %s)\n  %s\n\n", news[k].first.Format("15:04"), news[k].count, news[k].first.Format("02.01"), k)
 		}
-		b.WriteString("Подробностите са в лога: journalctl -u almanac\n")
+		b.WriteString("Подробностите са в дневника: journalctl -u almanac\n")
 		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 			return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: fmt.Sprintf("АЛМАНАХ: %d нови проблема", len(kinds)), Text: b.String()})
 		})

@@ -5,6 +5,7 @@ import { emblem } from "../art/emblem.ts";
 import { metal, podiumMedal, seasonName } from "../art/season.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { meter } from "../ui.ts";
 import { daysLeft, type Season } from "./ranks.ts";
 
@@ -27,7 +28,12 @@ export function seasonCard(): Child {
         h("span", { class: "muted" }, daysLeft(s.daysLeft)),
       ),
       s.place
-        ? h("p", { class: "season-place" }, h("b", null, `${s.place}-и`), h("span", { class: "muted" }, ` от ${s.of}`))
+        ? h(
+            "p",
+            { class: "season-place" },
+            h("b", null, ordinal(s.place)),
+            h("span", { class: "muted" }, ` от ${s.of}`),
+          )
         : [
             h("p", null, `Игри за рейтинг този сезон: ${s.games} от ${s.minGames}, за да се класираш.`),
             meter(Math.round((100 * s.games) / s.minGames), `${s.games} от ${s.minGames} игри`),
@@ -58,8 +64,8 @@ export function seasonCard(): Child {
                 h(
                   "span",
                   null,
-                  h("b", null, seasonName(p.id)),
-                  h("span", { class: "muted" }, ` · ${p.place}-и от ${p.of} · ${p.division.name}, ${p.rating}`),
+                  h("b", null, `Сезон ${seasonName(p.id)}`),
+                  h("span", { class: "muted" }, ` · ${ordinal(p.place)} от ${p.of} · ${p.division.name}, ${p.rating}`),
                 ),
               ),
             ),

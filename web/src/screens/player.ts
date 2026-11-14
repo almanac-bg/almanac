@@ -185,7 +185,7 @@ function numbers(p: Profile): Child {
     "div",
     { class: "stats" },
     stat(String(p.streak), p.streak === 1 ? "ден поред" : "дни поред", "gold"),
-    stat(`${percent(p.right, p.answers)}%`, "верни отговора", "mint"),
+    stat(`${percent(p.right, p.answers)}%`, "верни отговори", "mint"),
     p.duels > 0
       ? stat(`${p.won}/${p.duels}`, "спечелени дуела", "rose")
       : stat(String(p.days), "дни с въпросите на деня"),

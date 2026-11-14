@@ -144,7 +144,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	s.plain(w, "Админ", template.HTML(body.String()))
+	s.plain(w, "Управление", template.HTML(body.String()))
 }
 
 // resolve marks a question's reports as seen to.
@@ -186,7 +186,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{else}}<p class="muted">Няма нови.</p>{{end}}
 
 <h2>Най-трудните</h2>
-<p class="muted">Въпроси с поне 10 отговора, по дял верни.</p>
+<p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
 <table class="stats"><thead><tr><th>Въпрос</th><th>Отговори</th><th>Верни</th></tr></thead><tbody>
 {{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · най-често грешат с „{{.Lure}}“{{end}}</span></td>
 <td>{{.Answers}}</td><td>{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}

@@ -1,11 +1,11 @@
 // What a game earned, said once, at its end: the day's goals it finished (with their XP), the level (and whether it
-// went up), how it moved the mastery of its topics, and any achievement that came with it, which may be worn as a
-// title at once.
+// went up), how it moved the mastery of its topics, any achievement that came with it, and any title these unlock,
+// which may be worn at once.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { play } from "../lib/sound.ts";
-import { type AchievementInfo, badge, meter, tierWords } from "../ui.ts";
+import { type AchievementInfo, badge, meter, type TitleRef, tierWords } from "../ui.ts";
 import { type MasteryMove, masteryMoves } from "./mastery.ts";
 
 interface News {
@@ -16,6 +16,8 @@ interface News {
   from: number;
   to: number;
   levelUp?: boolean;
+  /** The titles the levels just reached unlock. */
+  titles?: TitleRef[];
   mastery?: MasteryMove[];
 }
 
@@ -42,6 +44,7 @@ export function news(run: number, delay = 0): Child {
     return [
       n.goals.length ? goalsDone(n.goals) : null,
       levelCard(n.level, n.xp, n.from, n.to, n.levelUp),
+      (n.titles ?? []).map((t) => levelTitle(t, n.level)),
       masteryMoves(n.mastery ?? []),
       n.achievements.map(unlocked),
     ];
@@ -88,8 +91,6 @@ function goalsDone(goals: News["goals"]): Child {
 }
 
 function unlocked(a: AchievementInfo): Child {
-  const worn = signal(false);
-  const error = signal("");
   return h(
     "section",
     { class: `card unlock t-${a.tier}` },
@@ -100,26 +101,60 @@ function unlocked(a: AchievementInfo): Child {
       h("p", { class: "kicker" }, `Ново ${tierWords[a.tier].one} постижение`),
       h("strong", null, a.name),
       h("span", { class: "muted" }, a.about),
-      () =>
-        worn()
-          ? h("span", { class: "muted", role: "status" }, "Сега е твоята титла.")
-          : h(
-              "button",
-              {
-                class: "link",
-                type: "button",
-                onclick: async () => {
-                  try {
-                    await api("PATCH", "/api/me/look", { title: a.id });
-                    worn.set(true);
-                  } catch (err) {
-                    error.set((err as ApiError).message);
-                  }
-                },
-              },
-              "Сложи като титла",
-            ),
-      () => error() && h("span", { class: "bad" }, error()),
+      a.title ? titleLine(a.title) : null,
     ),
   );
+}
+
+/** A title a new level unlocks. */
+function levelTitle(t: TitleRef, level: number): Child {
+  return h(
+    "section",
+    { class: `card unlock t-${t.tier}` },
+    h(
+      "div",
+      { class: "unlock-text" },
+      h("p", { class: "kicker" }, `Нова ${tierWords[t.tier].title.toLowerCase()} титла`),
+      h("strong", { class: "unlock-title-name" }, t.name),
+      h("span", { class: "muted" }, `Идва с ниво ${level}.`),
+      wearTitle(t),
+    ),
+  );
+}
+
+/** The title an achievement unlocks, and the way to wear it. */
+function titleLine(t: TitleRef): Child {
+  return [
+    h("span", { class: "unlock-title" }, "Отключва титлата ", h("b", { class: `t-${t.tier}` }, `„${t.name}“`), "."),
+    wearTitle(t),
+  ];
+}
+
+/** Puts a title on at once, and says so. */
+function wearTitle(t: TitleRef): Child {
+  const worn = signal(false);
+  const error = signal("");
+  return [
+    () =>
+      worn()
+        ? h("span", { class: "muted", role: "status" }, "Сега е под името ти.")
+        : h(
+            "button",
+            {
+              class: "link",
+              type: "button",
+              "aria-label": `Сложи титлата „${t.name}“`,
+              onclick: async () => {
+                try {
+                  await api("PATCH", "/api/me/look", { title: t.id });
+                  worn.set(true);
+                } catch (err) {
+                  error.set((err as ApiError).message);
+                }
+              },
+            },
+            "Сложи я",
+          ),
+    () => error() && h("span", { class: "bad" }, error()),
+  ];
 }

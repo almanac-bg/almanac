@@ -78,7 +78,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
   await a.goto("/settings");
   await a.getByLabel("Име", { exact: true }).fill("Ана Петрова");
-  await a.getByLabel("Таг", { exact: true }).fill(`@${tag}`);
+  await a.getByLabel("Потребителско име", { exact: true }).fill(`@${tag}`);
   await a.getByRole("button", { name: "Запази" }).click();
   await expect(a.getByText("Запазено.")).toBeVisible();
   await a.goto("/me");
@@ -87,16 +87,20 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // Bo asks her by that tag; an unknown tag is said to be unknown.
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  await b.getByLabel("Таг или имейл на приятел").fill("@nosuch_player_here");
+  await b.getByLabel("Потребителско име или имейл на приятел").fill("@nosuch_player_here");
   await b.getByRole("button", { name: "Покани", exact: true }).click();
-  await expect(b.getByText("Няма играч с такъв таг.")).toBeVisible();
-  await b.getByLabel("Таг или имейл на приятел").fill(`@${tag.toUpperCase()}`);
+  await expect(b.getByText("Няма играч с такова потребителско име.")).toBeVisible();
+  await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag.toUpperCase()}`);
   await b.getByRole("button", { name: "Покани", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText(`@${tag}`);
 
-  // Ana sees the dot on Профил and the request on Приятели, and says yes.
-  await a.goto("/friends");
+  // Ana sees the dot on Приятели in the bar and the request there, and says yes.
+  await a.goto("/");
+  const bar = a.getByRole("navigation", { name: "Основно" });
+  await expect(bar.getByRole("link", { name: /Приятели/ })).toHaveClass(/news/);
+  await bar.getByRole("link", { name: /Приятели/ }).click();
+  await expect(a).toHaveURL(/\/friends$/);
   await expect(a.locator(".invitation")).toContainText("иска да сте приятели");
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);

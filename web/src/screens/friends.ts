@@ -36,7 +36,7 @@ interface Friends {
   requests: { in: Request[]; out: Request[] };
 }
 
-/** Приятели, as a page of its own (from the profile). */
+/** Приятели, one of the main places. */
 export function friends(): Child {
   title("Приятели");
   return h("section", { class: "screen" }, friendsCard());
@@ -162,7 +162,11 @@ function friendsCard(): Child {
                   ),
                 ),
               )
-            : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по таг или имейл, или им прати линка си."),
+            : h(
+                "p",
+                { class: "muted" },
+                "Още нямаш приятели тук. Добави ги по потребителско име или имейл, или им прати поканата си.",
+              ),
           adder,
           d.requests.out.length
             ? h(
@@ -190,11 +194,11 @@ function friendsCard(): Child {
                 ),
               )
             : null,
-          shareButton("Покани с линк", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
+          shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
           h(
             "p",
             { class: "muted small" },
-            "Линкът ти: ",
+            "Твоята покана: ",
             h("a", { href: new URL(d.invite).pathname, class: "invite-link" }, d.invite),
           ),
         ];
@@ -226,7 +230,7 @@ function addFriend(reload: () => Promise<void>): Child {
             text: r.friends
               ? `Вече сте приятели с ${r.name}.`
               : byEmail
-                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в приложението."
+                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в играта."
                 : `Поканата до ${r.name} е изпратена.`,
           });
           to.set("");
@@ -247,8 +251,8 @@ function addFriend(reload: () => Promise<void>): Child {
         { class: "add-friend-row" },
         h("input", {
           name: "to",
-          "aria-label": "Таг или имейл на приятел",
-          placeholder: "@таг или имейл",
+          "aria-label": "Потребителско име или имейл на приятел",
+          placeholder: "@име или имейл",
           autocomplete: "off",
           autocapitalize: "none",
           spellcheck: false,
@@ -295,7 +299,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
           "span",
           {
             class: "record",
-            title: `Дуели помежду ви: ${f.won} победи, ${f.lost} загуби${f.drawn ? `, ${f.drawn} равни` : ""}`,
+            title: `Дуели помежду ви: ${f.won} ${f.won === 1 ? "победа" : "победи"}, ${f.lost} ${f.lost === 1 ? "загуба" : "загуби"}${f.drawn ? `, ${f.drawn} равни` : ""}`,
           },
           h("span", { class: "sr" }, "Дуели: "),
           `${f.won} : ${f.lost}`,

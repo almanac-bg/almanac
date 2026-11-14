@@ -235,7 +235,7 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 			rows.Close()
 			return nil, nil, err
 		}
-		look := lookOf(id, avatar, title, points)
+		look := g.lookOf(id, avatar, title, points)
 		r.Look = &look
 		in = append(in, r)
 	}
@@ -352,7 +352,7 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 			rows.Close()
 			return nil, err
 		}
-		f.Look = lookOf(f.ID, avatar, title, total)
+		f.Look = g.lookOf(f.ID, avatar, title, total)
 		if points.Valid {
 			f.Today = &Score{Name: f.Name, Points: int(points.Int64), Rights: int(rights.Int64), Ms: ms.Int64}
 		}
@@ -425,7 +425,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
-		s.Me, s.Look = id == userID, lookOf(id, avatar, title, total)
+		s.Me, s.Look = id == userID, g.lookOf(id, avatar, title, total)
 		others = others || !s.Me
 		board = append(board, s)
 	}

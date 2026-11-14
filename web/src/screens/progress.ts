@@ -1,7 +1,7 @@
 // A player's progress as the server keeps it: the level, every achievement, and what they may look like.
 
 import { api } from "../lib/api.ts";
-import type { AchievementInfo, Tier } from "../ui.ts";
+import type { AchievementInfo, TitleRef } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 
 export interface Progress {
@@ -15,8 +15,9 @@ export interface Progress {
   shapes: { shape: string; locked?: boolean; how?: string }[];
   tones: string[];
   standing: Standing;
-  /** The titles of a season's podium, first to third: won some times, or not yet (0). */
-  podium: { id: string; name: string; tier: Tier; won: number }[];
+  /** Every title, the season podium's first (named by how many times they're won): yours, or locked with what
+   * unlocks it. */
+  titles: TitleView[];
   /** The wardrobe: the frame and pattern worn ("" for none), and all there are. */
   frame: string;
   backdrop: string;
@@ -36,27 +37,10 @@ export interface Cosmetic {
 
 export const loadProgress = () => api<Progress>("GET", "/api/me/progress");
 
-/** A title as the wardrobe lists it: a podium's or an achievement's; earned, or with what unlocks it. */
-export interface TitleInfo {
-  id: string;
-  name: string;
-  tier: Tier;
-  earned: boolean;
-  how: string;
-}
-
-const podiumHow = ["първо място в сезон", "второ място в сезон", "трето място в сезон"];
-
-/** Every title there is: the podium's first, then the achievements'. */
-export function titlesOf(p: Progress): TitleInfo[] {
-  return [
-    ...p.podium.map((t, i) => ({ id: t.id, name: t.name, tier: t.tier, earned: t.won > 0, how: podiumHow[i] ?? "" })),
-    ...p.achievements.map((a) => ({
-      id: a.id,
-      name: a.name,
-      tier: a.tier,
-      earned: !!a.at,
-      how: a.about.charAt(0).toLowerCase() + a.about.slice(1),
-    })),
-  ];
+/** A title as the wardrobe lists it: yours to wear, or locked with what unlocks it. */
+export interface TitleView extends TitleRef {
+  /** Where it comes from: the level, an achievement, a topic's mastery, or the rating (a division, Роял, a season). */
+  group: "level" | "achievement" | "topic" | "rank";
+  locked?: boolean;
+  how?: string;
 }
