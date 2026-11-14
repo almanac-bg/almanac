@@ -19,7 +19,8 @@ import (
 // in a row, how fast, a topic, a type of question, a game without a mistake, duels, Арена, Роял); the two drawn are
 // never of one family, nor of a family drawn the day before, and some are about something drawn with them: a topic, a
 // type of question. A goal done earns its tier's XP, kept as it's done (whether or not the player looks) and told
-// once, at the end of the game that did it.
+// once, at the end of the game that did it. A day with all three done earns a reserve day for the streak (runs.go),
+// and counts towards the achievements for full days.
 
 // Goal is one of the day's goals: what to do, how much of it, and where it's done.
 type Goal struct {

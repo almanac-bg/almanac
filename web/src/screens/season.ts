@@ -52,6 +52,19 @@ export function seasonCard(): Child {
             ),
           )
         : h("p", { class: "board-note" }, "Първите трима в края на сезона печелят медал, рамка и титла."),
+      // What the season pays everyone placed, by the division they end it in.
+      h(
+        "p",
+        { class: "season-pay" },
+        emblem(s.division.id, "s"),
+        h(
+          "span",
+          null,
+          s.place ? "В края на сезона: " : "Класирай се и в края на сезона вземаш ",
+          h("b", { class: "num" }, `+${s.division.xp} XP`),
+          ` за дивизия ${s.division.name}. Колкото по-висока, толкова повече.`,
+        ),
+      ),
       s.past.length
         ? h(
             "ul",
@@ -65,7 +78,11 @@ export function seasonCard(): Child {
                   "span",
                   null,
                   h("b", null, `Сезон ${seasonName(p.id)}`),
-                  h("span", { class: "muted" }, ` · ${place(p.place, p.of)} · ${p.division.name}, ${p.rating}`),
+                  h(
+                    "span",
+                    { class: "muted" },
+                    ` · ${place(p.place, p.of)} · ${p.division.name}, ${p.rating}${p.xp ? ` · +${p.xp} XP` : ""}`,
+                  ),
                 ),
               ),
             ),

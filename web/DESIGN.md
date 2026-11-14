@@ -123,7 +123,8 @@ takes a token.
 - **Progress:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
-  - `.level-card` (with `up` for a new level), `.unlock` (a new achievement), `.badge-mark`.
+  - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a season ended),
+    `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
   - `.achievements`/`.achievement` (and `locked`), `.worn` (what's worn), `.picker`/`.pick` and `.tone-pick` for
     choosing a look.
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
@@ -142,6 +143,7 @@ takes a token.
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
   - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.season-card`
+  - `.unlocks .unlock-row`
 
 ## Tiers
 
@@ -153,8 +155,14 @@ takes a token.
   the tier's colour, where the achievement's own picture is drawn large (`medalPictures`, one per achievement). Epic
   and legendary glow. Locked: grey, with a ring for its progress. Hidden and not found: a „?“, and nothing about how
   or what it gives.
-- Every achievement says how it's earned, how far along the player is, and its reward (the avatar, the
-  title, when it gives one). A title shows in its tier's ink wherever it's worn.
+- Every achievement says how it's earned, how far along the player is, and its reward: its tier's XP, and only
+  what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first
+  of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
+- **One system.** XP comes from answers, the day's goals, achievements and a season's end (by division); the rating
+  from duels, Арена and Роял. Level, achievements, mastery, division, Роял and podium unlock the wardrobe. After a
+  game, everything newly unlocked is told together (`.unlocks`, each with „Сложи“), whatever unlocked it; Профил shows
+  what comes next (`.next`); the day's goals, all three done, earn a reserve day for the streak (`.goals-reserve`,
+  `.week li.saved`). Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
   colours (`art/emblem.ts` places them).

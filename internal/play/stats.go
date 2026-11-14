@@ -6,6 +6,8 @@ import "context"
 type Stats struct {
 	Streak  int      `json:"streak"`
 	Week    [7]bool  `json:"week"`    // this week's days played, Monday first
+	Saved   [7]bool  `json:"saved"`   // this week's days a reserve day kept the streak through
+	Reserve int      `json:"reserve"` // reserve days in hand
 	Days    int      `json:"days"`    // days' questions finished
 	Games   int      `json:"games"`   // runs finished, of every kind
 	Answers int      `json:"answers"` // questions answered (or timed out)
@@ -36,10 +38,11 @@ type Played struct {
 // StatsOf reads a player's stats.
 func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	var s Stats
-	var err error
-	if s.Streak, err = g.Streak(ctx, userID); err != nil {
+	streak, err := g.StreakOf(ctx, userID)
+	if err != nil {
 		return s, err
 	}
+	s.Streak, s.Reserve, s.Saved = streak.Days, streak.Reserve, g.InWeek(streak.Saved)
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}

@@ -12,7 +12,7 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
-import { meter } from "../ui.ts";
+import { meter, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -22,6 +22,8 @@ interface Today {
   streak: number;
   /** This week's days played, Monday first (for a player who has played). */
   week?: boolean[];
+  /** Reserve days in hand: each keeps the streak through a day missed. */
+  reserve?: number;
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
   run: State | null;
@@ -102,6 +104,15 @@ function status(t: Today): Child {
         h("b", { class: "status-n" }, String(days)),
         h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
       ),
+      t.reserve
+        ? h(
+            "span",
+            { class: "status-reserve", title: reserveWords(t.reserve) },
+            picture("shield", "reserve-pic"),
+            h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
+            h("span", { class: "sr" }, reserveWords(t.reserve)),
+          )
+        : null,
     ),
     lv
       ? h(

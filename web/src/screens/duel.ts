@@ -10,7 +10,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { back, formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
+import { back, type Division, formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -41,7 +41,7 @@ export interface DuelView {
 export interface Standing {
   rating: number;
   rated: number;
-  division: { id: "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend"; name: string; from: number };
+  division: Division;
   next: number;
 }
 

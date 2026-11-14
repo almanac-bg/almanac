@@ -40,9 +40,11 @@ export interface Season {
   games: number;
   place?: number;
   of: number;
+  /** The division the player's rating is in now: ended there, the season pays its XP. */
+  division: Standing["division"];
   /** Seasons ended first, second and third. */
   podium: [number, number, number];
-  past: { id: string; place: number; of: number; rating: number; division: Standing["division"] }[];
+  past: { id: string; place: number; of: number; rating: number; division: Standing["division"]; xp: number }[];
 }
 
 interface Answer {

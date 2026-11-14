@@ -1,28 +1,46 @@
-// What a game earned, said once, at its end: the day's goals it finished (with their XP), the level (and whether it
-// went up), how it moved the mastery of its topics, any achievement that came with it, and any title these unlock,
-// which may be worn at once.
+// What a game earned, said once, at its end: the day's goals it finished (with their XP), a season ended (and what it
+// paid), the level (and whether it went up), a division reached for the first time, how it moved the mastery of its
+// topics, any achievement that came with it (with its XP), and — all together — everything these unlocked to wear,
+// each a tap from being worn.
 
+import { emblem } from "../art/emblem.ts";
+import { seasonName } from "../art/season.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { place } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { type AchievementInfo, badge, meter, type TitleRef, tierWords } from "../ui.ts";
+import {
+  type AchievementInfo,
+  badge,
+  type Division,
+  meter,
+  rewardWords,
+  tierWords,
+  type Unlock,
+  unlockPicture,
+  unlockWords,
+} from "../ui.ts";
 import { type MasteryMove, masteryMoves } from "./mastery.ts";
 
 interface News {
   achievements: AchievementInfo[];
   goals: { name: string; xp: number }[];
+  season?: { id: string; place: number; of: number; division: Division; xp: number };
   level: number;
   xp: number;
   from: number;
   to: number;
   levelUp?: boolean;
-  /** The titles the levels just reached unlock. */
-  titles?: TitleRef[];
+  /** A division the rating has reached for the first time. */
+  division?: Division;
+  /** Everything newly unlocked to wear, whatever unlocked it. */
+  unlocks: Unlock[];
+  /** The avatar worn (shape-tone): an unlocked shape is put on in its tone. */
+  avatar: string;
   mastery?: MasteryMove[];
 }
 
-/** The level, a step up, the game's mastery and new achievements, asked for once the game (run) is kept (after
- * `delay`: a duel is kept a moment after it ends). */
+/** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends). */
 export function news(run: number, delay = 0): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
@@ -33,7 +51,7 @@ export function news(run: number, delay = 0): Child {
           // In the order they show, each after the one before (and after the game's end).
           if (n.goals.length) play("goal");
           if (n.levelUp) play("level");
-          if (n.achievements.length) play("achievement");
+          if (n.achievements.length || n.division) play("achievement");
         },
         () => {},
       ),
@@ -45,10 +63,12 @@ export function news(run: number, delay = 0): Child {
     if (!n) return null;
     return [
       n.goals.length ? goalsDone(n.goals) : null,
+      n.season ? seasonEnded(n.season) : null,
       levelCard(n.level, n.xp, n.from, n.to, n.levelUp),
-      (n.titles ?? []).map((t) => levelTitle(t, n.level)),
+      n.division ? divisionReached(n.division) : null,
       masteryMoves(n.mastery ?? []),
       n.achievements.map(unlocked),
+      n.unlocks.length ? unlocks(n.unlocks, n.avatar) : null,
     ];
   };
 }
@@ -103,59 +123,100 @@ function unlocked(a: AchievementInfo): Child {
       h("p", { class: "kicker" }, `Ново ${tierWords[a.tier].one} постижение`),
       h("strong", null, a.name),
       h("span", { class: "muted" }, a.about),
-      a.title ? titleLine(a.title) : null,
+      h("span", { class: "unlock-reward" }, rewardWords(a)),
     ),
   );
 }
 
-/** A title a new level unlocks. */
-function levelTitle(t: TitleRef, level: number): Child {
+/** A season ended: the place, the division it ended in, and the XP that paid. */
+function seasonEnded(s: NonNullable<News["season"]>): Child {
   return h(
     "section",
-    { class: `card unlock t-${t.tier}` },
+    { class: "card unlock season-end" },
+    emblem(s.division.id, "m"),
     h(
       "div",
       { class: "unlock-text" },
-      h("p", { class: "kicker" }, `Нова ${tierWords[t.tier].title.toLowerCase()} титла`),
-      h("strong", { class: "unlock-title-name" }, t.name),
-      h("span", { class: "muted" }, `Идва с ниво ${level}.`),
-      wearTitle(t),
+      h("p", { class: "kicker" }, `Сезон ${seasonName(s.id)} свърши`),
+      h("strong", null, `${place(s.place, s.of)} · ${s.division.name}`),
+      h("span", { class: "unlock-reward" }, `+${s.xp} XP за дивизия ${s.division.name}`),
     ),
   );
 }
 
-/** The title an achievement unlocks, and the way to wear it. */
-function titleLine(t: TitleRef): Child {
-  return [
-    h("span", { class: "unlock-title" }, "Отключва титлата ", h("b", { class: `t-${t.tier}` }, `„${t.name}“`), "."),
-    wearTitle(t),
-  ];
+/** A division the rating has reached for the first time. */
+function divisionReached(d: Division): Child {
+  return h(
+    "section",
+    { class: `card unlock d-${d.id}` },
+    emblem(d.id, "m"),
+    h(
+      "div",
+      { class: "unlock-text" },
+      h("p", { class: "kicker" }, "Нова дивизия"),
+      h("strong", null, d.name),
+      h("span", { class: "muted" }, `Сезон, завършен в нея, носи +${d.xp} XP.`),
+    ),
+  );
 }
 
-/** Puts a title on at once, and says so. */
-function wearTitle(t: TitleRef): Child {
-  const worn = signal(false);
+/** Everything just unlocked to wear, each drawn and a tap from being worn. */
+function unlocks(list: Unlock[], worn: string): Child {
+  return h(
+    "section",
+    { class: "card unlocks" },
+    h("p", { class: "kicker" }, list.length === 1 ? "Отключено" : `Отключени: ${list.length}`),
+    h(
+      "ul",
+      { class: "unlock-list" },
+      list.map((u) =>
+        h(
+          "li",
+          { class: u.tier ? `unlock-row t-${u.tier}` : "unlock-row" },
+          unlockPicture(u, worn),
+          h(
+            "span",
+            { class: "unlock-text" },
+            h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
+            h("span", { class: "muted" }, `С ${u.from}.`),
+          ),
+          wear(u, worn),
+        ),
+      ),
+    ),
+    h("a", { class: "link", href: "/wardrobe" }, "Към гардероба"),
+  );
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Puts an unlock on at once (an avatar's shape in the tone worn), and says so. */
+function wear(u: Unlock, worn: string): Child {
+  const done = signal(false);
   const error = signal("");
+  const [, tone = "gold"] = worn.split("-");
+  const body =
+    u.kind === "avatar" ? { avatar: `${u.id}-${tone}` } : u.kind === "title" ? { title: u.id } : { [u.kind]: u.id };
   return [
     () =>
-      worn()
-        ? h("span", { class: "muted", role: "status" }, "Сега е под името ти.")
+      done()
+        ? h("span", { class: "muted", role: "status" }, "Сложено")
         : h(
             "button",
             {
-              class: "link",
+              class: "btn inline",
               type: "button",
-              "aria-label": `Сложи титлата „${t.name}“`,
+              "aria-label": `Сложи: ${unlockWords(u)}`,
               onclick: async () => {
                 try {
-                  await api("PATCH", "/api/me/look", { title: t.id });
-                  worn.set(true);
+                  await api("PATCH", "/api/me/look", body);
+                  done.set(true);
                 } catch (err) {
                   error.set((err as ApiError).message);
                 }
               },
             },
-            "Сложи я",
+            "Сложи",
           ),
     () => error() && h("span", { class: "bad" }, error()),
   ];

@@ -323,10 +323,11 @@ func (s *Server) season(w http.ResponseWriter, r *http.Request) error {
 
 // seasonNews tells a player placed in a season how it ended.
 func (s *Server) seasonNews(ctx context.Context, n play.SeasonNews) {
-	body := place(n.Place, n.Of) + " в рейтинга. Новият сезон започна."
+	body := fmt.Sprintf("%s в рейтинга и +%d XP. Новият сезон започна.", place(n.Place, n.Of), n.XP)
 	if n.Place <= 3 {
 		title, _ := play.PodiumTitle(n.Place, 1)
-		body = fmt.Sprintf("%s: %s на сезона! Новият сезон започна.", place(n.Place, n.Of), strings.ToLower(title))
+		body = fmt.Sprintf("%s: %s на сезона и +%d XP! Новият сезон започна.", place(n.Place, n.Of),
+			strings.ToLower(title), n.XP)
 	}
 	go s.notify(context.WithoutCancel(ctx), push.Message{URL: "/me", Title: "Сезонът свърши", Body: body}, n.To)
 }
@@ -341,5 +342,9 @@ func (s *Server) goals(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"goals": goals})
+	streak, err := s.game.StreakOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"goals": goals, "reserve": streak.Reserve, "reserveMax": play.ReserveMax})
 }

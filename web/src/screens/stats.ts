@@ -11,6 +11,8 @@ import { stat, streak } from "../ui.ts";
 export interface Stats {
   streak: number;
   week: boolean[];
+  saved: boolean[];
+  reserve: number;
   days: number;
   games: number;
   answers: number;
@@ -62,10 +64,11 @@ export function stats(): Child {
   return () => {
     const s = data();
     if (!s) return null;
-    if (s.games === 0) return [streak(s.streak, s.week), h("p", { class: "muted" }, "Още няма изиграни игри.")];
+    if (s.games === 0)
+      return [streak(s.streak, s.week, s.saved, s.reserve), h("p", { class: "muted" }, "Още няма изиграни игри.")];
     const place = day()?.place;
     return [
-      streak(s.streak, s.week),
+      streak(s.streak, s.week, s.saved, s.reserve),
       h(
         "div",
         { class: "stats" },

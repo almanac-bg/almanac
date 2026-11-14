@@ -2,6 +2,7 @@
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { badgeArt } from "./art/badge.ts";
+import type { DivisionID } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
@@ -146,8 +147,9 @@ function today(): number {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
 }
 
-/** The streak: days in a row with the day's ten, and this week's days played. */
-export function streak(days: number, week?: boolean[]): Child {
+/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), and the reserve
+ * days in hand. */
+export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
@@ -164,6 +166,13 @@ export function streak(days: number, week?: boolean[]): Child {
         h("span", { class: "streak-unit" }, unit),
       ),
       h("p", null, days ? "поред с въпросите на деня" : "Изиграй днешните и започни серия."),
+      h(
+        "p",
+        { class: "streak-reserve" },
+        reserve
+          ? `${reserveWords(reserve)}: ако пропуснеш ден, серията остава.`
+          : "Изпълни и трите цели за деня и печелиш резервен ден за серията.",
+      ),
     ),
     week?.length === 7
       ? h(
@@ -173,8 +182,9 @@ export function streak(days: number, week?: boolean[]): Child {
             h(
               "li",
               {
-                class: [week[i] && "on", i === now && "today"].filter(Boolean).join(" ") || undefined,
-                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : ""}`,
+                class:
+                  [week[i] && "on", saved?.[i] && "saved", i === now && "today"].filter(Boolean).join(" ") || undefined,
+                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : saved?.[i] ? ": пазен с резервен ден" : ""}`,
               },
               h("i", { class: "week-dot" }),
               d,
@@ -184,6 +194,9 @@ export function streak(days: number, week?: boolean[]): Child {
       : null,
   );
 }
+
+/** Reserve days, counted: 1 резервен ден, 2 резервни дни. */
+export const reserveWords = (n: number) => (n === 1 ? "1 резервен ден" : `${n} резервни дни`);
 
 /** A count of games, the way it's said: 1 игра, 2 игри. */
 export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;
@@ -316,8 +329,60 @@ export interface AchievementInfo {
   progress?: number;
   hidden?: boolean;
   at?: number;
-  /** The title it unlocks, if any (not told of a hidden one not yet found). */
-  title?: TitleRef;
+  /** The XP it earns, once. */
+  xp?: number;
+  /** What else it gives: what it unlocks that the player doesn't have yet (once earned, what came with it). Not told
+   * of a hidden one not yet found. */
+  rewards?: Unlock[];
+}
+
+/** A band of rating: where it starts, and the XP a season ended in it pays. */
+export interface Division {
+  id: DivisionID;
+  name: string;
+  from: number;
+  xp: number;
+}
+
+/** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */
+export interface Unlock {
+  kind: "title" | "frame" | "backdrop" | "avatar";
+  /** What to wear it by (an avatar's: its shape). */
+  id: string;
+  /** Its name ("" for an avatar: see `shapeNames`). */
+  name: string;
+  tier?: Tier;
+  /** What unlocks it, as a phrase after „с“: „ниво 5“, „дивизия Злато“. */
+  from: string;
+}
+
+/** What an unlock is, in a word, and its name: „титла „Оракул““, „рамка „Пламъци““. */
+export function unlockWords(u: Unlock): string {
+  const name = u.kind === "avatar" ? (shapeNames[u.id] ?? u.id) : u.name;
+  const kind = { title: "титла", frame: "рамка", backdrop: "фон", avatar: "аватар" }[u.kind];
+  return `${kind} „${name}“`;
+}
+
+/** An achievement's reward, said in a line: its XP and what it unlocks. */
+export function rewardWords(a: AchievementInfo): string {
+  const parts = [a.xp ? `+${a.xp} XP` : "", ...(a.rewards ?? []).map(unlockWords)].filter(Boolean);
+  return parts.join(" · ");
+}
+
+/** An unlock drawn: an avatar's shape, a frame or a pattern on the player's own avatar (`worn`: shape-tone), or a
+ * title in its tier's ink. */
+export function unlockPicture(u: Unlock, worn: string): Child {
+  const [, tone = "gold"] = worn.split("-");
+  switch (u.kind) {
+    case "avatar":
+      return avatar(`${u.id}-${tone}`);
+    case "frame":
+      return avatar(worn, { frame: u.id });
+    case "backdrop":
+      return avatar(worn, { backdrop: u.id });
+    default:
+      return h("span", { class: `unlock-title-mark t-${u.tier ?? "common"}`, "aria-hidden": "true" });
+  }
 }
 
 /** A title: its id (to wear it), its name, and its tier. */

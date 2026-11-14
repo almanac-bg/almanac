@@ -5,7 +5,7 @@ import { picture } from "../art/picture.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { badge, meter, profileNav, shapeNames, tiers, tierWords } from "../ui.ts";
+import { type AchievementInfo, badge, meter, profileNav, rewardWords, tiers, tierWords, unlockWords } from "../ui.ts";
 import { loadProgress, type Progress } from "./progress.ts";
 
 export function rewards() {
@@ -15,6 +15,7 @@ export function rewards() {
     { class: "screen" },
     () => (user() ? profileNav() : null),
     h("h1", null, "Награди"),
+    howItWorks(),
     when(
       () => user(),
       () => {
@@ -56,6 +57,13 @@ function achievements(p: Progress): Child {
           tierWords[tier].group,
           h("span", { class: "muted" }, ` · ${list.filter((a) => a.at).length} от ${list.length}`),
         ),
+        p.tierUnlocks[tier]?.length
+          ? h(
+              "p",
+              { class: "tier-reward" },
+              `Първото ${tierWords[tier].one} постижение отключва ${p.tierUnlocks[tier]?.map(unlockWords).join(" и ")}.`,
+            )
+          : null,
         h(
           "ul",
           { class: "achievements" },
@@ -82,8 +90,8 @@ function achievements(p: Progress): Child {
                 h(
                   "span",
                   { class: "achievement-reward" },
-                  h("span", { class: "reward-mark tone-gold", "aria-hidden": "true" }, picture(a.icon)),
-                  `Награда: аватар „${shapeNames[a.icon] ?? a.icon}“${a.title ? ` и титла „${a.title.name}“` : ""}`,
+                  rewardMark(a),
+                  `${a.at ? "Донесе" : "Награда"}: ${rewardWords(a)}`,
                 ),
               ),
             ),
@@ -92,6 +100,55 @@ function achievements(p: Progress): Child {
         ),
       );
     }),
+  );
+}
+
+/** The picture beside an achievement's reward: the avatar it gives, if it gives one. */
+function rewardMark(a: AchievementInfo): Child {
+  const shape = a.rewards?.find((u) => u.kind === "avatar")?.id;
+  return shape ? h("span", { class: "reward-mark tone-gold", "aria-hidden": "true" }, picture(shape)) : null;
+}
+
+/** How it all fits together, in a few lines: what earns XP, what the rating is for, what unlocks what. */
+export function howItWorks(): Child {
+  return h(
+    "details",
+    { class: "more how" },
+    h("summary", null, "Как се печели"),
+    h(
+      "ul",
+      { class: "how-list" },
+      h(
+        "li",
+        null,
+        h("b", null, "XP и нива. "),
+        "Всеки отговор, всяка цел за деня, всяко постижение и краят на всеки сезон носят XP. XP вдига нивото, а нивата отключват титли, рамки, фонове и короната.",
+      ),
+      h(
+        "li",
+        null,
+        h("b", null, "Рейтинг и дивизии. "),
+        "Дуелите, Арената и Роял местят рейтинга. Нова дивизия отключва титла или рамка, а сезонът, завършен в нея, носи XP: колкото по-висока, толкова повече.",
+      ),
+      h(
+        "li",
+        null,
+        h("b", null, "Постижения. "),
+        "Всяко носи XP според рядкостта си, а някои и аватар, титла или рамка.",
+      ),
+      h(
+        "li",
+        null,
+        h("b", null, "Цели за деня. "),
+        "Три на ден, за XP. Изпълниш ли и трите, печелиш резервен ден: ако пропуснеш ден, серията ти остава.",
+      ),
+      h(
+        "li",
+        null,
+        h("b", null, "Майсторство. "),
+        "Колкото по-добре знаеш една тема, толкова по-високо стигаш в нея: „Майстор“ и „Светило“ са титли.",
+      ),
+    ),
   );
 }
 
@@ -116,7 +173,7 @@ function secret(list: Progress["achievements"]): Child {
         "span",
         { class: "achievement-reward" },
         h("span", { class: "reward-mark secret", "aria-hidden": "true" }),
-        "Награда: ще разбереш",
+        `Награда: +${first.xp ?? 0} XP и още нещо — ще разбереш`,
       ),
     ),
   );

@@ -19,9 +19,11 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
-		if out["streak"], err = s.game.Streak(r.Context(), u.ID); err != nil {
+		streak, err := s.game.StreakOf(r.Context(), u.ID)
+		if err != nil {
 			return err
 		}
+		out["streak"], out["reserve"], out["saved"] = streak.Days, streak.Reserve, s.game.InWeek(streak.Saved)
 		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
 			return err
 		}
@@ -29,7 +31,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		var runID int64
-		err := s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
+		err = s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {
 			st, err := s.game.State(r.Context(), u.ID, runID)
 			if err != nil {

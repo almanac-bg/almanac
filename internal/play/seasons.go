@@ -4,14 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"time"
 )
 
-// Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Арена, Роял) count for the season they're
-// played in; a player with MinSeasonGames of them is placed on its board. When the month ends the board is kept —
-// its first three take the season's podium: a medal, a frame in its metal, and a title that counts how many times
-// („Трикратен шампион“, „Двукратен вицешампион“) — and every rating goes halfway back to the start: the strong stay
-// ahead, but each month is a race again.
+// Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Арена, Роял) count for the season
+// they're played in; a player with MinSeasonGames of them is placed on its board. When the month ends the board is
+// kept: everyone on it is paid the XP of the division they ended in (Division.XP), its first three take the season's
+// podium — a medal, a frame in its metal, and a title that counts how many times („Трикратен шампион“, „Двукратен
+// вицешампион“) — and every rating goes halfway back to the start: the strong stay ahead, but each month is a race
+// again.
 
 const (
 	// MinSeasonGames is how many rated games a season takes to be placed in it: a win or two isn't a season.
@@ -26,9 +28,9 @@ func seasonOf(t time.Time) string { return t.In(Bulgaria).Format("2006-01") }
 
 // SeasonNews is told to each player placed in a season when it ends.
 type SeasonNews struct {
-	To        int64
-	Season    string
-	Place, Of int
+	To            int64
+	Season        string
+	Place, Of, XP int
 }
 
 // ensureSeason ends the season being played if its month is over: it places everyone with enough games in it,
@@ -53,18 +55,19 @@ func (g *Game) ensureSeason(ctx context.Context) error {
 			return err
 		}
 		// The board as it ends: the same order as RatingBoard's.
-		if _, err := tx.Exec(`INSERT INTO season_results (season, user_id, place, rating, games)
-			SELECT ?, id, row_number() OVER (ORDER BY rating DESC, season_games DESC, id), rating, season_games
+		if _, err := tx.Exec(`INSERT INTO season_results (season, user_id, place, rating, games, xp, seen)
+			SELECT ?, id, row_number() OVER (ORDER BY rating DESC, season_games DESC, id), rating, season_games, `+
+			divisionXP("rating")+`, 0
 			FROM users WHERE season_games >= ?`, open, MinSeasonGames); err != nil {
 			return err
 		}
-		rows, err := tx.Query(`SELECT user_id, place, count(*) OVER () FROM season_results WHERE season = ?`, open)
+		rows, err := tx.Query(`SELECT user_id, place, count(*) OVER (), xp FROM season_results WHERE season = ?`, open)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			n := SeasonNews{Season: open}
-			if err := rows.Scan(&n.To, &n.Place, &n.Of); err != nil {
+			if err := rows.Scan(&n.To, &n.Place, &n.Of, &n.XP); err != nil {
 				rows.Close()
 				return err
 			}
@@ -94,6 +97,15 @@ func (g *Game) ensureSeason(ctx context.Context) error {
 	return nil
 }
 
+// divisionXP is a SQL expression for what a season ended at a rating (a column) pays: its division's XP.
+func divisionXP(rating string) string {
+	expr := "CASE"
+	for i := len(Divisions) - 1; i > 0; i-- {
+		expr += " WHEN " + rating + " >= " + strconv.Itoa(Divisions[i].From) + " THEN " + strconv.Itoa(Divisions[i].XP)
+	}
+	return expr + " ELSE " + strconv.Itoa(Divisions[0].XP) + " END"
+}
+
 // Season is the season as a player sees it: which month, the days left, their games in it and their place on its
 // board now, and how the seasons before ended for them.
 type Season struct {
@@ -104,6 +116,8 @@ type Season struct {
 	// Place is where the player stands on the season's board now (0: not placed yet), of Of placed.
 	Place int `json:"place,omitempty"`
 	Of    int `json:"of"`
+	// Division is the one the player's rating is in now: ended there, the season pays its XP (placed or not yet).
+	Division Division `json:"division"`
 	// Podium is how many seasons the player has ended first, second and third.
 	Podium Podium       `json:"podium"`
 	Past   []PastSeason `json:"past"`
@@ -116,6 +130,7 @@ type PastSeason struct {
 	Of       int      `json:"of"`
 	Rating   int      `json:"rating"`
 	Division Division `json:"division"`
+	XP       int      `json:"xp"` // what it paid
 }
 
 // SeasonOf is the season now, as a player sees it (0: nobody signed in, the season alone).
@@ -125,6 +140,7 @@ func (g *Game) SeasonOf(ctx context.Context, userID int64) (Season, error) {
 	}
 	now := g.Now().In(Bulgaria)
 	s := Season{ID: seasonOf(now), MinGames: MinSeasonGames, Past: []PastSeason{}}
+	s.Division, _ = DivisionOf(StartRating)
 	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, Bulgaria)
 	s.DaysLeft = int(end.Sub(now).Hours()/24) + 1
 	db := g.DB.Read
@@ -137,6 +153,7 @@ func (g *Game) SeasonOf(ctx context.Context, userID int64) (Season, error) {
 		Scan(&rating, &s.Games); err != nil {
 		return s, err
 	}
+	s.Division, _ = DivisionOf(rating)
 	if s.Games >= MinSeasonGames {
 		if err := db.QueryRowContext(ctx, `SELECT 1 + count(*) FROM users WHERE season_games >= ?1
 			AND (rating > ?2 OR (rating = ?2 AND (season_games > ?3 OR (season_games = ?3 AND id < ?4))))`,
@@ -144,7 +161,7 @@ func (g *Game) SeasonOf(ctx context.Context, userID int64) (Season, error) {
 			return s, err
 		}
 	}
-	rows, err := db.QueryContext(ctx, `SELECT r.season, r.place, r.rating,
+	rows, err := db.QueryContext(ctx, `SELECT r.season, r.place, r.rating, r.xp,
 			(SELECT count(*) FROM season_results x WHERE x.season = r.season)
 		FROM season_results r WHERE r.user_id = ? ORDER BY r.season DESC`, userID)
 	if err != nil {
@@ -153,7 +170,7 @@ func (g *Game) SeasonOf(ctx context.Context, userID int64) (Season, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var p PastSeason
-		if err := rows.Scan(&p.ID, &p.Place, &p.Rating, &p.Of); err != nil {
+		if err := rows.Scan(&p.ID, &p.Place, &p.Rating, &p.XP, &p.Of); err != nil {
 			return s, err
 		}
 		p.Division, _ = DivisionOf(p.Rating)
