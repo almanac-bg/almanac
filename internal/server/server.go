@@ -120,12 +120,17 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.OnArena = s.arenaEnded
+	s.rooms.Crowd = s.game.Crowd
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
 	return s, nil
 }
+
+// CountCrowds counts how players have answered each question, so that the first answers after a start show it
+// (later counts run by themselves as they fall due).
+func (s *Server) CountCrowds(ctx context.Context) error { return s.game.CountCrowds(ctx) }
 
 // SetBank swaps in a new bank (a reload): new plays use it, plays under way keep theirs.
 func (s *Server) SetBank(b *bank.Bank) { s.bank.Store(b) }

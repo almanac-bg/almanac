@@ -81,7 +81,7 @@ func grade(t *testing.T, d Dealt, answer string) Graded {
 func revealed(t *testing.T, d Dealt) map[string]any {
 	t.Helper()
 	var r map[string]any
-	b, _ := json.Marshal(d.Reveal())
+	b, _ := json.Marshal(d.Reveal(nil))
 	if err := json.Unmarshal(b, &r); err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestMatchGrading(t *testing.T) {
 			t.Fatalf("seed %d: all right graded %+v", seed, g)
 		}
 		var rev struct{ Pairs []int }
-		_ = json.Unmarshal(mustJSON(d.Reveal()), &rev)
+		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
 		if !slices.Equal(rev.Pairs, right) {
 			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Pairs, right)
 		}
@@ -455,10 +455,90 @@ func TestLuckTakenOut(t *testing.T) {
 				right++
 			}
 		}
-		match += matchScore(right, 4-right, 4)
+		match += matchScore(right, 4-right, 4, 4)
 	}
 	order, match = order/float64(len(perms)), match/float64(len(perms))
 	if math.Abs(order-7.0/36) > 1e-9 || math.Abs(match-0.125) > 1e-9 {
 		t.Errorf("at random: an order is worth %v, a match %v", order, match)
+	}
+	// With a decoy: the four lefts joined at random to four of five rights.
+	decoy, n := 0.0, 0
+	for _, p := range injections(4, 5) {
+		right := 0
+		for i, v := range p {
+			if i == v {
+				right++
+			}
+		}
+		decoy += matchScore(right, 4-right, 4, 5)
+		n++
+	}
+	if decoy /= float64(n); math.Abs(decoy-53.0/480) > 1e-9 {
+		t.Errorf("at random: a match with a decoy is worth %v", decoy)
+	}
+}
+
+// injections lists every way to give each of k things a different one of n.
+func injections(k, n int) [][]int {
+	if k == 0 {
+		return [][]int{{}}
+	}
+	var out [][]int
+	for _, p := range injections(k-1, n) {
+		for v := range n {
+			if !slices.Contains(p, v) {
+				out = append(out, append(slices.Clone(p), v))
+			}
+		}
+	}
+	return out
+}
+
+func TestMatchDecoy(t *testing.T) {
+	q := &Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{
+		{"Австралия", "Канбера"}, {"Канада", "Отава"}, {"Турция", "Анкара"}, {"Нигерия", "Абуджа"},
+	}, Decoy: "Сидни"}
+	capital := map[string]string{"Австралия": "Канбера", "Канада": "Отава", "Турция": "Анкара", "Нигерия": "Абуджа"}
+	for seed := range uint64(20) {
+		d := q.Deal(seed)
+		var view struct{ Left, Right []string }
+		_ = json.Unmarshal(mustJSON(d.View()), &view)
+		if len(view.Left) != 4 || len(view.Right) != 5 || !slices.Contains(view.Right, "Сидни") {
+			t.Fatalf("seed %d: dealt %v / %v", seed, view.Left, view.Right)
+		}
+		right := make([]int, 4)
+		for i, l := range view.Left {
+			right[i] = slices.Index(view.Right, capital[l])
+		}
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: right}))); !g.Right || g.Score != 1 {
+			t.Fatalf("seed %d: all right graded %+v", seed, g)
+		}
+		var rev struct {
+			Pairs []int
+			Decoy *int
+		}
+		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
+		if !slices.Equal(rev.Pairs, right) || rev.Decoy == nil || view.Right[*rev.Decoy] != "Сидни" {
+			t.Fatalf("seed %d: revealed %+v", seed, rev)
+		}
+		// Three right and the fourth on the decoy: three quarters, less a quarter of one.
+		trap := slices.Clone(right)
+		trap[0] = *rev.Decoy
+		g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: trap})))
+		if g.Right || math.Abs(g.Score-(3-0.25)/4) > 1e-9 {
+			t.Fatalf("seed %d: three and the decoy graded %+v", seed, g)
+		}
+		// The log keeps the decoy as the place past the pairs, whatever the deal.
+		var given MatchAnswer
+		_ = json.Unmarshal(g.Given, &given)
+		if !slices.Contains(given.Pairs, 4) {
+			t.Fatalf("seed %d: logged %v", seed, given.Pairs)
+		}
+	}
+	if p := (&Match{Pairs: q.Pairs, Decoy: "Отава"}).check(); len(p) == 0 {
+		t.Error("a decoy that is one of the rights passed")
+	}
+	if _, err := q.Deal(1).Grade(json.RawMessage(`{"pairs":[0,1,2,5]}`)); err == nil {
+		t.Error("a right past the column was graded")
 	}
 }

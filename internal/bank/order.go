@@ -148,7 +148,7 @@ func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 	}, nil
 }
 
-func (d *dealtOrder) Reveal() any {
+func (d *dealtOrder) Reveal(c *Crowd) any {
 	shownAt := make([]int, len(d.order))
 	for i, b := range d.order {
 		shownAt[b] = i
@@ -167,7 +167,7 @@ func (d *dealtOrder) Reveal() any {
 		Values []float64 `json:"values"`
 		Unit   string    `json:"unit,omitempty"`
 		reveal
-	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail)}
+	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
 }
 
 // orderScore is what an order is worth: how many of its pairs stand the right way round, less how many stand the

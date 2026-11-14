@@ -61,9 +61,9 @@ func (d *dealtTrueFalse) Grade(answer json.RawMessage) (Graded, error) {
 	return g, nil
 }
 
-func (d *dealtTrueFalse) Reveal() any {
+func (d *dealtTrueFalse) Reveal(c *Crowd) any {
 	return struct {
 		Truth bool `json:"truth"`
 		reveal
-	}{d.q.Answer, revealOf(&d.q.Head, &d.q.Tail)}
+	}{d.q.Answer, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
 }

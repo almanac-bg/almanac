@@ -93,7 +93,7 @@ func (d *dealtChoice) Grade(answer json.RawMessage) (Graded, error) {
 	return g, nil
 }
 
-func (d *dealtChoice) Reveal() any {
+func (d *dealtChoice) Reveal(c *Crowd) any {
 	right := 0
 	for i, b := range d.order {
 		if b == 0 {
@@ -103,7 +103,7 @@ func (d *dealtChoice) Reveal() any {
 	return struct {
 		Pick int `json:"pick"`
 		reveal
-	}{right, revealOf(&d.q.Head, &d.q.Tail)}
+	}{right, revealOf(&d.q.Head, &d.q.Tail, c.view(d.order))}
 }
 
 // fold makes two texts compare the same when they differ only in case or spacing.

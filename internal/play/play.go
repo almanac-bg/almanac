@@ -72,7 +72,8 @@ type Game struct {
 	seasonMu sync.Mutex
 	season   string // the season being played, once ensureSeason has seen it
 
-	hard hardnessCache // how hard each question is (mastery.go)
+	hard   hardnessCache // how hard each question is (mastery.go)
+	crowds crowdCache    // how players have answered each question (crowd.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -385,7 +386,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			return err
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
-		res.Reveal = d.Reveal()
+		res.Reveal = d.Reveal(g.Crowd(d.Question().Base().ID))
 		res.State, err = g.state(tx, r)
 		return err
 	})
@@ -447,7 +448,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 		if !ok {
 			continue // gone from the bank since
 		}
-		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), d.Reveal()
+		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), d.Reveal(g.Crowd(d.Question().Base().ID))
 		it.Given = json.RawMessage("null")
 		if shown.Valid {
 			it.Given = json.RawMessage(shown.String)

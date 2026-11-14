@@ -141,10 +141,10 @@ func (d *dealtNumber) Grade(answer json.RawMessage) (Graded, error) {
 	return Graded{Score: score, Right: score >= RightFrom, Exact: d.q.Exact(guess), Given: given, Shown: given}, nil
 }
 
-func (d *dealtNumber) Reveal() any {
+func (d *dealtNumber) Reveal(c *Crowd) any {
 	return struct {
 		Value float64 `json:"value"`
 		Unit  string  `json:"unit,omitempty"`
 		reveal
-	}{d.q.Answer, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail)}
+	}{d.q.Answer, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
 }

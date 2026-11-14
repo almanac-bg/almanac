@@ -193,7 +193,7 @@ func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
 		head := q.Base()
 		known := labelKnown[head.Difficulty]
 		if t := answered[head.ID]; t.n > 0 {
-			luck := chance[head.Type]
+			luck := chanceOf(q)
 			seen := min(max((t.sum/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
 			known = (float64(t.n)*seen + hardnessPrior*known) / float64(t.n+hardnessPrior)
 		}
@@ -237,9 +237,9 @@ func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID,
 		if !ok {
 			a = newAbility()
 		}
-		a.learn(score, h.byID[id], chance[head.Type])
+		a.learn(score, h.byID[id], chanceOf(q))
 		topics[head.Category] = a
-		all.learn(score, h.byID[id], chance[head.Type])
+		all.learn(score, h.byID[id], chanceOf(q))
 	}
 	return topics, all, rows.Err()
 }

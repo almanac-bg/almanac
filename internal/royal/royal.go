@@ -663,7 +663,7 @@ func (h *Hub) View(viewer int64) View {
 		if t.phase == play.RoyalReveal {
 			q.LeftMs = 0
 			q.NextMs = max(1, (Pause - now.Sub(t.at)).Milliseconds())
-			q.Reveal = &RevealView{Answer: d.Reveal()}
+			q.Reveal = &RevealView{Answer: d.Reveal(h.game.Crowd(d.Question().Base().ID))}
 			if me != nil && me.inQ {
 				r := me.res
 				q.Reveal.Mine, q.Reveal.Points, q.Reveal.Speed = true, r.Points, r.Speed
