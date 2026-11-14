@@ -3,7 +3,7 @@
 
 import { type Child, h } from "../lib/dom.ts";
 import { categories } from "../state.ts";
-import { meter, questions, toneOf } from "../ui.ts";
+import { meter, questions, toneOf, topicMark } from "../ui.ts";
 
 export interface Mastery {
   category: string;
@@ -57,7 +57,7 @@ function row(m: Mastery, extra: Child = null): Child {
     h(
       "div",
       { class: "mastery-head" },
-      h("span", { class: "mastery-topic" }, h("span", { class: "dot", "aria-hidden": "true" }), topicName(m.category)),
+      h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category)),
       m.sure ? masteryBadge(m) : null,
     ),
     m.sure ? meter(m.known, `${m.known}% от темата`) : null,

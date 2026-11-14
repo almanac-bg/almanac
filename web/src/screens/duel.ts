@@ -10,7 +10,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { formatNumber, meter, profileHref, type Tier, who } from "../ui.ts";
+import { formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -150,6 +150,7 @@ export function duel() {
     h(
       "div",
       { class: "intro" },
+      pageArt("duel", "tone-rose"),
       h("h1", null, "Дуел"),
       h(
         "p",

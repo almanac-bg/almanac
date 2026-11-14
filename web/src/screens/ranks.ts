@@ -9,7 +9,7 @@ import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Tier, toneOf } from "../ui.ts";
+import { type Tier, toneOf, topicMark } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 
 interface Ranked {
@@ -139,7 +139,7 @@ export function ranks() {
                       "aria-pressed": () => topic() === c.id,
                       onclick: () => pick(topic, c.id),
                     },
-                    h("span", { class: "dot", "aria-hidden": "true" }),
+                    topicMark(c.id),
                     c.name,
                   ),
                 ),
