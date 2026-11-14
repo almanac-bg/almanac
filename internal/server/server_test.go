@@ -675,7 +675,8 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	subscribe := func(p *player, path string) {
 		t.Helper()
 		browser, _ := ecdh.P256().GenerateKey(rand.Reader)
-		sub := map[string]any{"endpoint": ps.URL + path, "keys": map[string]string{
+		// As a browser sends it (PushSubscription.toJSON), expirationTime and all.
+		sub := map[string]any{"endpoint": ps.URL + path, "expirationTime": nil, "keys": map[string]string{
 			"p256dh": base64.RawURLEncoding.EncodeToString(browser.PublicKey().Bytes()),
 			"auth":   base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef")),
 		}}
