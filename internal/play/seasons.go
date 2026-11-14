@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Роял) count for the season they're
+// Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Арена, Роял) count for the season they're
 // played in; a player with MinSeasonGames of them is placed on its board. When the month ends the board is kept —
 // its first three take the season's podium: a medal, a frame in its metal, and a title that counts how many times
 // („Трикратен шампион“, „Двукратен вицешампион“) — and every rating goes halfway back to the start: the strong stay

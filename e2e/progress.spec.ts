@@ -30,7 +30,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the hedgehog is drawn on its tile.
   await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
-  await page.getByRole("button", { name: "Корона, заключена" }).click();
+  await page.getByRole("button", { name: "Корона, заключено" }).click();
   await expect(page.getByText("Короната се отключва на ниво 10.")).toBeVisible();
 
   // Sounds are on until turned off, and stay off on this device.

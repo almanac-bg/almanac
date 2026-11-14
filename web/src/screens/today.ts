@@ -9,7 +9,7 @@ import { playRun, trail } from "../game/run.ts";
 import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
+import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 import { meter } from "../ui.ts";
@@ -69,7 +69,7 @@ export function today() {
             h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
               const b = fresh().board;
               return b.place
-                ? h("a", { class: "place-line", href: "/ranks" }, `${ordinal(b.place)} от ${b.players} днес`)
+                ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
                 : null;
             }),
             just ? news(run.id) : null,

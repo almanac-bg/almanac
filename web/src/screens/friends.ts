@@ -6,7 +6,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
-import { avatar, formatNumber, pageArt, profileHref, type Tier } from "../ui.ts";
+import { avatar, formatNumber, pageArt, profileHref, record, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
@@ -300,7 +300,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
           "span",
           {
             class: "record",
-            title: `Дуели помежду ви: ${f.won} ${f.won === 1 ? "победа" : "победи"}, ${f.lost} ${f.lost === 1 ? "загуба" : "загуби"}${f.drawn ? `, ${f.drawn} равни` : ""}`,
+            title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}`,
           },
           h("span", { class: "sr" }, "Дуели: "),
           `${f.won} : ${f.lost}`,

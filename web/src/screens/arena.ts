@@ -69,7 +69,7 @@ export function arena() {
     () => {
       switch (trouble()) {
         case "replaced":
-          return h("p", { class: "status", role: "status" }, "Чакаш за арена в друг прозорец.");
+          return h("p", { class: "status", role: "status" }, "Вече чакаш за арена в друг прозорец.");
         case "gone":
           return h(
             "div",

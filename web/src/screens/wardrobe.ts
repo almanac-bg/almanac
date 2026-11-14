@@ -21,9 +21,9 @@ const parts: [Part, string][] = [
 /** The groups of titles still locked, as headed. */
 const titleGroups: [TitleView["group"], string][] = [
   ["level", "С нивата"],
-  ["achievement", "С постижения"],
-  ["topic", "С майсторство в тема"],
-  ["rank", "С рейтинга, Роял и сезона"],
+  ["achievement", "С постиженията"],
+  ["topic", "С майсторството в темите"],
+  ["rank", "С рейтинга, Роял и сезоните"],
 ];
 
 export function wardrobe() {
@@ -160,7 +160,7 @@ function avatars(p: Progress, set: (body: { avatar: string }) => void, told: { s
               class: s.locked ? "pick locked" : "pick",
               type: "button",
               "aria-pressed": s.shape === shape,
-              "aria-label": s.locked ? `${shapeNames[s.shape]}, заключена` : shapeNames[s.shape],
+              "aria-label": s.locked ? `${shapeNames[s.shape]}, заключено` : shapeNames[s.shape],
               onclick: () =>
                 s.locked
                   ? told.set(
@@ -200,8 +200,8 @@ function wear(
             class: c.locked ? "pick locked" : "pick",
             type: "button",
             "aria-pressed": c.id === worn,
-            "aria-label": c.locked ? `${c.name}, заключена` : c.name,
-            onclick: () => (c.locked ? told.set(`${c.name}: отключва се с ${c.how}.`) : put(c.id)),
+            "aria-label": c.locked ? `${c.name}, заключено` : c.name,
+            onclick: () => (c.locked ? told.set(`${c.name}. Отключва се: ${c.how}.`) : put(c.id)),
           },
           preview(c.id),
         ),

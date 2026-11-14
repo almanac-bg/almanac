@@ -163,7 +163,7 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 			if streak == 1 {
 				days = "ден"
 			}
-			body = fmt.Sprintf("Серията ти е %d %s. Не я изпускай: десет въпроса, до полунощ.", streak, days)
+			body = fmt.Sprintf("Серията ти е %d %s. Не я прекъсвай: десет въпроса, до полунощ.", streak, days)
 		}
 		s.notify(ctx, push.Message{Title: "Въпросите на деня те чакат", Body: body, URL: "/"}, id)
 	}
@@ -171,21 +171,25 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	return len(users)
 }
 
-// ordinal is a player's place in digits, as Bulgarian writes it: 1-ви, 2-ри, 3-ти, 4-ти, 5-и … 11-и … 21-ви, 100-тен.
+// place is a player's place among others, said of the place so that it reads the same to everyone: „3-то място от 12“.
+func place(n, of int) string { return fmt.Sprintf("%s място от %d", ordinal(n), of) }
+
+// ordinal is n as the ordinal of a neuter word („място“), in digits as Bulgarian writes it: 1-во, 2-ро, 3-то, 4-то,
+// 5-о … 11-о … 21-во, 100-тно, 1000-но.
 func ordinal(n int) string {
-	end := "и"
+	end := "о"
 	switch tens := n % 100; {
 	case n > 0 && n%1000 == 0:
-		end = "ен"
+		end = "но"
 	case n > 0 && tens == 0:
-		end = "тен"
+		end = "тно"
 	case tens >= 11 && tens <= 19:
 	case n%10 == 1:
-		end = "ви"
+		end = "во"
 	case n%10 == 2:
-		end = "ри"
+		end = "ро"
 	case n%10 == 3, n%10 == 4:
-		end = "ти"
+		end = "то"
 	}
 	return fmt.Sprintf("%d-%s", n, end)
 }

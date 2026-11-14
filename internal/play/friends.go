@@ -291,7 +291,7 @@ func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
 	return nil
 }
 
-// RequestsWaiting is how many friend requests wait for a player's answer (for the dot on Заедно).
+// RequestsWaiting is how many friend requests wait for a player's answer (for the dot on Приятели).
 func (g *Game) RequestsWaiting(ctx context.Context, userID int64) (int, error) {
 	var n int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests

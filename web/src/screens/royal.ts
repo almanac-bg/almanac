@@ -10,7 +10,7 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
+import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing, user } from "../state.ts";
@@ -244,7 +244,7 @@ function history(list: Past[]): Child {
           h(
             "span",
             { class: "royal-past" },
-            h("strong", null, me ? `${ordinal(me.place)} от ${t.players.length}` : "—"),
+            h("strong", null, me ? place(me.place, t.players.length) : "—"),
             h(
               "span",
               { class: "muted" },
@@ -472,7 +472,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
           ? "Печелиш Роял!"
           : me
             ? first.entered > 1 && me.place
-              ? `${ordinal(me.place)} от ${first.entered}`
+              ? place(me.place, first.entered)
               : "Роял свърши"
             : best
               ? `${best.name} печели`

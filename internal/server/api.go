@@ -28,8 +28,8 @@ type apiError struct {
 func (e *apiError) Error() string { return e.code }
 
 var (
-	errNotFound   = &apiError{http.StatusNotFound, "not_found", "Няма такова нещо."}
-	errBadRequest = &apiError{http.StatusBadRequest, "bad_request", "Нещо в заявката не е наред."}
+	errNotFound   = &apiError{http.StatusNotFound, "not_found", "Не го намираме."}
+	errBadRequest = &apiError{http.StatusBadRequest, "bad_request", "Нещо не е наред. Опитай пак."}
 	errSignedOut  = &apiError{http.StatusUnauthorized, "signed_out", "Първо влез в профила си."}
 	errTooMany    = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много опити. Опитай пак малко по-късно."}
 )
@@ -48,20 +48,20 @@ var playerErrors = map[error]*apiError{
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
 	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
 	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
-	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Пет твои предизвикателства чакат приятели. Изчакай някое да свърши."},
+	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Пет твои дуела чакат приятели. Изчакай някой от тях да свърши."},
 	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
 	live.ErrNoMatch:        {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
-	live.ErrNotNow:         {http.StatusConflict, "not_now", "Не точно сега."},
+	live.ErrNotNow:         {http.StatusConflict, "not_now", "Сега това не може."},
 	live.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
-	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Чакат отговор твърде много покани: до 50."},
+	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор: до 50."},
 	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял е отворен от 20:45 до 21:00."},
-	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Не точно сега."},
+	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Сега това не може."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
 	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави домакинът."},
-	room.ErrNotNow:         {http.StatusConflict, "not_now", "Не точно сега."},
+	room.ErrNotNow:         {http.StatusConflict, "not_now", "Сега това не може."},
 	room.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	room.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_rooms", "Твърде много отворени стаи. Опитай след малко."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
