@@ -7,11 +7,13 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// slot is what a place in a run asks for: a difficulty, a type, and a picture or not.
+// slot is what a place in a run asks for: a difficulty, a type, and a picture or not. A slot for a kind still new to
+// the bank (alt set) takes alt instead where the pool has none of its own.
 type slot struct {
 	difficulty bank.Difficulty
 	typ        string
 	picture    picture
+	alt        string
 }
 
 type picture int8
@@ -23,19 +25,19 @@ const (
 )
 
 // daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not early, an
-// order and a match in the middle, and a number to finish on (closest wins). A slot whose type a topic lacks takes a
-// choice instead (choose).
+// order, a split and a match in the middle, and a number to finish on (closest wins). A slot whose type a topic lacks
+// takes a choice instead (choose).
 var daySlots = []slot{
-	{bank.Easy, "choice", noPicture},
-	{bank.Easy, "choice", withPicture},
-	{bank.Easy, "truefalse", noPicture},
-	{bank.Medium, "choice", noPicture},
-	{bank.Medium, "order", noPicture},
-	{bank.Medium, "choice", noPicture},
-	{bank.Medium, "match", noPicture},
-	{bank.Hard, "choice", noPicture},
-	{bank.Hard, "choice", noPicture},
-	{bank.Hard, "number", noPicture},
+	{bank.Easy, "choice", noPicture, ""},
+	{bank.Easy, "choice", withPicture, ""},
+	{bank.Easy, "truefalse", noPicture, ""},
+	{bank.Medium, "choice", noPicture, ""},
+	{bank.Medium, "order", noPicture, ""},
+	{bank.Medium, "split", noPicture, "choice"},
+	{bank.Medium, "match", noPicture, ""},
+	{bank.Hard, "choice", noPicture, ""},
+	{bank.Hard, "choice", noPicture, ""},
+	{bank.Hard, "number", noPicture, ""},
 }
 
 // drawDay draws a day: each slot from another topic, never a question an earlier day had (while any are left). The
@@ -74,7 +76,9 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 			}
 			assigned[i] = next(
 				has(func(q bank.Question) bool { return matches(q, s, true, true) }),
-				has(func(q bank.Question) bool { return matches(q, slot{q.Base().Difficulty, s.typ, s.picture}, true, true) }),
+				has(func(q bank.Question) bool {
+					return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
+				}),
 			)
 		}
 	}
@@ -94,6 +98,9 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
 // gets — the type kept longest, then the difficulty — and a fresh one before one that isn't.
 func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) bool, r *rand.Rand) bank.Question {
+	if s.alt != "" && !slices.ContainsFunc(pool, func(q bank.Question) bool { return q.Base().Type == s.typ && allowed(q) }) {
+		s.typ = s.alt
+	}
 	fits := []func(bank.Question) bool{
 		func(q bank.Question) bool { return matches(q, s, true, true) },
 		func(q bank.Question) bool { return matches(q, s, true, false) },

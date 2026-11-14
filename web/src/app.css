@@ -2012,6 +2012,163 @@
     color: var(--text-muted);
   }
 
+  /* „Раздели“: the things one by one on a card, sent left or right; the two groups under them. */
+  .split {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .split-deck {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 11rem;
+    touch-action: pan-y;
+  }
+
+  .split-card {
+    position: absolute;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+    width: 82%;
+    min-height: 9rem;
+    padding: var(--space-5) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--raised);
+    box-shadow:
+      var(--elev-2),
+      inset 0 0 0 1px var(--line);
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 800;
+    text-align: center;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    user-select: none;
+    touch-action: none;
+    cursor: grab;
+    transition:
+      transform 220ms ease,
+      opacity 220ms ease;
+  }
+
+  .split-card.under {
+    transform: translateY(10px) scale(0.94);
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .split-card.dragging {
+    cursor: grabbing;
+    transition: none;
+  }
+
+  .split-card.gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .split-card.went-left {
+    transform: translateX(-130%) rotate(-14deg);
+  }
+
+  .split-card.went-right {
+    transform: translateX(130%) rotate(14deg);
+  }
+
+  /* While dragged far enough, the card names the group it's going to. */
+  .split-lean {
+    position: absolute;
+    top: var(--space-3);
+    max-width: 45%;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    color: var(--on-accent);
+    font: 800 0.75rem / 1.2 var(--font-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .split-lean.on-left {
+    left: var(--space-3);
+  }
+
+  .split-lean.on-right {
+    right: var(--space-3);
+  }
+
+  .split-card.lean-left .split-lean.on-left,
+  .split-card.lean-right .split-lean.on-right {
+    opacity: 1;
+  }
+
+  .split-text {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .split-sides {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .option.split-side {
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 10px var(--space-3);
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .split-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .split-arrow {
+    color: var(--text-muted);
+  }
+
+  .split-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 2rem;
+  }
+
+  .split-pips {
+    display: flex;
+    gap: 6px;
+  }
+
+  .split-pips b {
+    width: 20px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--sunken);
+  }
+
+  .split-pips b.done {
+    background: var(--gold);
+  }
+
+  .split-result {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .split-pair {
+    flex: 1;
+    min-width: 0;
+  }
+
   /* „Свържи“: two columns, and a line for each pair joined. */
   .match {
     position: relative;
@@ -4580,6 +4737,7 @@
     .btn,
     .option,
     .option.crowd,
+    .split-card,
     .topic,
     .chip {
       transition: none;

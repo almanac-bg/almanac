@@ -24,9 +24,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 ## The aims (the owner's rules)
 
 - **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`), judged by the rubric below.
-- **Kinds: 60% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match**, in every category (`bank.TypeMix`),
-  close to what the game draws (a run of ten has six choices and one of each other kind), so that no kind runs out
-  long before the others.
+- **Kinds: 55% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split** (once „Подсказки“ joins:
+  50% choice and 5% of it), in every category (`bank.TypeMix`), close to what the game draws (a run of ten has five
+  choices and one of each other kind), so that no kind runs out long before the others.
 - **The bank must be fully balanced, always** (the owner's rule): every category the same size; in it, the kinds in
   their mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15%
   hard, like its choices). So every category has exactly the same count in every cell: as many hard number
@@ -64,6 +64,8 @@ By kind:
   follows: generous for easy, tight for hard.
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
+- **Split:** easy groups are what most people tell apart already (a mammal or not); hard ones need the detail
+  (Ботев or Вазов by a lesser poem), with items that look alike across the groups.
 - **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
   rights) alike. The decoy sets the difficulty too: a far one for easy, a close one for hard.
 - **A picture** makes a question easier only if it shows the answer's look to people who'd recognise it.
@@ -80,7 +82,7 @@ Every question is one JSON object in its category's file:
 | Field                | What                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `id`                 | The category's prefix and a number (`his-412`). Next free number; never reuse or change one |
-| `type`               | `choice`, `number`, `order`, `truefalse` or `match`                                      |
+| `type`               | `choice`, `number`, `order`, `truefalse`, `match` or `split`                             |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 200 characters (see below)                                 |
@@ -99,6 +101,11 @@ By type:
   `unit`. The text says the direction.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. 10 seconds to answer.
+- **`split`:** „Раздели“. The text asks the one question that sorts („Бозайник ли е животното?“, „Чия е
+  творбата: на Ботев или на Вазов?“), `groups` are the two answers to it (each at most 24 characters, left first),
+  and six `items` (`text` at most 45 characters, `group` 0 or 1), at least two in each group. Every item belongs to
+  its group under every source, and to only that one: a pair of groups that leaves room for „both“ or „neither“
+  („Европа или Азия?“ for Турция) is not a split. The game shows the items one by one in its own order. 30 seconds.
 - **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), four `pairs` of `left` and
   `right`, and a `decoy`: a fifth right that fits no left, each at most 30 characters. Every left has exactly one
   right that fits, under every source, and the decoy fits none of them (check it as hard as an answer). The decoy is

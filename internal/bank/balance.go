@@ -9,13 +9,14 @@ var Mix = map[Difficulty]float64{Easy: 0.50, Medium: 0.35, Hard: 0.15}
 // Difficulties in order, easy first.
 var Difficulties = []Difficulty{Easy, Medium, Hard}
 
-// TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13),
-// close to what the game draws: a run of ten has six choices and one of each other kind, and Роял adds true-or-not.
-// So that no kind runs out long before the others.
-var TypeMix = map[string]float64{"choice": 0.60, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075}
+// TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13;
+// splits since 2026-11-14), close to what the game draws: a run of ten has five choices and one of each other kind,
+// and Роял adds true-or-not. So that no kind runs out long before the others. (The owner's aim once „Подсказки“ joins:
+// choices 50%, splits and clues 5% each.)
+var TypeMix = map[string]float64{"choice": 0.55, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075, "split": 0.05}
 
 // TypeOrder is the kinds in the order a report shows them.
-var TypeOrder = []string{"choice", "truefalse", "number", "order", "match"}
+var TypeOrder = []string{"choice", "truefalse", "number", "order", "match", "split"}
 
 // Balance is how a bank stands against its aims: what it has, and what it takes to reach them by adding questions
 // (never by dropping any).

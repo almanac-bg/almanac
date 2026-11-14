@@ -55,7 +55,14 @@ export interface MatchView extends ViewBase {
   right: string[];
 }
 
-export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView;
+/** „Раздели“: six things, one by one, each sent to one of two groups. */
+export interface SplitView extends ViewBase {
+  type: "split";
+  groups: [string, string];
+  items: string[];
+}
+
+export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView | SplitView;
 
 /** The answer, as the deal showed it, with the fact behind it. */
 export interface Reveal {
@@ -71,6 +78,8 @@ export interface Reveal {
   pairs?: number[];
   /** Where a match's decoy is shown: the right that is no left's pair. */
   decoy?: number;
+  /** A split's groups: for each item (as shown), the group it belongs to. */
+  sides?: number[];
   unit?: string;
   fact?: string;
   credit?: Credit;
@@ -104,7 +113,9 @@ export type Answer =
   | { order: number[] }
   | { truth: boolean }
   /** For each left (as shown), the right joined to it, or -1. */
-  | { pairs: number[] };
+  | { pairs: number[] }
+  /** For each item (as shown), the group it was sent to, or -1. */
+  | { sides: number[] };
 
 export interface Mark {
   points: number;

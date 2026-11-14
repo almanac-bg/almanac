@@ -37,7 +37,7 @@ func Limit(q bank.Question) time.Duration {
 	switch q.Base().Type {
 	case "truefalse":
 		return 10 * time.Second
-	case "order", "match":
+	case "order", "match", "split":
 		return 30 * time.Second
 	}
 	return 20 * time.Second

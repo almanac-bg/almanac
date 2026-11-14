@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -66,6 +67,7 @@ func answer(m *Match, right bool) json.RawMessage {
 		Order []int    `json:"order"`
 		Truth *bool    `json:"truth"`
 		Pairs []int    `json:"pairs"`
+		Sides []int    `json:"sides"`
 	}
 	_ = json.Unmarshal(raw, &rv)
 	var a any
@@ -85,6 +87,14 @@ func answer(m *Match, right bool) json.RawMessage {
 		a = map[string]float64{"value": v}
 	case rv.Truth != nil:
 		a = map[string]bool{"truth": *rv.Truth == right}
+	case rv.Sides != nil:
+		sides := slices.Clone(rv.Sides)
+		if !right {
+			for i := range sides {
+				sides[i] = 1 - sides[i]
+			}
+		}
+		a = map[string][]int{"sides": sides}
 	case rv.Pairs != nil:
 		p := rv.Pairs
 		if !right {

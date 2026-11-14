@@ -10,14 +10,14 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// A topic run's shape: a true-or-not second, an order and a match in the middle, a number last; easy to hard by
+// A topic run's shape: a true-or-not second, an order and a match in the middle, a split and a number last; easy to hard by
 // ability, about two in three right.
 func TestTopicShape(t *testing.T) {
 	for ability, want := range map[float64]string{
-		-2:  "c:e t:e c:e c:e c:e c:e c:m o:m m:m n:h",
-		0:   "c:e t:e c:e c:m c:m o:m c:m m:m c:h n:h",
-		0.5: "c:e t:e c:m c:m o:m m:m c:h c:h c:h n:h",
-		1:   "c:e t:m o:m m:m c:h c:h c:h c:h c:h n:h",
+		-2:  "c:e t:e c:e c:e c:e c:e s:m o:m m:m n:h",
+		0:   "c:e t:e c:e c:m c:m o:m c:m m:m s:h n:h",
+		0.5: "c:e t:e c:m c:m o:m m:m c:h c:h s:h n:h",
+		1:   "c:e t:m o:m m:m c:h c:h c:h c:h s:h n:h",
 	} {
 		var got []string
 		for _, s := range topicSlots(ability) {

@@ -76,6 +76,7 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		Order []int    `json:"order"`
 		Truth *bool    `json:"truth"`
 		Pairs []int    `json:"pairs"`
+		Sides []int    `json:"sides"`
 	}
 	_ = json.Unmarshal(reveal, &r)
 	var a any
@@ -86,6 +87,8 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		a = map[string]float64{"value": *r.Value}
 	case r.Truth != nil:
 		a = map[string]bool{"truth": *r.Truth}
+	case r.Sides != nil:
+		a = map[string][]int{"sides": r.Sides}
 	case r.Pairs != nil:
 		a = map[string][]int{"pairs": r.Pairs}
 	default:
@@ -96,7 +99,7 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 }
 
 // wrong is a wrong answer to it (a choice's other option, a number far off, the other of true or not, every pair of
-// a match joined one along, an order backwards).
+// a match joined one along, every item of a split sent the other way, an order backwards).
 func (w *world) wrong(runID int64, n int) json.RawMessage {
 	var r map[string]any
 	_ = json.Unmarshal(w.right(runID, n), &r)
@@ -110,6 +113,11 @@ func (w *world) wrong(runID int64, n int) json.RawMessage {
 		r["value"] = num.Answer + 10*num.Tolerance*num.Answer // far off on either scale
 	case r["truth"] != nil:
 		r["truth"] = !r["truth"].(bool)
+	case r["sides"] != nil:
+		sides := r["sides"].([]any)
+		for i, v := range sides {
+			sides[i] = 1 - int(v.(float64))
+		}
 	case r["pairs"] != nil:
 		p := r["pairs"].([]any)
 		r["pairs"] = append(p[1:], p[0])

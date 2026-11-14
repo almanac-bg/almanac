@@ -99,6 +99,7 @@ var goalTypes = []struct{ id, words string }{
 	{"number", "с число"},
 	{"order", "с подреждане"},
 	{"match", "със свързване"},
+	{"split", "с разделяне"},
 	{"truefalse", "„Вярно или невярно“"},
 }
 
@@ -112,7 +113,9 @@ func (k goalKind) args(b *bank.Bank) []string {
 		}
 	case "type":
 		for _, t := range goalTypes {
-			out = append(out, t.id)
+			if len(b.Live("", t.id)) > 0 { // a kind the bank has none of yet makes no goal
+				out = append(out, t.id)
+			}
 		}
 	}
 	return out
