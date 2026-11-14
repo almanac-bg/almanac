@@ -95,7 +95,12 @@ Every question is one JSON object in its category's file:
 
 By type:
 
-- **`choice`:** `answer` and three `wrong`, each at most 60 characters. The game shows them in its own order.
+- **`choice`:** `answer` and three `wrong`, each at most 60 characters. The game shows them in its own order. The
+  options may be pictures (flags, paintings, animals, buildings): `pictures`, four images in the options' order (the
+  answer's first), each with its own licence like a question's picture, and no `image` over the question. The text
+  then names what to find („Кое е знамето на Литва?“, at most 60 characters); the names show only with the answer.
+  Each `alt` describes its picture without naming it („Три хоризонтални ивици: жълта, зелена, червена“), and the four
+  look alike enough that the picture, not a giveaway, decides.
 - **`number`:** `answer`, `unit` (empty for a year), `step` (1 for whole numbers; 0.1 for one decimal), `scale`
   (`linear`, or `log` across orders of magnitude) and `tolerance` (how far off scores nothing; on a log scale, a
   factor above 1). It's typed on a pad, and the player isn't told a range. Only a temperature (°C) may be below 0.

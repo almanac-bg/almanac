@@ -671,3 +671,59 @@ func TestClues(t *testing.T) {
 		t.Error("a choice was paced")
 	}
 }
+
+func TestChoiceOfPictures(t *testing.T) {
+	pic := func(file, alt string) Image {
+		return Image{File: file, W: 1200, H: 720, Alt: alt, Credit: "неизвестен автор", License: "PD",
+			Source: "https://commons.wikimedia.org/wiki/File:Flag.svg"}
+	}
+	q := &Choice{Head: Head{Type: "choice", Difficulty: Medium, Text: "Кое е знамето на Литва?"}, Answer: "Литва",
+		Wrong: []string{"Боливия", "Унгария", "Габон"},
+		Pictures: []Image{
+			pic("0000000000000001.webp", "Три ивици: жълта, зелена, червена"),
+			pic("0000000000000002.webp", "Три ивици: червена, жълта, зелена"),
+			pic("0000000000000003.webp", "Три ивици: червена, бяла, зелена"),
+			pic("0000000000000004.webp", "Три ивици: зелена, жълта, синя"),
+		}}
+	if p := q.check(); len(p) > 0 {
+		t.Fatal(p)
+	}
+	for seed := range uint64(10) {
+		d := q.Deal(seed)
+		var view struct {
+			Pictures []ImageView
+			Choices  []string
+		}
+		_ = json.Unmarshal(mustJSON(d.View()), &view)
+		// The pictures only: no option's name shows before the answer.
+		pics := string(mustJSON(view.Pictures))
+		for _, name := range q.options() {
+			if strings.Contains(pics, name) || view.Choices != nil {
+				t.Fatalf("seed %d: the view names %s: %s", seed, name, pics)
+			}
+		}
+		var rev struct {
+			Pick    int
+			Names   []string
+			Credits []ImageCredit
+		}
+		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
+		if len(view.Pictures) != 4 || rev.Names[rev.Pick] != "Литва" || len(rev.Credits) != 4 ||
+			!strings.Contains(view.Pictures[rev.Pick].Src, "0000000000000001") {
+			t.Fatalf("seed %d: view %+v, reveal %+v", seed, view, rev)
+		}
+	}
+	if !HasPictures(q) {
+		t.Error("a choice of pictures has none")
+	}
+	three := *q
+	three.Pictures = q.Pictures[:3]
+	if p := three.check(); len(p) == 0 {
+		t.Error("a choice with three pictures passed")
+	}
+	both := *q
+	both.Image = &q.Pictures[0]
+	if p := both.check(); len(p) == 0 {
+		t.Error("a choice of pictures with a picture over it passed")
+	}
+}

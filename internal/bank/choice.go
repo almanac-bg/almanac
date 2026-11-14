@@ -7,10 +7,14 @@ import (
 )
 
 // Choice is four options, one of them right: the answer and three wrong ones. A deal shows them in an order of its own.
+// The options may be pictures (a flag, a painting, an animal): then the player picks a picture, and the names show
+// only with the answer.
 type Choice struct {
 	Head
 	Answer string   `json:"answer"`
 	Wrong  []string `json:"wrong"`
+	// Pictures, if set, are the options themselves, one for each in the bank's order (the answer's first).
+	Pictures []Image `json:"pictures,omitempty"`
 	Tail
 }
 
@@ -39,10 +43,41 @@ func (q *Choice) check() []string {
 		}
 		seen[k] = true
 	}
+	if len(q.Pictures) > 0 {
+		if len(q.Pictures) != ChoiceOptions {
+			p = append(p, "a choice of pictures needs one picture for each of its 4 options")
+		}
+		if q.Image != nil {
+			p = append(p, "a choice of pictures has no picture over the question too")
+		}
+		files := map[string]bool{}
+		for i := range q.Pictures {
+			p = append(p, q.Pictures[i].check()...)
+			if files[q.Pictures[i].File] {
+				p = append(p, "two options are the same picture: "+q.Pictures[i].File)
+			}
+			files[q.Pictures[i].File] = true
+		}
+	}
 	return p
 }
 
-func (q *Choice) key() string { return fold(q.Text) + "|" + q.Image.file() }
+// pictures are the question's pictures: the one over it, and its options' if they are pictures.
+func (q *Choice) pictures() []*Image {
+	out := make([]*Image, 0, len(q.Pictures))
+	for i := range q.Pictures {
+		out = append(out, &q.Pictures[i])
+	}
+	return out
+}
+
+func (q *Choice) key() string {
+	k := fold(q.Text) + "|" + q.Image.file()
+	for i := range q.Pictures {
+		k += "|" + q.Pictures[i].File
+	}
+	return k
+}
 
 func (q *Choice) words() []string { return append([]string{q.Text}, q.options()...) }
 
@@ -59,15 +94,31 @@ type dealtChoice struct {
 func (d *dealtChoice) Question() Question { return d.q }
 
 func (d *dealtChoice) View() any {
+	if len(d.q.Pictures) > 0 {
+		// The pictures only: their names would give the answer away.
+		pics := make([]*ImageView, len(d.order))
+		for i, b := range d.order {
+			pics[i] = d.q.Pictures[b].view()
+		}
+		return struct {
+			view
+			Pictures []*ImageView `json:"pictures"`
+		}{viewOf(&d.q.Head, &d.q.Tail), pics}
+	}
+	return struct {
+		view
+		Choices []string `json:"choices"`
+	}{viewOf(&d.q.Head, &d.q.Tail), d.shown()}
+}
+
+// shown is the options' names in the deal's order.
+func (d *dealtChoice) shown() []string {
 	options := d.q.options()
 	shown := make([]string, len(d.order))
 	for i, b := range d.order {
 		shown[i] = options[b]
 	}
-	return struct {
-		view
-		Choices []string `json:"choices"`
-	}{viewOf(&d.q.Head, &d.q.Tail), shown}
+	return shown
 }
 
 // ChoiceAnswer is a pick: the option's place as shown.
@@ -100,10 +151,20 @@ func (d *dealtChoice) Reveal(c *Crowd) any {
 			right = i
 		}
 	}
-	return struct {
+	out := struct {
 		Pick int `json:"pick"`
+		// Names and Credits are a choice of pictures' options' names and their pictures' credits, as shown.
+		Names   []string       `json:"names,omitempty"`
+		Credits []*ImageCredit `json:"credits,omitempty"`
 		reveal
-	}{right, revealOf(&d.q.Head, &d.q.Tail, c.view(d.order))}
+	}{Pick: right, reveal: revealOf(&d.q.Head, &d.q.Tail, c.view(d.order))}
+	if len(d.q.Pictures) > 0 {
+		out.Names = d.shown()
+		for _, b := range d.order {
+			out.Credits = append(out.Credits, d.q.Pictures[b].credit())
+		}
+	}
+	return out
 }
 
 // fold makes two texts compare the same when they differ only in case or spacing.

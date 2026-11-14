@@ -151,8 +151,8 @@ func Load(dir string) (*Bank, []Problem) {
 			q, line := item.q, item.line
 			h := q.Base()
 			errs, warnings := checkQuestion(q, today)
-			if q.Extra().Image != nil {
-				errs = append(errs, q.Extra().Image.checkFiles(filepath.Join(dir, ImagesDir))...)
+			for _, im := range picturesOf(q) {
+				errs = append(errs, im.checkFiles(filepath.Join(dir, ImagesDir))...)
 			}
 			for _, e := range errs {
 				fail(file, line, h.ID, e)
@@ -178,7 +178,7 @@ func Load(dir string) (*Bank, []Problem) {
 	// Pictures nobody uses: left behind by an edit, or a question that went missing.
 	used := map[string]bool{}
 	for _, q := range b.Questions {
-		if im := q.Extra().Image; im != nil {
+		for _, im := range picturesOf(q) {
 			used[im.File], used[im.Small()] = true, true
 		}
 	}

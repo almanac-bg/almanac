@@ -24,7 +24,10 @@ interface ViewBase {
 
 export interface ChoiceView extends ViewBase {
   type: "choice";
-  choices: string[];
+  /** The options' names; none when the options are pictures (the names show with the answer). */
+  choices?: string[];
+  /** The options as pictures (a flag, a painting). */
+  pictures?: Picture[];
 }
 
 export interface NumberView extends ViewBase {
@@ -94,6 +97,9 @@ export interface Reveal {
   sides?: number[];
   /** All the clues of a clues question. */
   clues?: string[];
+  /** A choice of pictures: its options' names and its pictures' credits, as shown. */
+  names?: string[];
+  credits?: Credit[];
   unit?: string;
   fact?: string;
   credit?: Credit;

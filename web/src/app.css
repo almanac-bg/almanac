@@ -2012,6 +2012,53 @@
     color: var(--text-muted);
   }
 
+  /* A choice of pictures: two by two, each picture with its letter, and its name once answered. */
+  .pic-options {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .option.pic-option {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .pic-option-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 5 / 3;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    background: var(--sunken);
+  }
+
+  .pic-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 28px;
+  }
+
+  .pic-letter {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8125rem;
+  }
+
+  .pic-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+  }
+
+  .pic-credits {
+    margin-top: var(--space-2);
+  }
+
   /* „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out. */
   .clues {
     display: grid;

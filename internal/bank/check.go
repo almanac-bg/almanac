@@ -71,7 +71,7 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 		errs = append(errs, `difficulty must be "easy", "medium" or "hard"`)
 	}
 	limit := textMax
-	if t.Image != nil {
+	if HasPictures(q) {
 		limit = imageTextMax
 	}
 	errs = append(errs, checkLine("text", h.Text, limit)...)

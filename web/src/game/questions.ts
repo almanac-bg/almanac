@@ -127,13 +127,16 @@ const letters = ["А", "Б", "В", "Г"];
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
 
 function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
-  const buttons = view.choices.map((text, i) =>
+  const pictures = view.pictures;
+  const names = pictures?.map(() => h("span", { class: "pic-name" })) ?? [];
+  const buttons = (pictures ?? view.choices ?? []).map((option, i) =>
     h(
       "button",
       {
-        class: "option",
+        class: pictures ? "option pic-option" : "option",
         type: "button",
         disabled: locked,
+        "aria-label": typeof option === "string" ? null : `${letters[i]}: ${option.alt}`,
         onclick: () => {
           if (locked.peek()) return;
           buttons[i]?.classList.add("picked");
@@ -141,22 +144,57 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           submit({ pick: i });
         },
       },
-      h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-      h("span", null, text),
+      typeof option === "string"
+        ? [h("span", { class: "letter", "aria-hidden": "true" }, letters[i]), h("span", null, option)]
+        : [
+            h("img", {
+              class: "pic-option-img",
+              src: option.src,
+              srcset: option.srcset,
+              sizes: "(max-width: 36rem) 46vw, 18rem",
+              width: option.w,
+              height: option.h,
+              alt: "",
+              decoding: "async",
+            }),
+            h(
+              "span",
+              { class: "pic-foot" },
+              h("span", { class: "letter pic-letter", "aria-hidden": "true" }, letters[i]),
+              names[i],
+            ),
+          ],
     ),
   );
+  const credits = h("p", { class: "credit pic-credits", hidden: true });
   return {
-    node: h("div", { class: "options" }, buttons),
+    node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options" }, buttons), credits),
     pending: () => null,
     reveal(reveal, given) {
       buttons.forEach((b, i) => {
         b.classList.remove("picked");
         const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
         b.classList.add(how);
+        const name = reveal.names?.[i];
+        if (name) {
+          names[i]?.replaceChildren(name);
+          b.setAttribute("aria-label", `${letters[i]}: ${name}`);
+        }
         const picked = reveal.crowd?.picks?.[i];
         if (picked !== undefined) crowdOn(b, picked);
-        if (how !== "dim") b.append(sign());
+        if (how !== "dim") (b.querySelector(".pic-foot") ?? b).append(sign());
       });
+      if (reveal.credits?.length) {
+        credits.hidden = false;
+        credits.replaceChildren(
+          "Снимки: ",
+          ...reveal.credits.flatMap((c, i) => [
+            i ? " · " : "",
+            h("a", { href: c.source, target: "_blank", rel: "noopener" }, `${letters[i]} ${c.credit}`),
+            ` (${c.license})`,
+          ]),
+        );
+      }
     },
   };
 }

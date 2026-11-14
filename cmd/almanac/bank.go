@@ -91,7 +91,7 @@ func summary(b *bank.Bank) string {
 		}
 		pictures := 0
 		for _, q := range b.Live(c.ID, "") {
-			if q.Extra().Image != nil {
+			if bank.HasPictures(q) {
 				pictures++
 			}
 		}
