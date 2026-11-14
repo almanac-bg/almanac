@@ -43,6 +43,8 @@ type Config struct {
 	MTASTSMode string
 	// Royal is when Роял's evenings are (royal.Evening when unset).
 	Royal royal.Schedule
+	// MistakesAfter is how long a missed question waits for its second chance (play.MistakesAfter when unset).
+	MistakesAfter time.Duration
 	// Push sends notifications; nil: none.
 	Push *push.Sender
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
@@ -112,6 +114,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
 	s.game.SeasonNews = s.seasonNews
+	s.game.MistakesAfter = cfg.MistakesAfter
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
 	}
@@ -164,6 +167,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/day", s.startDay)
 	api("GET /api/day/{day}/board", s.board)
 	api("POST /api/topic", s.startTopic)
+	api("GET /api/mistakes", s.mistakes)
+	api("POST /api/mistakes", s.startMistakes)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)
 	api("POST /api/runs/{id}/answer", s.answer)

@@ -41,6 +41,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
+	play.ErrNoMistakes:     {http.StatusConflict, "no_mistakes", "Още няма въпроси за втори шанс."},
 	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може връзката да е грешна."},
 	play.ErrOwnInvite:      {http.StatusConflict, "own_invite", "Това е твоята покана. Прати я на приятел."},
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},

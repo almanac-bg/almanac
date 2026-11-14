@@ -22,7 +22,7 @@ export interface Stats {
   mastery: Mastery[];
   recent: {
     id: number;
-    kind: "day" | "topic" | "challenge" | "duel"; // challenge: an all-topics game from when there were challenges
+    kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes"; // challenge: from when there were challenges
     day?: string;
     category?: string;
     rights: number;
@@ -48,6 +48,10 @@ function what(p: Stats["recent"][number]): string {
       return "Въпросите на деня";
     case "duel":
       return `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`;
+    case "royal":
+      return "Роял";
+    case "mistakes":
+      return "Втори шанс";
     default:
       return topicName(p.category);
   }

@@ -1476,3 +1476,68 @@ func TestRetention(t *testing.T) {
 		t.Errorf("a week on: %+v", c)
 	}
 }
+
+func TestMistakes(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	// Ten wrong in a topic, then nothing waits until three days have passed.
+	s, _ := w.g.StartTopic(ctx, ana, "general")
+	missed := w.picks(s.ID)
+	w.play(ana, s.ID, repeat(w.wrong, Length)...)
+	if n, _ := w.g.Mistakes(ctx, ana); n != 0 {
+		t.Fatalf("%d waiting at once", n)
+	}
+	if _, err := w.g.StartMistakes(ctx, ana); !errors.Is(err, ErrNoMistakes) {
+		t.Fatalf("a second chance at once: %v", err)
+	}
+	w.wait(MistakesAfter)
+	if n, _ := w.g.Mistakes(ctx, ana); n != Length {
+		t.Fatalf("%d waiting after three days", n)
+	}
+	m, err := w.g.StartMistakes(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Kind != "mistakes" || m.Total != Length {
+		t.Fatalf("the run: %+v", m)
+	}
+	for i, p := range w.picks(m.ID) {
+		if p.ID != missed[i].ID {
+			t.Fatalf("question %d is %s, not the one missed first (%s)", i, p.ID, missed[i].ID)
+		}
+	}
+	// Right on the first, and its fact is learned; wrong on the rest, which wait three days again.
+	if _, err := w.g.Show(ctx, ana, m.ID); err != nil {
+		t.Fatal(err)
+	}
+	res, err := w.g.Answer(ctx, ana, m.ID, 0, w.right(m.ID, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, _ := w.b.Get(missed[0].ID)
+	if res.Learned != (q.Extra().Fact != "") {
+		t.Errorf("learned = %v for a question with fact %q", res.Learned, q.Extra().Fact)
+	}
+	for n := 1; n < Length; n++ {
+		if _, err := w.g.Show(ctx, ana, m.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.g.Answer(ctx, ana, m.ID, n, w.wrong(m.ID, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, _ := w.g.Mistakes(ctx, ana); n != 0 {
+		t.Fatalf("%d waiting right after a second chance", n)
+	}
+	w.wait(MistakesAfter)
+	if n, _ := w.g.Mistakes(ctx, ana); n != Length-1 {
+		t.Fatalf("%d waiting again, want the %d still wrong", n, Length-1)
+	}
+	// A right answer in a topic run is never a second chance's „learned“.
+	s, _ = w.g.StartTopic(ctx, ana, "general")
+	w.g.Show(ctx, ana, s.ID)
+	if res, _ := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0)); res.Learned {
+		t.Error("learned in a topic run")
+	}
+}

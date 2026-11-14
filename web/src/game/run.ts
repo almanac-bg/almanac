@@ -293,6 +293,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     const pause = pauseFor(q.view);
     append(after, [
       verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
+      res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
       upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
     ]);
