@@ -66,6 +66,8 @@ type Game struct {
 	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
+	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
+	RoyalAt func(time.Time) time.Time
 	// LeagueNews, if set, is told of each place when a week of the leagues ends.
 	LeagueNews func(context.Context, LeagueNews)
 	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser

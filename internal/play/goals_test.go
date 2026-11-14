@@ -38,9 +38,9 @@ func TestGoalDraws(t *testing.T) {
 	seen := map[string]bool{}
 	for seed := range uint64(3000) {
 		friends := seed%2 == 0
-		yesterday := drawGoals(seed+1_000_000, w.b, friends, nil)
-		ids := drawGoals(seed, w.b, friends, yesterday)
-		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, friends, yesterday)) {
+		yesterday := drawGoals(seed+1_000_000, w.b, friends, true, nil)
+		ids := drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)
+		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)) {
 			t.Fatalf("seed %d: %v", seed, ids)
 		}
 		before := map[string]bool{}
@@ -58,13 +58,17 @@ func TestGoalDraws(t *testing.T) {
 				t.Fatalf("seed %d: %v after %v, a family twice", seed, ids, yesterday)
 			case k.friends && !friends:
 				t.Fatalf("seed %d: %q for a player without friends", seed, id)
+			case k.retired:
+				t.Fatalf("seed %d: %q is retired", seed, id)
+			case k.evening && seed%3 == 0:
+				t.Fatalf("seed %d: %q after the evening's Роял", seed, id)
 			}
 			families[k.family] = true
 			seen[k.id] = true
 		}
 	}
 	for _, k := range goalKinds[1:] {
-		if !seen[k.id] {
+		if !seen[k.id] && !k.retired {
 			t.Errorf("never drawn: %s", k.id)
 		}
 	}

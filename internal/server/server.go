@@ -118,6 +118,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
 	}
+	s.game.RoyalAt = cfg.Royal.Next
 	s.royal = royal.NewHub(s.game, cfg.Royal)
 	s.royal.News = s.royalNews
 	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
