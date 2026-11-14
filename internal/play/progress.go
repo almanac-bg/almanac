@@ -547,6 +547,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		if err != nil {
 			return err
 		}
+		b := g.Bank()
 		for goals.Next() {
 			var id string
 			var d DoneGoal
@@ -554,7 +555,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				goals.Close()
 				return err
 			}
-			if goal, ok := goalByID(id); ok {
+			if goal, _, _, ok := goalOf(b, id); ok {
 				d.Name = goal.Name
 				n.Goals = append(n.Goals, d)
 			}

@@ -86,7 +86,7 @@ func (g *Game) SettleArena(ctx context.Context, list []ArenaPlace) (map[int64]in
 		return nil, err
 	}
 	for _, p := range list {
-		if _, err := g.Award(ctx, p.UserID); err != nil {
+		if err := g.afterRun(ctx, p.UserID); err != nil {
 			return deltas, err
 		}
 	}
