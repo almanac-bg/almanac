@@ -35,10 +35,22 @@ export interface Asked {
 
 /** How everyone else did with a question, in one quiet line under its verdict, as each kind of question counts right:
  * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), without „днес“ for everyone ever.
- * A right answer few others got stands out. Nothing while the question has too few answers to say. */
+ * A right answer few others got stands out, said as the feat it is („Познаха го само 12% от играчите днес.“), and
+ * nobody right is said as such, never as „0%“. Nothing while the question has too few answers to say. */
 export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
   if (!c) return null;
   const s = `${percent(c.right)} от играчите${c.today ? " днес" : ""}`;
+  if (c.right === 0) {
+    const none = right
+      ? c.today
+        ? "Днес само ти го позна."
+        : "Досега само ти го позна."
+      : c.today
+        ? "Днес още никой не го е познал."
+        : "Още никой не го е познал.";
+    return h("p", { class: right ? "crowd-says rare" : "crowd-says" }, none);
+  }
+  if (right && c.right <= rare) return h("p", { class: "crowd-says rare" }, `Познаха го само ${s}.`);
   const says = {
     choice: `Вярно отговарят ${s}.`,
     truefalse: `Вярно отговарят ${s}.`,
@@ -48,7 +60,7 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
     match: `Всички двойки свързват ${s}.`,
     split: `Всичко на място слагат ${s}.`,
   }[type];
-  return h("p", { class: right && c.right <= rare ? "crowd-says rare" : "crowd-says" }, says);
+  return h("p", { class: "crowd-says" }, says);
 }
 
 /** Shows on an answer what share of players gave it: a bar behind it, filling in, and the share beside it. */

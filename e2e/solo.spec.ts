@@ -76,7 +76,10 @@ test("the day says how its other players did with each question: under the verdi
   await page.getByRole("button", { name: "Започни" }).click();
   await answer(page);
   const says = page.locator(".after .verdict + .crowd-says");
-  await expect(says).toHaveText(/^[А-Яа-я ]+ (\d+|под 1)% от играчите днес\.$/);
+  // The other answered nothing, so this may be the first right answer: then it says so, never „0%“.
+  await expect(says).toHaveText(
+    /^([А-Яа-я ]+ (\d+|под 1)% от играчите днес|Днес (само ти го позна|още никой не го е познал))\.$/,
+  );
   await moveOn(page);
   for (let n = 1; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
@@ -84,7 +87,7 @@ test("the day says how its other players did with each question: under the verdi
     await moveOn(page);
   }
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
-  await expect(page.locator(".reviewed").first().locator(".crowd-says")).toContainText("от играчите днес.");
+  await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите днес\.$|^Днес /);
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
