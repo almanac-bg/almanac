@@ -68,6 +68,9 @@ type Game struct {
 	RoyalNews func(context.Context, RoyalNews)
 	// SeasonNews, if set, is told of each place when a season ends.
 	SeasonNews func(context.Context, SeasonNews)
+	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
+	// tests make it seconds).
+	MistakesAfter time.Duration
 
 	seasonMu sync.Mutex
 	season   string // the season being played, once ensureSeason has seen it
@@ -177,6 +180,9 @@ type Result struct {
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
 	TimedOut bool    `json:"timedOut,omitempty"`
+	// Learned is a second chance taken (mistakes.go): the first right answer to the question, so its fact is in the
+	// Almanac now.
+	Learned bool `json:"learned,omitempty"`
 	// Given is the answer as it shows (the player's screen has it already).
 	Given  json.RawMessage `json:"-"`
 	Reveal any             `json:"reveal"`
@@ -392,6 +398,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			return err
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
+		res.Learned = r.kind == "mistakes" && gr.Right && d.Question().Extra().Fact != ""
 		res.Reveal = d.Reveal(g.Crowd(d.Question().Base().ID))
 		res.State, err = g.state(tx, r)
 		return err

@@ -16,6 +16,7 @@ import { invite } from "./screens/invite.ts";
 import { liveDuel } from "./screens/live.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
+import { mistakes } from "./screens/mistakes.ts";
 import { topic } from "./screens/play.ts";
 import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
@@ -33,7 +34,7 @@ import { type Challenge, challenges, checkWaiting, friendRequests, playing, watc
  * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|arena|royal|room|r\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac)$/.test(p)],
@@ -101,6 +102,7 @@ if (root) {
       { path: /^\/arena\/([0-9]{6})$/, view: arenaGame },
       { path: /^\/royal$/, view: royal },
       { path: /^\/almanac$/, view: almanac },
+      { path: /^\/mistakes$/, view: mistakes },
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },

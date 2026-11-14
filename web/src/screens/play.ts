@@ -17,7 +17,14 @@ import { loadStats, type Stats } from "./stats.ts";
 /** The topics as tiles, each with how well the player knows it, and a run across all of them (on Начало). */
 export function topics(): Child {
   const stats = signal<Stats | null>(null);
-  if (user.peek()) loadStats().then(stats.set, () => {});
+  const waiting = signal(0);
+  if (user.peek()) {
+    loadStats().then(stats.set, () => {});
+    loadMistakes().then(
+      (m) => waiting.set(m.waiting >= m.from ? m.waiting : 0),
+      () => {},
+    );
+  }
   return h(
     "section",
     { class: "stack" },
@@ -49,8 +56,26 @@ export function topics(): Child {
             ),
           ),
         ),
+        waiting() ? h("li", { class: "topic-all" }, secondChance(waiting())) : null,
       ];
     }),
+  );
+}
+
+/** How many questions wait for the player's second chance, and from how many it opens. */
+export const loadMistakes = () => api<{ waiting: number; from: number }>("GET", "/api/mistakes");
+
+/** The way into a second chance: the questions the player got wrong, asked again (/mistakes). */
+export function secondChance(waiting: number): Child {
+  return h(
+    "a",
+    { href: "/mistakes", class: "topic tone-rose" },
+    h(
+      "span",
+      { class: "topic-text" },
+      h("span", { class: "topic-name" }, "Втори шанс"),
+      h("span", { class: "topic-meta" }, `${waiting} въпроса, на които сгреши`),
+    ),
   );
 }
 
@@ -80,34 +105,41 @@ export function topic([id = ""]: string[]) {
     return null;
   }
   title(name);
-  return run(category, name, (s, again) =>
-    h(
-      "div",
-      { class: "screen" },
-      h("p", { class: "kicker" }, name),
-      summary(s, null, [
-        news(s.id),
-        h(
-          "div",
-          { class: "actions" },
-          h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-          h("a", { class: "btn", href: "/" }, "Друга тема"),
-        ),
-      ]),
-    ),
+  return run(
+    name,
+    () => api<State>("POST", "/api/topic", { category }),
+    (s, again) =>
+      h(
+        "div",
+        { class: "screen" },
+        h("p", { class: "kicker" }, name),
+        summary(s, null, [
+          news(s.id),
+          h(
+            "div",
+            { class: "actions" },
+            h("button", { class: "btn primary big", onclick: again }, "Още десет"),
+            h("a", { class: "btn", href: "/" }, "Друга тема"),
+          ),
+        ]),
+      ),
   );
 }
 
-/** Plays a run of a topic ("" for all), and what finished draws at its end (again: another run). Each run starts
- * after a short count, which the player can cut short or back out of. */
-function run(category: string, name: string, finished: (s: State, again: () => void) => Child): Child {
+/** Plays a run that `begin` starts (a topic's, a second chance), and what finished draws at its end (again: another
+ * run). Each run starts after a short count, which the player can cut short or back out of. */
+export function run(
+  name: string,
+  begin: () => Promise<State>,
+  finished: (s: State, again: () => void) => Child,
+): Child {
   const screen = signal<Child>(null);
   const ready = () => screen.set(getReady(name, start, () => go("/")));
   const start = async () => {
     screen.set(h("p", { class: "muted" }, "…"));
     try {
       await player();
-      const s = await api<State>("POST", "/api/topic", { category });
+      const s = await begin();
       screen.set(playRun(s, (end) => finished(end, ready)));
     } catch (err) {
       screen.set(

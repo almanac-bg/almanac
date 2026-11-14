@@ -5,6 +5,7 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
 import { fact, meter, pageArt, profileNav, toneOf, topicMark } from "../ui.ts";
+import { loadMistakes } from "./play.ts";
 
 interface Learned {
   id: string;
@@ -20,6 +21,12 @@ export function almanac() {
   const data = signal<{ facts: Learned[]; of: Record<string, number> } | null>(null);
   const topic = signal("");
   const error = signal("");
+  const waiting = signal(0);
+  if (user.peek())
+    loadMistakes().then(
+      (m) => waiting.set(m.waiting >= m.from ? m.waiting : 0),
+      () => {},
+    );
   if (user.peek())
     api<{ facts: Learned[]; of: Record<string, number> }>("GET", "/api/almanac").then(data.set, (err) =>
       error.set((err as ApiError).message),
@@ -35,6 +42,20 @@ export function almanac() {
       h("h1", null, "Моят Алманах"),
       h("p", { class: "muted" }, "Фактът зад всеки въпрос, на който отговори вярно."),
     ),
+    () =>
+      waiting()
+        ? h(
+            "div",
+            { class: "card second-chance" },
+            h("h2", null, "Втори шанс"),
+            h(
+              "p",
+              { class: "muted" },
+              `${waiting()} въпроса, на които сгреши, чакат нов опит. Отговори вярно и фактът е твой.`,
+            ),
+            h("a", { class: "btn primary", href: "/mistakes" }, "Опитай пак"),
+          )
+        : null,
     (): Child => {
       if (error()) return h("p", { role: "alert" }, error());
       const d = data();

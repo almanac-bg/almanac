@@ -44,6 +44,7 @@ import (
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
 //	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
 //	                    every evening at 21:00
+//	MISTAKES_AFTER      development only: how long a missed question waits for its second chance (5s); else 3 days
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
 //	                    MTA_STS_MODE testing (the default) or enforce
 //
@@ -84,6 +85,13 @@ func serve([]string) error {
 			return errors.New("ROYAL_LOBBY must be like 1m, and no longer than ROYAL_EVERY")
 		}
 		cfg.Royal = royal.Schedule{Every: e, Lobby: lobby}
+	}
+	if after := os.Getenv("MISTAKES_AFTER"); after != "" && dev {
+		a, err := time.ParseDuration(after)
+		if err != nil || a <= 0 {
+			return errors.New("MISTAKES_AFTER must be like 5s")
+		}
+		cfg.MistakesAfter = a
 	}
 	secret := os.Getenv("SECRET")
 	switch {

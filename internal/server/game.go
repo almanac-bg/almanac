@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // today is the day screen's state: the day, the viewer's streak, level and run (if any), whether they've finished a
@@ -112,6 +114,35 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	st, err := s.game.StartTopic(r.Context(), u.ID, in.Category)
+	if err != nil {
+		return err
+	}
+	return ok(w, st)
+}
+
+// mistakes says how many questions wait for the player's second chance, and from how many it opens.
+func (s *Server) mistakes(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	n, err := s.game.Mistakes(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]int{"waiting": n, "from": play.MistakesFrom})
+}
+
+// startMistakes starts a second chance: the questions the player got wrong, asked again.
+func (s *Server) startMistakes(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
+		return errTooMany
+	}
+	st, err := s.game.StartMistakes(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}

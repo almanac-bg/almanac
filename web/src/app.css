@@ -3480,6 +3480,19 @@
   .almanac-head .meter {
     grid-column: 1 / -1;
   }
+
+  /* A second chance (Втори шанс): the way in from the Almanac, and the note on an answer that put a fact in it. */
+  .second-chance {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+
+  .learned {
+    margin: 0;
+    color: var(--gold-ink);
+    font-weight: 600;
+  }
   .goal .meter {
     grid-column: 2;
     height: 5px;
