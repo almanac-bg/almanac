@@ -151,6 +151,8 @@ export interface Shown {
   leftMs: number;
   /** How soon more of the question shows (its next clue): look again then. */
   moreMs?: number;
+  /** How soon its time starts by itself, while it waits for its pictures: the screen starts it once they're in. */
+  startsMs?: number;
 }
 
 export interface State {

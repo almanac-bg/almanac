@@ -102,7 +102,7 @@ function status(t: Today): Child {
   const share = lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
   return h(
     "div",
-    { class: "status" },
+    { class: "status-row" },
     h(
       "a",
       { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },

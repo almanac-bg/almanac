@@ -1,7 +1,9 @@
 // Package play is the game: runs through a set of questions (the day's, a topic's), one question at a time, against
 // the server's clock; duels kept as runs; friends.
 //
-// A question's time runs only while it's shown: Show starts it, Answer stops it. Between questions a player reads the
+// A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
+// them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
+// line doesn't eat the time, and the server still says when it runs. Between questions a player reads the
 // answer and its fact for as long as they like. A question left showing past its time counts as unanswered, whenever
 // the run is next looked at. Everything a run does goes through the database, so a refresh, a second tab or a
 // restart of the server changes nothing.
@@ -29,6 +31,9 @@ const (
 	MaxPoints = 1000
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
 	Grace = 2 * time.Second
+	// PictureWait is the longest a question's time waits for its pictures to come in (four of them, on a slow line),
+	// and so the most anyone gets to look before it runs.
+	PictureWait = 8 * time.Second
 )
 
 // Limit is how long a question is shown before its time runs out: a statement to judge true or not is quick;
@@ -167,6 +172,9 @@ type Shown struct {
 	LeftMs   int64  `json:"leftMs"`
 	// MoreMs is how soon more of the question shows (the next clue): look again then. 0 for nothing more.
 	MoreMs int64 `json:"moreMs,omitempty"`
+	// StartsMs is how soon its time starts by itself, while it waits for its pictures: the screen starts it sooner
+	// (Start), once they're in. 0 once it runs.
+	StartsMs int64 `json:"startsMs,omitempty"`
 }
 
 // Result is what an answer earned, the answer itself, and the run after it.
@@ -229,9 +237,9 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 			limit := Limit(d.Question())
 			since := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
-				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
-				LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
-				MoreMs: bank.NextStep(d, since).Milliseconds(),
+				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
+				LimitMs: limit.Milliseconds(), LeftMs: max(0, min(limit, limit-since).Milliseconds()),
+				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
 			}
 		}
 	}
@@ -320,8 +328,19 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 	return s, err
 }
 
-// Show puts the next question on screen and starts its time (the one already showing keeps its time).
+// Show puts the next question on screen and starts its time (the one already showing keeps its time); a question
+// with pictures, PictureWait later at most (Start).
 func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
+	return g.show(ctx, userID, runID, PictureWait)
+}
+
+// ShowNow puts the next question on screen and starts its time at once, pictures or not: a live duel's, whose clock
+// is the match's.
+func (g *Game) ShowNow(ctx context.Context, userID, runID int64) (State, error) {
+	return g.show(ctx, userID, runID, 0)
+}
+
+func (g *Game) show(ctx context.Context, userID, runID int64, wait time.Duration) (State, error) {
 	var s State
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, runID)
@@ -336,16 +355,48 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 			return err
 		}
 		if !r.finished && !r.shownAt.Valid {
-			now := store.Ms(g.Now())
-			if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`, now, r.id); err != nil {
+			start := g.Now()
+			if d, ok := g.deal(r.picks[r.at]); ok && bank.HasPictures(d.Question()) {
+				start = start.Add(wait)
+			}
+			if err := r.startAt(tx, start); err != nil {
 				return err
 			}
-			r.shownAt = sql.NullInt64{Int64: now, Valid: true}
 		}
 		s, err = g.state(tx, r)
 		return err
 	})
 	return s, err
+}
+
+// Start starts the time of question n, shown and waiting for its pictures, now that the player's screen has them in.
+func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, error) {
+	var s State
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		r, err := load(tx, userID, runID)
+		if err != nil {
+			return err
+		}
+		now := g.Now()
+		if !r.finished && r.at == n && r.shownAt.Valid && r.shownAt.Int64 > now.UnixMilli() {
+			if err := r.startAt(tx, now); err != nil {
+				return err
+			}
+		}
+		s, err = g.state(tx, r)
+		return err
+	})
+	return s, err
+}
+
+// startAt keeps when the question showing starts its time.
+func (r *run) startAt(tx *sql.Tx, t time.Time) error {
+	at := store.Ms(t)
+	if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`, at, r.id); err != nil {
+		return err
+	}
+	r.shownAt = sql.NullInt64{Int64: at, Valid: true}
+	return nil
 }
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it.
@@ -370,7 +421,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
-		took := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
+		took := max(0, g.Now().Sub(time.UnixMilli(r.shownAt.Int64))) // before its time starts: at once
 		limit := Limit(d.Question())
 		var gr bank.Graded
 		switch {

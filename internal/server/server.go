@@ -171,6 +171,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/mistakes", s.startMistakes)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)
+	api("POST /api/runs/{id}/start", s.start)
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
 	api("POST /api/questions/{id}/report", s.report)

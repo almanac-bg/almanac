@@ -514,7 +514,7 @@ func (m *Match) show(n int) {
 	for _, s := range m.sides {
 		s.answered, s.took, s.given, s.gained, s.speed, s.row, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, 0, false, false
 		if s.human() {
-			if _, err := m.hub.game.Show(context.Background(), s.ID, s.run); err != nil {
+			if _, err := m.hub.game.ShowNow(context.Background(), s.ID, s.run); err != nil {
 				slog.Error("live duel", "duel", m.id, "err", err)
 				m.cancel()
 				return

@@ -320,7 +320,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     head(first),
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () => {
       const v = view();
@@ -361,7 +361,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     { class: "question" },
     head(first),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),

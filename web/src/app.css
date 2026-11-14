@@ -813,7 +813,7 @@
   }
 
   /* Начало's top: the streak and the level, side by side, each a way to Профил. */
-  .status {
+  .status-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
@@ -1646,11 +1646,13 @@
     letter-spacing: -0.01em;
   }
 
+  /* The picture over a question: while it's asked, low enough for the whole question to fit (--fit, from
+     questions.ts). */
   .picture {
     display: block;
     width: 100%;
     height: auto;
-    max-height: 40vh;
+    max-height: min(40vh, var(--fit, 40vh));
     object-fit: contain;
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -1922,7 +1924,7 @@
     opacity: 0.6;
   }
 
-  .key.back::before {
+  .key.erase::before {
     content: "";
     width: 26px;
     height: 26px;

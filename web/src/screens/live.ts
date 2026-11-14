@@ -321,7 +321,7 @@ function question(view: () => LiveView, first: LiveView): Child {
     scoreboard(view, first.total),
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () =>
       sent()
@@ -356,7 +356,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     questionHead(first.n, first.total, topicName(q.category)),
     scoreboard(view, first.total),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     theirs(first.them, q.view),
