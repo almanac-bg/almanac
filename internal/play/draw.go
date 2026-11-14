@@ -76,7 +76,9 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 			}
 			assigned[i] = next(
 				has(func(q bank.Question) bool { return matches(q, s, true, true) }),
-				has(func(q bank.Question) bool { return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true) }),
+				has(func(q bank.Question) bool {
+					return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
+				}),
 			)
 		}
 	}
