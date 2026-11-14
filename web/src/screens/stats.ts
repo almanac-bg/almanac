@@ -78,9 +78,11 @@ export function stats(): Child {
         { class: "stats" },
         place
           ? stat(ordinal(place, "n"), "място днес", "gold")
-          : stat(String(s.days), "дни с въпросите на деня", "gold"),
+          : stat(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня", "gold"),
         stat(`${percent(s.right, s.answers)}%`, "верни отговори", "mint"),
-        s.duels > 0 ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose") : stat(String(s.answers), "отговора"),
+        s.duels > 0
+          ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose")
+          : stat(String(s.answers), s.answers === 1 ? "отговор" : "отговора"),
         stat(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
       ),
       masteryCard(s.mastery),

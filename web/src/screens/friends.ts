@@ -133,7 +133,11 @@ function friendsCard(): Child {
           return user()
             ? null
             : [
-                h("p", { class: "muted" }, "Покани приятели: виждате резултатите си за деня и се каните на дуел."),
+                h(
+                  "p",
+                  { class: "muted" },
+                  "Покани приятели: ще виждате резултатите си за деня и ще се предизвиквате на дуел.",
+                ),
                 h(
                   "button",
                   {
@@ -292,7 +296,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
       h(
         "span",
         { class: "friend-day" },
-        f.today ? `Днес: ${f.today.rights}/10 · ${formatNumber(f.today.points)} т.` : "Днес още няма резултат",
+        f.today ? `${f.today.rights} от 10 · ${formatNumber(f.today.points)} т.` : "Днес още няма резултат",
       ),
     ),
     played

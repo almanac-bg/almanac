@@ -79,7 +79,7 @@ export function arenaGame(params: string[]) {
 }
 
 export function room([code = ""]: string[], arena = false) {
-  title(arena ? "Арена" : "Игра");
+  title(arena ? "Арена" : "Стая");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
@@ -137,8 +137,8 @@ export function room([code = ""]: string[], arena = false) {
         ? h(
             "div",
             { class: "stack" },
-            h("h1", null, "Тази арена свърши"),
-            h("p", { class: "lead" }, "Или връзката с нея прекъсна. Влез в нова."),
+            h("h1", null, "Тази арена вече я няма"),
+            h("p", { class: "lead" }, "Свърши или връзката прекъсна. Влез в нова."),
             h("a", { class: "btn primary", href: "/arena" }, "Нова арена"),
           )
         : trouble() === "gone"

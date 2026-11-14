@@ -14,7 +14,7 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
 
   // Bo opens it and accepts: they're friends, both ways.
   await b.goto(link ?? "");
-  await expect(b.getByRole("heading", { name: /те кани за приятел/ })).toBeVisible();
+  await expect(b.getByRole("heading", { name: /иска да сте приятели/ })).toBeVisible();
   await b.getByRole("button", { name: "Приеми" }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();

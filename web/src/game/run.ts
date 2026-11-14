@@ -107,7 +107,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
       "div",
       { class: "actions" },
       h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
-      h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
+      h("button", { class: "btn", onclick: () => leave(cancel) }, "Откажи"),
     ),
   );
 }
@@ -168,7 +168,7 @@ function tally(el: HTMLElement, points: number, from: number, inRow: number) {
       points > 0
         ? h(
             "span",
-            { class: "tally-points", "aria-label": `${points} точки` },
+            { class: "tally-points", "aria-label": `${points} ${points === 1 ? "точка" : "точки"}` },
             countUp(points, from),
             h("small", null, " т."),
           )
@@ -213,7 +213,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
     h("div", { class: "track" }, bar),
     h(
       "span",
-      { class: "secs", role: "timer", "aria-label": () => `${left()} секунди` },
+      { class: "secs", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
       () => String(left()),
       h("small", null, "с"),
     ),

@@ -11,7 +11,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
-import { meter, toneOf } from "../ui.ts";
+import { meter, questions, toneOf } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it, and a run across all of them (on Начало). */
@@ -74,7 +74,7 @@ export function secondChance(waiting: number): Child {
       "span",
       { class: "topic-text" },
       h("span", { class: "topic-name" }, "Втори шанс"),
-      h("span", { class: "topic-meta" }, `${waiting} въпроса, на които сгреши`),
+      h("span", { class: "topic-meta" }, `${questions(waiting)}, ${waiting === 1 ? "на който" : "на които"} сгреши`),
     ),
   );
 }

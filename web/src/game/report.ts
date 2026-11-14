@@ -40,7 +40,7 @@ export function report(id: string): Child {
             }),
           ),
           h("button", { class: "btn" }, "Изпрати"),
-          h("button", { type: "button", class: "link", onclick: () => state.set("closed") }, "Отказ"),
+          h("button", { type: "button", class: "link", onclick: () => state.set("closed") }, "Откажи"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         );
     }

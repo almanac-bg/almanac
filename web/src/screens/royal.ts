@@ -302,7 +302,7 @@ function history(list: Past[]): Child {
   return h(
     "section",
     { class: "stack" },
-    h("h2", { class: "section-title" }, "Последните ти"),
+    h("h2", { class: "section-title" }, "Последните ти вечери"),
     h(
       "ul",
       { class: "duel-list" },
@@ -399,7 +399,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     ),
     v0.in
       ? h("button", { class: "btn", type: "button", disabled: busy, onclick: () => act("DELETE") }, "Излез")
-      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влизам"),
+      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влез"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
     () => {
       const v = view();

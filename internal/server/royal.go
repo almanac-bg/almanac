@@ -129,7 +129,7 @@ func (s *Server) royals(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
 	m := push.Message{URL: "/royal", Title: "Роял: " + place(n.Place, n.Of)}
 	if n.Of >= 3 { // with fewer, ratings don't move
-		m.Body = fmt.Sprintf("Рейтинг: %+d.", n.Delta)
+		m.Body = ratingWords(n.Delta)
 	}
 	go s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
 }

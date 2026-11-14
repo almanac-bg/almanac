@@ -98,8 +98,8 @@ var goalKinds = []goalKind{
 var goalTypes = []struct{ id, words string }{
 	{"number", "с число"},
 	{"order", "с подреждане"},
-	{"match", "със свързване"},
-	{"split", "с разделяне"},
+	{"match", "с двойки"},
+	{"split", "с две групи"},
 	{"truefalse", "„Вярно или невярно“"},
 }
 
