@@ -11,6 +11,7 @@ import { dayShareText } from "../game/share.ts";
 import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
@@ -18,6 +19,7 @@ import { meter, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
+import { signIn } from "./settings.ts";
 import { yearCard } from "./year.ts";
 
 interface Today {
@@ -86,6 +88,9 @@ export function today() {
         : dayCard(t, start(t)),
       // Mid-December into January: the year in the game, a tap away.
       yearCard(),
+      // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
+      // and not right after a game, which has its news.
+      just || !run?.done ? null : keepCard(t),
       // Just played, the goals it finished are told with its news.
       just || !t.played ? null : goalsCard(),
       // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
@@ -191,4 +196,52 @@ function untilMidnight(): string {
   const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
   const hours = Math.floor(minutes / 60);
   return hours > 0 ? `${hours} ч и ${minutes % 60} мин` : `${minutes} мин`;
+}
+
+/** Where „По-късно“ is kept, on this device. */
+const laterKey = "keep-later";
+
+/** A guest who keeps coming back is asked to keep their profile with an email (lib/keep.ts): a guest's game lives on
+ * one device only. „По-късно“ asks again in a week. */
+function keepCard(t: Today): Child {
+  const u = user.peek();
+  let laterAt = 0;
+  try {
+    laterAt = Number(localStorage.getItem(laterKey) ?? 0);
+  } catch {
+    // no storage here: ask
+  }
+  if (!u || !askToKeep({ email: u.email, streak: t.streak, level: t.level?.level ?? 1, laterAt, now: Date.now() }))
+    return null;
+  const shown = signal(true);
+  return () =>
+    shown() && !user()?.email
+      ? h(
+          "section",
+          { class: "card keep-card" },
+          h("h2", null, "Запази профила си"),
+          h(
+            "p",
+            { class: "muted" },
+            `${t.streak >= 3 ? `Серия от ${t.streak} дни!` : `Ниво ${t.level?.level}!`} Засега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде.`,
+          ),
+          signIn(),
+          h(
+            "button",
+            {
+              class: "link",
+              type: "button",
+              onclick: () => {
+                try {
+                  localStorage.setItem(laterKey, String(Date.now()));
+                } catch {
+                  // no storage: just for now
+                }
+                shown.set(false);
+              },
+            },
+            "По-късно",
+          ),
+        )
+      : null;
 }

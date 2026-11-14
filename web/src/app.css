@@ -546,6 +546,18 @@
     font-weight: 700;
   }
 
+  /* Начало's ask to keep a guest's profile (screens/today.ts): the sign-in form in a card. */
+  .keep-card {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+  }
+
+  .keep-card h2,
+  .keep-card p {
+    margin: 0;
+  }
+
   /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
   .year-card {
     display: grid;
