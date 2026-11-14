@@ -100,8 +100,7 @@ app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
 
-# The upload key and its passwords (mobile/README.md)
-keystore.properties
+# An upload key, should one land here: it lives in ~/.config/almanac (mobile/README.md)
 *.jks
 *.keystore
 # Firebase's file for notifications: kept outside the repository (mobile/README.md)

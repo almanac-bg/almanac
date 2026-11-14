@@ -33,18 +33,19 @@ cd mobile && npm ci && npx cap sync      # after any change here or a new plugin
   Open `ios/App/App.xcodeproj`, Product → Archive, then Distribute → App Store Connect. Signing is automatic for the
   team; the push and associated-domains capabilities come from `App/App.entitlements`.
 - **Android:** Android Studio (its SDK). `cd android && ./gradlew bundleRelease` makes
-  `app/build/outputs/bundle/release/app-release.aab`, signed with the upload key if `android/keystore.properties`
-  names it:
+  `app/build/outputs/bundle/release/app-release.aab`, signed with the upload key that
+  `~/.config/almanac/android-upload.properties` (or the file `ALMANAC_UPLOAD_KEY` names) gives:
 
   ```properties
-  storeFile=/Users/<you>/.almanac/upload.jks
+  storeFile=/Users/<you>/.config/almanac/android-upload.jks
   storePassword=…
   keyAlias=upload
   keyPassword=…
   ```
 
-  The keystore and its passwords live outside the repository (and in the password manager). Lost, it's replaced by
-  Play Console → App signing → Upload key → Request reset.
+  The keystore and its password live outside the repository (and in the password manager). Lost, it's replaced by
+  Play Console → App signing → Upload key → Request reset, with a new key's certificate
+  (`keytool -export -rfc -alias upload`).
 
 Icons and splash screens come from `assets/` (`npm run icons`).
 
