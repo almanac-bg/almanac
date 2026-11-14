@@ -1980,9 +1980,13 @@
     font-weight: 600;
   }
 
+  /* The number's field, pad and button: a phone's width at most, so on a big screen the keys stay keys. */
   .number {
     display: grid;
     gap: var(--space-4);
+    width: 100%;
+    max-width: 22rem;
+    margin-inline: auto;
   }
 
   /* The number as typed: big, on its own line, the unit beside it. */
@@ -1990,9 +1994,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 4.5rem;
+    min-height: 3.5rem;
     padding: 0 var(--space-4);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-strong);
     border-radius: var(--radius-md);
     background: var(--sunken);
     cursor: text;
@@ -2000,7 +2004,6 @@
 
   .number-out.live {
     border-color: var(--accent);
-    box-shadow: var(--focus);
   }
 
   .typed {
@@ -2008,7 +2011,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--text);
-    font: 800 2.5rem / 1 var(--font-numeral);
+    font: 800 2rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2061,13 +2064,13 @@
     appearance: none;
     display: grid;
     place-items: center;
-    min-height: 3.25rem;
+    min-height: 3rem;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: var(--raised);
     box-shadow: var(--elev-1);
     color: var(--text);
-    font: 800 1.5rem / 1 var(--font-numeral);
+    font: 700 1.375rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     cursor: pointer;
     touch-action: manipulation;
@@ -2159,32 +2162,6 @@
     font-size: 1.25rem;
     font-weight: 800;
     text-align: center;
-  }
-
-  .option.tf > span:nth-child(2) {
-    flex: none;
-  }
-
-  .tf-mark {
-    width: 28px;
-    height: 28px;
-    background: var(--text-muted);
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .tf-yes {
-    --i: var(--i-check);
-  }
-
-  .tf-no {
-    --i: var(--i-cross);
-  }
-
-  .option.tf .sign {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-4);
   }
 
   /* How everyone else answered: a bar behind each answer as long as the share that gave it, the share beside it, and
@@ -5621,13 +5598,14 @@
       max-width: 48rem;
     }
 
-    /* In a game: the question and its answers bigger, read from further away; short answers two by two. */
+    /* In a game: the question and its answers bigger, read from further away; a choice's answers two by two. A
+       list stays one column: things put in order (dragged up and down), and the rows of pairs and groups shown. */
     .playing .ask {
       font-size: 2rem;
       line-height: 2.5rem;
     }
 
-    .playing .options:not(.pic-options) {
+    .playing .options:not(.pic-options, .sortable-list, .match-result, .split-result) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 

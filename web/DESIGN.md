@@ -83,7 +83,8 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
 ## Wide screens
 
 - **48rem (a tablet):** the column grows to 48rem; the places move into the header; in a game the question and its
-  answers are bigger, and a choice's answers sit two by two.
+  answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
+  number's field and pad stay a phone's width.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
   „Сподели“ beside „Прегледай въпросите“), and under it the topics, five to a row; beside them, at most 22rem wide,
   the streak and the level, the goals and the ways to play with others, one under another. A new player, with only
@@ -116,7 +117,8 @@ takes a token.
 - **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives gold, lilac, sky, rose or mint, in
   the bank's order. Each also has its picture (see Pictures).
 - **Right, close and wrong never rest on hue alone.** Each also gets ✓, ∼ or ✕, the word, and a filled or hollow
-  mark.
+  mark. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
+  as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
 
 ## Type
