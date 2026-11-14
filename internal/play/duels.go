@@ -552,7 +552,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 		return err
 	}
 	for _, n := range news {
-		if _, err := g.Award(ctx, n.To); err != nil {
+		if err := g.afterRun(ctx, n.To); err != nil { // a duel won finishes goals too
 			return err
 		}
 		if g.DuelNews != nil {

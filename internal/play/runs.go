@@ -252,7 +252,7 @@ func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
 	return week, rows.Err()
 }
 
-// Merge moves a guest's runs and friends to the account they signed in to (account.Accounts.Merge): all runs but a
+// Merge moves a guest's runs, friends and goals to the account they signed in to (account.Accounts.Merge): all runs but a
 // day the account has played itself, which stays the account's.
 func Merge(tx *sql.Tx, from, to int64) error {
 	_, err := tx.Exec(`UPDATE runs SET user_id = ? WHERE user_id = ?
@@ -277,6 +277,11 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
 		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen) SELECT ?, id, at, seen FROM achievements WHERE user_id = ?`,
+			[]any{to, from}},
+		// So are the goals the guest finished (with their XP), and the day's goals drawn, unless the account has its own.
+		{`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
+			SELECT ?, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?`, []any{to, from}},
+		{`INSERT OR IGNORE INTO day_goals (user_id, day, n, goal) SELECT ?, day, n, goal FROM day_goals WHERE user_id = ?`,
 			[]any{to, from}},
 		{`UPDATE users SET avatar = coalesce(avatar, (SELECT avatar FROM users WHERE id = ?)),
 			title = coalesce(title, (SELECT title FROM users WHERE id = ?)) WHERE id = ?`, []any{from, from, to}},

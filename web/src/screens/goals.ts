@@ -1,4 +1,5 @@
-// The day's goals: three a day — the day's questions, and two drawn for the player — each worth XP once done.
+// The day's goals: three a day — the day's questions, a goal drawn for the player and a harder one — each worth XP
+// once done (more for the harder), and each a way to where it's done.
 
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -9,12 +10,14 @@ interface DayGoal {
   id: string;
   name: string;
   target: number;
+  /** Where it's done; none: anywhere, or right here. */
+  href?: string;
   progress: number;
   done: boolean;
   xp: number;
 }
 
-/** Начало's card: today's three goals, how far along each is, and the XP each earns. */
+/** Начало's card: today's three goals, how far along each is, the XP each earns, and (until done) the way to it. */
 export function goalsCard(): Child {
   if (!user.peek()) return null;
   const data = signal<DayGoal[] | null>(null);
@@ -44,7 +47,9 @@ export function goalsCard(): Child {
             "li",
             { class: g.done ? "goal done" : "goal" },
             h("span", { class: "goal-mark", "aria-hidden": "true" }),
-            h("span", { class: "goal-name" }, g.name),
+            g.href && !g.done
+              ? h("a", { class: "goal-name", href: g.href }, g.name)
+              : h("span", { class: "goal-name" }, g.name),
             h("span", { class: "goal-xp num" }, `+${g.xp} XP`),
             g.target > 1 && !g.done
               ? meter(Math.round((100 * g.progress) / g.target), `${g.progress} от ${g.target}`)

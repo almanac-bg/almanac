@@ -471,10 +471,32 @@
   }
 
   .goal {
+    position: relative;
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: 4px var(--space-3);
+  }
+
+  /* A goal not done yet leads to where it's done: the whole row is the link. */
+  a.goal-name {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  a.goal-name::before {
+    position: absolute;
+    inset: -6px 0;
+    content: "";
+  }
+
+  a.goal-name::after {
+    content: "\00a0›"; /* kept with the last word */
+    color: var(--text-muted);
+  }
+
+  a.goal-name:hover {
+    color: var(--link);
   }
 
   .goal-mark {

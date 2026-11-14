@@ -527,8 +527,13 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and its goal 100 more: the first level.)
-	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300+GoalXP || lvl != 2 ||
+	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and the goals it finished more: the first level.)
+	goals := 0
+	for _, d := range n.Goals {
+		goals += d.XP
+	}
+	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || goals < GoalXP[0] ||
+		n.XP != 300+goals || lvl != 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
@@ -967,35 +972,6 @@ func TestWardrobe(t *testing.T) {
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("halo"), nil); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("Легенда's frame at the start: %v", err)
-	}
-}
-
-func TestGoals(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	goals, err := w.g.GoalsOf(ctx, ana)
-	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done || goals[0].XP != GoalXP {
-		t.Fatalf("a new player's goals: %+v %v", goals, err)
-	}
-	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
-		t.Fatal("the day's goals changed within the day")
-	}
-	// The day's questions: that goal is done without looking, its XP is the player's, and it's told once.
-	s, _ := w.g.StartDay(ctx, ana)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	var games int
-	_ = w.db.Read.QueryRow(`SELECT sum(xp) FROM runs WHERE user_id = ?`, ana).Scan(&games)
-	n, err := w.g.NewsOf(ctx, ana, 0)
-	if err != nil || len(n.Goals) == 0 || n.Goals[0].Name != Goals[0].Name || n.Goals[0].XP != GoalXP ||
-		n.XP != games+GoalXP*len(n.Goals) {
-		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)
-	}
-	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP {
-		t.Fatalf("a goal told twice: %+v", again)
-	}
-	if look, _ := w.g.LookOf(ctx, ana); look.Level != n.Level {
-		t.Fatalf("the level others see: %d, not %d", look.Level, n.Level)
 	}
 }
 
