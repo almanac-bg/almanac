@@ -5,7 +5,7 @@
 
 import { emblem } from "../art/emblem.ts";
 import { news } from "../game/news.ts";
-import { answered, ask, picture } from "../game/questions.ts";
+import { answered, ask, crowdLine, picture } from "../game/questions.ts";
 import { questionHead, timer, trail, upNext } from "../game/run.ts";
 import type { Answer, Mark, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -363,6 +363,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
+    crowdLine(q.view.type, r.answer.crowd, r.right),
     theirs(first.them, q.view),
     upNext(q.nextMs ?? 0, last ? "Към резултата…" : `Въпрос ${first.n + 2} след малко…`),
   );

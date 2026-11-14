@@ -2180,9 +2180,21 @@
   }
 
   .crowd-says {
+    margin: 0;
     color: var(--text-muted);
     font-size: 0.9375rem;
     line-height: 1.375rem;
+  }
+
+  /* Under the verdict, it belongs to it. */
+  .verdict + .crowd-says {
+    margin-top: calc(-1 * var(--space-2));
+  }
+
+  /* A right answer few others got: a small reward, in gold. */
+  .crowd-says.rare {
+    color: var(--gold-ink);
+    font-weight: 600;
   }
 
   /* Where everyone's guesses at a number fell. */

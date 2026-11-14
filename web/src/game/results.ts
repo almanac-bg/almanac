@@ -6,7 +6,7 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { categories } from "../state.ts";
 import { countUp, fact, formatNumber, type Look, who } from "../ui.ts";
-import { answered, picture } from "./questions.ts";
+import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
 import type { Reviewed, Score, State } from "./types.ts";
@@ -140,6 +140,7 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
           h("h3", { class: "ask" }, it.view.text),
           picture(it.view),
           answered(it.view, it.reveal, it.given),
+          crowdLine(it.view.type, it.reveal.crowd, it.right),
           it.reveal.fact ? fact(it.reveal.fact) : null,
           report(it.reveal.id),
         ),

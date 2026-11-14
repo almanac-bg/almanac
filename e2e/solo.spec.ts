@@ -25,10 +25,13 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  // The result is shared without its answers: the date, the score, a square for each question, the site.
+  // The result is shared without its answers: the date, the score, a square for each question (and a right answer few
+  // of the day's other players got, if there's one: other tests play the same day), the site.
   await page.getByRole("button", { name: "Сподели" }).click();
   const shared = await page.evaluate(() => (window as unknown as { shared: string }).shared);
-  expect(shared).toMatch(/^АЛМАНАХ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨🟥]{10}\nalmanac\.bg$/u);
+  expect(shared).toMatch(
+    /^АЛМАНАХ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨🟥]{10}\n(Познах въпрос \d+, който .+\n)?almanac\.bg$/u,
+  );
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
@@ -54,6 +57,34 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".league-link")).toContainText("място от");
   await page.locator(".league-link").click();
   await expect(page.locator(".league-board .row.me")).toBeVisible();
+});
+
+test("the day says how its other players did with each question: under the verdict, and in the review", async ({
+  page,
+  playwright,
+}) => {
+  test.setTimeout(120_000);
+  // Another player has answered the day's first question (the browser tests count a crowd from one answer).
+  const other = await playwright.request.newContext({ baseURL: test.info().project.use.baseURL });
+  await other.post("/api/guest", { data: {} });
+  const run = await (await other.post("/api/day", { data: {} })).json();
+  await other.post(`/api/runs/${run.id}/show`, { data: {} });
+  expect((await other.post(`/api/runs/${run.id}/answer`, { data: { n: 0, answer: null } })).ok()).toBe(true);
+  await other.dispose();
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Започни" }).click();
+  await answer(page);
+  const says = page.locator(".after .verdict + .crowd-says");
+  await expect(says).toHaveText(/^[А-Яа-я ]+ (\d+|под 1)% от играчите днес\.$/);
+  await moveOn(page);
+  for (let n = 1; n < 10; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    await answer(page);
+    await moveOn(page);
+  }
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(page.locator(".reviewed").first().locator(".crowd-says")).toContainText("от играчите днес.");
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {

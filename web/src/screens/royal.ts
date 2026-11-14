@@ -5,7 +5,7 @@
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
 
-import { answered, ask, picture } from "../game/questions.ts";
+import { answered, ask, crowdLine, picture } from "../game/questions.ts";
 import { review } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
@@ -557,6 +557,7 @@ function reveal(view: () => Evening, first: Evening): Child {
           r.speed,
         )
       : null,
+    crowdLine(q.view.type, r.answer.crowd, r.mine && r.right),
     said ? h("p", { class: "royal-left" }, said) : null,
     upNext(q.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     () => {

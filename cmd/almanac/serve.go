@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -45,6 +46,8 @@ import (
 //	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
 //	                    every evening at 21:00
 //	MISTAKES_AFTER      development only: how long a missed question waits for its second chance (5s); else 3 days
+//	CROWD_FROM          development only: how many answers a question needs before how players answered it shows
+//	                    (1); else 10 of the day's players for the day's ten, 20 for everyone's
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
 //	                    MTA_STS_MODE testing (the default) or enforce
 //
@@ -92,6 +95,13 @@ func serve([]string) error {
 			return errors.New("MISTAKES_AFTER must be like 5s")
 		}
 		cfg.MistakesAfter = a
+	}
+	if from := os.Getenv("CROWD_FROM"); from != "" && dev {
+		n, err := strconv.Atoi(from)
+		if err != nil || n < 1 {
+			return errors.New("CROWD_FROM must be a number from 1")
+		}
+		cfg.CrowdMin = n
 	}
 	secret := os.Getenv("SECRET")
 	switch {

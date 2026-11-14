@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -79,12 +80,16 @@ type Game struct {
 	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
 	// tests make it seconds).
 	MistakesAfter time.Duration
+	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
+	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
+	CrowdMin int
 
 	weekMu sync.Mutex
 	week   string // the leagues' week being played, once ensureWeek has seen it
 
-	hard   hardnessCache // how hard each question is (mastery.go)
-	crowds crowdCache    // how players have answered each question (crowd.go)
+	hard      hardnessCache // how hard each question is (mastery.go)
+	crowds    crowdCache    // how players have answered each question (crowd.go)
+	dayCrowds dayCrowdCache // how the day's players have answered its questions (crowd.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -431,17 +436,20 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 // answer grades an answer; a Роял run's only as its tournament's (royal), so that it keeps the tournament's pace.
 func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, royal bool) (Result, error) {
 	var res Result
+	var r *run
+	var d bank.Dealt
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := load(tx, userID, runID)
-		if err != nil {
+		var err error
+		if r, err = load(tx, userID, runID); err != nil {
 			return err
 		}
 		if r.finished || n != r.at || (r.kind == "royal") != royal {
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
-		d, ok := g.deal(r.picks[r.at])
+		var ok bool
+		d, ok = g.deal(r.picks[r.at])
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
@@ -474,11 +482,20 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
 		res.Learned = r.kind == "mistakes" && gr.Right && d.Question().Extra().Fact != ""
-		res.Reveal = d.Reveal(g.Crowd(d.Question().Base().ID))
 		res.State, err = g.state(tx, r)
 		return err
 	})
-	if err == nil && finished {
+	if err != nil {
+		return res, err
+	}
+	// How other players answered it: counted once the answer is kept, outside the write, which it never waits on. The
+	// answer is kept whatever happens here: a count that fails shows none.
+	crowd, err := g.crowdOf(ctx, g.DB.Read, r, d.Question())
+	if err != nil {
+		slog.Warn("counting a question's crowd", "question", d.Question().Base().ID, "err", err)
+	}
+	res.Reveal = d.Reveal(crowd)
+	if finished {
 		err = g.finished(ctx, userID, runID)
 	}
 	return res, err
@@ -533,24 +550,36 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := []Reviewed{}
+	var all []Reviewed
 	for rows.Next() {
 		var it Reviewed
 		var shown sql.NullString
 		if err := rows.Scan(&it.N, &shown, &it.Points, &it.Right); err != nil {
+			rows.Close()
 			return nil, err
 		}
-		d, ok := g.deal(r.picks[it.N])
-		if !ok {
-			continue // gone from the bank since
-		}
-		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), d.Reveal(g.Crowd(d.Question().Base().ID))
 		it.Given = json.RawMessage("null")
 		if shown.Valid {
 			it.Given = json.RawMessage(shown.String)
 		}
+		all = append(all, it)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := []Reviewed{}
+	for _, it := range all {
+		d, ok := g.deal(r.picks[it.N])
+		if !ok {
+			continue // gone from the bank since
+		}
+		crowd, err := g.crowdOf(ctx, g.DB.Read, r, d.Question())
+		if err != nil {
+			return nil, err
+		}
+		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), d.Reveal(crowd)
 		out = append(out, it)
 	}
-	return out, rows.Err()
+	return out, nil
 }

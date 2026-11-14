@@ -35,6 +35,8 @@ interface Today {
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
   played?: boolean;
   run: State | null;
+  /** The day played: the right answer the fewest of its other players got (its place, their share right). */
+  rarest?: { n: number; right: number } | null;
   board: Board;
 }
 
@@ -105,7 +107,11 @@ export function today() {
                   : null;
               }),
               // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
-              { main: shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak)) },
+              {
+                main: shareButton("Сподели", () =>
+                  dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest),
+                ),
+              },
               [just ? news(run.id) : null, countdown()],
             )
           : dayCard(t, start(t), run?.trail ?? []),

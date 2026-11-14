@@ -48,6 +48,11 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 			out["run"] = st
+			if st.Done { // the right answer the fewest others got, for the result shared
+				if out["rarest"], err = s.game.RarestRight(r.Context(), u.ID, day); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	board, err := s.game.BoardOf(r.Context(), day, viewer)
