@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { fact, meter, pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
+import { fact, pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
 import { loadMistakes } from "./play.ts";
 
 interface Learned {
@@ -61,15 +61,14 @@ export function almanac() {
       const d = data();
       if (!user()) return h("p", { class: "muted" }, "Изиграй първите си въпроси и фактите ще се събират тук.");
       if (!d) return h("p", { class: "muted" }, "…");
-      const all = Object.values(d.of).reduce((a, b) => a + b, 0);
       const shown = topic() ? d.facts.filter((f) => f.category === topic()) : d.facts;
       return [
         h(
           "div",
           { class: "card almanac-head" },
           h("b", { class: "almanac-n" }, String(d.facts.length)),
-          h("span", { class: "muted" }, `от ${all} факта`),
-          meter(all ? Math.round((100 * d.facts.length) / all) : 0, `${d.facts.length} от ${all} факта`),
+          // How many learned, not of how many there are: a first week's dozen out of thousands looks like nothing.
+          h("span", { class: "muted" }, d.facts.length === 1 ? "научен факт" : "научени факта"),
         ),
         h(
           "ul",

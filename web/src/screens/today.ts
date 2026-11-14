@@ -177,7 +177,10 @@ function dayCard(t: Today, start: () => Promise<void>): Child {
     h(
       "p",
       { class: "day-meta" },
-      `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`,
+      // Who has played today, once someone has: a zero says only that the place is empty.
+      players
+        ? `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
+        : "Около 3 минути",
     ),
   );
 }

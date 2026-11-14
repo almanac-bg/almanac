@@ -34,7 +34,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания; of everyone or of friends (not the league: a group is its own).
-- **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level, division (after a first rated game),
+- **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
   league (once in one), streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
