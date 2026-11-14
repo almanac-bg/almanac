@@ -45,12 +45,20 @@ export async function answer(page: Page): Promise<void> {
   }
 }
 
-/** Plays a run's ten questions, solo: answer, see the answer, and the game moves on by itself. */
+/** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. */
 export async function playRun(page: Page): Promise<void> {
   for (let n = 0; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await answer(page);
-    await expect(page.locator(".verdict")).toBeVisible();
+    await moveOn(page);
   }
   await expect(page.locator(".summary, .screen h1").first()).toBeVisible({ timeout: 10_000 });
+}
+
+/** After an answer: its verdict shows; with a fact to read, a tap moves on (as a quick reader would), else the game
+ * moves on by itself. */
+export async function moveOn(page: Page): Promise<void> {
+  await expect(page.locator(".verdict")).toBeVisible();
+  const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
+  if (await go.isVisible()) await go.click().catch(() => {}); // gone already: the game moved on
 }
