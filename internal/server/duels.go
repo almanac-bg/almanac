@@ -68,14 +68,7 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
-	rc := http.NewResponseController(w)
-	send := func(line string) bool {
-		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		if _, err := fmt.Fprint(w, line); err != nil {
-			return false
-		}
-		return rc.Flush() == nil
-	}
+	send := sender(w)
 	fail := func(event string) { send("event: " + event + "\ndata: {}\n\n") }
 	if !s.limits.allow("live:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		fail("busy")
