@@ -25,7 +25,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/(duel|arena|royal|room|ranks|rewards|me|friends|settings|almanac)$`),
-	regexp.MustCompile(`^/duel/[0-9]{1,12}$`),
+	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/arena/[0-9]{6}$`),
