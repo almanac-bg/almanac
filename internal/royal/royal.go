@@ -1,5 +1,6 @@
 // Package royal is Роял played live: every evening at the same time, everyone in it on the same question at the same
-// moment. The first wrong answer (or the time running out) is the way out, and those out watch the rest to the end.
+// moment. The first wrong answer (or the time running out) is the way out, once the answer shows — unless nobody
+// still in got that question right, when those who answered stay in. Those out watch the rest to the end.
 //
 // The lobby opens a quarter of an hour before the start; whoever is there at the start plays. A tournament takes up
 // to play.RoyalSize players: when one is full, the next to come start another, on the same questions. Each moves on
@@ -127,6 +128,7 @@ type table struct {
 	at      time.Time // when the phase began
 	entered int
 	wentOut int           // on the question whose answer shows
+	spared  bool          // nobody got that question right, so nobody went out on a wrong answer
 	paced   time.Duration // how far into the question its screens were last told of more showing (bank.Paced)
 }
 
@@ -215,7 +217,7 @@ func (h *Hub) Load(ctx context.Context) error {
 				}
 				m.inQ = m.in || p.At == l.N+1
 				m.answered = p.At > l.N
-				m.res.Right = m.answered && p.Right == p.At
+				m.res.Right = m.answered && p.LastRight
 				if l.Phase == play.RoyalReveal && m.inQ && !m.answered {
 					m.res.TimedOut = true
 				}
@@ -393,7 +395,7 @@ func (h *Hub) begin(ctx context.Context, t *table, now time.Time) error {
 
 // shown is question n on everyone's screen (the database has it so already).
 func (h *Hub) shown(t *table, n int, now time.Time) {
-	t.phase, t.n, t.at, t.wentOut, t.paced = play.RoyalQuestion, n, now, 0, 0
+	t.phase, t.n, t.at, t.wentOut, t.paced, t.spared = play.RoyalQuestion, n, now, 0, 0, false
 	for _, m := range t.members {
 		m.inQ, m.answered, m.given, m.res = m.in, false, nil, play.Result{}
 	}
@@ -421,8 +423,6 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	m.answered, m.given, m.res = true, res.Given, res
 	if res.Right {
 		m.reached++
-	} else {
-		m.in, m.outAt = false, n
 	}
 	now := h.now()
 	for _, o := range t.members {
@@ -434,17 +434,23 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	return h.reveal(ctx, t, now)
 }
 
-// reveal shows the answer to the question now: whoever hasn't answered is out.
+// reveal shows the answer to the question now, and takes out whoever it put out (play.RevealRoyal): those who didn't
+// answer, and those who answered wrong unless nobody got it right (spared).
 func (h *Hub) reveal(ctx context.Context, t *table, now time.Time) error {
-	if err := h.game.RevealRoyal(ctx, t.id); err != nil {
+	out, spared, err := h.game.RevealRoyal(ctx, t.id)
+	if err != nil {
 		return err
 	}
-	t.phase, t.at, t.wentOut = play.RoyalReveal, now, 0
+	t.phase, t.at, t.wentOut, t.spared = play.RoyalReveal, now, 0, spared
 	for _, m := range t.members {
-		if m.inQ && !m.answered {
-			m.in, m.outAt, m.res = false, t.n, play.Result{TimedOut: true}
+		if !m.inQ {
+			continue
 		}
-		if m.inQ && !m.in {
+		if !m.answered {
+			m.res = play.Result{TimedOut: true}
+		}
+		if slices.Contains(out, m.ID) {
+			m.in, m.outAt = false, t.n
 			t.wentOut++
 		}
 	}
@@ -610,9 +616,11 @@ type View struct {
 	Tables  int `json:"tables"`
 	N       int `json:"n"`
 	Entered int `json:"entered"`
-	// Left is how many are still in; WentOut, how many went out on the question whose answer shows.
+	// Left is how many are still in; WentOut, how many went out on the question whose answer shows; Spared, that
+	// nobody got it right, so those who answered stay in.
 	Left     int           `json:"left"`
 	WentOut  int           `json:"wentOut"`
+	Spared   bool          `json:"spared,omitempty"`
 	Players  []PlayerView  `json:"players"`
 	Question *QuestionView `json:"question,omitempty"`
 	// RunID is the viewer's run, once it's over: to go over its questions.
@@ -684,6 +692,7 @@ func (h *Hub) View(viewer int64) View {
 		return v
 	}
 	v.Phase, v.N, v.Entered, v.WentOut = t.phase, t.n, t.entered, t.wentOut
+	v.Spared = t.phase == play.RoyalReveal && t.spared
 	if me != nil {
 		v.In, v.Out = true, t.phase != play.RoyalLobby && !me.in
 		if t.phase == play.RoyalEnd || (v.Out && t.phase != play.RoyalQuestion) {
