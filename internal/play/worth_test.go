@@ -62,7 +62,7 @@ func TestXP(t *testing.T) {
 		gr   bank.Graded
 		want int
 	}{
-		{bank.Graded{}, 0}, // the time ran out, or given up on
+		{bank.Graded{}, 0},             // the time ran out, or given up on
 		{bank.Graded{Given: given}, 2}, // wrong: a little for playing
 		{bank.Graded{Given: given, Score: 0.5}, 11},
 		{bank.Graded{Given: given, Score: 1, Right: true}, 20},
