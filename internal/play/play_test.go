@@ -532,6 +532,11 @@ func TestProgress(t *testing.T) {
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
+	for _, a := range n.Achievements {
+		if want := titleFor(a.ID); (a.Title == nil) != (want == nil) || (want != nil && *a.Title != *want) {
+			t.Fatalf("news of %s, and its title: %+v", a.ID, a.Title)
+		}
+	}
 	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Achievements) != 0 || again.LevelUp {
 		t.Fatalf("the same news twice: %+v", again)
 	}
@@ -560,7 +565,7 @@ func TestProgress(t *testing.T) {
 	w.play(ana, run.ID, repeat(w.right, Length)...)
 	p, _ = w.g.ProgressOf(ctx, ana)
 	for _, a := range p.Achievements {
-		if a.ID == "topicPerfect" && (a.At == 0 || a.Name != "Отличник") {
+		if a.ID == "topicPerfect" && (a.At == 0 || a.Name != "Тема без грешка") {
 			t.Fatalf("a hidden achievement once found: %+v", a)
 		}
 	}
@@ -570,11 +575,17 @@ func TestProgress(t *testing.T) {
 		avatar, title *string
 		ok            bool
 	}{
-		{ptr("star-gold"), ptr("perfect"), true},
+		{nil, ptr("master-history"), true}, // ten right in history: sure, and a master
+		{ptr("star-gold"), ptr("flawless"), true},
 		{ptr("crown-gold"), nil, false},
 		{ptr("star-black"), nil, false},
 		{ptr("bogus"), nil, false},
-		{nil, ptr("duel1"), false},
+		{nil, ptr("perfect"), false}, // an achievement isn't a title
+		{nil, ptr("duelInstinct"), false},
+		{nil, ptr("passion"), false}, // level 5
+		{nil, ptr("royalCrown"), false},
+		{nil, ptr("master-science"), false},
+		{nil, ptr("podium3"), false},
 		{nil, ptr("nosuch"), false},
 	} {
 		if err := w.g.SetLook(ctx, ana, c.avatar, c.title); (err == nil) != c.ok {
@@ -582,7 +593,7 @@ func TestProgress(t *testing.T) {
 		}
 	}
 	b, _ := w.g.BoardOf(ctx, w.g.Today(), ana)
-	if top := b.Top[0]; top.Avatar != "star-gold" || top.Title != "Десет от десет" || top.Level < 2 {
+	if top := b.Top[0]; top.Avatar != "star-gold" || top.Title != "Безупречност" || top.TitleTier != Rare || top.Level < 2 {
 		t.Fatalf("the board shows %+v", top)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("")); err != nil {
@@ -1064,8 +1075,102 @@ func TestSeasons(t *testing.T) {
 	if look, _ := w.g.LookOf(ctx, ps[1]); look.Title != "Вицешампион" || !strings.Contains(look.Avatar, "/podium2/") {
 		t.Fatalf("second's look: %+v", look)
 	}
-	if name, _ := PodiumTitle(3, 12); name != "12-кратен бронзов медалист" {
-		t.Fatalf("a dozen thirds: %q", name)
+	for _, c := range []struct {
+		place, n int
+		want     string
+	}{{1, 1, "Шампион"}, {1, 3, "Трикратен шампион"}, {2, 2, "Двукратен вицешампион"}, {3, 1, "Бронзов медалист"},
+		{3, 12, "12-кратен бронзов медалист"}} {
+		if name, _ := PodiumTitle(c.place, c.n); name != c.want {
+			t.Fatalf("place %d, %d times: %q", c.place, c.n, name)
+		}
+	}
+}
+
+func TestTitles(t *testing.T) {
+	// Titles are their own: each unlocked by something there is, none an achievement's name.
+	ids := map[string]bool{}
+	for _, tt := range Titles {
+		if ids[tt.ID] || tt.Name == "" || tt.Tier == "" {
+			t.Fatalf("title %+v", tt)
+		}
+		ids[tt.ID] = true
+		if _, ok := achievementByID(tt.by.achieved); tt.by.achieved != "" && !ok {
+			t.Fatalf("%s is unlocked by no achievement", tt.ID)
+		}
+		if slices.ContainsFunc(Achievements, func(a Achievement) bool { return a.Name == tt.Name }) {
+			t.Fatalf("%s is an achievement's name", tt.Name)
+		}
+	}
+
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	p, _ := w.g.ProgressOf(ctx, ana)
+	topics := len(w.g.Bank().Categories) * len(topicTiers)
+	if len(p.Titles) != 3+len(Titles)+topics || p.Titles[0].ID != "podium1" || p.Titles[0].Name != "Шампион" ||
+		p.Titles[2].How != "трето място в сезон" {
+		t.Fatalf("a new player's titles: %+v", p.Titles)
+	}
+	byID := map[string]TitleView{}
+	for _, v := range p.Titles {
+		byID[v.ID] = v
+		if v.Locked == (v.ID == "spark") || (v.Locked && v.How == "") || v.Group == "" {
+			t.Fatalf("a new player's title %+v", v)
+		}
+	}
+	if v := byID["nightOwl"]; v.How != "скрито постижение" {
+		t.Fatalf("a hidden achievement's title tells how: %+v", v)
+	}
+	if v := byID["unquenched"]; v.How != "играй въпросите на деня тридесет дни поред." {
+		t.Fatalf("an achievement's title: %+v", v)
+	}
+	if v := byID["master-history"]; v.Name != "Майстор · История" || v.How != "стигни до „Майстор“ в „История“" ||
+		v.Group != TitleTopic {
+		t.Fatalf("a topic's title: %+v", v)
+	}
+	if v := byID["diamondMind"]; v.How != "дивизия Диамант" {
+		t.Fatalf("a division's title: %+v", v)
+	}
+
+	// A level's title, told when the level is.
+	if _, err := w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, '2026-11-01', 'x', 1, 2100, 1)`, ana); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := w.g.NewsOf(ctx, ana, 0); err != nil || n.Level != 5 || len(n.Titles) != 2 || n.Titles[0].ID != "curious" ||
+		n.Titles[1].ID != "passion" {
+		t.Fatalf("level 5's news: %+v %v", n, err)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("passion")); err != nil {
+		t.Fatalf("level 5's title: %v", err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Страст към викторините" || look.TitleTier != Common {
+		t.Fatalf("the look: %+v", look)
+	}
+
+	// A Роял won, with someone else in it; alone, it doesn't count.
+	royal := func(players ...int64) {
+		res, err := w.db.Write.Exec(`INSERT INTO royals (questions, created_at, closes_at, ended_at) VALUES ('[]', 1, 1, 1)`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := res.LastInsertId()
+		for i, u := range players {
+			if _, err := w.db.Write.Exec(`INSERT INTO royal_players (royal_id, user_id, joined_at, place) VALUES (?, ?, 1, ?)`,
+				id, u, i+1); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	royal(bo)
+	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("a Роял alone: %v", err)
+	}
+	royal(bo, ana)
+	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); err != nil {
+		t.Fatalf("a Роял won: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("second in a Роял: %v", err)
 	}
 }
 

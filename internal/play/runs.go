@@ -171,7 +171,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 			return b, err
 		}
 		s.Me = id == viewer
-		s.Look = lookOf(id, avatar, title, points)
+		s.Look = g.lookOf(id, avatar, title, points)
 		b.Top = append(b.Top, s)
 	}
 	if err := rows.Err(); err != nil || viewer == 0 {
@@ -185,7 +185,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
 		Scan(&runID, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Ms, &avatar, &title, &points)
-	mine.Look = lookOf(viewer, avatar, title, points)
+	mine.Look = g.lookOf(viewer, avatar, title, points)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}

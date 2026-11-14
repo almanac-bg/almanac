@@ -518,7 +518,7 @@ func (g *Game) RoyalsOf(ctx context.Context, userID int64) ([]Royal, error) {
 				players.Close()
 				return nil, err
 			}
-			p.Look, p.Me = lookOf(id, avatar, title, points), id == userID
+			p.Look, p.Me = g.lookOf(id, avatar, title, points), id == userID
 			out[i].Players = append(out[i].Players, p)
 		}
 		players.Close()

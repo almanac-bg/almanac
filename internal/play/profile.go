@@ -67,7 +67,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if err != nil {
 		return p, err
 	}
-	p.Me, p.Look = id == viewer, lookOf(id, avatar, title, total)
+	p.Me, p.Look = id == viewer, g.lookOf(id, avatar, title, total)
 	if p.Standing, err = g.StandingOf(ctx, id); err != nil {
 		return p, err
 	}

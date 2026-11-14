@@ -694,7 +694,7 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64, show bool) (*D
 	if err != nil {
 		return nil, err
 	}
-	look := lookOf(userID, avatar, title, points)
+	look := g.lookOf(userID, avatar, title, points)
 	s.Look = &look
 	if runID != 0 {
 		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, points, rights, ms FROM runs WHERE id = ?`, runID).
