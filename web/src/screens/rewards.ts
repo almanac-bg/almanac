@@ -6,8 +6,7 @@ import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge, meter, shapeNames, type Tier, tiers, tierWords, toneNames } from "../ui.ts";
-import { type Cosmetic, loadProgress, type Progress } from "./progress.ts";
-import { seasonSection } from "./season.ts";
+import { type Cosmetic, loadProgress, type Progress, titlesOf } from "./progress.ts";
 
 export function rewards() {
   title("Награди");
@@ -22,7 +21,6 @@ export function rewards() {
         const load = () => loadProgress().then(progress.set, () => {});
         load();
         return [
-          seasonSection(),
           () => {
             const p = progress();
             return p ? achievements(p) : null;
@@ -39,8 +37,6 @@ export function rewards() {
     ),
   );
 }
-
-const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
@@ -127,8 +123,13 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
     const p = progress();
     if (!p) return null;
     const [shape = "", tone = ""] = p.avatar.split("-");
-    // Every title, by tier: the earned ones to wear, the rest with what unlocks them.
-    const titles = tiers.flatMap((t: Tier) => p.achievements.filter((a) => a.tier === t));
+    // Every title — a season's podium's, then the achievements' by tier: the earned ones to wear, the rest with what
+    // unlocks them.
+    const all = titlesOf(p);
+    const titles = [
+      ...all.slice(0, p.podium.length),
+      ...tiers.flatMap((t: Tier) => all.slice(p.podium.length).filter((a) => a.tier === t)),
+    ];
     return h(
       "section",
       null,
@@ -193,7 +194,11 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
         (id) => set({ backdrop: id }),
       ),
       h("h3", null, "Титла"),
-      h("p", { class: "muted" }, "Титлата се вижда под името ти. Всяко постижение отключва една."),
+      h(
+        "p",
+        { class: "muted" },
+        "Титлата се вижда под името ти. Всяко постижение отключва една, а място в първите трима на сезон — още една, която брои колко пъти.",
+      ),
       h(
         "ul",
         { class: "titles" },
@@ -210,7 +215,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
           h(
             "li",
             null,
-            a.at
+            a.earned
               ? h(
                   "button",
                   {
@@ -227,7 +232,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
                   { class: `title-pick locked t-${a.tier}` },
                   h("span", { class: "title-name" }, a.name),
                   h("span", { class: "title-tier" }, tierWords[a.tier].title),
-                  h("span", { class: "title-how" }, `Отключва се: ${lower(a.about)}`),
+                  h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
                 ),
           ),
         ),

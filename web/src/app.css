@@ -471,7 +471,7 @@
     font: 800 1.125rem / 1.4 var(--font-sans);
   }
 
-  /* The day's goals: each with its mark (a star once done), and the season's strip under them. */
+  /* The day's goals: each with its mark (a star once done) and the XP it earns. */
   .goal-list {
     display: grid;
     gap: var(--space-2);
@@ -507,83 +507,68 @@
     text-decoration-color: var(--line-strong);
   }
 
-  .goal-n {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    font-weight: 700;
-  }
-
-  .season-strip {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--line);
+  /* Just done, at a game's end: said, not struck out. */
+  .goal.fresh .goal-name {
     color: var(--text);
-    font-size: 0.875rem;
     text-decoration: none;
   }
 
-  /* A season: its banner in its colour (art/season.ts), the stars, the medals on the way. */
+  .goal-xp {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 800;
+  }
+
+  .goal.done .goal-xp {
+    color: var(--gold-ink);
+  }
+
+  .goal-n {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  /* The season (the rating's month): where the player stands, their podium medals, the seasons before. */
   .season-card {
     display: grid;
     gap: var(--space-3);
-    overflow: hidden;
-  }
-
-  .season-banner {
-    height: 96px;
-    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
-    background: linear-gradient(135deg, color-mix(in srgb, var(--season) 35%, var(--surface)), var(--surface));
-  }
-
-  .season-banner svg {
-    width: 100%;
-    height: 100%;
-  }
-
-  .season-arc {
-    fill: none;
-    stroke: var(--season);
-    stroke-width: 2;
-    opacity: 0.35;
-  }
-
-  .season-star {
-    fill: var(--season);
-    opacity: 0.8;
   }
 
   .season-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--space-1) var(--space-3);
   }
 
-  .season-stars b {
-    font: 900 2.25rem / 1 var(--font-numeral);
+  .season-place b {
+    font: 900 2rem / 1 var(--font-numeral);
   }
 
-  .season-track,
+  .podium,
   .season-past {
-    display: grid;
-    gap: var(--space-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .season-track li,
-  .season-past li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-3);
+  .season-past {
+    display: grid;
   }
 
-  .season-track li:not(.reached) {
+  .podium li,
+  .season-past li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .podium li.none {
     color: var(--text-muted);
   }
 
@@ -592,6 +577,11 @@
     flex: none;
     width: 36px;
     height: 36px;
+  }
+
+  .season-medal.s {
+    width: 26px;
+    height: 26px;
   }
 
   .season-medal svg {
@@ -626,6 +616,18 @@
 
   .season-medal.earned .season-medal-star {
     fill: color-mix(in srgb, var(--div) 35%, white);
+  }
+
+  /* Класации: who the board is of (everyone, friends) and, for knowledge, which topic. */
+  .board-filters {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .board-note {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
   }
 
   /* Роял's table: those out are dimmer; how far each got on the right. */
@@ -2732,7 +2734,7 @@
     grid-column: 1 / -1;
   }
   .goal .meter {
-    grid-column: 2 / -1;
+    grid-column: 2;
     height: 5px;
   }
 
@@ -2882,6 +2884,18 @@
 
   .fr-halo {
     --frame: var(--div-legend);
+  }
+
+  .fr-podium1 {
+    --frame: var(--div-gold);
+  }
+
+  .fr-podium2 {
+    --frame: var(--div-silver);
+  }
+
+  .fr-podium3 {
+    --frame: var(--div-bronze);
   }
 
   .bd-dots {

@@ -527,8 +527,8 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (A perfect day earns 20 XP an answer and 100 for the day: 300, the first level.)
-	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300 || lvl != 2 ||
+	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and its goal 100 more: the first level.)
+	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300+GoalXP || lvl != 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
@@ -829,7 +829,7 @@ func TestWardrobe(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	p, _ := w.g.ProgressOf(ctx, ana)
-	if len(p.Frames) != len(Frames)+1 || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
+	if len(p.Frames) != len(Frames) || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
 		t.Fatalf("a new player's frames: %+v", p.Frames)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), nil); !errors.Is(err, ErrNotYours) {
@@ -851,39 +851,156 @@ func TestWardrobe(t *testing.T) {
 	}
 }
 
-func TestGoalsAndSeason(t *testing.T) {
+func TestGoals(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
 	goals, err := w.g.GoalsOf(ctx, ana)
-	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done {
+	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done || goals[0].XP != GoalXP {
 		t.Fatalf("a new player's goals: %+v %v", goals, err)
 	}
 	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
 		t.Fatal("the day's goals changed within the day")
 	}
-	// The day's questions: that goal is done, and a star for the season, without looking.
+	// The day's questions: that goal is done without looking, its XP is the player's, and it's told once.
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	season, _ := w.g.SeasonOf(ctx, ana)
-	if season.Stars < 1 || season.DaysLeft < 1 || season.Hue < 0 || season.Hue >= 360 {
-		t.Fatalf("the season after a goal: %+v", season)
+	var games int
+	_ = w.db.Read.QueryRow(`SELECT sum(xp) FROM runs WHERE user_id = ?`, ana).Scan(&games)
+	n, err := w.g.NewsOf(ctx, ana, 0)
+	if err != nil || len(n.Goals) == 0 || n.Goals[0].Name != Goals[0].Name || n.Goals[0].XP != GoalXP ||
+		n.XP != games+GoalXP*len(n.Goals) {
+		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)
 	}
-	b, _ := w.g.SeasonBoard(ctx, ana)
-	if b.Place != 1 || b.Mine == nil || b.Mine.Value != season.Stars {
-		t.Fatalf("the season's board: %+v", b)
+	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP {
+		t.Fatalf("a goal told twice: %+v", again)
 	}
-	// A season's gold makes its frame the player's.
-	month := w.g.Now().In(Bulgaria).Format("2006-01")
-	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("a season's frame without its gold: %v", err)
+	if look, _ := w.g.LookOf(ctx, ana); look.Level != n.Level {
+		t.Fatalf("the level others see: %d, not %d", look.Level, n.Level)
 	}
-	for i := range SeasonTiers[len(SeasonTiers)-1].Stars {
-		_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at) VALUES (?, ?, ?, 0)`,
-			ana, month+"-01", fmt.Sprintf("g%d", i))
+}
+
+func TestSeasons(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	// Five players with a season's games, one with too few.
+	var ps []int64
+	for i, rating := range []int{1300, 1200, 1100, 1000, 900} {
+		p := w.user()
+		ps = append(ps, p)
+		_, _ = w.db.Write.Exec(`UPDATE users SET rating = ?, rated = 20, season_games = ? WHERE id = ?`,
+			rating, MinSeasonGames+i, p)
 	}
-	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); err != nil {
-		t.Fatalf("a season's frame with its gold: %v", err)
+	few := w.user()
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1500, rated = 3, season_games = 3 WHERE id = ?`, few)
+	b, err := w.g.RatingBoard(ctx, ps[1], false)
+	if err != nil || len(b.Top) != 5 || b.Place != 2 || b.Top[0].Value != 1300 || b.Top[0].Division == nil {
+		t.Fatalf("the season's board: %+v %v", b, err)
+	}
+	s, _ := w.g.SeasonOf(ctx, few)
+	if s.Place != 0 || s.Games != 3 || s.Of != 5 || s.MinGames != MinSeasonGames || s.DaysLeft < 1 {
+		t.Fatalf("a season without enough games: %+v", s)
+	}
+	_ = w.g.befriend(ctx, ps[4], ps[0])
+	if f, _ := w.g.RatingBoard(ctx, ps[4], true); len(f.Top) != 2 || f.Place != 2 {
+		t.Fatalf("the board among friends: %+v", f)
+	}
+	// The month ends: the board is kept, the first three take the podium, and every rating goes halfway back.
+	var told []SeasonNews
+	w.g.SeasonNews = func(_ context.Context, n SeasonNews) { told = append(told, n) }
+	w.now = time.Date(2026, 12, 1, 0, 5, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 5 || told[0].Season != "2026-11" || told[0].Of != 5 {
+		t.Fatalf("the season's news: %+v", told)
+	}
+	var rating, games int
+	_ = w.db.Read.QueryRow(`SELECT rating, season_games FROM users WHERE id = ?`, ps[0]).Scan(&rating, &games)
+	if rating != 1150 || games != 0 || softened(900) != 950 || softened(1001) != 1000 {
+		t.Fatalf("softened: %d, %d games", rating, games)
+	}
+	if again, _ := w.g.RatingBoard(ctx, ps[0], false); len(again.Top) != 0 {
+		t.Fatalf("a new season's board: %+v", again)
+	}
+	s, _ = w.g.SeasonOf(ctx, ps[0])
+	if s.ID != "2026-12" || s.Podium != (Podium{1, 0, 0}) || len(s.Past) != 1 || s.Past[0].Place != 1 ||
+		s.Past[0].Rating != 1300 || s.Past[0].Division.ID != "platinum" {
+		t.Fatalf("the champion's season: %+v", s)
+	}
+	// Once only, whatever the clock does after.
+	if err := w.g.SettleDue(ctx); err != nil || len(told) != 5 {
+		t.Fatalf("a season ended twice: %v", err)
+	}
+	// A podium's title and frame are the player's; the next season's champion counts twice.
+	if err := w.g.SetLook(ctx, ps[1], nil, ptr("podium1"), nil, nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("the champion's title, second: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[1], nil, ptr("podium2"), ptr("podium2"), nil); err != nil {
+		t.Fatalf("second's title and frame: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[2], nil, nil, ptr("podium2"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("second's frame, third: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[0], nil, ptr("podium1"), ptr("podium3"), nil); err != nil {
+		t.Fatalf("the champion's title, and a lower frame: %v", err)
+	}
+	_, _ = w.db.Write.Exec(`UPDATE users SET season_games = ? WHERE id = ?`, MinSeasonGames, ps[0])
+	w.now = time.Date(2027, 1, 1, 0, 5, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if look, _ := w.g.LookOf(ctx, ps[0]); look.Title != "Двукратен шампион" || look.TitleTier != Legendary {
+		t.Fatalf("the champion's title: %+v", look)
+	}
+	if look, _ := w.g.LookOf(ctx, ps[1]); look.Title != "Вицешампион" || !strings.Contains(look.Avatar, "/podium2/") {
+		t.Fatalf("second's look: %+v", look)
+	}
+	if name, _ := PodiumTitle(3, 12); name != "12-кратен бронзов медалист" {
+		t.Fatalf("a dozen thirds: %q", name)
+	}
+}
+
+func TestBoards(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, cy := w.user(), w.user(), w.user()
+	// Ana knows the day's ten; Bo misses them all; Cy plays nothing.
+	for _, p := range []struct {
+		id    int64
+		right bool
+	}{{ana, true}, {bo, false}} {
+		for range KnowAll / Length {
+			s, err := w.g.StartTopic(ctx, p.id, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.right {
+				w.play(p.id, s.ID, repeat(w.right, Length)...)
+			} else {
+				w.play(p.id, s.ID, repeat(w.wrong, Length)...)
+			}
+		}
+	}
+	k, err := w.g.KnowledgeBoard(ctx, bo, false, "")
+	if err != nil || len(k.Top) != 2 || k.Top[0].Value != 100 || k.Top[0].Answers != KnowAll || k.Place != 2 ||
+		k.Mine.Value != 0 {
+		t.Fatalf("the board of knowledge: %+v %v", k, err)
+	}
+	if _, err := w.g.KnowledgeBoard(ctx, bo, false, "nope"); !errors.Is(err, ErrNoTopic) {
+		t.Fatalf("a topic there isn't: %v", err)
+	}
+	topic := w.b.Categories[0].ID
+	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, topic); len(k.Top) != 0 {
+		t.Fatalf("a topic nobody has %d answers in: %+v", KnowTopic, k)
+	}
+	l, err := w.g.LevelBoard(ctx, cy, false)
+	if err != nil || len(l.Top) != 2 || l.Top[0].Name == "" || l.Place != 0 || l.Top[0].Value <= l.Top[1].Value {
+		t.Fatalf("the board of levels: %+v %v", l, err)
+	}
+	_ = w.g.befriend(ctx, cy, bo)
+	if l, _ := w.g.LevelBoard(ctx, cy, true); len(l.Top) != 1 || !l.Top[0].Me && l.Top[0].Name == "" {
+		t.Fatalf("levels among friends: %+v", l)
 	}
 }
 

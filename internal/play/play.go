@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand/v2"
+	"sync"
 	"time"
 	_ "time/tzdata" // Bulgaria's days, wherever the server runs
 
@@ -67,6 +68,11 @@ type Game struct {
 	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
+	// SeasonNews, if set, is told of each place when a season ends.
+	SeasonNews func(context.Context, SeasonNews)
+
+	seasonMu sync.Mutex
+	season   string // the season being played, once ensureSeason has seen it
 
 	hard hardnessCache // how hard each question is (mastery.go)
 }
@@ -400,7 +406,7 @@ func (g *Game) afterRun(ctx context.Context, userID int64) error {
 	if _, err := g.Award(ctx, userID); err != nil {
 		return err
 	}
-	_, err := g.GoalsOf(ctx, userID) // a goal done is kept, whether or not the player looks
+	_, err := g.GoalsOf(ctx, userID) // a goal done is kept, with its XP, whether or not the player looks
 	return err
 }
 

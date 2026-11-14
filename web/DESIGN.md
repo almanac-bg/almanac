@@ -123,12 +123,12 @@ takes a token.
   Сребро a chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned star shield with rays — in
   `--div-*` colours.
 - **Avatar frames are generated** (`web/src/art/frame.ts`) around the rounded tile: Пръстен, Двоен пръстен, Точки,
-  Пламъци, Лавров венец, Кристал, Ореол; **patterns** behind the shape are CSS (`.bd-dots`, `-stripes`, `-grid`,
+  Пламъци, Лавров венец, Кристал, Ореол, and a season's podium (Шампионска, Сребърна, Бронзова: stars at the corners
+  in the place's metal); **patterns** behind the shape are CSS (`.bd-dots`, `-stripes`, `-grid`,
   `-rays`, `-stars`). Both unlock by level, achievement or the highest division reached, and show on every avatar
   (the server sends a look's avatar as `shape-tone/frame/backdrop`).
-- **Season art is generated** (`web/src/art/season.ts`): each season (a calendar month) has its own colour, a step
-  round the colour wheel a month; its banner (arcs and scattered stars), its medals (bronze, silver, gold) and its
-  frame are drawn in it.
+- **Season art is generated** (`web/src/art/season.ts`): the podium's medals — gold, silver, bronze — in the
+  divisions' metals.
 
 ## Flow
 
@@ -153,15 +153,16 @@ Every element that looks like a game measures something the game already counts:
 | Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                           | Днес, Профил                 |
 | Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                | Verdict, result, day board   |
 | In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                      | Question head, verdict       |
-| XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's; adds up                                                                                                                            | Level, week board, goals     |
+| XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's, 100 a daily goal; adds up                                                                                                          | Level, level board, goals    |
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                                                                                                                              | Result, Профил               |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                      | Room boards                  |
 | Duels        | Played in each one's own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                   | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                     | Дуел, Роял, Профил, Класации |
 | Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; the first wrong answer is out, then watch                                                                                        | Роял, Класации               |
-| Goals        | Three a day (the day's questions, and two drawn), each a star                                                                                                                                                                               | Начало                       |
-| Season       | A calendar month's stars; 10/30/60 earn its bronze/silver/gold medal, gold its frame                                                                                                                                                        | Награди, Класации            |
+| Goals        | Three a day (the day's questions, and two drawn), each 100 XP once done, told at the game's end                                                                                                                                             | Начало, result               |
+| Season       | The rating's calendar month: placed after 10 rated games; at its end the first three win a medal, a frame and a title that counts („Двукратен шампион“), and every rating goes halfway back to 1000                                         | Класации, Профил             |
+| Boards       | Rating (the season's), level (all XP) and knowledge (share right after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                            | Класации                     |
 | Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                                                                                                                                      | Result                       |
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                 | Result, Профил, avatars      |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                             | Result, Профил               |

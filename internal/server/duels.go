@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
@@ -102,25 +103,43 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	go s.notify(context.WithoutCancel(ctx), m, n.To)
 }
 
-// ranks are the boards: the best by rating, and this week's XP.
+// ranks is a board: by rating this season (with the season), by level, or by knowledge (over every topic, or one);
+// of everyone, or of the viewer and their friends (?among=friends).
 func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	viewer := int64(0)
 	if u, err := s.user(r); err == nil && u != nil {
 		viewer = u.ID
 	}
-	rating, err := s.game.RatingBoard(r.Context(), viewer)
+	q := r.URL.Query()
+	friends := q.Get("among") == "friends"
+	ctx := r.Context()
+	switch q.Get("by") {
+	case "level":
+		b, err := s.game.LevelBoard(ctx, viewer, friends)
+		if err != nil {
+			return err
+		}
+		return ok(w, map[string]any{"board": b})
+	case "knowledge":
+		b, err := s.game.KnowledgeBoard(ctx, viewer, friends, q.Get("topic"))
+		if err != nil {
+			return err
+		}
+		least := play.KnowAll
+		if q.Get("topic") != "" {
+			least = play.KnowTopic
+		}
+		return ok(w, map[string]any{"board": b, "least": least})
+	}
+	b, err := s.game.RatingBoard(ctx, viewer, friends)
 	if err != nil {
 		return err
 	}
-	week, err := s.game.WeekBoard(r.Context(), viewer)
+	season, err := s.game.SeasonOf(ctx, viewer)
 	if err != nil {
 		return err
 	}
-	season, err := s.game.SeasonBoard(r.Context(), viewer)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"rating": rating, "week": week, "season": season})
+	return ok(w, map[string]any{"board": b, "season": season})
 }
 
 // almanac is the player's collection of learned facts.
@@ -136,8 +155,31 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, a)
 }
 
-// season is the player's goals for today and their season.
+// season is the rating's season as the player sees it: their games and place in it, and how the ones before ended.
 func (s *Server) season(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	season, err := s.game.SeasonOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, season)
+}
+
+// seasonNews tells a player placed in a season how it ended.
+func (s *Server) seasonNews(ctx context.Context, n play.SeasonNews) {
+	body := fmt.Sprintf("%d-и от %d в рейтинга. Новият сезон започна.", n.Place, n.Of)
+	if n.Place <= 3 {
+		title, _ := play.PodiumTitle(n.Place, 1)
+		body = fmt.Sprintf("%d-и от %d: %s на сезона! Новият сезон започна.", n.Place, n.Of, strings.ToLower(title))
+	}
+	go s.notify(context.WithoutCancel(ctx), push.Message{URL: "/me", Title: "Сезонът свърши", Body: body}, n.To)
+}
+
+// goals are the player's goals for today.
+func (s *Server) goals(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
@@ -146,9 +188,5 @@ func (s *Server) season(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	season, err := s.game.SeasonOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"goals": goals, "season": season})
+	return ok(w, map[string]any{"goals": goals})
 }
