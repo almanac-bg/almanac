@@ -14,6 +14,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/room"
+	"github.com/almanac-bg/almanac/internal/royal"
 )
 
 // apiError is an error a player can be shown: a code for the client, and the words for the player.
@@ -49,6 +50,8 @@ var playerErrors = map[error]*apiError{
 	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Имаш пет дуела, които чакат. Изчакай някой да свърши."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Чакат отговор твърде много покани: до 50."},
+	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял е отворен от 20:45 до 21:00."},
+	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Не точно сега."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
 	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави домакинът."},

@@ -123,49 +123,6 @@ func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"rating": rating, "week": week, "season": season})
 }
 
-// joinRoyal puts the player in a tournament and gives them their run.
-func (s *Server) joinRoyal(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	st, id, err := s.game.JoinRoyal(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"royal": id, "state": st})
-}
-
-// royals lists the tournaments the player is in, with their rating.
-func (s *Server) royals(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	list, err := s.game.RoyalsOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	if list == nil {
-		list = []play.Royal{}
-	}
-	st, err := s.game.StandingOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"royals": list, "standing": st})
-}
-
-// royalNews tells a player how a tournament they were in ended.
-func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
-	m := push.Message{
-		URL:   "/royal",
-		Title: fmt.Sprintf("Роял: %d-и от %d", n.Place, n.Of),
-		Body:  fmt.Sprintf("Рейтинг: %+d.", n.Delta),
-	}
-	go s.notify(context.WithoutCancel(ctx), m, n.To)
-}
-
 // almanac is the player's collection of learned facts.
 func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
