@@ -577,12 +577,11 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
     h(
       "button",
       {
-        class: `option tf ${truth ? "tf-yes" : "tf-no"}`,
+        class: "option tf",
         type: "button",
         disabled: locked,
         onclick: () => pick(truth),
       },
-      h("span", { class: "tf-mark", "aria-hidden": "true" }),
       h("span", null, truth ? "Вярно" : "Невярно"),
       h("kbd", { class: "key-hint", "aria-hidden": "true" }, truth ? "1" : "2"),
     );
@@ -606,8 +605,8 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
           truth === reveal.truth ? "right" : given && "truth" in given && given.truth === truth ? "wrong" : "dim";
         b.classList.add(how);
         const said = reveal.crowd?.picks?.[truth ? 0 : 1];
+        // No ✓ or ✕ here: on „Вярно“ and „Невярно“ they read as the answers' own words. The verdict under them says it.
         if (said !== undefined) crowdOn(b, said);
-        if (how !== "dim") b.append(sign());
       }
     },
   };
