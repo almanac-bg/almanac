@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 const root = join(import.meta.dirname, "..", "..");
-const places = ["web/src", "web/public", "internal", "cmd", "bank/sample"];
+const places = ["web/src", "web/public", "internal", "cmd", "bank/sample", "mobile/www"];
 const kinds = /\.(ts|go|css|html|json|webmanifest|txt)$/;
 
 /** Letters of Russian (and other Cyrillic alphabets) that Bulgarian has none of. */

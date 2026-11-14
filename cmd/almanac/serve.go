@@ -24,7 +24,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// serve runs the game, configured by the environment (deploy/almanac.env lists every setting):
+// serve runs the game, configured by the environment (deploy/env.example shows the server's):
 //
 //	DEV=1               development: the client from disk, mail to the log (and to MAIL_DIR, if set), a fixed secret
 //	ADDR                where to listen (:8080)
@@ -39,6 +39,10 @@ import (
 //	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once)
 //	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
 //	PUSH_PRIVATE_KEY    no notifications
+//	APNS_KEY_FILE       notifications to the app on iPhones: the team's APNs key (.p8), with APNS_KEY_ID and
+//	                    APNS_TEAM_ID; without them, none there
+//	FCM_CREDENTIALS_FILE notifications to the app on Android: the Firebase service account's key (.json); without
+//	                    it, none there
 //	BACKUP_ENDPOINT     S3-compatible storage for hourly copies of the database (R2), with BACKUP_BUCKET,
 //	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
 //	OPERATOR_NAME       who runs the game, for the privacy page
@@ -152,6 +156,9 @@ func serve([]string) error {
 		}
 		cfg.Push = &push.Sender{Keys: keys, Subject: "mailto:" + cfg.Contact}
 	}
+	if cfg.Phones, err = phones(); err != nil {
+		return err
+	}
 	srv, err := server.New(cfg, server.Deps{DB: db, Accounts: accounts, Outbox: outbox, Bank: b})
 	if err != nil {
 		return err
@@ -227,4 +234,31 @@ func every(ctx context.Context, period time.Duration, fn func()) {
 		case <-t.C:
 		}
 	}
+}
+
+// phones is what sends notifications to the game's app, from the keys the environment names (nil: none at all).
+func phones() (*push.Phones, error) {
+	var p push.Phones
+	if file := os.Getenv("APNS_KEY_FILE"); file != "" {
+		p8, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		if p.Apple, err = push.NewApple(p8, os.Getenv("APNS_KEY_ID"), os.Getenv("APNS_TEAM_ID"), "bg.almanac.app"); err != nil {
+			return nil, err
+		}
+	}
+	if file := os.Getenv("FCM_CREDENTIALS_FILE"); file != "" {
+		creds, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		if p.Google, err = push.NewGoogle(creds); err != nil {
+			return nil, err
+		}
+	}
+	if p.Apple == nil && p.Google == nil {
+		return nil, nil
+	}
+	return &p, nil
 }

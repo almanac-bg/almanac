@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">АЛМАНАХ</string>
+    <string name="title_activity_main">АЛМАНАХ</string>
+    <string name="package_name">bg.almanac.app</string>
+    <string name="custom_url_scheme">bg.almanac.app</string>
+</resources>

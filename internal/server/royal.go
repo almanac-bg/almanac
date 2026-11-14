@@ -167,7 +167,7 @@ func (s *Server) planRoyal(w http.ResponseWriter, r *http.Request) error {
 // callRoyal calls to the evening that starts at start, as its lobby opens: those who said they'd come, and those who
 // want Роял's notifications every evening. Once an evening, whatever restarts the server. It says how many it called.
 func (s *Server) callRoyal(ctx context.Context, start time.Time) int {
-	if s.push == nil {
+	if s.push == nil && s.phones == nil {
 		return 0
 	}
 	res, err := s.db.Write.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES ('royal_called', ?)

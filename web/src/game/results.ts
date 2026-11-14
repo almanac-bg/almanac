@@ -2,6 +2,7 @@
 // answers), laid out the same on every result screen.
 
 import { type ApiError, api } from "../lib/api.ts";
+import { appShare } from "../lib/app.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { categories } from "../state.ts";
@@ -69,6 +70,7 @@ export function shareButton(label: string, text: () => string, url?: string, pri
         class: primary ? "btn primary big" : "btn",
         onclick: async () => {
           const body = text();
+          if (await appShare(body, url)) return;
           if (navigator.share) {
             try {
               await navigator.share({ text: body, url });

@@ -1,16 +1,21 @@
 // Notifications: the evening reminder, word from friends (a link accepted, a call to a duel) and Роял's call, each kind
-// on or off as the player chooses. The browser asks the player first; the service worker (/sw.js) shows them.
+// on or off as the player chooses. The browser asks the player first; the service worker (/sw.js) shows them. In the
+// game's app the phone asks instead, and they come from Apple's or Google's push service to the phone (phone.ts).
 
-import { pushKey } from "../state.ts";
+import { phonePlatforms, pushKey } from "../state.ts";
 import { api } from "./api.ts";
+import { inApp, phone, platform } from "./app.ts";
 import { reportProblem } from "./errors.ts";
 
-/** Whether this browser can take notifications from the game. */
+/** Whether this browser (or the app, on this phone) can take notifications from the game. */
 export const pushable = () =>
-  !!pushKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  inApp
+    ? phonePlatforms.includes(platform)
+    : !!pushKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
 /** An iPhone or iPad in a browser tab: notifications come only once the game is added to the home screen. */
 export const needsHomeScreen = () =>
+  !inApp &&
   /iPhone|iPad|iPod/.test(navigator.userAgent) &&
   !("PushManager" in window) &&
   !matchMedia("(display-mode: standalone)").matches;
@@ -18,6 +23,10 @@ export const needsHomeScreen = () =>
 /** Registers the service worker as the game opens, so that a tap on „Включи“ finds it ready: on an iPhone the
  * browser asks about notifications only within a moment of the tap, and a worker still installing then costs it. */
 export function preparePush(): void {
+  if (inApp) {
+    pushOn().catch(() => {}); // tells the server the phone's token again: it can change
+    return;
+  }
   if (pushable()) navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
 }
 
@@ -32,6 +41,7 @@ async function registration(): Promise<ServiceWorkerRegistration> {
  * (it keeps it once), so that one it never heard of, or heard of for another player here, is the one it sends to. */
 export async function pushOn(): Promise<boolean> {
   if (!pushable()) return false;
+  if (inApp) return (await phone()).pushOn(api);
   const reg = await navigator.serviceWorker.getRegistration("/");
   const sub = await reg?.pushManager.getSubscription();
   if (sub) api("POST", "/api/push", sub.toJSON()).catch(() => {});
@@ -42,6 +52,7 @@ export async function pushOn(): Promise<boolean> {
  * browser asks for permission as it does: an iPhone allows the subscription only within a moment of a tap, so asking
  * first (Notification.requestPermission) and subscribing after the player answers is too late there. */
 export async function turnOn(): Promise<string | null> {
+  if (inApp) return (await phone()).turnOn(api);
   if (Notification.permission === "denied") return denied;
   const reg = await registration();
   let sub: PushSubscription;
@@ -68,6 +79,7 @@ export async function turnOn(): Promise<string | null> {
 const denied = "Браузърът не позволи известия. Може да ги разрешиш от настройките му за сайта.";
 
 export async function turnOff(): Promise<void> {
+  if (inApp) return (await phone()).turnOff(api);
   const reg = await navigator.serviceWorker.getRegistration("/");
   const sub = await reg?.pushManager.getSubscription();
   if (!sub) return;

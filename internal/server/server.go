@@ -47,8 +47,10 @@ type Config struct {
 	MistakesAfter time.Duration
 	// CrowdMin is how many answers a question needs before how players answered it shows (play.CrowdMin).
 	CrowdMin int
-	// Push sends notifications; nil: none.
+	// Push sends notifications to browsers; nil: none.
 	Push *push.Sender
+	// Phones sends notifications to the game's app on phones; nil: none.
+	Phones *push.Phones
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
 	// Dev serves the client from disk, as the build rewrites it.
@@ -75,6 +77,7 @@ type Server struct {
 	live     *live.Hub
 	royal    *royal.Hub
 	push     *push.Sender
+	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
 	closing  chan struct{}
 	bank     atomic.Pointer[bank.Bank]
@@ -126,6 +129,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.royal.News = s.royalNews
 	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
 	s.push = cfg.Push
+	s.phones = cfg.Phones
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Crowd = s.game.Crowd
 	s.rooms.Barred = s.game.DayQuestions
@@ -160,6 +164,8 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/me/look", s.setLook)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
+	api("POST /api/push/phone", s.addPhone)
+	api("DELETE /api/push/phone", s.removePhone)
 	api("GET /api/push/prefs", s.pushPrefs)
 	api("PATCH /api/push/prefs", s.setPushPref)
 	api("POST /api/errors", s.clientError)
@@ -224,6 +230,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /admin", s.admin)
 	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
+	mux.HandleFunc("GET /.well-known/apple-app-site-association", s.appleAppSiteAssociation)
+	mux.HandleFunc("GET /.well-known/assetlinks.json", s.assetLinks)
 	mux.HandleFunc("/", s.page)
 
 	var h http.Handler = mux

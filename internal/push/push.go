@@ -1,6 +1,7 @@
 // Package push sends notifications to players' browsers (Web Push): a message encrypted for the browser that asked
 // for it (RFC 8291, aes128gcm), sent to its push service with the game's signed name (VAPID, RFC 8292). Only the
 // push services browsers use are posted to (Services), never a redirect: a subscription is whatever a player sends.
+// The game's own app on phones gets its notifications from Apple's and Google's push services instead (phones.go).
 // Standard library only.
 package push
 

@@ -23,6 +23,7 @@ interface Boot {
   categories: Category[];
   version: string;
   push: string;
+  phones: string[] | null;
 }
 
 const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{}");
@@ -32,6 +33,8 @@ export const categories: Category[] = boot.categories ?? [];
 export const version = boot.version ?? "";
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
+/** The platforms the game's app gets notifications on ("ios", "android"). */
+export const phonePlatforms: string[] = boot.phones ?? [];
 
 /** The player, made a guest first if they have no account yet (the first time they play). */
 export async function player(): Promise<User> {

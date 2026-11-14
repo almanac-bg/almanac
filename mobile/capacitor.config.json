@@ -1,0 +1,30 @@
+{
+  "appId": "bg.almanac.app",
+  "appName": "АЛМАНАХ",
+  "webDir": "www",
+  "appendUserAgent": "AlmanacApp",
+  "backgroundColor": "#110c20",
+  "server": {
+    "url": "https://almanac.bg",
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": true,
+    "allowsLinkPreview": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["alert", "sound"]
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 600,
+      "backgroundColor": "#110c20",
+      "showSpinner": false
+    }
+  }
+}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>АЛМАНАХ</title>
+<style>
+  :root { color-scheme: dark light; --bg: #110c20; --ink: #f5f3fa; --muted: #b9b2cc; --accent: #fbbf24; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f5f3fa; --ink: #140f26; --muted: #5b5470; --accent: #b45309; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+  body { display: grid; place-items: center; font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); box-sizing: border-box; text-align: center; }
+  main { max-width: 22rem; }
+  img { width: 72px; height: 72px; }
+  h1 { font-size: 1.4rem; margin: 1rem 0 0.5rem; }
+  p { color: var(--muted); margin: 0 0 1.5rem; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 0.8rem 1.6rem;
+    background: var(--accent); color: #140f26; }
+</style>
+</head>
+<body>
+<main>
+  <img src="mark.svg" alt="">
+  <h1>Няма връзка</h1>
+  <p>АЛМАНАХ се играе с интернет. Провери връзката и опитай пак.</p>
+  <button type="button" onclick="location.href = 'https://almanac.bg/'">Опитай пак</button>
+</main>
+</body>
+</html>

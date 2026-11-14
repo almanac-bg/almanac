@@ -43,6 +43,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `e2e` | The game in real browsers (Playwright) |
 | `bank/sample` | A public sample of the questions; the real bank is private (`private/`, the `questions` skill) |
 | `deploy` | The server's service and scripts (`deploy.sh` = `almanac-deploy`) |
+| `mobile` | The app for iPhone and Android: the site in the phone's web view (Capacitor), with notifications; `mobile/README.md` |
 
 Each Go package starts with a doc comment that says what it is and how it works: read it before changing the
 package, and keep it true after.

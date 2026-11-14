@@ -1,0 +1,166 @@
+package server
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/push"
+	"github.com/almanac-bg/almanac/internal/store"
+)
+
+// fakeAPNs takes pushes for iPhones and counts them by token; the tokens in gone are ones Apple no longer knows.
+type fakeAPNs struct {
+	mu   sync.Mutex
+	hits map[string]int
+	gone map[string]bool
+}
+
+func (f *fakeAPNs) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimPrefix(r.URL.Path, "/3/device/")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.gone[token] {
+		w.WriteHeader(http.StatusGone)
+		_, _ = w.Write([]byte(`{"reason":"Unregistered"}`))
+		return
+	}
+	f.hits[token]++
+}
+
+func (f *fakeAPNs) count(token string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.hits[token]
+}
+
+// The game's app on an iPhone: its player allows notifications, the app gives the phone's token, and the game's
+// notifications go to Apple for it, as they go to a browser's push service.
+func TestPhoneNotifications(t *testing.T) {
+	fake := &fakeAPNs{hits: map[string]int{}, gone: map[string]bool{}}
+	apns := httptest.NewTLSServer(fake)
+	t.Cleanup(apns.Close)
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	der, _ := x509.MarshalPKCS8PrivateKey(k)
+	apple, err := push.NewApple(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), "KEY1234567", "TEAM123456", "bg.almanac.app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apple.Client, apple.Hosts = apns.Client(), []string{apns.URL}
+
+	db, _ := store.Open(filepath.Join(t.TempDir(), "game.db"))
+	t.Cleanup(func() { db.Close() })
+	b, _ := bank.Load("../../bank/sample")
+	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
+	ts := httptest.NewUnstartedServer(nil)
+	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Phones: &push.Phones{Apple: apple}},
+		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts.Config.Handler = s.Handler()
+	ts.Start()
+	t.Cleanup(ts.Close)
+	g := &game{t: t, srv: s, db: db, url: ts.URL}
+
+	// The page tells the app which platforms it can notify.
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(page), `"phones":["ios"]`) {
+		t.Fatal("the page doesn't say the app gets notifications on iPhones")
+	}
+
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	anaPhone, boPhone := strings.Repeat("a1", 32), strings.Repeat("b2", 32)
+	for _, bad := range []map[string]any{
+		{"platform": "ios", "token": "not a token"},
+		{"platform": "android", "token": "token-of-an-android-phone-with-no-sender"},
+		{"platform": "web", "token": anaPhone},
+	} {
+		if status, _ := ana.call("POST", "/api/push/phone", bad); status != 400 {
+			t.Fatalf("%v: %d", bad, status)
+		}
+	}
+	for p, token := range map[*player]string{ana: anaPhone, bo: boPhone} {
+		if status, _ := p.call("POST", "/api/push/phone", map[string]any{"platform": "ios", "token": token}); status != 200 {
+			t.Fatalf("a phone's token: %d", status)
+		}
+	}
+
+	// Ana plays the day; at 19:05 Bo's phone is reminded, Ana's isn't.
+	_, run := ana.call("POST", "/api/day", map[string]any{})
+	playRun(ana, run)
+	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
+	_, _ = db.Write.Exec(`UPDATE runs SET day = ?`, evening.Format(time.DateOnly))
+	if n := s.remind(t.Context(), evening); n != 1 || fake.count(boPhone) != 1 || fake.count(anaPhone) != 0 {
+		t.Fatalf("reminded %d; bo %d, ana %d", n, fake.count(boPhone), fake.count(anaPhone))
+	}
+
+	// A phone Apple no longer knows is forgotten at the first push to it.
+	fake.mu.Lock()
+	fake.gone[boPhone] = true
+	fake.mu.Unlock()
+	var boID int64
+	_ = db.Read.QueryRow(`SELECT user_id FROM phones WHERE token = ?`, boPhone).Scan(&boID)
+	s.notify(t.Context(), pushAsked, push.Message{Title: "Роял", Body: "Започва.", URL: "/royal"}, boID)
+	var left int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, boPhone).Scan(&left)
+	if left != 0 {
+		t.Fatal("a gone phone kept")
+	}
+
+	// Ana turns notifications off on her phone: it's forgotten; Bo can't forget Ana's.
+	if status, _ := bo.call("DELETE", "/api/push/phone", map[string]any{"token": anaPhone}); status != 200 {
+		t.Fatalf("delete: %d", status)
+	}
+	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, anaPhone).Scan(&left)
+	if left != 1 {
+		t.Fatal("another player's phone forgotten")
+	}
+	ana.call("DELETE", "/api/push/phone", map[string]any{"token": anaPhone})
+	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, anaPhone).Scan(&left)
+	if left != 0 {
+		t.Fatal("a phone turned off, kept")
+	}
+}
+
+// The site says which app opens its links, as an iPhone and Android check it.
+func TestAppLinks(t *testing.T) {
+	g := start(t)
+	for path, want := range map[string]string{
+		"/.well-known/apple-app-site-association": "CA38SQWUTC.bg.almanac.app",
+		"/.well-known/assetlinks.json":            "bg.almanac.app",
+	} {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body any
+		err = json.NewDecoder(res.Body).Decode(&body)
+		res.Body.Close()
+		raw, _ := json.Marshal(body)
+		if err != nil || res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/json" || !strings.Contains(string(raw), want) {
+			t.Fatalf("%s: %d %s %s", path, res.StatusCode, res.Header.Get("Content-Type"), raw)
+		}
+	}
+}
