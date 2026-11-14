@@ -158,7 +158,8 @@ type hardnessCache struct {
 	h    *hardnesses
 }
 
-// hardness is how hard each question is: what its label says, and, the more answers it has, what they say.
+// hardness is how hard each question is: what its label says, and, the more answers it has, what they say (people's:
+// FairAnswers).
 func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
 	c := &g.hard
 	c.mu.Lock()
@@ -172,7 +173,7 @@ func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
 		sum float64
 	}
 	answered := map[string]tally{}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, count(*), sum(score) FROM answers GROUP BY question_id`)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, count(*), sum(score) FROM answers WHERE `+FairAnswers+` GROUP BY question_id`)
 	if err != nil {
 		return nil, err
 	}

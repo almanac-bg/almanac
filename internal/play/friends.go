@@ -331,12 +331,13 @@ type Friend struct {
 	Drawn int `json:"drawn"`
 }
 
-// FriendsOf lists a player's friends: those who've played today first, best first, then the rest by name.
+// FriendsOf lists a player's friends: those who've played today first, best first, then the rest by name. A friend's
+// day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
 	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
-		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL
+		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.scripted
 		WHERE f.user_id = ?`, g.Today(), userID)
 	if err != nil {
 		return nil, err
@@ -404,13 +405,13 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 }
 
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
-// Empty while none of their friends has.
+// Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+` FROM runs r
 		JOIN users u ON u.id = r.user_id
-		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL
-		AND (r.user_id = ? OR r.user_id IN (SELECT friend_id FROM friends WHERE user_id = ?))
-		ORDER BY r.points DESC, r.ms, r.id`, day, userID, userID)
+		WHERE r.kind = 'day' AND r.day = ?1 AND r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
+		AND (r.user_id = ?2 OR r.user_id IN (SELECT friend_id FROM friends WHERE user_id = ?2))
+		ORDER BY r.points DESC, r.ms, r.id`, day, userID)
 	if err != nil {
 		return nil, err
 	}

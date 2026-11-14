@@ -10,7 +10,8 @@ import (
 // Calibration checks each question's difficulty against what players have done with it. A label is a writer's
 // judgement; answers are the truth. The game leans on difficulty — a run goes from easy to hard, a topic run follows
 // how well a player knows it, Роял's rounds are easy, medium, hard — so a label that disagrees with the answers is
-// worth judging again.
+// worth judging again. The answers are people's: a game played at a script's speed says nothing of how hard a
+// question is (fair.go).
 //
 // A score is compared after taking away what guessing alone would get (a quarter on a choice, half on a true-or-not,
 // what an order or a match put down at random is worth, nothing on a number): what's left is how much players knew.
@@ -65,7 +66,7 @@ type Calibrated struct {
 // furthest off first).
 func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, count(*), avg(score) FROM answers
-		GROUP BY question_id HAVING count(*) >= ?`, CalibrateFrom)
+		WHERE `+FairAnswers+` GROUP BY question_id HAVING count(*) >= ?`, CalibrateFrom)
 	if err != nil {
 		return nil, err
 	}

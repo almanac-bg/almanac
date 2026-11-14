@@ -711,6 +711,12 @@ func playRun(p *player, run map[string]any) {
 	id := strconv.Itoa(int(run["id"].(float64)))
 	for n := range 10 {
 		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		// Answered at a person's pace, three seconds in, or the game is a script's that only its player sees
+		// (play/fair.go).
+		if _, err := p.g.db.Write.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`,
+			p.g.srv.game.Now().Add(-3*time.Second).UnixMilli(), id); err != nil {
+			p.g.t.Fatal(err)
+		}
 		view := st["question"].(map[string]any)["view"].(map[string]any)
 		a := map[string]any{"pick": 0}
 		switch view["type"] {

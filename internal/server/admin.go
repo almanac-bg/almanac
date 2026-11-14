@@ -76,13 +76,13 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Cells []cell
 	}
 	data := struct {
-		Players, WithEmail, DayToday, Questions, Live int
-		Active                                        play.Active
-		After                                         []int
-		Cohorts                                       []cohort
-		Overall                                       []cell
-		Reported                                      []reported
-		Hardest, Easiest                              []stat
+		Players, WithEmail, DayToday, DayScripted, Questions, Live int
+		Active                                                     play.Active
+		After                                                      []int
+		Cohorts                                                    []cohort
+		Overall                                                    []cell
+		Reported                                                   []reported
+		Hardest, Easiest                                           []stat
 	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays}
 	today := s.game.Today()
 	if cohorts, active, err := s.game.Retention(ctx, play.RetentionDays[len(play.RetentionDays)-1]+10); err == nil {
@@ -111,7 +111,9 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
-	_ = db.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday)
+	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
+	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE NOT scripted), count(*) FILTER (WHERE scripted) FROM runs
+		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday, &data.DayScripted)
 
 	rows, err := db.QueryContext(ctx, `SELECT r.question_id, r.text, coalesce(u.name, '—'), r.at FROM reports r
 		LEFT JOIN users u ON u.id = r.user_id WHERE r.resolved_at IS NULL ORDER BY r.question_id, r.at`)
@@ -145,7 +147,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	read := func(order string) []stat {
 		var out []stat
 		rows, err := db.QueryContext(ctx, `SELECT question_id, count(*), sum(is_right), avg(ms) FROM answers
-			GROUP BY question_id HAVING count(*) >= 10 ORDER BY 1.0 * sum(is_right) / count(*) `+order+`, count(*) DESC LIMIT 30`)
+			WHERE `+play.FairAnswers+` GROUP BY question_id HAVING count(*) >= 10 ORDER BY 1.0 * sum(is_right) / count(*) `+order+`, count(*) DESC LIMIT 30`)
 		if err != nil {
 			return nil
 		}
@@ -174,7 +176,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		}
 		var pick int
 		if db.QueryRowContext(ctx, `SELECT json_extract(given, '$.pick') p FROM answers WHERE question_id = ? AND given IS NOT NULL
-			AND json_extract(given, '$.pick') > 0 GROUP BY p ORDER BY count(*) DESC LIMIT 1`, st.ID).Scan(&pick) == nil {
+			AND json_extract(given, '$.pick') > 0 AND `+play.FairAnswers+` GROUP BY p ORDER BY count(*) DESC LIMIT 1`, st.ID).Scan(&pick) == nil {
 			data.Hardest[i].Lure = bank.Option(q, pick)
 		}
 	}
@@ -211,7 +213,8 @@ func bulgaria() *time.Location {
 }
 
 var adminBody = template.Must(template.New("admin").Parse(`
-<p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.
+<p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
+По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
 
 <h2>Връщат ли се</h2>

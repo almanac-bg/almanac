@@ -7,7 +7,8 @@
 // answer and its fact for as long as they like. A question left showing past its time counts as unanswered, whenever
 // the run is next looked at. Everything a run does goes through the database, so a refresh, a second tab or a
 // restart of the server changes nothing. A run left half-way goes on where it stopped: the day's when the player comes
-// back to it, a topic's when they start the same topic again that day (StartTopic).
+// back to it, a topic's when they start the same topic again that day (StartTopic). A game played quicker than a
+// person plays counts for its player alone (fair.go).
 package play
 
 import (
@@ -49,26 +50,6 @@ func Limit(q bank.Question) time.Duration {
 	}
 	return 20 * time.Second
 }
-
-// Floor is the least time a person takes to answer a question of its kind, as the server times it (from when it
-// showed the question to when the answer came, so the trip to the server and back is in it too). Seeing four options
-// and tapping one takes about half a second before reading a word (choice reaction time), so a tap under 0.7 s
-// wasn't read: a true-or-not, a choice, a clue. A number is read, typed and sent: 1.2 s. An order, a match or a
-// split is four taps or more after reading: 2 s. Each is well under what a quick player takes (they rarely answer
-// under a second) and well over a script (tens of milliseconds), so that a recording's speed is a person's
-// (fastRun).
-func Floor(q bank.Question) time.Duration {
-	switch q.Base().Type {
-	case "number":
-		return 1200 * time.Millisecond
-	case "order", "match", "split":
-		return 2 * time.Second
-	}
-	return 700 * time.Millisecond
-}
-
-// floorLeast is the lowest Floor of any kind.
-const floorLeast = 700 * time.Millisecond
 
 // Bulgaria is where the game's days begin and end.
 var Bulgaria, _ = time.LoadLocation("Europe/Sofia")
@@ -137,10 +118,11 @@ type run struct {
 	xp             int
 	ms             int64
 	finished       bool
+	scripted       bool // played at a script's speed (fair.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL`
+	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL, scripted`
 
 type scanner interface{ Scan(...any) error }
 
@@ -148,7 +130,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished, &r.scripted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -305,6 +287,9 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 		return err
 	}
 	if err := g.markActive(tx, r.userID); err != nil {
+		return err
+	}
+	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return err
 	}
 	r.at++

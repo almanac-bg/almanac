@@ -1664,6 +1664,7 @@ func TestDayCrowd(t *testing.T) {
 	// bo plays on, the second right too, the rest wrong; the review shows the same, and the third has no crowd.
 	for n := 1; n < Length; n++ {
 		w.g.Show(ctx, bo, s.ID)
+		w.wait(3 * time.Second) // at a person's pace, or bo's answers count for bo alone (fair.go)
 		answer := w.wrong
 		if n == 1 {
 			answer = w.right

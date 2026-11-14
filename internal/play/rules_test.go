@@ -349,11 +349,11 @@ func TestRecordingsArePeoples(t *testing.T) {
 		return s.ID
 	}
 	ana := w.user()
-	scripted := game(quick(RecordingQuick + 1)) // one quick answer too many
+	scripted := game(quick(MostQuick + 1)) // one quick answer too many
 	if _, err := w.g.StartRecorded(ctx, ana); !errors.Is(err, ErrNobody) {
 		t.Fatalf("with only a script's game to play against: %v, want nobody", err)
 	}
-	person := game(quick(RecordingQuick)) // knew two at once
+	person := game(quick(MostQuick)) // knew two at once
 	l, err := w.g.StartRecorded(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
@@ -368,13 +368,13 @@ func TestRecordingsArePeoples(t *testing.T) {
 		if len(qs) == 0 {
 			t.Fatalf("no %s question in the sample bank", typ)
 		}
-		return slices.Repeat([]Pick{{ID: qs[0].Base().ID}}, RecordingQuick+1)
+		return slices.Repeat([]Pick{{ID: qs[0].Base().ID}}, MostQuick+1)
 	}
 	second := map[int]int64{0: 1000, 1: 1000, 2: 1000}
-	if !fastRun(w.b, of("order"), second) {
+	if !scriptPaced(w.b, of("order"), second) {
 		t.Fatal("three orders put down in a second each count as a person's")
 	}
-	if fastRun(w.b, of("truefalse"), second) {
+	if scriptPaced(w.b, of("truefalse"), second) {
 		t.Fatal("three statements judged in a second each count as a script's")
 	}
 }
