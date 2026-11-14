@@ -339,7 +339,8 @@ async function signOut() {
 }
 
 /** Signing in with an email: the address, then the code mailed to it. */
-function signIn(): Child {
+/** Signing in by email, with a code: in Настройки, and on Начало for a guest who keeps coming back. */
+export function signIn(): Child {
   const email = signal("");
   const code = signal("");
   const sent = signal(false);
