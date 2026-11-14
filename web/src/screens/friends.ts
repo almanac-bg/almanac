@@ -6,7 +6,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
-import { avatar, profileHref, type Tier } from "../ui.ts";
+import { avatar, formatNumber, profileHref, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
@@ -279,7 +279,7 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
       h(
         "span",
         { class: "friend-day" },
-        f.today ? `Днес: ${f.today.rights}/10 · ${f.today.points} т.` : "Днес още няма резултат",
+        f.today ? `Днес: ${f.today.rights}/10 · ${formatNumber(f.today.points)} т.` : "Днес още няма резултат",
       ),
     ),
     played

@@ -7,7 +7,7 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { tickOn } from "../lib/prefs.ts";
 import { play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { type VerdictKind, verdict } from "../ui.ts";
+import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
@@ -79,8 +79,9 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
-/** The top of a question: which one of how many, and its topic (and, in a duel, against whom). */
-export function questionHead(n: number, total: number, aside: string): Child {
+/** The top of a question: which one of how many, and its topic (and, in a duel, against whom), with the game's
+ * tally under it, if it has one. */
+export function questionHead(n: number, total: number, aside: string, tally: Child = null): Child {
   return h(
     "header",
     { class: "question-head" },
@@ -90,8 +91,33 @@ export function questionHead(n: number, total: number, aside: string): Child {
       h("b", { class: "count-n" }, String(n + 1)),
       h("span", { class: "count-of" }, ` от ${total}`),
     ),
-    h("p", { class: "kicker" }, aside),
+    h("div", { class: "head-side" }, h("p", { class: "kicker" }, aside), tally),
   );
+}
+
+/** A run's tally while it's played: the right answers in a row it's on, and its points so far (rising from `from`),
+ * once there are some. */
+function tally(el: HTMLElement, points: number, from: number, inRow: number) {
+  el.replaceChildren(
+    ...[
+      inRowChip(inRow),
+      points > 0
+        ? h(
+            "span",
+            { class: "tally-points", "aria-label": `${points} точки` },
+            countUp(points, from),
+            h("small", null, " т."),
+          )
+        : null,
+    ].filter((c): c is HTMLElement => c !== null),
+  );
+}
+
+/** How many right answers in a row a run's last ones are. */
+function inRowOf(marks: Mark[]): number {
+  let n = 0;
+  for (let i = marks.length - 1; i >= 0 && marks[i]?.right; i--) n++;
+  return n;
 }
 
 /** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. The
@@ -157,6 +183,8 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
   const after = h("div", { class: "after", hidden: true });
   let progress = trail(s.trail, s.total, q.n);
   let sent = false;
+  const score = h("div", { class: "tally" });
+  tally(score, s.points, s.points, inRowOf(s.trail));
 
   // Moving on, once the answer has shown for a while: never into a question nobody's looking at (a tab in the
   // background), as its time would run unseen.
@@ -195,11 +223,12 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     const now = trail(res.state.trail, s.total);
     progress.replaceWith(now);
     progress = now;
+    tally(score, res.state.points, s.points, res.inRow ?? 0);
     const kind = kindOf(res, answer);
     play(kind);
     const pause = pauseFor(q.view);
     append(after, [
-      verdict(kind, res.points, undefined, res.speed),
+      verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
       res.reveal.credit ? credit(res.reveal.credit) : null,
       upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
     ]);
@@ -235,7 +264,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
   return h(
     "article",
     { class: "question" },
-    questionHead(q.n, s.total, topicName(q.category)),
+    questionHead(q.n, s.total, topicName(q.category), score),
     progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),

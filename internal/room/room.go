@@ -156,6 +156,7 @@ type Room struct {
 type member struct {
 	Player
 	points, rights int
+	inRow          int // right answers in a row, the last ones
 	online         int
 	// The question now: whether they've answered, what they gave (as shown), how it went.
 	answered bool
@@ -163,6 +164,7 @@ type member struct {
 	graded   bank.Graded
 	gained   int
 	speed    int // of gained, for being quick
+	row      int // of gained, for the right answers in a row
 	// Every answer of this game, for the review at its end.
 	log []loggedAnswer
 }
@@ -301,7 +303,7 @@ func (r *Room) start() error {
 		return play.ErrNoQuestion
 	}
 	for _, m := range r.players {
-		m.points, m.rights, m.log = 0, 0, nil
+		m.points, m.rights, m.inRow, m.log = 0, 0, 0, nil
 	}
 	r.show(0)
 	return nil
@@ -313,7 +315,7 @@ func (r *Room) bank() *bank.Bank { return r.hub.bank() }
 func (r *Room) show(n int) {
 	r.phase, r.n, r.shownAt = Question, n, time.Now()
 	for _, m := range r.players {
-		m.answered, m.given, m.graded, m.gained, m.speed = false, nil, bank.Graded{}, 0, 0
+		m.answered, m.given, m.graded, m.gained, m.speed, m.row = false, nil, bank.Graded{}, 0, 0, 0
 	}
 	limit := play.Limit(r.dealt[n].Question())
 	r.after(limit+Grace, func() { r.reveal() })
@@ -360,14 +362,18 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if err != nil {
 		return ErrAnswer
 	}
-	// Points as in any game (play.WorthOf): for knowing, more for harder questions, and a part for being quick.
+	// Points as in any game (play.WorthOf): for knowing, more for harder questions and right answers in a row, and a
+	// part for being quick.
 	m.answered, m.given, m.graded = true, g.Shown, g
-	w := play.WorthOf(d.Question(), g.Score, took)
-	m.gained, m.speed = w.Points, w.Speed
-	m.points += m.gained
 	if g.Right {
 		m.rights++
+		m.inRow++
+	} else {
+		m.inRow = 0
 	}
+	w := play.WorthOf(d.Question(), g.Score, took, m.inRow)
+	m.gained, m.speed, m.row = w.Points, w.Speed, w.Row
+	m.points += m.gained
 	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right})
 	for _, p := range r.players {
 		if p.online > 0 && !p.answered {
@@ -385,6 +391,7 @@ func (r *Room) reveal() {
 	for _, m := range r.players {
 		if !m.answered { // the time ran out on them
 			m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID})
+			m.inRow = 0
 		}
 	}
 	if r.timer != nil {
@@ -401,6 +408,11 @@ func (r *Room) next() {
 		return
 	}
 	r.phase = End
+	for _, m := range r.players {
+		if m.rights == len(r.dealt) {
+			m.points += play.AllRight
+		}
+	}
 	r.changed()
 }
 
@@ -419,6 +431,8 @@ type View struct {
 	// Review is every question of the game with the viewer's answer, once it's over: the facts behind the answers and
 	// a word about a question are kept for then, so that the game itself flows.
 	Review []ReviewedView `json:"review,omitempty"`
+	// AllRight is what the viewer's game earned at its end for every answer right (in their points).
+	AllRight int `json:"allRight,omitempty"`
 }
 
 // ReviewedView is one question of a finished game, as the viewer answered it (as play.Reviewed is for a run).
@@ -463,8 +477,10 @@ type QuestionView struct {
 type RevealView struct {
 	Answer any `json:"answer"`
 	Points int `json:"points"`
-	// Speed is how many of the points were for being quick.
+	// Speed is how many of the points were for being quick, and Row how many for the right answers in a row InRow.
 	Speed  int  `json:"speed,omitempty"`
+	Row    int  `json:"row,omitempty"`
+	InRow  int  `json:"inRow,omitempty"`
 	Right  bool `json:"right"`
 	Exact  bool `json:"exact,omitempty"`
 	Missed bool `json:"missed,omitempty"`
@@ -505,7 +521,11 @@ func (r *Room) View(viewer int64) View {
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given
 			if r.phase == Reveal {
-				q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
+				q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Row: me.row,
+					Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
+				if me.row > 0 {
+					q.Reveal.InRow = me.inRow
+				}
 			}
 		}
 		if r.phase == Reveal {
@@ -516,6 +536,9 @@ func (r *Room) View(viewer int64) View {
 	}
 	if me := r.member(viewer); me != nil && r.phase == End {
 		v.Review = r.review(me)
+		if me.rights == len(r.dealt) {
+			v.AllRight = play.AllRight
+		}
 	}
 	return v
 }
