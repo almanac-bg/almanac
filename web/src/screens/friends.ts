@@ -36,7 +36,7 @@ interface Friends {
   requests: { in: Request[]; out: Request[] };
 }
 
-/** Приятели, as a page of its own (from the profile). */
+/** Приятели, one of the main places. */
 export function friends(): Child {
   title("Приятели");
   return h("section", { class: "screen" }, h("h1", null, "Приятели"), friendsCard());
