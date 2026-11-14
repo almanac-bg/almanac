@@ -31,14 +31,12 @@ const (
 )
 
 // Limit is how long a question is shown before its time runs out: a statement to judge true or not is quick;
-// putting four things in order, or joining four pairs, takes longer than a tap or a typed number.
+// putting four things in order, or joining four pairs, takes longer than a tap or a typed number: both get the same time.
 func Limit(q bank.Question) time.Duration {
 	switch q.Base().Type {
 	case "truefalse":
 		return 10 * time.Second
-	case "order":
-		return 25 * time.Second
-	case "match":
+	case "order", "match":
 		return 30 * time.Second
 	}
 	return 20 * time.Second
