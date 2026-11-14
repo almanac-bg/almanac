@@ -2012,6 +2012,65 @@
     color: var(--text-muted);
   }
 
+  /* „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out. */
+  .clues {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .clue {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 3.5rem;
+    padding: 10px var(--space-4) 10px var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line);
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .clue-worth {
+    flex: none;
+    width: 3.25rem;
+    color: var(--gold-ink);
+    font: 900 1.375rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .clue-text {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    line-height: 1.375rem;
+  }
+
+  /* The last clue out: what an answer now is worth. */
+  .clue.now {
+    box-shadow: inset 0 0 0 2px var(--gold);
+  }
+
+  .clue.past .clue-worth {
+    color: var(--text-muted);
+    text-decoration: line-through;
+  }
+
+  .clue.locked {
+    background: transparent;
+  }
+
+  .clue.locked .clue-worth,
+  .clue.locked .clue-text {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
   /* „Раздели“: the things one by one on a card, sent left or right; the two groups under them. */
   .split {
     display: grid;

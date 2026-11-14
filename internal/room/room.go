@@ -166,6 +166,7 @@ type Room struct {
 	shownAt    time.Time
 	revealedAt time.Time
 	timer      *time.Timer
+	paceTimer  *time.Timer // the next clue of the question now (bank.Paced)
 	subs       map[*Sub]struct{}
 	opened     time.Time
 	active     time.Time
@@ -285,6 +286,9 @@ func (r *Room) close() {
 	if r.timer != nil {
 		r.timer.Stop()
 	}
+	if r.paceTimer != nil {
+		r.paceTimer.Stop()
+	}
 	for s := range r.subs {
 		close(s.Done)
 		delete(r.subs, s)
@@ -347,7 +351,27 @@ func (r *Room) show(n int) {
 	}
 	limit := play.Limit(r.dealt[n].Question())
 	r.after(limit+Grace, func() { r.reveal() })
+	r.pace(n)
 	r.changed()
+}
+
+// pace tells every screen to look again as more of question n shows (its next clue), while it's still up.
+func (r *Room) pace(n int) {
+	if r.paceTimer != nil {
+		r.paceTimer.Stop()
+	}
+	next := bank.NextStep(r.dealt[n], time.Since(r.shownAt))
+	if next == 0 {
+		return
+	}
+	r.paceTimer = time.AfterFunc(next, func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.n == n && r.phase == Question && !r.closed {
+			r.changed()
+			r.pace(n)
+		}
+	})
 }
 
 // after runs fn after d, if the room is then still on the same question and phase (and open).
@@ -386,7 +410,7 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if took > limit+Grace {
 		return ErrNotNow
 	}
-	g, err := d.Grade(raw)
+	g, err := bank.GradeAt(d, raw, took)
 	if err != nil {
 		return ErrAnswer
 	}
@@ -567,10 +591,13 @@ func (r *Room) View(viewer int64) View {
 	}
 	if r.phase == Question || r.phase == Reveal {
 		d := r.dealt[r.n]
-		limit := play.Limit(d.Question())
+		limit, since := play.Limit(d.Question()), time.Since(r.shownAt)
+		if r.phase == Reveal {
+			since = limit // everything shows with the answer
+		}
 		q := &QuestionView{
-			Category: d.Question().Base().Category, View: d.View(),
-			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - time.Since(r.shownAt)).Milliseconds()),
+			Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
+			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
 		}
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given

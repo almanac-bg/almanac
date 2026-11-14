@@ -37,7 +37,7 @@ func Limit(q bank.Question) time.Duration {
 	switch q.Base().Type {
 	case "truefalse":
 		return 10 * time.Second
-	case "order", "match", "split":
+	case "order", "match", "split", "clues":
 		return 30 * time.Second
 	}
 	return 20 * time.Second
@@ -162,6 +162,8 @@ type Shown struct {
 	View     any    `json:"view"`
 	LimitMs  int64  `json:"limitMs"`
 	LeftMs   int64  `json:"leftMs"`
+	// MoreMs is how soon more of the question shows (the next clue): look again then. 0 for nothing more.
+	MoreMs int64 `json:"moreMs,omitempty"`
 }
 
 // Result is what an answer earned, the answer itself, and the run after it.
@@ -219,10 +221,11 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 		d, ok := g.deal(r.picks[r.at])
 		if ok {
 			limit := Limit(d.Question())
-			left := limit - g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
+			since := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
-				N: r.at, Category: d.Question().Base().Category, View: d.View(),
-				LimitMs: limit.Milliseconds(), LeftMs: max(0, left.Milliseconds()),
+				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
+				LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
+				MoreMs: bank.NextStep(d, since).Milliseconds(),
 			}
 		}
 	}
@@ -366,7 +369,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res.TimedOut = true
 		case len(answer) == 0 || string(answer) == "null":
 		default:
-			if gr, err = d.Grade(answer); err != nil {
+			if gr, err = bank.GradeAt(d, answer, took); err != nil {
 				return ErrBadAnswer
 			}
 		}

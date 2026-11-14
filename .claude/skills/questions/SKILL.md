@@ -24,9 +24,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 ## The aims (the owner's rules)
 
 - **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`), judged by the rubric below.
-- **Kinds: 55% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split** (once „Подсказки“ joins:
-  50% choice and 5% of it), in every category (`bank.TypeMix`), close to what the game draws (a run of ten has five
-  choices and one of each other kind), so that no kind runs out long before the others.
+- **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split, 5% clues**, in every category
+  (`bank.TypeMix`), close to what the game draws (a run of ten has five choices, one of each other kind, and a split
+  or clues), so that no kind runs out long before the others.
 - **The bank must be fully balanced, always** (the owner's rule): every category the same size; in it, the kinds in
   their mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15%
   hard, like its choices). So every category has exactly the same count in every cell: as many hard number
@@ -64,6 +64,8 @@ By kind:
   follows: generous for easy, tight for hard.
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
+- **Clues:** the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
+  whose last clue gives it to anyone; hard is one whose last clue still needs knowing the topic.
 - **Split:** easy groups are what most people tell apart already (a mammal or not); hard ones need the detail
   (Ботев or Вазов by a lesser poem), with items that look alike across the groups.
 - **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
@@ -82,7 +84,7 @@ Every question is one JSON object in its category's file:
 | Field                | What                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `id`                 | The category's prefix and a number (`his-412`). Next free number; never reuse or change one |
-| `type`               | `choice`, `number`, `order`, `truefalse`, `match` or `split`                             |
+| `type`               | `choice`, `number`, `order`, `truefalse`, `match`, `split` or `clues`                    |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 200 characters (see below)                                 |
@@ -101,6 +103,13 @@ By type:
   `unit`. The text says the direction.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. 10 seconds to answer.
+- **`clues`:** „Подсказки“. The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
+  (each at most 110 characters, a sentence ending with a period), `answer` and three `wrong` like a choice. The clues
+  go from the hardest to the easiest: the first one only an expert knows, the second narrows it to a well-read
+  person, the third gives it to almost anyone who knows the topic at all. Every clue is true of the answer only, and
+  none names it or gives it away by a word from it. The wrong options fit the first clue's kind (all people, all
+  countries) and some of them fit a clue taken alone, so that guessing early costs. The clues come 10 seconds apart;
+  an answer is worth all of its points on the first clue, 60% on the second, 30% on the third. 30 seconds.
 - **`split`:** „Раздели“. The text asks the one question that sorts („Бозайник ли е животното?“, „Чия е
   творбата: на Ботев или на Вазов?“), `groups` are the two answers to it (each at most 24 characters, left first),
   and six `items` (`text` at most 45 characters, `group` 0 or 1), at least two in each group. Every item belongs to

@@ -206,3 +206,63 @@ func TestRoomsLimits(t *testing.T) {
 		t.Fatalf("an answer in the lobby: %v", err)
 	}
 }
+
+// A clues question's clues reach the screens as their time comes, and not before.
+func TestCluesComeInTime(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		b := sample(t)
+		hub := NewHub(b)
+		ana := Player{ID: 1, Name: "Ана"}
+		r, _ := hub.Open(ana, "")
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		q := b().Live("", "clues")[0]
+		r.mu.Lock()
+		r.dealt[0] = q.Deal(1)
+		r.show(0)
+		r.mu.Unlock()
+		sub, _ := r.Follow(ana.ID)
+		out := func() int {
+			var v struct{ Clues []string }
+			_ = json.Unmarshal(mustJSON(t, r.View(ana.ID).Question.View), &v)
+			return len(v.Clues)
+		}
+		drain := func() bool {
+			select {
+			case <-sub.C:
+				return true
+			default:
+				return false
+			}
+		}
+		drain()
+		if out() != 1 {
+			t.Fatalf("%d clues at the start", out())
+		}
+		time.Sleep(bank.ClueEvery - time.Second)
+		synctest.Wait()
+		if drain() || out() != 1 {
+			t.Fatal("a clue before its time")
+		}
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if !drain() || out() != 2 {
+			t.Fatalf("the second clue: told %v, %d out", false, out())
+		}
+		time.Sleep(bank.ClueEvery)
+		synctest.Wait()
+		if !drain() || out() != 3 {
+			t.Fatalf("the third clue: %d out", out())
+		}
+	})
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}

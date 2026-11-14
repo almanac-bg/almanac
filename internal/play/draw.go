@@ -43,6 +43,7 @@ var daySlots = []slot{
 // drawDay draws a day: each slot from another topic, never a question an earlier day had (while any are left). The
 // slots that need something special (a picture, an order, a number) get their topics first, from those that have one.
 func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
+	slots := newKind(slices.Clone(daySlots), r)
 	var topics []string
 	next := func(wants ...func(string) bool) string {
 		if len(topics) == 0 { // more slots than topics: round again
@@ -63,9 +64,9 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 		return t
 	}
 	special := func(s slot) bool { return s.typ != "choice" || s.picture == withPicture }
-	assigned := make([]string, len(daySlots))
+	assigned := make([]string, len(slots))
 	for pass := range 2 {
-		for i, s := range daySlots {
+		for i, s := range slots {
 			if special(s) != (pass == 0) {
 				continue
 			}
@@ -86,13 +87,27 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	var picks []Pick
-	for i, s := range daySlots {
+	for i, s := range slots {
 		if q := choose(b.Live(assigned[i], ""), s, allowed, fresh, r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}
 	}
 	return picks
+}
+
+// newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
+// in each run.
+var newKinds = []string{"split", "clues"}
+
+// newKind gives a run's slot for the new kinds one of them, at random.
+func newKind(slots []slot, r *rand.Rand) []slot {
+	for i := range slots {
+		if slots[i].typ == newKinds[0] {
+			slots[i].typ = newKinds[r.IntN(len(newKinds))]
+		}
+	}
+	return slots
 }
 
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
@@ -143,7 +158,7 @@ func Draw(b *bank.Bank, category string, ability float64, seen map[string]bool, 
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
-	for _, s := range topicSlots(ability) {
+	for _, s := range newKind(topicSlots(ability), r) {
 		if q := choose(pool, s, allowed, fresh, r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})

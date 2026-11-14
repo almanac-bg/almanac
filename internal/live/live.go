@@ -301,6 +301,7 @@ type Match struct {
 	pause      time.Duration // how long the answer now shows
 	timer      *time.Timer
 	recTimer   *time.Timer // the recording's answer to the question now
+	paceTimer  *time.Timer // the next clue of the question now (bank.Paced)
 	subs       map[*Sub]struct{}
 }
 
@@ -442,6 +443,28 @@ func (m *Match) stop() {
 	if m.recTimer != nil {
 		m.recTimer.Stop()
 	}
+	if m.paceTimer != nil {
+		m.paceTimer.Stop()
+	}
+}
+
+// pace tells both screens to look again as more of question n shows (its next clue), while it's still up.
+func (m *Match) pace(n int) {
+	if m.paceTimer != nil {
+		m.paceTimer.Stop()
+	}
+	next := bank.NextStep(m.dealt[n], time.Since(m.shownAt))
+	if next == 0 {
+		return
+	}
+	m.paceTimer = time.AfterFunc(next, func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if m.n == n && m.phase == PhaseQuestion {
+			m.changed()
+			m.pace(n)
+		}
+	})
 }
 
 // after runs fn after d, if the duel is then still on the same question and phase.
@@ -500,6 +523,7 @@ func (m *Match) show(n int) {
 	}
 	limit := play.Limit(m.dealt[n].Question())
 	m.after(limit+play.Grace, m.reveal)
+	m.pace(n)
 	// The recording answers when it did.
 	if m.recTimer != nil {
 		m.recTimer.Stop()
@@ -534,11 +558,11 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if m.phase != PhaseQuestion || n != m.n || s.answered {
 		return ErrNotNow
 	}
-	g, err := m.dealt[n].Grade(raw)
+	took := time.Since(m.shownAt)
+	g, err := bank.GradeAt(m.dealt[n], raw, took)
 	if err != nil {
 		return ErrAnswer
 	}
-	took := time.Since(m.shownAt)
 	res, err := m.hub.game.Answer(context.Background(), s.ID, s.run, n, raw)
 	if errors.Is(err, play.ErrOutOfStep) {
 		return ErrNotNow
@@ -707,10 +731,13 @@ func (m *Match) View(viewer int64) View {
 	}
 	if m.phase == PhaseQuestion || m.phase == PhaseReveal {
 		d := m.dealt[m.n]
-		limit := play.Limit(d.Question())
+		limit, since := play.Limit(d.Question()), time.Since(m.shownAt)
+		if shown {
+			since = limit // everything shows with the answer
+		}
 		q := &QuestionView{
-			Category: d.Question().Base().Category, View: d.View(),
-			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - time.Since(m.shownAt)).Milliseconds()),
+			Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
+			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
 			Given: me.given,
 		}
 		if shown {

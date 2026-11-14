@@ -122,7 +122,8 @@ type table struct {
 	n       int
 	at      time.Time // when the phase began
 	entered int
-	wentOut int // on the question whose answer shows
+	wentOut int           // on the question whose answer shows
+	paced   time.Duration // how far into the question its screens were last told of more showing (bank.Paced)
 }
 
 type member struct {
@@ -269,8 +270,13 @@ func (h *Hub) Step(ctx context.Context) {
 				err = h.begin(ctx, t, now)
 			}
 		case play.RoyalQuestion:
-			if d := n.dealt[t.n]; d == nil || now.Sub(t.at) >= play.Limit(d.Question())+play.Grace {
+			d := n.dealt[t.n]
+			if d == nil || now.Sub(t.at) >= play.Limit(d.Question())+play.Grace {
 				err = h.reveal(ctx, t, now)
+			} else if next := bank.NextStep(d, t.paced); next > 0 && now.Sub(t.at) >= t.paced+next {
+				// More of the question shows (its next clue): the screens look again.
+				t.paced += next
+				h.changed(t)
 			}
 		case play.RoyalReveal:
 			if now.Sub(t.at) >= Pause {
@@ -377,7 +383,7 @@ func (h *Hub) begin(ctx context.Context, t *table, now time.Time) error {
 
 // shown is question n on everyone's screen (the database has it so already).
 func (h *Hub) shown(t *table, n int, now time.Time) {
-	t.phase, t.n, t.at, t.wentOut = play.RoyalQuestion, n, now, 0
+	t.phase, t.n, t.at, t.wentOut, t.paced = play.RoyalQuestion, n, now, 0, 0
 	for _, m := range t.members {
 		m.inQ, m.answered, m.given, m.res = m.in, false, nil, play.Result{}
 	}
@@ -652,10 +658,13 @@ func (h *Hub) View(viewer int64) View {
 	}
 	if (t.phase == play.RoyalQuestion || t.phase == play.RoyalReveal) && n.dealt[t.n] != nil {
 		d := n.dealt[t.n]
-		limit := play.Limit(d.Question())
+		limit, since := play.Limit(d.Question()), now.Sub(t.at)
+		if t.phase == play.RoyalReveal {
+			since = limit // everything shows with the answer
+		}
 		q := &QuestionView{
-			Category: d.Question().Base().Category, View: d.View(),
-			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - now.Sub(t.at)).Milliseconds()),
+			Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
+			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
 		}
 		if me != nil && me.inQ {
 			q.Given = me.given

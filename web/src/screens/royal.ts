@@ -382,6 +382,11 @@ function question(view: () => Evening, first: Evening): Child {
     }
   };
   const asked = ask(q.view, send, locked);
+  // More of the question shows as its time runs (the next clue): the server sends it when it's due.
+  effect(() => {
+    const v = view();
+    if (v.n === first.n && v.question) asked.update?.(v.question.view);
+  });
   const tick = setInterval(() => {
     secs.update((n) => Math.max(0, n - 1));
     if (secs.peek() > 0 || locked.peek()) return;
