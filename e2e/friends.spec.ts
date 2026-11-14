@@ -22,12 +22,15 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
 
   // Ana challenges Bo and plays hers now; once she has, Bo is told wherever he is, and plays from there.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  // Each question says whom it's a duel with.
+  await expect(a.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(a);
   await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика на дуел");
   await notice.getByRole("button", { name: "Играй" }).click();
+  await expect(b.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(b);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });

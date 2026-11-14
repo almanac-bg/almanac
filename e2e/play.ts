@@ -45,10 +45,12 @@ export async function answer(page: Page): Promise<void> {
   }
 }
 
-/** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. */
+/** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. Each question opens at the
+ * top of the page, wherever the answer before it was scrolled to. */
 export async function playRun(page: Page): Promise<void> {
   for (let n = 0; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    expect(await page.evaluate(() => scrollY)).toBe(0);
     await answer(page);
     await moveOn(page);
   }

@@ -123,11 +123,13 @@ takes a token.
 - **Mastery:** `.mastery` (the tier's bars, lit in the topic's tone, and its name), `.mastery-list`/`.mastery-row`, and
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
-  - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
+  - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
+    the way out on a phone), `.trail`, `.timer` and `.ask`.
   - `.picture` over a question: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
     its pictures are in.
-  - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
+  - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; and `missed`, a row of a right
+    answer the player didn't have (an order, pairs, groups): plain, with a hollow ✕ and „ти: …“ for what they gave.
   - „Раздели“: `.split` with `.split-deck` (the thing now on a `.split-card`, the next one `under` it; dragged, it
     names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
     `.split-back`; afterwards `.split-result`.
@@ -212,8 +214,9 @@ takes a token.
   more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
   answer with its standings for 6 seconds; a live duel shows both answers for 4 seconds (6 for a number, an order or
   a match). A question never opens in a tab that's out of sight.
-- **A game has the whole screen.** On a phone the bar of places steps aside while a question or its answer shows
-  (the name at the top still goes home), so the pad and the verdict fit and a stray tap can't leave the game.
+- **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
+  answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
+  game. Each question opens at the top of the page.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
 - **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
