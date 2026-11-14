@@ -390,7 +390,7 @@ function end(v: LiveView, again: () => void): Child {
       if (d) {
         play("end");
         kept.set(d);
-      } else error.set("Резултатът още се пази. Виж го след малко в дуелите си.");
+      } else error.set("Резултатът още се записва. Виж го след малко в дуелите си.");
     },
     (err) => error.set((err as ApiError).message),
   );

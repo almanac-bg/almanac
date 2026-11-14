@@ -72,10 +72,10 @@ export function invite([code = ""]: string[]) {
               "div",
               { class: "intro" },
               h("p", { class: "kicker" }, "Покана"),
-              h("h1", null, "Това е твоят линк"),
-              h("p", { class: "lead" }, "Прати го на приятел: щом го отвори и приеме, ставате приятели."),
+              h("h1", null, "Това е твоята покана"),
+              h("p", { class: "lead" }, "Прати я на приятел: щом я отвори и приеме, ставате приятели."),
             ),
-            shareButton("Прати линка", () => "Ела да сме приятели в АЛМАНАХ:", location.href),
+            shareButton("Прати поканата", () => "Ела да сме приятели в АЛМАНАХ:", location.href),
           ),
         );
       } else if (info.friends) {

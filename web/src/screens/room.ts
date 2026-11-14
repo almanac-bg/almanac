@@ -7,6 +7,7 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
@@ -198,9 +199,9 @@ function lobby(view: () => RoomView, code: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, () => topicName(view().category)),
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
-      h("p", { class: "lead" }, "Дай кода на другите или им прати линка."),
+      h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
     ),
-    shareButton("Прати линка", () => "Ела да играем на АЛМАНАХ:", `${location.origin}/r/${code}`, false),
+    shareButton("Прати връзката", () => "Ела да играем на АЛМАНАХ:", `${location.origin}/r/${code}`, false),
     h(
       "section",
       { class: "card" },
@@ -406,7 +407,7 @@ function arenaEnd(view: () => RoomView): Child {
         return !best ? "Край" : best.me ? "Ти печелиш!" : `${best.name} печели`;
       }),
       me?.place && me.place > 1
-        ? h("p", { class: "place-line" }, `Ти си ${me.place}-и от ${first.players.length}.`)
+        ? h("p", { class: "place-line" }, `Ти си ${ordinal(me.place)} от ${first.players.length}.`)
         : null,
     ),
     h("section", { class: "board" }, h("h2", null, "Класиране"), () =>

@@ -3849,14 +3849,20 @@
     gap: var(--space-2);
   }
 
+  /* On a narrow phone the button goes under the field, so the field keeps room for its hint. */
   .add-friend-row {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 
   .add-friend-row input {
-    flex: 1;
+    flex: 999 1 12rem;
     min-width: 0;
+  }
+
+  .add-friend-row .btn {
+    flex: 1 0 auto;
   }
 
   .waiting {

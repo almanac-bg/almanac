@@ -62,6 +62,9 @@ and facts — is in **standard literary Bulgarian**. Code, comments, commit mess
   [rechnik.chitanka.info](https://rechnik.chitanka.info)), and when a word is only "also used", pick the plain,
   common Bulgarian one. Known slips: знаток → експерт or познавач; ответ → отговор; вопрос → въпрос; игрок → играч;
   уровень → ниво; сейчас → сега.
+- **Bulgarian words, not loanwords.** A loanword stays only where Bulgarian has nothing else in common use („имейл“,
+  „рейтинг“); otherwise the Bulgarian word: връзка, not линк; потребителско име, not таг; часовник, not таймер. Never
+  borrowed slang.
 - **Bulgarian letters only:** never ё, ы or э.
 - **No Bulgarian in Latin letters**, anywhere: a route is `/daily`, never `/dnes`.
 - **The house style** is in `web/DESIGN.md` (Copy): „ти“ to one player, short plain sentences, gender-neutral,

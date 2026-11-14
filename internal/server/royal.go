@@ -126,7 +126,7 @@ func (s *Server) royals(w http.ResponseWriter, r *http.Request) error {
 
 // royalNews tells a player how a tournament they were in ended, when they weren't there to see it.
 func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
-	m := push.Message{URL: "/royal", Title: fmt.Sprintf("Роял: %d-и от %d", n.Place, n.Of)}
+	m := push.Message{URL: "/royal", Title: fmt.Sprintf("Роял: %s от %d", ordinal(n.Place), n.Of)}
 	if n.Of >= 3 { // with fewer, ratings don't move
 		m.Body = fmt.Sprintf("Рейтинг: %+d.", n.Delta)
 	}

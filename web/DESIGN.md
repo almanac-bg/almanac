@@ -181,13 +181,19 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 - **Language:** standard Bulgarian (Bulgarian words, never Russian ones: see `CLAUDE.md`), to one player with „ти“,
   in short plain sentences. Text must be gender-neutral.
+- **Bulgarian words, not loanwords,** when a plain Bulgarian word says the same: „връзка“ or „покана“, not „линк“;
+  „потребителско име“, not „таг“; „часовник“, not „таймер“. A loanword stays only where Bulgarian has nothing else in
+  common use („имейл“, „аватар“, „рейтинг“), and never as slang („вайб“, „чилвам“). `language.test.ts` knows the ones
+  that have slipped in.
 - **Buttons** are verbs: „Започни“, „Отговори“, „Още десет“.
 - **Verdicts** are a fixed set: „Точно!“, „Вярно!“, „Близо.“, „Не е това.“ and „Времето изтече.“
 - **Numbers the Bulgarian way:**
   - a space between thousands from 10 000 up („1380“, „12 500“);
   - a decimal comma;
   - a unit after a space („15 с“);
-  - places as „12-и“.
+  - ordinals with the ending the dictionary gives (`lib/ordinal.ts`): „1-ви“, „2-ри“, „3-ти“, „4-ти“, „5-и“, „12-и“,
+    „21-ви“, and „3-то място“;
+  - months in lower case, also after a word („Сезон ноември 2026“).
 - **No emoji in the interface.**
 
 ## Motion

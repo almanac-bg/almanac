@@ -6,6 +6,7 @@ import { seasonName } from "../art/season.ts";
 import { boardRow } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
 import { type Tier, toneOf } from "../ui.ts";
@@ -167,7 +168,7 @@ export function ranks() {
             d.board,
             (r) => [h("small", { class: "sub" }, `${n(r.answers ?? 0)} отг. · `), `${r.value}%`],
             `Още никой няма ${d.least ?? 100} отговора${name ? " в тази тема" : ""}.`,
-            `Делът верни отговори след поне ${d.least ?? 100}${name ? " в темата" : ""}. Изтеклото време се брои за грешен отговор.`,
+            `Делът на верните отговори след поне ${d.least ?? 100}${name ? " в темата" : ""}. Изтеклото време се брои за грешен отговор.`,
           );
         }
       }
@@ -189,7 +190,7 @@ export function ranks() {
 function seasonHead(s: Season): Child {
   const mine = user.peek()
     ? s.place
-      ? `Ти си ${s.place}-и от ${s.of}.`
+      ? `Ти си ${ordinal(s.place)} от ${s.of}.`
       : `Твоите игри този сезон: ${s.games} от ${s.minGames}.`
     : "";
   return h(

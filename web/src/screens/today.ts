@@ -7,6 +7,7 @@ import { playRun, trail } from "../game/run.ts";
 import type { Board, Score, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 import { figure, streak } from "../ui.ts";
@@ -113,7 +114,7 @@ function finished(t: Today, s: State): Child {
       s,
       () => {
         const b = fresh().board;
-        return b.place ? h("p", { class: "place-line" }, `${b.place}-и от ${b.players} днес.`) : null;
+        return b.place ? h("p", { class: "place-line" }, `${ordinal(b.place)} от ${b.players} днес.`) : null;
       },
       news(s.id),
       () => {

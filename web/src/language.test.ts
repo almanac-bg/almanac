@@ -1,5 +1,6 @@
-// The game speaks Bulgarian (CLAUDE.md): no letter Bulgarian doesn't have, and none of the Russian words that have
-// slipped in before, in anything a player may see — the client, the server's texts and mails, the sample bank.
+// The game speaks Bulgarian (CLAUDE.md): no letter Bulgarian doesn't have, none of the Russian words that have slipped
+// in before, and none of the loanwords a Bulgarian word says as well, in anything a player may see — the client, the
+// server's texts and mails, the sample bank.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,6 +26,16 @@ const words: Record<string, string> = {
 };
 const word = new RegExp(`(?<!\\p{L})(${Object.keys(words).join("|")})(?!\\p{L})`, "iu");
 
+/** Loanwords that have crept in, each in the forms it takes, with the Bulgarian words that say the same. */
+const loans: Record<string, string> = {
+  "линк|линка|линкът|линкове|линковете": "връзка, покана",
+  "таг|тага|тагът|тагове|таговете": "потребителско име",
+  "таймер|таймера|таймерът": "часовник",
+  "лог|лога|логът": "дневник",
+};
+const loan = new RegExp(`(?<!\\p{L})(${Object.keys(loans).join("|")})(?!\\p{L})`, "iu");
+const loanFor = (w: string) => Object.entries(loans).find(([k]) => k.split("|").includes(w.toLowerCase()))?.[1];
+
 function* files(dir: string): Generator<string> {
   for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
     const path = join(dir, e.name);
@@ -33,7 +44,7 @@ function* files(dir: string): Generator<string> {
   }
 }
 
-test("everything a player may read is in Bulgarian letters and words", () => {
+test("everything a player may read is in Bulgarian letters and words, not loanwords", () => {
   const found: string[] = [];
   for (const place of places) {
     for (const path of files(place)) {
@@ -44,6 +55,8 @@ test("everything a player may read is in Bulgarian letters and words", () => {
           if (l) found.push(`${path}:${i + 1}: „${l[0]}“ isn't a Bulgarian letter`);
           const w = line.match(word);
           if (w?.[1]) found.push(`${path}:${i + 1}: „${w[1]}“ is Russian; say ${words[w[1].toLowerCase()]}`);
+          const o = line.match(loan);
+          if (o?.[1]) found.push(`${path}:${i + 1}: „${o[1]}“ is a loanword; say ${loanFor(o[1])}`);
         });
     }
   }

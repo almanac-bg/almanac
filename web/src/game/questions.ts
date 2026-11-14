@@ -2,6 +2,7 @@
 // as the server has one Go file per type (internal/bank).
 
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { formatNumber } from "../ui.ts";
 import type { Answer, ChoiceView, MatchView, NumberView, OrderView, Reveal, TrueFalseView, View } from "./types.ts";
@@ -247,7 +248,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     moved = true;
     lay();
     play("key");
-    said.textContent = `„${view.items[item]}“ е на ${to + 1}. място.`;
+    said.textContent = `„${view.items[item]}“ е на ${ordinal(to + 1, "n")} място.`;
   };
   rows.forEach((row, item) => {
     row.addEventListener("pointerdown", (e: PointerEvent) => {
