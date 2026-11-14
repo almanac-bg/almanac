@@ -156,5 +156,23 @@
     "fact": "ABBA печели „Евровизия“ през 1974 г. с „Waterloo“.",
     "added": "2026-11-13",
     "updated": "2026-11-14"
+  },
+  {
+    "id": "mus-963",
+    "type": "split",
+    "difficulty": "easy",
+    "text": "Чия е песента: на „Бийтълс“ или на „Ролинг Стоунс“?",
+    "groups": ["„Бийтълс“", "„Ролинг Стоунс“"],
+    "items": [
+      {"text": "„Yesterday“", "group": 0},
+      {"text": "„Satisfaction“", "group": 1},
+      {"text": "„Hey Jude“", "group": 0},
+      {"text": "„Paint It Black“", "group": 1},
+      {"text": "„Let It Be“", "group": 0},
+      {"text": "„Angie“", "group": 1}
+    ],
+    "fact": "„Yesterday“ е сред най-често записваните песни: има хиляди версии от други изпълнители.",
+    "added": "2026-11-14",
+    "updated": "2026-11-14"
   }
 ]

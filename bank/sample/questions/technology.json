@@ -155,5 +155,23 @@
     "fact": "Amazon започва през 1994 г. като онлайн книжарница.",
     "added": "2026-11-13",
     "updated": "2026-11-14"
+  },
+  {
+    "id": "tec-963",
+    "type": "split",
+    "difficulty": "easy",
+    "text": "Къде е основана компанията?",
+    "groups": ["В САЩ", "Извън САЩ"],
+    "items": [
+      {"text": "Apple", "group": 0},
+      {"text": "Nokia", "group": 1},
+      {"text": "Microsoft", "group": 0},
+      {"text": "Samsung", "group": 1},
+      {"text": "Google", "group": 0},
+      {"text": "Sony", "group": 1}
+    ],
+    "fact": "„Нокия“ започва през 1865 г. като фабрика за хартия във Финландия.",
+    "added": "2026-11-14",
+    "updated": "2026-11-14"
   }
 ]

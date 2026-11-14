@@ -316,6 +316,8 @@ func TestPlayingOverHTTP(t *testing.T) {
 			answer = map[string]bool{"truth": true}
 		case "match":
 			answer = map[string][]int{"pairs": {0, 1, 2, 3}}
+		case "split":
+			answer = map[string][]int{"sides": {0, 1, 0, 1, 0, 1}}
 		}
 		status, res := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": answer})
 		if status != 200 || res["reveal"] == nil {
@@ -696,6 +698,8 @@ func TestNotifications(t *testing.T) {
 				a = map[string]any{"truth": true}
 			} else if view["type"] == "match" {
 				a = map[string]any{"pairs": []int{0, 1, 2, 3}}
+			} else if view["type"] == "split" {
+				a = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
 			}
 			p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
 		}

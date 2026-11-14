@@ -542,3 +542,74 @@ func TestMatchDecoy(t *testing.T) {
 		t.Error("a right past the column was graded")
 	}
 }
+
+func TestSplitGrading(t *testing.T) {
+	q := &Split{Head: Head{Type: "split", Text: "Бозайник ли е?"}, Groups: [2]string{"Бозайник", "Не е бозайник"},
+		Items: []SplitItem{{"Делфин", 0}, {"Прилеп", 0}, {"Кит", 0}, {"Пингвин", 1}, {"Акула", 1}, {"Костенурка", 1}}}
+	if p := q.check(); len(p) > 0 {
+		t.Fatal(p)
+	}
+	group := map[string]int{"Делфин": 0, "Прилеп": 0, "Кит": 0, "Пингвин": 1, "Акула": 1, "Костенурка": 1}
+	for seed := range uint64(20) {
+		d := q.Deal(seed)
+		var view struct{ Items []string }
+		_ = json.Unmarshal(mustJSON(d.View()), &view)
+		right := make([]int, len(view.Items))
+		for i, it := range view.Items {
+			right[i] = group[it]
+		}
+		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: right}))); !g.Right || g.Score != 1 {
+			t.Fatalf("seed %d: all right graded %+v", seed, g)
+		}
+		var rev struct{ Sides []int }
+		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
+		if !slices.Equal(rev.Sides, right) {
+			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Sides, right)
+		}
+		// One sent wrong: five right less one; one left where it is: five of six, nothing taken.
+		wrong := slices.Clone(right)
+		wrong[0] = 1 - wrong[0]
+		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: wrong}))); g.Right || math.Abs(g.Score-4.0/6) > 1e-9 {
+			t.Fatalf("seed %d: one wrong graded %+v", seed, g)
+		}
+		left := slices.Clone(right)
+		left[5] = -1
+		g := grade(t, d, string(mustJSON(SplitAnswer{Sides: left})))
+		if g.Right || math.Abs(g.Score-5.0/6) > 1e-9 {
+			t.Fatalf("seed %d: one left graded %+v", seed, g)
+		}
+		// The log keeps the bank's order, whatever the deal.
+		var given SplitAnswer
+		_ = json.Unmarshal(g.Given, &given)
+		for b, it := range q.Items {
+			if given.Sides[b] != -1 && given.Sides[b] != it.Group {
+				t.Fatalf("seed %d: logged %v", seed, given.Sides)
+			}
+		}
+	}
+	for _, bad := range []string{`{"sides":[0,1,0,1,0]}`, `{"sides":[0,1,0,1,0,2]}`, `{}`} {
+		if _, err := q.Deal(1).Grade(json.RawMessage(bad)); err == nil {
+			t.Errorf("%s was graded", bad)
+		}
+	}
+	lone := *q
+	lone.Items = slices.Clone(q.Items)
+	lone.Items[3].Group, lone.Items[4].Group = 0, 0
+	if p := lone.check(); len(p) == 0 {
+		t.Error("a split with one item in a group passed")
+	}
+	// Six items sent at random: worth 5/32 on average.
+	sum := 0.0
+	for mask := range 64 {
+		right := 0
+		for i := range 6 {
+			if mask>>i&1 == 1 {
+				right++
+			}
+		}
+		sum += splitScore(right, 6-right, 6)
+	}
+	if math.Abs(sum/64-5.0/32) > 1e-9 {
+		t.Errorf("at random a split is worth %v", sum/64)
+	}
+}

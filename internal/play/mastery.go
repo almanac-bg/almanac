@@ -340,7 +340,7 @@ func (g *Game) MasteryMoves(ctx context.Context, userID, runID int64) ([]Mastery
 // topicSlots is a topic run's shape for a player's ability there: as many easy, medium and hard questions as make
 // about aimRight of them right, easy to hard — easier for those still learning a topic, harder as they know it.
 // There's always at least one easy and one hard question, and three medium (the order and the match are among them).
-// One true-or-not, one order, one match and one number, the rest choices.
+// One true-or-not, one order, one match, one split and one number, the rest choices.
 func topicSlots(ability float64) []slot {
 	right := map[bank.Difficulty]float64{}
 	for d, known := range labelKnown {
@@ -370,5 +370,12 @@ func topicSlots(ability float64) []slot {
 	slots[easy+medium/2].typ = "order"
 	slots[easy+medium-1].typ = "match"
 	slots[Length-1].typ = "number"
+	// The split takes the last choice before the number: a topic still without splits plays a choice there.
+	for i := Length - 2; i >= 0; i-- {
+		if slots[i].typ == "choice" {
+			slots[i].typ, slots[i].alt = "split", "choice"
+			break
+		}
+	}
 	return slots
 }

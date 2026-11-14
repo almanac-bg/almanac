@@ -1,7 +1,7 @@
 // Package bank holds the game's questions: the types a question can be, the bank on disk, and the checks a bank must
 // pass before a server plays it.
 //
-// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go) and plugs in through the
+// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
 // player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order.
@@ -170,6 +170,14 @@ func AnswerText(q Question) string {
 			pairs = append(pairs, "примамка: "+q.Decoy)
 		}
 		return strings.Join(pairs, "; ")
+	case *Split:
+		groups := [2][]string{}
+		for _, it := range q.Items {
+			if it.Group == 0 || it.Group == 1 {
+				groups[it.Group] = append(groups[it.Group], it.Text)
+			}
+		}
+		return q.Groups[0] + ": " + strings.Join(groups[0], ", ") + "; " + q.Groups[1] + ": " + strings.Join(groups[1], ", ")
 	}
 	return ""
 }

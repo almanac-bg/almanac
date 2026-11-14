@@ -13,6 +13,7 @@ import type {
   NumberView,
   OrderView,
   Reveal,
+  SplitView,
   Spread,
   TrueFalseView,
   View,
@@ -62,6 +63,8 @@ function crowdSays(type: View["type"], c: Crowd): string {
       return `Изцяло вярно подреждат ${s} от играчите.`;
     case "match":
       return `Всички двойки свързват ${s} от играчите.`;
+    case "split":
+      return `Всичко на място слагат ${s} от играчите.`;
   }
 }
 
@@ -84,6 +87,8 @@ function askType(view: View, submit: (a: Answer) => void, locked: Signal<boolean
       return truefalse(view, submit, locked);
     case "match":
       return match(view, submit, locked);
+    case "split":
+      return split(view, submit, locked);
   }
 }
 
@@ -663,6 +668,168 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         decoy.hidden = false;
         decoy.replaceChildren("Без двойка: ", h("strong", null, spareText));
       }
+    },
+  };
+}
+
+/** How far a card must be dragged to go to a side, in px: past it, it goes when let go. */
+const flingAt = 72;
+
+/** „Раздели“: the things one by one on a card, each sent to its group by a swipe left or right, a tap on the group, or
+ * the arrow keys. The last one sent sends the answer; until then the last one can be taken back. */
+function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+  const n = view.items.length;
+  const sides = signal<number[]>([]); // the groups the items were sent to, in order
+  const said = h("p", { class: "sr", "aria-live": "polite" });
+  const deck = h("div", { class: "split-deck" });
+  const pips = h(
+    "div",
+    { class: "split-pips", "aria-hidden": "true" },
+    view.items.map(() => h("b")),
+  );
+  const send = (side: number) => {
+    const at = sides.peek().length;
+    if (locked.peek() || at >= n) return;
+    const card = deck.querySelector<HTMLElement>(".split-card.top");
+    if (card) {
+      card.classList.add("gone", side === 0 ? "went-left" : "went-right");
+      card.style.transform = "";
+    }
+    play("key");
+    said.textContent = `„${view.items[at]}“: ${view.groups[side]}.`;
+    sides.update((s) => [...s, side]);
+    if (at + 1 === n) submit({ sides: [...sides.peek()] });
+    else window.setTimeout(lay, 180);
+  };
+  const back = () => {
+    if (locked.peek() || sides.peek().length === 0) return;
+    sides.update((s) => s.slice(0, -1));
+    play("tap");
+    lay();
+  };
+  const sideButton = (side: number) =>
+    h(
+      "button",
+      {
+        class: `option split-side ${side === 0 ? "to-left" : "to-right"}`,
+        type: "button",
+        disabled: locked,
+        "aria-label": `Към „${view.groups[side]}“`,
+        onclick: () => send(side),
+      },
+      h(
+        "span",
+        { class: "split-label" },
+        side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "← ") : null,
+        view.groups[side],
+        side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, " →") : null,
+      ),
+    );
+  const undo = h("button", { class: "link split-back", type: "button", onclick: back }, "Върни последното");
+  // Lays the deck: the next thing on top, the one after it under it.
+  const lay = () => {
+    const at = sides.peek().length;
+    for (const [i, p] of [...pips.children].entries()) p.classList.toggle("done", i < at);
+    undo.hidden = at === 0 || at >= n;
+    const cards: HTMLElement[] = [];
+    const nextText = view.items[at + 1];
+    if (nextText !== undefined) cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, nextText));
+    const text = view.items[at];
+    if (text !== undefined) {
+      const card = h(
+        "div",
+        { class: "split-card top", "aria-live": "polite" },
+        h("span", { class: "split-lean on-left", "aria-hidden": "true" }, view.groups[0]),
+        h("span", { class: "split-lean on-right", "aria-hidden": "true" }, view.groups[1]),
+        h("span", { class: "split-text" }, text),
+      );
+      drag(card);
+      cards.push(card);
+    }
+    deck.replaceChildren(...cards);
+  };
+  const drag = (card: HTMLElement) => {
+    card.addEventListener("pointerdown", (e: PointerEvent) => {
+      if (locked.peek() || e.button !== 0) return;
+      const x0 = e.clientX;
+      let dx = 0;
+      card.setPointerCapture(e.pointerId);
+      card.classList.add("dragging");
+      const follow = (ev: PointerEvent) => {
+        dx = ev.clientX - x0;
+        card.style.transform = `translateX(${dx}px) rotate(${dx / 16}deg)`;
+        card.classList.toggle("lean-left", dx < -flingAt / 2);
+        card.classList.toggle("lean-right", dx > flingAt / 2);
+      };
+      const drop = () => {
+        card.removeEventListener("pointermove", follow);
+        card.removeEventListener("pointerup", drop);
+        card.removeEventListener("pointercancel", drop);
+        card.classList.remove("dragging", "lean-left", "lean-right");
+        if (Math.abs(dx) >= flingAt) send(dx < 0 ? 0 : 1);
+        else card.style.transform = "";
+      };
+      card.addEventListener("pointermove", follow);
+      card.addEventListener("pointerup", drop);
+      card.addEventListener("pointercancel", drop);
+    });
+  };
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
+    if (e.key === "ArrowLeft") send(0);
+    else if (e.key === "ArrowRight") send(1);
+    else if (e.key === "Backspace") back();
+    else return;
+    e.preventDefault();
+  });
+  lay();
+  const hint = h(
+    "p",
+    { class: "hint" },
+    "Плъзни всяко наляво или надясно",
+    h("span", { class: "sr" }, " или натисни групата му отдолу"),
+    ".",
+  );
+  const board = h(
+    "div",
+    { class: "split" },
+    hint,
+    deck,
+    h("div", { class: "split-sides" }, sideButton(0), sideButton(1)),
+    h("div", { class: "split-foot" }, pips, undo),
+    said,
+  );
+  const result = h("ol", { class: "options split-result", hidden: true });
+  return {
+    node: h("div", null, board, result),
+    pending: () => {
+      const s = sides.peek();
+      return s.length ? { sides: view.items.map((_, i) => s[i] ?? -1) } : null;
+    },
+    reveal(reveal, given) {
+      board.hidden = true;
+      result.hidden = false;
+      const mine = given && "sides" in given ? given.sides : [];
+      result.replaceChildren(
+        ...view.items.map((text, i) => {
+          const group = reveal.sides?.[i] ?? 0;
+          const gave = mine[i] ?? -1;
+          const ok = gave === group;
+          return h(
+            "li",
+            { class: ok ? "option right" : "option wrong" },
+            h(
+              "span",
+              { class: "split-pair" },
+              h("strong", null, text),
+              " — ",
+              view.groups[group] ?? "",
+              ok ? null : h("small", { class: "match-gave" }, gave >= 0 ? `ти: ${view.groups[gave]}` : "без отговор"),
+            ),
+            sign(),
+          );
+        }),
+      );
     },
   };
 }

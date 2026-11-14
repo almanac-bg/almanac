@@ -119,6 +119,9 @@ takes a token.
 - **Play:**
   - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
+  - „Раздели“: `.split` with `.split-deck` (the thing now on a `.split-card`, the next one `under` it; dragged, it
+    names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
+    `.split-back`; afterwards `.split-result`.
   - How everyone else answered, once a question has enough answers: `.option.crowd` (a bar behind an answer as long
     as the share of players who gave it, the share beside it), `.spread` (where a number's guesses fell, the answer's
     part in `--right`, the player's in `--accent`) and `.crowd-says` (one sentence under the question).
