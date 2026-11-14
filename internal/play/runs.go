@@ -129,6 +129,7 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 // Score is one player's result on a board.
 type Score struct {
 	Name   string `json:"name"`
+	Tag    string `json:"tag,omitempty"`
 	Points int    `json:"points"`
 	Rights int    `json:"rights"`
 	Ms     int64  `json:"ms"`
@@ -154,7 +155,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	if err != nil {
 		return b, err
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL ORDER BY r.points DESC, r.ms, r.id LIMIT 20`, day)
 	if err != nil {
@@ -166,7 +167,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 		var s Score
 		var avatar, title string
 		var points int
-		if err := rows.Scan(&id, &s.Name, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &points); err != nil {
+		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &points); err != nil {
 			return b, err
 		}
 		s.Me = id == viewer
@@ -180,10 +181,10 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	var runID int64
 	var avatar, title string
 	var points int
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, r.points, r.rights, r.ms, `+lookColumns+`
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&runID, &mine.Name, &mine.Points, &mine.Rights, &mine.Ms, &avatar, &title, &points)
+		Scan(&runID, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Ms, &avatar, &title, &points)
 	mine.Look = lookOf(viewer, avatar, title, points)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil

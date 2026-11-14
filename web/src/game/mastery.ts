@@ -71,15 +71,20 @@ function row(m: Mastery, extra: Child = null): Child {
   );
 }
 
-/** Every topic, how well it's known: the best known first, then those still being found out, then the rest. */
-export function masteryCard(all: Mastery[]): Child {
+/** Every topic, how well it's known: the best known first, then those still being found out, then the rest. Said
+ * to the player, or (another's) about them. */
+export function masteryCard(all: Mastery[], theirs = false): Child {
   const order = (m: Mastery) => (m.sure ? 2000 + m.known : m.answers ? 1000 + m.answers : 0);
   const sorted = [...all].sort((a, b) => order(b) - order(a));
   return h(
     "section",
     { class: "card stack" },
-    h("h2", { class: "section-title" }, "Колко знаеш"),
-    h("p", { class: "muted" }, "Каква част от въпросите на всяка тема знаеш. По-трудните въпроси тежат повече."),
+    h("h2", { class: "section-title" }, theirs ? "Колко знае" : "Колко знаеш"),
+    h(
+      "p",
+      { class: "muted" },
+      `Каква част от въпросите на всяка тема ${theirs ? "знае" : "знаеш"}. По-трудните въпроси тежат повече.`,
+    ),
     h(
       "ol",
       { class: "mastery-list" },

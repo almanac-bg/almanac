@@ -736,3 +736,64 @@ func TestFriendsOverHTTP(t *testing.T) {
 		t.Fatalf("still friends: %v", his)
 	}
 }
+
+// Anyone may see a player's profile by their tag; a signed-in viewer also sees how they stand with them, and only a
+// friend gets the id to call them to a duel.
+func TestProfilesOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	_, a := ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	anaTag := a["user"].(map[string]any)["tag"].(string)
+	_, run := ana.call("POST", "/api/topic", map[string]string{"category": "music"})
+	id := strconv.Itoa(int(run["id"].(float64)))
+	for n := range 10 {
+		ana.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		ana.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
+	}
+
+	status, p := g.player().call("GET", "/api/players/@"+strings.ToUpper(anaTag), nil)
+	if status != http.StatusOK || p["name"] != name(a) || p["tag"] != anaTag || p["games"] != float64(1) ||
+		p["friend"] != nil || p["id"] != nil || p["me"] != nil {
+		t.Fatalf("Ana's profile, to someone not signed in: %d %v", status, p)
+	}
+	if _, ok := p["mastery"].([]any); !ok {
+		t.Fatalf("no mastery: %v", p)
+	}
+	if _, p := ana.call("GET", "/api/players/"+anaTag, nil); p["me"] != true {
+		t.Fatalf("Ana's own profile: %v", p)
+	}
+	if status, _ := bo.call("GET", "/api/players/nosuchplayer", nil); status != http.StatusNotFound {
+		t.Fatalf("no such player: %d", status)
+	}
+	if status, _ := bo.call("GET", "/api/players/%21%21", nil); status != http.StatusNotFound {
+		t.Fatalf("a tag that can't be: %d", status)
+	}
+
+	// Bo asks; Ana sees he asks, he sees he asked; once she accepts, they're friends and he may call her to a duel.
+	bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag})
+	if _, p := bo.call("GET", "/api/players/"+anaTag, nil); p["friend"] != "asked" || p["request"] == nil {
+		t.Fatalf("Ana, to Bo who asked: %v", p)
+	}
+	_, me := bo.call("GET", "/api/me", nil)
+	boTag := me["user"].(map[string]any)["tag"].(string)
+	_, p = ana.call("GET", "/api/players/"+boTag, nil)
+	if p["friend"] != "asks" {
+		t.Fatalf("Bo, to Ana whom he asked: %v", p)
+	}
+	ana.call("POST", fmt.Sprintf("/api/friends/requests/%d/accept", int64(p["request"].(float64))), map[string]any{})
+	_, p = bo.call("GET", "/api/players/"+anaTag, nil)
+	if p["friend"] != "yes" || p["id"] != a["user"].(map[string]any)["id"] || p["record"] == nil {
+		t.Fatalf("Ana, to her friend Bo: %v", p)
+	}
+
+	res, err := http.Get(g.url + "/players/" + anaTag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(body), `og:title" content="`+name(a)+` (@`+anaTag+`) в АЛМАНАХ"`) {
+		t.Fatalf("the profile page: %d\n%s", res.StatusCode, body[:min(len(body), 1500)])
+	}
+}

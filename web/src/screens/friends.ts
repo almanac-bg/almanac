@@ -6,7 +6,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
-import { avatar, type Tier } from "../ui.ts";
+import { avatar, formatNumber, profileHref, type Tier } from "../ui.ts";
 
 interface Friend {
   id: number;
@@ -111,7 +111,7 @@ export function friendsCard(): Child {
           h(
             "p",
             null,
-            h("strong", null, r.name),
+            r.tag ? h("a", { href: profileHref(r.tag) }, h("strong", null, r.name)) : h("strong", null, r.name),
             h("span", { class: "muted" }, ` @${r.tag}`),
             " иска да сте приятели.",
           ),
@@ -176,7 +176,7 @@ export function friendsCard(): Child {
                     null,
                     r.email
                       ? h("span", null, r.email)
-                      : h("span", null, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
+                      : h("a", { href: profileHref(r.tag ?? "") }, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
                     h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
@@ -269,12 +269,17 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
     h(
       "div",
       { class: "friend-text" },
-      h("strong", { class: "friend-name" }, f.name, h("span", { class: "friend-tag" }, ` @${f.tag}`)),
+      h(
+        "a",
+        { class: "friend-name", href: profileHref(f.tag) },
+        f.name,
+        h("span", { class: "friend-tag" }, ` @${f.tag}`),
+      ),
       f.title ? h("span", { class: `who-title t-${f.titleTier ?? "common"}` }, f.title) : null,
       h(
         "span",
         { class: "friend-day" },
-        f.today ? `Днес: ${f.today.rights}/10 · ${f.today.points} т.` : "Днес още няма резултат",
+        f.today ? `Днес: ${f.today.rights}/10 · ${formatNumber(f.today.points)} т.` : "Днес още няма резултат",
       ),
     ),
     played

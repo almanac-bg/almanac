@@ -23,9 +23,9 @@ import (
 const (
 	// Length is how many questions a run has.
 	Length = 10
-	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more:
-	// worth).
-	MaxPoints = 100
+	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more,
+	// one in a row of right answers more: worth).
+	MaxPoints = 1000
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
 	Grace = 2 * time.Second
 )
@@ -134,6 +134,8 @@ type State struct {
 	At       int    `json:"at"`
 	Points   int    `json:"points"`
 	Rights   int    `json:"rights"`
+	// AllRight is what the game earned at its end for every answer right (in Points), once it's done.
+	AllRight int `json:"allRight,omitempty"`
 	// Trail is how each answered question went, in order.
 	Trail []Mark `json:"trail"`
 	// Question is the one shown now, if one is.
@@ -160,8 +162,10 @@ type Shown struct {
 // Result is what an answer earned, the answer itself, and the run after it.
 type Result struct {
 	Points int `json:"points"`
-	// Speed is how many of the points were for being quick.
+	// Speed is how many of the points were for being quick, and Row how many for the right answers in a row InRow.
 	Speed    int     `json:"speed,omitempty"`
+	Row      int     `json:"row,omitempty"`
+	InRow    int     `json:"inRow,omitempty"`
 	Score    float64 `json:"score"`
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
@@ -184,6 +188,9 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
 		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category,
 		Total: len(r.picks), At: r.at, Points: r.points, Rights: r.rights, Done: r.finished, Trail: []Mark{},
+	}
+	if r.finished && r.allRight() {
+		s.AllRight = AllRight
 	}
 	rows, err := tx.Query(`SELECT points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
@@ -257,10 +264,24 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if r.finished {
 		finishedAt = now
 		r.xp += finishXP(r.kind)
+		if r.allRight() {
+			r.points += AllRight
+		}
 	}
 	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
 		r.at, r.points, r.rights, r.xp, r.ms, finishedAt, r.id)
 	return err
+}
+
+// allRight is whether a run went through all of its questions, each answered right.
+func (r *run) allRight() bool { return r.at == len(r.picks) && r.rights == len(r.picks) }
+
+// rightsInRow is how many right answers a run's last ones are in a row.
+func rightsInRow(tx *sql.Tx, runID int64) (int, error) {
+	var n int
+	err := tx.QueryRow(`SELECT count(*) FROM answers WHERE run_id = ?
+		AND n > coalesce((SELECT max(n) FROM answers WHERE run_id = ? AND NOT is_right), -1)`, runID, runID).Scan(&n)
+	return n, err
 }
 
 // State is a player's run as it stands.
@@ -333,8 +354,18 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 				return ErrBadAnswer
 			}
 		}
-		w := WorthOf(d.Question(), gr.Score, took)
-		res.Points, res.Speed = w.Points, w.Speed
+		inRow := 0
+		if gr.Right {
+			if inRow, err = rightsInRow(tx, r.id); err != nil {
+				return err
+			}
+			inRow++
+		}
+		w := WorthOf(d.Question(), gr.Score, took, inRow)
+		res.Points, res.Speed, res.Row = w.Points, w.Speed, w.Row
+		if inRow > 1 {
+			res.InRow = inRow
+		}
 		if err := g.record(tx, r, gr, w, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}

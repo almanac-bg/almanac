@@ -3,7 +3,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
-import { fact, type Look, who } from "../ui.ts";
+import { countUp, fact, formatNumber, type Look, who } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
@@ -30,8 +30,9 @@ export function summary(s: State, line: Child, ...more: Child[]): Child {
         h(
           "p",
           { class: "points" },
-          h("b", { class: "points-n" }, String(s.points)),
+          h("b", { class: "points-n" }, countUp(s.points)),
           h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"),
+          s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
         ),
       ),
       line,
@@ -107,7 +108,7 @@ export function review(load: () => Promise<Reviewed[]>): Child {
           h(
             "p",
             { class: "kicker" },
-            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${it.points} т.`,
+            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
           ),
           h("h3", { class: "ask" }, it.view.text),
           picture(it.view),
@@ -126,19 +127,19 @@ export function boardRow(
   place: number,
   name: string,
   score: Child,
-  opts: { me?: boolean; gap?: boolean; look?: Look } = {},
+  opts: { me?: boolean; gap?: boolean; look?: Look; tag?: string } = {},
 ) {
   const cls = ["row", place <= 3 && `p${place}`, opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ");
   return h(
     "li",
     { class: cls },
     h("span", { class: "place" }, String(place)),
-    who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name),
+    who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name, opts.tag),
     h("span", { class: "pts" }, score),
   );
 }
 
-const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), String(s.points)];
+const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), formatNumber(s.points)];
 
 /** A board of results: the best, and the viewer among them. */
 export function board(title: string, scores: Score[], place?: number, mine?: Score): Child {
@@ -150,9 +151,14 @@ export function board(title: string, scores: Score[], place?: number, mine?: Sco
     h(
       "ol",
       null,
-      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me, look: s })),
+      rows.map((s, i) => boardRow(i + 1, s.name, scoreOf(s), { me: s.me, look: s, tag: s.tag })),
       place && mine && !rows.some((s) => s.me)
-        ? boardRow(place, mine.name, scoreOf(mine), { me: true, gap: place > rows.length + 1, look: mine })
+        ? boardRow(place, mine.name, scoreOf(mine), {
+            me: true,
+            gap: place > rows.length + 1,
+            look: mine,
+            tag: mine.tag,
+          })
         : null,
     ),
   );

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"mime"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -29,6 +31,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/arena/[0-9]{6}$`),
 	regexp.MustCompile(`^/together$`),
 	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
+	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
 }
 
 var shell = template.Must(template.New("shell").Parse(`<!doctype html>
@@ -115,6 +118,13 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
 			title = name + " те кани в АЛМАНАХ"
 			description = "Приеми и сте приятели: виждате резултатите си за деня и се каните на дуел."
+		}
+	case strings.HasPrefix(path, "/players/"):
+		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
+			if p, err := s.game.ProfileOf(r.Context(), tag, 0); err == nil {
+				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
+				description = fmt.Sprintf("Ниво %d · %s · %d изиграни игри.", p.Level, p.Standing.Division.Name, p.Games)
+			}
 		}
 	case strings.HasPrefix(path, "/r/"):
 		code := strings.TrimPrefix(path, "/r/")

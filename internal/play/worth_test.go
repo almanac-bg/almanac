@@ -21,29 +21,36 @@ func TestWorth(t *testing.T) {
 	}
 	choice := q("choice", bank.Medium) // 20 s: all the speed in the first 5
 	for _, c := range []struct {
-		q             bank.Question
-		score         float64
-		took          time.Duration
-		points, speed int
+		q                  bank.Question
+		score              float64
+		took               time.Duration
+		inRow              int
+		points, speed, row int
 	}{
-		{choice, 1, 0, 100, 25},
-		{choice, 1, 5 * time.Second, 100, 25},
-		{choice, 1, 12500 * time.Millisecond, 88, 13},
-		{choice, 1, 20 * time.Second, 75, 0},
-		{choice, 1, 21 * time.Second, 75, 0}, // within the grace
-		{choice, 0, 0, 0, 0},
-		{q("choice", bank.Easy), 1, 0, 60, 15},
-		{q("choice", bank.Hard), 1, 0, 140, 35},
-		{q("truefalse", bank.Medium), 1, 0, 50, 12},
-		{q("number", bank.Hard), 0.5, 30 * time.Second, 53, 0},
+		{choice, 1, 0, 1, 1000, 250, 0},
+		{choice, 1, 5 * time.Second, 1, 1000, 250, 0},
+		{choice, 1, 12500 * time.Millisecond, 1, 880, 130, 0},
+		{choice, 1, 20 * time.Second, 1, 750, 0, 0},
+		{choice, 1, 21 * time.Second, 1, 750, 0, 0}, // within the grace
+		{choice, 0, 0, 0, 0, 0, 0},
+		{q("choice", bank.Easy), 1, 0, 1, 800, 200, 0},
+		{q("choice", bank.Hard), 1, 0, 1, 1200, 300, 0},
+		{q("truefalse", bank.Medium), 1, 0, 1, 500, 120, 0},
+		{q("number", bank.Hard), 0.5, 30 * time.Second, 0, 450, 0, 0},
+		// Right answers in a row: a tenth more from the second, up to a half more.
+		{choice, 1, 0, 2, 1100, 250, 100},
+		{choice, 1, 20 * time.Second, 3, 900, 0, 150},
+		{choice, 1, 0, 6, 1500, 250, 500},
+		{choice, 1, 0, 9, 1500, 250, 500},
 	} {
-		if w := WorthOf(c.q, c.score, c.took); w.Points != c.points || w.Speed != c.speed {
-			t.Errorf("%s %s, %v after %v: %+v, want %d (%d for speed)", c.q.Base().Type, c.q.Base().Difficulty,
-				c.score, c.took, w, c.points, c.speed)
+		w := WorthOf(c.q, c.score, c.took, c.inRow)
+		if w.Points != c.points || w.Speed != c.speed || w.Row != c.row {
+			t.Errorf("%s %s, %v after %v, %d in a row: %+v, want %d (%d for speed, %d for the row)", c.q.Base().Type,
+				c.q.Base().Difficulty, c.score, c.took, c.inRow, w, c.points, c.speed, c.row)
 		}
 	}
 	// A guess at a true-or-not is worth what one at a choice of four is.
-	if tf, ch := 0.5*float64(WorthOf(q("truefalse", bank.Medium), 1, 0).Points), 0.25*float64(WorthOf(choice, 1, 0).Points); tf != ch {
+	if tf, ch := 0.5*float64(WorthOf(q("truefalse", bank.Medium), 1, 0, 1).Points), 0.25*float64(WorthOf(choice, 1, 0, 1).Points); tf != ch {
 		t.Errorf("a guess: %v at a true-or-not, %v at a choice", tf, ch)
 	}
 }
@@ -65,5 +72,51 @@ func TestXP(t *testing.T) {
 	}
 	if finishXP("topic") != 50 || finishXP("day") != 100 {
 		t.Error("a game's end")
+	}
+}
+
+// A run counts right answers in a row: a wrong one starts the row again, and a game right throughout earns AllRight.
+func TestRowsInARun(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	bo := w.user()
+	answer := func(runID int64, n int, how func(int64, int) json.RawMessage) Result {
+		t.Helper()
+		if _, err := w.g.Show(ctx, bo, runID); err != nil {
+			t.Fatal(err)
+		}
+		w.wait(time.Second)
+		res, err := w.g.Answer(ctx, bo, runID, n, how(runID, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	s, _ := w.g.StartTopic(ctx, bo, "")
+	for n, c := range []struct {
+		how   func(int64, int) json.RawMessage
+		inRow int
+	}{{w.right, 0}, {w.right, 2}, {w.right, 3}, {w.wrong, 0}, {w.right, 0}, {w.right, 2}} {
+		res := answer(s.ID, n, c.how)
+		if res.InRow != c.inRow || (c.inRow > 0) != (res.Row > 0) {
+			t.Fatalf("answer %d: %d in a row, %d points for it; want %d in a row", n, res.InRow, res.Row, c.inRow)
+		}
+	}
+	for n := 6; n < Length; n++ {
+		answer(s.ID, n, w.right)
+	}
+	if st, _ := w.g.State(ctx, bo, s.ID); st.AllRight != 0 {
+		t.Fatalf("a game with a wrong answer earned %d for all right", st.AllRight)
+	}
+
+	s, _ = w.g.StartTopic(ctx, bo, "")
+	sum := 0
+	var last Result
+	for n := range Length {
+		last = answer(s.ID, n, w.right)
+		sum += last.Points
+	}
+	if !last.State.Done || last.State.AllRight != AllRight || last.State.Points != sum+AllRight || last.InRow != Length {
+		t.Fatalf("a game right throughout: %+v, %d in a row; answers earned %d", last.State, last.InRow, sum)
 	}
 }
