@@ -2117,6 +2117,60 @@
     color: var(--wrong-ink);
   }
 
+  /* Before a run: a ring running out around the seconds left, and a way to start at once or back out. */
+  .get-ready {
+    justify-items: center;
+    padding-top: var(--space-5);
+    text-align: center;
+  }
+
+  .ready-clock {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 168px;
+    height: 168px;
+  }
+
+  .ready-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ready-track,
+  .ready-arc {
+    fill: none;
+    stroke-width: 8;
+  }
+
+  .ready-track {
+    stroke: var(--sunken);
+  }
+
+  .ready-arc {
+    stroke: var(--gold);
+    stroke-dasharray: 100;
+    animation: ready-run var(--ready) linear forwards;
+  }
+
+  @keyframes ready-run {
+    to {
+      stroke-dashoffset: 100;
+    }
+  }
+
+  .ready-n {
+    font: 900 4.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .get-ready .actions {
+    width: min(100%, 320px);
+  }
+
   /* A friend's challenge, wherever the player is: who, until when, play or say no. */
   .challenge-notice {
     display: flex;
@@ -4071,7 +4125,7 @@
   }
 
   /* Less motion: the device's setting until the player sets their own (Настройки → Достъпност, the .calm class). The
-     timer still moves: it is information. */
+     timer and the count before a run still move: they are information. */
   @media (prefers-reduced-motion: reduce) {
     .btn,
     .option,
@@ -4089,7 +4143,7 @@
     }
   }
 
-  :root.calm *:not(.time-bar),
+  :root.calm *:not(.time-bar, .ready-arc),
   :root.calm *::before,
   :root.calm *::after {
     animation: none;

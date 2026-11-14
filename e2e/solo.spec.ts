@@ -33,6 +33,9 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   test.setTimeout(120_000);
   await page.goto("/");
   await page.getByRole("link", { name: "История" }).click();
+  // A short count first, then the game starts by itself.
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
   await playRun(page);
   // A word about a question waits for the end, in the review.
   await page.getByRole("button", { name: "Въпросите, отговорите и „Знаеше ли?“" }).click();
@@ -41,7 +44,28 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByRole("button", { name: "Изпрати" }).click();
   await expect(page.getByText("Благодарим! Ще го прегледаме.")).toBeVisible();
   await page.getByRole("button", { name: "Още десет" }).click();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
+});
+
+test("a topic's count can be backed out of, or cut short", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Всички теми" }).click();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await page.getByRole("button", { name: "Отказ" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  // Nothing started behind it.
+  await page.waitForTimeout(3500);
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.getByRole("link", { name: "История" }).click();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.getByRole("link", { name: "История" }).click();
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });
 
 test("a run left between two questions goes on at once", async ({ page }) => {

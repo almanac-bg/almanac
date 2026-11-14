@@ -58,6 +58,66 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
   return h("div", { class: "run" }, () => screen());
 }
 
+/** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and
+ * a way to start at once. Each second ticks; the start pings. */
+export function getReady(what: string, start: () => void, cancel: () => void): Child {
+  const seconds = 3;
+  const left = signal(seconds);
+  let gone = false;
+  const leave = (fn: () => void) => {
+    if (gone) return;
+    gone = true;
+    clearInterval(tick);
+    fn();
+  };
+  const begin = () =>
+    leave(() => {
+      play("ping");
+      start();
+    });
+  const tick = setInterval(() => {
+    left.update((n) => n - 1);
+    if (left.peek() <= 0) begin();
+    else if (tickOn.peek()) play("tick");
+  }, 1000);
+  onCleanup(() => clearInterval(tick));
+  if (tickOn.peek()) play("tick");
+  listen(document, "keydown", (e) => {
+    if (e.key === "Escape") leave(cancel);
+  });
+
+  // The ring: a full circle that runs down with the clock (in CSS, over the same seconds), like a question's time bar.
+  const ring = svg("svg", { class: "ready-ring", viewBox: "0 0 120 120", "aria-hidden": "true" });
+  const circle = (cls: string) => svg("circle", { class: cls, cx: 60, cy: 60, r: 52, pathLength: 100 });
+  ring.append(circle("ready-track"), circle("ready-arc"));
+  ring.style.setProperty("--ready", `${seconds}s`);
+
+  return h(
+    "div",
+    { class: "screen get-ready" },
+    h("p", { class: "kicker" }, what),
+    h("h1", null, "Приготви се"),
+    h(
+      "div",
+      { class: "ready-clock", role: "timer", "aria-label": () => `Започва след ${left()} с` },
+      ring,
+      h("b", { class: "ready-n" }, () => String(Math.max(1, left()))),
+    ),
+    h(
+      "div",
+      { class: "actions" },
+      h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
+      h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
+    ),
+  );
+}
+
+function svg(name: string, attrs: Record<string, string | number>): SVGElement {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+}
+
 function failed(message: string, retry: () => void): Child {
   return h(
     "div",
