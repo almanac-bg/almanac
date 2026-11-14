@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, playRun } from "./play.ts";
+import { answer, moveOn, playRun } from "./play.ts";
 
 test("a second chance: the questions missed come back, from Начало and from the Almanac", async ({ page }) => {
   test.setTimeout(180_000);
@@ -31,7 +31,7 @@ test("a second chance: the questions missed come back, from Начало and fro
   for (let n = 0; n < total; n++) {
     await expect(head).toContainText(`${n + 1} от ${total}`, { timeout: 10_000 });
     await answer(page);
-    await expect(page.locator(".verdict")).toBeVisible();
+    await moveOn(page);
   }
   await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".kicker", { hasText: "Втори шанс" })).toBeVisible();

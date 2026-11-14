@@ -7,7 +7,7 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { tickOn } from "../lib/prefs.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, playing } from "../state.ts";
-import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
+import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture, picturesIn } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
@@ -246,6 +246,12 @@ export function pauseFor(view: View): number {
   return view.type === "choice" || view.type === "truefalse" ? 3000 : 4500;
 }
 
+/** How long a fact takes to read, unhurried (none for no fact): a little to start, more for each letter, at most nine
+ * seconds — whoever reads faster moves on with a tap. */
+export function readingTime(text?: string): number {
+  return text ? Math.min(9000, 1200 + 45 * text.length) : 0;
+}
+
 /** The game moving on by itself: a line that fills while the answer shows. */
 export function upNext(ms: number, label: string): Child {
   const fill = h("i", { class: "up-next-fill" });
@@ -307,12 +313,29 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     tally(score, res.state.points, s.points, res.inRow ?? 0);
     const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
-    const pause = pauseFor(q.view);
+    // The fact behind the answer, at the moment the player most wants it: time to read it, or a tap to move on.
+    const said = res.reveal.fact;
+    const pause = pauseFor(q.view) + readingTime(said);
     append(after, [
       verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
       res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
+      said ? fact(said) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
       upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
+      said
+        ? h(
+            "button",
+            {
+              class: "btn",
+              type: "button",
+              onclick: () => {
+                clearTimeout(advance);
+                moveOn();
+              },
+            },
+            res.state.done ? "Към резултата" : "Напред",
+          )
+        : null,
     ]);
     after.hidden = false;
     requestAnimationFrame(() => after.scrollIntoView({ block: "nearest", behavior: "smooth" }));
