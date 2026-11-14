@@ -13,6 +13,7 @@ import type {
   MatchView,
   NumberView,
   OrderView,
+  Picture,
   Reveal,
   SplitView,
   Spread,
@@ -106,18 +107,64 @@ export function answered(view: View, reveal: Reveal, given: Answer | null): Chil
   return a.node;
 }
 
-export function picture(view: View): Child {
+/** How the question's picture and a choice's pictures are drawn: the size each takes on the screen, for the browser
+ * to pick a file by. */
+const overSizes = "(max-width: 36rem) 100vw, 36rem";
+const optionSizes = "(max-width: 36rem) 46vw, 18rem";
+
+/** The least a question's picture is drawn at, however little room the screen has. */
+const pictureFloor = 128;
+
+/** The picture over a question. While it's asked (fit), it's kept low enough that the question, the picture and the
+ * whole answering part under it fit on the screen, down to a floor on a screen too small for that, and kept so as
+ * the screen changes size. */
+export function picture(view: View, fit = false): Child {
   const im = view.image;
   if (!im) return null;
-  return h("img", {
+  const img = h("img", {
     class: "picture",
     src: im.src,
     srcset: im.srcset,
-    sizes: "(max-width: 36rem) 100vw, 36rem",
+    sizes: overSizes,
     width: im.w,
     height: im.h,
     alt: im.alt,
     decoding: "async",
+  });
+  if (fit) {
+    // The answering part follows the picture; the room it leaves is the screen's height less the question's height
+    // without the picture (as if the page were at its top, where a question opens), and a margin under it.
+    const size = () => {
+      const below = img.nextElementSibling;
+      if (!img.isConnected || !below) return;
+      const end = below.getBoundingClientRect().bottom + scrollY - img.getBoundingClientRect().height;
+      img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - end - 16))}px`);
+    };
+    requestAnimationFrame(size);
+    listen(window, "resize", size);
+  }
+  return img;
+}
+
+/** Loads a question's pictures as its screen will show them, so that its time can start once they're in: done when
+ * each is decoded (or has failed), or after `ms` at most. */
+export function picturesIn(view: View, ms: number): Promise<void> {
+  const files: [Picture, string][] = [];
+  if (view.image) files.push([view.image, overSizes]);
+  if (view.type === "choice") for (const p of view.pictures ?? []) files.push([p, optionSizes]);
+  const loads = files.map(([p, sizes]) => {
+    const img = new Image();
+    img.sizes = sizes;
+    img.srcset = p.srcset;
+    img.src = p.src;
+    return img.decode().catch(() => {});
+  });
+  return new Promise((done) => {
+    const t = setTimeout(done, ms);
+    Promise.all(loads).then(() => {
+      clearTimeout(t);
+      done();
+    });
   });
 }
 
@@ -151,7 +198,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
               class: "pic-option-img",
               src: option.src,
               srcset: option.srcset,
-              sizes: "(max-width: 36rem) 46vw, 18rem",
+              sizes: optionSizes,
               width: option.w,
               height: option.h,
               alt: "",
@@ -285,7 +332,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
           : h(
               "button",
               {
-                class: k === "⌫" ? "key back" : "key",
+                class: k === "⌫" ? "key erase" : "key",
                 type: "button",
                 disabled: locked,
                 "aria-label": k === "⌫" ? "Изтрий" : k === "," ? "Запетая" : null,

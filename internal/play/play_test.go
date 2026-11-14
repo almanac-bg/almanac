@@ -138,6 +138,9 @@ func (w *world) play(user, runID int64, answers ...func(int64, int) json.RawMess
 		if _, err := w.g.Show(w.t.Context(), user, runID); err != nil {
 			w.t.Fatal(err)
 		}
+		if _, err := w.g.Start(w.t.Context(), user, runID, n); err != nil { // its pictures in, if it has any
+			w.t.Fatal(err)
+		}
 		w.wait(3 * time.Second)
 		res, err := w.g.Answer(w.t.Context(), user, runID, n, answer(runID, n))
 		if err != nil {
@@ -277,6 +280,67 @@ func TestQuestionTime(t *testing.T) {
 	// Another player's run is as good as missing.
 	if _, err := w.g.State(ctx, w.user(), s.ID); !errors.Is(err, ErrNoRun) {
 		t.Fatalf("someone else's run: %v", err)
+	}
+}
+
+// A question with a picture waits for it: its time starts once the player's screen has it in, or PictureWait after
+// it's shown at the latest. A live duel's starts at once (the match keeps the time).
+func TestPictureTime(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	s, _ := w.g.StartDay(ctx, u)
+	picks := w.picks(s.ID)
+	picks[0].ID, picks[1].ID, picks[2].ID = "geo-901", "geo-902", "geo-903"
+	raw, _ := json.Marshal(picks)
+	if _, err := w.db.Write.Exec(`UPDATE runs SET questions = ? WHERE id = ?`, string(raw), s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if q, _ := w.b.Get("geo-901"); !bank.HasPictures(q) {
+		t.Fatal("geo-901 has no picture")
+	}
+
+	// Shown, waiting: the full time, and when it starts by itself.
+	shown, _ := w.g.Show(ctx, u, s.ID)
+	if q := shown.Question; q == nil || q.LeftMs != q.LimitMs || q.StartsMs != PictureWait.Milliseconds() {
+		t.Fatalf("shown, waiting for its picture: %+v", q)
+	}
+	w.wait(2 * time.Second) // the picture loading
+	if again, _ := w.g.Show(ctx, u, s.ID); again.Question.LeftMs != again.Question.LimitMs || again.Question.StartsMs != 6000 {
+		t.Fatalf("a refresh while it waits: %+v", again.Question)
+	}
+	if st, _ := w.g.Start(ctx, u, s.ID, 1); st.Question.StartsMs == 0 {
+		t.Fatal("another question's start started this one")
+	}
+	started, _ := w.g.Start(ctx, u, s.ID, 0)
+	if q := started.Question; q.StartsMs != 0 || q.LeftMs != q.LimitMs {
+		t.Fatalf("started: %+v", q)
+	}
+	w.wait(time.Second)
+	if again, _ := w.g.Start(ctx, u, s.ID, 0); again.Question.LeftMs != again.Question.LimitMs-1000 {
+		t.Fatalf("started twice: %+v", again.Question)
+	}
+	w.wait(5 * time.Second)
+	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 6*time.Second, 1).Points {
+		t.Fatalf("answered 6 s after it started: %+v %v", res, err)
+	}
+
+	// Never started by the screen: it starts by itself, PictureWait after it's shown.
+	_, _ = w.g.Show(ctx, u, s.ID)
+	w.wait(PictureWait + Limit(w.question(s.ID, 1)))
+	if st, _ := w.g.State(ctx, u, s.ID); st.At != 1 || st.Question == nil || st.Question.LeftMs != 0 {
+		t.Fatalf("its time, after it started by itself: %+v", st.Question)
+	}
+	w.wait(Grace + time.Second)
+	if st, _ := w.g.State(ctx, u, s.ID); st.At != 2 {
+		t.Fatalf("not out of time after PictureWait and its time: %+v", st)
+	}
+
+	// A live duel's starts at once.
+	now, _ := w.g.ShowNow(ctx, u, s.ID)
+	if now.Question.StartsMs != 0 {
+		t.Fatalf("a live duel's question waits: %+v", now.Question)
 	}
 }
 

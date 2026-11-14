@@ -186,6 +186,25 @@ func (s *Server) show(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, st)
 }
 
+// start starts a question's time once its pictures are in on the player's screen (play.Start).
+func (s *Server) start(w http.ResponseWriter, r *http.Request) error {
+	user, id, err := s.runOf(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		N int `json:"n"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	st, err := s.game.Start(r.Context(), user, id, in.N)
+	if err != nil {
+		return err
+	}
+	return ok(w, st)
+}
+
 func (s *Server) answer(w http.ResponseWriter, r *http.Request) error {
 	user, id, err := s.runOf(r)
 	if err != nil {

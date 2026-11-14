@@ -8,7 +8,7 @@ import { tickOn } from "../lib/prefs.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
-import { ask, picture } from "./questions.ts";
+import { ask, picture, picturesIn } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. */
@@ -20,6 +20,17 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
       at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}));
     } catch (err) {
       screen.set(failed((err as ApiError).message, next));
+    }
+  };
+  // A question with pictures waits for them, its time with it (the server starts it by itself if they take too long):
+  // it shows once they're in, its time starting then.
+  const start = async (q: Shown) => {
+    await picturesIn(q.view, q.startsMs ?? 0);
+    if (gone) return;
+    try {
+      at(await api<State>("POST", `/api/runs/${initial.id}/start`, { n: q.n }));
+    } catch (err) {
+      screen.set(failed((err as ApiError).message, () => start(q)));
     }
   };
   const reload = async () => {
@@ -41,16 +52,22 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
     };
     document.addEventListener("visibilitychange", seen);
   };
+  let gone = false;
   onCleanup(() => {
+    gone = true;
     if (seen) document.removeEventListener("visibilitychange", seen);
     playing.set(false);
   });
 
-  // Where the run stands: its end, a question showing, or between questions (the next one opens at once).
+  // Where the run stands: its end, a question waiting for its pictures, a question showing, or between questions
+  // (the next one opens at once).
   const at = (s: State) => {
     playing.set(!s.done);
     if (s.done) screen.set(done(s));
-    else if (s.question) screen.set(question(s, s.question, next, reload));
+    else if (s.question?.startsMs) {
+      const q = s.question;
+      whenSeen(() => start(q));
+    } else if (s.question) screen.set(question(s, s.question, next, reload));
     else whenSeen(next);
   };
 
@@ -358,7 +375,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () => problem(),
     after,

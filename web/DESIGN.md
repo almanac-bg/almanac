@@ -120,6 +120,9 @@ takes a token.
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
   - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
+  - `.picture` over a question: while it's asked, `picture(view, true)` keeps it low enough for the question, the
+    picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
+    its pictures are in.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
   - „Раздели“: `.split` with `.split-deck` (the thing now on a `.split-card`, the next one `under` it; dragged, it
     names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
@@ -149,7 +152,8 @@ takes a token.
   - `game/run.ts` has `trail`, `questionHead` and `timer`.
   - `game/results.ts` has `summary`, `board`, `boardRow` and `shareButton`.
 - **Selectors:** give a part its own class (`.streak-num`) rather than a tag under a class (`.streak b`). Biome's
-  `noDescendingSpecificity` flags the second kind.
+  `noDescendingSpecificity` flags the second kind. One class, one thing: a name already in `app.css` (`.back`, the
+  way back; `.status`, a line of status) is taken, so a new part gets a name of its own (`.key.erase`, `.status-row`).
 - **Test hooks:** the browser tests depend on these classes; keep them:
   - `.question-head`, `.options .option`, `.number`, `.keypad` and `.sortable-list`
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
