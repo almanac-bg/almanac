@@ -8,7 +8,7 @@ import { summary } from "../game/results.ts";
 import { getReady, playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal } from "../lib/dom.ts";
+import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
 import { meter, questions, toneOf } from "../ui.ts";
@@ -52,7 +52,7 @@ export function topics(): Child {
               "span",
               { class: "topic-text" },
               h("span", { class: "topic-name" }, "Всички теми"),
-              h("span", { class: "topic-meta" }, "По един въпрос от всяка"),
+              h("span", { class: "topic-meta" }, "Въпроси от всички теми"),
             ),
           ),
         ),
@@ -133,16 +133,16 @@ export function run(
   begin: () => Promise<State>,
   finished: (s: State, again: () => void) => Child,
 ): Child {
-  const screen = signal<Child>(null);
-  const ready = () => screen.set(getReady(name, start, () => go("/")));
+  const screen = slot();
+  const ready = () => screen.show(() => getReady(name, start, () => go("/")));
   const start = async () => {
-    screen.set(h("p", { class: "muted" }, "…"));
+    screen.show(() => h("p", { class: "muted" }, "…"));
     try {
       await player();
       const s = await begin();
-      screen.set(playRun(s, (end) => finished(end, ready)));
+      screen.show(() => playRun(s, (end) => finished(end, ready)));
     } catch (err) {
-      screen.set(
+      screen.show(() =>
         h(
           "div",
           { class: "stack" },
@@ -153,5 +153,5 @@ export function run(
     }
   };
   ready();
-  return h("div", null, () => screen());
+  return h("div", null, screen);
 }

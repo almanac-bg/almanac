@@ -103,12 +103,17 @@ var goalKinds = []goalKind{
 }
 
 // goalTypes are the types of question a goal can be about, as its name says them (a choice is every game's; no goal).
-var goalTypes = []struct{ id, words string }{
-	{"number", "с число"},
-	{"order", "с подреждане"},
-	{"match", "с двойки"},
-	{"split", "с две групи"},
-	{"truefalse", "„Вярно или невярно“"},
+// A rare one is no longer drawn (kept for a day it was drawn for): a split comes in every other game at most (it takes
+// turns with clues, draw.go newKind), so three right ones take six games or more, not one day's play.
+var goalTypes = []struct {
+	id, words string
+	rare      bool
+}{
+	{"number", "с число", false},
+	{"order", "с подреждане", false},
+	{"match", "с двойки", false},
+	{"split", "с две групи", true},
+	{"truefalse", "„Вярно или невярно“", false},
 }
 
 // args are what a kind of goal can be about, in the bank as it is.
@@ -121,7 +126,7 @@ func (k goalKind) args(b *bank.Bank) []string {
 		}
 	case "type":
 		for _, t := range goalTypes {
-			if len(b.Live("", t.id)) > 0 { // a kind the bank has none of yet makes no goal
+			if !t.rare && len(b.Live("", t.id)) > 0 { // a kind the bank has none of yet makes no goal
 				out = append(out, t.id)
 			}
 		}

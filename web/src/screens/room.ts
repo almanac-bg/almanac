@@ -144,6 +144,7 @@ export function room([code = ""]: string[]) {
           places.clear();
           return lobby(view as () => RoomView, code);
         case "question":
+          if (v.n === 0) places.clear(); // a new game („Нова игра“ goes from the end straight to its first question)
           return question(view as () => RoomView, code, v);
         case "reveal":
           return reveal(view as () => RoomView, v, places);

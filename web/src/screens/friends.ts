@@ -3,7 +3,7 @@
 
 import { shareButton } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
 import { avatar, formatNumber, pageArt, profileHref, record, type Tier } from "../ui.ts";
@@ -172,7 +172,14 @@ function friendsCard(): Child {
                 { class: "muted" },
                 "Още нямаш приятели тук. Добави ги по потребителско име или имейл, или им прати поканата си.",
               ),
-          adder,
+        ];
+      },
+      // Outside the blocks drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
+      when(data, () => adder),
+      () => {
+        const d = data();
+        if (!d) return null;
+        return [
           d.requests.out.length
             ? h(
                 "div",

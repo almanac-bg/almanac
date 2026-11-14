@@ -104,6 +104,34 @@ func decimals(step float64) int {
 
 func formatNumber(v, step float64) string { return strconv.FormatFloat(v, 'f', decimals(step), 64) }
 
+// sayNumber is a number as the game writes it to players (web/src/ui.ts formatNumber): a decimal comma, no more
+// decimals than step has and none trailing, and a space between thousands from 10 000 up.
+func sayNumber(v, step float64) string {
+	s := formatNumber(v, step)
+	if strings.Contains(s, ".") {
+		s = strings.TrimRight(strings.TrimRight(s, "0"), ".")
+	}
+	sign, s := "", strings.TrimPrefix(s, "-")
+	if v < 0 && s != "0" {
+		sign = "-"
+	}
+	whole, frac, _ := strings.Cut(s, ".")
+	if len(whole) > 4 {
+		var b strings.Builder
+		for i, c := range whole {
+			if i > 0 && (len(whole)-i)%3 == 0 {
+				b.WriteRune('\u00a0')
+			}
+			b.WriteRune(c)
+		}
+		whole = b.String()
+	}
+	if frac != "" {
+		return sign + whole + "," + frac
+	}
+	return sign + whole
+}
+
 func (q *Number) Deal(uint64) Dealt { return &dealtNumber{q} }
 
 type dealtNumber struct{ q *Number }

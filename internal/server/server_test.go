@@ -426,9 +426,12 @@ func (p *player) follow(code string) *stream {
 }
 
 // stream opens an event stream at path.
-func (p *player) stream(path string) *stream {
+func (p *player) stream(path string, lastID ...string) *stream {
 	p.g.t.Helper()
 	req, _ := http.NewRequest("GET", p.g.url+path, nil)
+	for _, id := range lastID {
+		req.Header.Set("Last-Event-ID", id) // as a browser sends it, coming back after the line dropped
+	}
 	res, err := p.client.Do(req)
 	if err != nil {
 		p.g.t.Fatal(err)
@@ -574,6 +577,17 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
 	if v["question"].(map[string]any)["reveal"] == nil || v["them"].(map[string]any)["given"] == nil {
 		t.Fatalf("no answers shown: %v", v)
+	}
+
+	// Ana's line drops and comes back: the same duel, not the queue for a new one. A duel that's gone (a restart) says
+	// so.
+	again := ana.stream("/api/duels/live/events", strconv.FormatInt(id, 10))
+	if v := again.until(func(map[string]any) bool { return true }); int64(v["id"].(float64)) != id {
+		t.Fatalf("back in another duel: %v", v)
+	}
+	gone := ana.stream("/api/duels/live/events", strconv.FormatInt(id+1000, 10))
+	if line, _ := gone.r.ReadString('\n'); line != "event: closed\n" {
+		t.Fatalf("a duel that's gone: %q", line)
 	}
 }
 

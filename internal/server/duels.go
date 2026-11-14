@@ -54,9 +54,10 @@ func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) 
 }
 
 // liveEvents is a live duel on a player's screen (Server-Sent Events). Opening it asks for a duel: the one the
-// player is in, if they're in one (a line that dropped and came back), else with whoever is waiting; else they wait,
-// told how long, and play a recording if nobody comes. Then the duel as they see it, again after every change.
-// Closing it while waiting stops waiting.
+// player is in, if they're in one, else with whoever is waiting; else they wait, told how long, and play a recording
+// if nobody comes. Then the duel as they see it, again after every change, each view with the duel's id: a line
+// that dropped and came back sends it (Last-Event-ID), and follows that duel again, or hears it's gone. Closing it
+// while waiting stops waiting.
 func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -80,51 +81,68 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 		fail("busy")
 		return
 	}
-	p, err := s.livePlayer(r.Context(), u.ID)
-	if err != nil {
-		slog.Error("live duel", "err", err)
-		fail("busy")
-		return
-	}
-	seek := s.live.Seek(p)
-	defer seek.Leave()
-
 	ping := time.NewTicker(20 * time.Second) // keeps the line open through proxies (Cloudflare closes it after 100 s)
 	defer ping.Stop()
-	select {
-	case <-seek.Done():
-	default:
-		data, _ := json.Marshal(map[string]int64{"leftMs": seek.Left().Milliseconds()})
-		if !send("event: waiting\ndata: " + string(data) + "\n\n") {
-			return
+	// find is the duel to follow. A line that dropped and came back (the browser says the duel it had) goes back to
+	// that duel, over or not, or hears that it's gone (a restart): never into the queue for a new one, which would
+	// leave the screen on the old one's last question.
+	find := func() (*live.Match, bool) {
+		if last := r.Header.Get("Last-Event-ID"); last != "" {
+			id, _ := strconv.ParseInt(last, 10, 64)
+			m, err := s.live.Get(id)
+			if err != nil {
+				fail("closed")
+				return nil, false
+			}
+			return m, true
 		}
-	}
-	for waiting := true; waiting; {
+		p, err := s.livePlayer(r.Context(), u.ID)
+		if err != nil {
+			slog.Error("live duel", "err", err)
+			fail("busy")
+			return nil, false
+		}
+		seek := s.live.Seek(p)
+		defer seek.Leave() // once it's settled, only the waiting it stops
 		select {
 		case <-seek.Done():
-			waiting = false
-		case <-ping.C:
-			if !send(": ping\n\n") {
-				return
+		default:
+			data, _ := json.Marshal(map[string]int64{"leftMs": seek.Left().Milliseconds()})
+			if !send("event: waiting\ndata: " + string(data) + "\n\n") {
+				return nil, false
 			}
-		case <-s.closing:
-			return
-		case <-r.Context().Done():
-			return
 		}
-	}
-	switch {
-	case errors.Is(seek.Err, play.ErrNobody):
-		fail("nobody")
-		return
-	case seek.Err != nil:
-		if !errors.Is(seek.Err, live.ErrTooMany) {
-			slog.Error("live duel", "err", seek.Err)
+		for waiting := true; waiting; {
+			select {
+			case <-seek.Done():
+				waiting = false
+			case <-ping.C:
+				if !send(": ping\n\n") {
+					return nil, false
+				}
+			case <-s.closing:
+				return nil, false
+			case <-r.Context().Done():
+				return nil, false
+			}
 		}
-		fail("busy")
+		switch {
+		case errors.Is(seek.Err, play.ErrNobody):
+			fail("nobody")
+			return nil, false
+		case seek.Err != nil:
+			if !errors.Is(seek.Err, live.ErrTooMany) {
+				slog.Error("live duel", "err", seek.Err)
+			}
+			fail("busy")
+			return nil, false
+		}
+		return seek.Match, true
+	}
+	m, found := find()
+	if !found {
 		return
 	}
-	m := seek.Match
 	sub, err := m.Follow(u.ID)
 	if err != nil {
 		fail("closed")
@@ -135,7 +153,8 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-sub.C:
 			data, _ := json.Marshal(m.View(u.ID))
-			if !send("data: " + string(data) + "\n\n") {
+			// The duel's id goes with each view: a line that drops sends it back (Last-Event-ID), to come back to it.
+			if !send("id: " + strconv.FormatInt(m.ID(), 10) + "\ndata: " + string(data) + "\n\n") {
 				return
 			}
 		case <-ping.C:
@@ -239,6 +258,9 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 		m.Title = n.From + " те предизвика на дуел"
 		m.Body = fmt.Sprintf("Десет въпроса, когато ти е удобно: имаш %d часа.", int(play.FriendFor.Hours()))
 	case "result":
+		if n.Seen {
+			return
+		}
 		var kind string
 		if err := s.db.Read.QueryRowContext(ctx, `SELECT kind FROM duels WHERE id = ?`, n.DuelID).Scan(&kind); err != nil || kind != "friend" {
 			return
@@ -341,7 +363,7 @@ func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
 	if n.XP > 0 {
 		body += fmt.Sprintf(" +%d XP.", n.XP)
 	}
-	go s.notify(context.WithoutCancel(ctx), pushFriends, push.Message{URL: "/ranks", Title: "Седмицата в лигата свърши", Body: body}, n.To)
+	go s.notify(context.WithoutCancel(ctx), pushFriends, push.Message{URL: "/ranks#league", Title: "Седмицата в лигата свърши", Body: body}, n.To)
 }
 
 // goals are the player's goals for today.

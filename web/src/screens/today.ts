@@ -10,11 +10,12 @@ import { playRun, trail } from "../game/run.ts";
 import { dayShareText } from "../game/share.ts";
 import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
+import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
-import { player, user } from "../state.ts";
+import { dayInBulgaria } from "../lib/year.ts";
+import { player, playing, user } from "../state.ts";
 import { meter, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
@@ -44,23 +45,37 @@ const longDate = (day: string) =>
 
 export function today() {
   title();
-  const screen = signal<Child>(h("p", { class: "muted" }, "…"));
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
   const load = async () => {
     try {
       const t = await api<Today>("GET", "/api/day");
-      if (t.run && !t.run.done) screen.set(playRun(t.run, (s) => home(t, s, true)));
-      else screen.set(home(t, t.run, false));
+      day = t.day;
+      const run = t.run;
+      if (run && !run.done) screen.show(() => playRun(run, (s) => home(t, s, true)));
+      else screen.show(() => home(t, t.run, false));
     } catch (err) {
-      screen.set(h("p", { role: "alert" }, (err as ApiError).message));
+      screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
     }
   };
   const start = (t: Today) => async () => {
     await player();
     const s = await api<State>("POST", "/api/day", {});
-    screen.set(playRun(s, (end) => home(t, end, true)));
+    screen.show(() => playRun(s, (end) => home(t, end, true)));
   };
+  // A new day while the screen stays open (a phone left on Начало overnight): the new day's ten, not yesterday's
+  // result with a countdown to a day that has come. Never in the middle of a game.
+  let day = "";
+  const newDay = () => {
+    if (day && !document.hidden && !playing.peek() && dayInBulgaria() !== day) load();
+  };
+  document.addEventListener("visibilitychange", newDay);
+  const every = setInterval(newDay, 60_000);
+  onCleanup(() => {
+    document.removeEventListener("visibilitychange", newDay);
+    clearInterval(every);
+  });
   load();
-  return h("div", null, () => screen());
+  return h("div", null, screen);
 
   /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
    * earned is told once), then the ways to play. */

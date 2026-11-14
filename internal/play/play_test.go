@@ -1574,13 +1574,18 @@ func TestRetention(t *testing.T) {
 	if len(cohorts) != 2 || cohorts[0].Day != "2026-11-13" || cohorts[0].New != 1 || cohorts[0].Back[0] != -1 {
 		t.Fatalf("cohorts: %+v", cohorts)
 	}
-	if c := cohorts[1]; c.Day != "2026-11-12" || c.New != 2 || c.Back[0] != 1 || c.Back[1] != -1 || c.Back[3] != -1 {
+	// The 12th's day 1 is today: not over, so not counted yet.
+	if c := cohorts[1]; c.Day != "2026-11-12" || c.New != 2 || c.Back[0] != -1 || c.Back[1] != -1 || c.Back[3] != -1 {
 		t.Errorf("the 12th: %+v", c)
 	}
-	// A week on, Бо is back on day 7; Ана's day 3 was missed.
+	// A week on, Бо is back on day 7; Ана's day 3 was missed. Read the day after.
 	w.wait(6 * 24 * time.Hour)
 	playOne(bo)
+	w.wait(24 * time.Hour)
 	cohorts, _, _ = w.g.Retention(ctx, 30)
+	if c := cohorts[len(cohorts)-1]; c.Back[0] != 1 {
+		t.Errorf("day 1, once over: %+v", c)
+	}
 	if c := cohorts[len(cohorts)-1]; c.Back[1] != 0 || c.Back[2] != 1 || c.Back[3] != -1 {
 		t.Errorf("a week on: %+v", c)
 	}

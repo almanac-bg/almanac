@@ -588,13 +588,18 @@ func (r *Room) View(viewer int64) View {
 	return v
 }
 
-// review is the game's questions with how m answered each (the answer log holds one entry per question, in order).
+// review is the game's questions with how m answered each. The answer log holds one entry per question from the one
+// m joined on (a player who comes mid-game has none before it): looked up by question, not by place.
 func (r *Room) review(m *member) []ReviewedView {
+	logged := make(map[string]loggedAnswer, len(m.log))
+	for _, l := range m.log {
+		logged[l.questionID] = l
+	}
 	out := make([]ReviewedView, 0, len(r.dealt))
 	for i, d := range r.dealt {
 		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(r.hub.crowd(d.Question().Base().ID)), Given: json.RawMessage("null")}
-		if i < len(m.log) && m.log[i].questionID == d.Question().Base().ID && m.log[i].shown != nil {
-			it.Given, it.Points, it.Right = m.log[i].shown, m.log[i].points, m.log[i].right
+		if l, ok := logged[d.Question().Base().ID]; ok && l.shown != nil {
+			it.Given, it.Points, it.Right = l.shown, l.points, l.right
 		}
 		out = append(out, it)
 	}

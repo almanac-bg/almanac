@@ -13,6 +13,12 @@ function inBulgaria(now: Date): { y: number; m: number; d: number } {
   return { y: get("year"), m: get("month"), d: get("day") };
 }
 
+/** A moment's date in Bulgaria, as the server writes a day: 2026-11-14. */
+export function dayInBulgaria(now = new Date()): string {
+  const { y, m, d } = inBulgaria(now);
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 /** The year whose look back is open at a moment (0 before the first, 2026's), and whether it's fresh: from 15
  * December to 15 January, when Начало offers it. */
 export function yearNow(now = new Date()): { year: number; fresh: boolean } {

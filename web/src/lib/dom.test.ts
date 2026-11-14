@@ -1,7 +1,7 @@
 // The signals and scopes the UI rests on (the DOM parts are covered by the browser tests).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { batch, computed, effect, onCleanup, safeURL, scope, signal } from "./dom.ts";
+import { batch, computed, effect, onCleanup, safeURL, scope, signal, slot } from "./dom.ts";
 
 test("an effect runs again when what it read changes, and only then", () => {
   const a = signal(1);
@@ -90,4 +90,29 @@ test("links go to this site, the web or mail only", () => {
   ]) {
     assert.ok(!safeURL(bad), bad);
   }
+});
+
+test("a slot's views, set after an await, are undone in turn and with the screen", async () => {
+  const place = slot();
+  const undone: string[] = [];
+  const read = signal(0);
+  let built = 0;
+  // As a screen puts it in the page: a child the page re-runs.
+  const [, dispose] = scope(() => effect(() => void place()));
+  await Promise.resolve(); // a fetch: no scope is open here
+  place.show(() => {
+    built++;
+    read(); // what a view reads draws the view, not the slot again
+    onCleanup(() => undone.push("first"));
+    return null;
+  });
+  read.set(1);
+  assert.equal(built, 1);
+  place.show(() => {
+    onCleanup(() => undone.push("second"));
+    return null;
+  });
+  assert.deepEqual(undone, ["first"]);
+  dispose();
+  assert.deepEqual(undone, ["first", "second"]);
 });

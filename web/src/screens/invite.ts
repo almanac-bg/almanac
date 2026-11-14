@@ -3,7 +3,7 @@
 
 import { shareButton } from "../game/results.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal } from "../lib/dom.ts";
+import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 
@@ -15,7 +15,7 @@ interface Info {
 
 export function invite([code = ""]: string[]) {
   title("Покана");
-  const screen = signal<Child>(h("p", { class: "muted" }, "…"));
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
   const error = signal("");
 
   const friends = (name: string, id?: number): Child =>
@@ -55,7 +55,7 @@ export function invite([code = ""]: string[]) {
     try {
       await player();
       const r = await api<{ id: number; name: string }>("POST", `/api/invites/${code}`, {});
-      screen.set(friends(r.name, r.id));
+      screen.show(() => friends(r.name, r.id));
     } catch (err) {
       error.set((err as ApiError).message);
     }
@@ -64,7 +64,7 @@ export function invite([code = ""]: string[]) {
   api<Info>("GET", `/api/invites/${code}`).then(
     (info) => {
       if (info.own) {
-        screen.set(
+        screen.show(() =>
           h(
             "section",
             { class: "screen" },
@@ -79,9 +79,9 @@ export function invite([code = ""]: string[]) {
           ),
         );
       } else if (info.friends) {
-        screen.set(friends(info.by));
+        screen.show(() => friends(info.by));
       } else {
-        screen.set(
+        screen.show(() =>
           h(
             "section",
             { class: "screen" },
@@ -104,7 +104,7 @@ export function invite([code = ""]: string[]) {
       }
     },
     (err: ApiError) =>
-      screen.set(
+      screen.show(() =>
         h(
           "section",
           { class: "screen" },
@@ -114,5 +114,5 @@ export function invite([code = ""]: string[]) {
         ),
       ),
   );
-  return h("div", null, () => screen());
+  return h("div", null, screen);
 }

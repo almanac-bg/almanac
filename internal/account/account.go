@@ -171,10 +171,14 @@ func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
 	u.Email = email.String
 	// Once a day at most: a write per request would be a write per request.
 	if store.Ms(now)-seen > int64(24*time.Hour/time.Millisecond) {
-		_, err := a.DB.Write.ExecContext(ctx, `UPDATE sessions SET seen_at = ?, expires_at = ? WHERE token_hash = ?;
-			UPDATE users SET seen_at = ? WHERE id = ?`,
-			store.Ms(now), store.Ms(now.AddDate(0, 0, SessionDays)), hash, store.Ms(now), u.ID)
+		// Two statements, not one Exec: the driver binds each statement of a multi-statement Exec from the first
+		// argument, so the second never matched.
+		_, err := a.DB.Write.ExecContext(ctx, `UPDATE sessions SET seen_at = ?, expires_at = ? WHERE token_hash = ?`,
+			store.Ms(now), store.Ms(now.AddDate(0, 0, SessionDays)), hash)
 		if err != nil {
+			return nil, err
+		}
+		if _, err := a.DB.Write.ExecContext(ctx, `UPDATE users SET seen_at = ? WHERE id = ?`, store.Ms(now), u.ID); err != nil {
 			return nil, err
 		}
 	}

@@ -47,7 +47,9 @@ function what(p: Stats["recent"][number]): string {
     case "day":
       return "Въпросите на деня";
     case "duel":
-      return `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome ?? "draw"]}`;
+      // A friend's challenge has its opponent and result once both have played: until then (or if it was declined or
+      // ran out), only that it was a duel.
+      return p.outcome ? `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome]}` : "Дуел";
     case "royal":
       return "Роял";
     case "mistakes":

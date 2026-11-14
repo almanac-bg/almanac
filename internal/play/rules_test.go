@@ -110,7 +110,15 @@ func TestRunEndedByTheClock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Not Vi's turn while Ana is still playing: nothing to play yet.
+	if d, _ := w.g.DuelsOf(ctx, vi); len(d) != 0 {
+		t.Fatalf("Vi sees a challenge Ana hasn't played: %+v", d)
+	}
 	lastRunsOut(ana, s.ID, w.right)
+	// Ana's run of the open challenge is no recording for Vi to learn its answers from.
+	if _, err := w.g.StartRecorded(ctx, vi); !errors.Is(err, ErrNobody) {
+		t.Fatalf("a recording from an open challenge: %v", err)
+	}
 	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
 		t.Fatalf("Vi wasn't told: %+v", told)
 	}
@@ -126,8 +134,12 @@ func TestRunEndedByTheClock(t *testing.T) {
 	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "lost" || len(told) != 3 {
 		t.Fatalf("Vi's duel: %+v, told %+v", d[0], told)
 	}
+	// Vi has the result on screen (their run settled it); Ana hears of it.
+	if told[1].To != ana || told[1].Seen || told[2].To != vi || !told[2].Seen {
+		t.Fatalf("who has seen the result: %+v", told[1:])
+	}
 	// Settled again (both sides at once): nothing more, and no error.
-	if err := w.g.settleDuel(ctx, id, false); err != nil || len(told) != 3 {
+	if err := w.g.settleDuel(ctx, id, false, 0); err != nil || len(told) != 3 {
 		t.Fatalf("a duel settled twice: %v, told %d", err, len(told))
 	}
 
@@ -139,6 +151,12 @@ func TestRunEndedByTheClock(t *testing.T) {
 	lastRunsOut(gal, l.Runs[0], w.right)
 	if d, _ := w.g.DuelsOf(ctx, gal); len(d) != 1 || !d[0].Recorded || d[0].State == "expired" {
 		t.Fatalf("Gal's duel against a recording: %+v", d)
+	}
+	// A recording isn't its player: no record between the two.
+	var against sql.NullInt64
+	_ = w.db.Read.QueryRow(`SELECT opponent_id FROM runs WHERE id = ?`, l.Runs[0]).Scan(&against)
+	if against.Valid {
+		t.Fatalf("a duel against a recording counts against its player %d", against.Int64)
 	}
 
 	// One finished and not settled then (a restart in between) gets its result once its time is up.

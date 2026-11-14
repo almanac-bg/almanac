@@ -1,7 +1,7 @@
 // Настройки: the name and tag, the account and its email, sounds and reminders, and the data the game keeps.
 
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal, when } from "../lib/dom.ts";
+import { type Child, computed, effect, h, signal, untracked, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { bigText, calm, setBigText, setCalm, setTick, tickOn } from "../lib/prefs.ts";
 import {
@@ -51,8 +51,17 @@ export function settings() {
 }
 
 function nameForm(): Child {
-  const name = signal(user.peek()?.name ?? "");
-  const tag = signal(user.peek()?.tag ?? "");
+  const name = signal("");
+  const tag = signal("");
+  // The account's, and again when it's another (a guest who signs in to the account they had): never the last one's.
+  const id = computed(() => user()?.id);
+  effect(() => {
+    id();
+    untracked(() => {
+      name.set(user()?.name ?? "");
+      tag.set(user()?.tag ?? "");
+    });
+  });
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   return h(
@@ -340,6 +349,8 @@ function deleteAccount(): Child {
 }
 
 async function signOut() {
+  // This browser's notifications were the account's: they stop with it (while signed in, so the server forgets them).
+  if (pushable()) await turnOff().catch(() => {});
   await api("POST", "/api/auth/signout", {}).catch(() => {});
   user.set(null);
 }

@@ -74,7 +74,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if p.Streak, err = g.Streak(ctx, id); err != nil {
 		return p, err
 	}
-	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'), count(*) FILTER (WHERE kind = 'duel'),
+	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'), count(*) FILTER (WHERE kind = 'duel' AND outcome IS NOT NULL),
 		count(*) FILTER (WHERE outcome = 'won') FROM runs WHERE user_id = ? AND finished_at IS NOT NULL`, id).
 		Scan(&p.Games, &p.Days, &p.Duels, &p.Won)
 	if err != nil {
