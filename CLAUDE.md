@@ -43,7 +43,7 @@ package, and keep it true after.
 
 ```bash
 go run ./cmd/build -watch & DEV=1 go run ./cmd/almanac serve   # http://localhost:8080, mail in the log
-go vet ./... && go test -race ./...                            # the server
+test -z "$(gofmt -l .)" && go vet ./... && go test -race ./...  # the server (CI fails on unformatted Go)
 npm run check && npm test                                      # the client: types, lint, unit tests, language
 npx playwright test -c e2e --project chromium e2e/<spec>       # the browser specs your change touches
 ```
