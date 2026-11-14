@@ -107,6 +107,9 @@ func TestGoals(t *testing.T) {
 	for _, d := range n.Goals {
 		sum += d.XP
 	}
+	for _, a := range n.Achievements {
+		sum += a.XP
+	}
 	if err != nil || !slices.Contains(n.Goals, DoneGoal{Name: "Изиграй въпросите на деня", XP: GoalXP[0]}) ||
 		n.XP != games+sum {
 		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)

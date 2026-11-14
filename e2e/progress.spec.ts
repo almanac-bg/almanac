@@ -6,17 +6,28 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await page.goto("/play/history");
   await playRun(page);
   await expect(page.locator(".level-card")).toContainText("Ниво");
+  // Everything the game unlocked is told together, each a tap from being worn.
+  const unlocked = page.locator(".unlocks .unlock-row", { hasText: "Титла „Нова искра“" });
+  await expect(unlocked).toContainText("С ниво 1.");
+  await unlocked.getByRole("button", { name: "Сложи: титла „Нова искра“" }).click();
+  await expect(unlocked).toContainText("Сложено");
 
   await page.goto("/rewards");
-  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 24/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 29/ })).toBeVisible();
   // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
   await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");
   // Progress towards a goal, a reward in sight, and the hidden ones kept secret.
   await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(/\d+ \/ 100/);
-  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText("Награда: аватар „Книга“");
-  await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText("и титла „Неугасим пламък“");
-  await expect(page.locator(".achievement", { hasText: /скрит/i }).first()).toContainText("Награда: ще разбереш");
+  // Each earns XP, and some more: only what's new to the player (the flame is the first streak's).
+  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(
+    "Награда: +50 XP · аватар „Книга“",
+  );
+  await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText(
+    "Награда: +400 XP · титла „Неугасим пламък“ · рамка „Пламъци“",
+  );
+  await expect(page.getByText("Първото епично постижение отключва фон „Лъчи“.")).toBeVisible();
+  await expect(page.locator(".achievement", { hasText: /скрит/i }).first()).toContainText("ще разбереш");
 
   // Гардероб, a tap away in Профил: the avatar first, the titles a tab away, the locked ones folded.
   await page.getByRole("navigation", { name: "Профил" }).getByRole("link", { name: "Гардероб" }).click();

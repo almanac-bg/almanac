@@ -1,6 +1,7 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -13,9 +14,20 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Progress is what a player earns by playing: a level from all the XP they've earned, achievements for things
-// they've done, and with them avatars and titles (titles.go) to choose from. All of it comes from the game's own records:
-// nothing to buy, nothing made up.
+// Progress is what a player earns by playing, and it's one system: two measures, and what they unlock.
+//
+//   - XP is for playing: every answer and game (worth.go), the day's goals (goals.go), each achievement (its tier's
+//     XP, once) and each season ended in its standings (its division's XP, seasons.go). All of it adds up to a level.
+//   - The rating is strength: duels, Арена and Роял move it (rating.go); its divisions, and a season's podium, are
+//     what it's worth.
+//
+// Both unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a Роял
+// won or a podium each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
+// once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
+// something, the next division, the achievements nearest. The day's goals, done all three, also keep the streak
+// through a missed day (runs.go: reserve days), and the streak makes achievements of its own.
+//
+// All of it comes from the game's own records: nothing to buy, nothing made up.
 
 // ErrNotYours is a title or an avatar the player hasn't earned (or one there's no such thing as).
 var ErrNotYours = errors.New("not earned")
@@ -33,14 +45,14 @@ func LevelOf(total int) (level, from, to int) {
 	return level, from, from + step
 }
 
-// Achievement is something a player has done, once and for good, named for the deed („Десет от десет“). Its shape is
-// an avatar they may wear; some unlock a title too (titles.go).
+// Achievement is something a player has done, once and for good, named for the deed („Десет от десет“). It earns its
+// tier's XP (AchievementXP); some also unlock an avatar (Icon), a title (titles.go) or a frame (wardrobe.go).
 type Achievement struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	// About is how it's earned, said to whoever hasn't yet.
 	About string `json:"about"`
-	Icon  string `json:"icon"` // the shape it's drawn with; earning it unlocks that shape as an avatar (its reward)
+	Icon  string `json:"icon"` // the avatar's shape it unlocks ("" for none); its medal's picture is the client's
 	Tier  Tier   `json:"tier"`
 	// Goal is how much of its measure it takes (3 days, 100 answers); 1 for a thing done once.
 	Goal int `json:"goal"`
@@ -59,6 +71,10 @@ const (
 	Legendary Tier = "legendary"
 )
 
+// AchievementXP is what an achievement earns, by its tier: from about a game for a common one to a few evenings'
+// play for a legendary one.
+var AchievementXP = map[Tier]int{Common: 50, Rare: 150, Epic: 400, Legendary: 1000}
+
 // Achievements are every achievement there is, by tier, in the order a profile shows them.
 var Achievements = []Achievement{
 	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common, 3, false},
@@ -66,6 +82,7 @@ var Achievements = []Achievement{
 	{"fast", "Под две секунди", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
 	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
+	{"fullDay", "Пълен ден", "Изпълни и трите цели за деня.", "", Common, 1, false},
 
 	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
 	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare, 1, false},
@@ -76,6 +93,8 @@ var Achievements = []Achievement{
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
+	{"arenaWin", "Победа в Арената", "Спечели игра в Арената.", "", Rare, 1, false},
+	{"placed", "В класирането", "Завърши сезон в класирането: с поне 10 игри с рейтинг в него.", "", Rare, 1, false},
 
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
 	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
@@ -84,6 +103,8 @@ var Achievements = []Achievement{
 	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
 	{"topicPerfect", "Тема без грешка", "Познай всичките десет въпроса в игра по тема.", "spark", Epic, 1, true},
 	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, „Вярно или невярно“, свързване.", "clover", Epic, 5, true},
+	{"royalWin", "Вечерта е твоя", "Спечели Роял.", "", Epic, 1, false},
+	{"fullDays30", "Тридесет пълни дни", "Изпълни и трите цели за деня в тридесет различни дни.", "", Epic, 30, false},
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
@@ -193,11 +214,10 @@ var lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/'
 		WHERE user_id = u.id AND place = CAST(substr(u.title, 7) AS INTEGER)) ELSE coalesce(u.title, '') END,
 	` + xpOf("u.id")
 
-// xpOf is a SQL expression for all the XP a player (a column or a parameter) has earned: their games', and their
-// goals'.
+// xpOf is a SQL expression for all the XP a player (a column or a parameter) has earned: their games', goals',
+// achievements' and seasons' (the xp_earned view).
 func xpOf(user string) string {
-	return `((SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ` + user + `) +
-		(SELECT coalesce(sum(xp), 0) FROM goals_done WHERE user_id = ` + user + `))`
+	return `(SELECT coalesce(sum(xp), 0) FROM xp_earned WHERE user_id = ` + user + `)`
 }
 
 // LookOf is how a player shows to others.
@@ -210,13 +230,14 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 }
 
 // Earned is an achievement as a player sees it: when they earned it (0: not yet), how far they are towards its
-// goal, and the title it unlocks, if any. A hidden one not yet earned is told only as hidden: no name, no how, no
-// reward.
+// goal, the XP it earns and what else it gives them: what it unlocks that nothing they've earned already has (and,
+// once earned, what it did). A hidden one not yet earned is told only as hidden: no name, no how, no reward but XP.
 type Earned struct {
 	Achievement
-	At       int64     `json:"at,omitempty"`
-	Progress int       `json:"progress"`
-	Title    *TitleRef `json:"title,omitempty"`
+	At       int64    `json:"at,omitempty"`
+	Progress int      `json:"progress"`
+	XP       int      `json:"xp"`
+	Rewards  []Unlock `json:"rewards,omitempty"`
 }
 
 // hiddenAchievement is what a player sees of a hidden achievement they haven't found yet.
@@ -246,6 +267,10 @@ type Progress struct {
 	Backdrop  string     `json:"backdrop"`
 	Frames    []Cosmetic `json:"frames"`
 	Backdrops []Cosmetic `json:"backdrops"`
+	// Next is what comes next: the next level that unlocks something, the next division.
+	Next Next `json:"next"`
+	// TierUnlocks are what the first achievement of a tier unlocks, of what the player doesn't have yet.
+	TierUnlocks map[Tier][]Unlock `json:"tierUnlocks"`
 }
 
 // totalXP is all the XP a player has earned.
@@ -314,12 +339,17 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
+	w, err := g.wardrobeOf(ctx, userID)
+	if err != nil {
+		return p, err
+	}
 	for _, a := range Achievements {
-		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), Title: titleFor(a.ID)}
+		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), XP: AchievementXP[a.Tier],
+			Rewards: w.rewardsOf(a)}
 		if e.At != 0 {
 			e.Progress = a.Goal
 		} else if a.Hidden {
-			e.Achievement, e.Progress, e.Title = hiddenAchievement(a), 0, nil
+			e.Achievement, e.Progress, e.Rewards = hiddenAchievement(a), 0, nil
 		}
 		p.Achievements = append(p.Achievements, e)
 	}
@@ -331,13 +361,10 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if p.Standing, err = g.StandingOf(ctx, userID); err != nil {
 		return p, err
 	}
-	w, err := g.wardrobeOf(ctx, userID)
-	if err != nil {
-		return p, err
-	}
 	p.Titles = w.titleViews(g.titles())
 	p.Frame, p.Backdrop = frame.String, backdrop.String
 	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
+	p.Next, p.TierUnlocks = w.next(p.Standing.Rating), w.tierUnlocks()
 	return p, nil
 }
 
@@ -359,8 +386,8 @@ func (g *Game) Award(ctx context.Context, userID int64) ([]string, error) {
 		if _, already := earned[a.ID]; already || reached[a.ID] < a.Goal {
 			continue
 		}
-		if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO achievements (user_id, id, at) VALUES (?, ?, ?)`,
-			userID, a.ID, now); err != nil {
+		if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO achievements (user_id, id, at, xp) VALUES (?, ?, ?, ?)`,
+			userID, a.ID, now, AchievementXP[a.Tier]); err != nil {
 			return news, err
 		}
 		news = append(news, a.ID)
@@ -383,8 +410,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	if err != nil {
 		return nil, err
 	}
-	var games, duelsWon, friends, topicsPlayed, types int
-	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect bool
+	var games, duelsWon, friends, topicsPlayed, types, fullDays int
+	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect, arenaWin, royalWin, placed bool
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
@@ -408,9 +435,14 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND `+bulgarianHour("finished_at")+` < 7),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
-			AND rights = json_array_length(questions))`, userID).
+			AND rights = json_array_length(questions)),
+		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2)),
+		EXISTS (SELECT 1 FROM arena_players WHERE user_id = ?1 AND place = 1),
+		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
+			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),
+		EXISTS (SELECT 1 FROM season_results WHERE user_id = ?1)`, userID, GoalsPerDay).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
-			&topicPerfect)
+			&topicPerfect, &fullDays, &arenaWin, &royalWin, &placed)
 	if err != nil {
 		return nil, err
 	}
@@ -451,6 +483,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		"friend1": friends, "friends5": friends, "friendWin": one(friendWin),
 		"nightOwl": one(nightOwl), "earlyBird": one(earlyBird), "lastSecond": one(lastSecond),
 		"topicPerfect": one(topicPerfect), "allTypes": types,
+		"fullDay": fullDays, "fullDays30": fullDays, "arenaWin": one(arenaWin), "royalWin": one(royalWin),
+		"placed": one(placed),
 	}, nil
 }
 
@@ -501,19 +535,24 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 	return false, rows.Err()
 }
 
-// News is what's new for a player since they last looked: achievements earned (each with the title it unlocks, if
-// any), the day's goals done (with their XP), and their level (whether it's gone up, and the titles that came with
-// it).
+// News is what's new for a player since they last looked: achievements earned (each with its XP and what it gave),
+// the day's goals done (with their XP), a season ended (with what it paid), their level (whether it's gone up), a
+// division reached for the first time, and everything they've unlocked to wear, whatever unlocked it.
 type News struct {
 	Achievements []Earned   `json:"achievements"`
 	Goals        []DoneGoal `json:"goals"`
+	Season       *SeasonEnd `json:"season,omitempty"`
 	Level        int        `json:"level"`
 	XP           int        `json:"xp"`
 	From         int        `json:"from"`
 	To           int        `json:"to"`
 	LevelUp      bool       `json:"levelUp,omitempty"`
-	// Titles are the titles the levels just reached unlock, and the game's mastery of its topics.
-	Titles []TitleRef `json:"titles,omitempty"`
+	// Division is a division the player's rating has reached for the first time.
+	Division *Division `json:"division,omitempty"`
+	// Unlocks are what the player may wear now and hasn't been told of: titles, frames, patterns, avatars.
+	Unlocks []Unlock `json:"unlocks"`
+	// Avatar is the avatar worn (shape-tone), for an unlocked shape to be put on in it.
+	Avatar string `json:"avatar"`
 	// Mastery is how the game just played moved the player's mastery of its topics, when one is told of.
 	Mastery []MasteryMove `json:"mastery,omitempty"`
 }
@@ -524,10 +563,23 @@ type DoneGoal struct {
 	XP   int    `json:"xp"`
 }
 
-// NewsOf tells a player what's new, once: the achievements, the goals and the level are marked as told. With the
-// game just played (runID; 0 for none), it also tells how that game moved their mastery.
+// SeasonEnd is how a season ended for a player placed in it, and the XP it paid.
+type SeasonEnd struct {
+	ID       string   `json:"id"`
+	Place    int      `json:"place"`
+	Of       int      `json:"of"`
+	Division Division `json:"division"`
+	XP       int      `json:"xp"`
+}
+
+// NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
+// for none), it also tells how that game moved their mastery. It awards first, so that whatever ended meanwhile (a
+// friend's duel, an Арена, a season) is in it.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
-	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}}
+	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}, Unlocks: []Unlock{}}
+	if _, err := g.Award(ctx, userID); err != nil {
+		return n, err
+	}
 	total, err := g.totalXP(ctx, userID)
 	if err != nil {
 		return n, err
@@ -538,10 +590,23 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			return n, err
 		}
 	}
-	n.Titles = g.titlesOfMoves(n.Mastery)
+	w, err := g.wardrobeOf(ctx, userID)
+	if err != nil {
+		return n, err
+	}
+	have := w.unlocks()
 	n.XP = total
 	n.Level, n.From, n.To = LevelOf(total)
+	b := g.Bank()
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var avatar sql.NullString
+		var seen, peak, peakSeen int
+		var known bool
+		if err := tx.QueryRow(`SELECT avatar, level_seen, peak, peak_seen, unlocks_known FROM users WHERE id = ?`, userID).
+			Scan(&avatar, &seen, &peak, &peakSeen, &known); err != nil {
+			return err
+		}
+		n.Avatar = cmp.Or(avatar.String, DefaultAvatar(userID))
 		rows, err := tx.Query(`SELECT id FROM achievements WHERE user_id = ? AND NOT seen ORDER BY at`, userID)
 		if err != nil {
 			return err
@@ -553,21 +618,18 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				return err
 			}
 			if a, ok := achievementByID(id); ok {
-				n.Achievements = append(n.Achievements, Earned{Achievement: a, Progress: a.Goal, Title: titleFor(id)})
+				n.Achievements = append(n.Achievements, Earned{Achievement: a, Progress: a.Goal, XP: AchievementXP[a.Tier],
+					At: w.earned[id], Rewards: w.rewardsOf(a)})
 			}
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE achievements SET seen = 1 WHERE user_id = ? AND NOT seen`, userID); err != nil {
-			return err
-		}
 		goals, err := tx.Query(`SELECT goal, xp FROM goals_done WHERE user_id = ? AND NOT seen ORDER BY at`, userID)
 		if err != nil {
 			return err
 		}
-		b := g.Bank()
 		for goals.Next() {
 			var id string
 			var d DoneGoal
@@ -584,18 +646,65 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		if err := goals.Err(); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE goals_done SET seen = 1 WHERE user_id = ? AND NOT seen`, userID); err != nil {
+		var s SeasonEnd
+		err = tx.QueryRow(`SELECT r.season, r.place, r.rating, r.xp,
+				(SELECT count(*) FROM season_results x WHERE x.season = r.season)
+			FROM season_results r WHERE r.user_id = ? AND NOT r.seen ORDER BY r.season DESC LIMIT 1`, userID).
+			Scan(&s.ID, &s.Place, &s.Division.From, &s.XP, &s.Of)
+		switch {
+		case err == nil:
+			s.Division, _ = DivisionOf(s.Division.From)
+			n.Season = &s
+		case !errors.Is(err, sql.ErrNoRows):
 			return err
 		}
-		var seen int
-		if err := tx.QueryRow(`SELECT level_seen FROM users WHERE id = ?`, userID).Scan(&seen); err != nil {
-			return err
+		// The unlocks not told yet; a player from before they were kept starts from what they have, untold.
+		told := map[string]bool{}
+		if known {
+			rows, err := tx.Query(`SELECT id FROM unlocks_told WHERE user_id = ?`, userID)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var k string
+				if err := rows.Scan(&k); err != nil {
+					rows.Close()
+					return err
+				}
+				told[k] = true
+			}
+			rows.Close()
+			if err := rows.Err(); err != nil {
+				return err
+			}
 		}
-		if n.LevelUp = seen < n.Level; n.LevelUp {
-			n.Titles = append(titlesAtLevel(seen, n.Level), n.Titles...)
-			_, err = tx.Exec(`UPDATE users SET level_seen = ? WHERE id = ?`, n.Level, userID)
+		for _, u := range have {
+			if told[u.key()] {
+				continue
+			}
+			if known {
+				n.Unlocks = append(n.Unlocks, u)
+			}
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO unlocks_told (user_id, id) VALUES (?, ?)`, userID, u.key()); err != nil {
+				return err
+			}
 		}
-		return err
+		if d, _ := DivisionOf(peak); d.From > peakSeen {
+			n.Division = &d
+		}
+		n.LevelUp = seen < n.Level
+		for _, q := range []string{
+			`UPDATE achievements SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
+			`UPDATE goals_done SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
+			`UPDATE season_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
+			`UPDATE users SET level_seen = max(level_seen, ?2), peak_seen = max(peak_seen, peak), unlocks_known = 1
+				WHERE id = ?1`,
+		} {
+			if _, err := tx.Exec(q, userID, n.Level); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	return n, err
 }

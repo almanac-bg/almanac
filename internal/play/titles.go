@@ -73,6 +73,7 @@ var Titles = []Title{
 	{"duelInstinct", "Дуелен инстинкт", Epic, TitleAchievement, unlock{achieved: "duel10"}, ""},
 	{"polymath", "Всестранен ум", Epic, TitleAchievement, unlock{achieved: "allTypes"}, ""},
 	{"unquenched", "Неугасим пламък", Epic, TitleAchievement, unlock{achieved: "streak30"}, ""},
+	{"purpose", "Целеустременост", Epic, TitleAchievement, unlock{achieved: "fullDays30"}, ""},
 	{"encyclopedia", "Ходеща енциклопедия", Legendary, TitleAchievement, unlock{achieved: "master5"}, ""},
 	{"razor", "Ум като бръснач", Legendary, TitleAchievement, unlock{achieved: "duel50"}, ""},
 	{"sunrises", "Сто изгрева", Legendary, TitleAchievement, unlock{achieved: "streak100"}, ""},
@@ -118,42 +119,6 @@ type TitleRef struct {
 }
 
 func (t Title) ref() TitleRef { return TitleRef{t.ID, t.Name, t.Tier} }
-
-// titleFor is the title an achievement unlocks, if it unlocks one.
-func titleFor(achievement string) *TitleRef {
-	i := slices.IndexFunc(Titles, func(t Title) bool { return t.by.achieved == achievement })
-	if i < 0 {
-		return nil
-	}
-	ref := Titles[i].ref()
-	return &ref
-}
-
-// titlesAtLevel are the titles the levels after `from` up to `to` unlock.
-func titlesAtLevel(from, to int) []TitleRef {
-	var list []TitleRef
-	for _, t := range Titles {
-		if t.by.level > from && t.by.level <= to {
-			list = append(list, t.ref())
-		}
-	}
-	return list
-}
-
-// titlesOfMoves are the topics' titles a game's mastery moves just reached.
-func (g *Game) titlesOfMoves(moves []MasteryMove) []TitleRef {
-	var list []TitleRef
-	for _, m := range moves {
-		for _, t := range topicTiers {
-			if m.To.Sure && m.To.Tier >= t.tier && (!m.From.Sure || m.From.Tier < t.tier) {
-				if title, ok := g.titleByID(topicTitleID(t.tier, m.To.Category)); ok {
-					list = append(list, title.ref())
-				}
-			}
-		}
-	}
-	return list
-}
 
 // TitleView is a title as a player may wear it: theirs, or locked with what unlocks it.
 type TitleView struct {

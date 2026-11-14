@@ -326,6 +326,101 @@ func TestBoardAndStreak(t *testing.T) {
 	}
 }
 
+// The day's three goals done earn a reserve day; a missed day spends it, and the streak holds.
+func TestReserveDays(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	full := func() {
+		s, _ := w.g.StartDay(ctx, ana)
+		w.play(ana, s.ID, repeat(w.right, Length)...)
+		for i := range GoalsPerDay {
+			_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, ?, ?, 1, 0, 1)`,
+				ana, w.g.Today(), fmt.Sprint("g", i))
+		}
+	}
+	full()
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 1 {
+		t.Fatalf("after a full day: %+v", s)
+	}
+	w.wait(48 * time.Hour) // a day missed
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 0 || len(s.Saved) != 1 || s.Saved[0] != "2026-11-13" {
+		t.Fatalf("a day missed, with a reserve: %+v", s)
+	}
+	if saved := w.g.InWeek([]string{"2026-11-13"}); saved != [7]bool{4: true} {
+		t.Fatalf("the saved day this week: %v", saved)
+	}
+	full()
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 2 || s.Reserve != 1 {
+		t.Fatalf("played on after a reserve: %+v", s)
+	}
+	w.wait(72 * time.Hour) // two days missed, one reserve
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || len(s.Saved) != 0 {
+		t.Fatalf("two days missed: %+v", s)
+	}
+}
+
+// A division reached is told once with what it unlocks; an achievement's reward is only what's new to the player; a
+// player from before unlocks were kept isn't told of what they have.
+func TestUnlocks(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, old := w.user(), w.user()
+	_, _ = w.g.NewsOf(ctx, ana, 0)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1200, peak = 1200 WHERE id = ?`, ana)
+	n, err := w.g.NewsOf(ctx, ana, 0)
+	got := []string{}
+	for _, u := range n.Unlocks {
+		got = append(got, u.Kind+":"+u.ID+" "+u.From)
+	}
+	if err != nil || n.Division == nil || n.Division.ID != "gold" ||
+		!slices.Equal(got, []string{"title:goldSeason дивизия Злато", "backdrop:stars дивизия Злато"}) {
+		t.Fatalf("gold reached: %v %+v %v", got, n.Division, err)
+	}
+	if again, _ := w.g.NewsOf(ctx, ana, 0); again.Division != nil || len(again.Unlocks) != 0 {
+		t.Fatalf("gold told twice: %+v", again)
+	}
+	p, _ := w.g.ProgressOf(ctx, ana)
+	if p.Next.Division == nil || p.Next.Division.ID != "platinum" || len(p.Next.DivisionUnlocks) != 0 {
+		t.Fatalf("next after gold: %+v", p.Next)
+	}
+
+	// The shield is duel1's: once it's earned, duel10 gives its XP and its title, not the shield.
+	_, _ = w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, 'duel1', 1, 50, 1)`, ana)
+	p, _ = w.g.ProgressOf(ctx, ana)
+	for _, a := range p.Achievements {
+		switch a.ID {
+		case "duel1":
+			if len(a.Rewards) != 1 || a.Rewards[0].ID != "shield" {
+				t.Fatalf("duel1's rewards: %+v", a.Rewards)
+			}
+		case "duel10":
+			if a.XP != AchievementXP[Epic] || len(a.Rewards) != 1 || a.Rewards[0].ID != "duelInstinct" {
+				t.Fatalf("duel10's rewards: %+v", a.Rewards)
+			}
+		case "friend1", "friendWin":
+			// The heart is the first's in the list, not friendWin's.
+			if heart := len(a.Rewards) == 1 && a.Rewards[0].ID == "heart"; heart != (a.ID == "friend1") {
+				t.Fatalf("%s's rewards: %+v", a.ID, a.Rewards)
+			}
+		}
+	}
+	// The first epic one unlocks a pattern: the tier's reward, told once.
+	if u := p.TierUnlocks[Epic]; len(u) != 1 || u[0].ID != "rays" || len(p.TierUnlocks[Common]) != 0 {
+		t.Fatalf("the tiers' rewards: %+v", p.TierUnlocks)
+	}
+
+	// A player from before: what they have is taken in untold.
+	_, _ = w.db.Write.Exec(`UPDATE users SET unlocks_known = 0, peak = 1500, peak_seen = 1500 WHERE id = ?`, old)
+	if n, _ := w.g.NewsOf(ctx, old, 0); len(n.Unlocks) != 0 || n.Division != nil {
+		t.Fatalf("a player from before: %+v", n)
+	}
+	_, _ = w.db.Write.Exec(`UPDATE users SET peak = 1700 WHERE id = ?`, old)
+	if n, _ := w.g.NewsOf(ctx, old, 0); n.Division == nil || n.Division.ID != "legend" || len(n.Unlocks) != 2 {
+		t.Fatalf("a player from before, reaching Легенда: %+v", n)
+	}
+}
+
 func TestTopics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -528,21 +623,34 @@ func TestProgress(t *testing.T) {
 		ids = append(ids, a.ID)
 	}
 	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and the goals it finished more: the first level.)
+	// (and each achievement its tier's XP).
 	goals := 0
 	for _, d := range n.Goals {
 		goals += d.XP
 	}
+	for _, a := range n.Achievements {
+		goals += a.XP
+		if a.XP != AchievementXP[a.Tier] {
+			t.Fatalf("news of %s, and its XP: %+v", a.ID, a)
+		}
+	}
 	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || goals < GoalXP[0] ||
-		n.XP != 300+goals || lvl != 2 ||
+		n.XP != 300+goals || lvl < 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
+	// „Десет от десет“ gives its avatar and its title, and both are told as unlocked.
 	for _, a := range n.Achievements {
-		if want := titleFor(a.ID); (a.Title == nil) != (want == nil) || (want != nil && *a.Title != *want) {
-			t.Fatalf("news of %s, and its title: %+v", a.ID, a.Title)
+		if a.ID == "perfect" && (len(a.Rewards) != 2 || a.Rewards[0] != (Unlock{Kind: "avatar", ID: "star",
+			From: "постижението „Десет от десет“"}) || a.Rewards[1].ID != "flawless") {
+			t.Fatalf("perfect's rewards: %+v", a.Rewards)
 		}
 	}
-	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Achievements) != 0 || again.LevelUp {
+	if !slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.Kind == "avatar" && u.ID == "star" }) ||
+		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.Kind == "title" && u.ID == "flawless" }) {
+		t.Fatalf("unlocks after a perfect day: %+v", n.Unlocks)
+	}
+	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Achievements) != 0 || again.LevelUp || len(again.Unlocks) != 0 {
 		t.Fatalf("the same news twice: %+v", again)
 	}
 
@@ -587,14 +695,14 @@ func TestProgress(t *testing.T) {
 		{ptr("bogus"), nil, false},
 		{nil, ptr("perfect"), false}, // an achievement isn't a title
 		{nil, ptr("duelInstinct"), false},
-		{nil, ptr("passion"), false}, // level 5
+		{nil, ptr("erudition"), false}, // level 8
 		{nil, ptr("royalCrown"), false},
 		{nil, ptr("master-science"), false},
 		{nil, ptr("podium3"), false},
 		{nil, ptr("nosuch"), false},
 	} {
 		if err := w.g.SetLook(ctx, ana, c.avatar, c.title); (err == nil) != c.ok {
-			t.Fatalf("SetLook(%v, %v): %v", c.avatar, c.title, err)
+			t.Fatalf("SetLook(%v, %v): %v", deref(c.avatar), deref(c.title), err)
 		}
 	}
 	b, _ := w.g.BoardOf(ctx, w.g.Today(), ana)
@@ -1007,8 +1115,18 @@ func TestSeasons(t *testing.T) {
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(told) != 5 || told[0].Season != "2026-11" || told[0].Of != 5 {
+	if len(told) != 5 || told[0].Season != "2026-11" || told[0].Of != 5 || told[0].XP != 700 || told[4].XP != 100 {
 		t.Fatalf("the season's news: %+v", told)
+	}
+	// It paid each their division's XP: told once in the news, with the achievement for being placed.
+	n, err := w.g.NewsOf(ctx, ps[0], 0)
+	if err != nil || n.Season == nil || n.Season.XP != 700 || n.Season.Place != 1 || n.Season.Division.ID != "platinum" ||
+		n.XP < 700 || !slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "placed" }) ||
+		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.Kind == "title" && u.Name == "Шампион" }) {
+		t.Fatalf("the champion's news: %+v %v", n, err)
+	}
+	if again, _ := w.g.NewsOf(ctx, ps[0], 0); again.Season != nil {
+		t.Fatalf("a season told twice: %+v", again.Season)
 	}
 	var rating, games int
 	_ = w.db.Read.QueryRow(`SELECT rating, season_games FROM users WHERE id = ?`, ps[0]).Scan(&rating, &games)
@@ -1112,9 +1230,19 @@ func TestTitles(t *testing.T) {
 	if _, err := w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, '2026-11-01', 'x', 1, 2100, 1)`, ana); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := w.g.NewsOf(ctx, ana, 0); err != nil || n.Level != 5 || len(n.Titles) != 2 || n.Titles[0].ID != "curious" ||
-		n.Titles[1].ID != "passion" {
-		t.Fatalf("level 5's news: %+v %v", n, err)
+	// Everything the levels up to 5 unlock is told with it: the titles, a frame, a pattern.
+	n, err := w.g.NewsOf(ctx, ana, 0)
+	told := []string{}
+	for _, u := range n.Unlocks {
+		told = append(told, u.Kind+":"+u.ID+" "+u.From)
+	}
+	if err != nil || n.Level != 5 || !slices.Equal(told, []string{"title:spark ниво 1", "title:curious ниво 3",
+		"title:passion ниво 5", "frame:ring ниво 2", "frame:double ниво 5", "backdrop:dots ниво 3"}) {
+		t.Fatalf("level 5's news: %v %+v %v", told, n, err)
+	}
+	if p, _ := w.g.ProgressOf(ctx, ana); p.Next.Level != 6 || len(p.Next.LevelUnlocks) != 1 ||
+		p.Next.LevelUnlocks[0].ID != "stripes" || p.Next.Division == nil || p.Next.Division.ID != "silver" {
+		t.Fatalf("what's next at level 5: %+v", p.Next)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("passion")); err != nil {
 		t.Fatalf("level 5's title: %v", err)
@@ -1188,7 +1316,8 @@ func TestBoards(t *testing.T) {
 		t.Fatalf("the board of levels: %+v %v", l, err)
 	}
 	_ = w.g.befriend(ctx, cy, bo)
-	if l, _ := w.g.LevelBoard(ctx, cy, true); len(l.Top) != 1 || !l.Top[0].Me && l.Top[0].Name == "" {
+	// A friend made is an achievement, and its XP puts the player on the board.
+	if l, _ := w.g.LevelBoard(ctx, cy, true); len(l.Top) != 2 || l.Place != 2 || l.Mine.Value != AchievementXP[Common] {
 		t.Fatalf("levels among friends: %+v", l)
 	}
 }
@@ -1216,4 +1345,11 @@ func TestCalibrate(t *testing.T) {
 			t.Fatalf("a question all got right: %+v", c)
 		}
 	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
 }

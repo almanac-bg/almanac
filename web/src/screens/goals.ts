@@ -1,10 +1,12 @@
 // The day's goals: three a day — the day's questions, a goal drawn for the player and a harder one — each worth XP
-// once done (more for the harder), and each a way to where it's done.
+// once done (more for the harder), and each a way to where it's done. All three done earn a reserve day, which keeps
+// the streak through a day missed.
 
+import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { user } from "../state.ts";
-import { meter } from "../ui.ts";
+import { meter, reserveWords } from "../ui.ts";
 
 interface DayGoal {
   id: string;
@@ -17,17 +19,23 @@ interface DayGoal {
   xp: number;
 }
 
+interface Goals {
+  goals: DayGoal[];
+  /** Reserve days in hand, of the most there can be: all three goals done earns one. */
+  reserve: number;
+  reserveMax: number;
+}
+
 /** Начало's card: today's three goals, how far along each is, the XP each earns, and (until done) the way to it. */
 export function goalsCard(): Child {
   if (!user.peek()) return null;
-  const data = signal<DayGoal[] | null>(null);
-  api<{ goals: DayGoal[] }>("GET", "/api/goals").then(
-    (r) => data.set(r.goals),
-    () => {},
-  );
+  const data = signal<Goals | null>(null);
+  api<Goals>("GET", "/api/goals").then(data.set, () => {});
   return () => {
-    const goals = data();
-    if (!goals) return null;
+    const d = data();
+    if (!d) return null;
+    const goals = d.goals;
+    const all3 = goals.every((g) => g.done);
     const earned = goals.filter((g) => g.done).reduce((n, g) => n + g.xp, 0);
     const all = goals.reduce((n, g) => n + g.xp, 0);
     return h(
@@ -58,6 +66,17 @@ export function goalsCard(): Child {
             h("span", { class: "sr" }, g.done ? "изпълнена" : "още не"),
           ),
         ),
+      ),
+      // All three keep the streak through a missed day.
+      h(
+        "p",
+        { class: all3 ? "goals-reserve done" : "goals-reserve" },
+        picture("shield", "reserve-pic"),
+        all3
+          ? `И трите са изпълнени: имаш ${reserveWords(d.reserve)} за серията.`
+          : d.reserve >= d.reserveMax
+            ? `Резервните ти дни са пълни: ${d.reserve} от ${d.reserveMax}.`
+            : "Изпълни и трите: +1 резервен ден за серията.",
       ),
     );
   };

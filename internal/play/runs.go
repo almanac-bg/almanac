@@ -200,32 +200,89 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	return b, err
 }
 
-// Streak is how many days in a row, up to today or yesterday, a player has finished the day's questions.
-func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day FROM runs WHERE user_id = ? AND kind = 'day'
-		AND finished_at IS NOT NULL ORDER BY day DESC LIMIT 3660`, userID)
+// ReserveMax is how many reserve days a player can keep: a day whose three goals were all done earns one, and a day
+// missed spends one, so the streak holds through it. The day's goals keep the streak, not only the day's questions.
+const ReserveMax = 2
+
+// StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
+// while today isn't played yet), the reserve days they have, and the days a reserve kept the streak through.
+type StreakNow struct {
+	Days    int      `json:"days"`
+	Reserve int      `json:"reserve"`
+	Saved   []string `json:"saved"`
+}
+
+// StreakOf is a player's streak, from every day they've played: each day played adds to it (and, with all its goals
+// done, earns a reserve day), each day missed spends a reserve day, or ends it.
+func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
+	s := StreakNow{Saved: []string{}}
+	played, full := map[string]bool{}, map[string]bool{}
+	first := ""
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, 0 FROM runs WHERE user_id = ?1 AND kind = 'day'
+			AND finished_at IS NOT NULL AND day >= ?2
+		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3`,
+		userID, g.Now().In(Bulgaria).AddDate(-10, 0, 0).Format(time.DateOnly), GoalsPerDay)
 	if err != nil {
-		return 0, err
+		return s, err
 	}
 	defer rows.Close()
-	expect, _ := time.Parse(time.DateOnly, g.Today())
-	streak := 0
 	for rows.Next() {
 		var day string
-		if err := rows.Scan(&day); err != nil {
-			return 0, err
+		var goals bool
+		if err := rows.Scan(&day, &goals); err != nil {
+			return s, err
 		}
-		d, _ := time.Parse(time.DateOnly, day)
-		if streak == 0 && d.Equal(expect.AddDate(0, 0, -1)) {
-			expect = d // today not played yet: the streak runs to yesterday
+		if goals {
+			full[day] = true
+			continue
 		}
-		if !d.Equal(expect) {
-			break
+		played[day] = true
+		if first == "" || day < first {
+			first = day
 		}
-		streak++
-		expect = expect.AddDate(0, 0, -1)
 	}
-	return streak, rows.Err()
+	if err := rows.Err(); err != nil || first == "" {
+		return s, err
+	}
+	today := g.Today()
+	d, _ := time.Parse(time.DateOnly, first)
+	for day := first; day <= today; day = d.Format(time.DateOnly) {
+		switch {
+		case played[day]:
+			s.Days++
+			if full[day] {
+				s.Reserve = min(ReserveMax, s.Reserve+1)
+			}
+		case day == today: // not played yet: the streak runs to yesterday
+		case s.Days > 0 && s.Reserve > 0:
+			s.Reserve--
+			s.Saved = append(s.Saved, day)
+		default:
+			s.Days, s.Saved = 0, s.Saved[:0]
+		}
+		d = d.AddDate(0, 0, 1)
+	}
+	return s, nil
+}
+
+// Streak is how many days in a row a player has finished the day's questions, reserve days kept (StreakOf).
+func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {
+	s, err := g.StreakOf(ctx, userID)
+	return s.Days, err
+}
+
+// InWeek is which of these days (YYYY-MM-DD) are in this week, Monday first: a reserve's days on the streak's strip.
+func (g *Game) InWeek(days []string) [7]bool {
+	var week [7]bool
+	today, _ := time.Parse(time.DateOnly, g.Today())
+	monday := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
+	for _, day := range days {
+		d, _ := time.Parse(time.DateOnly, day)
+		if i := int(d.Sub(monday) / (24 * time.Hour)); i >= 0 && i < len(week) {
+			week[i] = true
+		}
+	}
+	return week
 }
 
 // Week is which days of this week, Monday first, a player has finished the day's questions on: the streak's strip.
@@ -276,8 +333,9 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		// The guest's arenas are the account's (unless both played the same one, which can't be: one person).
 		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
-		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen) SELECT ?, id, at, seen FROM achievements WHERE user_id = ?`,
-			[]any{to, from}},
+		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp) SELECT ?, id, at, seen, xp FROM achievements
+			WHERE user_id = ?`, []any{to, from}},
+		{`INSERT OR IGNORE INTO unlocks_told (user_id, id) SELECT ?, id FROM unlocks_told WHERE user_id = ?`, []any{to, from}},
 		// So are the goals the guest finished (with their XP), and the day's goals drawn, unless the account has its own.
 		{`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
 			SELECT ?, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?`, []any{to, from}},

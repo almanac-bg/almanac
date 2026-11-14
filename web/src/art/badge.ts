@@ -37,6 +37,11 @@ export const medalPictures: Record<string, string> = {
   master: "cap",
   master5: "wreath",
   allTypes: "clover",
+  fullDay: "mode-almanac",
+  fullDays30: "medal",
+  arenaWin: "mode-arena",
+  royalWin: "crown",
+  placed: "division-gold",
 };
 
 export interface BadgeOptions {

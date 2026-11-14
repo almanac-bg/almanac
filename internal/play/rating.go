@@ -14,22 +14,24 @@ import (
 // StartRating is where every player starts.
 const StartRating = 1000
 
-// Division is a band of rating with a name: Бронз to Легенда.
+// Division is a band of rating with a name: Бронз to Легенда. A season ended in it pays XP: the rating's one way into
+// the level, once a month, so that playing to win counts for progress too.
 type Division struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	From int    `json:"from"`
+	XP   int    `json:"xp"`
 }
 
 // Divisions from the lowest up; each begins at From. Everyone starts in Бронз; a few wins make Сребро, and each
 // division after takes more (Elo keeps the average near the start, so the top ones stay rare).
 var Divisions = []Division{
-	{"bronze", "Бронз", 0},
-	{"silver", "Сребро", 1050},
-	{"gold", "Злато", 1150},
-	{"platinum", "Платина", 1300},
-	{"diamond", "Диамант", 1450},
-	{"legend", "Легенда", 1600},
+	{"bronze", "Бронз", 0, 100},
+	{"silver", "Сребро", 1050, 200},
+	{"gold", "Злато", 1150, 400},
+	{"platinum", "Платина", 1300, 700},
+	{"diamond", "Диамант", 1450, 1000},
+	{"legend", "Легенда", 1600, 1500},
 }
 
 // DivisionOf is the division a rating is in, and where the next one starts (0 at the top).
@@ -128,8 +130,7 @@ func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ran
 // LevelBoard is the most XP ever earned (the highest levels): who has played the most, and the most knowingly.
 func (g *Game) LevelBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
 	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, x.xp, 0, `+lookColumns+`
-		FROM (SELECT user_id, sum(xp) AS xp FROM (SELECT user_id, xp FROM runs UNION ALL SELECT user_id, xp FROM goals_done)
-			GROUP BY user_id) x JOIN users u ON u.id = x.user_id
+		FROM (SELECT user_id, sum(xp) AS xp FROM xp_earned GROUP BY user_id) x JOIN users u ON u.id = x.user_id
 		WHERE x.xp > 0`+among(friends)+` ORDER BY x.xp DESC, u.id`, false)
 }
 
