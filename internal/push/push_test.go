@@ -93,7 +93,7 @@ func TestSendToAPushService(t *testing.T) {
 	sub := Subscription{Endpoint: srv.URL + "/push/abc"}
 	sub.Keys.P256dh = b64.EncodeToString(browser.PublicKey().Bytes())
 	sub.Keys.Auth = b64.EncodeToString(auth)
-	s := &Sender{Keys: keys, Subject: "mailto:privacy@almanac.bg", Client: srv.Client()}
+	s := &Sender{Keys: keys, Subject: "mailto:privacy@almanac.bg", Client: srv.Client(), Services: []string{srv.Listener.Addr().String()}}
 	m := Message{Title: "АЛМАНАХ", Body: "Днешните въпроси те чакат.", URL: "/"}
 	if err := s.Send(t.Context(), sub, m); err != nil {
 		t.Fatal(err)
@@ -127,5 +127,56 @@ func TestSendToAPushService(t *testing.T) {
 		if bad.Check() == nil {
 			t.Errorf("%+v passed", bad)
 		}
+	}
+}
+
+// The game posts only to the push services browsers use: anyone can send any address as their subscription, and
+// the server mustn't post to whatever they name (its own network, anyone's), directly or by a redirect.
+func TestOnlyPushServices(t *testing.T) {
+	pub, priv, _ := NewKeys()
+	keys, _ := ParseKeys(pub, priv)
+	browser, _ := ecdh.P256().GenerateKey(nil)
+	sub := func(endpoint string) Subscription {
+		s := Subscription{Endpoint: endpoint}
+		s.Keys.P256dh = b64.EncodeToString(browser.PublicKey().Bytes())
+		s.Keys.Auth = b64.EncodeToString([]byte("0123456789abcdef"))
+		return s
+	}
+	s := &Sender{Keys: keys}
+	for _, ok := range []string{
+		"https://fcm.googleapis.com/fcm/send/abc", "https://updates.push.services.mozilla.com/wpush/v2/abc",
+		"https://web.push.apple.com/abc", "https://wns2-par02p.notify.windows.com/w/?token=abc",
+	} {
+		if err := s.Check(sub(ok)); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{
+		"https://127.0.0.1/x", "https://localhost/x", "https://169.254.169.254/x", "https://almanac.bg/api/x",
+		"https://fcm.googleapis.com:8443/x", "https://evilnotify.windows.com/x", "https://fcm.googleapis.com.evil.bg/x",
+		"http://fcm.googleapis.com/x",
+	} {
+		if s.Check(sub(bad)) == nil {
+			t.Errorf("%s passed", bad)
+		}
+	}
+
+	// A stored subscription elsewhere is never posted to: it's forgotten.
+	hit := false
+	elsewhere := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hit = true }))
+	defer elsewhere.Close()
+	s.Client = elsewhere.Client()
+	if err := s.Send(t.Context(), sub(elsewhere.URL+"/x"), Message{Title: "x"}); err != ErrGone || hit {
+		t.Fatalf("posted elsewhere: %v, hit %v", err, hit)
+	}
+
+	// A push service's redirect isn't followed.
+	service := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+"/x", http.StatusTemporaryRedirect)
+	}))
+	defer service.Close()
+	s.Client, s.Services = service.Client(), []string{service.Listener.Addr().String()}
+	if err := s.Send(t.Context(), sub(service.URL+"/x"), Message{Title: "x"}); err == nil || hit {
+		t.Fatalf("followed a redirect: %v, hit %v", err, hit)
 	}
 }

@@ -1,6 +1,7 @@
 // Package push sends notifications to players' browsers (Web Push): a message encrypted for the browser that asked
-// for it (RFC 8291, aes128gcm), sent to its push service with the game's signed name (VAPID, RFC 8292). Standard
-// library only.
+// for it (RFC 8291, aes128gcm), sent to its push service with the game's signed name (VAPID, RFC 8292). Only the
+// push services browsers use are posted to (Services), never a redirect: a subscription is whatever a player sends.
+// Standard library only.
 package push
 
 import (
@@ -23,6 +24,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -104,16 +106,54 @@ type Message struct {
 // ErrGone means the browser unsubscribed (or the subscription expired): forget it.
 var ErrGone = errors.New("the subscription is gone")
 
+// ErrNotService means an endpoint isn't at a push service the game knows: it's never posted to, since anyone can
+// send any address as their subscription.
+var ErrNotService = errors.New("not a known push service")
+
+// Services are the push services browsers subscribe with (Chrome and its kin, Firefox, Safari, Edge): a host as it
+// is, or, starting with a dot, any host under that domain. Nothing else is posted to.
+var Services = []string{
+	"fcm.googleapis.com", "android.googleapis.com",
+	"updates.push.services.mozilla.com", ".push.services.mozilla.com",
+	"web.push.apple.com", ".push.apple.com",
+	".notify.windows.com",
+}
+
 // Sender sends pushes.
 type Sender struct {
 	Keys *Keys
 	// Subject is how a push service can reach whoever runs the game (mailto:…).
 	Subject string
 	Client  *http.Client
+	// Services, when set, replaces the push services the game posts to (the tests' own).
+	Services []string
 }
 
-// Send encrypts m for a subscription and posts it to its push service.
+// Check says whether a subscription is one a push service gave, at a push service the game posts to.
+func (s *Sender) Check(sub Subscription) error {
+	if err := sub.Check(); err != nil {
+		return err
+	}
+	u, _ := url.Parse(sub.Endpoint)
+	host := strings.ToLower(u.Host) // with the port, if one is given: a known service is at the default one
+	services := s.Services
+	if services == nil {
+		services = Services
+	}
+	for _, known := range services {
+		if host == known || (strings.HasPrefix(known, ".") && strings.HasSuffix(host, known)) {
+			return nil
+		}
+	}
+	return ErrNotService
+}
+
+// Send encrypts m for a subscription and posts it to its push service. A subscription that isn't at a known push
+// service is ErrGone, to be forgotten.
 func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
+	if err := s.Check(sub); errors.Is(err, ErrNotService) {
+		return ErrGone
+	}
 	payload, _ := json.Marshal(m)
 	body, err := encrypt(sub, payload)
 	if err != nil {
@@ -136,10 +176,12 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
 	req.Header.Set("TTL", "43200") // half a day: an old reminder is no use
 	req.Header.Set("Urgency", "normal")
 	req.Header.Set("Authorization", "vapid t="+jwt+", k="+s.Keys.Public)
-	client := s.Client
-	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second}
+	client := http.Client{Timeout: 15 * time.Second}
+	if s.Client != nil {
+		client = *s.Client
 	}
+	// A push service answers; it doesn't send the post on elsewhere.
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	res, err := client.Do(req)
 	if err != nil {
 		return err
