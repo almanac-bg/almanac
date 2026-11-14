@@ -764,10 +764,11 @@
     text-align: right;
   }
 
-  /* The ways to play: a small card each, two by two, in its colour. */
+  /* The ways to play with others: three peers, so three in a row, a small card each in its colour; on a phone the
+     picture over the name (a big screen puts it beside, below). */
   .modes {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-2);
     margin: 0;
     padding: 0;
@@ -776,11 +777,13 @@
 
   .mode {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-1);
     height: 100%;
     min-height: 4.25rem;
-    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+    padding: var(--space-3) var(--space-1);
+    text-align: center;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background:
@@ -811,6 +814,7 @@
 
   .mode-text {
     display: grid;
+    gap: 2px;
     min-width: 0;
   }
 
@@ -820,8 +824,8 @@
 
   .mode-about {
     color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
   }
 
   /* Начало's top: the streak and the level, side by side, each a way to Профил. */
@@ -1226,10 +1230,17 @@
 
   input.code {
     min-height: 4rem;
-    font: 800 2.5rem / 1 var(--font-numeral);
-    letter-spacing: 0.14em;
+    padding-inline: var(--space-2);
+    font: 800 clamp(2rem, 10vw, 2.5rem) / 1 var(--font-numeral);
+    letter-spacing: 0.1em;
     text-align: center;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Empty, the code's field says what goes in it in plain words, never in digits that look typed. */
+  input.code::placeholder {
+    font: 500 1.125rem / 1 var(--font-sans);
+    letter-spacing: normal;
   }
 
   .join {
@@ -3980,8 +3991,8 @@
     font: 900 1.25rem / 1 var(--font-numeral);
   }
 
-  /* Under a result: „Прегледай въпросите“ and, for the day, „Сподели“ beside it (one above the other on a narrow
-     phone). */
+  /* Under a result, after its gold button: „Прегледай въпросите“ and the other ways on, plain and the same size, side
+     by side where they fit (one above the other on a narrow phone). */
   .result-actions {
     display: flex;
     flex-wrap: wrap;
@@ -3993,11 +4004,13 @@
   }
 
   .result-actions .btn {
+    padding-inline: var(--space-4);
     white-space: nowrap;
   }
 
-  .result-actions :where(.share) .btn {
-    width: 100%;
+  /* The questions, once opened at the end of a result: „Прегледай въпросите“ brings their heading to the top. */
+  .review-head {
+    scroll-margin-top: var(--space-5);
   }
 
   .level-card {
@@ -4363,11 +4376,19 @@
     color: var(--tier-ink, var(--text));
   }
 
-  /* What a game unlocked, all together, each a tap from being worn; an achievement's XP and rewards in a line. */
+  /* What a game unlocked, all together, each a tap from being worn; an achievement's XP and rewards in a line. Small
+     print under each name, so the news stays short. */
   .unlock-reward {
     color: var(--gold-ink);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 700;
+    line-height: 1.125rem;
+  }
+
+  .unlock-about {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
   }
 
   .unlocks {
@@ -5128,15 +5149,13 @@
     }
   }
 
-  /* A narrow phone: a topic's longest word still fits its tile whole, and a way to play's name beside its picture. */
+  /* A narrow phone: a topic's longest word still fits its tile whole. */
   @media (max-width: 22.5rem) {
-    .topic-pic,
-    .mode-pic {
+    .topic-pic {
       width: 36px;
       height: 36px;
     }
 
-    .mode,
     .topic {
       gap: 6px 8px;
     }
@@ -5186,6 +5205,14 @@
 
     .topics {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    /* A way to play has room for its picture beside the name, like a topic. */
+    .mode {
+      flex-direction: row;
+      gap: 10px;
+      padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+      text-align: left;
     }
 
     .tabs a[aria-current="page"]::after {

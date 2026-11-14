@@ -97,8 +97,9 @@ export function today() {
                 ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
                 : null;
             }),
+            // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
+            { main: shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak)) },
             [just ? news(run.id) : null, countdown()],
-            shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak), undefined, false),
           )
         : dayCard(t, start(t)),
       // Mid-December into January: the year in the game, a tap away.

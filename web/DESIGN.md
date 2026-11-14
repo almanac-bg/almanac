@@ -26,9 +26,9 @@ three when you add or change a screen.
 Four main places, in a bar at the bottom of a phone (in the header on a big screen). Nothing else goes in the bar.
 
 - **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten, or
-  once played, how they went (the place a way to the day's board) with „Сподели“ beside „Прегледай въпросите“; the
-  day's goals; the ways to play with others, two by two; the
-  topics, two by two (three on a big screen), and all of them at once. Дуел, Роял and Стая open from here and
+  once played, how they went (the place a way to the day's board) with „Сподели“, the gold button, right under it
+  and „Прегледай въпросите“ below; the day's goals; the ways to play with others, three in a row (the picture over
+  the name on a phone); the topics, two by two (three on a big screen), and all of them at once. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
   streak, the goals and the ways to play with others come after the first game.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
@@ -143,14 +143,18 @@ takes a token.
   - `.achievements`/`.achievement` (and `locked`), `.worn` (what's worn), `.picker`/`.pick` and `.tone-pick` for
     choosing a look.
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
-  `.players` and `.settings`.
+  `.players` and `.settings`. Every result screen (the day, a topic, Втори шанс, a duel, a room) is laid out the same:
+  the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's „Сподели“, „Още
+  десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
+  (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
+  opened (the button takes the player there).
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
   - `ui.ts` has `verdict`, `fact`, `streak`, `stat`, `figure`, `meter` and `toneOf`.
   - `game/mastery.ts` has `masteryBadge`, `masteryCard` and `masteryMoves`.
   - `game/run.ts` has `trail`, `questionHead` and `timer`.
-  - `game/results.ts` has `summary`, `board`, `boardRow` and `shareButton`.
+  - `game/results.ts` has `summary`, `nextSteps`, `review`/`reviewParts`, `board`, `boardRow` and `shareButton`.
 - **Selectors:** give a part its own class (`.streak-num`) rather than a tag under a class (`.streak b`). Biome's
   `noDescendingSpecificity` flags the second kind. One class, one thing: a name already in `app.css` (`.back`, the
   way back; `.status`, a line of status) is taken, so a new part gets a name of its own (`.key.erase`, `.status-row`).

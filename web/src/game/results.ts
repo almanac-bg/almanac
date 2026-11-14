@@ -1,7 +1,9 @@
-// The end of a run: how it went, the way to share it, and the questions gone over with their answers.
+// The end of a game: how it went, then what to do next (the way to share it, the questions to go over with their
+// answers), laid out the same on every result screen.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
+import { calm } from "../lib/prefs.ts";
 import { categories } from "../state.ts";
 import { countUp, fact, formatNumber, type Look, who } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
@@ -10,9 +12,12 @@ import { trail } from "./run.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
- * then whatever the screen adds (`more`), and the questions to go over, with `beside` next to that button (the
- * day's „Сподели“). */
-export function summary(s: State, line: Child, more: Child[], beside: Child = null): Child {
+ * right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others); then
+ * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. */
+export function summary(s: State, line: Child, next: { main: Child; also?: Child[] }, more: Child[] = []): Child {
+  const questions = reviewParts(
+    async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
+  );
   return h(
     "section",
     { class: "summary" },
@@ -39,9 +44,17 @@ export function summary(s: State, line: Child, more: Child[], beside: Child = nu
       line,
       trail(s.trail, s.total),
     ),
+    nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
     more,
-    review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions, beside),
+    questions.list,
   );
+}
+
+/** What to do after a game, right under its result: the one gold action, then the others, plain and the same size,
+ * side by side where they fit. */
+export function nextSteps(main: Child, others: Child[]): Child {
+  const rest = others.filter(Boolean);
+  return h("div", { class: "actions" }, main, rest.length ? h("div", { class: "result-actions" }, rest) : null);
 }
 
 /** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text). */
@@ -79,51 +92,62 @@ export function shareButton(label: string, text: () => string, url?: string, pri
 }
 
 /** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
- * about the question if something's wrong with it. `beside` stays next to the button that opens it. */
-export function review(load: () => Promise<Reviewed[]>, beside: Child = null): Child {
+ * about the question if something's wrong with it, opened right under the button (which goes once they're open). */
+export function review(load: () => Promise<Reviewed[]>): Child {
+  const { button, list, opened } = reviewParts(load);
+  return h("section", { class: "review" }, () => (opened() ? null : button), list);
+}
+
+/** The questions of a game to go over, in two parts: the button, kept with the other ways on under the result, and
+ * the list it opens, kept for the end of the screen; the button takes the player there. */
+export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; list: Child; opened: () => boolean } {
   const items = signal<Reviewed[] | null>(null);
   const error = signal("");
+  let heading: HTMLElement | null = null;
+  const show = () => {
+    if (!heading?.isConnected) return;
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: "start", behavior: calm.peek() ? "auto" : "smooth" });
+  };
   const open = async () => {
+    if (items.peek()) return show();
     try {
       items.set(await load());
+      error.set("");
+      requestAnimationFrame(show);
     } catch (err) {
       error.set((err as ApiError).message);
     }
   };
-  return h(
-    "section",
-    { class: "review" },
-    beside
-      ? h("div", { class: "result-actions" }, () => (items() ? null : reviewButton(open)), beside)
-      : () => (items() ? null : reviewButton(open)),
-    () => error() && h("p", { class: "bad" }, error()),
-    () => {
-      const list = items();
-      if (!list) return null;
-      return [
-        h("h2", null, "Въпросите"),
-        list.map((it) =>
+  const button = h("button", { class: "btn", type: "button", onclick: open }, "Прегледай въпросите");
+  const list = () => {
+    const all = items();
+    if (!all) return error() ? h("p", { class: "bad", role: "alert" }, error()) : null;
+    heading = h("h2", { class: "review-head", tabindex: -1 }, "Въпросите");
+    return h(
+      "section",
+      { class: "review" },
+      heading,
+      all.map((it) =>
+        h(
+          "article",
+          { class: "reviewed" },
           h(
-            "article",
-            { class: "reviewed" },
-            h(
-              "p",
-              { class: "kicker" },
-              `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
-            ),
-            h("h3", { class: "ask" }, it.view.text),
-            picture(it.view),
-            answered(it.view, it.reveal, it.given),
-            it.reveal.fact ? fact(it.reveal.fact) : null,
-            report(it.reveal.id),
+            "p",
+            { class: "kicker" },
+            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
           ),
+          h("h3", { class: "ask" }, it.view.text),
+          picture(it.view),
+          answered(it.view, it.reveal, it.given),
+          it.reveal.fact ? fact(it.reveal.fact) : null,
+          report(it.reveal.id),
         ),
-      ];
-    },
-  );
+      ),
+    );
+  };
+  return { button, list, opened: () => items() !== null };
 }
-
-const reviewButton = (open: () => void) => h("button", { class: "btn", onclick: open }, "Прегледай въпросите");
 
 /** One row of a board: the place (gold, silver, bronze for the first three), the player with their look, the
  * score. */
