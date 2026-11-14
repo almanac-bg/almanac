@@ -2,36 +2,33 @@ import { expect, test } from "@playwright/test";
 import { answer, playRun } from "./play.ts";
 
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
-// meet in the same one, as players do; alone, a player is out at their first wrong answer, and with others, the game
-// ends once one is left.
-test("Роял: in from the lobby, live to the first wrong answer (or the last one in), then the standings", async ({
-  page,
-}) => {
-  test.setTimeout(360_000);
+// meet in the same one, as players do. A wrong answer puts nobody out: the game always runs its fifteen questions,
+// cut after some of them to those ahead, and those cut watch to the end.
+test("Роял: in from the lobby, live to the fifteenth question (or a cut), then the standings", async ({ page }) => {
+  test.setTimeout(480_000);
   await page.goto("/royal");
   // A game under way (another engine's) ends before the next lobby opens.
-  await page.getByRole("button", { name: "Влез" }).click({ timeout: 240_000 });
+  await page.getByRole("button", { name: "Влез" }).click({ timeout: 300_000 });
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
 
   const standings = page.getByRole("heading", { name: "Класиране" });
+  const watching = page.getByText("Гледаш до края.");
   for (let n = 0; n < 15; n++) {
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
-    await expect(asked.or(standings).first()).toBeVisible({ timeout: 60_000 });
-    if (await standings.isVisible()) break;
+    await expect(asked.or(watching).first()).toBeVisible({ timeout: 60_000 });
+    if (await watching.isVisible()) break;
     if (n === 0) {
       await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
     }
     await answer(page);
-    // The answer shows once everyone still in has answered.
+    // The answer shows once everyone still in has answered, with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
-    if (await page.locator(".verdict").getByText("Отпадаш").isVisible()) {
-      // Out: the rest is watched to the end.
-      await expect(page.getByText("Гледаш.").or(standings).first()).toBeVisible({ timeout: 60_000 });
-      break;
-    }
+    await expect(page.locator(".royal-table .row.me")).toBeVisible();
   }
-  await expect(standings).toBeVisible({ timeout: 180_000 });
+  // The end: the standings of all, after the fifteenth question.
+  await expect(page.locator(".intro").getByText(/верни\./)).toBeVisible({ timeout: 360_000 });
+  await expect(standings).toBeVisible();
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
 });

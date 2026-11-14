@@ -142,6 +142,35 @@ func TestNext(t *testing.T) {
 	}
 }
 
+// onward waits for the answer showing to have shown: on to the next question (or the end).
+func (w *world) onward() { w.wait(CutPause) }
+
+// timeUp waits for the question showing's time to run out.
+func (w *world) timeUp() { w.wait(20*time.Second + play.Grace) }
+
+func TestKeep(t *testing.T) {
+	for _, c := range []struct {
+		entered int
+		want    map[int]int // question (counted from 1) → how many go on after it
+	}{
+		{50, map[int]int{5: 30, 8: 20, 11: 10, 14: 3}},
+		{20, map[int]int{5: 12, 8: 8, 11: 4, 14: 3}},
+		{45, map[int]int{5: 27, 8: 18, 11: 9, 14: 3}},
+		{13, map[int]int{5: 8, 8: 6, 11: 3, 14: 3}},
+		{10, map[int]int{5: 6, 8: 4, 11: 2, 14: 2}},
+		{5, map[int]int{5: 3, 8: 2, 11: 2, 14: 2}},
+		{3, map[int]int{5: 2, 8: 2, 11: 2, 14: 2}},
+		{2, map[int]int{5: 2, 8: 2, 11: 2, 14: 2}},
+		{1, map[int]int{5: 1, 8: 1, 11: 1, 14: 1}},
+	} {
+		for n := range play.RoyalLength {
+			if got := play.RoyalKeep(n, c.entered); got != c.want[n+1] {
+				t.Errorf("of %d, after question %d: %d go on, want %d", c.entered, n+1, got, c.want[n+1])
+			}
+		}
+	}
+}
+
 func TestEvening(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -181,6 +210,9 @@ func TestEvening(t *testing.T) {
 	if v.Phase != play.RoyalQuestion || v.N != 0 || v.Entered != 3 || v.Question == nil || v.Question.LeftMs != v.Question.LimitMs {
 		t.Fatalf("the start: %+v", v)
 	}
+	if v.Cut == nil || v.Cut.After != 5 || v.Cut.Keep != 2 || v.Cut.Now || v.Cut.Line == nil {
+		t.Fatalf("the first cut, ahead: %+v", v.Cut)
+	}
 	if _, m := w.h.mine(zed.ID); m != nil {
 		t.Fatal("Zed is in the game without being there")
 	}
@@ -192,65 +224,105 @@ func TestEvening(t *testing.T) {
 		t.Fatalf("watching: %+v", v)
 	}
 
-	// Question 1: Bo's wrong is the way out; once all three have answered, the answer shows at once.
+	// Question 1: Bo's wrong puts him behind, not out; once all three have answered, the answer shows at once.
 	w.wait(2 * time.Second)
 	w.give(ana, true)
 	w.give(bo, false)
 	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion {
 		t.Fatalf("the answer showed before Vi answered: %+v", v)
 	}
+	if v := w.h.View(vi.ID); v.Players[0].Reached != 0 {
+		t.Fatalf("Ana's answer told before it shows: %+v", v.Players)
+	}
 	if err := w.h.Answer(ctx, bo.ID, 0, w.answer(bo, true)); !errors.Is(err, ErrNotNow) {
 		t.Fatalf("answered twice: %v", err)
 	}
+	w.wait(time.Second)
 	w.give(vi, true)
 	v = w.h.View(bo.ID)
-	if v.Phase != play.RoyalReveal || !v.Out || v.WentOut != 1 || v.Left != 2 || v.Question.Reveal == nil ||
-		!v.Question.Reveal.Mine || v.Question.Reveal.Right {
-		t.Fatalf("Bo's way out: %+v %+v", v, v.Question)
+	if v.Phase != play.RoyalReveal || v.Out || v.WentOut != 0 || v.Left != 3 || v.Question.Reveal == nil ||
+		!v.Question.Reveal.Mine || v.Question.Reveal.Right || v.Last {
+		t.Fatalf("Bo's wrong answer: %+v %+v", v, v.Question)
+	}
+	// Ana first (as many right as Vi, and quicker), then Vi; Bo third; the line is Vi's.
+	if p := v.Players; p[0].Name != ana.Name || p[0].Rank != 1 || p[1].Name != vi.Name || p[1].Rank != 2 ||
+		p[2].Name != bo.Name || p[2].Rank != 3 || !p[2].Me || p[0].Ms != 2000 || p[1].Ms != 3000 {
+		t.Fatalf("the standings: %+v", p)
+	}
+	if c := v.Cut; c == nil || c.After != 5 || c.Now || c.Line == nil || c.Line.Rights != 1 || c.Line.Ms != 3000 {
+		t.Fatalf("the line: %+v", v.Cut)
 	}
 
-	if v := w.h.View(ana.ID); v.Last {
-		t.Fatalf("the end told with two still in: %+v", v)
+	// Questions 2–5: all three right. Bo is one behind at the cut, and out.
+	for n := 1; n < 5; n++ {
+		w.onward()
+		for _, p := range []Player{ana, vi, bo} {
+			w.give(p, true)
+		}
 	}
-
-	// Question 2: Vi lets the time run out, and Ana is the last one in: she has won, the end comes once the answer
-	// has shown.
+	v = w.h.View(bo.ID)
+	if v.Phase != play.RoyalReveal || v.N != 4 || !v.Out || v.WentOut != 1 || v.Left != 2 || v.Cut == nil || !v.Cut.Now ||
+		v.Cut.Keep != 2 || v.Cut.Line.Rights != 5 {
+		t.Fatalf("the cut after question 5: %+v %+v", v, v.Cut)
+	}
+	// The cut shows longer than an answer.
 	w.wait(Pause)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.N != 1 {
-		t.Fatalf("the next question: %+v", v)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal {
+		t.Fatalf("the cut gone by in a pause: %+v", v)
 	}
-	if err := w.h.Answer(ctx, bo.ID, 1, w.answer(ana, true)); !errors.Is(err, ErrNotNow) {
+	w.wait(CutPause - Pause)
+	// Two left, and no cut ahead can put either out: the rest is a final of two.
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.N != 5 || v.Cut != nil {
+		t.Fatalf("question 6, two in: %+v %+v", v, v.Cut)
+	}
+	if err := w.h.Answer(ctx, bo.ID, 5, w.answer(bo, true)); !errors.Is(err, ErrNotNow) {
 		t.Fatalf("Bo answered while out: %v", err)
 	}
+
+	// Question 6: Vi lets the time run out, and plays on. Then both right to the end, all fifteen.
 	w.give(ana, true)
-	w.wait(20*time.Second + play.Grace)
-	if v := w.h.View(vi.ID); v.Phase != play.RoyalReveal || !v.Out || !v.Question.Reveal.Missed || !v.Last || v.Left != 1 {
+	w.timeUp()
+	if v := w.h.View(vi.ID); v.Phase != play.RoyalReveal || v.Out || !v.Question.Reveal.Missed || v.Last {
 		t.Fatalf("Vi's time ran out: %+v", v)
 	}
-	w.wait(Pause)
+	for n := 6; n < play.RoyalLength; n++ {
+		w.onward()
+		w.give(ana, true)
+		w.give(vi, true)
+	}
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.N != 14 || !v.Last || v.Cut != nil {
+		t.Fatalf("the last question: %+v", v)
+	}
+	w.onward()
 	v = w.h.View(ana.ID)
-	if v.Phase != play.RoyalEnd || v.N != 1 || v.Place != 1 || v.Delta <= 0 || v.RunID == 0 || len(v.Players) != 3 {
+	if v.Phase != play.RoyalEnd || v.N != 14 || v.Place != 1 || v.Delta <= 0 || v.RunID == 0 || len(v.Players) != 3 {
 		t.Fatalf("the end: %+v", v)
 	}
-	if p := v.Players; p[0].Name != ana.Name || p[1].Name != vi.Name || p[2].Name != bo.Name || p[2].Delta >= 0 {
+	if p := v.Players; p[0].Name != ana.Name || p[1].Name != vi.Name || p[2].Name != bo.Name || p[2].Delta >= 0 ||
+		p[2].Place != 3 || p[2].OutAt != 4 {
 		t.Fatalf("the places: %+v", p)
 	}
 	if len(told) != 0 {
 		t.Fatalf("told those watching of the end: %+v", told)
 	}
 	r, err := w.g.RoyalsOf(ctx, ana.ID)
-	if err != nil || len(r) != 1 || r[0].Players[0].Reached != 2 || r[0].Players[0].Place != 1 {
+	if err != nil || len(r) != 1 || r[0].Players[0].Reached != 15 || r[0].Players[0].Place != 1 || r[0].Players[2].Reached != 4 {
 		t.Fatalf("Ana's tournaments: %+v %v", r, err)
 	}
-	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 2 {
+	if rv, err := w.g.Review(ctx, ana.ID, v.RunID); err != nil || len(rv) != 15 {
 		t.Fatalf("Ana's game gone over: %d %v", len(rv), err)
 	}
-	// Her game was played to its end: two right of two, all of a game's end XP.
-	var xp int
-	var finished bool
-	_ = w.db.Read.QueryRow(`SELECT xp, finished_at IS NOT NULL FROM runs WHERE id = ?`, v.RunID).Scan(&xp, &finished)
-	if want := 2*(play.XPAnswer+play.XPKnown) + play.XPFinish; xp != want || !finished {
-		t.Fatalf("Ana's run: %d XP (want %d), finished %v", xp, want, finished)
+	// Her game was played to its end, all right; Bo's ended at the cut, as a game of fifteen.
+	xpOf := func(p Player) (xp int, finished bool) {
+		_ = w.db.Read.QueryRow(`SELECT r.xp, r.finished_at IS NOT NULL FROM runs r JOIN royal_players p ON p.run_id = r.id
+			WHERE p.user_id = ?`, p.ID).Scan(&xp, &finished)
+		return
+	}
+	if xp, done := xpOf(ana); xp != 15*(play.XPAnswer+play.XPKnown)+play.XPFinish || !done {
+		t.Fatalf("Ana's run: %d XP, finished %v", xp, done)
+	}
+	if xp, done := xpOf(bo); xp != play.XPAnswer+4*(play.XPAnswer+play.XPKnown)+13 || !done {
+		t.Fatalf("Bo's run: %d XP, finished %v", xp, done)
 	}
 	if !w.has(ana, "royalWin") || w.has(vi, "royalWin") {
 		t.Fatal("„Вечерта е твоя“ not Ana's alone")
@@ -315,20 +387,18 @@ func TestFull(t *testing.T) {
 	}
 }
 
-// A restart of the server mid-game picks it up again: the question showing shows again, its time from then.
+// A restart of the server mid-game picks it up again: the question showing shows again, its time from then, and the
+// standings are as they were.
 func TestRestart(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo := w.player(), w.player()
-	w.at(20, 50, 0)
-	for _, p := range []Player{ana, bo} {
-		w.h.Follow(p.ID)
-		_ = w.h.Join(ctx, p)
-	}
-	w.at(21, 0, 0)
+	w.start(ana, bo)
+	w.wait(time.Second)
 	w.give(ana, true)
+	w.wait(time.Second)
 	w.give(bo, true)
-	w.wait(Pause)
+	w.onward()
 	w.give(ana, true) // question 2: Bo hasn't answered when the server restarts
 
 	w.now = w.now.Add(30 * time.Second)
@@ -346,92 +416,91 @@ func TestRestart(t *testing.T) {
 	}
 	w.h.Follow(bo.ID)
 	w.give(bo, false)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || !v.Out || v.Left != 1 || !v.Last {
+	v = w.h.View(bo.ID)
+	if v.Phase != play.RoyalReveal || v.Out || v.Left != 2 || v.Last {
 		t.Fatalf("after the restart, Bo's answer: %+v", v)
 	}
-	// Another restart while the answer that decided it shows: Ana is still the last one in, and wins.
+	if p := v.Players; p[0].Name != ana.Name || p[0].Reached != 2 || p[0].Ms != 1000 || p[1].Reached != 1 || p[1].Ms != 2000 {
+		t.Fatalf("the standings after a restart: %+v", p)
+	}
+	// Another restart while the answer shows: the game goes on.
 	w.h = NewHub(w.g, Evening)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Left != 1 || !v.Last {
-		t.Fatalf("the answer that decided it, after a restart: %+v", v)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Left != 2 || v.Players[1].Ms != 2000 {
+		t.Fatalf("the answer showing, after a restart: %+v", v)
 	}
-	w.wait(Pause)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 || v.N != 1 {
-		t.Fatalf("the end after a restart: %+v", v)
-	}
-}
-
-// The last one in wins, even with no more right than the one who went out on the same question: Bo, quicker on the
-// first, lets the second's time run out while Ana's wrong answer to it is spared (nobody got it right).
-func TestLastOneIn(t *testing.T) {
-	w := setup(t)
-	ana, bo := w.player(), w.player()
-	w.start(ana, bo)
-	w.wait(time.Second)
-	w.give(bo, true)
-	w.wait(6 * time.Second)
-	w.give(ana, true)
-	w.wait(Pause)
-	w.give(ana, false)
-	w.wait(20*time.Second + play.Grace)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || !v.Spared || v.Out || v.WentOut != 1 || v.Left != 1 || !v.Last {
-		t.Fatalf("Ana spared, Bo out: %+v", v)
-	}
-	w.wait(Pause)
-	v := w.h.View(ana.ID)
-	if v.Phase != play.RoyalEnd || v.Place != 1 || v.Players[0].Reached != 1 || v.Players[1].Reached != 1 ||
-		v.Players[1].Place != 2 || v.Delta != 0 {
-		t.Fatalf("the end: %+v", v)
-	}
-	var xp int
-	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, v.RunID).Scan(&xp)
-	if want := (play.XPAnswer + play.XPKnown) + play.XPAnswer + play.XPFinish/2; xp != want {
-		t.Fatalf("Ana's XP: %d, want %d", xp, want)
-	}
-	if !w.has(ana, "royalWin") || w.has(bo, "royalWin") {
-		t.Fatal("„Вечерта е твоя“ not Ana's alone")
+	w.onward()
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.N != 2 {
+		t.Fatalf("the next question after a restart: %+v", v)
 	}
 }
 
-// Everyone still in out on the same question: nobody is the last one in, and the places go by the answers.
-func TestAllOut(t *testing.T) {
+// Level at a cut's line, all go on: a cut never tells apart those it can't.
+func TestLevelGoOn(t *testing.T) {
 	w := setup(t)
 	ana, bo, vi := w.player(), w.player(), w.player()
 	w.start(ana, bo, vi)
-	w.give(ana, true)
-	w.give(bo, true)
-	w.give(vi, false)
-	w.wait(Pause)
-	// Neither answers the second.
-	w.wait(20*time.Second + play.Grace)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.WentOut != 2 || v.Left != 0 || !v.Last {
-		t.Fatalf("both out: %+v", v)
+	for n := range 5 {
+		if n > 0 {
+			w.onward()
+		}
+		for _, p := range []Player{ana, bo, vi} {
+			w.give(p, n != 2) // all wrong on the third
+		}
 	}
-	w.wait(Pause)
-	v := w.h.View(ana.ID)
-	if v.Phase != play.RoyalEnd || v.Players[0].Place != 1 || v.Players[1].Place > 2 || v.Players[2].Name != vi.Name {
-		t.Fatalf("the end: %+v", v)
+	v := w.h.View(vi.ID)
+	if v.Phase != play.RoyalReveal || v.N != 4 || v.Out || v.WentOut != 0 || v.Left != 3 || !v.Cut.Now ||
+		v.Players[2].Rank != 1 {
+		t.Fatalf("level at the cut: %+v %+v", v, v.Cut)
 	}
 }
 
-// Alone in a tournament, there's nobody to be beaten with: the first wrong answer is the way out.
+// Of as many right, the quicker go on: the time the right answers took, not the wrong ones.
+func TestQuickerGoOn(t *testing.T) {
+	w := setup(t)
+	ana, bo, vi := w.player(), w.player(), w.player()
+	w.start(ana, bo, vi)
+	for n := range 5 {
+		if n > 0 {
+			w.onward()
+		}
+		w.wait(time.Second)
+		w.give(ana, n != 0) // a slow miss costs nothing: Ana's wrong one is quick, but not counted
+		w.give(bo, true)
+		w.wait(time.Second)
+		w.give(vi, true)
+	}
+	v := w.h.View(vi.ID)
+	if v.Phase != play.RoyalReveal || v.Out || v.WentOut != 1 || v.Players[0].Name != bo.Name || v.Players[1].Name != vi.Name {
+		t.Fatalf("Ana a right answer behind, out: %+v", v)
+	}
+	if v := w.h.View(ana.ID); !v.Out {
+		t.Fatalf("Ana still in: %+v", v)
+	}
+	// Bo and Vi as many right: Bo, quicker, ahead.
+	if v.Players[0].Rank != 1 || v.Players[1].Rank != 2 || v.Players[0].Ms != 5000 || v.Players[1].Ms != 10000 {
+		t.Fatalf("Bo ahead of Vi: %+v", v.Players)
+	}
+}
+
+// Alone in a tournament, there's nobody to be cut against: all fifteen, whatever the answers.
 func TestAlone(t *testing.T) {
 	w := setup(t)
 	ana := w.player()
 	w.start(ana)
-	w.give(ana, true)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Out || v.Last || v.Left != 1 {
-		t.Fatalf("right, alone: %+v", v)
+	for n := range play.RoyalLength {
+		if n > 0 {
+			w.onward()
+		}
+		w.give(ana, n%2 == 0)
+		if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Out || v.Cut != nil || v.Last != (n == 14) {
+			t.Fatalf("question %d, alone: %+v", n+1, v)
+		}
 	}
 	w.wait(Pause)
-	w.give(ana, false)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.WentOut != 1 || !v.Last {
-		t.Fatalf("wrong, alone: %+v", v)
-	}
-	w.wait(Pause)
-	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 || v.Entered != 1 {
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd || v.Place != 1 || v.Entered != 1 || v.Players[0].Reached != 8 {
 		t.Fatalf("the end, alone: %+v", v)
 	}
 	if w.has(ana, "royalWin") {
@@ -503,9 +572,10 @@ func TestOpenedAndGlance(t *testing.T) {
 	if g := w.h.Glance(); g.Phase != "live" || g.In != 2 || g.Next != start.Add(24*time.Hour).UnixMilli() {
 		t.Fatalf("the games: %+v", g)
 	}
+	// Neither answers again: the game runs its fifteen questions out, a step at a time.
 	w.give(ana, false)
 	w.give(bo, false)
-	for range 10 {
+	for range 2 * play.RoyalLength {
 		w.wait(time.Minute)
 	}
 	if g := w.h.Glance(); g.Phase != "soon" || g.StartsAt != start.Add(24*time.Hour).UnixMilli() {
@@ -518,33 +588,22 @@ func TestOpenedAndGlance(t *testing.T) {
 	}
 }
 
-// A question nobody gets right puts nobody out; the next one gets right by one puts the other out, and ends the game.
-func TestSpared(t *testing.T) {
+// Two in a tournament play it to its end as a duel: no cut can put either out, so none shows.
+func TestTwo(t *testing.T) {
 	w := setup(t)
-	ctx := t.Context()
 	ana, bo := w.player(), w.player()
-	w.at(20, 50, 0)
-	for _, p := range []Player{ana, bo} {
-		w.h.Follow(p.ID)
-		if err := w.h.Join(ctx, p); err != nil {
-			t.Fatal(err)
+	w.start(ana, bo)
+	for n := range 5 {
+		if n > 0 {
+			w.wait(Pause)
 		}
+		if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.N != n || v.Cut != nil {
+			t.Fatalf("question %d of two: %+v %+v", n+1, v, v.Cut)
+		}
+		w.give(ana, true)
+		w.give(bo, false)
 	}
-	w.at(21, 0, 0)
-	w.wait(2 * time.Second)
-	w.give(ana, false)
-	w.give(bo, false)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || !v.Spared || v.Out || v.Left != 2 || v.WentOut != 0 {
-		t.Fatalf("both wrong: %+v", v)
-	}
-	w.wait(Pause)
-	w.give(ana, true)
-	w.give(bo, false)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalReveal || v.Spared || !v.Out || v.Left != 1 || v.WentOut != 1 || !v.Last {
-		t.Fatalf("Ana right, Bo wrong: %+v", v)
-	}
-	w.wait(Pause)
-	if v := w.h.View(bo.ID); v.Phase != play.RoyalEnd || v.Place != 2 || v.Players[0].Name != ana.Name {
-		t.Fatalf("the end: %+v", v)
+	if v := w.h.View(bo.ID); v.Out || v.WentOut != 0 || w.h.pause(w.h.night.tables[0]) != Pause {
+		t.Fatalf("after question 5, of two: %+v", v)
 	}
 }

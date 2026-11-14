@@ -12,7 +12,7 @@ This file is the way in. Read it first; it says where everything else is.
 
 Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
 whoever comes (a recording of a real game if nobody does) and friends challenged in their own time; Роял every
-evening at 21:00, up to 50 live, out at the first wrong answer; rooms with a code for playing together; friends,
+evening at 21:00, up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; rooms with a code for playing together; friends,
 levels (XP), achievements, titles, avatars, a rating with divisions, and weekly leagues. Points are a game's score,
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
 system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when), which a
