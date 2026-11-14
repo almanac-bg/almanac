@@ -645,12 +645,52 @@
     font: 900 1.5rem / 1.75rem var(--font-sans);
   }
 
-  .league-place {
-    margin: 0;
+  /* Профил's line of the league: its mountain, the place in the group, a tap from it. */
+  .league-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--line);
+    color: inherit;
+    text-decoration: none;
+    transition: box-shadow 160ms;
   }
 
-  .league-place b {
-    font: 900 2rem / 1 var(--font-numeral);
+  .league-link:hover {
+    box-shadow:
+      var(--elev-2),
+      inset 0 0 0 1px var(--line);
+  }
+
+  .league-link:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .league-link-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .league-link-name {
+    font-weight: 800;
+  }
+
+  .league-link-more {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  .league-link-i {
+    flex: none;
+    color: var(--text-muted);
+    transform: scaleX(-1);
   }
 
   .league-zone {
@@ -1313,6 +1353,7 @@
 
   .figure {
     display: grid;
+    align-content: start;
     gap: var(--space-1);
   }
 
@@ -3307,13 +3348,21 @@
     margin: 0;
   }
 
+  /* The name and what's beside it („ти“): the name gives way with an ellipsis, the badge always shows whole. */
   .who-name {
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    min-width: 0;
     font-size: 1rem;
     line-height: 1.375rem;
     font-weight: 600;
-    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .who-label {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
   }
 
   .who-title {
@@ -3327,8 +3376,9 @@
   }
 
   .you {
-    margin-left: var(--space-2);
-    padding: 2px 8px;
+    flex: none;
+    margin-left: 6px;
+    padding: 2px 7px;
     border-radius: var(--radius-full);
     background: var(--accent);
     color: var(--on-accent);
@@ -3337,7 +3387,6 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    vertical-align: 2px;
   }
 
   .pts {
@@ -4024,11 +4073,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .level-card .meter {
+  .level-card .meter,
+  .me-level-bar .meter {
     height: 10px;
   }
 
-  .level-card .meter-fill {
+  .level-card .meter-fill,
+  .me-level-bar .meter-fill {
     background: var(--gold);
     box-shadow: 0 0 12px -2px var(--gold);
   }
@@ -4336,6 +4387,78 @@
     line-height: 1.125rem;
   }
 
+  /* Награди's tiers: a grid of medals, each a tap from its card. The card spans the row after its medal's, and the
+     grid fills the rest of that row with the medals that follow (dense). */
+  .medals {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    grid-auto-flow: row dense;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .medal-btn {
+    appearance: none;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: var(--space-1);
+    width: 100%;
+    height: 100%;
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 160ms;
+  }
+
+  .medal-btn:hover {
+    background: var(--surface);
+  }
+
+  .medal-btn[aria-expanded="true"] {
+    background: var(--surface);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--tier);
+  }
+
+  .medal-btn:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .medal-name {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 700;
+    overflow-wrap: break-word;
+  }
+
+  .medal.locked .medal-name {
+    color: var(--text-muted);
+  }
+
+  .medal-progress {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 700;
+  }
+
+  .medal-card {
+    grid-column: 1 / -1;
+  }
+
   .unlock {
     display: flex;
     align-items: center;
@@ -4474,6 +4597,28 @@
     display: grid;
     justify-items: start;
     gap: var(--space-3);
+  }
+
+  /* Профил's level: the level and its bar, what the next level brings, then what else comes next. */
+  .me-level {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-3);
+  }
+
+  .me-level-bar {
+    display: grid;
+    justify-self: stretch;
+    gap: var(--space-2);
+  }
+
+  .next-level {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    font-size: 0.8125rem;
   }
 
   .next-list {
@@ -5149,6 +5294,15 @@
 
     .topic-name {
       font-size: 0.9375rem;
+    }
+
+    /* A board's row gives its gaps to the name. */
+    .row {
+      gap: var(--space-2);
+    }
+
+    .who {
+      gap: var(--space-2);
     }
   }
 

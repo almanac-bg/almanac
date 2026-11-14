@@ -53,3 +53,13 @@ export interface TitleView extends TitleRef {
   locked?: boolean;
   how?: string;
 }
+
+/** The achievements not yet earned nearest to done (of those that tell how far along they are, first), the hidden
+ * ones left out. */
+export function nearest(list: AchievementInfo[], n: number): AchievementInfo[] {
+  const share = (a: AchievementInfo) => (a.progress ?? 0) / (a.goal ?? 1);
+  return list
+    .filter((a) => !a.at && !a.hidden)
+    .sort((a, b) => share(b) - share(a) || (a.goal ?? 1) - (b.goal ?? 1))
+    .slice(0, n);
+}

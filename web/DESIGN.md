@@ -38,6 +38,10 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   league (once in one), streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
+  Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
+  Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
+  achievements nearest to done, in full; then each tier is a grid of medals (`.medals`/`.medal`), the earned first,
+  and a tap opens a medal's card (`.medal-card`) across the row under it, one at a time.
 
 ## Space and size
 
@@ -140,8 +144,9 @@ takes a token.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
   - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a week of the league ended),
     `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
-  - `.achievements`/`.achievement` (and `locked`), `.worn` (what's worn), `.picker`/`.pick` and `.tone-pick` for
-    choosing a look.
+  - `.achievements`/`.achievement` (and `locked`), `.medals`/`.medal` with `.medal-card` (Награди's grid), `.worn`
+    (what's worn), `.picker`/`.pick` and `.tone-pick` for choosing a look.
+  - `.league-link` (Профил's line of the league, a tap from the group).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`

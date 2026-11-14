@@ -17,20 +17,26 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
 
   await page.goto("/rewards");
   await expect(page.getByRole("heading", { name: /Постижения · \d+ от 30/ })).toBeVisible();
-  // By tier, each with how it's earned; every title, the locked ones with what unlocks them.
+  // The nearest to done first, in full; then by tier, a grid of medals, each a tap from how it's earned.
+  await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 3" })).toBeVisible();
-  await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");
+  const open = async (name: RegExp) => {
+    const medal = page.locator(".medals").getByRole("button", { name }).first();
+    await medal.click();
+    await expect(medal).toHaveAttribute("aria-expanded", "true");
+    return page.locator(".medal-card");
+  };
+  await expect(await open(/^Петдесет победи/)).toContainText("Спечели петдесет дуела.");
   // Progress towards a goal, a reward in sight, and the hidden ones kept secret.
-  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(/\d+ \/ 100/);
-  // Each earns XP, and some more: only what's new to the player (the flame is the first streak's).
-  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(
-    "Награда: +50 XP · аватар „Книга“",
-  );
-  await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText(
-    "Награда: +400 XP · титла „Неугасим пламък“ · рамка „Пламъци“",
-  );
+  await expect(page.locator(".medals").getByRole("button", { name: /^Сто отговора/ })).toContainText(/\d+\/100/);
+  // Each earns XP, and some more: only what's new to the player (the flame is the first streak's). One card at a time.
+  const hundred = await open(/^Сто отговора/);
+  await expect(hundred).toContainText(/\d+ \/ 100/);
+  await expect(hundred).toContainText("Награда: +50 XP · аватар „Книга“");
+  await expect(page.locator(".medal-card")).toHaveCount(1);
+  await expect(await open(/^Цял месец/)).toContainText("Награда: +400 XP · титла „Неугасим пламък“ · рамка „Пламъци“");
   await expect(page.getByText("Първото епично постижение отключва фон „Лъчи“.")).toBeVisible();
-  await expect(page.locator(".achievement", { hasText: /скрит/i }).first()).toContainText("ще разбереш");
+  await expect(await open(/скрит/i)).toContainText("ще разбереш");
 
   // Гардероб, a tap away in Профил: the avatar first, the titles a tab away, the locked ones folded.
   await page.getByRole("navigation", { name: "Профил" }).getByRole("link", { name: "Гардероб" }).click();
