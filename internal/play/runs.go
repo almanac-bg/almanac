@@ -332,6 +332,9 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
 		// The guest's arenas are the account's (unless both played the same one, which can't be: one person).
 		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		// The days the guest played on were the account's player's: the same person, so not a player who left.
+		{`INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?, day FROM active_days WHERE user_id = ?`, []any{to, from}},
+		{`DELETE FROM active_days WHERE user_id = ?`, []any{from}},
 		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
 		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp) SELECT ?, id, at, seen, xp FROM achievements
 			WHERE user_id = ?`, []any{to, from}},

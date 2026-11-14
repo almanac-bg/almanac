@@ -260,6 +260,9 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, r.picks[r.at].ID, given, shown, gr.Score, w.Points, gr.Right, ms, now); err != nil {
 		return err
 	}
+	if err := g.markActive(tx, r.userID); err != nil {
+		return err
+	}
 	r.at++
 	r.points += w.Points
 	r.xp += xp(gr)

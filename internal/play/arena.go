@@ -73,6 +73,9 @@ func (g *Game) SettleArena(ctx context.Context, list []ArenaPlace) (map[int64]in
 				VALUES (?, ?, ?, ?, ?, ?)`, id, p.UserID, p.Place, p.Points, p.Rights, moved[i]); err != nil {
 				return err
 			}
+			if err := g.markActive(tx, p.UserID); err != nil {
+				return err
+			}
 			if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1),
 				rated = rated + 1,
 				season_games = season_games + 1 WHERE id = ?2`, moved[i], p.UserID); err != nil {
