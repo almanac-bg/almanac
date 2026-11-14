@@ -16,7 +16,9 @@ import (
 // A duel with whoever comes is played live, both on each question at the same moment (internal/live runs it; here
 // it's made, and settled once both runs are done). If nobody comes in time, it's played against a recording of a
 // real player's earlier game on the same questions (a topic's or a duel's, never the day's, and none with today's
-// questions in it): only the player's rating moves, as the recorded one didn't ask to play.
+// questions in it), a real one by a player of about their rating (recordedRun): only the player's rating moves, and
+// half as far, as the recorded one didn't ask to play nor plays to win; and only RecordedRatedPerDay such duels a day
+// move it.
 //
 // A friend is challenged in their own time: the challenger plays at once, and the friend hears of it when they've
 // finished; from then they have FriendFor to play the same questions or say no.
@@ -49,7 +51,8 @@ type DuelNews struct {
 	// Outcome is the one told's: won, lost or draw (with a result).
 	Outcome string
 	Delta   int
-	// Friendly is a result that didn't move ratings (not the first duel of the day between the two).
+	// Friendly is a result that didn't move ratings (not the first duel of the day between the two, or past the day's
+	// rated duels against recordings).
 	Friendly bool
 	DuelID   int64
 }
@@ -367,8 +370,17 @@ type recorded struct {
 	picks []Pick
 }
 
+// RecordingBand is how far a recording's player's rating may be from the player's to be their match, while there's
+// one that close; RecordingRights how many right answers make a game worth playing against.
+const (
+	RecordingBand   = 150
+	RecordingRights = 3
+)
+
 // recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
-// run never), among the latest: the one with the fewest the player has seen. Nil if there's none.
+// run never), to play against: a real game (RecordingRights right or more), by a player whose rating is within
+// RecordingBand of the player's, the one with the fewest questions the player has seen, the latest first. Short of
+// such, the nearest it gets: any real game, then any game. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	seen, err := seenBy(tx, userID)
 	if err != nil {
@@ -378,19 +390,29 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(`SELECT id, questions FROM runs WHERE kind IN ('topic', 'duel') AND finished_at IS NOT NULL
-		AND user_id <> ? AND json_array_length(questions) = ? ORDER BY finished_at DESC LIMIT 200`, userID, Length)
+	var mine int
+	if err := tx.QueryRow(`SELECT rating FROM users WHERE id = ?`, userID).Scan(&mine); err != nil {
+		return nil, err
+	}
+	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating FROM runs r JOIN users u ON u.id = r.user_id
+		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND r.user_id <> ? AND json_array_length(r.questions) = ?
+		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	b := g.Bank()
-	var best *recorded
-	fewest := Length + 1
+	// The best of each kind: in the band and real (0), real (1), any (2); each the fewest seen, the latest first.
+	var best [3]*recorded
+	var fewest [3]int
+	for i := range fewest {
+		fewest[i] = Length + 1
+	}
 	for rows.Next() {
 		var id int64
 		var raw string
-		if err := rows.Scan(&id, &raw); err != nil {
+		var rights, rating int
+		if err := rows.Scan(&id, &raw, &rights, &rating); err != nil {
 			return nil, err
 		}
 		var picks []Pick
@@ -406,11 +428,32 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 				n++
 			}
 		}
-		if whole && n < fewest {
-			best, fewest = &recorded{id: id, picks: picks}, n
+		if !whole {
+			continue
+		}
+		real := rights >= RecordingRights
+		for kind, fits := range [3]bool{real && abs(rating-mine) <= RecordingBand, real, true} {
+			if fits && n < fewest[kind] {
+				best[kind], fewest[kind] = &recorded{id: id, picks: picks}, n
+			}
 		}
 	}
-	return best, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, r := range best {
+		if r != nil {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
 
 // settleRun settles the duel a just-finished run belongs to once both sides are played (a live one against a
@@ -446,6 +489,20 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 		}
 	}
 	return nil
+}
+
+// RecordedRatedPerDay is how many duels against recordings move a player's rating in a day: past it, they're
+// friendlies, so a rating can't be farmed against the recordings of the weak (or of one's own second account).
+const RecordedRatedPerDay = 5
+
+// recordedRatedToday is how many duels against recordings have moved a player's rating today (in Bulgaria).
+func (g *Game) recordedRatedToday(tx *sql.Tx, userID int64) (int, error) {
+	now := g.Now().In(Bulgaria)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, Bulgaria)
+	var n int
+	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND ghost_run IS NOT NULL AND a_id = ?
+		AND ended_at >= ?`, userID, store.Ms(midnight)).Scan(&n)
+	return n, err
 }
 
 // ratedToday says whether a duel between the two players has already moved their ratings today (in Bulgaria).
@@ -493,7 +550,13 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			return err
 		}
 		rated := true
-		if !ghost {
+		if ghost {
+			n, err := g.recordedRatedToday(tx, a.id)
+			if err != nil {
+				return err
+			}
+			rated = n < RecordedRatedPerDay
+		} else {
 			done, err := g.ratedToday(tx, a.id, b.id)
 			if err != nil {
 				return err
@@ -523,6 +586,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 				return 0, nil
 			}
 			d := eloDelta(s.rating, against, s.rated, score)
+			if ghost {
+				d /= 2 // a recording doesn't play to win: it moves a rating half as far
+			}
 			_, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1
 				WHERE id = ?2`, d, s.id)
 			return d, err
@@ -539,8 +605,8 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
 			Friendly: !rated, DuelID: duelID})
 		if ghost {
-			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, rated = 1 WHERE id = ?`,
-				now, "ghost_"+outcomeOf(score), da, duelID)
+			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, rated = ? WHERE id = ?`,
+				now, "ghost_"+outcomeOf(score), da, rated, duelID)
 			return err
 		}
 		db, err := rate(b, a.rating, 1-score)

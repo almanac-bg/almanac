@@ -1,4 +1,4 @@
-// A live duel: waiting for someone (or, after 30 seconds, a recording of a real game), the two face to face, then
+// A live duel: waiting for someone (or, after 10 seconds, a recording of a real game), the two face to face, then
 // each question for both at the same moment — the other's answer comes in as they give it, and shows with yours —
 // and the result. The server sends the duel as this player sees it after every change; the browser reconnects if
 // the line drops, and comes back to the same duel.
