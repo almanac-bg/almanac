@@ -431,7 +431,7 @@
   }
 
   /* Моят Алманах: the count, and each fact as a card in its topic's colour. */
-  .almanac-head {
+  .card.almanac-head {
     display: grid;
     grid-template-columns: auto 1fr;
     align-items: baseline;
@@ -439,22 +439,24 @@
   }
 
   .almanac-n {
-    font: 900 2.75rem / 1 var(--font-numeral);
+    font: 900 3.25rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
   .almanac-list {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .almanac-item {
-    display: grid;
-    gap: var(--space-2);
-    border-left: 4px solid var(--tone);
+  /* The topic's colour as an edge painted inside the card, so the content keeps the card's 16. */
+  .card.almanac-item {
+    box-shadow:
+      inset 4px 0 0 var(--tone),
+      var(--elev-1),
+      inset 0 0 0 1px var(--line);
   }
 
   .almanac-q {
@@ -533,6 +535,7 @@
   .goal-xp {
     color: var(--text-muted);
     font-size: 0.8125rem;
+    line-height: 1.125rem;
     font-weight: 800;
   }
 
@@ -541,8 +544,10 @@
   }
 
   .goal-n {
+    justify-self: end;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
     font-weight: 700;
   }
 
@@ -559,7 +564,8 @@
   }
 
   /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
-  .year-card {
+  /* A way in, not a card of parts: its three lines read as one. */
+  .card.year-card {
     display: grid;
     gap: var(--space-1);
     color: inherit;
@@ -572,7 +578,7 @@
 
   .year-pips {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -581,7 +587,7 @@
   .year-pips li {
     flex: 1;
     height: 4px;
-    border-radius: 2px;
+    border-radius: var(--radius-full);
     background: var(--line);
   }
 
@@ -651,7 +657,7 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow:
       var(--elev-1),
@@ -762,8 +768,8 @@
 
   /* Роял's next evening, and the countdown to its start. */
   .royal-when {
-    font-size: 1.5rem;
-    font-weight: 800;
+    font: 900 2rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
   }
 
   .royal-count {
@@ -822,23 +828,26 @@
     gap: var(--space-1);
     height: 100%;
     min-height: 4.25rem;
-    padding: var(--space-3) var(--space-1);
+    padding: var(--space-3) var(--space-2);
     text-align: center;
-    border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background:
       radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 18%, transparent), transparent 60%),
       var(--surface);
-    box-shadow: var(--elev-1);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--line);
     color: var(--text);
     text-decoration: none;
     transition:
       transform 120ms ease,
-      border-color 160ms ease;
+      box-shadow 160ms ease;
   }
 
   .mode:hover {
-    border-color: var(--tone);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--tone);
     transform: translateY(-1px);
   }
 
@@ -848,8 +857,8 @@
 
   .mode-pic {
     flex: none;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
   }
 
   .mode-text {
@@ -884,7 +893,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: 3.5rem;
+    min-height: 4.25rem;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -918,10 +927,10 @@
     white-space: nowrap;
   }
 
-  .status-flame {
+  .status-item .status-flame {
     flex: none;
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
   }
 
   .streak-chip .status-n {
@@ -938,13 +947,8 @@
     color: var(--text-muted);
   }
 
+  /* The level's words, then how far into it: beside them, so its number sits level with the streak's. */
   .level-chip {
-    display: grid;
-    gap: 6px;
-  }
-
-  /* The day's ten, before they're played: the date, what they are, the marks to come, the gold button. */
-  .card.hero.day {
     gap: var(--space-3);
   }
 
@@ -972,6 +976,8 @@
 
   .day-next {
     font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: center;
   }
 
   /* The way back from a screen reached from a main place. */
@@ -999,9 +1005,9 @@
   /* Профил's own places, at the top of each: a row of tabs that are links. */
   .subnav {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
     overflow-x: auto;
-    padding: 4px;
+    padding: var(--space-1);
     border-radius: var(--radius-full);
     background: var(--sunken);
     scrollbar-width: none;
@@ -1069,7 +1075,7 @@
   .page-art {
     width: 88px;
     height: 88px;
-    margin: 0 0 -4px -6px;
+    margin: 0 0 -4px -3px;
   }
 
   /* A topic's small picture on a chip or a row. */
@@ -1091,7 +1097,7 @@
 
   .card {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-4);
     padding: var(--space-4);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -1200,7 +1206,6 @@
 
   .btn.big {
     min-height: 3.75rem;
-    border-radius: var(--radius-lg);
     font-size: 1.1875rem;
   }
 
@@ -1228,6 +1233,12 @@
     text-decoration-thickness: 1px;
   }
 
+  /* A link on its own line that's tapped, not read in a sentence: a finger's height. */
+  .link.tap {
+    justify-self: start;
+    min-height: 2.75rem;
+  }
+
   .link:disabled {
     color: var(--text-muted);
     cursor: default;
@@ -1235,12 +1246,18 @@
 
   .field {
     display: grid;
-    gap: 6px;
+    gap: var(--space-2);
   }
 
   .field > span {
     font-size: 0.875rem;
+    line-height: 1.25rem;
     font-weight: 700;
+  }
+
+  .field small {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
   }
 
   input,
@@ -1256,8 +1273,9 @@
       box-shadow 160ms ease;
   }
 
+  /* A field is a button's height, so the two pair up side by side and one under the other. */
   input {
-    min-height: 3.25rem;
+    min-height: 3rem;
     padding: 0 var(--space-4);
   }
 
@@ -1380,7 +1398,7 @@
   }
 
   .figure-value {
-    font: 800 2rem / 1 var(--font-numeral);
+    font: 900 2rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1436,7 +1454,7 @@
     grid-template-columns: auto 1fr;
     align-items: center;
     gap: var(--space-2) var(--space-4);
-    padding: var(--space-4) var(--space-5);
+    padding: var(--space-4);
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow:
@@ -1532,15 +1550,17 @@
 
   /* ---- Trail: a pip per question ---- */
 
-  /* One row always: on a narrow phone the pips shrink rather than wrap. */
+  /* One row always, across the column on a phone (the pips shrink rather than wrap); on a big screen they stop
+     growing at 32px. */
   .trail {
     list-style: none;
+    max-width: 24.5rem;
     margin: 0;
     padding: 0;
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 24px);
-    gap: 6px;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: var(--space-2);
   }
 
   .trail li {
@@ -1595,7 +1615,7 @@
   /* ---- A question ---- */
 
   .question {
-    gap: 18px;
+    gap: var(--space-4);
   }
 
   .question-head {
@@ -1639,8 +1659,13 @@
     justify-items: end;
     gap: var(--space-2);
     min-width: 0;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-2);
     margin-left: auto;
+  }
+
+  /* No points yet: the topic sits on the head's bottom edge, level with „от 10“. */
+  .tally:empty {
+    display: none;
   }
 
   /* A duel with a friend: with whom, over the topic, in the duels' colour. */
@@ -1738,7 +1763,6 @@
   }
 
   .secs small {
-    margin-left: 2px;
     color: var(--text-muted);
     font: 700 0.875rem / 1 var(--font-sans);
   }
@@ -1761,8 +1785,9 @@
     color: var(--text-muted);
   }
 
+  /* 24 above the question: the game's count and clock apart from what's asked. */
   .ask {
-    margin-top: var(--space-1);
+    margin-top: var(--space-2);
     font-size: 1.5rem;
     line-height: 1.875rem;
     font-weight: 700;
@@ -1783,7 +1808,7 @@
 
   .options {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .option {
@@ -1916,7 +1941,9 @@
 
   /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer, so it
      stays plain; a hollow ✕ and „ти: …“ say what the player gave instead. */
+  /* A row with „ти: …“ under its words stays a row's height. */
   .option.missed {
+    padding-block: var(--space-2);
     box-shadow: none;
   }
 
@@ -1955,7 +1982,7 @@
 
   .number {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-4);
   }
 
   /* The number as typed: big, on its own line, the unit beside it. */
@@ -2120,7 +2147,7 @@
   .tf-options {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .option.tf {
@@ -2156,8 +2183,8 @@
 
   .option.tf .sign {
     position: absolute;
-    top: var(--space-2);
-    right: var(--space-2);
+    top: var(--space-3);
+    right: var(--space-4);
   }
 
   /* How everyone else answered: a bar behind each answer as long as the share that gave it, the share beside it, and
@@ -2295,9 +2322,11 @@
     min-height: 28px;
   }
 
+  /* A small letter keeps a big one's shape: its corner in proportion. */
   .pic-letter {
     width: 28px;
     height: 28px;
+    border-radius: var(--radius-xs);
     font-size: 0.8125rem;
   }
 
@@ -2326,8 +2355,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 3.5rem;
-    padding: 10px var(--space-4) 10px var(--space-3);
+    min-height: 3.75rem;
+    padding: 10px var(--space-4) 10px 10px;
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow: inset 0 0 0 1px var(--line);
@@ -2474,7 +2503,7 @@
   .split-sides {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .option.split-side {
@@ -2541,7 +2570,7 @@
   .match-col {
     display: grid;
     align-content: start;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .match-lines {
@@ -2561,8 +2590,8 @@
 
   .option.match-item {
     gap: var(--space-2);
-    min-height: 3.5rem;
-    padding: 8px;
+    min-height: 3.75rem;
+    padding: var(--space-2);
     font-size: 1rem;
     line-height: 1.25rem;
   }
@@ -2575,6 +2604,7 @@
   .option.match-item .letter {
     width: 26px;
     height: 26px;
+    border-radius: var(--radius-xs);
     font-size: 0.8125rem;
   }
 
@@ -2607,6 +2637,7 @@
     display: block;
     color: var(--wrong-ink);
     font-size: 0.8125rem;
+    line-height: 1rem;
     font-weight: 700;
   }
 
@@ -2704,8 +2735,8 @@
   /* Tabs that switch what a screen shows. */
   .segmented {
     display: flex;
-    gap: 4px;
-    padding: 4px;
+    gap: var(--space-1);
+    padding: var(--space-1);
     border-radius: var(--radius-full);
     background: var(--sunken);
   }
@@ -2718,7 +2749,7 @@
     border-radius: var(--radius-full);
     background: none;
     color: var(--text-muted);
-    font: 800 0.9375rem / 1 var(--font-sans);
+    font: 800 0.875rem / 1 var(--font-sans);
     cursor: pointer;
   }
 
@@ -3100,7 +3131,7 @@
     display: grid;
     gap: var(--space-1);
     padding: var(--space-4);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow:
       var(--elev-1),
@@ -3246,12 +3277,19 @@
     overflow: hidden;
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-5);
+    padding: var(--space-4);
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow:
       var(--elev-1),
       inset 0 0 0 1px var(--line);
+  }
+
+  /* A fact inside a card (Моят Алманах): a well in it, its corner smaller than the card's around it. */
+  .card .fact {
+    border-radius: var(--radius-md);
+    background: var(--sunken);
+    box-shadow: none;
   }
 
   /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. */
@@ -3358,7 +3396,7 @@
   .board {
     display: grid;
     overflow: hidden;
-    padding: var(--space-2) 0;
+    padding: 0;
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow:
@@ -3366,8 +3404,9 @@
       inset 0 0 0 1px var(--line);
   }
 
+  /* The title 16 in, as in any card; the rows run to the card's edges. */
   .board h2 {
-    padding: var(--space-3) var(--space-4) var(--space-2);
+    padding: var(--space-4) var(--space-4) var(--space-2);
   }
 
   .board ol {
@@ -3457,6 +3496,11 @@
     line-height: 1.375rem;
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  /* A name keeps its own figures: only the numbers of a row line up in columns. */
+  .row .who-name {
+    font-variant-numeric: normal;
   }
 
   .who-label {
@@ -3558,9 +3602,11 @@
 
   /* ---- Topics ---- */
 
+  /* Every row as tall as its tallest tile, so one with more to say doesn't make its row stand out. */
   .topics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
     gap: var(--space-2);
     margin: 0;
     padding: 0;
@@ -3577,7 +3623,7 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 6px 10px;
+    gap: var(--space-2) var(--space-3);
     width: 100%;
     height: 100%;
     min-height: 4.25rem;
@@ -3600,7 +3646,6 @@
 
   .topic-all .topic {
     grid-template-columns: minmax(0, 1fr);
-    min-height: 3.5rem;
     padding-left: var(--space-4);
   }
 
@@ -3692,7 +3737,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 2px var(--space-2);
+    gap: 2px var(--space-1);
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1rem;
@@ -3719,7 +3764,11 @@
 
   .topic .meter {
     grid-column: 1 / -1;
-    height: 4px;
+  }
+
+  .level-chip .meter {
+    flex: 1;
+    min-width: 2rem;
   }
 
   .level-chip .meter-fill {
@@ -3732,8 +3781,6 @@
 
   /* A second chance (Втори шанс): the way in from the Almanac, and the note on an answer that put a fact in it. */
   .second-chance {
-    display: grid;
-    gap: var(--space-2);
     justify-items: start;
   }
 
@@ -3744,7 +3791,6 @@
   }
   .goal .meter {
     grid-column: 2;
-    height: 5px;
   }
 
   .chips {
@@ -3790,9 +3836,11 @@
     transform: translateY(-1px);
   }
 
+  /* In the 26px slot a topic's picture has, so every chip's words start at one inset. */
   .chip .dot {
     width: 10px;
     height: 10px;
+    margin: 0 var(--space-2) 0 var(--space-1);
     border-radius: 4px;
   }
 
@@ -4056,7 +4104,6 @@
     display: grid;
     flex: none;
     place-items: center;
-    align-self: flex-start;
     width: 2.75rem;
     height: 2.75rem;
     border-radius: var(--radius-md);
@@ -4083,7 +4130,7 @@
   .worn {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .worn-text {
@@ -4092,15 +4139,23 @@
     min-width: 0;
   }
 
+  /* The name as Профил shows it beside the same avatar. */
   .worn-name {
-    font-size: 1.25rem;
+    font-size: 1.625rem;
+    line-height: 1.08;
     font-weight: 800;
+    letter-spacing: -0.02em;
   }
 
   /* What's folded away until asked for: the locked titles. */
   .more {
     display: grid;
     gap: var(--space-3);
+  }
+
+  /* Closed, nothing under the summary: no gap left for what's folded. */
+  .more:not([open]) {
+    gap: 0;
   }
 
   .more > summary {
@@ -4176,14 +4231,11 @@
 
   /* Under a result, after its gold button: „Прегледай въпросите“ and the other ways on, plain and the same size, side
      by side where they fit (one above the other on a narrow phone). */
+  /* The other ways on, of one size: side by side in equal columns where they fit, else one under another. */
   .result-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13.5rem), 1fr));
     gap: var(--space-2);
-  }
-
-  .result-actions > * {
-    flex: 1 1 max-content;
   }
 
   .result-actions .btn {
@@ -4331,11 +4383,11 @@
 
   .tier {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-3);
   }
 
   .tier-head {
-    margin: var(--space-2) 0 0;
+    margin: 0;
     color: var(--tier-ink);
     font: 800 0.8125rem / 1rem var(--font-sans);
     letter-spacing: 0.08em;
@@ -4358,10 +4410,6 @@
     font-weight: 700;
   }
 
-  .achievement-progress .meter {
-    height: 5px;
-  }
-
   .achievement-progress .meter-fill {
     background: var(--tier);
   }
@@ -4369,7 +4417,8 @@
   .achievement-reward {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
+    min-height: 22px;
     margin-top: 2px;
     color: var(--text-muted);
     font-size: 0.75rem;
@@ -4502,7 +4551,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow:
@@ -4515,8 +4564,10 @@
     box-shadow: inset 0 0 0 1px var(--line);
   }
 
+  /* The words take the rest of the row, so every card's meter and count end at the same edge. */
   .achievement-text {
     display: grid;
+    flex: 1;
     min-width: 0;
   }
 
@@ -4549,8 +4600,8 @@
   .medal-btn {
     appearance: none;
     display: grid;
+    grid-template-rows: auto 1fr auto;
     justify-items: center;
-    align-content: start;
     gap: var(--space-1);
     width: 100%;
     height: 100%;
@@ -4649,9 +4700,7 @@
   }
 
   .unlocks {
-    display: grid;
     justify-items: start;
-    gap: var(--space-2);
   }
 
   .unlock-list {
@@ -4672,7 +4721,7 @@
 
   .unlock-row .btn {
     flex: none;
-    min-height: 2.25rem;
+    min-height: 2.75rem;
     margin-left: auto;
     padding: 0 var(--space-3);
     font-size: 0.875rem;
@@ -4713,7 +4762,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin: var(--space-2) 0 0;
+    margin: 0;
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1.125rem;
@@ -4756,9 +4805,7 @@
 
   /* Профил's level: the level and its bar, what the next level brings, then what else comes next. */
   .me-level {
-    display: grid;
     justify-items: start;
-    gap: var(--space-3);
   }
 
   .me-level-bar {
@@ -4774,6 +4821,7 @@
     gap: var(--space-1) var(--space-3);
     margin: 0;
     font-size: 0.8125rem;
+    line-height: 1.125rem;
   }
 
   .next-list {
@@ -4806,6 +4854,7 @@
   .next-reward {
     color: var(--gold-ink);
     font-size: 0.8125rem;
+    line-height: 1.125rem;
     font-weight: 700;
   }
 
@@ -4848,15 +4897,17 @@
   }
 
   .tier-reward {
-    margin: 0 0 var(--space-2);
+    margin: 0;
     color: var(--tier-ink, var(--text-muted));
     font-size: 0.8125rem;
+    line-height: 1.125rem;
     font-weight: 700;
   }
 
+  /* Five to a row on the narrowest phone, so the five colours above sit in a row over them. */
   .picker {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
     gap: var(--space-2);
     margin: 0;
     padding: 0;
@@ -4868,7 +4919,8 @@
     display: grid;
     place-items: center;
     width: 100%;
-    padding: 6px;
+    aspect-ratio: 1;
+    padding: var(--space-1);
     border: 0;
     border-radius: var(--radius-md);
     background: transparent;
@@ -4884,16 +4936,18 @@
     opacity: 0.6;
   }
 
+  /* The colours in the avatars' columns, each over the one under it. */
   .tones {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+    justify-items: center;
+    gap: var(--space-2);
   }
 
   .tone-pick {
     appearance: none;
-    width: 36px;
-    height: 36px;
+    width: 2.75rem;
+    height: 2.75rem;
     border: 0;
     border-radius: var(--radius-full);
     background: var(--tone);
@@ -5057,6 +5111,7 @@
 
   .small {
     font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
   /* Read by screen readers, not shown. */
@@ -5144,6 +5199,11 @@
     font-weight: 800;
   }
 
+  /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
+  .mastery-topic .topic-mark {
+    margin-left: 0;
+  }
+
   .mastery-meta {
     display: flex;
     flex-wrap: wrap;
@@ -5188,7 +5248,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) 14px;
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow:
@@ -5213,22 +5273,20 @@
   }
 
   .game-score {
-    font: 800 1.75rem / 1 var(--font-numeral);
+    font: 900 2rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
   .settings {
     display: grid;
-    gap: var(--space-6);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--line);
+    gap: var(--space-5);
   }
 
   .settings > section,
   .settings > form {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-4);
   }
 
   /* ---- The server's own pages (privacy) ---- */
@@ -5443,7 +5501,7 @@
     }
 
     .topic {
-      gap: 6px 8px;
+      gap: var(--space-2);
     }
 
     .subnav a {
@@ -5452,8 +5510,17 @@
       font-size: 0.8125rem;
     }
 
+    .segmented button {
+      font-size: 0.8125rem;
+    }
+
+    /* The longest topic's name („Литература“) fits beside its picture. */
+    .topic {
+      padding-right: var(--space-2);
+    }
+
     .topic-name {
-      font-size: 0.9375rem;
+      font-size: 0.875rem;
     }
 
     /* A board's row gives its gaps to the name. */
@@ -5499,18 +5566,23 @@
     }
 
     /* Ten topics, five to a row (no topic alone in a row), the picture over the name; all of them at once under. */
+    /* Here the tiles stand tall, the picture over the name: the two rows of topics as tall as each other, and
+       „Всички теми“ (and „Втори шанс“) its own height under them. */
     .topics {
       grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-rows: repeat(2, 1fr);
+      grid-auto-rows: auto;
     }
 
     .topic {
       grid-template-columns: minmax(0, 1fr);
       align-content: start;
-      padding: 10px var(--space-3) var(--space-3);
+      padding: var(--space-3);
     }
 
     .topic-all .topic {
       align-content: center;
+      padding-left: var(--space-3);
     }
 
     .topic-name {
@@ -5520,8 +5592,8 @@
     /* A way to play has room for its picture beside the name, like a topic. */
     .mode {
       flex-direction: row;
-      gap: 10px;
-      padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
       text-align: left;
     }
 
@@ -5692,7 +5764,8 @@
     }
 
     /* Гардероб: bigger looks to choose from, more to a row. */
-    .picker {
+    .picker,
+    .tones {
       grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
     }
 

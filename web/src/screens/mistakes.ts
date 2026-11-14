@@ -23,10 +23,10 @@ export function mistakes() {
       return h(
         "div",
         { class: "screen" },
-        h("p", { class: "kicker" }, "Втори шанс"),
+        // What was played, where the day's result has its date: every result laid out the same.
         summary(
           s,
-          null,
+          h("div", { class: "day-line" }, h("span", { class: "kicker" }, "Втори шанс")),
           {
             main: () =>
               more()

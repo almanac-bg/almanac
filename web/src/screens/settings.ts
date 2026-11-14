@@ -41,7 +41,7 @@ export function settings() {
             "section",
             null,
             h("h2", null, "Данните ти"),
-            h("p", null, h("a", { href: "/privacy" }, "Какво пазим и защо")),
+            h("p", null, h("a", { class: "link", href: "/privacy" }, "Какво пазим и защо")),
             deleteAccount(),
           ),
         ),
@@ -342,10 +342,10 @@ function deleteAccount(): Child {
             },
             "Изтрий профила",
           ),
-          h("button", { class: "link", onclick: () => asking.set(false) }, "Откажи"),
+          h("button", { class: "link tap", onclick: () => asking.set(false) }, "Откажи"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         )
-      : h("button", { class: "link", onclick: () => asking.set(true) }, "Изтрий профила");
+      : h("button", { class: "link tap", onclick: () => asking.set(true) }, "Изтрий профила");
 }
 
 async function signOut() {

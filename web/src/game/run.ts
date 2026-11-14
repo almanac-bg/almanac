@@ -124,8 +124,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   return h(
     "div",
     { class: "screen get-ready" },
-    h("p", { class: "kicker" }, what),
-    h("h1", null, "Приготви се"),
+    h("div", { class: "intro" }, h("p", { class: "kicker" }, what), h("h1", null, "Приготви се")),
     h(
       "div",
       { class: "ready-clock", role: "timer", "aria-label": () => `Започва след ${left()} с` },
@@ -267,7 +266,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
       "span",
       { class: "secs", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
       () => String(left()),
-      h("small", null, "с"),
+      h("small", null, " с"),
     ),
     () => {
       if (locked()) freeze();

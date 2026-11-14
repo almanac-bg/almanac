@@ -45,14 +45,14 @@ export function rooms() {
       h("h1", null, "Стая"),
       h(
         "p",
-        { class: "muted" },
+        { class: "lead" },
         "За приятели, семейство или клас: всички получават един и същ въпрос в един и същ момент, всеки на телефона си.",
       ),
     ),
     h(
       "section",
       { class: "card" },
-      h("h2", null, "Влез с код"),
+      h("h2", { class: "card-title" }, "Влез с код"),
       h(
         "form",
         {
@@ -83,7 +83,7 @@ export function rooms() {
     h(
       "section",
       { class: "card" },
-      h("h2", null, "Отвори нова стая"),
+      h("h2", { class: "card-title" }, "Отвори нова стая"),
       h("p", { class: "muted" }, "Избери тема. После дай кода на другите."),
       h(
         "ul",

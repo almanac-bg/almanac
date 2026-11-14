@@ -40,14 +40,14 @@ export function almanac() {
       { class: "intro" },
       pageArt("almanac", "tone-gold"),
       h("h1", null, "Моят Алманах"),
-      h("p", { class: "muted" }, "Фактът зад всеки въпрос, на който отговори вярно."),
+      h("p", { class: "lead" }, "Фактът зад всеки въпрос, на който отговори вярно."),
     ),
     () =>
       waiting()
         ? h(
             "div",
             { class: "card second-chance" },
-            h("h2", null, "Втори шанс"),
+            h("h2", { class: "card-title" }, "Втори шанс"),
             h(
               "p",
               { class: "muted" },
