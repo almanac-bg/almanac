@@ -1580,3 +1580,37 @@ func TestMistakes(t *testing.T) {
 		t.Error("learned in a topic run")
 	}
 }
+
+func TestYear(t *testing.T) {
+	w := setup(t) // Thursday, 12 November 2026
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	if _, err := w.g.YearOf(ctx, ana, 2027); !errors.Is(err, ErrNoYear) {
+		t.Fatalf("a year not started: %v", err)
+	}
+	if y, err := w.g.YearOf(ctx, ana, 2026); err != nil || y.Days != 0 || y.League != nil || y.First != nil {
+		t.Fatalf("a year without a game: %+v %v", y, err)
+	}
+	// Three days in a row of the day's questions, a gap, then one more; a topic game of right answers.
+	for _, gap := range []int{0, 1, 1, 2} {
+		w.wait(time.Duration(gap) * 24 * time.Hour)
+		s, err := w.g.StartDay(ctx, ana)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(ana, s.ID, repeat(w.wrong, Length)...)
+	}
+	s, _ := w.g.StartTopic(ctx, ana, "history")
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	y, err := w.g.YearOf(ctx, ana, 2026)
+	if err != nil || y.Days != 4 || y.Streak != 3 || y.Games != 5 || y.Answers != 5*Length || y.Right != Length ||
+		y.XP <= 0 || y.League == nil || y.League.Name != "Странджа" {
+		t.Fatalf("Ana's year: %+v %v", y, err)
+	}
+	if y.Facts == 0 || y.First == nil || y.First.Fact == "" {
+		t.Fatalf("the facts of Ana's year: %+v", y)
+	}
+	if b, _ := w.g.YearOf(ctx, bo, 2026); b.Days != 0 || b.Games != 0 {
+		t.Fatalf("Bo's year has Ana's games: %+v", b)
+	}
+}

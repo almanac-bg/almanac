@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dayShareText } from "./share.ts";
+import { dayShareText, yearShareText } from "./share.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { points: 1000, right: true };
@@ -30,4 +30,22 @@ test("nothing in it gives an answer away: only the date, numbers, squares and th
     3,
   );
   assert.match(text, /^АЛМАНАХ · 9 май\n9 от 10 · серия 3\n[🟩🟨🟥]{10}\nalmanac\.bg$/u);
+});
+
+test("a year is shared as its days and streak, its answers, its strongest topic and facts, and the site", () => {
+  assert.equal(
+    yearShareText({ year: 2026, days: 42, streak: 12, answers: 1234, right: 839, topic: "История", facts: 312 }),
+    [
+      "Моята 2026 в АЛМАНАХ",
+      "42 дни игра · серия 12",
+      "1234 отговора, 68% верни",
+      "Най-силна тема: История",
+      "312 факта в Алманаха",
+      "almanac.bg",
+    ].join("\n"),
+  );
+  assert.equal(
+    yearShareText({ year: 2026, days: 1, streak: 1, answers: 1, right: 0, facts: 0 }),
+    ["Моята 2026 в АЛМАНАХ", "1 ден игра", "1 отговор, 0% верни", "almanac.bg"].join("\n"),
+  );
 });

@@ -29,6 +29,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/arena/[0-9]{6}$`),
+	regexp.MustCompile(`^/year/[0-9]{4}$`),
 	regexp.MustCompile(`^/together$`),
 	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),

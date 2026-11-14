@@ -310,6 +310,23 @@ func (s *Server) league(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, v)
 }
 
+// year is the player's look back at a year in the game.
+func (s *Server) year(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	year, err := strconv.Atoi(r.PathValue("year"))
+	if err != nil {
+		return errNotFound
+	}
+	y, err := s.game.YearOf(r.Context(), u.ID, year)
+	if err != nil {
+		return err
+	}
+	return ok(w, y)
+}
+
 // leagueNews tells a player how their week in the league ended.
 func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
 	body := fmt.Sprintf("%s в %s.", place(n.Place, n.Of), n.From.Name)

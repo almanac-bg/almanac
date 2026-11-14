@@ -197,6 +197,7 @@ func (s *Server) routes() http.Handler {
 	api("DELETE /api/royal/plan", s.planRoyal)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/league", s.league)
+	api("GET /api/year/{year}", s.year)
 	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)

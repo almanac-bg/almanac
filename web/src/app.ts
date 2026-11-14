@@ -27,6 +27,7 @@ import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { wardrobe } from "./screens/wardrobe.ts";
+import { year } from "./screens/year.ts";
 import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 
 /**
@@ -37,7 +38,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
   ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|arena|royal|room|r\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac)$/.test(p)],
+  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4})$/.test(p)],
 ];
 
 reportErrors();
@@ -103,6 +104,7 @@ if (root) {
       { path: /^\/royal$/, view: royal },
       { path: /^\/almanac$/, view: almanac },
       { path: /^\/mistakes$/, view: mistakes },
+      { path: /^\/year\/([0-9]{4})$/, view: year },
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },
