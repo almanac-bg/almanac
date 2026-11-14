@@ -1,15 +1,12 @@
 // Package royal is Роял played live: every evening at the same time, everyone in it on the same question at the same
-// moment. The first wrong answer (or the time running out) is the way out, once the answer shows — unless nobody
-// still in got that question right, when those who answered stay in. Those out watch the rest to the end.
-//
-// The end comes when it has stakes: after the last question, once nobody is left in, or once one is left of two or
-// more — the last one in has won, and plays no question alone. Whoever plays a tournament alone (nobody else came,
-// or the last tournament of a full evening took one) plays against the questions: out at the first wrong answer, as
-// "nobody got it right" is no news with nobody else in (play.RevealRoyal).
+// moment. A wrong answer puts nobody out: the game is cut after some questions (play.RoyalCuts) to those ahead, the
+// most right answers first and the quickest of as many, and the last question is a final of three. Those cut watch
+// the rest to the end. The game always reaches its last question, so an evening is an evening for everyone in it.
 //
 // The lobby opens a quarter of an hour before the start; whoever is there at the start plays. A tournament takes up
 // to play.RoyalSize players: when one is full, the next to come start another, on the same questions. Each moves on
-// at its own pace: a question's answer shows once everyone still in has answered, or when its time is up.
+// at its own pace: a question's answer shows once everyone still in has answered, or when its time is up; the answer
+// that a cut comes with shows longer (CutPause), with who goes on.
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was.
@@ -29,8 +26,10 @@ import (
 )
 
 const (
-	// Pause is how long the answer to a question shows (and who went out on it) before the next.
+	// Pause is how long the answer to a question shows (and the standings with it) before the next…
 	Pause = 6 * time.Second
+	// …and CutPause, the answer a cut comes with: who goes on, and who's out.
+	CutPause = 10 * time.Second
 	// results is how long, at least, the standings of an evening's games show once they're over.
 	results = 2 * time.Minute
 	// away is how long a player may be gone from the screen (the line dropped, a phone asleep) and still count as
@@ -133,7 +132,6 @@ type table struct {
 	at      time.Time // when the phase began
 	entered int
 	wentOut int           // on the question whose answer shows
-	spared  bool          // nobody got that question right, so nobody went out on a wrong answer
 	paced   time.Duration // how far into the question its screens were last told of more showing (bank.Paced)
 }
 
@@ -144,7 +142,8 @@ type member struct {
 	seen    time.Time // last on the screen
 	in      bool      // still in the game
 	inQ     bool      // in it for the question now
-	reached int       // questions answered right
+	reached int       // questions answered right, as of the last answer shown
+	ms      int64     // the time the right ones took
 	outAt   int
 	// The question now: whether they've answered, what they gave (as shown), how it went.
 	answered bool
@@ -216,7 +215,7 @@ func (h *Hub) Load(ctx context.Context) error {
 			m.Look, _ = h.game.LookOf(ctx, p.User)
 			if p.Run != 0 {
 				t.entered++
-				m.in, m.reached = !p.Out, p.Right
+				m.in, m.reached, m.ms = !p.Out, p.Right, p.RightMs
 				if p.Out {
 					m.outAt = p.At - 1
 				}
@@ -296,7 +295,7 @@ func (h *Hub) Step(ctx context.Context) {
 				h.changed(t)
 			}
 		case play.RoyalReveal:
-			if now.Sub(t.at) >= Pause {
+			if now.Sub(t.at) >= h.pause(t) {
 				err = h.next(ctx, t, now)
 			}
 		}
@@ -400,14 +399,13 @@ func (h *Hub) begin(ctx context.Context, t *table, now time.Time) error {
 
 // shown is question n on everyone's screen (the database has it so already).
 func (h *Hub) shown(t *table, n int, now time.Time) {
-	t.phase, t.n, t.at, t.wentOut, t.paced, t.spared = play.RoyalQuestion, n, now, 0, 0, false
+	t.phase, t.n, t.at, t.wentOut, t.paced = play.RoyalQuestion, n, now, 0, 0
 	for _, m := range t.members {
 		m.inQ, m.answered, m.given, m.res = m.in, false, nil, play.Result{}
 	}
 }
 
-// Answer takes a player's answer to question n. A wrong one is the way out; once everyone still in has answered,
-// the answer shows.
+// Answer takes a player's answer to question n. Once everyone still in has answered, the answer shows.
 func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -425,10 +423,8 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	if err != nil {
 		return err
 	}
+	// How it went shows to the others with the answer (reveal), not before.
 	m.answered, m.given, m.res = true, res.Given, res
-	if res.Right {
-		m.reached++
-	}
 	now := h.now()
 	for _, o := range t.members {
 		if o.inQ && !o.answered && h.there(o, now) {
@@ -439,14 +435,19 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	return h.reveal(ctx, t, now)
 }
 
-// reveal shows the answer to the question now, and takes out whoever it put out (play.RevealRoyal): those who didn't
-// answer, and those who answered wrong unless nobody got it right (spared).
+// reveal shows the answer to the question now, with the standings it makes, and takes out whoever a cut after it
+// puts out (play.RevealRoyal).
 func (h *Hub) reveal(ctx context.Context, t *table, now time.Time) error {
-	out, spared, err := h.game.RevealRoyal(ctx, t.id)
+	scores, out, err := h.game.RevealRoyal(ctx, t.id)
 	if err != nil {
 		return err
 	}
-	t.phase, t.at, t.wentOut, t.spared = play.RoyalReveal, now, 0, spared
+	t.phase, t.at, t.wentOut = play.RoyalReveal, now, 0
+	for _, s := range scores {
+		if m := t.member(s.User); m != nil {
+			m.reached, m.ms = s.Rights, s.Ms
+		}
+	}
 	for _, m := range t.members {
 		if !m.inQ {
 			continue
@@ -463,16 +464,33 @@ func (h *Hub) reveal(ctx context.Context, t *table, now time.Time) error {
 	return nil
 }
 
-// last says whether t's game ends once the answer showing has shown: after the last question, once nobody's left in
-// it, or once one is left of two or more (who has won).
-func (h *Hub) last(t *table) bool {
-	left := 0
+// keep is how many go on at a cut after question n (play.RoyalKeep), 0 if none: none either where it can't put
+// anyone out, with no more in than it keeps (two players, or a few after an earlier cut). Those in now are those in
+// for question n, if it's the question now, or at most those who will be, for one ahead.
+func (t *table) keep(n int) int {
+	k, in := play.RoyalKeep(n, t.entered), 0
 	for _, m := range t.members {
-		if m.in {
-			left++
+		if (n == t.n && m.inQ) || (n != t.n && m.in) {
+			in++
 		}
 	}
-	return left == 0 || (left == 1 && t.entered > 1) || t.n+1 >= len(h.night.picks) || h.night.dealt[t.n+1] == nil
+	if k >= in {
+		return 0
+	}
+	return k
+}
+
+// pause is how long the answer showing shows.
+func (h *Hub) pause(t *table) time.Duration {
+	if t.keep(t.n) > 0 {
+		return CutPause
+	}
+	return Pause
+}
+
+// last says whether t's game ends once the answer showing has shown: after the last question.
+func (h *Hub) last(t *table) bool {
+	return t.n+1 >= len(h.night.picks) || h.night.dealt[t.n+1] == nil
 }
 
 // next shows the next question, or ends the game (last).
@@ -638,11 +656,11 @@ type View struct {
 	Tables  int `json:"tables"`
 	N       int `json:"n"`
 	Entered int `json:"entered"`
-	// Left is how many are still in; WentOut, how many went out on the question whose answer shows; Spared, that
-	// nobody got it right, so those who answered stay in.
-	Left    int  `json:"left"`
-	WentOut int  `json:"wentOut"`
-	Spared  bool `json:"spared,omitempty"`
+	// Left is how many are still in; WentOut, how many went out on the question whose answer shows (a cut).
+	Left    int `json:"left"`
+	WentOut int `json:"wentOut"`
+	// Cut is the game's next cut: the one the answer showing comes with, while it shows (none once the final's on).
+	Cut *CutView `json:"cut,omitempty"`
 	// Last says the game ends once the answer showing has shown: the standings come next.
 	Last     bool          `json:"last,omitempty"`
 	Players  []PlayerView  `json:"players"`
@@ -653,14 +671,36 @@ type View struct {
 	Delta int   `json:"delta,omitempty"`
 }
 
+// CutView is a cut of the game: after which question (counted from 1), how many of those who began go on, and the
+// line, as the standings are now: the score of the last who'd go on (nil: everyone in would).
+type CutView struct {
+	After int        `json:"after"`
+	Keep  int        `json:"keep"`
+	Line  *ScoreView `json:"line,omitempty"`
+	// Now says it's the answer showing that the cut comes with: those behind the line are out.
+	Now bool `json:"now,omitempty"`
+}
+
+// ScoreView is a score: right answers, and the time they took.
+type ScoreView struct {
+	Rights int   `json:"rights"`
+	Ms     int64 `json:"ms"`
+}
+
 type PlayerView struct {
 	play.Look
 	// Key tells players apart in a tournament (names may repeat).
-	Key     int    `json:"key"`
-	Name    string `json:"name"`
-	Tag     string `json:"tag"`
-	In      bool   `json:"in"`
-	Reached int    `json:"reached"`
+	Key  int    `json:"key"`
+	Name string `json:"name"`
+	Tag  string `json:"tag"`
+	In   bool   `json:"in"`
+	// Reached is how many they've answered right (as of the last answer shown), and Ms the time those took.
+	Reached int   `json:"reached"`
+	Ms      int64 `json:"ms"`
+	// Rank is where they stand now (those level share it): the place, once it's ended. Goes says they'd go on at the
+	// next cut as they stand (those level with its line too), or have gone on at the cut the answer showing comes with.
+	Rank int  `json:"rank"`
+	Goes bool `json:"goes,omitempty"`
 	// OutAt is the question they went out on (-1: they haven't).
 	OutAt    int  `json:"outAt"`
 	Online   bool `json:"online"`
@@ -716,7 +756,6 @@ func (h *Hub) View(viewer int64) View {
 		return v
 	}
 	v.Phase, v.N, v.Entered, v.WentOut = t.phase, t.n, t.entered, t.wentOut
-	v.Spared = t.phase == play.RoyalReveal && t.spared
 	v.Last = t.phase == play.RoyalReveal && h.last(t)
 	if me != nil {
 		v.In, v.Out = true, t.phase != play.RoyalLobby && !me.in
@@ -730,7 +769,7 @@ func (h *Hub) View(viewer int64) View {
 			v.Left++
 		}
 		v.Players = append(v.Players, PlayerView{
-			Look: m.Look, Key: m.key, Name: m.Name, Tag: m.Tag, In: m.in, Reached: m.reached, OutAt: m.outAt,
+			Look: m.Look, Key: m.key, Name: m.Name, Tag: m.Tag, In: m.in, Reached: m.reached, Ms: m.ms, OutAt: m.outAt,
 			Online: h.online[m.ID] > 0, Answered: m.answered, Place: m.place, Delta: m.delta, Me: m == me,
 		})
 	}
@@ -739,17 +778,37 @@ func (h *Hub) View(viewer int64) View {
 		v.Left = len(t.members)
 	case play.RoyalEnd:
 		slices.SortStableFunc(v.Players, func(a, b PlayerView) int { return a.Place - b.Place })
+		for i := range v.Players {
+			v.Players[i].Rank = v.Players[i].Place
+		}
 	default:
-		// Those still in first, then those out, the last to go out first.
-		slices.SortStableFunc(v.Players, func(a, b PlayerView) int {
+		// Those still in first, then those out, the last to go out first; each as they stand.
+		ahead := func(a, b PlayerView) int {
 			if a.In != b.In {
 				if a.In {
 					return -1
 				}
 				return 1
 			}
-			return b.OutAt - a.OutAt
-		})
+			if a.OutAt != b.OutAt {
+				return b.OutAt - a.OutAt
+			}
+			return play.RoyalAhead(play.RoyalScore{Rights: a.Reached, Ms: a.Ms}, play.RoyalScore{Rights: b.Reached, Ms: b.Ms})
+		}
+		slices.SortStableFunc(v.Players, ahead)
+		for i := range v.Players {
+			v.Players[i].Rank = i + 1
+			if i > 0 && ahead(v.Players[i-1], v.Players[i]) == 0 {
+				v.Players[i].Rank = v.Players[i-1].Rank
+			}
+		}
+		v.Cut = h.cut(t, v.Players)
+		if v.Cut != nil {
+			for i, p := range v.Players {
+				v.Players[i].Goes = p.In && (v.Cut.Line == nil ||
+					play.RoyalAhead(play.RoyalScore{Rights: p.Reached, Ms: p.Ms}, play.RoyalScore{Rights: v.Cut.Line.Rights, Ms: v.Cut.Line.Ms}) <= 0)
+			}
+		}
 	}
 	if (t.phase == play.RoyalQuestion || t.phase == play.RoyalReveal) && n.dealt[t.n] != nil {
 		d := n.dealt[t.n]
@@ -766,7 +825,7 @@ func (h *Hub) View(viewer int64) View {
 		}
 		if t.phase == play.RoyalReveal {
 			q.LeftMs = 0
-			q.NextMs = max(1, (Pause - now.Sub(t.at)).Milliseconds())
+			q.NextMs = max(1, (h.pause(t) - now.Sub(t.at)).Milliseconds())
 			q.Reveal = &RevealView{Answer: d.Reveal(h.game.Crowd(d.Question().Base().ID))}
 			if me != nil && me.inQ {
 				r := me.res
@@ -777,4 +836,38 @@ func (h *Hub) View(viewer int64) View {
 		v.Question = q
 	}
 	return v
+}
+
+// cut is t's next cut as its players (in their order, those in first) see it: the one after the question now, or a later
+// one (none once no cut is left that can put anyone out).
+func (h *Hub) cut(t *table, players []PlayerView) *CutView {
+	from := t.n
+	if t.phase == play.RoyalReveal && t.keep(t.n) == 0 {
+		from++ // the answer showing has no cut: the next one's ahead
+	}
+	for n := from; n < len(h.night.picks)-1; n++ {
+		keep := t.keep(n)
+		if keep == 0 {
+			continue
+		}
+		c := &CutView{After: n + 1, Keep: keep, Now: t.phase == play.RoyalReveal && n == t.n}
+		in := 0
+		for _, p := range players {
+			if p.In {
+				in++
+			}
+		}
+		if c.Now {
+			// Those out are out already: the line is the last who went on.
+			if in > 0 {
+				p := players[in-1]
+				c.Line = &ScoreView{Rights: p.Reached, Ms: p.Ms}
+			}
+		} else if in > keep {
+			p := players[keep-1]
+			c.Line = &ScoreView{Rights: p.Reached, Ms: p.Ms}
+		}
+		return c
+	}
+	return nil
 }

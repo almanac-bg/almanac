@@ -300,8 +300,7 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	}
 	r.ms += ms
 	r.shownAt = sql.NullInt64{}
-	// A Роял run goes on after a wrong answer until the answer shows: whether it's the way out is the tournament's to
-	// say (RevealRoyal), once it knows how everyone answered.
+	// A Роял run goes on after a wrong answer: who goes on is the tournament's to say, at its cuts (RevealRoyal).
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}

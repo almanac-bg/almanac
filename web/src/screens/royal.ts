@@ -1,7 +1,8 @@
-// Роял: every evening at 21:00, live. Up to fifty players on the same question at the same moment, easy to hard in
-// three rounds; the first wrong answer is the way out, and those out watch the rest to the end, which comes once one
-// is left of several (who has won). The lobby opens a quarter of an hour before; whoever is on this screen at the
-// start plays.
+// Роял: every evening at 21:00, live. Up to fifty players on the same fifteen questions at the same moment, easy to
+// hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11 and 14 those with the most right go
+// on (of as many, the quicker), and the last question is a final of three; those cut watch the rest to the end. Each
+// answer shows with the standings and the next cut's line. The lobby opens a quarter of an hour before; whoever is on
+// this screen at the start plays.
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
 
@@ -11,7 +12,7 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { place } from "../lib/ordinal.ts";
+import { ordinal, place } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
@@ -39,9 +40,10 @@ interface Evening {
   n: number;
   entered: number;
   left: number;
+  /** How many went out on the answer showing (a cut). */
   wentOut: number;
-  /** Nobody got the question whose answer shows right, so those who answered it stay in. */
-  spared?: boolean;
+  /** The next cut: the one the answer showing comes with, while it shows (none in the final). */
+  cut?: Cut;
   /** The game ends once the answer showing has shown: the standings come next. */
   last?: boolean;
   players: Player[];
@@ -67,12 +69,32 @@ interface Evening {
   delta?: number;
 }
 
+/** A cut of the game: after which question, how many go on, and the line (the last who'd go on, as it stands). */
+interface Cut {
+  after: number;
+  keep: number;
+  line?: Score;
+  /** It's the answer showing that the cut comes with. */
+  now?: boolean;
+}
+
+interface Score {
+  rights: number;
+  ms: number;
+}
+
 interface Player {
   key: number;
   name: string;
   tag: string;
   in: boolean;
+  /** Right answers so far, and the time they took (which tells apart those with as many). */
   reached: number;
+  ms: number;
+  /** Where they stand now (those level share it). */
+  rank: number;
+  /** They'd go on at the next cut as they stand (or have, at the cut showing). */
+  goes?: boolean;
   /** The question they went out on (-1: they haven't). */
   outAt: number;
   online: boolean;
@@ -117,11 +139,22 @@ function left(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+const rights = (n: number) => `${n} ${n === 1 ? "верен" : "верни"}`;
+
 /** How far a player got, in words: how many right. */
 function reach(p: Player | Past["players"][number], length: number): string {
   if (p.reached >= length) return `всичките ${length}!`;
-  return `${p.reached} ${p.reached === 1 ? "верен" : "верни"}`;
+  return rights(p.reached);
 }
+
+/** Seconds, to a tenth: „41,3 с“. */
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1).replace(".", ",")} с`;
+
+/** A score in words: „4 верни, 41,3 с“. */
+const scored = (s: Score) => `${rights(s.rights)}, ${seconds(s.ms)}`;
+
+/** „8-ия въпрос“. */
+const nth = (n: number) => `${ordinal(n)}я въпрос`;
 
 const signed = (d: number) => `${d > 0 ? "+" : ""}${d}`;
 const delta = (d?: number) => (d ? h("span", { class: d > 0 ? "delta up" : "delta down" }, signed(d)) : null);
@@ -198,7 +231,7 @@ export function royal() {
 }
 
 const about =
-  "Всяка вечер в 21:00. До 50 души на едни и същи петнадесет въпроса, в един и същи миг — от лесни към трудни, в три кръга. Първият грешен отговор те изважда.";
+  "Всяка вечер в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.";
 
 /** Before the lobby opens: when the next one is, your rating, and how your last ones went. */
 function soon(view: () => Evening, now: Signal<number>): Child {
@@ -339,8 +372,8 @@ function history(list: Past[]): Child {
   );
 }
 
-/** The players as chips with their avatars: those still in, and (dimmer) those out. */
-function chips(players: Player[], note: (p: Player) => string = () => ""): Child {
+/** The lobby's players as chips with their avatars (dimmer: not on the screen). */
+function chips(players: Player[]): Child {
   return h(
     "ul",
     { class: "players" },
@@ -351,7 +384,6 @@ function chips(players: Player[], note: (p: Player) => string = () => ""): Child
         avatar(p.avatar, { size: "s", name: p.name }),
         p.name,
         p.me ? " (ти)" : "",
-        note(p),
       ),
     ),
   );
@@ -400,7 +432,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
         { class: "lead" },
         v0.in
           ? `Вътре си. Остани на този екран: в ${clock(v0.startsAt)} играят тези, които са тук.`
-          : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Грешният отговор те изважда.`,
+          : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. До 5-ия въпрос никой не отпада.`,
       ),
     ),
     v0.in
@@ -431,47 +463,81 @@ function head(v: Evening): Child {
   return questionHead(v.n, v.length, `Кръг ${round} · ${topicName(v.question?.category ?? "")}`);
 }
 
-/** How many are still in, of how many began; or, for a tournament of one, that it's against the questions. */
-function still(view: () => Evening): Child {
-  return h("p", { class: "royal-left" }, () => {
+/** Where the game stands for this player: how many are in, their place and score, and the next cut with its line
+ * (as of the last answer shown). */
+function standing(view: () => Evening): Child {
+  return h("div", { class: "royal-standing", role: "status" }, () => {
     const v = view();
     if (v.entered === 1) {
-      return v.in
-        ? "В турнира си само ти: играеш до първия грешен отговор."
-        : "В този турнир играе само един: до първия грешен отговор.";
+      return h(
+        "p",
+        { class: "royal-left" },
+        v.in ? "В турнира си само ти: играеш и петнадесетте въпроса." : "В този турнир играе само един.",
+      );
     }
-    return `В играта: ${v.left} от ${v.entered}`;
+    const me = v.players.find((p) => p.me);
+    const c = v.cut;
+    const where = !me
+      ? null
+      : !me.in
+        ? `Отпадна след ${nth(me.outAt + 1)}. Гледаш до края.`
+        : `Ти си ${ordinal(me.rank)}: ${rights(me.reached)}, ${seconds(me.ms)}.`;
+    let line: string;
+    if (!c) line = "Финал: печели този с най-много верни, а при равни — по-бързият.";
+    else if (c.now) line = "";
+    else if (!c.line) line = `След ${nth(c.after)} продължават първите ${c.keep}: засега всички.`;
+    else
+      line = `След ${nth(c.after)} продължават първите ${c.keep}. Чертата: ${scored(c.line)}${
+        me?.in ? (me.goes ? " — засега продължаваш." : " — под нея си.") : ""
+      }`;
+    return [
+      h("p", { class: "royal-left" }, `В играта: ${v.left} от ${v.entered}`),
+      where ? h("p", { class: "royal-me" }, where) : null,
+      line ? h("p", { class: "royal-line" }, line) : null,
+    ];
   });
 }
 
-/** What the answer showing did to the game: who went out on it, and who's left (the winner, once one is left of
- * several). Nothing for a tournament of one: the verdict says it all. */
-function outcome(v: Evening): string | null {
-  if (v.entered === 1) return null;
-  const out =
-    v.spared && v.wentOut === 1
-      ? "Никой не позна. Отпадна само един, без отговор."
-      : v.spared && v.wentOut > 1
-        ? `Никой не позна. Отпаднаха само ${v.wentOut}, без отговор.`
-        : v.spared
-          ? "Никой не позна, затова никой не отпада."
-          : v.wentOut === 0
-            ? "Никой не отпадна."
-            : v.wentOut === 1
-              ? "Отпадна един."
-              : `Отпаднаха ${v.wentOut}.`;
-  const winner = v.left === 1 && v.last ? v.players.find((p) => p.in) : undefined;
-  const left =
-    v.left === 0
-      ? "Не остана никой."
-      : winner?.me
-        ? "Остана само ти: печелиш Роял!"
-        : winner
-          ? `Остана само ${winner.name}: печели Роял.`
-          : v.left === 1
-            ? `Остава един от ${v.entered}.`
-            : `Остават ${v.left} от ${v.entered}.`;
-  return `${out} ${left}`;
+/** What a cut did, as its answer shows: how many go on, and whether you do. */
+function cutSaid(v: Evening): string | null {
+  if (!v.cut?.now || v.entered === 1) return null;
+  const me = v.players.find((p) => p.me);
+  const went =
+    v.wentOut === 0
+      ? `Отсяване: продължават всички (${v.left}).`
+      : `Отсяване: продължават ${v.left} от ${v.left + v.wentOut}.`;
+  const you = !me ? "" : me.in ? " Продължаваш!" : me.outAt === v.n ? " Отпадаш." : "";
+  return went + you;
+}
+
+/** The standings as the answer showing leaves them: those who go on (or would, at the next cut) marked, the line
+ * between, and those out below. */
+function standings(v: Evening): Child {
+  const c = v.cut;
+  const rows: Child[] = [];
+  v.players.forEach((p, i, all) => {
+    rows.push(
+      h(
+        "li",
+        {
+          class: ["row", p.goes && "up", !p.in && "out", p.me && "me"].filter(Boolean).join(" "),
+        },
+        h("span", { class: "place" }, String(p.rank)),
+        who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
+        h(
+          "span",
+          { class: "royal-reach" },
+          h("span", null, rights(p.reached)),
+          h("span", { class: "muted" }, p.in ? seconds(p.ms) : `до ${ordinal(p.outAt + 1)}я`),
+        ),
+      ),
+    );
+    const next = all[i + 1];
+    if (c && p.goes && next && !next.goes) {
+      rows.push(h("li", { class: "league-line up" }, c.now ? "Продължават" : `Дотук продължават след ${nth(c.after)}`));
+    }
+  });
+  return h("section", { class: "board league-board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
 }
 
 function question(view: () => Evening, first: Evening): Child {
@@ -526,7 +592,7 @@ function question(view: () => Evening, first: Evening): Child {
       );
     },
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    still(view),
+    standing(view),
   );
 }
 
@@ -535,8 +601,8 @@ function reveal(view: () => Evening, first: Evening): Child {
   const r = q?.reveal;
   if (!q || !r) return null;
   const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
-  if (r.mine) playAnswer(kind, r.right ? first.n + 1 : 0);
-  const said = outcome(first);
+  if (r.mine) playAnswer(kind, r.right ? 1 : 0);
+  const said = cutSaid(first);
   return h(
     "article",
     { class: "question" },
@@ -544,27 +610,12 @@ function reveal(view: () => Evening, first: Evening): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
-    r.mine
-      ? verdict(
-          kind,
-          r.points,
-          r.missed
-            ? "Без отговор. Отпадаш."
-            : r.right
-              ? undefined
-              : first.spared
-                ? "Никой не позна: оставаш."
-                : "Отпадаш.",
-          r.speed,
-        )
-      : null,
+    r.mine ? verdict(kind, r.points, r.missed ? "Без отговор" : undefined, r.speed) : null,
     crowdLine(q.view.type, r.answer.crowd, r.mine && r.right),
-    said ? h("p", { class: "royal-left" }, said) : null,
+    said ? h("p", { class: "royal-cut", role: "status" }, said) : null,
+    standing(view),
     upNext(q.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
-    () => {
-      const v = view();
-      return chips(v.players, (p) => (p.in ? "" : ` · отпадна на ${p.outAt + 1}`));
-    },
+    standings(first),
   );
 }
 
@@ -599,7 +650,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
             { class: "lead" },
             me.reached >= first.length
               ? `Всичките ${first.length} верни.`
-              : // Of the questions they answered: the game may have ended before its last.
+              : // Of the questions they answered: those out, to their cut.
                 `${me.reached} от ${me.outAt >= 0 ? me.outAt + 1 : first.n + 1} верни.`,
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )

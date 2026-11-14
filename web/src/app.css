@@ -817,6 +817,32 @@
     text-align: center;
   }
 
+  /* Where the game stands for you: your place and score, and the next cut's line. */
+  .royal-standing {
+    display: grid;
+    gap: var(--space-1);
+    text-align: center;
+  }
+
+  .royal-standing p {
+    margin: 0;
+  }
+
+  .royal-line {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  /* What a cut did, as its answer shows. */
+  .royal-cut {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--sunken);
+    font-weight: 800;
+    text-align: center;
+  }
+
   .royal-past {
     display: grid;
     gap: 2px;
