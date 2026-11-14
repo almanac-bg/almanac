@@ -1,4 +1,4 @@
-// АЛМАНАХ's web client: the mark and the name, the four main places (in the header on a big screen, a bar at the
+// АЛМАНАХ's web client: the mark and the name, the six main places (in the header on a big screen, a bar at the
 // bottom of a phone's), and the screen the router puts under them.
 
 import { type ApiError, api } from "./lib/api.ts";
@@ -26,12 +26,17 @@ import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 
-/** The four main places: where each goes, its name and icon, and which paths are part of it. */
-const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
-  ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  ["/rewards", "Награди", "award", (p) => p === "/rewards"],
-  ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
+/**
+ * The six main places: where each goes, its name (and the part of it left out where the bar is narrow) and icon, and
+ * which paths are part of it.
+ */
+const links: [href: string, label: string, wide: string, icon: string, here: (p: string) => boolean][] = [
+  ["/", "Начало", "", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
+  ["/friends", "Приятели", "", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
+  ["/ranks", "Класации", "", "podium", (p) => p === "/ranks"],
+  ["/rewards", "Награди", "", "award", (p) => p === "/rewards"],
+  ["/almanac", "Алманах", "Моят ", "book", (p) => p === "/almanac"],
+  ["/me", "Профил", "", "user", (p) => /^\/(me|settings)$/.test(p)],
 ];
 
 reportErrors();
@@ -53,22 +58,22 @@ if (root) {
       h(
         "nav",
         { class: "tabs", "aria-label": "Основно" },
-        links.map(([href, label, icon, here]) =>
+        links.map(([href, label, wide, icon, here]) =>
           h(
             "a",
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // A duel waits for the player: a dot on Начало; someone asks to be friends: a dot on Профил.
+              // A duel waits for the player: a dot on Начало; someone asks to be friends: a dot on Приятели.
               class: () =>
-                (href === "/" && challenges().length) || (href === "/me" && friendRequests()) ? "news" : "",
+                (href === "/" && challenges().length) || (href === "/friends" && friendRequests()) ? "news" : "",
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
-            h("span", { class: "tab-label" }, label),
+            h("span", { class: "tab-label" }, wide ? h("span", { class: "tab-wide" }, wide) : null, label),
             () =>
               href === "/" && challenges().length
                 ? h("span", { class: "sr" }, " (дуел те чака)")
-                : href === "/me" && friendRequests()
+                : href === "/friends" && friendRequests()
                   ? h("span", { class: "sr" }, " (покана за приятелство)")
                   : null,
           ),

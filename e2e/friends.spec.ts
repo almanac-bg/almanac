@@ -95,8 +95,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText(`@${tag}`);
 
-  // Ana sees the dot on Профил and the request on Приятели, and says yes.
-  await a.goto("/friends");
+  // Ana sees the dot on Приятели in the bar and the request there, and says yes.
+  await a.goto("/");
+  const bar = a.getByRole("navigation", { name: "Основно" });
+  await expect(bar.getByRole("link", { name: /Приятели/ })).toHaveClass(/news/);
+  await bar.getByRole("link", { name: /Приятели/ }).click();
+  await expect(a).toHaveURL(/\/friends$/);
   await expect(a.locator(".invitation")).toContainText("иска да сте приятели");
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
