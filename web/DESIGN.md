@@ -134,7 +134,8 @@ takes a token.
 
 - **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
   more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds. A question never opens in a tab that's out of sight.
+  answer with its standings for 6 seconds; a live duel shows both answers for 4 seconds (6 for a number, an order or
+  a match). A question never opens in a tab that's out of sight.
 - **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
   the last answer (of a run, a duel or a room), not between questions.
 - **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
@@ -157,7 +158,7 @@ Every element that looks like a game measures something the game already counts:
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                                                                                                                              | Result, Профил               |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                      | Room boards                  |
-| Duels        | Played in each one's own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                   | Дуел, Профил                 |
+| Duels        | Live with whoever comes (a recording of a real game if nobody does in 30 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                         | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                     | Дуел, Роял, Профил, Класации |
 | Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; the first wrong answer is out, then watch                                                                                        | Роял, Класации               |
 | Goals        | Three a day (the day's questions, and two drawn), each 100 XP once done, told at the game's end                                                                                                                                             | Начало, result               |

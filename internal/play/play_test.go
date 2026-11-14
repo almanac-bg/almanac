@@ -671,10 +671,10 @@ func TestFriendRequests(t *testing.T) {
 	}
 }
 
-func TestAsyncDuels(t *testing.T) {
+func TestLiveDuels(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
+	ana, bo, gal := w.user(), w.user(), w.user()
 	var told []DuelNews
 	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
 	rating := func(id int64) int {
@@ -682,94 +682,167 @@ func TestAsyncDuels(t *testing.T) {
 		return s.Rating
 	}
 
-	// Nothing recorded yet: Ana's duel is her own, open, on fresh questions; she plays it and it waits.
-	s, aDuel, err := w.g.FindDuel(ctx, ana)
-	if err != nil || len(w.picks(s.ID)) != Length {
-		t.Fatalf("Ana's duel: %+v %v", s, err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 1 || d[0].State != "wait" || d[0].Opponent != nil {
-		t.Fatalf("Ana's waiting duel: %+v", d)
+	// Nothing recorded yet: nobody to play against.
+	if _, err := w.g.StartRecorded(ctx, gal); !errors.Is(err, ErrNobody) {
+		t.Fatalf("a recording out of nothing: %v", err)
 	}
 
-	// Bo asks for one: he takes Ana's, plays it worse, and both get the result.
-	s, bDuel, err := w.g.FindDuel(ctx, bo)
-	if err != nil || bDuel != aDuel {
-		t.Fatalf("Bo didn't take Ana's duel: %d %v", bDuel, err)
+	// Ana and Bo, live: the same questions, a run each; a duel under way isn't in their lists yet.
+	l, err := w.g.StartLive(ctx, ana, bo)
+	if err != nil || len(l.Picks) != Length || l.Users != [2]int64{ana, bo} {
+		t.Fatalf("a live duel: %+v %v", l, err)
 	}
-	if d, _ := w.g.DuelsOf(ctx, bo); d[0].State != "play" || d[0].Opponent.Points != 0 {
-		t.Fatalf("Bo sees Ana's score before playing: %+v", d[0].Opponent)
+	if !slices.Equal(w.picks(l.Runs[0]), w.picks(l.Runs[1])) {
+		t.Fatal("different questions for the two")
 	}
-	w.play(bo, s.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 0 {
+		t.Fatalf("a live duel listed while it's played: %+v", d)
+	}
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
 	da, _ := w.g.DuelsOf(ctx, ana)
 	db, _ := w.g.DuelsOf(ctx, bo)
-	if da[0].State != "won" || db[0].State != "lost" || da[0].Delta <= 0 || db[0].Delta >= 0 ||
-		rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
-		t.Fatalf("the result: %+v / %+v, ratings %d %d", da[0], db[0], rating(ana), rating(bo))
+	if len(da) != 1 || da[0].Kind != "live" || da[0].State != "won" || db[0].State != "lost" || da[0].Friendly ||
+		da[0].Delta <= 0 || rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
+		t.Fatalf("the result: %+v / %+v", da, db)
 	}
-	full := AllRight
-	for n := range Length {
-		full += WorthOf(w.question(s.ID, n), 1, 3*time.Second, n+1).Points // w.play answers after 3 s
-	}
-	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != full {
-		t.Fatalf("scores after the end: %+v / %+v, want %d", da[0].Opponent, db[0].Opponent, full)
-	}
-	if len(told) != 2 || told[0].Kind != "result" {
+	if len(told) != 2 || told[0].Kind != "result" || told[0].Friendly {
 		t.Fatalf("told: %+v", told)
 	}
 
-	// A friend asked: Vi hears once Ana has played, and plays when she can.
+	// Again the same day: a friendly, the result kept but no rating moved.
+	before := [2]int{rating(ana), rating(bo)}
+	l, _ = w.g.StartLive(ctx, bo, ana)
+	w.play(bo, l.Runs[0], repeat(w.right, Length)...)
+	w.play(ana, l.Runs[1], repeat(w.wrong, Length)...)
+	if da, _ = w.g.DuelsOf(ctx, ana); da[0].State != "lost" || !da[0].Friendly || da[0].Delta != 0 ||
+		[2]int{rating(ana), rating(bo)} != before {
+		t.Fatalf("a second duel the same day: %+v, ratings %d %d", da[0], rating(ana), rating(bo))
+	}
+	// The next day it counts again.
+	w.wait(24 * time.Hour)
+	l, _ = w.g.StartLive(ctx, ana, bo)
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
+	if da, _ = w.g.DuelsOf(ctx, ana); da[0].Friendly || da[0].Delta <= 0 {
+		t.Fatalf("the next day's duel: %+v", da[0])
+	}
+
+	// Gal, against a recording: its answers come with it, and only her rating moves.
+	before = [2]int{rating(ana), rating(bo)}
+	l, err = w.g.StartRecorded(ctx, gal)
+	if err != nil || l.Users[0] != gal || l.Users[1] == gal || len(l.Recording) != Length {
+		t.Fatalf("against a recording: %+v %v", l, err)
+	}
+	if l.Recording[0].Ms == 0 || (l.Recording[0].Right && l.Recording[0].Points == 0) {
+		t.Fatalf("a recorded answer: %+v", l.Recording[0])
+	}
+	w.play(gal, l.Runs[0], repeat(w.wrong, Length)...)
+	d, _ := w.g.DuelsOf(ctx, gal)
+	if len(d) != 1 || !d[0].Recorded || d[0].Opponent == nil || d[0].State == "won" || rating(gal) > StartRating {
+		t.Fatalf("Gal's duel against a recording: %+v, rating %d", d, rating(gal))
+	}
+	if [2]int{rating(ana), rating(bo)} != before {
+		t.Fatal("a recorded player's rating moved")
+	}
+
+	// Called off (a player never came), and cut off (the server restarted): over, without a result.
+	l, _ = w.g.StartLive(ctx, ana, gal)
+	if err := w.g.CancelLive(ctx, l.DuelID); err != nil {
+		t.Fatal(err)
+	}
+	l2, _ := w.g.StartLive(ctx, bo, gal)
+	if err := w.g.EndLive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{l.DuelID, l2.DuelID} {
+		var outcome string
+		_ = w.db.Read.QueryRow(`SELECT outcome FROM duels WHERE id = ?`, id).Scan(&outcome)
+		if outcome != "expired" {
+			t.Fatalf("duel %d: %q", id, outcome)
+		}
+	}
+}
+
+func TestFriendDuels(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, vi, stranger := w.user(), w.user(), w.user()
+	var told []DuelNews
+	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
+	if _, _, err := w.g.ChallengeFriend(ctx, ana, stranger); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("challenged a stranger: %v", err)
+	}
 	w.befriend(ana, vi)
-	s, fDuel, err := w.g.ChallengeFriend(ctx, ana, vi)
+
+	// Ana plays first; Vi can't before, and hears of it only once Ana has finished.
+	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.g.PlayDuel(ctx, vi, fDuel); !errors.Is(err, ErrNoDuel) {
+	if _, err := w.g.PlayDuel(ctx, vi, id); !errors.Is(err, ErrNoDuel) {
 		t.Fatalf("Vi played before Ana: %v", err)
 	}
-	told = nil
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
-		t.Fatalf("Vi wasn't asked: %+v", told)
+	if c, _ := w.g.Challenges(ctx, vi); len(c) != 0 {
+		t.Fatalf("Vi challenged before Ana played: %+v", c)
 	}
-	vs, err := w.g.PlayDuel(ctx, vi, fDuel)
+	w.wait(time.Hour)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" || told[0].DuelID != id {
+		t.Fatalf("Vi wasn't told: %+v", told)
+	}
+	// Her 48 hours start now, not when Ana began.
+	c, _ := w.g.Challenges(ctx, vi)
+	if len(c) != 1 || c[0].ID != id || c[0].ExpiresAt != w.now.Add(FriendFor).UnixMilli() {
+		t.Fatalf("Vi's challenge: %+v", c)
+	}
+	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "play" || d[0].Opponent.Points != 0 {
+		t.Fatalf("Vi sees Ana's score before playing: %+v", d[0])
+	}
+	vs, err := w.g.PlayDuel(ctx, vi, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(vi, vs.ID, repeat(w.right, Length)...)
-	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State == "play" || d[0].State == "wait" {
+	w.play(vi, vs.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "lost" || d[0].Delta >= 0 {
 		t.Fatalf("Vi's duel after both played: %+v", d[0])
 	}
 
-	// Gal: no open duel waits now, so hers is on a recorded run's questions; nobody takes it in time, and it's
-	// settled against the recording — only her rating moves.
-	s, gDuel, err := w.g.FindDuel(ctx, gal)
-	if err != nil {
+	// A friend may say no; and one not played in time ends without a result.
+	_, no, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	if err := w.g.DeclineDuel(ctx, vi, no); err != nil {
 		t.Fatal(err)
 	}
-	w.play(gal, s.ID, repeat(w.wrong, Length)...)
-	before := map[int64]int{ana: rating(ana), bo: rating(bo), vi: rating(vi)}
-	w.wait(OpenFor + time.Minute)
+	s, late, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	w.wait(FriendFor - time.Minute)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	d, _ := w.g.DuelsOf(ctx, gal)
-	if d[0].ID != gDuel || !d[0].Recorded || d[0].State != "lost" || rating(gal) >= StartRating {
-		t.Fatalf("Gal's duel against a recording: %+v, rating %d", d[0], rating(gal))
+	if c, _ := w.g.Challenges(ctx, vi); len(c) != 1 || c[0].ID != late {
+		t.Fatalf("expired early: %+v", c)
 	}
-	for id, r := range before {
-		if rating(id) != r {
-			t.Fatalf("a recorded player's rating moved: %d %d→%d", id, r, rating(id))
-		}
-	}
-
-	// A friend may say no.
-	_, nDuel, _ := w.g.ChallengeFriend(ctx, ana, vi)
-	if err := w.g.DeclineDuel(ctx, vi, nDuel); err != nil {
+	w.wait(2 * time.Minute)
+	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := w.g.DuelsOf(ctx, ana); d[len(d)-1].State != "declined" && d[0].State != "declined" {
-		t.Fatalf("a declined duel: %+v", d)
+	states := map[int64]string{}
+	d, _ := w.g.DuelsOf(ctx, ana)
+	for _, x := range d {
+		states[x.ID] = x.State
+	}
+	if states[no] != "declined" || states[late] != "expired" {
+		t.Fatalf("Ana's duels: %v", states)
+	}
+
+	// At most MaxWaiting challenges wait on friends at once.
+	for range MaxWaiting {
+		if _, _, err := w.g.ChallengeFriend(ctx, ana, vi); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err := w.g.ChallengeFriend(ctx, ana, vi); !errors.Is(err, ErrManyWaiting) {
+		t.Fatalf("one too many: %v", err)
 	}
 }
 

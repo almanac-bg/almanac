@@ -2096,6 +2096,180 @@
     color: var(--wrong-ink);
   }
 
+  /* A friend's challenge, wherever the player is: who, until when, play or say no. */
+  .challenge-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    max-width: 40rem;
+    margin: 0 auto var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--rose) 16%, var(--surface));
+    box-shadow: inset 0 0 0 1px var(--rose-ink);
+  }
+
+  .challenge-text {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+  }
+
+  .challenge-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  /* A live duel: the wait, the two face to face, the board above each question, the other's answer. */
+  .live-count {
+    margin: 0;
+    color: var(--rose-ink);
+    font: 900 7.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  .live-faces {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+  }
+
+  .live-face {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .live-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 1.125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-division {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .live-vs {
+    color: var(--text-muted);
+    font-weight: 800;
+  }
+
+  .live-board {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .live-side {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--elev-1);
+  }
+
+  .live-side.me {
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--line-strong);
+  }
+
+  .live-who {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .live-side-name {
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-points {
+    margin-left: auto;
+    color: var(--gold-ink);
+    font: 900 1.75rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .live-doing {
+    min-height: 1.25rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .live-theirs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .live-theirs-how {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--wrong-ink);
+    font-weight: 700;
+  }
+
+  .live-theirs-sign {
+    --i: var(--i-cross);
+    width: 14px;
+    height: 14px;
+    background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+
+  .live-theirs.h-right .live-theirs-how {
+    color: var(--right-ink);
+  }
+
+  .live-theirs.h-right .live-theirs-sign {
+    --i: var(--i-check);
+  }
+
+  .live-theirs.h-partial .live-theirs-how,
+  .live-theirs.h-missed .live-theirs-how {
+    color: var(--text-muted);
+  }
+
+  .live-theirs.h-partial .live-theirs-sign,
+  .live-theirs.h-missed .live-theirs-sign {
+    display: none;
+  }
+
+  .live-theirs-points {
+    margin-left: auto;
+    color: var(--gold-ink);
+    font: 900 1.5rem / 1 var(--font-numeral);
+  }
+
   /* The game moving on by itself: a line filling while the answer shows. */
   .up-next {
     display: grid;
