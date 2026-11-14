@@ -208,7 +208,7 @@ func TestRefusesOtherSites(t *testing.T) {
 func TestPages(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string]int{
-		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/nowhere": 404, "/api/nowhere": 404,
+		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/live": 200, "/duel/12": 200, "/duel/other": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
 	} {
