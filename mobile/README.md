@@ -29,9 +29,10 @@ A new build is needed only when this folder changes (a plugin, the icon, the nat
 cd mobile && npm ci && npx cap sync      # after any change here or a new plugin
 ```
 
-- **iOS:** Xcode (`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` if the command-line tools are selected).
-  Open `ios/App/App.xcodeproj`, Product → Archive, then Distribute → App Store Connect. Signing is automatic for the
-  team; the push and associated-domains capabilities come from `App/App.entitlements`.
+- **iOS:** Xcode, with the team's Apple ID in Settings → Accounts. `scripts/ios-upload.sh` builds and uploads to App
+  Store Connect (TestFlight). The team has no registered iPhone, so Xcode's own Product → Archive fails for want of a
+  development profile: the script archives unsigned and has the export sign for the App Store. The entitlements
+  (push, links) are `App/App.entitlements` for Debug (push sandbox) and `App/AppRelease.entitlements` for Release.
 - **Android:** Android Studio (its SDK). `cd android && ./gradlew bundleRelease` makes
   `app/build/outputs/bundle/release/app-release.aab`, signed with the upload key that
   `~/.config/almanac/android-upload.properties` (or the file `ALMANAC_UPLOAD_KEY` names) gives:
