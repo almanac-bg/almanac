@@ -4,12 +4,11 @@ import (
 	"context"
 	"slices"
 	"strconv"
-	"strings"
 )
 
 // The wardrobe: besides the avatar's shape and tone and the title, a frame around the avatar and a pattern behind
-// it. Each is unlocked by something the player has done — a level, an achievement, a division reached — and shows
-// wherever they do. The art is drawn in the client (web/src/art/frame.ts, the .bd-* patterns).
+// it. Each is unlocked by something the player has done — a level, an achievement, a division reached, a place on a
+// season's podium — and shows wherever they do. The art is drawn in the client (web/src/art/frame.ts, the .bd-* patterns).
 
 // Cosmetic is a frame or a pattern as a player may pick it: free, unlocked, or locked with what unlocks it.
 type Cosmetic struct {
@@ -19,13 +18,14 @@ type Cosmetic struct {
 	How    string `json:"how,omitempty"`
 }
 
-// unlock is what makes a cosmetic a player's: a level, an achievement of a tier (any one), one achievement, or a
-// division reached (by the highest rating).
+// unlock is what makes a cosmetic a player's: a level, an achievement of a tier (any one), one achievement, a
+// division reached (by the highest rating), or a season ended in a place (1–3) or better.
 type unlock struct {
 	level    int
 	tier     Tier
 	achieved string
 	division string
+	podium   int
 }
 
 type cosmetic struct {
@@ -42,6 +42,9 @@ var Frames = []cosmetic{
 	{"laurel", "Лавров венец", unlock{tier: Legendary}},
 	{"gem", "Кристал", unlock{division: "diamond"}},
 	{"halo", "Ореол", unlock{division: "legend"}},
+	{"podium3", "Бронзова", unlock{podium: 3}},
+	{"podium2", "Сребърна", unlock{podium: 2}},
+	{"podium1", "Шампионска", unlock{podium: 1}},
 }
 
 // Backdrops, the patterns behind the avatar's shape, from the plainest.
@@ -53,13 +56,13 @@ var Backdrops = []cosmetic{
 	{"stars", "Звезди", unlock{division: "gold"}},
 }
 
-// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, and the
-// seasons they earned gold in (each one's frame, "season-YYYY-MM", is theirs).
+// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, and their
+// places on seasons' podiums.
 type wardrobe struct {
 	level  int
 	earned map[string]int64
 	peak   int
-	golds  []string
+	podium Podium
 }
 
 func (w wardrobe) has(u unlock) bool {
@@ -77,6 +80,9 @@ func (w wardrobe) has(u unlock) bool {
 	case u.division != "":
 		i := slices.IndexFunc(Divisions, func(d Division) bool { return d.ID == u.division })
 		return i >= 0 && w.peak >= Divisions[i].From
+	case u.podium > 0:
+		best := w.podium.best()
+		return best > 0 && best <= u.podium
 	}
 	return true
 }
@@ -98,6 +104,9 @@ func (u unlock) how() string {
 				return "дивизия " + d.Name
 			}
 		}
+	case u.podium > 0:
+		return map[int]string{1: "първо място в сезон", 2: "първо или второ място в сезон",
+			3: "място в първите трима на сезон"}[u.podium]
 	}
 	return ""
 }
@@ -119,27 +128,6 @@ func (w wardrobe) owns(all []cosmetic, id string) bool {
 	return i >= 0 && w.has(all[i].by)
 }
 
-// ownsFrame is whether a frame is the player's: one of Frames unlocked, or a season's they earned gold in.
-func (w wardrobe) ownsFrame(id string) bool {
-	if season, ok := strings.CutPrefix(id, "season-"); ok {
-		return slices.Contains(w.golds, season)
-	}
-	return w.owns(Frames, id)
-}
-
-// seasonFrames are the frames of the seasons a player earned gold in, and this season's, locked until they do.
-func (w wardrobe) seasonFrames(now string) []Cosmetic {
-	var out []Cosmetic
-	for _, s := range w.golds {
-		out = append(out, Cosmetic{ID: "season-" + s, Name: "Сезон " + s})
-	}
-	if !slices.Contains(w.golds, now) {
-		out = append(out, Cosmetic{ID: "season-" + now, Name: "Сезон " + now, Locked: true,
-			How: "златния медал на сезона (" + strconv.Itoa(SeasonTiers[len(SeasonTiers)-1].Stars) + " звезди)"})
-	}
-	return out
-}
-
 func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	var w wardrobe
 	total, err := g.totalXP(ctx, userID)
@@ -153,6 +141,6 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if err = g.DB.Read.QueryRowContext(ctx, `SELECT peak FROM users WHERE id = ?`, userID).Scan(&w.peak); err != nil {
 		return w, err
 	}
-	w.golds, err = g.goldSeasons(ctx, userID)
+	w.podium, err = g.podiumOf(ctx, userID)
 	return w, err
 }

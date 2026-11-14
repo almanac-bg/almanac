@@ -17,6 +17,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
@@ -67,6 +68,7 @@ type Server struct {
 	outbox   *mail.Outbox
 	game     *play.Game
 	rooms    *room.Hub
+	live     *live.Hub
 	royal    *royal.Hub
 	push     *push.Sender
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
@@ -109,6 +111,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game = play.New(d.DB, s.bank.Load)
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
+	s.game.SeasonNews = s.seasonNews
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
 	}
@@ -116,6 +119,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.royal.News = s.royalNews
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
+	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	s.handler = s.routes()
@@ -160,8 +164,10 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
-	api("POST /api/duels", s.startDuel)
+	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
+	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
+	api("POST /api/duels/live/{id}/answer", s.liveAnswer)
 	api("POST /api/duels/{id}/play", s.playDuel)
 	api("DELETE /api/duels/{id}", s.declineDuel)
 	api("GET /api/ranks", s.ranks)
@@ -173,6 +179,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/royal", s.royals)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/season", s.season)
+	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/invites", s.duelInvites)
 	api("POST /api/friends/requests", s.requestFriend)
@@ -229,6 +236,11 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 			NextProtos:   []string{"h2", "http/1.1"},
 		})
 	}
+	// Live duels are played in memory: those the last run of the server left under way are over, without a result.
+	if err := s.game.EndLive(ctx); err != nil {
+		ln.Close()
+		return err
+	}
 	slog.Info("serving", "addr", ln.Addr().String(), "url", s.cfg.PublicURL, "version", s.cfg.Version, "tls", s.cfg.TLSCert != "")
 	srv.RegisterOnShutdown(func() { close(s.closing) })
 	// Роял's games under way before a restart go on.
@@ -259,6 +271,7 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 				return
 			case <-t.C:
 				s.rooms.Sweep()
+				s.live.Sweep()
 				if err := s.game.SettleDue(ctx); err != nil {
 					slog.Error("duels", "err", err)
 				}

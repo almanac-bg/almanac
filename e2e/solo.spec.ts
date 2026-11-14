@@ -8,6 +8,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Започни" }).click();
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
+  // The day's goal is done, said once with its XP.
+  await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+100 XP");
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
@@ -16,11 +18,15 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.reload();
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
-  // The day's goal is done (a star for the season), and the season counts it.
-  // (The other two goals are drawn per day, and a run of the day can finish them too.)
+  // The day's goal stays done. (The other two goals are drawn per day, and a run of the day can finish them too.)
   await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
-  await page.goto("/rewards");
-  await expect(page.locator(".season-stars")).toContainText(/[1-9]\d* ★/);
+  // The XP shows on the board of levels; the season's board waits for ten rated games.
+  await page.goto("/ranks");
+  await expect(page.locator(".season-card")).toContainText("0 от 10");
+  await page.getByRole("tab", { name: "Ниво" }).click();
+  await expect(page.locator(".board .row.me")).toContainText("ниво");
+  await page.getByRole("tab", { name: "Приятели" }).click();
+  await expect(page.locator(".board .row.me")).toBeVisible();
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
