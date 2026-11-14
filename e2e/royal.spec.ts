@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer } from "./play.ts";
+import { answer, playRun } from "./play.ts";
 
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
 // meet in the same one, as players do.
@@ -34,6 +34,9 @@ test("Роял: in from the lobby, live to the first wrong answer (or through al
 
 test("Роял: „Ще дойда“ before the lobby, and Начало's card while it's open", async ({ page }) => {
   test.setTimeout(360_000);
+  // Начало shows the ways to play with others once a first game is finished.
+  await page.goto("/play/history");
+  await playRun(page);
   await page.goto("/royal");
   // „Ще дойда“ shows until the next lobby opens: before it, and under the standings of an evening over (which show a
   // while, here into the next evenings).
