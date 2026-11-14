@@ -176,6 +176,9 @@ function divisionReached(d: Division): Child {
   );
 }
 
+/** How many unlocks a game's news shows one by one. */
+const shownUnlocks = 2;
+
 /** „Ново за теб“: the achievements earned and everything unlocked to wear, in one list (each unlock a tap from being
  * worn), and how a topic's game moved its mastery, in a line. */
 function fresh(n: News): Child {
@@ -190,11 +193,16 @@ function fresh(n: News): Child {
           "ul",
           { class: "unlock-list" },
           n.achievements.map(earned),
-          n.unlocks.map((u) => unlockRow(u, n.avatar)),
+          n.unlocks.slice(0, shownUnlocks).map((u) => unlockRow(u, n.avatar)),
         )
       : null,
     mastery,
-    n.unlocks.length ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба") : null,
+    // A first game unlocks several things at once: two are told here, the rest wait in the wardrobe.
+    n.unlocks.length > shownUnlocks
+      ? h("a", { class: "link", href: "/wardrobe" }, `Още ${n.unlocks.length - shownUnlocks} в гардероба`)
+      : n.unlocks.length
+        ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба")
+        : null,
   );
 }
 

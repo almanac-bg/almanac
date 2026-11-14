@@ -103,27 +103,47 @@ func (a *Accounts) Guest(ctx context.Context) (User, string, error) {
 	return u, token, err
 }
 
-// createUser makes a player with a name and a tag drawn for them (the first free tag), until they choose their own.
+// createUser makes a player with a name and a tag drawn for them, until they choose their own: one animal for both,
+// the one their avatar starts as (Animals), and a number.
 func createUser(tx *sql.Tx, email string) (User, error) {
 	now := store.Now()
 	var mail any
 	if email != "" {
 		mail = email
 	}
-	name := randomName()
+	// The id picks the animal, so the player is made first, under a tag of its own, and named after.
+	var u User
 	for range 50 {
-		tag := randomTag()
-		res, err := tx.Exec(`INSERT INTO users (name, tag, email, created_at, seen_at) VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT (tag) DO NOTHING`, name, tag, mail, now, now)
+		tag := "new" + digits(9)
+		res, err := tx.Exec(`INSERT INTO users (name, tag, email, created_at, seen_at) VALUES ('', ?, ?, ?, ?)
+			ON CONFLICT (tag) DO NOTHING`, tag, mail, now, now)
 		if err != nil {
 			return User{}, err
 		}
 		if n, _ := res.RowsAffected(); n == 1 {
 			id, _ := res.LastInsertId()
-			return User{ID: id, Name: name, Tag: tag, Email: email}, nil
+			u = User{ID: id, Tag: tag, Email: email}
+			break
 		}
 	}
-	return User{}, errors.New("no free tag")
+	if u.ID == 0 {
+		return User{}, errors.New("no free tag")
+	}
+	a := AnimalOf(u.ID)
+	u.Name = a.Name + " " + digits(3)
+	for range 50 {
+		tag := a.Tag + digits(4)
+		res, err := tx.Exec(`UPDATE OR IGNORE users SET name = ?, tag = ? WHERE id = ?`, u.Name, tag, u.ID)
+		if err != nil {
+			return User{}, err
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			u.Tag = tag
+			return u, nil
+		}
+	}
+	_, err := tx.Exec(`UPDATE users SET name = ? WHERE id = ?`, u.Name, u.ID) // every tag of the animal taken: keep "new…"
+	return u, err
 }
 
 // Session finds who a token signs in, and keeps the session alive while it's used.
@@ -385,26 +405,30 @@ var reserved = map[string]bool{
 	"support": true, "help": true, "root": true, "system": true,
 }
 
-// Names a new player starts with: an animal of Bulgaria and a number, until they choose their own.
-var animals = []string{
-	"Сова", "Лисица", "Таралеж", "Видра", "Язовец", "Сърна", "Кос", "Щъркел", "Делфин", "Рис", "Бухал", "Катерица",
-	"Кълвач", "Чапла", "Пеликан", "Костенурка", "Елен", "Вълк", "Мечка", "Орел", "Сокол", "Чучулига", "Славей", "Пъстърва",
+// Animal is what a new player starts as, until they choose: a name (with a number), a tag (with digits) and the
+// avatar of the same animal.
+type Animal struct {
+	Name  string // in Bulgarian, as players read it
+	Tag   string // in Latin letters, as tags are
+	Shape string // the avatar's shape (play.FreeShapes, in the same order)
 }
 
-func randomName() string {
-	i, _ := rand.Int(rand.Reader, big.NewInt(int64(len(animals))))
-	n, _ := rand.Int(rand.Reader, big.NewInt(900))
-	return fmt.Sprintf("%s %d", animals[i.Int64()], 100+n.Int64())
+// Animals are what new players start as: the free avatars' animals, in play.FreeShapes's order (a test keeps it).
+var Animals = []Animal{
+	{"Лисица", "fox", "fox"}, {"Мечка", "bear", "bear"}, {"Котка", "cat", "cat"}, {"Заек", "hare", "hare"},
+	{"Таралеж", "hedgehog", "hedgehog"}, {"Куче", "dog", "dog"}, {"Елен", "deer", "deer"},
+	{"Щъркел", "stork", "stork"}, {"Жаба", "frog", "frog"},
 }
 
-// Tags a new player starts with: an animal's name and four digits, until they choose their own.
-var tagAnimals = []string{
-	"owl", "fox", "hedgehog", "otter", "badger", "deer", "blackbird", "stork", "dolphin", "lynx", "eagle", "falcon",
-	"wolf", "bear", "heron", "pelican", "turtle", "squirrel", "lark", "trout", "beaver", "swallow", "hare", "robin",
-}
+// AnimalOf is the animal a player starts as: the same one play.DefaultAvatar draws for them.
+func AnimalOf(userID int64) Animal { return Animals[max(userID, 0)%int64(len(Animals))] }
 
-func randomTag() string {
-	i, _ := rand.Int(rand.Reader, big.NewInt(int64(len(tagAnimals))))
-	n, _ := rand.Int(rand.Reader, big.NewInt(9000))
-	return fmt.Sprintf("%s%d", tagAnimals[i.Int64()], 1000+n.Int64())
+// digits are n random digits, the first not a zero.
+func digits(n int) string {
+	lo := int64(1)
+	for range n - 1 {
+		lo *= 10
+	}
+	d, _ := rand.Int(rand.Reader, big.NewInt(9*lo))
+	return fmt.Sprint(lo + d.Int64())
 }

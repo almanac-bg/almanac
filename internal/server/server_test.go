@@ -1066,3 +1066,29 @@ func TestOrdinal(t *testing.T) {
 		}
 	}
 }
+
+// A new player starts as one animal: its name, its tag and the avatar drawn for them.
+func TestGuestIsOneAnimal(t *testing.T) {
+	if len(account.Animals) != len(play.FreeShapes) {
+		t.Fatalf("%d animals for %d free avatars", len(account.Animals), len(play.FreeShapes))
+	}
+	for i, a := range account.Animals {
+		if a.Shape != play.FreeShapes[i] {
+			t.Fatalf("animal %d is %q, the free avatar %q", i, a.Shape, play.FreeShapes[i])
+		}
+	}
+	g := start(t)
+	for range 4 {
+		p := g.player()
+		_, out := p.call("POST", "/api/guest", map[string]any{})
+		u, _ := out["user"].(map[string]any)
+		id, _ := u["id"].(float64)
+		a := account.AnimalOf(int64(id))
+		name, _ := u["name"].(string)
+		tag, _ := u["tag"].(string)
+		if !strings.HasPrefix(name, a.Name+" ") || !strings.HasPrefix(tag, a.Tag) ||
+			!strings.HasPrefix(play.DefaultAvatar(int64(id)), a.Shape+"-") {
+			t.Fatalf("a guest %q @%s with the avatar %s", name, tag, play.DefaultAvatar(int64(id)))
+		}
+	}
+}

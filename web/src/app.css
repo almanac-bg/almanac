@@ -3580,9 +3580,6 @@
   .standing .meter-fill {
     background: var(--div);
   }
-  .almanac-head .meter {
-    grid-column: 1 / -1;
-  }
 
   /* A second chance (Втори шанс): the way in from the Almanac, and the note on an answer that put a fact in it. */
   .second-chance {
