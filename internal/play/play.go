@@ -282,7 +282,7 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	var finishedAt any
 	if r.finished {
 		finishedAt = now
-		r.xp += finishXP(r.kind)
+		r.xp += finishXP(r.kind, r.rights, len(r.picks))
 		if r.allRight() {
 			r.points += AllRight
 		}

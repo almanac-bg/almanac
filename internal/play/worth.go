@@ -82,21 +82,25 @@ func speed(took, limit time.Duration) float64 {
 	return max(0, float64(limit-took)/float64(limit-quick))
 }
 
-// XP is what a player earns by playing: it adds up across games, and makes their level. It's for playing and for
-// knowing, never for being quick or drawing harder questions, so that someone still learning a topic, or reading
-// slowly, goes up as surely as anyone. A game's answers and its end earn it here; the day's goals, achievements and
-// a week's first places in the league earn more (progress.go).
+// XP is what a player earns by playing: it adds up across games, and makes their level (and each week's race in the
+// leagues). It's for knowing, with a little for playing: an answer earns XPKnown times its score and XPAnswer for
+// being given, and a game's end earns XPFinish in the share of it answered right, so that tapping at random earns a
+// fraction of what knowing does. Never for being quick or drawing harder questions, so that someone still learning a
+// topic, or reading slowly, goes up as surely as anyone. The day's questions earn XPDay for coming, whatever the
+// score: the day is the habit. The day's goals, achievements and a week's first places in the league earn more
+// (progress.go).
 const (
 	// XPAnswer is what any answer given earns (one left to run out of time, or given up on, earns nothing)…
-	XPAnswer = 10
-	// …and XPKnown more, times its score.
-	XPKnown = 10
-	// XPFinish is for a game played to its end; XPDay more for the day's questions.
+	XPAnswer = 2
+	// …and XPKnown more, times its score: a right answer earns 20 in all.
+	XPKnown = 18
+	// XPFinish is for a game played to its end, in the share of its questions answered right; XPDay more, all of it,
+	// for the day's questions.
 	XPFinish = 50
 	XPDay    = 50
 )
 
-// xp is what an answer earns: something for giving one, more for what it was worth.
+// xp is what an answer earns: a little for giving one, the rest for what it was worth.
 func xp(gr bank.Graded) int {
 	if gr.Given == nil {
 		return 0
@@ -104,10 +108,15 @@ func xp(gr bank.Graded) int {
 	return XPAnswer + int(math.Round(XPKnown*gr.Score))
 }
 
-// finishXP is what playing a game to its end earns.
-func finishXP(kind string) int {
-	if kind == "day" {
-		return XPFinish + XPDay
+// finishXP is what playing a game to its end earns: XPFinish in the share of its questions answered right, and the
+// day's XPDay.
+func finishXP(kind string, rights, total int) int {
+	xp := 0
+	if total > 0 {
+		xp = int(math.Round(float64(XPFinish*rights) / float64(total)))
 	}
-	return XPFinish
+	if kind == "day" {
+		xp += XPDay
+	}
+	return xp
 }
