@@ -45,6 +45,8 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 			if u, err := url.Parse(sub.Endpoint); err == nil {
 				host = u.Host
 			}
+			// The player's words in the log: one line, and short.
+			host = strings.ReplaceAll(strings.ReplaceAll(host[:min(len(host), 100)], "\n", ""), "\r", "")
 			slog.Warn("push: a subscription elsewhere than a known push service", "host", host)
 		}
 		return errBadRequest
