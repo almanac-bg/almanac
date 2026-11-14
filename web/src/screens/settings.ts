@@ -16,7 +16,7 @@ import {
   turnOn,
 } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
-import { setSound, soundOn } from "../lib/sound.ts";
+import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
 import { back } from "../ui.ts";
 
@@ -187,7 +187,13 @@ function sounds(): Child {
     "section",
     null,
     h("h2", null, "Звук"),
-    h("p", { class: "muted" }, "Важи за това устройство."),
+    h(
+      "p",
+      { class: "muted" },
+      quietWhenSilent()
+        ? "Важи за това устройство. Когато телефонът е на тих режим, звуците мълчат."
+        : "Важи за това устройство.",
+    ),
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
     switchRow("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
   );

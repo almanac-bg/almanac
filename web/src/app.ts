@@ -6,6 +6,7 @@ import { type ApiError, api } from "./lib/api.ts";
 import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
+import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
@@ -121,6 +122,7 @@ if (root) {
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   watchWaiting();
   prepareSound();
+  preparePush();
 }
 
 /** A friend has challenged the player: who, until when, and play it or say no. */

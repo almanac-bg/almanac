@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,9 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &sub); err != nil {
 		return err
 	}
+	// Keys come base64url without padding from most browsers; take them with it too.
+	sub.Keys.P256dh = strings.TrimRight(sub.Keys.P256dh, "=")
+	sub.Keys.Auth = strings.TrimRight(sub.Keys.Auth, "=")
 	if err := sub.Check(); err != nil {
 		return errBadRequest
 	}
