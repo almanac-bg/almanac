@@ -85,7 +85,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Hardest, Easiest                              []stat
 	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays}
 	today := s.game.Today()
-	if cohorts, active, err := s.game.Retention(ctx, 30); err == nil {
+	if cohorts, active, err := s.game.Retention(ctx, play.RetentionDays[len(play.RetentionDays)-1]+10); err == nil {
 		data.Active = active
 		// Overall: of the players whose day N has come, the share that came back on it.
 		news, backs := make([]int, len(play.RetentionDays)), make([]int, len(play.RetentionDays))
@@ -128,7 +128,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 			if rp == nil {
 				rp = &reported{ID: id}
 				if q, ok := b.Get(id); ok {
-					rp.Category, rp.Text, rp.Answer = q.Base().Category, q.Base().Text, bank.AnswerText(q)
+					rp.Category, rp.Text, rp.Answer = q.Base().Category, q.Base().Text, bank.KeeperText(q)
 				}
 				byID[id] = rp
 				order = append(order, id)
@@ -159,7 +159,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 			st.Seconds = ms / 1000
 			st.Share = 100 * st.Right / st.Answers
 			if q, ok := b.Get(st.ID); ok {
-				st.Text, st.Answer = q.Base().Text, bank.AnswerText(q)
+				st.Text, st.Answer = q.Base().Text, bank.KeeperText(q)
 			}
 			out = append(out, st)
 		}

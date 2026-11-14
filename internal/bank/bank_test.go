@@ -730,3 +730,24 @@ func TestChoiceOfPictures(t *testing.T) {
 		t.Error("a choice of pictures with a picture over it passed")
 	}
 }
+
+func TestAnswerTextIsBulgarian(t *testing.T) {
+	for _, c := range []struct {
+		q    Question
+		want string
+	}{
+		{&Number{Answer: 40075, Step: 1, Unit: "км"}, "40 075 км"},
+		{&Number{Answer: 6.5, Step: 0.1, Unit: "млн."}, "6,5 млн."},
+		{&Number{Answer: -273.15, Step: 0.01}, "-273,15"},
+		{&Number{Answer: 1876, Step: 1}, "1876"},
+		{&Match{Pairs: []MatchPair{{Left: "Франция", Right: "Париж"}}, Decoy: "Сидни"}, "Франция — Париж"},
+	} {
+		if got := AnswerText(c.q); got != c.want {
+			t.Errorf("%T: %q, want %q", c.q, got, c.want)
+		}
+	}
+	o := &Order{Unit: "млн. км²", Items: []OrderItem{{Text: "Азия", Value: 44.6}, {Text: "Европа", Value: 10.18}}, Direction: "desc"}
+	if got := AnswerText(o); !strings.Contains(got, "Азия (44,6 млн. км²)") {
+		t.Errorf("order: %q", got)
+	}
+}

@@ -1,7 +1,7 @@
 // What the whole app shares: who's playing, and the categories. The server puts both in the page.
 
 import { api } from "./lib/api.ts";
-import { signal } from "./lib/dom.ts";
+import { effect, signal, untracked } from "./lib/dom.ts";
 import { play } from "./lib/sound.ts";
 
 export interface User {
@@ -67,7 +67,13 @@ export let checkWaiting: () => Promise<void> = async () => {};
  * to be friends. */
 export function watchWaiting(): void {
   checkWaiting = async () => {
-    if (!user.peek() || document.hidden) return;
+    if (!user.peek()) {
+      // Signed out, or the account deleted: its challenges and requests go with it.
+      challenges.set([]);
+      friendRequests.set(0);
+      return;
+    }
+    if (document.hidden) return;
     try {
       const r = await api<{ requests: number; challenges: Challenge[] }>("GET", "/api/friends/invites");
       const known = new Set(challenges.peek().map((c) => c.id));
@@ -79,7 +85,10 @@ export function watchWaiting(): void {
       // Offline for a moment: the next look will tell.
     }
   };
-  checkWaiting();
+  effect(() => {
+    user();
+    untracked(checkWaiting);
+  });
   setInterval(checkWaiting, 30_000);
   document.addEventListener("visibilitychange", () => checkWaiting());
 }

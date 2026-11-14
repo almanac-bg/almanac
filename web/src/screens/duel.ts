@@ -7,7 +7,7 @@ import { review } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { Reviewed, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal } from "../lib/dom.ts";
+import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
 import { back, type Division, formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
@@ -126,7 +126,7 @@ export function duel() {
   title("Дуел");
   const data = signal<{ duels: DuelView[]; standing: Standing } | null>(null);
   const friends = signal<Friend[]>([]);
-  const screen = signal<Child>(null);
+  const screen = slot();
   const error = signal("");
   if (user.peek()) {
     api<{ duels: DuelView[]; standing: Standing }>("GET", "/api/duels").then(data.set, () => {});
@@ -139,7 +139,7 @@ export function duel() {
     error.set("");
     try {
       const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend });
-      screen.set(playRun(r.state, () => afterDuel(r.duel)));
+      screen.show(() => playRun(r.state, () => afterDuel(r.duel)));
     } catch (err) {
       error.set((err as ApiError).message);
     }
@@ -217,8 +217,8 @@ export function duel() {
       ];
     },
   );
-  screen.set(hub);
-  return h("div", null, () => screen());
+  screen.show(() => hub);
+  return h("div", null, screen);
 }
 
 function section(heading: string, list: DuelView[]): Child {
@@ -243,32 +243,32 @@ export function playChallenge(id: number): void {
 export function duelOne(params: string[]) {
   title("Дуел");
   const id = Number(params[0]);
-  const screen = signal<Child>(h("p", { class: "muted" }, "…"));
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
   (async () => {
     try {
       const { duels } = await api<{ duels: DuelView[] }>("GET", "/api/duels");
       const d = duels.find((x) => x.id === id);
-      if (!d) return screen.set(h("p", { role: "alert" }, "Този дуел вече го няма."));
+      if (!d) return screen.show(() => h("p", { role: "alert" }, "Този дуел вече го няма."));
       const play = async () => {
         const s =
           d.runId && d.you
             ? await api<State>("GET", `/api/runs/${d.runId}`)
             : await api<State>("POST", `/api/duels/${id}/play`, {});
         checkWaiting(); // the notice goes
-        screen.set(playRun(s, () => afterDuel(id)));
+        screen.show(() => playRun(s, () => afterDuel(id)));
       };
       // Asked and not started: who asks, and the choice (unless said yes to already); started: straight back in.
       const yes = accepted === id;
       accepted = 0;
       if (d.state === "play" && !d.runId && !yes)
-        return screen.set(asked(d, play, () => screen.set(ended({ ...d, state: "declined" }))));
+        return screen.show(() => asked(d, play, () => screen.show(() => ended({ ...d, state: "declined" }))));
       if (d.state === "play") return play();
-      screen.set(ended(d));
+      screen.show(() => ended(d));
     } catch (err) {
-      screen.set(h("p", { role: "alert" }, (err as ApiError).message));
+      screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
     }
   })();
-  return h("div", null, () => screen());
+  return h("div", null, screen);
 }
 
 /** A duel the player is asked to: who asks, and play it or say no. */

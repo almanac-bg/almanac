@@ -3,7 +3,7 @@
 // end, so that the game flows.
 
 import { type ApiError, api } from "../lib/api.ts";
-import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { append, type Child, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { tickOn } from "../lib/prefs.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, playing } from "../state.ts";
@@ -13,13 +13,13 @@ import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.t
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. */
 export function playRun(initial: State, done: (s: State) => Child): Child {
-  const screen = signal<Child>(null);
+  const screen = slot();
 
   const next = async () => {
     try {
       at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}));
     } catch (err) {
-      screen.set(failed((err as ApiError).message, next));
+      screen.show(() => failed((err as ApiError).message, next));
     }
   };
   // A question with pictures waits for them, its time with it (the server starts it by itself if they take too long):
@@ -30,14 +30,14 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
     try {
       at(await api<State>("POST", `/api/runs/${initial.id}/start`, { n: q.n }));
     } catch (err) {
-      screen.set(failed((err as ApiError).message, () => start(q)));
+      screen.show(() => failed((err as ApiError).message, () => start(q)));
     }
   };
   const reload = async () => {
     try {
       at(await api<State>("GET", `/api/runs/${initial.id}`));
     } catch (err) {
-      screen.set(failed((err as ApiError).message, reload));
+      screen.show(() => failed((err as ApiError).message, reload));
     }
   };
   // A question opens only while the page is in view: its time would otherwise run unseen.
@@ -63,16 +63,18 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
   // (the next one opens at once).
   const at = (s: State) => {
     playing.set(!s.done);
-    if (s.done) screen.set(done(s));
+    if (s.done) screen.show(() => done(s));
     else if (s.question?.startsMs) {
       const q = s.question;
       whenSeen(() => start(q));
-    } else if (s.question) screen.set(question(s, s.question, next, reload));
-    else whenSeen(next);
+    } else if (s.question) {
+      const q = s.question;
+      screen.show(() => question(s, q, next, reload));
+    } else whenSeen(next);
   };
 
   at(initial);
-  return h("div", { class: "run" }, () => screen());
+  return h("div", { class: "run" }, screen);
 }
 
 /** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and

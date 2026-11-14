@@ -143,7 +143,8 @@ func mustJSON(v any) json.RawMessage {
 	return b
 }
 
-// AnswerText is a question's answer in words, for whoever keeps the bank (the admin page).
+// AnswerText is a question's answer in words, as players read it (Моят Алманах): numbers written the Bulgarian way,
+// with their unit.
 func AnswerText(q Question) string {
 	switch q := q.(type) {
 	case *Choice:
@@ -151,11 +152,11 @@ func AnswerText(q Question) string {
 	case *Clues:
 		return q.Answer
 	case *Number:
-		return strings.TrimSpace(formatNumber(q.Answer, q.Step) + " " + q.Unit)
+		return strings.TrimSpace(sayNumber(q.Answer, q.Step) + " " + q.Unit)
 	case *Order:
 		items := make([]string, 0, len(q.Items))
 		for _, i := range q.right() {
-			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, formatNumber(q.Items[i].Value, 0.01)))
+			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
 		}
 		return strings.Join(items, " → ")
 	case *TrueFalse:
@@ -168,9 +169,6 @@ func AnswerText(q Question) string {
 		for _, p := range q.Pairs {
 			pairs = append(pairs, p.Left+" — "+p.Right)
 		}
-		if q.Decoy != "" {
-			pairs = append(pairs, "примамка: "+q.Decoy)
-		}
 		return strings.Join(pairs, "; ")
 	case *Split:
 		groups := [2][]string{}
@@ -182,6 +180,14 @@ func AnswerText(q Question) string {
 		return q.Groups[0] + ": " + strings.Join(groups[0], ", ") + "; " + q.Groups[1] + ": " + strings.Join(groups[1], ", ")
 	}
 	return ""
+}
+
+// KeeperText is the answer as whoever keeps the bank reads it (the admin page): a match's decoy too.
+func KeeperText(q Question) string {
+	if m, ok := q.(*Match); ok && m.Decoy != "" {
+		return AnswerText(q) + "; примамка: " + m.Decoy
+	}
+	return AnswerText(q)
 }
 
 // Option is a choice's option by its place in the bank (0 is the answer), for reading the answer log.

@@ -135,6 +135,16 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
 			t.Fatalf("the room didn't move on by itself: %+v", v)
 		}
+		// Cy comes now, answers this one and goes: their review has it in its place, nothing before it.
+		cy := Player{ID: 3, Name: "Цв"}
+		if err := r.Join(cy); err != nil {
+			t.Fatal(err)
+		}
+		sc, _ := r.Follow(cy.ID)
+		if err := r.Answer(cy.ID, 1, answer(r, true)); err != nil {
+			t.Fatal(err)
+		}
+		r.Unfollow(sc)
 		time.Sleep(play.Limit(r.dealt[1].Question()) + play.Grace + time.Millisecond)
 		synctest.Wait()
 		if v := r.View(bo.ID); v.Phase != Reveal || !v.Question.Reveal.Missed {
@@ -157,6 +167,9 @@ func TestAGamePlayedTogether(t *testing.T) {
 		// Once it's over, each sees the questions with their own answers.
 		if rv := end.Review; len(rv) != play.Length || rv[0].Right || !rv[2].Right || string(rv[1].Given) != "null" {
 			t.Fatalf("Bo's review: %+v", rv)
+		}
+		if rv := r.View(cy.ID).Review; !rv[1].Right || string(rv[0].Given) != "null" {
+			t.Fatalf("the review of one who came late: %+v", rv[:2])
 		}
 		// Again: new questions, everyone from nought.
 		if err := r.Start(bo.ID); err != nil || r.View(bo.ID).Players[0].Points != 0 {

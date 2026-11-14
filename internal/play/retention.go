@@ -15,7 +15,7 @@ import (
 var RetentionDays = []int{1, 3, 7, 30}
 
 // Cohort is the players who first played on a day, and how many of them played again on each of RetentionDays after
-// it (-1 for a day that hasn't come yet).
+// it (-1 for a day that isn't over yet).
 type Cohort struct {
 	Day  string
 	New  int
@@ -63,7 +63,8 @@ func (g *Game) Retention(ctx context.Context, days int) ([]Cohort, Active, error
 		}
 		first, _ := time.ParseInLocation(time.DateOnly, c.Day, Bulgaria)
 		for i, n := range RetentionDays {
-			if first.AddDate(0, 0, n).Format(time.DateOnly) > day(0) {
+			// Day N counts once it's over: today's, still being played, would read low.
+			if first.AddDate(0, 0, n).Format(time.DateOnly) >= day(0) {
 				c.Back[i] = -1
 			}
 		}

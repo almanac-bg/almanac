@@ -32,6 +32,7 @@ export function report(id: string): Child {
             { class: "field" },
             h("span", null, "Какво не е наред?"),
             h("textarea", {
+              value: text.peek(),
               rows: 3,
               maxlength: 500,
               required: true,
@@ -41,7 +42,8 @@ export function report(id: string): Child {
           ),
           h("button", { class: "btn" }, "Изпрати"),
           h("button", { type: "button", class: "link", onclick: () => state.set("closed") }, "Откажи"),
-          error() && h("p", { class: "bad", role: "alert" }, error()),
+          // Its own child: read by the form, an error would draw the form again and lose what was typed.
+          () => error() && h("p", { class: "bad", role: "alert" }, error()),
         );
     }
   };

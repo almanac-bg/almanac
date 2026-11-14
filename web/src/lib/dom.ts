@@ -280,6 +280,29 @@ export function when(cond: () => unknown, then: () => Child, otherwise?: () => C
   return () => (on() ? untracked(then) : otherwise ? untracked(otherwise) : null);
 }
 
+/** A part of a screen whose view is set later: once a fetch is back, at each step of a game. */
+export interface Slot {
+  /** The view it shows now, as a child: put it where it goes (`h("div", null, slot)`). */
+  (): Child;
+  /** Shows the view `build` makes, in place of the last; built there, in a scope of its own. */
+  show(build: () => Child): void;
+}
+
+/**
+ * Makes a Slot. Each view is built inside the slot, so what it sets up (effects, timers, listeners) is undone when
+ * the next view replaces it or the screen goes. A view built beforehand and put in a signal — after an await, where
+ * no scope is open — would leave all of that running for good.
+ */
+export function slot(initial: () => Child = () => null): Slot {
+  const view = signal(initial);
+  const p = (() => {
+    const build = view();
+    return untracked(build);
+  }) as Slot;
+  p.show = (build) => view.set(build);
+  return p;
+}
+
 /** Replaces what's in `root` with what view builds, in a scope of its own; returns its dispose. */
 export function mount(root: Element, view: () => Child): () => void {
   const [node, dispose] = scope(() => toNode(view()));

@@ -55,6 +55,8 @@ type DuelNews struct {
 	// rated duels against recordings).
 	Friendly bool
 	DuelID   int64
+	// Seen is a result the one told has on screen already: they just finished the run that settled the duel.
+	Seen bool
 }
 
 // DuelView is a duel as one of its two players sees it.
@@ -226,7 +228,7 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 		if err := g.mayStart(tx, userID); err != nil {
 			return err
 		}
-		picks, err := g.drawFor(ctx, tx, userID)
+		picks, err := g.drawFor(ctx, tx, userID, friendID)
 		if err != nil {
 			return err
 		}
@@ -396,6 +398,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
 	}
 	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND r.user_id <> ? AND json_array_length(r.questions) = ?
+			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL AND (d.a_run = r.id OR d.b_run = r.id))
 		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
 	if err != nil {
 		return nil, err
@@ -476,9 +479,9 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	}
 	switch {
 	case aDone && bDone:
-		return g.settleDuel(ctx, duelID, false)
+		return g.settleDuel(ctx, duelID, false, runID)
 	case kind == "live" && ghost && aDone:
-		return g.settleDuel(ctx, duelID, true)
+		return g.settleDuel(ctx, duelID, true, runID)
 	case kind == "friend" && aDone && runID == aRun && bID.Valid:
 		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET expires_at = ? WHERE id = ?`,
 			store.Ms(g.Now().Add(FriendFor)), duelID); err != nil {
@@ -518,7 +521,7 @@ func (g *Game) ratedToday(tx *sql.Tx, a, b int64) (bool, error) {
 // settleDuel ends a duel: both played (a result for both), or a live one against a recording (a result for its
 // player only). The first duel of the day between the two moves their ratings; one after is a friendly. A duel
 // already ended (both sides finished at once, and the other settled it) is left as it is.
-func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
+func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finished int64) error {
 	type side struct {
 		id             int64
 		name           string
@@ -594,16 +597,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			return d, err
 		}
 		now := store.Ms(g.Now())
+		// opponent_id is a player the duel was against, never a recording's: the record between friends, their
+		// achievements and the year's rival count only duels both played.
+		opponentID := sql.NullInt64{Int64: b.id, Valid: !ghost}
 		da, err := rate(a, b.rating, score)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = ?, outcome = ? WHERE id = ?`,
-			b.name, b.id, ghost, outcomeOf(score), a.run); err != nil {
+			b.name, opponentID, ghost, outcomeOf(score), a.run); err != nil {
 			return err
 		}
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
-			Friendly: !rated, DuelID: duelID})
+			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
 		if ghost {
 			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, rated = ? WHERE id = ?`,
 				now, "ghost_"+outcomeOf(score), da, rated, duelID)
@@ -618,7 +624,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool) error {
 			return err
 		}
 		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, Outcome: outcomeOf(1 - score), Delta: db,
-			Friendly: !rated, DuelID: duelID})
+			Friendly: !rated, DuelID: duelID, Seen: b.run == finished})
 		outcome := map[float64]string{1: "a", 0: "b", 0.5: "draw"}[score]
 		_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, b_delta = ?, rated = ? WHERE id = ?`,
 			now, outcome, da, db, rated, duelID)
@@ -675,9 +681,9 @@ func (g *Game) SettleDue(ctx context.Context) error {
 	for _, d := range list {
 		switch {
 		case d.aDone && d.bDone:
-			err = g.settleDuel(ctx, d.id, false)
+			err = g.settleDuel(ctx, d.id, false, 0)
 		case d.ghost && d.aDone: // finished, and not settled then (a restart in between)
-			err = g.settleDuel(ctx, d.id, true)
+			err = g.settleDuel(ctx, d.id, true, 0)
 		default:
 			_, err = g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ? AND ended_at IS NULL`,
 				now, d.id)
@@ -700,6 +706,8 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) ([]DuelView, error) {
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_id WHEN d.ghost_run IS NOT NULL
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0)
 		FROM duels d WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'friend' OR d.ended_at IS NOT NULL)
+			AND NOT (d.b_id = ?1 AND d.ended_at IS NULL
+				AND (SELECT finished_at FROM runs WHERE id = d.a_run) IS NULL)
 		ORDER BY d.ended_at IS NOT NULL, coalesce(d.ended_at, d.created_at) DESC LIMIT 50`, userID)
 	if err != nil {
 		return nil, err
