@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, playRun } from "./play.ts";
+import { answer } from "./play.ts";
 
 test("a room for two: lobby, ten questions together, the standings", async ({ browser }) => {
   // Ten questions with the room's 6-second pause after each, in two browsers at once.
@@ -31,24 +31,34 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   await expect(guest.locator(".reviewed")).toHaveCount(10);
 });
 
-test("two people asking for a duel, each in their own time", async ({ browser }, info) => {
+test("two people asking for a duel play it live", async ({ browser }, info) => {
   // Matching is the server's, the same for every engine; and duels in two engines at once would match across them.
   test.skip(info.project.name !== "chromium", "one engine is enough");
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  // Ana plays hers; it waits for someone.
+  // Ana asks first and waits; Bo asks, and they meet.
   await a.goto("/duel");
   await a.getByRole("button", { name: "Намери съперник" }).click();
-  await playRun(a);
-  await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
-  // Bo asks for one later: he takes Ana's (or another waiting one), and has the result when he's done.
+  await expect(a.getByRole("heading", { name: "Търсим съперник" })).toBeVisible();
   await b.goto("/duel");
   await b.getByRole("button", { name: "Намери съперник" }).click();
-  await playRun(b);
-  await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство|Изигра своя дуел/ })).toBeVisible({
-    timeout: 10_000,
-  });
-  await b.goto("/duel");
-  await expect(b.locator(".standing")).toContainText("Рейтинг");
+  for (const p of [a, b]) await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
+  for (let n = 0; n < 10; n++) {
+    for (const p of [a, b])
+      await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 15_000 });
+    // Ana answers: Bo sees that she has, not what; then both answers show, side by side.
+    await answer(a);
+    await expect(b.locator(".live-doing")).toContainText("Отговори за");
+    await answer(b);
+    for (const p of [a, b]) {
+      await expect(p.locator(".verdict")).toBeVisible();
+      await expect(p.locator(".live-theirs")).toBeVisible();
+    }
+  }
+  for (const p of [a, b])
+    await expect(p.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 20_000 });
+  await expect(a.getByRole("button", { name: "Още един дуел" })).toBeVisible();
+  await a.goto("/duel");
+  await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
 });

@@ -51,6 +51,9 @@ func (g *Game) SettleArena(ctx context.Context, list []ArenaPlace) (map[int64]in
 	if len(list) == 0 {
 		return deltas, nil
 	}
+	if err := g.ensureSeason(ctx); err != nil { // a new month's game counts for the new season
+		return nil, err
+	}
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		places, ratings, rated := make([]int, len(list)), make([]int, len(list)), make([]int, len(list))
 		for i, p := range list {
@@ -71,7 +74,8 @@ func (g *Game) SettleArena(ctx context.Context, list []ArenaPlace) (map[int64]in
 				return err
 			}
 			if _, err := tx.Exec(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1),
-				rated = rated + 1 WHERE id = ?2`, moved[i], p.UserID); err != nil {
+				rated = rated + 1,
+				season_games = season_games + 1 WHERE id = ?2`, moved[i], p.UserID); err != nil {
 				return err
 			}
 			deltas[p.UserID] = moved[i]

@@ -7,7 +7,8 @@ import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import { avatar, badge, profileHref } from "../ui.ts";
 import { standingCard } from "./duel.ts";
-import { loadProgress, type Progress } from "./progress.ts";
+import { loadProgress, type Progress, titlesOf } from "./progress.ts";
+import { seasonCard } from "./season.ts";
 import { stats } from "./stats.ts";
 
 export function me() {
@@ -30,6 +31,7 @@ export function me() {
             const p = progress();
             return p ? standingCard(p.standing) : null;
           },
+          seasonCard(),
           stats(),
           () => {
             const p = progress();
@@ -91,7 +93,7 @@ function head(progress: () => Progress | null): Child {
       () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
       () => {
         const p = progress();
-        const t = p?.achievements.find((a) => a.id === p.title);
+        const t = p ? titlesOf(p).find((a) => a.id === p.title) : undefined;
         return t ? h("span", { class: `me-title t-${t.tier}` }, t.name) : null;
       },
     ),

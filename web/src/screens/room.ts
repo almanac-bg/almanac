@@ -6,10 +6,10 @@ import { boardRow, review, shareButton } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, computed, h, onCleanup, signal, untracked } from "../lib/dom.ts";
+import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
-import { categories, player } from "../state.ts";
+import { categories, player, playing } from "../state.ts";
 import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
@@ -114,6 +114,11 @@ export function room([code = ""]: string[], arena = false) {
     const v = view();
     return v ? `${v.phase}:${v.n}` : "";
   });
+  effect(() => {
+    const phase = view()?.phase;
+    playing.set(phase === "question" || phase === "reveal");
+  });
+  onCleanup(() => playing.set(false));
   return h(
     "div",
     { class: "screen" },

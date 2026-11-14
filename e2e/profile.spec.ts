@@ -6,7 +6,7 @@ test("a player's profile: from a board, asked to be friends, then a duel from it
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
-  // Ana plays a topic: she's on this week's board.
+  // Ana plays a topic: she's on the board of levels.
   await a.goto("/");
   await a.getByRole("link", { name: "История" }).click();
   await playRun(a);
@@ -16,7 +16,7 @@ test("a player's profile: from a board, asked to be friends, then a duel from it
 
   // Bo finds her there and opens her profile.
   await b.goto("/ranks");
-  await b.getByRole("tab", { name: "Седмица" }).click();
+  await b.getByRole("tab", { name: "Ниво" }).click();
   await b.locator(`.board a.who[href="/players/${ana.tag}"]`).first().click();
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);

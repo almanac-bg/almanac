@@ -527,8 +527,8 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (A perfect day earns 20 XP an answer and 100 for the day: 300, the first level.)
-	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300 || lvl != 2 ||
+	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and its goal 100 more: the first level.)
+	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || n.XP != 300+GoalXP || lvl != 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
@@ -671,10 +671,10 @@ func TestFriendRequests(t *testing.T) {
 	}
 }
 
-func TestAsyncDuels(t *testing.T) {
+func TestLiveDuels(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo, vi, gal := w.user(), w.user(), w.user(), w.user()
+	ana, bo, gal := w.user(), w.user(), w.user()
 	var told []DuelNews
 	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
 	rating := func(id int64) int {
@@ -682,94 +682,167 @@ func TestAsyncDuels(t *testing.T) {
 		return s.Rating
 	}
 
-	// Nothing recorded yet: Ana's duel is her own, open, on fresh questions; she plays it and it waits.
-	s, aDuel, err := w.g.FindDuel(ctx, ana)
-	if err != nil || len(w.picks(s.ID)) != Length {
-		t.Fatalf("Ana's duel: %+v %v", s, err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 1 || d[0].State != "wait" || d[0].Opponent != nil {
-		t.Fatalf("Ana's waiting duel: %+v", d)
+	// Nothing recorded yet: nobody to play against.
+	if _, err := w.g.StartRecorded(ctx, gal); !errors.Is(err, ErrNobody) {
+		t.Fatalf("a recording out of nothing: %v", err)
 	}
 
-	// Bo asks for one: he takes Ana's, plays it worse, and both get the result.
-	s, bDuel, err := w.g.FindDuel(ctx, bo)
-	if err != nil || bDuel != aDuel {
-		t.Fatalf("Bo didn't take Ana's duel: %d %v", bDuel, err)
+	// Ana and Bo, live: the same questions, a run each; a duel under way isn't in their lists yet.
+	l, err := w.g.StartLive(ctx, ana, bo)
+	if err != nil || len(l.Picks) != Length || l.Users != [2]int64{ana, bo} {
+		t.Fatalf("a live duel: %+v %v", l, err)
 	}
-	if d, _ := w.g.DuelsOf(ctx, bo); d[0].State != "play" || d[0].Opponent.Points != 0 {
-		t.Fatalf("Bo sees Ana's score before playing: %+v", d[0].Opponent)
+	if !slices.Equal(w.picks(l.Runs[0]), w.picks(l.Runs[1])) {
+		t.Fatal("different questions for the two")
 	}
-	w.play(bo, s.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 0 {
+		t.Fatalf("a live duel listed while it's played: %+v", d)
+	}
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
 	da, _ := w.g.DuelsOf(ctx, ana)
 	db, _ := w.g.DuelsOf(ctx, bo)
-	if da[0].State != "won" || db[0].State != "lost" || da[0].Delta <= 0 || db[0].Delta >= 0 ||
-		rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
-		t.Fatalf("the result: %+v / %+v, ratings %d %d", da[0], db[0], rating(ana), rating(bo))
+	if len(da) != 1 || da[0].Kind != "live" || da[0].State != "won" || db[0].State != "lost" || da[0].Friendly ||
+		da[0].Delta <= 0 || rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
+		t.Fatalf("the result: %+v / %+v", da, db)
 	}
-	full := AllRight
-	for n := range Length {
-		full += WorthOf(w.question(s.ID, n), 1, 3*time.Second, n+1).Points // w.play answers after 3 s
-	}
-	if da[0].Opponent.Points != 0 || db[0].Opponent.Points != full {
-		t.Fatalf("scores after the end: %+v / %+v, want %d", da[0].Opponent, db[0].Opponent, full)
-	}
-	if len(told) != 2 || told[0].Kind != "result" {
+	if len(told) != 2 || told[0].Kind != "result" || told[0].Friendly {
 		t.Fatalf("told: %+v", told)
 	}
 
-	// A friend asked: Vi hears once Ana has played, and plays when she can.
+	// Again the same day: a friendly, the result kept but no rating moved.
+	before := [2]int{rating(ana), rating(bo)}
+	l, _ = w.g.StartLive(ctx, bo, ana)
+	w.play(bo, l.Runs[0], repeat(w.right, Length)...)
+	w.play(ana, l.Runs[1], repeat(w.wrong, Length)...)
+	if da, _ = w.g.DuelsOf(ctx, ana); da[0].State != "lost" || !da[0].Friendly || da[0].Delta != 0 ||
+		[2]int{rating(ana), rating(bo)} != before {
+		t.Fatalf("a second duel the same day: %+v, ratings %d %d", da[0], rating(ana), rating(bo))
+	}
+	// The next day it counts again.
+	w.wait(24 * time.Hour)
+	l, _ = w.g.StartLive(ctx, ana, bo)
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
+	if da, _ = w.g.DuelsOf(ctx, ana); da[0].Friendly || da[0].Delta <= 0 {
+		t.Fatalf("the next day's duel: %+v", da[0])
+	}
+
+	// Gal, against a recording: its answers come with it, and only her rating moves.
+	before = [2]int{rating(ana), rating(bo)}
+	l, err = w.g.StartRecorded(ctx, gal)
+	if err != nil || l.Users[0] != gal || l.Users[1] == gal || len(l.Recording) != Length {
+		t.Fatalf("against a recording: %+v %v", l, err)
+	}
+	if l.Recording[0].Ms == 0 || (l.Recording[0].Right && l.Recording[0].Points == 0) {
+		t.Fatalf("a recorded answer: %+v", l.Recording[0])
+	}
+	w.play(gal, l.Runs[0], repeat(w.wrong, Length)...)
+	d, _ := w.g.DuelsOf(ctx, gal)
+	if len(d) != 1 || !d[0].Recorded || d[0].Opponent == nil || d[0].State == "won" || rating(gal) > StartRating {
+		t.Fatalf("Gal's duel against a recording: %+v, rating %d", d, rating(gal))
+	}
+	if [2]int{rating(ana), rating(bo)} != before {
+		t.Fatal("a recorded player's rating moved")
+	}
+
+	// Called off (a player never came), and cut off (the server restarted): over, without a result.
+	l, _ = w.g.StartLive(ctx, ana, gal)
+	if err := w.g.CancelLive(ctx, l.DuelID); err != nil {
+		t.Fatal(err)
+	}
+	l2, _ := w.g.StartLive(ctx, bo, gal)
+	if err := w.g.EndLive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{l.DuelID, l2.DuelID} {
+		var outcome string
+		_ = w.db.Read.QueryRow(`SELECT outcome FROM duels WHERE id = ?`, id).Scan(&outcome)
+		if outcome != "expired" {
+			t.Fatalf("duel %d: %q", id, outcome)
+		}
+	}
+}
+
+func TestFriendDuels(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, vi, stranger := w.user(), w.user(), w.user()
+	var told []DuelNews
+	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
+	if _, _, err := w.g.ChallengeFriend(ctx, ana, stranger); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("challenged a stranger: %v", err)
+	}
 	w.befriend(ana, vi)
-	s, fDuel, err := w.g.ChallengeFriend(ctx, ana, vi)
+
+	// Ana plays first; Vi can't before, and hears of it only once Ana has finished.
+	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.g.PlayDuel(ctx, vi, fDuel); !errors.Is(err, ErrNoDuel) {
+	if _, err := w.g.PlayDuel(ctx, vi, id); !errors.Is(err, ErrNoDuel) {
 		t.Fatalf("Vi played before Ana: %v", err)
 	}
-	told = nil
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
-		t.Fatalf("Vi wasn't asked: %+v", told)
+	if c, _ := w.g.Challenges(ctx, vi); len(c) != 0 {
+		t.Fatalf("Vi challenged before Ana played: %+v", c)
 	}
-	vs, err := w.g.PlayDuel(ctx, vi, fDuel)
+	w.wait(time.Hour)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" || told[0].DuelID != id {
+		t.Fatalf("Vi wasn't told: %+v", told)
+	}
+	// Her 48 hours start now, not when Ana began.
+	c, _ := w.g.Challenges(ctx, vi)
+	if len(c) != 1 || c[0].ID != id || c[0].ExpiresAt != w.now.Add(FriendFor).UnixMilli() {
+		t.Fatalf("Vi's challenge: %+v", c)
+	}
+	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "play" || d[0].Opponent.Points != 0 {
+		t.Fatalf("Vi sees Ana's score before playing: %+v", d[0])
+	}
+	vs, err := w.g.PlayDuel(ctx, vi, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(vi, vs.ID, repeat(w.right, Length)...)
-	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State == "play" || d[0].State == "wait" {
+	w.play(vi, vs.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "lost" || d[0].Delta >= 0 {
 		t.Fatalf("Vi's duel after both played: %+v", d[0])
 	}
 
-	// Gal: no open duel waits now, so hers is on a recorded run's questions; nobody takes it in time, and it's
-	// settled against the recording — only her rating moves.
-	s, gDuel, err := w.g.FindDuel(ctx, gal)
-	if err != nil {
+	// A friend may say no; and one not played in time ends without a result.
+	_, no, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	if err := w.g.DeclineDuel(ctx, vi, no); err != nil {
 		t.Fatal(err)
 	}
-	w.play(gal, s.ID, repeat(w.wrong, Length)...)
-	before := map[int64]int{ana: rating(ana), bo: rating(bo), vi: rating(vi)}
-	w.wait(OpenFor + time.Minute)
+	s, late, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	w.wait(FriendFor - time.Minute)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	d, _ := w.g.DuelsOf(ctx, gal)
-	if d[0].ID != gDuel || !d[0].Recorded || d[0].State != "lost" || rating(gal) >= StartRating {
-		t.Fatalf("Gal's duel against a recording: %+v, rating %d", d[0], rating(gal))
+	if c, _ := w.g.Challenges(ctx, vi); len(c) != 1 || c[0].ID != late {
+		t.Fatalf("expired early: %+v", c)
 	}
-	for id, r := range before {
-		if rating(id) != r {
-			t.Fatalf("a recorded player's rating moved: %d %d→%d", id, r, rating(id))
-		}
-	}
-
-	// A friend may say no.
-	_, nDuel, _ := w.g.ChallengeFriend(ctx, ana, vi)
-	if err := w.g.DeclineDuel(ctx, vi, nDuel); err != nil {
+	w.wait(2 * time.Minute)
+	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := w.g.DuelsOf(ctx, ana); d[len(d)-1].State != "declined" && d[0].State != "declined" {
-		t.Fatalf("a declined duel: %+v", d)
+	states := map[int64]string{}
+	d, _ := w.g.DuelsOf(ctx, ana)
+	for _, x := range d {
+		states[x.ID] = x.State
+	}
+	if states[no] != "declined" || states[late] != "expired" {
+		t.Fatalf("Ana's duels: %v", states)
+	}
+
+	// At most MaxWaiting challenges wait on friends at once.
+	for range MaxWaiting {
+		if _, _, err := w.g.ChallengeFriend(ctx, ana, vi); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err := w.g.ChallengeFriend(ctx, ana, vi); !errors.Is(err, ErrManyWaiting) {
+		t.Fatalf("one too many: %v", err)
 	}
 }
 
@@ -825,6 +898,11 @@ func TestArena(t *testing.T) {
 		if st.Rating != StartRating+d || st.Rated != 1 {
 			t.Fatalf("player %d's rating: %+v, moved by %d", id, st, d)
 		}
+		var games int
+		_ = w.db.Read.QueryRow(`SELECT season_games FROM users WHERE id = ?`, id).Scan(&games)
+		if games != 1 {
+			t.Fatalf("player %d's arena counted %d games for the season", id, games)
+		}
 	}
 	var kept int
 	_ = w.db.Read.QueryRow(`SELECT count(*) FROM arena_players WHERE place = 2 AND points = 500`).Scan(&kept)
@@ -859,7 +937,7 @@ func TestWardrobe(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	p, _ := w.g.ProgressOf(ctx, ana)
-	if len(p.Frames) != len(Frames)+1 || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
+	if len(p.Frames) != len(Frames) || !p.Frames[0].Locked || p.Frames[0].How != "ниво 2" {
 		t.Fatalf("a new player's frames: %+v", p.Frames)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), nil); !errors.Is(err, ErrNotYours) {
@@ -881,39 +959,156 @@ func TestWardrobe(t *testing.T) {
 	}
 }
 
-func TestGoalsAndSeason(t *testing.T) {
+func TestGoals(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
 	goals, err := w.g.GoalsOf(ctx, ana)
-	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done {
+	if err != nil || len(goals) != GoalsPerDay || goals[0].ID != "day" || goals[0].Done || goals[0].XP != GoalXP {
 		t.Fatalf("a new player's goals: %+v %v", goals, err)
 	}
 	if again, _ := w.g.GoalsOf(ctx, ana); again[1].ID != goals[1].ID || again[2].ID != goals[2].ID {
 		t.Fatal("the day's goals changed within the day")
 	}
-	// The day's questions: that goal is done, and a star for the season, without looking.
+	// The day's questions: that goal is done without looking, its XP is the player's, and it's told once.
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	season, _ := w.g.SeasonOf(ctx, ana)
-	if season.Stars < 1 || season.DaysLeft < 1 || season.Hue < 0 || season.Hue >= 360 {
-		t.Fatalf("the season after a goal: %+v", season)
+	var games int
+	_ = w.db.Read.QueryRow(`SELECT sum(xp) FROM runs WHERE user_id = ?`, ana).Scan(&games)
+	n, err := w.g.NewsOf(ctx, ana, 0)
+	if err != nil || len(n.Goals) == 0 || n.Goals[0].Name != Goals[0].Name || n.Goals[0].XP != GoalXP ||
+		n.XP != games+GoalXP*len(n.Goals) {
+		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)
 	}
-	b, _ := w.g.SeasonBoard(ctx, ana)
-	if b.Place != 1 || b.Mine == nil || b.Mine.Value != season.Stars {
-		t.Fatalf("the season's board: %+v", b)
+	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP {
+		t.Fatalf("a goal told twice: %+v", again)
 	}
-	// A season's gold makes its frame the player's.
-	month := w.g.Now().In(Bulgaria).Format("2006-01")
-	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("a season's frame without its gold: %v", err)
+	if look, _ := w.g.LookOf(ctx, ana); look.Level != n.Level {
+		t.Fatalf("the level others see: %d, not %d", look.Level, n.Level)
 	}
-	for i := range SeasonTiers[len(SeasonTiers)-1].Stars {
-		_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at) VALUES (?, ?, ?, 0)`,
-			ana, month+"-01", fmt.Sprintf("g%d", i))
+}
+
+func TestSeasons(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	// Five players with a season's games, one with too few.
+	var ps []int64
+	for i, rating := range []int{1300, 1200, 1100, 1000, 900} {
+		p := w.user()
+		ps = append(ps, p)
+		_, _ = w.db.Write.Exec(`UPDATE users SET rating = ?, rated = 20, season_games = ? WHERE id = ?`,
+			rating, MinSeasonGames+i, p)
 	}
-	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("season-"+month), nil); err != nil {
-		t.Fatalf("a season's frame with its gold: %v", err)
+	few := w.user()
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1500, rated = 3, season_games = 3 WHERE id = ?`, few)
+	b, err := w.g.RatingBoard(ctx, ps[1], false)
+	if err != nil || len(b.Top) != 5 || b.Place != 2 || b.Top[0].Value != 1300 || b.Top[0].Division == nil {
+		t.Fatalf("the season's board: %+v %v", b, err)
+	}
+	s, _ := w.g.SeasonOf(ctx, few)
+	if s.Place != 0 || s.Games != 3 || s.Of != 5 || s.MinGames != MinSeasonGames || s.DaysLeft < 1 {
+		t.Fatalf("a season without enough games: %+v", s)
+	}
+	_ = w.g.befriend(ctx, ps[4], ps[0])
+	if f, _ := w.g.RatingBoard(ctx, ps[4], true); len(f.Top) != 2 || f.Place != 2 {
+		t.Fatalf("the board among friends: %+v", f)
+	}
+	// The month ends: the board is kept, the first three take the podium, and every rating goes halfway back.
+	var told []SeasonNews
+	w.g.SeasonNews = func(_ context.Context, n SeasonNews) { told = append(told, n) }
+	w.now = time.Date(2026, 12, 1, 0, 5, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 5 || told[0].Season != "2026-11" || told[0].Of != 5 {
+		t.Fatalf("the season's news: %+v", told)
+	}
+	var rating, games int
+	_ = w.db.Read.QueryRow(`SELECT rating, season_games FROM users WHERE id = ?`, ps[0]).Scan(&rating, &games)
+	if rating != 1150 || games != 0 || softened(900) != 950 || softened(1001) != 1000 {
+		t.Fatalf("softened: %d, %d games", rating, games)
+	}
+	if again, _ := w.g.RatingBoard(ctx, ps[0], false); len(again.Top) != 0 {
+		t.Fatalf("a new season's board: %+v", again)
+	}
+	s, _ = w.g.SeasonOf(ctx, ps[0])
+	if s.ID != "2026-12" || s.Podium != (Podium{1, 0, 0}) || len(s.Past) != 1 || s.Past[0].Place != 1 ||
+		s.Past[0].Rating != 1300 || s.Past[0].Division.ID != "platinum" {
+		t.Fatalf("the champion's season: %+v", s)
+	}
+	// Once only, whatever the clock does after.
+	if err := w.g.SettleDue(ctx); err != nil || len(told) != 5 {
+		t.Fatalf("a season ended twice: %v", err)
+	}
+	// A podium's title and frame are the player's; the next season's champion counts twice.
+	if err := w.g.SetLook(ctx, ps[1], nil, ptr("podium1"), nil, nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("the champion's title, second: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[1], nil, ptr("podium2"), ptr("podium2"), nil); err != nil {
+		t.Fatalf("second's title and frame: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[2], nil, nil, ptr("podium2"), nil); !errors.Is(err, ErrNotYours) {
+		t.Fatalf("second's frame, third: %v", err)
+	}
+	if err := w.g.SetLook(ctx, ps[0], nil, ptr("podium1"), ptr("podium3"), nil); err != nil {
+		t.Fatalf("the champion's title, and a lower frame: %v", err)
+	}
+	_, _ = w.db.Write.Exec(`UPDATE users SET season_games = ? WHERE id = ?`, MinSeasonGames, ps[0])
+	w.now = time.Date(2027, 1, 1, 0, 5, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if look, _ := w.g.LookOf(ctx, ps[0]); look.Title != "Двукратен шампион" || look.TitleTier != Legendary {
+		t.Fatalf("the champion's title: %+v", look)
+	}
+	if look, _ := w.g.LookOf(ctx, ps[1]); look.Title != "Вицешампион" || !strings.Contains(look.Avatar, "/podium2/") {
+		t.Fatalf("second's look: %+v", look)
+	}
+	if name, _ := PodiumTitle(3, 12); name != "12-кратен бронзов медалист" {
+		t.Fatalf("a dozen thirds: %q", name)
+	}
+}
+
+func TestBoards(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, cy := w.user(), w.user(), w.user()
+	// Ana knows the day's ten; Bo misses them all; Cy plays nothing.
+	for _, p := range []struct {
+		id    int64
+		right bool
+	}{{ana, true}, {bo, false}} {
+		for range KnowAll / Length {
+			s, err := w.g.StartTopic(ctx, p.id, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.right {
+				w.play(p.id, s.ID, repeat(w.right, Length)...)
+			} else {
+				w.play(p.id, s.ID, repeat(w.wrong, Length)...)
+			}
+		}
+	}
+	k, err := w.g.KnowledgeBoard(ctx, bo, false, "")
+	if err != nil || len(k.Top) != 2 || k.Top[0].Value != 100 || k.Top[0].Answers != KnowAll || k.Place != 2 ||
+		k.Mine.Value != 0 {
+		t.Fatalf("the board of knowledge: %+v %v", k, err)
+	}
+	if _, err := w.g.KnowledgeBoard(ctx, bo, false, "nope"); !errors.Is(err, ErrNoTopic) {
+		t.Fatalf("a topic there isn't: %v", err)
+	}
+	topic := w.b.Categories[0].ID
+	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, topic); len(k.Top) != 0 {
+		t.Fatalf("a topic nobody has %d answers in: %+v", KnowTopic, k)
+	}
+	l, err := w.g.LevelBoard(ctx, cy, false)
+	if err != nil || len(l.Top) != 2 || l.Top[0].Name == "" || l.Place != 0 || l.Top[0].Value <= l.Top[1].Value {
+		t.Fatalf("the board of levels: %+v %v", l, err)
+	}
+	_ = w.g.befriend(ctx, cy, bo)
+	if l, _ := w.g.LevelBoard(ctx, cy, true); len(l.Top) != 1 || !l.Top[0].Me && l.Top[0].Name == "" {
+		t.Fatalf("levels among friends: %+v", l)
 	}
 }
 

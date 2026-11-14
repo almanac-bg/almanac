@@ -1,9 +1,10 @@
 // Avatar frames: drawn around the avatar's rounded tile, generated in code like the medals and emblems.
 //
 // Each frame has its own drawing, coloured from the theme in CSS (.fr-*): a ring, a double ring, a ring of dots,
-// flames along the top, laurel branches down the sides, gems at the corners, a halo with rays.
+// flames along the top, laurel branches down the sides, gems at the corners, a halo with rays, and a season's podium
+// (stars at the corners, in its place's metal).
 
-import { seasonHue } from "./season.ts";
+import { starPoints } from "./season.ts";
 
 const svgNS = "http://www.w3.org/2000/svg";
 
@@ -65,7 +66,9 @@ function parts(frame: string): SVGElement[] {
         });
       return [el("rect", { ...tile(3), class: "frame-line" }), gem(9, 9), gem(55, 9), gem(9, 55), gem(55, 55)];
     }
-    case "season": {
+    case "podium1":
+    case "podium2":
+    case "podium3": {
       const stars = [
         [9, 9],
         [55, 9],
@@ -94,29 +97,12 @@ function parts(frame: string): SVGElement[] {
   return [];
 }
 
-function starPoints(cx: number, cy: number, r: number): string {
-  const p: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const rr = i % 2 ? r * 0.45 : r;
-    const a = ((-90 + i * 36) * Math.PI) / 180;
-    p.push(`${(cx + rr * Math.cos(a)).toFixed(2)},${(cy + rr * Math.sin(a)).toFixed(2)}`);
-  }
-  return p.join(" ");
-}
-
-/** A frame for an avatar (decoration), or null for none. A season's frame ("season-YYYY-MM") is drawn in its
- * season's colour. */
+/** A frame for an avatar (decoration), or null for none. */
 export function frameArt(frame: string | undefined): SVGElement | null {
   if (!frame) return null;
-  const season = frame.startsWith("season-") ? frame.slice(7) : "";
-  const drawn = parts(season ? "season" : frame);
+  const drawn = parts(frame);
   if (!drawn.length) return null;
-  const svg = el("svg", {
-    viewBox: "0 0 64 64",
-    class: `avatar-frame fr-${season ? "season" : frame}`,
-    "aria-hidden": "true",
-  });
-  if (season) svg.style.setProperty("--frame", `hsl(${seasonHue(season)} 72% 62%)`);
+  const svg = el("svg", { viewBox: "0 0 64 64", class: `avatar-frame fr-${frame}`, "aria-hidden": "true" });
   svg.append(...drawn);
   return svg;
 }

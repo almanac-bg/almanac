@@ -2,202 +2,220 @@ package play
 
 import (
 	"context"
-	"hash/fnv"
+	"database/sql"
+	"errors"
 	"strconv"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Daily goals and seasons. Every day a player has three goals: the day's questions, and two more drawn for them.
-// Each one done is a star, and a season (a calendar month in Bulgaria) counts the stars: enough of them earn the
-// season's medal — bronze, silver, gold — and the gold one the season's own frame.
+// Seasons are the rating's: a calendar month in Bulgaria. Rated games (duels, Роял) count for the season they're
+// played in; a player with MinSeasonGames of them is placed on its board. When the month ends the board is kept —
+// its first three take the season's podium: a medal, a frame in its metal, and a title that counts how many times
+// („Трикратен шампион“, „Двукратен вицешампион“) — and every rating goes halfway back to the start: the strong stay
+// ahead, but each month is a race again.
 
-// Goal is one of the day's goals: what to do, and how much of it.
-type Goal struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Target int    `json:"target"`
+const (
+	// MinSeasonGames is how many rated games a season takes to be placed in it: a win or two isn't a season.
+	MinSeasonGames = 10
+)
+
+// softened is a rating as the next season starts it: halfway back to the start.
+func softened(rating int) int { return StartRating + (rating-StartRating)/2 }
+
+// seasonOf is the season a moment is in (YYYY-MM).
+func seasonOf(t time.Time) string { return t.In(Bulgaria).Format("2006-01") }
+
+// SeasonNews is told to each player placed in a season when it ends.
+type SeasonNews struct {
+	To        int64
+	Season    string
+	Place, Of int
 }
 
-// Goals are every goal there is; the first is every day's.
-var Goals = []Goal{
-	{"day", "Изиграй въпросите на деня", 1},
-	{"right15", "Отговори вярно на 15 въпроса", 15},
-	{"topic", "Изиграй игра по тема", 1},
-	{"duel", "Изиграй дуел", 1},
-	{"royal", "Влез в Роял", 1},
-	{"xp400", "Спечели 400 XP", 400},
-	{"fast3", "Три верни отговора за под 5 секунди", 3},
-}
-
-// GoalsPerDay is how many goals a day has.
-const GoalsPerDay = 3
-
-// SeasonTiers are the stars each season medal takes: bronze, silver, gold (and with gold, the season's frame).
-var SeasonTiers = []struct {
-	Stars int    `json:"stars"`
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-}{{10, "bronze", "Бронзов"}, {30, "silver", "Сребърен"}, {60, "gold", "Златен"}}
-
-// goalsFor are a player's goals on a day: the day's questions, and two of the rest, drawn by the player and the day
-// (the same all day, another the next).
-func goalsFor(userID int64, day string) []Goal {
-	rest := append([]Goal(nil), Goals[1:]...)
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(strconv.FormatInt(userID, 10) + "/" + day))
-	seed := h.Sum64()
-	out := []Goal{Goals[0]}
-	for len(out) < GoalsPerDay && len(rest) > 0 {
-		i := int(seed % uint64(len(rest)))
-		seed /= uint64(len(rest)) + 1
-		out = append(out, rest[i])
-		rest = append(rest[:i], rest[i+1:]...)
+// ensureSeason ends the season being played if its month is over: it places everyone with enough games in it,
+// softens every rating and starts the season of now. It runs before anything that moves a rating and every minute,
+// so that no game of a new month counts for the old one; it's cheap once the season is the month's.
+func (g *Game) ensureSeason(ctx context.Context) error {
+	now := seasonOf(g.Now())
+	g.seasonMu.Lock()
+	defer g.seasonMu.Unlock()
+	if g.season == now {
+		return nil
 	}
-	return out
-}
-
-// DayGoal is a goal as the player sees it today: how far along, and whether done.
-type DayGoal struct {
-	Goal
-	Progress int  `json:"progress"`
-	Done     bool `json:"done"`
-}
-
-// dayBounds are the day's start and end, in milliseconds.
-func dayBounds(day string) (int64, int64) {
-	t, _ := time.ParseInLocation(time.DateOnly, day, Bulgaria)
-	return t.UnixMilli(), t.AddDate(0, 0, 1).UnixMilli()
-}
-
-// GoalsOf are the player's goals for today, with how far along each is; any newly done is kept (a star).
-func (g *Game) GoalsOf(ctx context.Context, userID int64) ([]DayGoal, error) {
-	day := g.Today()
-	from, to := dayBounds(day)
-	var dayDone, topics, duels, royals, earned int
-	var right, fast int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.ms < 5000
-			AND a.at BETWEEN ?2 AND ?3)`, userID, from, to, day).
-		Scan(&dayDone, &topics, &duels, &royals, &earned, &right, &fast)
-	if err != nil {
-		return nil, err
-	}
-	reached := map[string]int{"day": dayDone, "right15": right, "topic": topics, "duel": duels, "royal": royals,
-		"xp400": earned, "fast3": fast}
-	now := store.Ms(g.Now())
-	var out []DayGoal
-	for _, goal := range goalsFor(userID, day) {
-		d := DayGoal{Goal: goal, Progress: min(reached[goal.ID], goal.Target)}
-		d.Done = d.Progress >= goal.Target
-		if d.Done {
-			if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO goals_done (user_id, day, goal, at) VALUES (?, ?, ?, ?)`,
-				userID, day, goal.ID, now); err != nil {
-				return nil, err
-			}
+	var news []SeasonNews
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var open string
+		err := tx.QueryRow(`SELECT id FROM season`).Scan(&open)
+		if errors.Is(err, sql.ErrNoRows) {
+			_, err = tx.Exec(`INSERT INTO season (id) VALUES (?)`, now)
+			return err
 		}
-		out = append(out, d)
+		if err != nil || open >= now {
+			return err
+		}
+		// The board as it ends: the same order as RatingBoard's.
+		if _, err := tx.Exec(`INSERT INTO season_results (season, user_id, place, rating, games)
+			SELECT ?, id, row_number() OVER (ORDER BY rating DESC, season_games DESC, id), rating, season_games
+			FROM users WHERE season_games >= ?`, open, MinSeasonGames); err != nil {
+			return err
+		}
+		rows, err := tx.Query(`SELECT user_id, place, count(*) OVER () FROM season_results WHERE season = ?`, open)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			n := SeasonNews{Season: open}
+			if err := rows.Scan(&n.To, &n.Place, &n.Of); err != nil {
+				rows.Close()
+				return err
+			}
+			news = append(news, n)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		// SQLite's integer division goes towards zero, as softened's does.
+		if _, err := tx.Exec(`UPDATE users SET rating = ?1 + (rating - ?1) / 2, season_games = 0
+			WHERE rating <> ?1 OR season_games <> 0`, StartRating); err != nil {
+			return err
+		}
+		_, err = tx.Exec(`UPDATE season SET id = ?`, now)
+		return err
+	})
+	if err != nil {
+		return err
 	}
-	return out, nil
+	g.season = now
+	if g.SeasonNews != nil {
+		for _, n := range news {
+			g.SeasonNews(ctx, n)
+		}
+	}
+	return nil
 }
 
-// Season is a season as a player sees it: which month, their stars, the medals' tiers, and the days left.
+// Season is the season as a player sees it: which month, the days left, their games in it and their place on its
+// board now, and how the seasons before ended for them.
 type Season struct {
 	ID       string `json:"id"` // YYYY-MM
-	Stars    int    `json:"stars"`
 	DaysLeft int    `json:"daysLeft"`
-	// Hue is the season's colour (0–359), from its month: its art and frame are drawn in it.
-	Hue   int          `json:"hue"`
-	Tiers any          `json:"tiers"`
-	Past  []PastSeason `json:"past"`
+	MinGames int    `json:"minGames"`
+	Games    int    `json:"games"`
+	// Place is where the player stands on the season's board now (0: not placed yet), of Of placed.
+	Place int `json:"place,omitempty"`
+	Of    int `json:"of"`
+	// Podium is how many seasons the player has ended first, second and third.
+	Podium Podium       `json:"podium"`
+	Past   []PastSeason `json:"past"`
 }
 
-// PastSeason is a season gone by: its stars, and the medal they earned ("" for none).
+// PastSeason is how a season ended for a player placed in it.
 type PastSeason struct {
-	ID    string `json:"id"`
-	Stars int    `json:"stars"`
-	Medal string `json:"medal,omitempty"`
-	Hue   int    `json:"hue"`
+	ID       string   `json:"id"`
+	Place    int      `json:"place"`
+	Of       int      `json:"of"`
+	Rating   int      `json:"rating"`
+	Division Division `json:"division"`
 }
 
-// seasonHue is a season's colour: the months go round the colour wheel, a step a month.
-func seasonHue(id string) int {
-	t, err := time.Parse("2006-01", id)
-	if err != nil {
-		return 45
-	}
-	months := t.Year()*12 + int(t.Month())
-	return (months * 137) % 360
-}
-
-func medalOf(stars int) string {
-	medal := ""
-	for _, t := range SeasonTiers {
-		if stars >= t.Stars {
-			medal = t.ID
-		}
-	}
-	return medal
-}
-
-// SeasonOf is the player's season now, and the ones before.
+// SeasonOf is the season now, as a player sees it (0: nobody signed in, the season alone).
 func (g *Game) SeasonOf(ctx context.Context, userID int64) (Season, error) {
+	if err := g.ensureSeason(ctx); err != nil {
+		return Season{}, err
+	}
 	now := g.Now().In(Bulgaria)
-	s := Season{ID: now.Format("2006-01"), Tiers: SeasonTiers, Past: []PastSeason{}}
-	s.Hue = seasonHue(s.ID)
+	s := Season{ID: seasonOf(now), MinGames: MinSeasonGames, Past: []PastSeason{}}
 	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, Bulgaria)
 	s.DaysLeft = int(end.Sub(now).Hours()/24) + 1
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT substr(day, 1, 7), count(*) FROM goals_done WHERE user_id = ?
-		GROUP BY substr(day, 1, 7) ORDER BY 1 DESC`, userID)
+	db := g.DB.Read
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE season_games >= ?`, MinSeasonGames).
+		Scan(&s.Of); err != nil || userID == 0 {
+		return s, err
+	}
+	var rating int
+	if err := db.QueryRowContext(ctx, `SELECT rating, season_games FROM users WHERE id = ?`, userID).
+		Scan(&rating, &s.Games); err != nil {
+		return s, err
+	}
+	if s.Games >= MinSeasonGames {
+		if err := db.QueryRowContext(ctx, `SELECT 1 + count(*) FROM users WHERE season_games >= ?1
+			AND (rating > ?2 OR (rating = ?2 AND (season_games > ?3 OR (season_games = ?3 AND id < ?4))))`,
+			MinSeasonGames, rating, s.Games, userID).Scan(&s.Place); err != nil {
+			return s, err
+		}
+	}
+	rows, err := db.QueryContext(ctx, `SELECT r.season, r.place, r.rating,
+			(SELECT count(*) FROM season_results x WHERE x.season = r.season)
+		FROM season_results r WHERE r.user_id = ? ORDER BY r.season DESC`, userID)
 	if err != nil {
 		return s, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id string
-		var n int
-		if err := rows.Scan(&id, &n); err != nil {
+		var p PastSeason
+		if err := rows.Scan(&p.ID, &p.Place, &p.Rating, &p.Of); err != nil {
 			return s, err
 		}
-		if id == s.ID {
-			s.Stars = n
-			continue
+		p.Division, _ = DivisionOf(p.Rating)
+		if p.Place <= len(s.Podium) {
+			s.Podium[p.Place-1]++
 		}
-		s.Past = append(s.Past, PastSeason{ID: id, Stars: n, Medal: medalOf(n), Hue: seasonHue(id)})
+		s.Past = append(s.Past, p)
 	}
 	return s, rows.Err()
 }
 
-// SeasonBoard is the most stars this season.
-func (g *Game) SeasonBoard(ctx context.Context, viewer int64) (Ranking, error) {
-	month := g.Now().In(Bulgaria).Format("2006-01")
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, s.stars, `+lookColumns+`
-		FROM (SELECT user_id, count(*) AS stars FROM goals_done WHERE substr(day, 1, 7) = '`+month+`' GROUP BY user_id) s
-		JOIN users u ON u.id = s.user_id ORDER BY s.stars DESC, u.id`, false)
-}
+// Podium is how many seasons a player has ended in each of the first three places.
+type Podium [3]int
 
-// goldSeasons are the seasons a player earned gold in: each one's frame is theirs.
-func (g *Game) goldSeasons(ctx context.Context, userID int64) ([]string, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT substr(day, 1, 7) FROM goals_done WHERE user_id = ?
-		GROUP BY substr(day, 1, 7) HAVING count(*) >= ?`, userID, SeasonTiers[len(SeasonTiers)-1].Stars)
+// podiumOf is a player's podium.
+func (g *Game) podiumOf(ctx context.Context, userID int64) (Podium, error) {
+	var p Podium
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT place, count(*) FROM season_results WHERE user_id = ? AND place <= 3
+		GROUP BY place`, userID)
 	if err != nil {
-		return nil, err
+		return p, err
 	}
 	defer rows.Close()
-	var out []string
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
+		var place, n int
+		if err := rows.Scan(&place, &n); err != nil {
+			return p, err
 		}
-		out = append(out, id)
+		p[place-1] = n
 	}
-	return out, rows.Err()
+	return p, rows.Err()
+}
+
+// best is the best place a player has ended a season in (0: none on the podium).
+func (p Podium) best() int {
+	for i, n := range p {
+		if n > 0 {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// podiumTitles are the places of the podium as titles — won once, and before a count — and the tier each shows in.
+var podiumTitles = [3]struct {
+	once, name string
+	tier       Tier
+}{{"Шампион", "шампион", Legendary}, {"Вицешампион", "вицешампион", Epic}, {"Бронзов медалист", "бронзов медалист", Rare}}
+
+// times say how many times, before a title („Двукратен“); past ten, in digits.
+var times = []string{"", "", "Двукратен", "Трикратен", "Четирикратен", "Петкратен", "Шесткратен", "Седемкратен",
+	"Осемкратен", "Деветкратен", "Десеткратен"}
+
+// PodiumTitle is the title of a place on the podium (1–3), won n times: „Шампион“, „Трикратен шампион“.
+func PodiumTitle(place, n int) (string, Tier) {
+	t := podiumTitles[place-1]
+	switch {
+	case n <= 1:
+		return t.once, t.tier
+	case n < len(times):
+		return times[n] + " " + t.name, t.tier
+	}
+	return strconv.Itoa(n) + "-кратен " + t.name, t.tier
 }

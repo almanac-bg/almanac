@@ -6,7 +6,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { tickOn } from "../lib/prefs.ts";
 import { play } from "../lib/sound.ts";
-import { categories } from "../state.ts";
+import { categories, playing } from "../state.ts";
 import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
@@ -41,10 +41,14 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
     };
     document.addEventListener("visibilitychange", seen);
   };
-  onCleanup(() => seen && document.removeEventListener("visibilitychange", seen));
+  onCleanup(() => {
+    if (seen) document.removeEventListener("visibilitychange", seen);
+    playing.set(false);
+  });
 
   // Where the run stands: its end, a question showing, or between questions (the next one opens at once).
   const at = (s: State) => {
+    playing.set(!s.done);
     if (s.done) screen.set(done(s));
     else if (s.question) screen.set(question(s, s.question, next, reload));
     else whenSeen(next);

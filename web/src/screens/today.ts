@@ -10,9 +10,9 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
 import { figure, streak } from "../ui.ts";
+import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
-import { goalsCard } from "./season.ts";
 
 interface Today {
   day: string;

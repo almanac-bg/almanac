@@ -45,24 +45,40 @@ export async function player(): Promise<User> {
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 
-/** How many duels wait for the player to play. */
-export const duelTurns = signal(0);
+/** A game is under way on the screen: nothing else asks for the player's attention then. */
+export const playing = signal(false);
 
-/** Asks every half minute, while the page is in view, whether a duel waits for the player, or someone asks to be
- * friends. */
+/** A friend's challenge waiting for the player: who, and until when. */
+export interface Challenge {
+  id: number;
+  from: string;
+  expiresAt: number;
+  /** Begun and not finished. */
+  started?: boolean;
+}
+
+/** The friends' challenges waiting for the player, the soonest to run out first. */
+export const challenges = signal<Challenge[]>([]);
+
+/** Looks again, now, whether something waits for the player (after they've answered a challenge, say). */
+export let checkWaiting: () => Promise<void> = async () => {};
+
+/** Asks every half minute, while the page is in view, whether a friend has challenged the player, or someone asks
+ * to be friends. */
 export function watchWaiting(): void {
-  const check = async () => {
+  checkWaiting = async () => {
     if (!user.peek() || document.hidden) return;
     try {
-      const r = await api<{ requests: number; duels: number }>("GET", "/api/friends/invites");
-      if (r.requests > friendRequests.peek() || r.duels > duelTurns.peek()) play("ping");
+      const r = await api<{ requests: number; challenges: Challenge[] }>("GET", "/api/friends/invites");
+      const known = new Set(challenges.peek().map((c) => c.id));
+      if (r.requests > friendRequests.peek() || r.challenges.some((c) => !known.has(c.id))) play("ping");
       friendRequests.set(r.requests);
-      duelTurns.set(r.duels);
+      challenges.set(r.challenges);
     } catch {
       // Offline for a moment: the next look will tell.
     }
   };
-  check();
-  setInterval(check, 30_000);
-  document.addEventListener("visibilitychange", check);
+  checkWaiting();
+  setInterval(checkWaiting, 30_000);
+  document.addEventListener("visibilitychange", () => checkWaiting());
 }
