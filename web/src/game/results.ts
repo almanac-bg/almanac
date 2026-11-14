@@ -10,8 +10,9 @@ import { trail } from "./run.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
- * then whatever the screen adds, and the questions to go over. */
-export function summary(s: State, line: Child, ...more: Child[]): Child {
+ * then whatever the screen adds (`more`), and the questions to go over, with `beside` next to that button (the
+ * day's „Сподели“). */
+export function summary(s: State, line: Child, more: Child[], beside: Child = null): Child {
   return h(
     "section",
     { class: "summary" },
@@ -39,11 +40,11 @@ export function summary(s: State, line: Child, ...more: Child[]): Child {
       trail(s.trail, s.total),
     ),
     more,
-    review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions),
+    review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions, beside),
   );
 }
 
-/** Shares through the phone's own sheet, or copies where there's none. */
+/** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text). */
 export function shareButton(label: string, text: () => string, url?: string, primary = true): Child {
   const done = signal("");
   return h(
@@ -78,8 +79,8 @@ export function shareButton(label: string, text: () => string, url?: string, pri
 }
 
 /** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
- * about the question if something's wrong with it. */
-export function review(load: () => Promise<Reviewed[]>): Child {
+ * about the question if something's wrong with it. `beside` stays next to the button that opens it. */
+export function review(load: () => Promise<Reviewed[]>, beside: Child = null): Child {
   const items = signal<Reviewed[] | null>(null);
   const error = signal("");
   const open = async () => {
@@ -89,37 +90,40 @@ export function review(load: () => Promise<Reviewed[]>): Child {
       error.set((err as ApiError).message);
     }
   };
-  return h("section", { class: "review" }, () => {
-    const list = items();
-    if (!list) {
-      return h(
-        "div",
-        { class: "stack" },
-        h("button", { class: "btn", onclick: open }, "Прегледай въпросите"),
-        error() && h("p", { class: "bad" }, error()),
-      );
-    }
-    return [
-      h("h2", null, "Въпросите"),
-      list.map((it) =>
-        h(
-          "article",
-          { class: "reviewed" },
+  return h(
+    "section",
+    { class: "review" },
+    beside
+      ? h("div", { class: "result-actions" }, () => (items() ? null : reviewButton(open)), beside)
+      : () => (items() ? null : reviewButton(open)),
+    () => error() && h("p", { class: "bad" }, error()),
+    () => {
+      const list = items();
+      if (!list) return null;
+      return [
+        h("h2", null, "Въпросите"),
+        list.map((it) =>
           h(
-            "p",
-            { class: "kicker" },
-            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
+            "article",
+            { class: "reviewed" },
+            h(
+              "p",
+              { class: "kicker" },
+              `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
+            ),
+            h("h3", { class: "ask" }, it.view.text),
+            picture(it.view),
+            answered(it.view, it.reveal, it.given),
+            it.reveal.fact ? fact(it.reveal.fact) : null,
+            report(it.reveal.id),
           ),
-          h("h3", { class: "ask" }, it.view.text),
-          picture(it.view),
-          answered(it.view, it.reveal, it.given),
-          it.reveal.fact ? fact(it.reveal.fact) : null,
-          report(it.reveal.id),
         ),
-      ),
-    ];
-  });
+      ];
+    },
+  );
 }
+
+const reviewButton = (open: () => void) => h("button", { class: "btn", onclick: open }, "Прегледай въпросите");
 
 /** One row of a board: the place (gold, silver, bronze for the first three), the player with their look, the
  * score. */

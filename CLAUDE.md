@@ -17,6 +17,13 @@ levels (XP), achievements, titles, avatars, a rating with divisions and monthly 
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
 system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when).
 
+## Direction
+
+The day's ten questions are the heart of the game: the habit a player comes back for, the result they share. Everything
+else serves it or stays out of its way. The game already has many systems; a new one must replace something or prove
+it's needed, and quiet beats loud (a new player sees the day and the topics first, a game's news is three cards at
+most). A change is judged by whether players come back: the retention numbers in `/admin`.
+
 ## Where things are
 
 | Path | What |

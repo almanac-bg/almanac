@@ -3840,6 +3840,39 @@
     font-weight: 700;
   }
 
+  /* The XP a game brought and the level, a line under the result (when no new level has a card). */
+  .news-xp {
+    margin: 0;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .news-xp b {
+    color: var(--text);
+    font: 900 1.25rem / 1 var(--font-numeral);
+  }
+
+  /* Under a result: „Прегледай въпросите“ and, for the day, „Сподели“ beside it (one above the other on a narrow
+     phone). */
+  .result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .result-actions > * {
+    flex: 1 1 max-content;
+  }
+
+  .result-actions .btn {
+    white-space: nowrap;
+  }
+
+  .result-actions :where(.share) .btn {
+    width: 100%;
+  }
+
   .level-card {
     display: grid;
     gap: var(--space-2);
@@ -4710,15 +4743,19 @@
     font: 900 1.25rem / 1 var(--font-numeral);
   }
 
-  .mastery-card {
-    display: grid;
-    gap: var(--space-3);
+  /* How a topic's game moved its mastery, a line in „Ново за теб“. */
+  .mastery-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    width: 100%;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
   }
 
-  .mastery-card.up {
-    box-shadow:
-      var(--glow-gold),
-      inset 0 0 0 1px var(--gold);
+  .mastery-line .mastery {
+    margin-left: auto;
   }
 
   .games {

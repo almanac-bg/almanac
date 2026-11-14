@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-// today is the day screen's state: the day, the viewer's streak, level and run (if any), and how many have played it.
+// today is the day screen's state: the day, the viewer's streak, level and run (if any), whether they've finished a
+// game yet, and how many have played the day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -30,6 +31,13 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		if out["level"], err = s.game.LevelNow(r.Context(), u.ID); err != nil {
 			return err
 		}
+		// Whether they've finished a game of any kind yet: until then Начало is the day and the topics only.
+		var played bool
+		if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND finished_at IS NOT NULL)`, u.ID).
+			Scan(&played); err != nil {
+			return err
+		}
+		out["played"] = played
 		var runID int64
 		err = s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {

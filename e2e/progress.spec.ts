@@ -5,8 +5,11 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   test.setTimeout(120_000);
   await page.goto("/play/history");
   await playRun(page);
-  await expect(page.locator(".level-card")).toContainText("Ниво");
-  // Everything the game unlocked is told together, each a tap from being worn.
+  // What the game brought is a line (a level card only for a new level), and „Ново за теб“ tells the rest: how the
+  // topic is known now, and everything the game unlocked, each a tap from being worn.
+  await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/[Нн]иво \d+/);
+  await expect(page.locator(".unlocks")).toContainText("Ново за теб");
+  await expect(page.locator(".unlocks .mastery-line")).toContainText("История");
   const unlocked = page.locator(".unlocks .unlock-row", { hasText: "Титла „Нова искра“" });
   await expect(unlocked).toContainText("С ниво 1.");
   await unlocked.getByRole("button", { name: "Сложи: титла „Нова искра“" }).click();

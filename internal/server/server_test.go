@@ -295,6 +295,10 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("playing without even a guest: %d", status)
 	}
 	p.call("POST", "/api/guest", map[string]any{})
+	// Before a first game finished, Начало is the day and the topics only.
+	if _, today := p.call("GET", "/api/day", nil); today["played"] != false {
+		t.Fatalf("played before a game: %v", today["played"])
+	}
 	status, run := p.call("POST", "/api/day", map[string]any{})
 	if status != 200 || run["total"] != float64(10) {
 		t.Fatalf("start: %d %v", status, run)
@@ -333,7 +337,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("review: %d %v", status, out)
 	}
 	_, today := p.call("GET", "/api/day", nil)
-	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) {
+	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["played"] != true {
 		t.Fatalf("today: %v", today)
 	}
 	// Начало shows the level too: the day's ten have earned XP.

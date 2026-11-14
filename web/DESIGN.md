@@ -25,14 +25,16 @@ three when you add or change a screen.
 
 Four main places, in a bar at the bottom of a phone (in the header on a big screen). Nothing else goes in the bar.
 
-- **Начало** (`/`): the streak and the level side by side (each a way to Профил); the day's ten, or once played, how
-  they went (the place a way to the day's board); the day's goals; the ways to play with others, two by two; the
+- **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten, or
+  once played, how they went (the place a way to the day's board) with „Сподели“ beside „Прегледай въпросите“; the
+  day's goals; the ways to play with others, two by two; the
   topics, two by two (three on a big screen), and all of them at once. Дуел, Арена, Роял and Стая open from here and
-  have a way back to it (`back()`).
+  have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
+  streak, the goals and the ways to play with others come after the first game.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
 - **Класации** (`/ranks`): Днес (the day's board, first), Рейтинг (with the season), Ниво and Знания; of everyone or
   of friends.
-- **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level, division,
+- **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level, division (after a first rated game),
   season, streak, numbers, mastery, latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
@@ -115,7 +117,7 @@ takes a token.
   - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways (the page itself never does).
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.
 - **Mastery:** `.mastery` (the tier's bars, lit in the topic's tone, and its name), `.mastery-list`/`.mastery-row`, and
-  `.mastery-card` (with `up` for a new tier) on a result.
+  `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
   - `.question-head` (with `.count`), `.trail`, `.timer` and `.ask`.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`.
@@ -170,7 +172,9 @@ takes a token.
   of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
 - **One system.** XP comes from answers, the day's goals, achievements and a season's end (by division); the rating
   from duels, Арена and Роял. Level, achievements, mastery, division, Роял and podium unlock the wardrobe. After a
-  game, everything newly unlocked is told together (`.unlocks`, each with „Сложи“), whatever unlocked it; Профил shows
+  game, its news is three cards at most: the goals it finished; the one biggest event (a season ended, a division
+  reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
+  (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. Профил shows
   what comes next (`.next`); the day's goals, all three done, earn a reserve day for the streak (`.goals-reserve`,
   `.week li.saved`). Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
@@ -250,7 +254,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - ordinals with the ending the dictionary gives (`lib/ordinal.ts`): „1-ви“, „2-ри“, „3-ти“, „4-ти“, „5-и“, „12-и“,
     „21-ви“, and „3-то място“;
   - months in lower case, also after a word („Сезон ноември 2026“).
-- **No emoji in the interface.**
+- **No emoji in the interface.** The one place they appear is the text a player shares of the day's result
+  (`game/share.ts`: 🟩 right, 🟨 close, 🟥 wrong), which never shows on a screen.
 
 ## Motion
 
@@ -275,7 +280,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - the clock while a question waits: `tick` and `tock` in turn each second, then `hurry` in each of the last five;
   - `tick` for each second of the count before a run;
   - `end` when a run's result opens;
-  - `level` and `achievement` with the news;
+  - `level`, `achievement` or `goal` with the news: only the biggest thing told plays;
   - `ping` when a game or a duel starts, or a friend calls to a duel.
 - **Nothing plays** for navigation, hovering or decoration.
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the

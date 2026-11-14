@@ -3,21 +3,38 @@ import { answer, playRun } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
+  // The phone's share sheet, stood in for: what it was given is kept.
+  await page.addInitScript(() => {
+    navigator.share = async (data?: ShareData) => {
+      (window as unknown as { shared: string }).shared = data?.text ?? "";
+    };
+  });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
+  // A new player sees the day and the topics only: playing with others comes after a first game.
+  await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
+  await expect(page.locator(".modes")).toHaveCount(0);
+  await expect(page.locator(".streak-chip")).toHaveCount(0);
   await page.getByRole("button", { name: "Започни" }).click();
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  // The day's goal is done, said once with its XP.
+  // The day's goal is done, said once with its XP; what the game brought is a line, the level with it.
   await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+50 XP");
+  // (A first day may well be a new level: then that's the card, with the XP.)
+  await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/\+\d+ XP · /);
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
+  // The result is shared without its answers: the date, the score, a square for each question, the site.
+  await page.getByRole("button", { name: "Сподели" }).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared: string }).shared);
+  expect(shared).toMatch(/^АЛМАНАХ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨🟥]{10}\nalmanac\.bg$/u);
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
+  await expect(page.locator(".modes")).toBeVisible();
   // The day's goal stays done. (The other two goals are drawn per day, and a run of the day can finish them too.)
   await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
   // Начало's top tells the streak and the level the day made.
