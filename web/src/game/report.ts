@@ -20,7 +20,7 @@ export function report(id: string): Child {
   return () => {
     switch (state()) {
       case "closed":
-        return h("button", { class: "link muted", onclick: () => state.set("open") }, "Нещо не е наред с въпроса?");
+        return h("button", { class: "link muted tap", onclick: () => state.set("open") }, "Нещо не е наред с въпроса?");
       case "sent":
         return h("p", { class: "muted", role: "status" }, "Благодарим! Ще го прегледаме.");
       case "open":

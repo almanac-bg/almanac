@@ -213,7 +213,7 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       back("/", "Начало"),
       pageArt("royal", "tone-gold"),
       h("h1", null, "Роял"),
-      h("p", { class: "muted" }, about),
+      h("p", { class: "lead" }, about),
     ),
     h(
       "section",

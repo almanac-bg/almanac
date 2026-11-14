@@ -126,7 +126,7 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
   const list = () => {
     const all = items();
     if (!all) return error() ? h("p", { class: "bad", role: "alert" }, error()) : null;
-    heading = h("h2", { class: "review-head", tabindex: -1 }, "Въпросите");
+    heading = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите");
     return h(
       "section",
       { class: "review" },

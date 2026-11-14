@@ -76,7 +76,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
           h("strong", { class: "worn-name" }, user()?.name ?? ""),
           worn
             ? h("span", { class: `me-title t-${worn.tier}` }, worn.name)
-            : h("span", { class: "muted" }, "Без титла"),
+            : h("span", { class: "muted small" }, "Без титла"),
         ),
       ),
       h(

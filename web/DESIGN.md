@@ -160,7 +160,10 @@ takes a token.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
   (a number's name, a tap from its meaning: `explain()`).
 - **Controls:**
-  - `.btn`, with `primary`, `big`, `rose` (accepting a friend request), `danger` and `inline`; and `.link`.
+  - `.btn`, with `primary`, `big`, `rose` (accepting a friend request), `danger` and `inline`, all with one corner
+    (`--radius-md`); and `.link` (`tap` for one on its own line, a finger's height).
+  - Like things are one size: a field is a button's height (48), an answer row 60 whatever the question's kind, a
+    meter 6, a row card 12 by 16 inside; every number of a size is from the scale.
   - `.field` and `input.code`; `.join` for an input with its button.
   - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways (the page itself never does).
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.

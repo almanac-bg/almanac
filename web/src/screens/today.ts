@@ -192,14 +192,18 @@ function dayCard(t: Today, start: () => Promise<void>, marks: Mark[]): Child {
   return h(
     "section",
     { class: "card hero day" },
-    h("p", { class: "kicker" }, longDate(t.day)),
-    h("h1", null, "Десет въпроса за днес"),
     h(
-      "p",
-      { class: "muted" },
-      at
-        ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
-        : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, longDate(t.day)),
+      h("h1", null, "Десет въпроса за днес"),
+      h(
+        "p",
+        { class: "muted" },
+        at
+          ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
+          : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
+      ),
     ),
     trail(marks, 10, at ? at : -1),
     h(

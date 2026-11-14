@@ -514,7 +514,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   const done = h(
     "button",
     {
-      class: "btn primary",
+      class: "btn primary big",
       disabled: locked,
       onclick: () => {
         if (locked.peek()) return;
@@ -537,7 +537,8 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     // The right order, as the answer; on each thing, whether the player had it in its place, and if not, where.
     // Nothing put in order (the time ran out first): the right order alone.
     reveal(reveal, given) {
-      hint.hidden = true;
+      // The line over the list stays, saying what it shows now, so the answers don't move under the player's eye.
+      hint.replaceChildren("Правилният ред:");
       done.hidden = true;
       const mine = given && "order" in given ? given.order : null;
       const unit = reveal.unit ? ` ${reveal.unit}` : "";
@@ -720,7 +721,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   const done = h(
     "button",
     {
-      class: "btn primary",
+      class: "btn primary big",
       disabled: () => locked() || pairs().includes(-1),
       onclick: () => {
         if (locked.peek()) return;
@@ -743,7 +744,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
     node: h("div", { class: "stack" }, hint, grid, said, done, result, decoy),
     pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
     reveal(reveal, given) {
-      hint.hidden = true;
+      hint.replaceChildren("Правилните двойки:");
       grid.hidden = true;
       done.hidden = true;
       result.hidden = false;
