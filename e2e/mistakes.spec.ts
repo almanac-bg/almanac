@@ -15,9 +15,11 @@ test("a second chance: the questions missed come back, from Начало and fro
     await page.goto("/almanac");
     await expect(card).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
-  await expect(card).toContainText(/\d+ въпроса, на които сгреши, чакат нов опит/);
+  await expect(card).toContainText(/\d+ въпрос(а, на които сгреши, чакат|, на който сгреши, чака) нов опит/);
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /Втори шанс/ })).toContainText(/\d+ въпроса, на които сгреши/);
+  await expect(page.getByRole("link", { name: /Втори шанс/ })).toContainText(
+    /\d+ въпрос(а, на които|, на който) сгреши/,
+  );
 
   await page.goto("/almanac");
   await page.getByRole("link", { name: "Опитай пак" }).click();

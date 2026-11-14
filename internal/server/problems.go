@@ -84,7 +84,7 @@ func (s *Server) MailProblems(ctx context.Context, to string, period time.Durati
 		}
 		b.WriteString("Подробностите са в дневника: journalctl -u almanac\n")
 		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-			return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: fmt.Sprintf("АЛМАНАХ: %d нови проблема", len(kinds)), Text: b.String()})
+			return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: problemsSubject(len(kinds)), Text: b.String()})
 		})
 		if err != nil {
 			slog.Error("mailing problems", "err", err)

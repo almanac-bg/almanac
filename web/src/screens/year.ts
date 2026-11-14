@@ -74,7 +74,7 @@ function slides(y: Year): Child[] {
     slide(
       `Твоята ${y.year}`,
       "АЛМАНАХ",
-      y.days ? "Ето какво свърши в играта тази година." : "Тази година още нямаш игри. Има време.",
+      y.days ? "Ето годината ти в играта." : "Тази година още нямаш игри. Има време.",
     ),
   ];
   if (!y.days) return out;
@@ -84,7 +84,7 @@ function slides(y: Year): Child[] {
       formatNumber(y.days),
       y.streak > 1
         ? `Най-дългата ти серия: ${count(y.streak, "ден", "дни")} поред с въпросите на деня.`
-        : `${count(y.games, "игра", "игри")} до край.`,
+        : `${count(y.games, "изиграна игра", "изиграни игри")}.`,
     ),
   );
   const share = y.answers ? Math.round((100 * y.right) / y.answers) : 0;
@@ -100,9 +100,9 @@ function slides(y: Year): Child[] {
   if (y.facts)
     out.push(
       slide(
-        "Научи",
+        "Научени факти",
         count(y.facts, "факт", "факта"),
-        "Всички са в Моят Алманах. Първият:",
+        "Всички са в Алманаха ти. Първият:",
         y.first ? fact(y.first.fact) : null,
       ),
     );
@@ -129,7 +129,7 @@ function slides(y: Year): Child[] {
         "Най-високо, докъдето стигна.",
       ),
     );
-  out.push(slide("XP за годината", `+${formatNumber(y.xp)}`, "Благодарим, че игра."));
+  out.push(slide("XP за годината", `+${formatNumber(y.xp)}`, "Благодарим ти, че играеш."));
   return out;
 }
 

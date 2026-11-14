@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { fact, meter, pageArt, profileNav, toneOf, topicMark } from "../ui.ts";
+import { fact, meter, pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
 import { loadMistakes } from "./play.ts";
 
 interface Learned {
@@ -51,7 +51,7 @@ export function almanac() {
             h(
               "p",
               { class: "muted" },
-              `${waiting()} въпроса, на които сгреши, чакат нов опит. Отговори вярно и фактът е твой.`,
+              `${questions(waiting())}, ${waiting() === 1 ? "на който сгреши, чака" : "на които сгреши, чакат"} нов опит. Отговори вярно и фактът е твой.`,
             ),
             h("a", { class: "btn primary", href: "/mistakes" }, "Опитай пак"),
           )

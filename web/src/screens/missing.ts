@@ -2,7 +2,7 @@ import { h } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 
 export function missing() {
-  title("Няма я");
+  title("Няма такава страница");
   return h(
     "section",
     { class: "screen" },
@@ -22,11 +22,11 @@ export function challengeGone() {
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, "Стара връзка"),
-      h("h1", null, "Предизвикателствата ги няма"),
+      h("h1", null, "Тази връзка вече не работи"),
       h(
         "p",
         { class: "lead" },
-        "Сега се играе с приятели: добави ги и се канете на дуел. А резултатите от въпросите на деня сравнявате всеки ден.",
+        "Сега се играе с приятели: добави ги и се предизвиквайте на дуел. А резултатите от въпросите на деня сравнявате всеки ден.",
       ),
     ),
     h("a", { class: "btn primary", href: "/duel" }, "Към дуелите"),
