@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Notifications from Apple's push service (Xcode makes it "production" in a build for the App Store). -->
+	<!-- Notifications from Apple's push service: its sandbox for a build from Xcode (Debug); AppRelease.entitlements,
+	     the same with "production", for TestFlight and the App Store. -->
 	<key>aps-environment</key>
 	<string>development</string>
 	<!-- Links to almanac.bg open in the app (the site's /.well-known/apple-app-site-association says which). -->
