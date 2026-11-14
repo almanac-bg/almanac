@@ -4,6 +4,7 @@
 import { badgeArt } from "./art/badge.ts";
 import { frameArt } from "./art/frame.ts";
 import { type Child, h } from "./lib/dom.ts";
+import { calm } from "./lib/prefs.ts";
 import { categories } from "./state.ts";
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
@@ -16,19 +17,65 @@ const verdictWords: Record<VerdictKind, string> = {
   time: "Времето изтече.",
 };
 
-/** How an answer went: its sign, the word, and the points it brought (and how many of them for being quick). */
-export function verdict(kind: VerdictKind, points: number, words = verdictWords[kind], speed = 0): Child {
+/** A number as people write it in Bulgarian: a space between thousands from 10 000 up, a decimal comma. */
+export function formatNumber(n: number, step = 1): string {
+  const decimals = Math.max(0, (String(step).split(".")[1] ?? "").length);
+  return new Intl.NumberFormat("bg", { maximumFractionDigits: decimals, useGrouping: Math.abs(n) >= 10000 }).format(n);
+}
+
+/** Points rising to `to` from `from`, once (at once where there's to be less motion); `prefix` goes before them. */
+export function countUp(to: number, from = 0, prefix = ""): HTMLElement {
+  const el = h("span", { class: "count-up" }, prefix + formatNumber(to));
+  if (calm.peek() || to === from) return el;
+  const start = performance.now();
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / riseMs);
+    const eased = 1 - (1 - t) ** 3;
+    el.textContent = prefix + formatNumber(Math.round((from + (to - from) * eased) / 10) * 10);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  el.textContent = prefix + formatNumber(from);
+  requestAnimationFrame(step);
+  return el;
+}
+
+/** How long points take to rise (DESIGN.md, Motion). */
+const riseMs = 520;
+
+/** Right answers in a row, from the second: the flame and how many. */
+export function inRowChip(n: number): HTMLElement | null {
+  if (n < 2) return null;
   return h(
-    "p",
+    "span",
+    { class: "in-row", "aria-label": `${n} верни отговора поред` },
+    h("i", { class: "in-row-flame", "aria-hidden": "true" }),
+    h("b", null, String(n)),
+    " поред",
+  );
+}
+
+/** How an answer went: its sign, the word, the right answers in a row it makes, and the points it brought (and how
+ * many of them for being quick, and for the row). */
+export function verdict(
+  kind: VerdictKind,
+  points: number,
+  words = verdictWords[kind],
+  speed = 0,
+  row = 0,
+  inRow = 0,
+): Child {
+  return h(
+    "div",
     { class: `verdict ${kind}`, role: "status" },
     h("span", { class: "verdict-sign", "aria-hidden": "true" }),
-    h("strong", { class: "verdict-word" }, words),
+    h("div", { class: "verdict-says" }, h("strong", { class: "verdict-word" }, words), inRowChip(inRow)),
     points > 0
       ? h(
           "span",
           { class: "verdict-pts" },
-          `+${points}`,
-          speed > 0 ? h("small", { class: "verdict-speed" }, `${speed} за бързина`) : null,
+          countUp(points, 0, "+"),
+          speed > 0 ? h("small", { class: "verdict-part" }, `${formatNumber(speed)} за бързина`) : null,
+          row > 0 ? h("small", { class: "verdict-part row" }, `${formatNumber(row)} за ${inRow} поред`) : null,
         )
       : null,
   );
@@ -222,11 +269,14 @@ export function avatar(
   );
 }
 
-/** A player on a board or a list: their avatar, name and title. */
-export function who(name: Child, look: Look = {}, extra: Child = null, plainName = ""): Child {
+/** Where a player's profile is: by their tag. */
+export const profileHref = (tag: string) => `/players/${tag}`;
+
+/** A player on a board or a list: their avatar, name and title; with their tag, a link to their profile. */
+export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
-    "span",
-    { class: "who" },
+    tag ? "a" : "span",
+    tag ? { class: "who", href: profileHref(tag) } : { class: "who" },
     avatar(look.avatar, { size: "s", level: look.level, name: plainName }),
     h(
       "span",

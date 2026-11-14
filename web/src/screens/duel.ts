@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
-import { meter, type Tier, who } from "../ui.ts";
+import { formatNumber, meter, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -92,7 +92,7 @@ function duelRow(d: DuelView): Child {
           : `${them?.name ?? "Някой"} те чака`
         : d.state === "declined" || d.state === "expired"
           ? "Без резултат"
-          : `${d.you?.points ?? 0} : ${them?.points ?? 0}${d.recorded ? " · срещу запис" : ""}`;
+          : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}`;
   return h(
     "li",
     null,
@@ -322,7 +322,7 @@ function ended(d: DuelView): Child {
           { class: "card duel-score" },
           side("Ти", d.you),
           h("span", { class: "duel-vs" }, ":"),
-          side(d.opponent.name, d.opponent),
+          side(d.opponent.name, d.opponent, d.opponent.tag),
           d.delta
             ? h(
                 "p",
@@ -339,12 +339,12 @@ function ended(d: DuelView): Child {
   );
 }
 
-function side(label: string, s: Side): Child {
+function side(label: string, s: Side, tag?: string): Child {
   return h(
     "div",
     { class: "duel-side" },
-    h("span", { class: "kicker" }, label),
-    h("b", { class: "duel-points" }, String(s.points)),
+    tag ? h("a", { class: "kicker", href: profileHref(tag) }, label) : h("span", { class: "kicker" }, label),
+    h("b", { class: "duel-points" }, formatNumber(s.points)),
     h("span", { class: "muted" }, `${s.rights} от 10`),
   );
 }
