@@ -20,8 +20,14 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   // The day's goal stays done. (The other two goals are drawn per day, and a run of the day can finish them too.)
   await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
-  // The XP shows on the board of levels; the season's board waits for ten rated games.
+  // Начало's top tells the streak and the level the day made.
+  await expect(page.locator(".streak-chip")).toContainText("1");
+  await expect(page.locator(".level-chip")).toContainText("Ниво");
+  // Класации opens on the day's board, the player on it; the XP shows on the board of levels; the season's board
+  // waits for ten rated games.
   await page.goto("/ranks");
+  await expect(page.locator(".board .row.me")).toContainText("/10");
+  await page.getByRole("tab", { name: "Рейтинг" }).click();
   await expect(page.locator(".season-card")).toContainText("0 от 10");
   await page.getByRole("tab", { name: "Ниво" }).click();
   await expect(page.locator(".board .row.me")).toContainText("ниво");

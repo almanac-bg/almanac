@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// today is the day screen's state: the day, the viewer's streak and run (if any), and how many have played it.
+// today is the day screen's state: the day, the viewer's streak, level and run (if any), and how many have played it.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -23,6 +23,9 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
+			return err
+		}
+		if out["level"], err = s.game.LevelNow(r.Context(), u.ID); err != nil {
 			return err
 		}
 		var runID int64

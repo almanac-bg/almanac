@@ -1,9 +1,10 @@
-// Класации: where players stand — by rating this season (with its division), by level, and by knowledge (over every
-// topic, or one) — among everyone, or among you and your friends.
+// Класации: where players stand — on the day's ten (first: it's what most play), by rating this season (with its
+// division), by level, and by knowledge (over every topic, or one) — among everyone, or among you and your friends.
 
 import { emblem } from "../art/emblem.ts";
 import { seasonName } from "../art/season.ts";
-import { boardRow } from "../game/results.ts";
+import { board, boardRow } from "../game/results.ts";
+import type { Board, Score } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
@@ -50,9 +51,16 @@ interface Answer {
   least?: number;
 }
 
-type By = "rating" | "level" | "knowledge";
+/** The day's boards, as /api/day has them. */
+interface Day {
+  board: Board;
+  friends?: Score[] | null;
+}
+
+type By = "day" | "rating" | "level" | "knowledge";
 
 const tabs: [By, string][] = [
+  ["day", "Днес"],
   ["rating", "Рейтинг"],
   ["level", "Ниво"],
   ["knowledge", "Знания"],
@@ -65,10 +73,11 @@ export const daysLeft = (d: number) => `още ${d} ${d === 1 ? "ден" : "дн
 
 export function ranks() {
   title("Класации");
-  const by = signal<By>("rating");
+  const by = signal<By>("day");
   const friends = signal(false);
   const topic = signal("");
   const data = signal<Answer | null>(null);
+  const day = signal<Day | null>(null);
   const error = signal("");
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
@@ -80,6 +89,10 @@ export function ranks() {
   const load = () => {
     data.set(null);
     error.set("");
+    if (by() === "day") {
+      if (!day.peek()) api<Day>("GET", "/api/day").then(day.set, (err) => error.set((err as ApiError).message));
+      return;
+    }
     const asked = current();
     api<Answer>("GET", `/api/ranks?${asked}`).then(
       (a) => {
@@ -111,13 +124,14 @@ export function ranks() {
             ],
             friends,
             (v) => pick(friends, v),
+            true,
           )
         : null,
       () =>
         by() === "knowledge"
           ? h(
               "ul",
-              { class: "chips", "aria-label": "Тема" },
+              { class: "chips scroll", "aria-label": "Тема" },
               h(
                 "li",
                 null,
@@ -149,6 +163,22 @@ export function ranks() {
     ),
     (): Child => {
       if (error()) return h("p", { role: "alert" }, error());
+      if (by() === "day") {
+        const t = day();
+        if (!t) return h("p", { class: "muted" }, "…");
+        if (friends())
+          return t.friends?.length
+            ? board("Днес · приятели", t.friends)
+            : h("p", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес.");
+        return t.board.top.length
+          ? board(
+              `Днес · ${t.board.players} ${t.board.players === 1 ? "играч" : "играчи"}`,
+              t.board.top,
+              t.board.place,
+              t.board.mine,
+            )
+          : h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
+      }
       const d = data();
       if (!d) return h("p", { class: "muted" }, "…");
       const among = (name: string) => (friends() ? `${name} · приятели` : name);
@@ -206,16 +236,22 @@ function seasonHead(s: Season): Child {
     h(
       "p",
       { class: "board-note" },
-      `Класират се играчите с поне ${s.minGames} игри за рейтинг (дуели и Роял) този месец. В края му първите трима печелят медал, рамка и титла, а всеки рейтинг се връща наполовина към 1000.`,
+      `Класират се играчите с поне ${s.minGames} игри за рейтинг (дуели и Роял). В края на месеца първите трима печелят медал, рамка и титла, а всеки рейтинг се връща наполовина към 1000.`,
     ),
   );
 }
 
 /** A segmented switch of a few choices. */
-function segmented<T>(label: string, options: [T, string][], now: () => T, choose: (v: T) => void): Child {
+function segmented<T>(
+  label: string,
+  options: [T, string][],
+  now: () => T,
+  choose: (v: T) => void,
+  small = false,
+): Child {
   return h(
     "div",
-    { class: "segmented", role: "tablist", "aria-label": label },
+    { class: small ? "segmented small" : "segmented", role: "tablist", "aria-label": label },
     options.map(([id, text]) =>
       h(
         "button",

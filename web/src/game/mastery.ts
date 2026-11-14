@@ -51,6 +51,23 @@ export function masteryLeft(m: Mastery): string {
 }
 
 function row(m: Mastery, extra: Child = null): Child {
+  // Still being found out: one line, the topic and what's left before it's told.
+  if (!m.sure)
+    return h(
+      "li",
+      { class: `mastery-row ${toneOf(m.category)}` },
+      h(
+        "div",
+        { class: "mastery-head" },
+        h(
+          "span",
+          { class: "mastery-topic" },
+          h("span", { class: "dot", "aria-hidden": "true" }),
+          topicName(m.category),
+        ),
+        h("span", { class: "mastery-meta" }, extra, masteryLeft(m)),
+      ),
+    );
   return h(
     "li",
     { class: `mastery-row ${toneOf(m.category)}` },
@@ -58,38 +75,47 @@ function row(m: Mastery, extra: Child = null): Child {
       "div",
       { class: "mastery-head" },
       h("span", { class: "mastery-topic" }, h("span", { class: "dot", "aria-hidden": "true" }), topicName(m.category)),
-      m.sure ? masteryBadge(m) : null,
+      masteryBadge(m),
     ),
-    m.sure ? meter(m.known, `${m.known}% от темата`) : null,
+    meter(m.known, `${m.known}% от темата`),
     h(
       "div",
       { class: "mastery-meta" },
-      m.sure ? h("b", { class: "mastery-known" }, `${m.known}%`) : null,
+      h("b", { class: "mastery-known" }, `${m.known}%`),
       extra,
       h("span", null, masteryLeft(m)),
     ),
   );
 }
 
-/** Every topic, how well it's known: the best known first, then those still being found out, then the rest. Said
- * to the player, or (another's) about them. */
+/** Every topic, how well it's known: the best known first, then those still being found out, and the ones not
+ * played yet named in a line. Said to the player, or (another's) about them. */
 export function masteryCard(all: Mastery[], theirs = false): Child {
   const order = (m: Mastery) => (m.sure ? 2000 + m.known : m.answers ? 1000 + m.answers : 0);
   const sorted = [...all].sort((a, b) => order(b) - order(a));
+  const played = sorted.filter((m) => m.answers);
+  const not = sorted.filter((m) => !m.answers);
   return h(
     "section",
     { class: "card stack" },
-    h("h2", { class: "section-title" }, theirs ? "Колко знае" : "Колко знаеш"),
     h(
-      "p",
-      { class: "muted" },
-      `Каква част от въпросите на всяка тема ${theirs ? "знае" : "знаеш"}. По-трудните въпроси тежат повече.`,
+      "div",
+      { class: "card-head" },
+      h("h2", { class: "section-title" }, theirs ? "Колко знае" : "Колко знаеш"),
+      h("span", { class: "muted small" }, "По-трудните въпроси тежат повече"),
     ),
-    h(
-      "ol",
-      { class: "mastery-list" },
-      sorted.map((m) => row(m)),
-    ),
+    played.length
+      ? h(
+          "ol",
+          { class: "mastery-list" },
+          played.map((m) => row(m)),
+        )
+      : null,
+    !played.length
+      ? h("p", { class: "muted small" }, theirs ? "Още няма изиграни теми." : "Изиграй тема и ще видиш колко я знаеш.")
+      : not.length
+        ? h("p", { class: "muted small" }, `Още неиграни: ${not.map((m) => topicName(m.category)).join(", ")}.`)
+        : null,
   );
 }
 

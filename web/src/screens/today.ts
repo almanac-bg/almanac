@@ -1,16 +1,17 @@
-// Начало: the day's ten questions, the same for everyone, once; your streak; the day's goals; and every other way
-// to play — with others, and by topic.
+// Начало: where every game starts, on one short screen. At the top the player's streak and level; then the day's ten
+// questions, the same for everyone, once (or, once played, how they went); the day's goals; and every other way to
+// play — with others, and by topic — a tap away. The day's boards are in Класации.
 
 import { news } from "../game/news.ts";
-import { board, summary } from "../game/results.ts";
+import { summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
-import type { Board, Score, State } from "../game/types.ts";
+import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { player, user } from "../state.ts";
-import { figure, streak } from "../ui.ts";
+import { meter } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -20,10 +21,10 @@ interface Today {
   streak: number;
   /** This week's days played, Monday first (for a player who has played). */
   week?: boolean[];
+  /** The player's level, from all their XP (for a player). */
+  level?: { level: number; xp: number; from: number; to: number };
   run: State | null;
   board: Board;
-  /** The day among the player and their friends, once a friend has finished it too. */
-  friends?: Score[] | null;
 }
 
 const longDate = (day: string) =>
@@ -37,102 +38,120 @@ export function today() {
   const load = async () => {
     try {
       const t = await api<Today>("GET", "/api/day");
-      if (t.run && !t.run.done) screen.set(playRun(t.run, (s) => finished(t, s)));
-      else if (t.run) screen.set(finished(t, t.run));
-      else screen.set(intro(t));
+      if (t.run && !t.run.done) screen.set(playRun(t.run, (s) => home(t, s, true)));
+      else screen.set(home(t, t.run, false));
     } catch (err) {
       screen.set(h("p", { role: "alert" }, (err as ApiError).message));
     }
   };
+  const start = (t: Today) => async () => {
+    await player();
+    const s = await api<State>("POST", "/api/day", {});
+    screen.set(playRun(s, (end) => home(t, end, true)));
+  };
+  load();
+  return h("div", null, () => screen());
 
-  const intro = (t: Today): Child => {
-    const busy = signal(false);
-    const error = signal("");
-    const players = t.board.players;
+  /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
+   * earned is told once), then the ways to play. */
+  function home(t: Today, run: State | null, just: boolean): Child {
+    // Just played: the streak, the level and the place it made, as they are now.
+    const fresh = signal<Today>(t);
+    if (just) api<Today>("GET", "/api/day").then(fresh.set, () => {});
     return h(
       "section",
-      { class: "screen" },
-      h(
-        "div",
-        { class: "intro" },
-        h("p", { class: "kicker" }, longDate(t.day)),
-        h("h1", null, "Десет въпроса за днес"),
-        h("p", { class: "lead" }, "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит."),
-      ),
-      h(
-        "div",
-        { class: "card hero" },
-        h(
-          "div",
-          { class: "figures" },
-          figure("10", "въпроса"),
-          figure("~3", "минути"),
-          figure(String(players), players === 1 ? "човек днес" : "души днес"),
-        ),
-        trail([], 10),
-      ),
-      h(
-        "button",
-        {
-          class: "btn primary big",
-          disabled: busy,
-          onclick: async () => {
-            busy.set(true);
-            try {
-              await player();
-              const s = await api<State>("POST", "/api/day", {});
-              screen.set(playRun(s, (end) => finished(t, end)));
-            } catch (err) {
-              error.set((err as ApiError).message);
-              busy.set(false);
-            }
-          },
-        },
-        "Започни",
-      ),
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
-      user.peek() ? streak(t.streak, t.week) : null,
-      goalsCard(),
+      { class: "screen home" },
+      () => (user() ? status(fresh()) : null),
+      run?.done
+        ? summary(
+            run,
+            h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
+              const b = fresh().board;
+              return b.place
+                ? h("a", { class: "place-line", href: "/ranks" }, `${ordinal(b.place)} от ${b.players} днес`)
+                : null;
+            }),
+            just ? news(run.id) : null,
+            countdown(),
+          )
+        : dayCard(t, start(t)),
+      // Just played, the goals it finished are told with its news.
+      just ? null : goalsCard(),
       modes(["duel", "arena", "royal", "room"], "С други"),
       topics(),
     );
-  };
-
-  load();
-  return h("div", null, () => screen());
+  }
 }
 
-function finished(t: Today, s: State): Child {
-  // The day as it is now, with this result on it: the board, the place, the streak it made.
-  const fresh = signal<Today>(t);
-  api<Today>("GET", "/api/day").then(fresh.set, () => {});
+/** The streak and the level, side by side: each a tap from Профил, where there's more of both. */
+function status(t: Today): Child {
+  const days = t.streak;
+  const lv = t.level;
+  const share = lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
   return h(
     "div",
-    { class: "screen" },
+    { class: "status" },
+    h(
+      "a",
+      { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },
+      h("span", { class: "i flame status-flame", "aria-hidden": "true" }),
+      h(
+        "span",
+        { class: "status-text" },
+        h("b", { class: "status-n" }, String(days)),
+        h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
+      ),
+    ),
+    lv
+      ? h(
+          "a",
+          { class: "status-item level-chip", href: "/me" },
+          h(
+            "span",
+            { class: "status-text" },
+            h("b", { class: "status-n" }, `Ниво ${lv.level}`),
+            h("span", { class: "status-label" }, `още ${lv.to - lv.xp} XP`),
+          ),
+          meter(share, `${share}% от ниво ${lv.level}`),
+        )
+      : null,
+  );
+}
+
+/** The day's ten, not played yet: what they are, and the gold button. */
+function dayCard(t: Today, start: () => Promise<void>): Child {
+  const busy = signal(false);
+  const error = signal("");
+  const players = t.board.players;
+  return h(
+    "section",
+    { class: "card hero day" },
     h("p", { class: "kicker" }, longDate(t.day)),
-    summary(
-      s,
-      () => {
-        const b = fresh().board;
-        return b.place ? h("p", { class: "place-line" }, `${ordinal(b.place)} от ${b.players} днес.`) : null;
+    h("h1", null, "Десет въпроса за днес"),
+    h("p", { class: "muted" }, "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит."),
+    trail([], 10),
+    h(
+      "button",
+      {
+        class: "btn primary big",
+        disabled: busy,
+        onclick: async () => {
+          busy.set(true);
+          try {
+            await start();
+          } catch (err) {
+            error.set((err as ApiError).message);
+            busy.set(false);
+          }
+        },
       },
-      news(s.id),
-      () => {
-        const f = fresh();
-        return f !== t || t.run?.done ? streak(f.streak, f.week) : null;
-      },
-      countdown(),
-      goalsCard(),
-      modes(["duel", "arena", "royal", "room"], "С други"),
-      topics(),
-      () => {
-        const f = fresh().friends;
-        return f?.length ? board("Приятели днес", f) : null;
-      },
-      () => {
-        const b = fresh().board;
-        return board("Днес", b.top, b.place, b.mine);
-      },
+      "Започни",
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    h(
+      "p",
+      { class: "day-meta" },
+      `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`,
     ),
   );
 }
@@ -142,7 +161,7 @@ function countdown(): Child {
   const left = signal(untilMidnight());
   const t = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(t));
-  return h("p", { class: "muted" }, () => `Нови въпроси след ${left()}.`);
+  return h("p", { class: "muted day-next" }, () => `Нови въпроси след ${left()}.`);
 }
 
 function untilMidnight(): string {

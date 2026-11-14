@@ -33,7 +33,7 @@ export function goalsCard(): Child {
       h(
         "div",
         { class: "card-head" },
-        h("h2", null, "Днешни цели"),
+        h("h2", { class: "card-title" }, "Днешни цели"),
         h("span", { class: "tag gold num" }, `${earned} от ${all} XP`),
       ),
       h(

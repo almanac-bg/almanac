@@ -8,13 +8,14 @@ import { needsHomeScreen, pushable, pushOn, turnOff, turnOn } from "../lib/push.
 import { title } from "../lib/router.ts";
 import { setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
+import { back } from "../ui.ts";
 
 export function settings() {
   title("Настройки");
   return h(
     "section",
     { class: "screen" },
-    h("h1", null, "Настройки"),
+    h("div", { class: "intro" }, () => (user() ? back("/me", "Профил") : null), h("h1", null, "Настройки")),
     when(
       () => user(),
       () =>

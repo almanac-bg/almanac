@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { fact, meter, toneOf } from "../ui.ts";
+import { fact, meter, profileNav, toneOf } from "../ui.ts";
 
 interface Learned {
   id: string;
@@ -27,11 +27,12 @@ export function almanac() {
   return h(
     "section",
     { class: "screen" },
+    () => (user() ? profileNav() : null),
     h(
       "div",
       { class: "intro" },
       h("h1", null, "Моят Алманах"),
-      h("p", { class: "lead" }, "Всичко, което научи: фактът зад всеки въпрос, на който отговори вярно."),
+      h("p", { class: "muted" }, "Фактът зад всеки въпрос, на който отговори вярно."),
     ),
     (): Child => {
       if (error()) return h("p", { role: "alert" }, error());
@@ -50,7 +51,7 @@ export function almanac() {
         ),
         h(
           "ul",
-          { class: "chips" },
+          { class: "chips scroll", "aria-label": "Тема" },
           h(
             "li",
             null,

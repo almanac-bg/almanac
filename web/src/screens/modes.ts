@@ -1,4 +1,5 @@
-// The ways to play with others, as cards: each with its picture, its name, a line about it, and its colour.
+// The ways to play with others, as small cards two by two: each with its picture, its name, a few words about it, and
+// its colour.
 
 import { picture } from "../art/picture.ts";
 import { type Child, h } from "../lib/dom.ts";
@@ -9,22 +10,22 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
   duel: {
     href: "/duel",
     name: "Дуел",
-    about: "Ти срещу друг играч, на живо.",
+    about: "Един срещу един",
     tone: "tone-rose",
   },
   arena: {
     href: "/arena",
     name: "Арена",
-    about: "От трима до петима играчи, на живо.",
+    about: "От трима до петима",
     tone: "tone-sky",
   },
   royal: {
     href: "/royal",
     name: "Роял",
-    about: "Всяка вечер в 21:00, на живо. Грешката те изважда.",
+    about: "Всяка вечер в 21:00",
     tone: "tone-gold",
   },
-  room: { href: "/room", name: "Стая", about: "Всички на един въпрос, на живо.", tone: "tone-lilac" },
+  room: { href: "/room", name: "Стая", about: "С код, за своите хора", tone: "tone-lilac" },
 };
 
 export function modes(which: Mode[], heading?: string): Child {
@@ -44,8 +45,12 @@ export function modes(which: Mode[], heading?: string): Child {
             "a",
             { class: `mode ${it.tone}`, href: it.href },
             picture(`mode-${m}`, "mode-pic"),
-            h("span", { class: "mode-name" }, it.name),
-            h("span", { class: "mode-about" }, it.about),
+            h(
+              "span",
+              { class: "mode-text" },
+              h("span", { class: "mode-name" }, it.name),
+              h("span", { class: "mode-about" }, it.about),
+            ),
           ),
         );
       }),

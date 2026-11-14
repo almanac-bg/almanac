@@ -13,6 +13,7 @@ for (const scheme of ["light", "dark"] as const) {
       "/room",
       "/ranks",
       "/rewards",
+      "/wardrobe",
       "/me",
       "/friends",
       "/settings",

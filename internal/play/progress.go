@@ -264,6 +264,26 @@ func (g *Game) totalXP(ctx context.Context, userID int64) (int, error) {
 	return total, err
 }
 
+// Level is where a player stands on the ladder of levels: the level, all the XP earned, and where this level and the
+// next begin.
+type Level struct {
+	Level int `json:"level"`
+	XP    int `json:"xp"`
+	From  int `json:"from"`
+	To    int `json:"to"`
+}
+
+// LevelNow is a player's level, from all the XP they've earned.
+func (g *Game) LevelNow(ctx context.Context, userID int64) (Level, error) {
+	xp, err := g.totalXP(ctx, userID)
+	if err != nil {
+		return Level{}, err
+	}
+	l := Level{XP: xp}
+	l.Level, l.From, l.To = LevelOf(xp)
+	return l, nil
+}
+
 func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id, at FROM achievements WHERE user_id = ?`, userID)
 	if err != nil {

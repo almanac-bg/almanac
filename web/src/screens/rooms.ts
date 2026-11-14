@@ -5,7 +5,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
-import { toneOf } from "../ui.ts";
+import { back, toneOf } from "../ui.ts";
 
 export function rooms() {
   title("Стая");
@@ -40,10 +40,11 @@ export function rooms() {
     h(
       "div",
       { class: "intro" },
+      back("/", "Начало"),
       h("h1", null, "Стая"),
       h(
         "p",
-        { class: "lead" },
+        { class: "muted" },
         "За приятели, семейство или клас: всички получават един и същ въпрос в един и същ момент, всеки на телефона си.",
       ),
     ),

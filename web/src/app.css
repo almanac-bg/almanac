@@ -132,6 +132,8 @@
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
     --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
+    --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E");
+    --i-tune: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 7h8M18 7h2M4 17h2M12 17h8'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3Ccircle cx='9' cy='17' r='2.5'/%3E%3C/svg%3E");
     --i-grip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 8h14M5 12h14M5 16h14'/%3E%3C/svg%3E");
     --i-near: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 13.5c2.6-3.2 5.2-3.2 8 0s5.4 3.2 8 0'/%3E%3C/svg%3E");
     --i-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4.5l3 2'/%3E%3C/svg%3E");
@@ -141,10 +143,8 @@
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
     --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20H4z' fill-opacity='.32'/%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 14h4.5v6H5zM14.5 16H19v4h-4.5z' fill-opacity='.32'/%3E%3Cpath d='M9.5 11h5v9h-5z'/%3E%3Cpath d='M3 20h18M5 20v-6h4.5M9.5 20v-9h5v9M14.5 16H19v4' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 1.6l1.3 2.6 2.9.4-2.1 2 .5 2.9L12 8.1l-2.6 1.4.5-2.9-2.1-2 2.9-.4z'/%3E%3C/svg%3E");
-    --i-award: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='9.5' r='5.5' fill-opacity='.32'/%3E%3Cpath d='M8.7 14 7 21l5-2.6 5 2.6-1.7-7' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='12' cy='9.5' r='5.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 6.6l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 8.7l2-.3z'/%3E%3C/svg%3E");
     --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='18' rx='6' fill-opacity='.32'/%3E%3Ccircle cx='12' cy='10' r='3.8'/%3E%3Cpath d='M5.2 19.3C6.4 16 9 14.6 12 14.6s5.6 1.4 6.8 4.7A6 6 0 0 1 15 21H9a6 6 0 0 1-3.8-1.7z'/%3E%3C/svg%3E");
     --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='7.5' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0z' fill-opacity='.32'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5M18.5 14.5a6.5 6.5 0 0 1 3 5.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 6.5C9.8 5 7 4.6 3.5 5v13.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5z' fill-opacity='.32'/%3E%3Cpath d='M12 6.5C9.8 5 7 4.6 3.5 5v13.5c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5C17 4.6 14.2 5 12 6.5zM12 6.5V20' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   @media (prefers-color-scheme: light) {
@@ -321,7 +321,7 @@
     text-decoration: none;
   }
 
-  /* The six main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
+  /* The four main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
   .tabs {
     position: fixed;
     right: 0;
@@ -329,7 +329,7 @@
     left: 0;
     z-index: 10;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
       max(var(--space-2), env(safe-area-inset-left));
     border-top: 1px solid var(--line);
@@ -342,36 +342,20 @@
     position: relative;
     display: grid;
     justify-items: center;
-    gap: 3px;
+    gap: 2px;
     padding: 6px 0 4px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
-    font: 700 0.6875rem / 1rem var(--font-sans);
+    font: 700 0.75rem / 1rem var(--font-sans);
     text-decoration: none;
   }
 
   .tabs .i {
-    font-size: 1.375rem;
+    font-size: 1.5rem;
   }
 
   .tab-label {
     white-space: nowrap;
-  }
-
-  /* The narrowest phones: six names side by side still keep apart. */
-  @media (max-width: 22.5rem) {
-    .tabs {
-      padding-inline: max(4px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-right));
-    }
-
-    .tabs a {
-      font-size: 0.625rem;
-    }
-  }
-
-  /* „Моят“ before Алманах only where there is room for it. */
-  .tab-wide {
-    display: none;
   }
 
   .tabs a:hover,
@@ -409,8 +393,12 @@
     --i: var(--i-podium);
   }
 
-  .i-award {
-    --i: var(--i-award);
+  .i-left {
+    --i: var(--i-left);
+  }
+
+  .i-tune {
+    --i: var(--i-tune);
   }
 
   .i-user {
@@ -419,10 +407,6 @@
 
   .i-users {
     --i: var(--i-users);
-  }
-
-  .i-book {
-    --i: var(--i-book);
   }
 
   /* Моят Алманах: the count, and each fact as a card in its topic's colour. */
@@ -638,10 +622,10 @@
     text-align: right;
   }
 
-  /* The ways to play: a card each, in its colour. */
+  /* The ways to play: a small card each, two by two, in its colour. */
   .modes {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
     margin: 0;
     padding: 0;
@@ -649,15 +633,16 @@
   }
 
   .mode {
-    display: grid;
-    align-content: start;
-    gap: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     height: 100%;
-    padding: var(--space-4);
+    min-height: 4.25rem;
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background:
-      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 60%),
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 18%, transparent), transparent 60%),
       var(--surface);
     box-shadow: var(--elev-1);
     color: var(--text);
@@ -677,68 +662,177 @@
   }
 
   .mode-pic {
-    width: 64px;
-    height: 64px;
-    margin: -4px 0 var(--space-1) -4px;
+    flex: none;
+    width: 48px;
+    height: 48px;
+  }
+
+  .mode-text {
+    display: grid;
+    min-width: 0;
   }
 
   .mode-name {
-    font: 900 1.25rem / 1.5rem var(--font-sans);
+    font: 800 1.0625rem / 1.375rem var(--font-sans);
   }
 
   .mode-about {
     color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
   }
 
-  /* A card that is a link to a place: words on the left, a peek on the right. */
-  .link-card {
+  /* Начало's top: the streak and the level, side by side, each a way to Профил. */
+  .status {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .status-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .link-card:hover {
-    border-color: var(--line-strong);
-  }
-
-  .link-card-text {
-    display: grid;
-    gap: 2px;
-  }
-
-  /* A list of places to go, as rows. */
-  .menu {
-    display: grid;
+    gap: var(--space-2);
+    min-height: 3.5rem;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow:
       var(--elev-1),
       inset 0 0 0 1px var(--line);
+    color: var(--text);
+    text-decoration: none;
   }
 
-  .menu a {
+  .status-item:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .status-text {
+    display: grid;
+    min-width: 0;
+  }
+
+  .status-n {
+    font: 900 1.375rem / 1.375rem var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .status-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .status-flame {
+    width: 24px;
+    height: 28px;
+  }
+
+  .streak-chip .status-n {
+    color: var(--gold-ink);
+  }
+
+  .streak-chip.cold .status-flame {
+    color: var(--line-strong);
+    filter: none;
+  }
+
+  .streak-chip.cold .status-n {
+    color: var(--text-muted);
+  }
+
+  .level-chip {
+    display: grid;
+    gap: 6px;
+  }
+
+  /* The day's ten, before they're played: the date, what they are, the marks to come, the gold button. */
+  .card.hero.day {
+    gap: var(--space-3);
+  }
+
+  .day-meta {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: center;
+  }
+
+  /* After: the date and the place on the day's board (a way to it). */
+  .day-line {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: baseline;
     justify-content: space-between;
-    min-height: 3.25rem;
-    padding: 0 var(--space-4);
-    color: var(--text);
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .day-next {
+    font-size: 0.875rem;
+  }
+
+  /* The way back from a screen reached from a main place. */
+  .back {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: 2px;
+    min-height: 2.75rem;
+    margin: calc(-1 * var(--space-3)) 0 calc(-1 * var(--space-2)) -6px;
+    padding-right: var(--space-2);
+    color: var(--text-muted);
     font-weight: 700;
     text-decoration: none;
   }
 
-  .menu a + a {
-    border-top: 1px solid var(--line);
+  .back:hover {
+    color: var(--text);
   }
 
-  .menu a::after {
-    content: "›";
+  .back-i {
+    font-size: 1.25rem;
+  }
+
+  /* Профил's own places, at the top of each: a row of tabs that are links. */
+  .subnav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: var(--sunken);
+    scrollbar-width: none;
+  }
+
+  .subnav a {
+    display: grid;
+    flex: 1 0 auto;
+    place-items: center;
+    min-height: 2.5rem;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-full);
     color: var(--text-muted);
+    font: 800 0.875rem / 1 var(--font-sans);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .subnav a[aria-current="page"] {
+    background: var(--raised);
+    box-shadow: var(--elev-1);
+    color: var(--text);
+  }
+
+  .subnav a:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  /* A card's own title, smaller than a screen's sections. */
+  .card-title {
     font-size: 1.25rem;
   }
 
@@ -785,7 +879,7 @@
   .card {
     display: grid;
     gap: var(--space-3);
-    padding: 18px;
+    padding: var(--space-4);
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow:
@@ -1951,6 +2045,17 @@
     box-shadow: var(--focus);
   }
 
+  /* A second, lesser switch under the first: whose board it is. */
+  .segmented.small {
+    justify-self: start;
+    width: min(100%, 15rem);
+  }
+
+  .segmented.small button {
+    min-height: 2rem;
+    font-size: 0.8125rem;
+  }
+
   /* Duels as rows: the other player, how it stands, the rating it moved. */
   .duel-list,
   .duel-friends {
@@ -2785,23 +2890,29 @@
   .topics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
+  /* All the topics at once: a tile across the row, after the others. */
+  .topic-all {
+    grid-column: 1 / -1;
+  }
+
   .topic {
     appearance: none;
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: var(--space-3);
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 10px;
     width: 100%;
     height: 100%;
-    min-height: 9.5rem;
-    padding: var(--space-4);
+    min-height: 4.25rem;
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
     border: 0;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     background: var(--surface);
     color: var(--text);
     box-shadow:
@@ -2816,8 +2927,14 @@
       box-shadow 200ms ease;
   }
 
+  .topic-all .topic {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 3.5rem;
+    padding-left: var(--space-4);
+  }
+
   .topic:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow:
       var(--elev-2),
       inset 0 0 0 1px var(--line-strong);
@@ -2827,17 +2944,15 @@
     box-shadow: var(--focus);
   }
 
-  .topic-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-2);
+  .topic-pic {
+    width: 44px;
+    height: 44px;
   }
 
-  .topic-pic {
-    width: 64px;
-    height: 64px;
-    margin: -6px 0 -4px -6px;
+  .topic-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
   }
 
   .mastery {
@@ -2893,30 +3008,24 @@
   }
 
   .topic-name {
-    align-self: end;
-    font-size: 1.3125rem;
-    line-height: 1.4375rem;
+    font-size: 1rem;
+    line-height: 1.25rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     text-wrap: balance;
-    overflow-wrap: anywhere;
-  }
-
-  .topic-foot {
-    display: grid;
-    gap: 6px;
+    hyphens: auto;
+    overflow-wrap: break-word;
   }
 
   .topic-meta {
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
+    align-items: center;
     gap: 2px var(--space-2);
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1rem;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
   }
 
   .meter {
@@ -2937,6 +3046,15 @@
     margin-top: var(--space-2);
   }
 
+  .topic .meter {
+    grid-column: 1 / -1;
+    height: 4px;
+  }
+
+  .level-chip .meter-fill {
+    background: var(--gold);
+  }
+
   .standing .meter-fill {
     background: var(--div);
   }
@@ -2955,6 +3073,16 @@
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  /* One row that scrolls sideways (the page itself never does). */
+  .chips.scroll {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: 2px var(--space-4) var(--space-1);
+    scrollbar-width: none;
   }
 
   .chip {
@@ -3227,13 +3355,79 @@
   .me-head {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .me-head-text {
     display: grid;
+    flex: 1;
     gap: 2px;
     min-width: 0;
+  }
+
+  .me-head h1 {
+    font-size: 1.625rem;
+    overflow-wrap: break-word;
+  }
+
+  /* Настройки, beside the name: a square with its icon. */
+  .icon-btn {
+    display: grid;
+    flex: none;
+    place-items: center;
+    align-self: flex-start;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--radius-md);
+    background: var(--raised);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--line-strong);
+    color: var(--text);
+  }
+
+  .icon-btn:hover {
+    color: var(--gold-ink);
+  }
+
+  .icon-btn:focus-visible {
+    box-shadow: var(--focus);
+  }
+
+  .icon-btn-i {
+    font-size: 1.375rem;
+  }
+
+  /* Гардероб: what's worn, as others see it. */
+  .worn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .worn-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .worn-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  /* What's folded away until asked for: the locked titles. */
+  .more {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .more > summary {
+    min-height: 2.75rem;
+    padding: var(--space-2) 0;
+    color: var(--link);
+    font-weight: 700;
+    cursor: pointer;
   }
 
   .me-title {
@@ -3391,14 +3585,6 @@
     background: none;
     color: var(--text-muted);
     font: 900 1.25rem / 1 var(--font-numeral);
-  }
-
-  .badges-peek {
-    display: flex;
-  }
-
-  .badges-peek .badge {
-    margin-left: -6px;
   }
 
   .tier {
@@ -4170,28 +4356,42 @@
     }
   }
 
-  /* A narrow phone: a topic's longest word still fits its tile whole. */
+  /* A narrow phone: a topic's longest word still fits its tile whole, and a way to play's name beside its picture. */
   @media (max-width: 22.5rem) {
+    .topic-pic,
+    .mode-pic {
+      width: 36px;
+      height: 36px;
+    }
+
+    .mode,
+    .topic {
+      gap: 6px 8px;
+    }
+
+    .subnav a {
+      flex-shrink: 1;
+      padding: 0 6px;
+      font-size: 0.8125rem;
+    }
+
     .topic-name {
-      font-size: 1.125rem;
-      line-height: 1.375rem;
+      font-size: 0.9375rem;
     }
   }
 
-  /* A big screen: the six places sit in the header, beside the name. */
+  /* A big screen: the four places sit in the header, beside the name. */
   @media (min-width: 48rem) {
     #app {
       padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
     }
 
-    /* A row of its own under the name, the six spread across it. */
+    /* Beside the name, at the header's end. */
     .tabs {
       position: static;
       display: flex;
-      flex-basis: 100%;
-      justify-content: space-between;
-      gap: 0;
-      margin: 0 calc(-1 * var(--space-2));
+      gap: var(--space-1);
+      margin: 0 calc(-1 * var(--space-2)) 0 0;
       padding: 0;
       border: 0;
       background: none;
@@ -4212,8 +4412,8 @@
       font-size: 1.125rem;
     }
 
-    .tab-wide {
-      display: inline;
+    .topics {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .tabs a[aria-current="page"]::after {

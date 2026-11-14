@@ -300,6 +300,10 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) {
 		t.Fatalf("today: %v", today)
 	}
+	// Начало shows the level too: the day's ten have earned XP.
+	if lv, _ := today["level"].(map[string]any); lv == nil || lv["level"].(float64) < 1 || lv["xp"].(float64) <= 0 {
+		t.Fatalf("today's level: %v", today["level"])
+	}
 	friend := g.player()
 	friend.call("POST", "/api/guest", map[string]any{})
 	if status, _ := friend.call("GET", "/api/runs/"+id, nil); status != 404 {
