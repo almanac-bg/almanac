@@ -27,7 +27,7 @@ XP is what playing earns, rating is strength: kept apart on purpose (`internal/p
 | `internal/royal` | Роял, live every evening |
 | `internal/room` | Rooms with a code |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: every client route must be listed there, or a reload is a 404) |
-| `internal/store` | SQLite; migrations in `internal/store/migrations`, numbered without gaps |
+| `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
 | `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, hourly backups to R2 |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
@@ -91,8 +91,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   if one fails, fix it with the next change. Before opening a PR, run only the specs your change touches, in
   Chromium: `npx playwright test -c e2e --project chromium e2e/<spec>`. Each checkout gets its own port, so sessions
   don't stop each other's test servers.
-- **A migration takes the next free number on `main`** when you open the PR. If another lands first, renumber yours
-  and push: the Server check fails within a minute on two migrations with one number.
+- **A migration is a new file in `internal/store/migrations`,** named `NNNN_what.sql` with the next number you see.
+  The database keeps the names of the migrations it has had, so if another session lands one with the same number,
+  both still run once: never renumber. Write a migration so it doesn't depend on another one being unmerged.
 
 ## Production
 

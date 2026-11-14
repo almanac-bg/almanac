@@ -3,10 +3,12 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestOpenMigratesAndReopens(t *testing.T) {
@@ -50,10 +52,74 @@ func TestRefusesNewerDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = db.Write.Exec(`PRAGMA user_version = 9999`)
+	_, _ = db.Write.Exec(`INSERT INTO schema_migrations (name, applied_at) VALUES ('9999_from_the_future.sql', 1)`)
 	db.Close()
 	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
 		t.Fatalf("opened a newer database: %v", err)
+	}
+}
+
+// A database migrated before names were kept (only user_version counts it) takes the names of the migrations it has,
+// and gets the rest.
+func TestNamesForACountedDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, 5)
+	if _, err := db.Write.Exec(`DROP TABLE schema_migrations`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	var count, version int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count)
+	_ = db.Read.QueryRow(`PRAGMA user_version`).Scan(&version)
+	files, _ := fs.Glob(migrations, "migrations/*.sql")
+	if count != len(files) || version != len(files) {
+		t.Fatalf("%d names, version %d, %d migrations", count, version, len(files))
+	}
+	db.Close()
+
+	// Counted past what this program has: a newer database, refused.
+	db = openAt(t, path, 0)
+	_, _ = db.Write.Exec(`DROP TABLE schema_migrations`)
+	_, _ = db.Write.Exec(`PRAGMA user_version = 9999`)
+	db.Close()
+	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
+		t.Fatalf("opened a newer counted database: %v", err)
+	}
+}
+
+// Two changes made side by side may both add a migration with the same number: each is applied once, whichever lands
+// first, and one that lands later with a lower name than the others is applied then.
+func TestMigrationsWithTheSameNumber(t *testing.T) {
+	defer func(m fs.FS) { migrations = m }(migrations)
+	set := fstest.MapFS{
+		"migrations/0001_a.sql": {Data: []byte(`CREATE TABLE a (x INTEGER);`)},
+		"migrations/0002_b.sql": {Data: []byte(`CREATE TABLE b (x INTEGER);`)},
+	}
+	migrations = set
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	set["migrations/0002_c.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE c (x INTEGER);`)}
+	set["migrations/0003_d.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE d (x INTEGER);`)}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	set["migrations/0002_bb.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE bb (x INTEGER);`)}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range []string{"a", "b", "bb", "c", "d"} {
+		if _, err := db.Write.Exec(`INSERT INTO ` + table + ` (x) VALUES (1)`); err != nil {
+			t.Fatalf("table %s: %v", table, err)
+		}
+	}
+	set["migrations/bad.sql"] = &fstest.MapFile{Data: []byte(`SELECT 1;`)}
+	if err := db.migrate(); err == nil {
+		t.Fatal("took a migration without a number")
 	}
 }
 
