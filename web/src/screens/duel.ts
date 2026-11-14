@@ -10,7 +10,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { meter, profileHref, type Tier, who } from "../ui.ts";
+import { formatNumber, meter, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -101,7 +101,7 @@ function duelRow(d: DuelView): Child {
           : `${them?.name ?? "Някой"} те чака`
         : d.state === "declined" || d.state === "expired"
           ? "Без резултат"
-          : `${d.you?.points ?? 0} : ${them?.points ?? 0}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · приятелски" : ""}`;
+          : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · приятелски" : ""}`;
   return h(
     "li",
     null,
@@ -389,7 +389,7 @@ function side(label: string, s: Side, tag?: string): Child {
     "div",
     { class: "duel-side" },
     tag ? h("a", { class: "kicker", href: profileHref(tag) }, label) : h("span", { class: "kicker" }, label),
-    h("b", { class: "duel-points" }, String(s.points)),
+    h("b", { class: "duel-points" }, formatNumber(s.points)),
     h("span", { class: "muted" }, `${s.rights} от 10`),
   );
 }

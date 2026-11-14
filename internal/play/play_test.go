@@ -246,7 +246,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0, 1).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 

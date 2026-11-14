@@ -321,6 +321,8 @@ type side struct {
 	given    json.RawMessage
 	gained   int
 	speed    int
+	row      int // of gained, for the right answers in a row
+	inRow    int // right answers in a row, this one counted
 	right    bool
 	exact    bool
 }
@@ -487,7 +489,7 @@ func (m *Match) cancel() {
 func (m *Match) show(n int) {
 	m.phase, m.n, m.shownAt = PhaseQuestion, n, time.Now()
 	for _, s := range m.sides {
-		s.answered, s.took, s.given, s.gained, s.speed, s.right, s.exact = false, 0, nil, 0, 0, false, false
+		s.answered, s.took, s.given, s.gained, s.speed, s.row, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, 0, false, false
 		if s.human() {
 			if _, err := m.hub.game.Show(context.Background(), s.ID, s.run); err != nil {
 				slog.Error("live duel", "duel", m.id, "err", err)
@@ -548,7 +550,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 		return err
 	}
 	s.answered, s.took, s.given = true, took, g.Shown
-	s.gained, s.speed, s.right, s.exact = res.Points, res.Speed, res.Right, res.Exact
+	s.gained, s.speed, s.row, s.inRow, s.right, s.exact = res.Points, res.Speed, res.Row, res.InRow, res.Right, res.Exact
 	if res.TimedOut {
 		s.given = nil
 	}
@@ -612,8 +614,14 @@ func pauseFor(q bank.Question) time.Duration {
 }
 
 // end is the last answer shown: the duel's result is kept already (the runs settled it as their last answers came).
+// A side with every answer right gets the bonus for it, as its run did.
 func (m *Match) end() {
 	m.stop()
+	for _, s := range m.sides {
+		if s.rights == len(m.dealt) {
+			s.points += play.AllRight
+		}
+	}
 	m.phase, m.ended = PhaseEnd, time.Now()
 	m.hub.release(m)
 	m.changed()
@@ -672,7 +680,10 @@ type RevealView struct {
 	Answer any `json:"answer"`
 	Points int `json:"points"`
 	// Speed is how many of the points were for being quick.
-	Speed  int  `json:"speed,omitempty"`
+	Speed int `json:"speed,omitempty"`
+	// Row is how many of the points were for the right answers in a row InRow.
+	Row    int  `json:"row,omitempty"`
+	InRow  int  `json:"inRow,omitempty"`
 	Right  bool `json:"right"`
 	Exact  bool `json:"exact,omitempty"`
 	Missed bool `json:"missed,omitempty"`
@@ -705,8 +716,8 @@ func (m *Match) View(viewer int64) View {
 		if shown {
 			q.LeftMs = 0
 			q.NextMs = max(1, (m.pause - time.Since(m.revealedAt)).Milliseconds())
-			q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Right: me.right, Exact: me.exact,
-				Missed: !me.answered}
+			q.Reveal = &RevealView{Answer: d.Reveal(), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
+				Right: me.right, Exact: me.exact, Missed: !me.answered}
 		}
 		v.Question = q
 	}

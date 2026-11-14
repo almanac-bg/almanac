@@ -10,7 +10,7 @@ import { type Child, computed, effect, h, onCleanup, signal, untracked } from ".
 import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
-import { avatar, type Tier, type VerdictKind, verdict } from "../ui.ts";
+import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
   code: string;
@@ -31,8 +31,19 @@ interface RoomView {
     leftMs: number;
     nextMs?: number;
     given?: Answer;
-    reveal?: { answer: Reveal; points: number; speed?: number; right: boolean; exact?: boolean; missed?: boolean };
+    reveal?: {
+      answer: Reveal;
+      points: number;
+      speed?: number;
+      row?: number;
+      inRow?: number;
+      right: boolean;
+      exact?: boolean;
+      missed?: boolean;
+    };
   };
+  /** Once the game is over: what this player's game earned for every answer right (in their points). */
+  allRight?: number;
 }
 
 interface Player {
@@ -278,7 +289,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed),
+    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(view, true, before),
   );
@@ -294,7 +305,9 @@ function standings(view: () => RoomView, gains: boolean, before?: Map<number, nu
         const row = boardRow(
           i + 1,
           p.name,
-          gains && p.gained ? [h("small", { class: "sub" }, `+${p.gained} · `), String(p.points)] : String(p.points),
+          gains && p.gained
+            ? [h("small", { class: "sub" }, `+${formatNumber(p.gained)} · `), formatNumber(p.points)]
+            : formatNumber(p.points),
           { me: p.me, look: p },
         );
         if (!p.online) row.classList.add("away");
@@ -334,6 +347,10 @@ function end(view: () => RoomView, code: string): Child {
         return best ? `${best.name} печели` : "Край";
       }),
     ),
+    () =>
+      view().allRight
+        ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} т.`)
+        : null,
     standings(view, false),
     () =>
       view().canLead

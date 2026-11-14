@@ -178,7 +178,7 @@ func TestTwoPlayLive(t *testing.T) {
 		}
 		vb := m.View(bo.ID)
 		if vb.Phase != PhaseReveal || vb.Question.Reveal.Right || !vb.Them.Right || vb.Them.Given == nil ||
-			vb.Them.Gained != play.WorthOf(m.dealt[0].Question(), 1, time.Second).Points || vb.Them.Points != vb.Them.Gained {
+			vb.Them.Gained != play.WorthOf(m.dealt[0].Question(), 1, time.Second, 1).Points || vb.Them.Points != vb.Them.Gained {
 			t.Fatalf("after both answered: %+v / %+v", vb.Them, vb.Question.Reveal)
 		}
 
@@ -195,6 +195,17 @@ func TestTwoPlayLive(t *testing.T) {
 		}
 		if v.You.Rights != play.Length || v.Them.Rights != 0 || len(v.You.Trail) != play.Length {
 			t.Fatalf("the end: %+v", v)
+		}
+		// The score on screen is the one kept: every answer's, the row bonus, and the bonus for all of them right.
+		for _, sd := range m.sides {
+			var kept int
+			_ = w.db.Read.QueryRow(`SELECT points FROM runs WHERE id = ?`, sd.run).Scan(&kept)
+			if kept != sd.points {
+				t.Fatalf("player %d: %d on screen, %d kept", sd.ID, sd.points, kept)
+			}
+		}
+		if v.You.Points < play.AllRight {
+			t.Fatalf("no bonus for all right: %d", v.You.Points)
 		}
 		if o := w.outcome(m.ID()); o != "a" && o != "b" {
 			t.Fatalf("the duel's result: %q", o)

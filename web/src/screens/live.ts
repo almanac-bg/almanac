@@ -5,7 +5,7 @@
 
 import { emblem } from "../art/emblem.ts";
 import { news } from "../game/news.ts";
-import { answered, ask, formatNumber, picture } from "../game/questions.ts";
+import { answered, ask, picture } from "../game/questions.ts";
 import { questionHead, timer, trail, upNext } from "../game/run.ts";
 import type { Answer, Mark, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -13,7 +13,7 @@ import { type Child, computed, effect, h, onCleanup, signal, untracked } from ".
 import { go, title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
-import { avatar, type Tier, type VerdictKind, verdict } from "../ui.ts";
+import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 import { type DuelView, ended } from "./duel.ts";
 
 interface Side {
@@ -54,7 +54,16 @@ interface LiveView {
     leftMs: number;
     nextMs?: number;
     given?: Answer;
-    reveal?: { answer: Reveal; points: number; speed?: number; right: boolean; exact?: boolean; missed?: boolean };
+    reveal?: {
+      answer: Reveal;
+      points: number;
+      speed?: number;
+      row?: number;
+      inRow?: number;
+      right: boolean;
+      exact?: boolean;
+      missed?: boolean;
+    };
   };
 }
 
@@ -239,7 +248,7 @@ function scoreboard(view: () => LiveView, total: number): Child {
         { class: "live-who" },
         () => avatar(s().avatar, { size: "s", name: s().name }),
         h("span", { class: "live-side-name" }, () => (mine ? "Ти" : s().name)),
-        h("b", { class: "live-points" }, () => String(s().points)),
+        h("b", { class: "live-points" }, () => formatNumber(s().points)),
       ),
       () => trail(s().trail, total, view().phase === "question" ? view().n : -1),
       mine ? null : () => h("p", { class: "live-doing", role: "status" }, doing(view(), s())),
@@ -338,7 +347,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed),
+    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     theirs(first.them, q.view),
     upNext(q.nextMs ?? 0, last ? "Към резултата…" : `Въпрос ${first.n + 2} след малко…`),
   );
@@ -366,7 +375,7 @@ function theirs(s: Side, v: View): Child {
       s.tookMs && !s.missed ? ` за ${seconds(s.tookMs)}` : "",
     ),
     h("span", { class: "live-theirs-how" }, h("span", { class: "live-theirs-sign", "aria-hidden": "true" }), words),
-    s.gained ? h("b", { class: "live-theirs-points" }, `+${s.gained}`) : null,
+    s.gained ? h("b", { class: "live-theirs-points" }, `+${formatNumber(s.gained)}`) : null,
   );
 }
 

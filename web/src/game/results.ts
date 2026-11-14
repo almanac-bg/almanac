@@ -3,7 +3,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
-import { fact, type Look, who } from "../ui.ts";
+import { countUp, fact, formatNumber, type Look, who } from "../ui.ts";
 import { answered, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
@@ -30,8 +30,9 @@ export function summary(s: State, line: Child, ...more: Child[]): Child {
         h(
           "p",
           { class: "points" },
-          h("b", { class: "points-n" }, String(s.points)),
+          h("b", { class: "points-n" }, countUp(s.points)),
           h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"),
+          s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
         ),
       ),
       line,
@@ -107,7 +108,7 @@ export function review(load: () => Promise<Reviewed[]>): Child {
           h(
             "p",
             { class: "kicker" },
-            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${it.points} т.`,
+            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
           ),
           h("h3", { class: "ask" }, it.view.text),
           picture(it.view),
@@ -138,7 +139,7 @@ export function boardRow(
   );
 }
 
-const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), String(s.points)];
+const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), formatNumber(s.points)];
 
 /** A board of results: the best, and the viewer among them. */
 export function board(title: string, scores: Score[], place?: number, mine?: Score): Child {
