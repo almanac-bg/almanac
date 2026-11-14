@@ -236,6 +236,40 @@ func TestPages(t *testing.T) {
 	}
 }
 
+func TestSearchEngines(t *testing.T) {
+	g := start(t)
+	get := func(path string) (*http.Response, string) {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return res, string(body)
+	}
+	if res, body := get("/robots.txt"); res.StatusCode != 200 || !strings.Contains(body, "Disallow: /api/") ||
+		!strings.Contains(body, "Sitemap: "+g.url+"/sitemap.xml") {
+		t.Errorf("robots.txt: %d %q", res.StatusCode, body)
+	}
+	if res, body := get("/sitemap.xml"); res.StatusCode != 200 || !strings.Contains(body, "<loc>"+g.url+"/</loc>") ||
+		!strings.Contains(body, "<loc>"+g.url+"/privacy</loc>") || strings.Count(body, "<loc>") != 2 {
+		t.Errorf("sitemap.xml: %d %q", res.StatusCode, body)
+	}
+	res, body := get("/")
+	if res.Header.Get("X-Robots-Tag") != "" || !strings.Contains(body, `<link rel="canonical" href="`+g.url+`/">`) {
+		t.Errorf("/: X-Robots-Tag %q, canonical missing: %v", res.Header.Get("X-Robots-Tag"), !strings.Contains(body, "canonical"))
+	}
+	if res, _ := get("/privacy"); res.Header.Get("X-Robots-Tag") != "" {
+		t.Errorf("/privacy: X-Robots-Tag %q", res.Header.Get("X-Robots-Tag"))
+	}
+	for _, path := range []string{"/me", "/ranks", "/play/history", "/r/123456", "/f/abcd1234", "/players/someone", "/nowhere"} {
+		res, body := get(path)
+		if res.Header.Get("X-Robots-Tag") != "noindex" || strings.Contains(body, "canonical") {
+			t.Errorf("%s: X-Robots-Tag %q", path, res.Header.Get("X-Robots-Tag"))
+		}
+	}
+}
+
 func TestBootDataIsSafeInTheScript(t *testing.T) {
 	g := start(t)
 	p := g.player()

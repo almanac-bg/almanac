@@ -197,6 +197,8 @@ func (s *Server) routes() http.Handler {
 	for _, f := range publicFiles {
 		mux.HandleFunc("GET /"+f, s.publicFile)
 	}
+	mux.HandleFunc("GET /robots.txt", s.robots)
+	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	mux.HandleFunc("GET /privacy", s.privacy)
 	mux.HandleFunc("GET /admin", s.admin)
 	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
