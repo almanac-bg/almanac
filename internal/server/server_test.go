@@ -654,7 +654,8 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	b, _ := bank.Load("../../bank/sample")
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	ts := httptest.NewUnstartedServer(nil)
-	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: ps.Client()}},
+	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: ps.Client(),
+		Services: []string{ps.Listener.Addr().String()}}},
 		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: b})
 	if err != nil {
 		t.Fatal(err)
@@ -736,6 +737,13 @@ func TestNotifications(t *testing.T) {
 	subscribe(bo, "/bo")
 	if status, _ := ana.call("POST", "/api/push", map[string]any{"endpoint": "http://plain.example/x"}); status != 400 {
 		t.Fatalf("a bad subscription: %d", status)
+	}
+	// Well-formed, but not at a push service: the server would post wherever it says.
+	outside := map[string]any{"endpoint": "https://169.254.169.254/x", "keys": map[string]string{
+		"p256dh": base64.RawURLEncoding.EncodeToString(make([]byte, 65)), "auth": base64.RawURLEncoding.EncodeToString(make([]byte, 16)),
+	}}
+	if status, _ := ana.call("POST", "/api/push", outside); status != 400 {
+		t.Fatalf("a subscription outside the push services: %d", status)
 	}
 
 	// Ana plays the day; at 19:05 only Bo is reminded, and only once.

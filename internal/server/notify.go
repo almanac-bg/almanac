@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -37,7 +38,17 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	// Keys come base64url without padding from most browsers; take them with it too.
 	sub.Keys.P256dh = strings.TrimRight(sub.Keys.P256dh, "=")
 	sub.Keys.Auth = strings.TrimRight(sub.Keys.Auth, "=")
-	if err := sub.Check(); err != nil {
+	if err := s.push.Check(sub); err != nil {
+		if errors.Is(err, push.ErrNotService) {
+			// A browser's push service the list misses shows here (push.Services).
+			host := ""
+			if u, err := url.Parse(sub.Endpoint); err == nil {
+				host = u.Host
+			}
+			// The player's words in the log: one line, and short.
+			host = strings.ReplaceAll(strings.ReplaceAll(host[:min(len(host), 100)], "\n", ""), "\r", "")
+			slog.Warn("push: a subscription elsewhere than a known push service", "host", host)
+		}
 		return errBadRequest
 	}
 	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at)
