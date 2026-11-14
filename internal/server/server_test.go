@@ -341,6 +341,10 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["played"] != true {
 		t.Fatalf("today: %v", today)
 	}
+	// The day done, its rarest right answer is asked for the result shared: none, with nobody else playing it.
+	if rarest, asked := today["rarest"]; !asked || rarest != nil {
+		t.Fatalf("today's rarest right answer: %v", today)
+	}
 	// Начало shows the level too: the day's ten have earned XP.
 	if lv, _ := today["level"].(map[string]any); lv == nil || lv["level"].(float64) < 1 || lv["xp"].(float64) <= 0 {
 		t.Fatalf("today's level: %v", today["level"])

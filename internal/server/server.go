@@ -45,6 +45,8 @@ type Config struct {
 	Royal royal.Schedule
 	// MistakesAfter is how long a missed question waits for its second chance (play.MistakesAfter when unset).
 	MistakesAfter time.Duration
+	// CrowdMin is how many answers a question needs before how players answered it shows (play.CrowdMin).
+	CrowdMin int
 	// Push sends notifications; nil: none.
 	Push *push.Sender
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
@@ -115,6 +117,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.RoyalNews = s.royalNews
 	s.game.LeagueNews = s.leagueNews
 	s.game.MistakesAfter = cfg.MistakesAfter
+	s.game.CrowdMin = cfg.CrowdMin
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
 	}

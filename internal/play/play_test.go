@@ -1581,6 +1581,132 @@ func TestCrowds(t *testing.T) {
 	}
 }
 
+// A question of the day shows how that day's other players answered it, once ten have: not the player's own answer,
+// not other days' players, not other kinds of game.
+func TestDayCrowd(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	crowdOf := func(reveal any) *bank.CrowdView {
+		var rev struct{ Crowd *bank.CrowdView }
+		_ = json.Unmarshal(mustJSON(t, reveal), &rev)
+		return rev.Crowd
+	}
+	// Nine players answer the day's first two questions: seven get the first right, two the second.
+	var picks []Pick
+	for i := range 9 {
+		p := w.user()
+		s, _ := w.g.StartDay(ctx, p)
+		picks = w.picks(s.ID)
+		first, second := w.wrong, w.wrong
+		if i < 7 {
+			first = w.right
+		}
+		if i < 2 {
+			second = w.right
+		}
+		w.play(p, s.ID, first, second)
+	}
+	// Other days and other games don't count: a topic's answer to the same question today, and a day's yesterday.
+	noise := w.user()
+	for _, run := range []struct{ kind, day string }{{"topic", ""}, {"day", "2026-11-11"}} {
+		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, started_at) VALUES (?, ?, nullif(?, ''), '[]', 0)`,
+			noise, run.kind, run.day)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := res.LastInsertId()
+		for n := range 3 {
+			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
+				VALUES (?, ?, ?, 1, 100, 1, 900, ?)`, id, n, picks[0].ID, w.now.UnixMilli()); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Nine others say too little: nothing shows (the crowd of everyone isn't counted yet either).
+	ana := w.user()
+	s, _ := w.g.StartDay(ctx, ana)
+	w.g.Show(ctx, ana, s.ID)
+	res, err := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := crowdOf(res.Reveal); c != nil {
+		t.Fatalf("nine others showed a crowd: %+v", c)
+	}
+	w.g.Show(ctx, ana, s.ID)
+	if _, err := w.g.Answer(ctx, ana, s.ID, 1, w.wrong(s.ID, 1)); err != nil {
+		t.Fatal(err)
+	}
+
+	// The next player has ten others, ana the tenth, and not their own answer (with it, 9 right of 11).
+	bo := w.user()
+	s, _ = w.g.StartDay(ctx, bo)
+	w.g.Show(ctx, bo, s.ID)
+	if res, err = w.g.Answer(ctx, bo, s.ID, 0, w.right(s.ID, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if c := crowdOf(res.Reveal); c == nil || !c.Today || c.Answers != 10 || math.Abs(c.Right-0.8) > 1e-9 {
+		t.Fatalf("the day's crowd: %+v", c)
+	}
+
+	// bo plays on, the second right too, the rest wrong; the review shows the same, and the third has no crowd.
+	for n := 1; n < Length; n++ {
+		w.g.Show(ctx, bo, s.ID)
+		answer := w.wrong
+		if n == 1 {
+			answer = w.right
+		}
+		if _, err := w.g.Answer(ctx, bo, s.ID, n, answer(s.ID, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := w.g.Review(ctx, bo, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := crowdOf(items[0].Reveal); c == nil || !c.Today || c.Answers != 10 {
+		t.Fatalf("the review's first: %+v", c)
+	}
+	if c := crowdOf(items[2].Reveal); c != nil {
+		t.Fatalf("the review's third, which no one else answered: %+v", c)
+	}
+	// The rarest right answer for the result shared: the second, which two in ten got.
+	rare, err := w.g.RarestRight(ctx, bo, "2026-11-12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rare == nil || rare.N != 1 || math.Abs(rare.Right-0.2) > 1e-9 {
+		t.Fatalf("the rarest right answer: %+v", rare)
+	}
+	// None for a day not finished (ana left it after one question).
+	if rare, _ := w.g.RarestRight(ctx, ana, "2026-11-12"); rare != nil {
+		t.Fatalf("a rarest right answer in an unfinished day: %+v", rare)
+	}
+
+	// The browser tests show a crowd from the first answer (CrowdMin); answers from before a question last changed were
+	// to another question.
+	w.g.CrowdMin = 1
+	third := mustQuestion(t, w, picks[2].ID)
+	third.Extra().Added, third.Extra().Updated = "2026-11-01", "2026-11-13"
+	if c, _ := w.g.dayCrowd(ctx, w.db.Read, "2026-11-12", third, 0); c != nil {
+		t.Fatalf("the third, changed since: %+v", c)
+	}
+	third.Extra().Updated = ""
+	if c, _ := w.g.dayCrowd(ctx, w.db.Read, "2026-11-12", third, 0); c == nil || c.Answers != 1 {
+		t.Fatalf("the third with CrowdMin 1: %+v", c)
+	}
+}
+
+func mustQuestion(t *testing.T, w *world, id string) bank.Question {
+	t.Helper()
+	q, ok := w.b.Get(id)
+	if !ok {
+		t.Fatal("no question", id)
+	}
+	return q
+}
+
 func mustJSON(t *testing.T, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)

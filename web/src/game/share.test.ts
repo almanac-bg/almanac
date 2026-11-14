@@ -32,6 +32,32 @@ test("nothing in it gives an answer away: only the date, numbers, squares and th
   assert.match(text, /^АЛМАНАХ · 9 май\n9 от 10 · серия 3\n[🟩🟨🟥]{10}\nalmanac\.bg$/u);
 });
 
+test("a right answer few of the day's players got is told, by its place and their share, never its answer", () => {
+  const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
+  assert.equal(
+    dayShareText("2026-11-14", trail, 10, 12, { n: 6, right: 0.12 }),
+    [
+      "АЛМАНАХ · 14 ноември",
+      "7 от 10 · серия 12",
+      "🟩🟩🟥🟩🟨🟩🟩🟩🟩🟥",
+      "Познах въпрос 7, който знаят само 12%",
+      "almanac.bg",
+    ].join("\n"),
+  );
+  // A quarter is still few; nobody else is said so; more than a quarter, or none known, isn't told.
+  assert.match(
+    dayShareText("2026-11-14", trail, 10, 1, { n: 0, right: 0.25 }),
+    /\nПознах въпрос 1, който знаят само 25%\n/,
+  );
+  assert.match(
+    dayShareText("2026-11-14", trail, 10, 1, { n: 3, right: 0 }),
+    /\nПознах въпрос 4, който не знае никой друг\n/,
+  );
+  for (const rarest of [{ n: 3, right: 0.26 }, null, undefined]) {
+    assert.equal(dayShareText("2026-11-14", trail, 10, 1, rarest).split("\n").length, 4);
+  }
+});
+
 test("a year is shared as its days and streak, its answers, its strongest topic and facts, and the site", () => {
   assert.equal(
     yearShareText({ year: 2026, days: 42, streak: 12, answers: 1234, right: 839, topic: "История", facts: 312 }),

@@ -59,6 +59,8 @@ export default defineConfig({
       ROYAL_LOBBY: "25s",
       // A missed question waits seconds for its second chance, not three days.
       MISTAKES_AFTER: "3s",
+      // How players answered a question shows from its first answer, not its tenth or twentieth.
+      CROWD_FROM: "1",
     },
   },
 });

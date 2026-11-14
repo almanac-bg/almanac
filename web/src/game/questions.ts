@@ -5,6 +5,7 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { formatNumber } from "../ui.ts";
+import { percent, rare } from "./share.ts";
 import type {
   Answer,
   ChoiceView,
@@ -32,56 +33,35 @@ export interface Asked {
   update?(view: View): void;
 }
 
-/** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it tells
- * how everyone else has answered (once the question has had enough answers to say). */
-export function ask(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
-  const a = askType(view, submit, locked);
-  const says = h("p", { class: "crowd-says", hidden: true });
-  return {
-    node: h("div", { class: "stack" }, a.node, says),
-    pending: a.pending,
-    update: a.update,
-    reveal(reveal, given) {
-      a.reveal(reveal, given);
-      const line = reveal.crowd ? crowdSays(view.type, reveal.crowd) : "";
-      says.textContent = line;
-      says.hidden = !line;
-    },
-  };
-}
-
-/** A share as the game writes it: „58%“, and „под 1%“ for what rounds to nothing but isn't. */
-export function share(x: number): string {
-  return x > 0 && x < 0.005 ? "под 1%" : `${Math.round(x * 100)}%`;
-}
-
-/** How everyone else did, in one sentence, as each kind of question counts right. */
-function crowdSays(type: View["type"], c: Crowd): string {
-  const s = share(c.right);
-  switch (type) {
-    case "choice":
-    case "truefalse":
-    case "clues":
-      return `Вярно отговарят ${s} от играчите.`;
-    case "number":
-      return `Достатъчно близо са ${s} от играчите.`;
-    case "order":
-      return `Изцяло вярно подреждат ${s} от играчите.`;
-    case "match":
-      return `Всички двойки свързват ${s} от играчите.`;
-    case "split":
-      return `Всичко на място слагат ${s} от играчите.`;
-  }
+/** How everyone else did with a question, in one quiet line under its verdict, as each kind of question counts right:
+ * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), without „днес“ for everyone ever.
+ * A right answer few others got stands out. Nothing while the question has too few answers to say. */
+export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
+  if (!c) return null;
+  const s = `${percent(c.right)} от играчите${c.today ? " днес" : ""}`;
+  const says = {
+    choice: `Вярно отговарят ${s}.`,
+    truefalse: `Вярно отговарят ${s}.`,
+    clues: `Вярно отговарят ${s}.`,
+    number: `Достатъчно близо са ${s}.`,
+    order: `Изцяло вярно подреждат ${s}.`,
+    match: `Всички двойки свързват ${s}.`,
+    split: `Всичко на място слагат ${s}.`,
+  }[type];
+  return h("p", { class: right && c.right <= rare ? "crowd-says rare" : "crowd-says" }, says);
 }
 
 /** Shows on an answer what share of players gave it: a bar behind it, filling in, and the share beside it. */
 function crowdOn(button: HTMLElement, x: number): void {
   button.classList.add("crowd");
-  button.append(h("span", { class: "value crowd-share" }, share(x)));
+  button.append(h("span", { class: "value crowd-share" }, percent(x)));
   requestAnimationFrame(() => button.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
 }
 
-function askType(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+/** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
+ * how everyone else has answered each option (once the question has had enough answers to say); the sentence that
+ * sums it up goes under the verdict (crowdLine). */
+export function ask(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
   switch (view.type) {
     case "choice":
       return choice(view, submit, locked);
@@ -402,7 +382,7 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
     {
       class: "spread-bars",
       role: "img",
-      "aria-label": `${share(inRange)} от догадките са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
+      "aria-label": `${percent(inRange)} от догадките са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
       style: { "grid-template-columns": `0.6fr repeat(${n}, 1fr) 0.6fr` },
     },
     shares.map((x, k) =>
@@ -959,7 +939,7 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
     h(
       "li",
       { class: "clue" },
-      h("span", { class: "clue-worth" }, share(clueWorth[i] ?? 0)),
+      h("span", { class: "clue-worth" }, percent(clueWorth[i] ?? 0)),
       h("span", { class: "clue-text" }),
     ),
   );

@@ -18,21 +18,44 @@ const months = [
   "декември",
 ];
 
+/** A share as the game writes it: „58%“, and „под 1%“ for what rounds to nothing but isn't. */
+export function percent(x: number): string {
+  return x > 0 && x < 0.005 ? "под 1%" : `${Math.round(x * 100)}%`;
+}
+
+/** The share of players right at or under which a right answer is a rare one, told and shared: a quarter. */
+export const rare = 0.25;
+
 /** The day's result to share: „АЛМАНАХ · 14 ноември“, „8 от 10 · серия 12“ (the streak from two days), a square for
- * each of the ten (🟩 right, 🟨 close, 🟥 wrong or not answered) and „almanac.bg“. `day` is YYYY-MM-DD. */
-export function dayShareText(day: string, trail: Mark[], total: number, streak: number): string {
+ * each of the ten (🟩 right, 🟨 close, 🟥 wrong or not answered), the right answer the fewest of the day's other
+ * players got, if few did (`rarest`: its place and their share right: „Познах въпрос 7, който знаят само 12%“), and
+ * „almanac.bg“. `day` is YYYY-MM-DD. */
+export function dayShareText(
+  day: string,
+  trail: Mark[],
+  total: number,
+  streak: number,
+  rarest?: { n: number; right: number } | null,
+): string {
   const [, month = 1, date = 1] = day.split("-").map(Number);
   const rights = trail.filter((m) => m.right).length;
   const squares = Array.from({ length: total }, (_, i) => {
     const m = trail[i];
     return m?.right ? "🟩" : m?.partial ? "🟨" : "🟥";
   }).join("");
+  const few =
+    rarest && rarest.right <= rare
+      ? `Познах въпрос ${rarest.n + 1}, който ${rarest.right ? `знаят само ${percent(rarest.right)}` : "не знае никой друг"}`
+      : "";
   return [
     `АЛМАНАХ · ${date} ${months[month - 1]}`,
     streak > 1 ? `${rights} от ${total} · серия ${streak}` : `${rights} от ${total}`,
     squares,
+    few,
     "almanac.bg",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** A count with its noun, one or many, in Bulgarian digits: „1 ден“, „12 дни“, „1 234 отговора“. */

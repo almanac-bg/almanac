@@ -155,7 +155,9 @@ takes a token.
     out is `now` (a gold edge: progress), the ones before it `past`, the ones to come `locked` (counting down).
   - How everyone else answered, once a question has enough answers: `.option.crowd` (a bar behind an answer as long
     as the share of players who gave it, the share beside it), `.spread` (where a number's guesses fell, the answer's
-    part in `--right`, the player's in `--accent`) and `.crowd-says` (one sentence under the question).
+    part in `--right`, the player's in `--accent`) and `.crowd-says` (one quiet sentence under the verdict, or under
+    the answer in a review, `crowdLine()`: the share right, of the day's players today for the day's ten; `.rare`,
+    in `--gold-ink`, for a right answer a quarter or fewer got).
   - `.verdict` and `.fact`.
 - **Progress:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.

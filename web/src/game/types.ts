@@ -115,6 +115,8 @@ export interface Crowd {
   picks?: number[];
   /** Where a number's typed guesses fell. */
   guesses?: Spread;
+  /** A question of the day's ten: its players today, not everyone ever. */
+  today?: boolean;
 }
 
 /** Typed guesses around a number's answer: equal parts of lo–hi (on a log scale if log), and the shares beyond. */

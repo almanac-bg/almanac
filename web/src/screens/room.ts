@@ -1,7 +1,7 @@
 // A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
-import { answered, ask, picture } from "../game/questions.ts";
+import { answered, ask, crowdLine, picture } from "../game/questions.ts";
 import { boardRow, nextSteps, reviewParts, shareButton } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
@@ -307,6 +307,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
+    crowdLine(q.view.type, r.answer.crowd, r.right),
     upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(view, true, before),
   );

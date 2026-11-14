@@ -16,12 +16,24 @@ import (
 // option, where the typed numbers fell, how many got it right. They're counted from the answer log now and then, in
 // the background, so that showing one never waits on the count; a question shows its crowd once it has CrowdFrom
 // answers since it last changed (a crowd that answered other options says nothing of these).
+//
+// The day's ten are the same for everyone, so a question of the day shows how that day's other players answered it
+// („… от играчите днес“), counted with each answer, once DayCrowdFrom of them have; until then everyone's. The share
+// of the day's players right is also what a shared result tells of its rarest right answer (RarestRight).
 
 const (
 	// CrowdFrom is how many answers a question needs before its crowd is shown: fewer say little.
 	CrowdFrom = 20
 	// CrowdFresh is how long a count stands before the next one.
 	CrowdFresh = time.Hour
+	// DayCrowdFrom is how many of the day's other players need to have answered a question of the day before theirs
+	// is the crowd shown. Fewer than CrowdFrom: they answered the same question in the same place, and on a young game
+	// twenty would take half the day; fewer than ten, early in the morning, would make one player's luck a statistic.
+	DayCrowdFrom = 10
+	// dayCrowdKeep is how big a day's crowd is kept for dayCrowdFresh rather than counted again with every answer:
+	// from there one more answer moves its share right by less than a rounding.
+	dayCrowdKeep  = 250
+	dayCrowdFresh = time.Minute
 )
 
 type crowdCache struct {
@@ -119,7 +131,7 @@ func (g *Game) countCrowds(ctx context.Context, now time.Time, b *bank.Bank) err
 			list = append(list, *t)
 			n += t.N
 		}
-		if n < CrowdFrom {
+		if n < g.crowdFrom(CrowdFrom) {
 			continue
 		}
 		q, _ := b.Get(id)
@@ -142,4 +154,160 @@ func changedMs(q bank.Question) int64 {
 		return 0
 	}
 	return d.UnixMilli()
+}
+
+// crowdFrom is how many answers a crowd needs before it's shown: from, unless the game says otherwise (CrowdMin).
+func (g *Game) crowdFrom(from int) int {
+	if g.CrowdMin > 0 {
+		return g.CrowdMin
+	}
+	return from
+}
+
+// crowdOf is how other players have answered a question of a run: for the day's ten, that day's players, once enough
+// of them have; otherwise everyone, as last counted.
+func (g *Game) crowdOf(ctx context.Context, db querier, r *run, q bank.Question) (*bank.Crowd, error) {
+	if r.kind == "day" {
+		c, err := g.dayCrowd(ctx, db, r.day, q, r.userID)
+		if c != nil || err != nil {
+			return c, err
+		}
+	}
+	return g.Crowd(q.Base().ID), nil
+}
+
+// dayCrowd is how the other players of a day have answered one of its questions (since it last changed): nil while
+// fewer than DayCrowdFrom have. A player's own answer is never in it, but in a crowd big enough to be kept a while
+// (dayCrowdKeep), where it can't change what shows.
+func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Question, userID int64) (*bank.Crowd, error) {
+	id, now, b := q.Base().ID, g.Now(), g.Bank()
+	key := day + " " + id
+	if c := g.dayCrowds.get(key, now, b); c != nil {
+		return c, nil
+	}
+	start, err := time.ParseInLocation(time.DateOnly, day, Bulgaria)
+	if err != nil {
+		return nil, err
+	}
+	// The question's answers since the day began (answers_question), each run looked up by its key: CROSS JOIN keeps
+	// that order, which the planner wouldn't choose without statistics (it would go through every day's runs).
+	rows, err := db.QueryContext(ctx, `SELECT a.given, count(*), sum(a.is_right) FROM answers a CROSS JOIN runs r ON r.id = a.run_id
+		WHERE a.question_id = ? AND a.at >= ? AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? GROUP BY a.given`,
+		id, max(start.UnixMilli(), changedMs(q)), day, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tallies []bank.Tally
+	n := 0
+	for rows.Next() {
+		var given sql.NullString
+		var t bank.Tally
+		if err := rows.Scan(&given, &t.N, &t.Right); err != nil {
+			return nil, err
+		}
+		if given.Valid {
+			t.Given = json.RawMessage(given.String)
+		}
+		tallies = append(tallies, t)
+		n += t.N
+	}
+	if err := rows.Err(); err != nil || n < g.crowdFrom(DayCrowdFrom) {
+		return nil, err
+	}
+	c := bank.CrowdOf(q, tallies)
+	c.Today = true
+	if n >= dayCrowdKeep {
+		g.dayCrowds.put(key, c, now, b)
+	}
+	return c, nil
+}
+
+// dayCrowdCache keeps the days' crowds big enough (dayCrowdKeep) for a little while (dayCrowdFresh).
+type dayCrowdCache struct {
+	mu sync.Mutex
+	by map[string]keptCrowd
+}
+
+type keptCrowd struct {
+	at   time.Time
+	bank *bank.Bank
+	c    *bank.Crowd
+}
+
+func (k keptCrowd) fresh(now time.Time, b *bank.Bank) bool {
+	return k.bank == b && !now.Before(k.at) && now.Sub(k.at) < dayCrowdFresh
+}
+
+func (d *dayCrowdCache) get(key string, now time.Time, b *bank.Bank) *bank.Crowd {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if k, ok := d.by[key]; ok && k.fresh(now, b) {
+		return k.c
+	}
+	return nil
+}
+
+func (d *dayCrowdCache) put(key string, c *bank.Crowd, now time.Time, b *bank.Bank) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.by == nil {
+		d.by = map[string]keptCrowd{}
+	}
+	for k, kept := range d.by {
+		if !kept.fresh(now, b) {
+			delete(d.by, k)
+		}
+	}
+	d.by[key] = keptCrowd{at: now, bank: b, c: c}
+}
+
+// FewRight is a right answer in the day's ten and how few of the day's other players got it right: its place in the
+// ten, and the share of them that did.
+type FewRight struct {
+	N     int     `json:"n"`
+	Right float64 `json:"right"`
+}
+
+// RarestRight is the player's right answer in a day's ten, finished, that the fewest of that day's other players got
+// right (of the questions enough of them have answered): nil for none.
+func (g *Game) RarestRight(ctx context.Context, userID int64, day string) (*FewRight, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id FROM runs r JOIN answers a ON a.run_id = r.id
+		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right ORDER BY a.n`,
+		userID, day)
+	if err != nil {
+		return nil, err
+	}
+	type right struct {
+		n  int
+		id string
+	}
+	var rights []right
+	for rows.Next() {
+		var it right
+		if err := rows.Scan(&it.n, &it.id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rights = append(rights, it)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var rare *FewRight
+	for _, it := range rights {
+		q, ok := g.Bank().Get(it.id)
+		if !ok {
+			continue
+		}
+		c, err := g.dayCrowd(ctx, g.DB.Read, day, q, userID)
+		if err != nil {
+			return nil, err
+		}
+		if c != nil && (rare == nil || c.Right < rare.Right) {
+			rare = &FewRight{N: it.n, Right: c.Right}
+		}
+	}
+	return rare, nil
 }

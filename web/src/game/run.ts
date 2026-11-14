@@ -10,7 +10,7 @@ import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
-import { ask, picture, picturesIn } from "./questions.ts";
+import { ask, crowdLine, picture, picturesIn } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
@@ -359,6 +359,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     const pause = pauseFor(q.view) + readingTime(said);
     append(after, [
       verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
+      crowdLine(q.view.type, res.reveal.crowd, res.right),
       res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
       said ? fact(said) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
