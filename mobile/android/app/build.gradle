@@ -1,9 +1,10 @@
 apply plugin: 'com.android.application'
 
-// The upload key, never in the repository: keystore.properties beside this folder's build.gradle (git-ignored) names
-// the keystore and its passwords (mobile/README.md). Without it, a release build is unsigned.
+// The upload key, never in the repository: ~/.config/almanac/android-upload.properties (or the file
+// ALMANAC_UPLOAD_KEY names) gives the keystore and its passwords (mobile/README.md). Without it, a release build is
+// unsigned.
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystorePropertiesFile = file(System.getenv('ALMANAC_UPLOAD_KEY') ?: "${System.getProperty('user.home')}/.config/almanac/android-upload.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
