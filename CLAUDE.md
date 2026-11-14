@@ -95,6 +95,18 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   The database keeps the names of the migrations it has had, so if another session lands one with the same number,
   both still run once: never renumber. Write a migration so it doesn't depend on another one being unmerged.
 
+## Leave the machine as you found it
+
+This runs on the owner's own Mac, with other sessions beside you. When your work is done (and before you say so):
+
+- **Stop what you started:** dev servers (`almanac serve`), `-watch` builds, background commands, anything left on a
+  port. Playwright closes its browsers and its test server by itself; a browser or script you opened yourself, close.
+- **Remove what you made:** temporary worktrees (`git worktree remove`), test databases and `test-results/`,
+  screenshots, scripts and files in the scratchpad or `/tmp`, temporary config copies.
+- **Never touch another session's** worktree, branch, server or files: check that a process or port is yours
+  (its folder) before stopping it.
+- Check with `ps`, `lsof -iTCP -sTCP:LISTEN` and `git status` that nothing of yours is left.
+
 ## Production
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
