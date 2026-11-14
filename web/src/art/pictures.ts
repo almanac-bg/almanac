@@ -910,27 +910,28 @@ const topics: Record<string, Layer[]> = {
 // ---- Ways to play: the cards on Начало, each in its mode's tone, over the card.
 
 /** An avatar's head as a friend on a card: the animal without its tile or its shoulders, set down at (x, y), `s` of
- * its size, turned by `deg`, one ink lighter than on its tile, so the tone is its main colour, as on the other cards. */
+ * its size, turned by `deg`. In front it's one ink lighter than on its tile, so the tone is its main colour, as on the
+ * other cards; behind, it keeps its tile's darker inks. */
 const lighter: Record<string, string> = { k1: "k2", k2: "k3", k4: "k5", l1: "l2" };
-const head = (id: string, x: number, y: number, s: number, deg: number): Layer[] => {
+const head = (id: string, x: number, y: number, s: number, deg: number, front: boolean): Layer[] => {
   const t = `transform="translate(${x} ${y}) rotate(${deg}) scale(${s}) translate(-32 -32)"`;
   return (avatars[id] ?? [])
     .filter(([, d]) => d !== shoulders && d !== foxChest)
-    .map(([ink, d, attrs]) => [lighter[ink] ?? ink, d, attrs ? `${t} ${attrs}` : t]);
+    .map(([ink, d, attrs]) => [(front && lighter[ink]) || ink, d, attrs ? `${t} ${attrs}` : t]);
 };
 
 const modes: Record<string, Layer[]> = {
   almanac: [ground, ...(avatars.book ?? [])],
   // Two friends side by side, the fox and the bear (the avatars are the players' faces), their heads leaning
-  // together. Their shoulders and the fox's white chest are the avatars' own, set down with the heads and cut at the
-  // disc's edge.
+  // together with a little space between them, both well inside the disc; the bear, a step behind, in darker inks.
+  // Their shoulders and the fox's white chest are the avatars' own, set down with the heads and cut at the disc's edge.
   friends: [
     ground,
-    ["k1", "M30 46.04C30.56 39.32 36.72 35.96 44 35.96C51.28 35.96 57.44 39.32 58 46.04V46.97A30 30 0 0 1 30 61.93Z"],
-    ...head("bear", 44, 27, 0.56, -5),
-    ["k2", "M6.2 47.3C8.18 42.17 13.91 39.6 20.5 39.6C28.3 39.6 34.9 43.2 35.5 50.4V61.8A30 30 0 0 1 6.2 47.3Z"],
-    ["k5", "M16.3 50.4C16.6 45 18.4 42.3 20.5 42.3C22.6 42.3 24.4 45 24.7 50.4V61.1A30 30 0 0 1 16.3 57.56Z"],
-    ...head("fox", 20.5, 30, 0.6, 5),
+    ["k1", "M31 46.32C31.48 40.56 36.76 37.68 43 37.68C49.24 37.68 54.52 40.56 55 46.32V51.26A30 30 0 0 1 31 61.98Z"],
+    ...head("bear", 43, 30, 0.48, -4, false),
+    ["k2", "M9 50C9.5 44 15 41 21.5 41C28 41 33.5 44 34 50V61.93A30 30 0 0 1 9 51.26Z"],
+    ["k5", "M18 50C18.25 45.5 19.75 43.25 21.5 43.25C23.25 43.25 24.75 45.5 25 50V61.17A30 30 0 0 1 18 58.53Z"],
+    ...head("fox", 21.5, 33, 0.5, 4, true),
   ],
   duel: [ground, ...sword(-42), ...sword(42), ["k5", sparkle(32, 14, 5)]],
   arena: [
