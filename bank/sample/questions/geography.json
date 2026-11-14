@@ -275,5 +275,54 @@
     "fact": "Връх Триглав е изобразен на герба и на знамето на Словения.",
     "added": "2026-11-14",
     "updated": "2026-11-14"
+  },
+  {
+    "id": "geo-965",
+    "type": "choice",
+    "difficulty": "medium",
+    "text": "Кое е знамето на Литва?",
+    "answer": "Литва",
+    "wrong": ["Боливия", "Унгария", "Габон"],
+    "pictures": [
+      {
+        "file": "f0f6ec7e0b258f30.webp",
+        "w": 1200,
+        "h": 720,
+        "alt": "Три хоризонтални ивици: жълта, зелена и червена",
+        "credit": "неизвестен автор",
+        "license": "PD",
+        "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Lithuania.svg"
+      },
+      {
+        "file": "703d76f0fe3c120e.webp",
+        "w": 1200,
+        "h": 720,
+        "alt": "Три хоризонтални ивици: червена, жълта и зелена",
+        "credit": "неизвестен автор",
+        "license": "PD",
+        "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Bolivia.svg"
+      },
+      {
+        "file": "dc6a9216ca85cb89.webp",
+        "w": 1200,
+        "h": 720,
+        "alt": "Три хоризонтални ивици: червена, бяла и зелена",
+        "credit": "неизвестен автор",
+        "license": "PD",
+        "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Hungary.svg"
+      },
+      {
+        "file": "087b5a8d2e985d04.webp",
+        "w": 1200,
+        "h": 720,
+        "alt": "Три хоризонтални ивици: зелена, жълта и синя",
+        "credit": "неизвестен автор",
+        "license": "PD",
+        "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Gabon.svg"
+      }
+    ],
+    "fact": "Жълтото, зеленото и червеното на литовското знаме се тълкуват като слънцето, горите и пролятата за свободата кръв.",
+    "added": "2026-11-14",
+    "updated": "2026-11-14"
   }
 ]
