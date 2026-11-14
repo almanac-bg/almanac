@@ -201,7 +201,7 @@ export const tierWords: Record<Tier, { group: string; one: string; title: string
   legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
 };
 
-/** Every avatar's name: the animals everyone has, then the emblems achievements unlock. */
+/** Every avatar's name: the animals everyone has, then the emblems achievements unlock (one each). */
 export const shapeNames: Record<string, string> = {
   fox: "Лисица",
   bear: "Мечка",
@@ -212,7 +212,23 @@ export const shapeNames: Record<string, string> = {
   deer: "Елен",
   stork: "Щъркел",
   frog: "Жаба",
+  squirrel: "Катерица",
+  lynx: "Рис",
+  badger: "Язовец",
+  sheep: "Овца",
+  turtle: "Костенурка",
+  mouse: "Мишка",
   flame: "Пламък",
+  torch: "Факла",
+  bonfire: "Клада",
+  phoenix: "Феникс",
+  books: "Купчина книги",
+  blades: "Щит и мечове",
+  helmet: "Тракийски шлем",
+  hearts: "Три сърца",
+  knight: "Шахматен кон",
+  cap: "Шапка на отличник",
+  wreath: "Венец",
   star: "Звезда",
   target: "Мишена",
   bolt: "Мълния",
@@ -237,6 +253,7 @@ export const toneNames: Record<string, string> = {
   mint: "мента",
 };
 
+/** The animals given to someone without an avatar of their own: the first nine (play.givenShapes). */
 const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
 /** An avatar for someone without one of their own: picked from their name, the same every time. */

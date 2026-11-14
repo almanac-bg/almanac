@@ -1241,3 +1241,26 @@ func TestCalibrate(t *testing.T) {
 		}
 	}
 }
+
+// Every achievement has a picture of its own, and so an avatar of its own to give; every emblem but the crown (a
+// level's) is some achievement's.
+func TestEveryAchievementItsOwnAvatar(t *testing.T) {
+	seen := map[string]string{}
+	for _, a := range Achievements {
+		if other, ok := seen[a.Icon]; ok {
+			t.Errorf("%s and %s are both drawn as %q", other, a.ID, a.Icon)
+		}
+		seen[a.Icon] = a.ID
+		if !slices.Contains(Unlockable, a.Icon) {
+			t.Errorf("%s gives %q, which isn't an avatar", a.ID, a.Icon)
+		}
+	}
+	for _, s := range Unlockable {
+		if _, ok := seen[s]; !ok && s != "crown" {
+			t.Errorf("%q is unlocked by no achievement", s)
+		}
+	}
+	if DefaultAvatar(12345) == "" || !slices.Contains(FreeShapes, strings.Split(DefaultAvatar(12345), "-")[0]) {
+		t.Errorf("a default avatar that isn't free: %q", DefaultAvatar(12345))
+	}
+}
