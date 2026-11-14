@@ -474,9 +474,19 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	gs, _ := w.g.StartDay(ctx, guest)
 	topic, _ := w.g.StartTopic(ctx, guest, "science")
 	os, _ := w.g.StartDay(ctx, owner)
+	// The guest said they'd come to tonight's Роял, and chose no word from friends.
+	_ = w.g.PlanRoyal(ctx, "2026-11-14", guest, true)
+	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
 	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
 	if err != nil {
 		t.Fatal(err)
+	}
+	if n, mine, _ := w.g.RoyalPlans(ctx, "2026-11-14", owner); n != 1 || !mine {
+		t.Fatalf("the guest's plan: %d, %v", n, mine)
+	}
+	var wanted int
+	if err := w.db.Read.QueryRow(`SELECT wanted FROM push_prefs WHERE user_id = ? AND kind = 'friends'`, owner).Scan(&wanted); err != nil || wanted != 0 {
+		t.Fatalf("the guest's choice of notifications: %d %v", wanted, err)
 	}
 	if _, err := w.g.State(ctx, owner, topic.ID); err != nil {
 		t.Fatal("the guest's topic run didn't move")

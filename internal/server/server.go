@@ -117,6 +117,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	}
 	s.royal = royal.NewHub(s.game, cfg.Royal)
 	s.royal.News = s.royalNews
+	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.OnArena = s.arenaEnded
@@ -152,6 +153,8 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/me/look", s.setLook)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
+	api("GET /api/push/prefs", s.pushPrefs)
+	api("PATCH /api/push/prefs", s.setPushPref)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
 	api("POST /api/auth/code", s.sendCode)
@@ -184,6 +187,9 @@ func (s *Server) routes() http.Handler {
 	api("DELETE /api/royal", s.leaveRoyal)
 	api("POST /api/royal/answer", s.royalAnswer)
 	api("GET /api/royal", s.royals)
+	api("GET /api/royal/tonight", s.tonight)
+	api("POST /api/royal/plan", s.planRoyal)
+	api("DELETE /api/royal/plan", s.planRoyal)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/season", s.season)
 	api("GET /api/goals", s.goals)

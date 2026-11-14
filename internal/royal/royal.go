@@ -78,6 +78,9 @@ type Hub struct {
 	sched Schedule
 	// News, if set, is told of the places of a tournament's players who were away from it when it ended.
 	News func(context.Context, play.RoyalNews)
+	// Opened, if set, is told (on its own goroutine) when an evening's lobby opens, with the evening's start. A
+	// restart of the server in the lobby's time tells it again.
+	Opened func(context.Context, time.Time)
 
 	mu     sync.Mutex
 	night  *night
@@ -96,6 +99,7 @@ type night struct {
 	dealt  []bank.Dealt
 	tables []*table
 	told   bool // that the lobby is open
+	called bool // Opened, that it is
 }
 
 func (n *night) opens(s Schedule) time.Time { return n.start.Add(-s.Lobby) }
@@ -261,6 +265,12 @@ func (h *Hub) Step(ctx context.Context) {
 	if !n.told && !now.Before(n.opens(h.sched)) {
 		n.told = true
 		h.changed(nil)
+	}
+	if !n.called && !now.Before(n.opens(h.sched)) && now.Before(n.start) {
+		n.called = true
+		if h.Opened != nil {
+			go h.Opened(context.WithoutCancel(ctx), n.start)
+		}
 	}
 	for _, t := range n.tables {
 		var err error
@@ -527,6 +537,57 @@ func (h *Hub) changed(t *table) {
 		default: // it hasn't looked since the last change; one look will do for both
 		}
 	}
+}
+
+// Glance is the evening at a glance, for those not on its screen: when it starts, and how many are in.
+type Glance struct {
+	// Phase is "soon" (the lobby isn't open), "lobby" (it is), or "live" (its games are under way).
+	Phase    string `json:"phase"`
+	StartsAt int64  `json:"startsAt"`
+	OpensAt  int64  `json:"opensAt"`
+	Now      int64  `json:"now"`
+	// Next is the first start after now: the evening one can still say they'll come to.
+	Next int64 `json:"next"`
+	// In is how many are in its lobbies, or still in its games.
+	In int `json:"in"`
+}
+
+// Glance is the evening now, at a glance.
+func (h *Hub) Glance() Glance {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := h.now()
+	g := Glance{Phase: "soon", Now: now.UnixMilli(), Next: h.sched.Next(now).UnixMilli()}
+	n := h.night
+	if n == nil {
+		next := h.sched.Next(now)
+		g.StartsAt, g.OpensAt = next.UnixMilli(), next.Add(-h.sched.Lobby).UnixMilli()
+		return g
+	}
+	g.StartsAt, g.OpensAt = n.start.UnixMilli(), n.opens(h.sched).UnixMilli()
+	if over, _ := n.over(); now.Before(n.opens(h.sched)) || (over && !now.Before(n.start)) {
+		if !now.Before(n.start) {
+			// Over: the next one is what's coming, its lobby maybe open already (and nobody in it yet).
+			next := h.sched.Next(now)
+			g.StartsAt, g.OpensAt = next.UnixMilli(), next.Add(-h.sched.Lobby).UnixMilli()
+			if !now.Before(next.Add(-h.sched.Lobby)) {
+				g.Phase = "lobby"
+			}
+		}
+		return g
+	}
+	g.Phase = "lobby"
+	if !now.Before(n.start) {
+		g.Phase = "live"
+	}
+	for _, t := range n.tables {
+		for _, m := range t.members {
+			if t.phase == play.RoyalLobby || m.in {
+				g.In++
+			}
+		}
+	}
+	return g
 }
 
 // View is the evening as one player sees it.

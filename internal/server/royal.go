@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -130,5 +131,88 @@ func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
 	if n.Of >= 3 { // with fewer, ratings don't move
 		m.Body = fmt.Sprintf("Рейтинг: %+d.", n.Delta)
 	}
-	go s.notify(context.WithoutCancel(ctx), m, n.To)
+	go s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
+}
+
+// tonight is the next Роял at a glance (for its tile on Начало and the screen before its lobby): when, how many are in
+// it once its lobby is open, and how many said they'd come, the player among them or not.
+func (s *Server) tonight(w http.ResponseWriter, r *http.Request) error {
+	var viewer int64
+	if u, err := s.user(r); err == nil && u != nil {
+		viewer = u.ID
+	}
+	return s.tonightFor(w, r.Context(), viewer)
+}
+
+func (s *Server) tonightFor(w http.ResponseWriter, ctx context.Context, viewer int64) error {
+	g := s.royal.Glance()
+	coming, planned, err := s.game.RoyalPlans(ctx, eveningOf(g.Next), viewer)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"glance": g, "coming": coming, "planned": planned})
+}
+
+// eveningOf is the day of the evening that starts at ms (Unix milliseconds), in Bulgaria.
+func eveningOf(ms int64) string {
+	return time.UnixMilli(ms).In(play.Bulgaria).Format(time.DateOnly)
+}
+
+// planRoyal says the player will come to the next Роял (POST), or won't after all (DELETE). They're called when its
+// lobby opens, whatever they chose for Роял's notifications.
+func (s *Server) planRoyal(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	day := eveningOf(s.royal.Glance().Next)
+	if err := s.game.PlanRoyal(r.Context(), day, u.ID, r.Method == http.MethodPost); err != nil {
+		return err
+	}
+	return s.tonightFor(w, r.Context(), u.ID)
+}
+
+// callRoyal calls to the evening that starts at start, as its lobby opens: those who said they'd come, and those who
+// want Роял's notifications every evening. Once an evening, whatever restarts the server. It says how many it called.
+func (s *Server) callRoyal(ctx context.Context, start time.Time) int {
+	if s.push == nil {
+		return 0
+	}
+	res, err := s.db.Write.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES ('royal_called', ?)
+		ON CONFLICT (key) DO UPDATE SET value = excluded.value WHERE value != excluded.value`, start.UTC().Format(time.RFC3339))
+	if err != nil {
+		slog.Error("royal call", "err", err)
+		return 0
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return 0 // called already
+	}
+	day := eveningOf(start.UnixMilli())
+	ids := func(q string, args ...any) []int64 {
+		rows, err := s.db.Read.QueryContext(ctx, q, args...)
+		if err != nil {
+			slog.Error("royal call", "err", err)
+			return nil
+		}
+		defer rows.Close()
+		var out []int64
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				out = append(out, id)
+			}
+		}
+		return out
+	}
+	planned := ids(`SELECT user_id FROM royal_plans WHERE day = ?`, day)
+	always := ids(`SELECT user_id FROM push_prefs WHERE kind = 'royal' AND wanted = 1
+		AND user_id NOT IN (SELECT user_id FROM royal_plans WHERE day = ?)`, day)
+	// The plans of evenings gone are of no more use.
+	_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM royal_plans WHERE day < ?`, day)
+	at := start.In(play.Bulgaria).Format("15:04")
+	m := push.Message{Title: "Входът за Роял е отворен", Body: "Роял започва в " + at + ". Влез.", URL: "/royal"}
+	s.notify(ctx, pushAsked, m, planned...)
+	s.notify(ctx, pushRoyal, m, always...)
+	slog.Info("royal called", "planned", len(planned), "always", len(always))
+	return len(planned) + len(always)
 }

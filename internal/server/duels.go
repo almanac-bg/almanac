@@ -253,7 +253,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	default:
 		return
 	}
-	go s.notify(context.WithoutCancel(ctx), m, n.To)
+	go s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
 }
 
 // ranks is a board: by rating this season (with the season), by level, or by knowledge (over every topic, or one);
@@ -329,7 +329,7 @@ func (s *Server) seasonNews(ctx context.Context, n play.SeasonNews) {
 		body = fmt.Sprintf("%s: %s на сезона и +%d XP! Новият сезон започна.", place(n.Place, n.Of),
 			strings.ToLower(title), n.XP)
 	}
-	go s.notify(context.WithoutCancel(ctx), push.Message{URL: "/me", Title: "Сезонът свърши", Body: body}, n.To)
+	go s.notify(context.WithoutCancel(ctx), pushFriends, push.Message{URL: "/me", Title: "Сезонът свърши", Body: body}, n.To)
 }
 
 // goals are the player's goals for today.

@@ -336,6 +336,12 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp) SELECT ?, id, at, seen, xp FROM achievements
 			WHERE user_id = ?`, []any{to, from}},
 		{`INSERT OR IGNORE INTO unlocks_told (user_id, id) SELECT ?, id FROM unlocks_told WHERE user_id = ?`, []any{to, from}},
+		// The guest's notifications come along, with what they chose of them (unless the account has chosen), and
+		// the Роял they said they'd come to.
+		{`UPDATE push_subs SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		{`INSERT OR IGNORE INTO push_prefs (user_id, kind, wanted) SELECT ?, kind, wanted FROM push_prefs WHERE user_id = ?`,
+			[]any{to, from}},
+		{`UPDATE OR IGNORE royal_plans SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// So are the goals the guest finished (with their XP), and the day's goals drawn, unless the account has its own.
 		{`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
 			SELECT ?, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?`, []any{to, from}},

@@ -364,3 +364,55 @@ func TestMissed(t *testing.T) {
 		t.Fatalf("an ended evening picked up: %v", err)
 	}
 }
+
+// The lobby's opening is told once an evening, and the evening at a glance follows it: soon, the lobby with how many are
+// in it, the games with how many are still in, then the next evening.
+func TestOpenedAndGlance(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	opened := make(chan time.Time, 4)
+	w.h.Opened = func(_ context.Context, start time.Time) { opened <- start }
+	start := time.Date(2026, 11, 14, 21, 0, 0, 0, play.Bulgaria)
+
+	w.at(20, 0, 0)
+	if g := w.h.Glance(); g.Phase != "soon" || g.StartsAt != start.UnixMilli() || g.Next != start.UnixMilli() || g.In != 0 {
+		t.Fatalf("before the lobby: %+v", g)
+	}
+	select {
+	case <-opened:
+		t.Fatal("told before the lobby opened")
+	default:
+	}
+	w.at(20, 45, 0)
+	w.at(20, 46, 0)
+	if got := <-opened; !got.Equal(start) {
+		t.Fatalf("opened %v, want %v", got, start)
+	}
+	ana, bo := w.player(), w.player()
+	for _, p := range []Player{ana, bo} {
+		w.h.Follow(p.ID)
+		if err := w.h.Join(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if g := w.h.Glance(); g.Phase != "lobby" || g.In != 2 || g.StartsAt != start.UnixMilli() {
+		t.Fatalf("the lobby: %+v", g)
+	}
+	w.at(21, 0, 0)
+	if g := w.h.Glance(); g.Phase != "live" || g.In != 2 || g.Next != start.Add(24*time.Hour).UnixMilli() {
+		t.Fatalf("the games: %+v", g)
+	}
+	w.give(ana, false)
+	w.give(bo, false)
+	for range 10 {
+		w.wait(time.Minute)
+	}
+	if g := w.h.Glance(); g.Phase != "soon" || g.StartsAt != start.Add(24*time.Hour).UnixMilli() {
+		t.Fatalf("after the evening: %+v", g)
+	}
+	select {
+	case <-opened:
+		t.Fatal("told twice")
+	default:
+	}
+}
